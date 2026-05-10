@@ -1,15 +1,16 @@
+import { motion } from "framer-motion";
+import OrbitVisual from "./OrbitVisual";
+
 const content = {
   en: {
-    title: "About Madar",
+    title: "Welcome to Madar",
     name: "Madar",
-    description:
-      "is a flexible digital management platform that helps businesses, stores, and clinics manage their daily operations from one place through a customizable system that combines simplicity, efficiency, and local identity.",
+    description: "is an adaptive business management platform designed to help organizations create and manage their own digital systems based on their unique needs.",
   },
   ar: {
-    title: "عن مدار",
+    title: "أهلاً بك في مدار",
     name: "مدار",
-    description:
-      "منصة إدارة رقمية مرنة تساعد الشركات والمتاجر والعيادات على إدارة عملياتها اليومية من مكان واحد من خلال نظام قابل للتخصيص يجمع بين البساطة والكفاءة والهوية المحلية.",
+    description: "منصة إدارة أعمال تكيفية صُممت لمساعدة المؤسسات على إنشاء وإدارة أنظمتها الرقمية الخاصة بناءً على احتياجاتها الفعلية.",
   },
 };
 
@@ -17,11 +18,33 @@ export default function HeroSection({ lang }) {
   const t = content[lang];
 
   return (
-    <section id="about" className="hero-section">
-      <h1 className="hero-title">{t.title}</h1>
-      <p className="hero-description">
-        <span className="arabic-name">{t.name}</span> {t.description}
-      </p>
+    <section id="home" className="hero-section">
+      <div className="hero-content">
+        <motion.h1
+          className="hero-title"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          {t.title}
+        </motion.h1>
+        <motion.p
+          className="hero-description"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          <span className="arabic-name">{t.name}</span> {t.description}
+        </motion.p>
+      </div>
+      <motion.div
+        className="hero-visual"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      >
+        <OrbitVisual lang={lang} />
+      </motion.div>
     </section>
   );
 }
