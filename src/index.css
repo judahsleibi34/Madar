@@ -1,0 +1,770 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap');
+
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f5f2ee;
+  font-family: Inter, sans-serif;
+}
+
+html[dir="rtl"] body {
+  font-family: "IBM Plex Sans Arabic", sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.site-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  min-height: 110px;
+  padding: 0 32px;
+  column-gap: 32px;
+  position: relative;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-self: start;
+}
+
+.logo,
+.footer-logo {
+  width: 80px;
+  height: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a2744;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 54px;
+  justify-self: center;
+}
+
+.nav-menu a {
+  color: #1a2744;
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
+}
+
+.nav-menu a:hover,
+.nav-menu a.active {
+  color: #8b2a1a;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: end;
+}
+
+
+/* ============================================================
+   HAMBURGER
+   ============================================================ */
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(26, 39, 68, 0.18);
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(26, 39, 68, 0.08);
+  transition: all 0.2s ease;
+}
+
+.hamburger:hover {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(139, 42, 26, 0.35);
+}
+
+.hamburger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #1a2744;
+  border-radius: 2px;
+  transition: all 0.25s ease;
+}
+
+.hamburger.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburger.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+.mobile-menu {
+  display: none;
+}
+
+.mobile-menu a {
+  color: #1a2744;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 14px 24px;
+  width: 100%;
+  text-align: center;
+  font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
+  border-bottom: 1px solid rgba(26, 39, 68, 0.07);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mobile-menu a:last-child {
+  border-bottom: none;
+}
+
+.mobile-menu a:hover {
+  color: #8b2a1a;
+  background: rgba(139, 42, 26, 0.05);
+}
+
+.mobile-menu-lang {
+  padding: 14px 24px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid rgba(26, 39, 68, 0.07);
+}
+
+
+/* ============================================================
+   HERO
+   ============================================================ */
+
+.hero-section {
+  flex: 1;
+  padding: 80px 5% 0 5%;
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+}
+
+.hero-content {
+  flex: 1.05;
+  max-width: 720px;
+}
+
+.hero-visual {
+  flex: 0.95;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.hero-title {
+  margin: 0 0 20px 0;
+  color: #1a2744;
+  font-size: 42px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.hero-subtitle {
+  margin: 40px 0 12px 0;
+  color: #1a2744;
+  font-size: 26px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.hero-description {
+  margin: 0 0 20px 0;
+  color: #3a3530;
+  font-size: 18px;
+  line-height: 1.8;
+  font-family: inherit;
+}
+
+.arabic-name {
+  color: #8b2a1a;
+  font-weight: 800;
+  font-size: 22px;
+  font-family: inherit;
+}
+
+
+/* ============================================================
+   ORBIT VISUAL
+   ============================================================ */
+
+.orbit-wrapper {
+  position: relative;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.center-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 130px;
+  height: 130px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #8b2a1a;
+  box-shadow: 0 24px 60px rgba(26, 39, 68, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.center-core span {
+  color: #8b2a1a;
+  font-weight: 800;
+  font-size: 18px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid rgba(139, 42, 26, 0.15);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation-name: rotateOrbit;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.orbit-one {
+  width: 180px;
+  height: 180px;
+  animation-duration: 8s;
+}
+
+.orbit-two {
+  width: 270px;
+  height: 270px;
+  animation-duration: 12s;
+  animation-direction: reverse;
+}
+
+.orbit-three {
+  width: 360px;
+  height: 360px;
+  animation-duration: 18s;
+}
+
+.orbit-dot {
+  position: absolute;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #8b2a1a;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: inherit;
+  box-shadow: 0 12px 30px rgba(26, 39, 68, 0.12);
+  border: 1px solid rgba(139, 42, 26, 0.2);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.orbit-one .orbit-dot {
+  top: 50%;
+  right: -36px;
+  transform: translateY(-50%) rotate(80deg);
+}
+
+.orbit-two .orbit-dot {
+  bottom: 22px;
+  left: 20px;
+  transform: rotate(45deg);
+}
+
+.orbit-three .orbit-dot {
+  top: 20px;
+  right: 30px;
+  transform: rotate(20deg);
+}
+
+@keyframes rotateOrbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+
+/* ============================================================
+   ABOUT
+   ============================================================ */
+
+.about-section {
+  margin-left: 80px;
+  margin-right: auto;
+  max-width: 1060px;
+  padding-bottom: 80px;
+}
+
+
+/* ============================================================
+   CONTACT PAGE
+   ============================================================ */
+
+.contact-page {
+  flex: 1;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 60px 5% 80px;
+  width: 100%;
+}
+
+.contact-hero {
+  margin-bottom: 48px;
+}
+
+.contact-hero h1 {
+  margin: 0 0 12px 0;
+  color: #1a2744;
+  font-size: 42px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.contact-hero p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.contact-content {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contact-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #1a2744;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.contact-form input,
+.contact-form textarea {
+  padding: 12px 16px;
+  border: 1px solid rgba(26, 39, 68, 0.18);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
+  color: #1a2744;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.2s ease;
+  resize: vertical;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  border-color: #8b2a1a;
+}
+
+.contact-form button {
+  align-self: center;
+  padding: 12px 32px;
+  background: #8b2a1a;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.contact-form button:hover {
+  background: #6e2014;
+}
+
+.contact-info-card {
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.08);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.contact-info-card h2 {
+  margin: 0;
+  color: #1a2744;
+  font-size: 20px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.contact-info-card strong {
+  display: block;
+  color: #8b2a1a;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.contact-info-card p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* direction:ltr keeps the number rendering correctly in both LTR & RTL contexts;
+   text-align is intentionally NOT set here so it inherits from the parent
+   (.footer-contact is centered; .contact-info-card flows naturally). */
+.phone-number {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
+.site-footer {
+  background: #ffffff;
+  border-top: 1px solid rgba(26, 39, 68, 0.08);
+  padding: 32px 5% 20px;
+  color: #1a2744;
+  margin-top: auto;
+}
+
+/* --- LTR footer layout (default) --- */
+.footer-content {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 48px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.footer-brand,
+.footer-links,
+.footer-contact {
+  text-align: center;
+}
+
+.footer-logo-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+/* FIX: footer-logo size consistent with header logo */
+.footer-logo {
+  width: 64px;
+  height: auto;
+}
+
+.footer-brand h3,
+.footer-links h4,
+.footer-contact h4 {
+  margin: 0 0 14px;
+  font-family: inherit;
+  font-weight: 800;
+  color: #1a2744;
+}
+
+.footer-brand h3 {
+  font-size: 24px;
+}
+
+.footer-links h4,
+.footer-contact h4 {
+  font-size: 18px;
+}
+
+.footer-brand p,
+.footer-contact p,
+.footer-bottom p {
+  margin: 0;
+  color: #3a3530;
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.footer-links-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+}
+
+.footer-links-grid a,
+.footer-links a {
+  display: block;
+  color: #3a3530;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 4px 0;
+}
+
+.footer-links-grid a:hover,
+.footer-links a:hover,
+.footer-links-grid a.active,
+.footer-links a.active {
+  color: #8b2a1a;
+}
+
+.footer-bottom {
+  max-width: 1180px;
+  margin: 20px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid rgba(26, 39, 68, 0.08);
+  text-align: center;
+}
+
+
+/* ============================================================
+   RTL
+   ============================================================ */
+
+html[dir="rtl"] .site-header       { direction: rtl; }
+html[dir="rtl"] .brand             { justify-self: end; }
+html[dir="rtl"] .nav-menu          { direction: rtl; }
+html[dir="rtl"] .nav-menu a        { font-family: inherit; }
+html[dir="rtl"] .lang-switcher     { justify-self: start; }
+html[dir="rtl"] .lang-dropdown     { right: auto; left: 0; transform-origin: top left; }
+html[dir="rtl"] .hero-section      { text-align: right; }
+html[dir="rtl"] .about-section     { margin-left: auto; margin-right: 80px; text-align: right; }
+html[dir="rtl"] .mobile-menu a     { font-family: inherit; }
+html[dir="rtl"] .contact-page      { text-align: right; }
+html[dir="rtl"] .contact-form button { align-self: center; }
+
+html[dir="rtl"] .phone-number {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: center;
+}
+
+/* --- RTL footer: flex so we can control column order --- */
+html[dir="rtl"] .site-footer {
+  direction: rtl;
+}
+
+html[dir="rtl"] .footer-content {
+  display: flex;
+  flex-direction: row;          /* explicit: columns side by side  */
+  justify-content: center;
+  align-items: flex-start;
+  gap: 48px;
+  direction: rtl;
+}
+
+/*
+  Visual order right → left: Brand | Links | Contact
+  In RTL flex the first item sits on the RIGHT.
+  order values: lower = rendered first = placed on the RIGHT.
+*/
+html[dir="rtl"] .footer-brand   { order: 1; flex: 1 1 0; max-width: 320px; text-align: center; }
+html[dir="rtl"] .footer-links   { order: 2; flex: 1 1 0; max-width: 320px; text-align: center; }
+html[dir="rtl"] .footer-contact { order: 3; flex: 1 1 0; max-width: 320px; text-align: center; }
+
+html[dir="rtl"] .footer-logo-row {
+  align-items: center;
+}
+
+html[dir="rtl"] .footer-bottom {
+  text-align: center;
+  direction: rtl;
+}
+
+html[dir="rtl"] .footer-links {
+  align-items: center;
+}
+
+
+/* ============================================================
+   RESPONSIVE — 900px
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .site-header {
+    min-height: auto;
+    padding: 20px;
+  }
+
+  .header-right .lang-switcher {
+    display: none;
+  }
+
+  .nav-menu {
+    display: none;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+
+  .mobile-menu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    grid-column: 1 / -1;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(26, 39, 68, 0.1);
+    border-radius: 16px;
+    padding: 8px 0;
+    margin-top: 4px;
+    box-shadow: 0 16px 40px rgba(26, 39, 68, 0.12);
+  }
+
+  .hero-section {
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: auto;
+    padding: 32px 5% 64px;
+  }
+
+  .hero-content   { flex: none; width: 100%; }
+  .hero-visual    { flex: none; width: 100%; margin-top: 24px; padding: 10px; }
+
+  .orbit-wrapper  { width: 300px; height: 300px; }
+  .center-core    { width: 105px; height: 105px; }
+  .center-core span { font-size: 16px; }
+  .orbit-one      { width: 145px; height: 145px; }
+  .orbit-two      { width: 215px; height: 215px; }
+  .orbit-three    { width: 290px; height: 290px; }
+  .orbit-dot      { font-size: 11px; padding: 7px 10px; }
+
+  .about-section,
+  html[dir="rtl"] .about-section {
+    margin-left: 20px;
+    margin-right: 20px;
+    max-width: none;
+  }
+
+  .contact-content  { grid-template-columns: 1fr; }
+  .contact-page     { padding: 40px 5% 60px; }
+  .contact-hero h1  { font-size: 32px; }
+
+  /* Footer: stack columns vertically on mobile (both LTR & RTL) */
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  html[dir="rtl"] .footer-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  html[dir="rtl"] .footer-brand,
+  html[dir="rtl"] .footer-links,
+  html[dir="rtl"] .footer-contact {
+    order: unset;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .site-footer {
+    padding: 40px 5% 22px;
+  }
+}
+
+
+/* ============================================================
+   RESPONSIVE — 600px
+   ============================================================ */
+
+@media (max-width: 600px) {
+  .logo             { width: 48px; }
+  .brand-name       { font-size: 17px; }
+  .hero-title       { font-size: 28px; }
+  .hero-subtitle    { font-size: 20px; }
+  .hero-description { font-size: 15px; }
+
+  .orbit-wrapper  { width: 260px; height: 260px; }
+  .center-core    { width: 90px;  height: 90px; }
+  .center-core span { font-size: 14px; }
+  .orbit-one      { width: 125px; height: 125px; }
+  .orbit-two      { width: 185px; height: 185px; }
+  .orbit-three    { width: 245px; height: 245px; }
+  .orbit-dot      { font-size: 10px; padding: 6px 9px; }
+}
