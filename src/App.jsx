@@ -6,6 +6,7 @@ import AboutSection from "./components/AboutSection";
 import ContactPage from "./components/ContactPage";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
+import PricingPage from "./components/PricingPage";
 
 export default function App() {
   const [lang, setLang] = useState("en");

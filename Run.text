@@ -1,0 +1,7 @@
+# for backend 
+cd madar_back_end
+uvicorn landing_page:app --reload
+
+# for frontend
+cd madar-app
+npm run dev
