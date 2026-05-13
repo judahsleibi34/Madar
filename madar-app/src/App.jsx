@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 
+import TeamPage from "./components/TeamPage";
 import Header from "./components/Header";
 import HeroSection from "./components/HeroSection";
 import AboutSection from "./components/AboutSection";
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="/contact" element={<ContactPage key={lang} lang={lang} />} />
             <Route path="/pricing" element={<PricingPage key={lang} lang={lang} />} />
             <Route path="/reset-password" element={<ResetPasswordPage key={lang} lang={lang} />} />
+            <Route path="/team" element={<TeamPage lang={lang} />} />
 
             <Route
               path="/login"

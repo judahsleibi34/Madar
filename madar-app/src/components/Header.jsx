@@ -5,17 +5,21 @@ import logo from "../assets/madar_header.svg";
 const navItems = {
   en: [
     { id: "home", label: "Home", path: "/" },
-    { id: "about", label: "About Us", path: "/about" },
     { id: "features", label: "Features", path: "/features" },
-    { id: "contact", label: "Contact Us", path: "/contact" },
     { id: "pricing", label: "Plans and Pricing", path: "/pricing" },
+    { id: "team", label: "Madar Team", path: "/team" },
+    { id: "about", label: "About Us", path: "/about" },
+    { id: "contact", label: "Contact Us", path: "/contact" },
+    
   ],
   ar: [
     { id: "home", label: "الرئيسية", path: "/" },
-    { id: "about", label: "من نحن", path: "/about" },
     { id: "features", label: "المميزات", path: "/features" },
-    { id: "contact", label: "تواصل معنا", path: "/contact" },
     { id: "pricing", label: "الخطط والأسعار", path: "/pricing" },
+    { id: "team", label: "فريق مدار", path: "/team" },
+    { id: "about", label: "من نحن", path: "/about" },
+    { id: "contact", label: "تواصل معنا", path: "/contact" },
+    
   ],
 };
 
