@@ -14,3 +14,7 @@ class SignUpRequest(BaseModel):
 class LogIn(BaseModel): 
     email: EmailStr
     password: str
+
+class PasswordReset(BaseModel):
+    access_token: str
+    password: str
