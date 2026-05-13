@@ -161,7 +161,7 @@ const pageText = {
       },
       {
         name: "Saliba Rishmawi",
-        role: "AI & Backend Developer",
+        role: "AI & Full-Stack Developer",
         description:
           "Supports Madar’s backend and AI direction, bringing experience in FastAPI, Python, computer vision, medical imaging AI, and system-level problem solving.",
         initials: "SR",
@@ -187,7 +187,7 @@ const pageText = {
       },
       {
         name: "صليبا ريشماوي",
-        role: "مطوّر ذكاء اصطناعي وأنظمة خلفية",
+        role: "مطوّر ذكاء اصطناعي وأنظمة محوسبه",
         description:
           "يدعم تطوير النظام الخلفي واتجاه الذكاء الاصطناعي في مدار، مع خبرة في FastAPI وPython والرؤية الحاسوبية ومعالجة الصور الطبية وحل المشكلات التقنية.",
         initials: "SR",
