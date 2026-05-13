@@ -1,6 +1,6 @@
 # for backend 
 cd madar_back_end
-uvicorn landing_page:app --reload
+uvicorn app:app --reload
 
 # for frontend
 cd madar-app
