@@ -1,0 +1,13 @@
+/* Shared design tokens */
+:root {
+  --madar-bg: #f5f2ee;
+  --madar-navy: #1a2744;
+  --madar-navy-dark: #111b31;
+  --madar-red: #8b2a1a;
+  --madar-red-dark: #6e2014;
+  --madar-cream: #f5f2ee;
+  --madar-gradient: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  --madar-gradient-hover: linear-gradient(135deg, #111b31 0%, #6e2014 100%);
+  --madar-button-shadow: 0 10px 24px rgba(139, 42, 26, 0.22);
+  --madar-button-shadow-hover: 0 14px 30px rgba(139, 42, 26, 0.3);
+}

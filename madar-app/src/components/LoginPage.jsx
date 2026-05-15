@@ -14,7 +14,7 @@ const pageText = {
     button: "Log In",
     loading: "Logging in...",
     success: "User is logged in! Redirecting...",
-    serverError: "Could not connect to backend.",
+    serverError: "Server error",
     loginFailed: "Login failed.",
     noAccount: "Don't have an account?",
     signup: "Sign Up",
@@ -136,11 +136,16 @@ export default function LoginPage({ lang = "en", onLoginSuccess }) {
       setStatusMessage(t.success);
       console.log("Login response:", data);
 
+      // if (onLoginSuccess) {
+      //   onLoginSuccess();
+      // }
+
+      // setTimeout(() => navigate("/pricing"), 1500);
+
       if (onLoginSuccess) {
-        onLoginSuccess();
+        onLoginSuccess(); 
       }
 
-      setTimeout(() => navigate("/pricing"), 1500);
     } catch (error) {
       console.error(error);
       setStatusMessage(t.serverError);
