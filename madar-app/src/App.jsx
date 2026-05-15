@@ -40,20 +40,20 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const hideAppChrome =
+  // Dashboard routes must render outside app-shell to avoid the
+  // flex column scroll trap that prevents window-level scrolling.
+  const isDashboardRoute =
     location.pathname.startsWith("/dashboard") ||
     location.pathname.startsWith("/page-builder");
 
   const normalizeUser = (userInfo) => {
     const firstName = userInfo?.first_name || "";
     const lastName = userInfo?.last_name || "";
-
     const fullName =
       userInfo?.name ||
       `${firstName} ${lastName}`.trim() ||
       userInfo?.username ||
       "User";
-
     return {
       id: userInfo?.id || "",
       auth_id: userInfo?.auth_id || "",
@@ -70,18 +70,13 @@ export default function App() {
       method: "POST",
       credentials: "include",
     });
-
-    if (!response.ok) {
-      throw new Error("Could not fetch user info");
-    }
-
+    if (!response.ok) throw new Error("Could not fetch user info");
     const data = await response.json();
     return normalizeUser(data.user);
   };
 
   useEffect(() => {
     localStorage.setItem(LANG_STORAGE_KEY, lang);
-
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   }, [lang]);
@@ -93,23 +88,18 @@ export default function App() {
           method: "GET",
           credentials: "include",
         });
-
         if (!statusResponse.ok) {
           setIsLoggedIn(false);
           setUser(null);
           return;
         }
-
         const statusData = await statusResponse.json();
-
         if (statusData.logged_in !== true) {
           setIsLoggedIn(false);
           setUser(null);
           return;
         }
-
         const userInfo = await fetchUserInfo();
-
         setIsLoggedIn(true);
         setUser(userInfo);
       } catch (error) {
@@ -120,7 +110,6 @@ export default function App() {
         setAuthChecked(true);
       }
     };
-
     checkAuth();
   }, []);
 
@@ -132,13 +121,11 @@ export default function App() {
   const handleLoginSuccess = async () => {
     try {
       const userInfo = await fetchUserInfo();
-
       setIsLoggedIn(true);
       setUser(userInfo);
       navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error("Could not load user info after login:", error);
-
       setIsLoggedIn(true);
       setUser(null);
       navigate("/dashboard", { replace: true });
@@ -156,179 +143,79 @@ export default function App() {
     } finally {
       setIsLoggedIn(false);
       setUser(null);
-
       navigate("/", { replace: true });
-
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: "auto",
-      });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }
   };
 
-  const renderDashboardSkeleton = (label = "Loading dashboard") => {
+  const renderDashboardSkeleton = (label = "Loading dashboard") => (
+    <div
+      className="dashboard-skeleton-layout"
+      aria-label={label}
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <aside className="dashboard-skeleton-sidebar">
+        <div className="skeleton-logo-row">
+          <div className="skeleton-circle" />
+          <div>
+            <div className="skeleton-line skeleton-title" />
+            <div className="skeleton-line skeleton-small" />
+          </div>
+        </div>
+        <div className="skeleton-nav">
+          <div className="skeleton-line skeleton-nav-item" />
+          <div className="skeleton-line skeleton-nav-item" />
+          <div className="skeleton-line skeleton-nav-item" />
+        </div>
+      </aside>
+      <section className="dashboard-skeleton-page">
+        <div className="dashboard-skeleton-header">
+          <div className="skeleton-line skeleton-heading" />
+          <div className="skeleton-line skeleton-subheading" />
+        </div>
+        <div className="dashboard-skeleton-cards">
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+        </div>
+        <div className="dashboard-skeleton-panels">
+          <div className="skeleton-panel skeleton-panel-large" />
+          <div className="skeleton-panel" />
+        </div>
+        <div className="dashboard-skeleton-panels lower">
+          <div className="skeleton-panel" />
+          <div className="skeleton-panel" />
+        </div>
+      </section>
+    </div>
+  );
+
+  /* ─────────────────────────────────────────────────────────
+     DASHBOARD ROUTES — rendered bare, NO app-shell wrapper.
+     This is the critical fix: app-shell's flex-column layout
+     was acting as a scroll container, trapping scroll inside
+     .admin-dashboard-page instead of letting the browser
+     window scroll. Without the wrapper, window scroll works
+     and position:sticky on the sidebar behaves correctly.
+  ───────────────────────────────────────────────────────── */
+  if (isDashboardRoute) {
     return (
-      <div
-        className="dashboard-skeleton-layout"
-        aria-label={label}
-        dir={lang === "ar" ? "rtl" : "ltr"}
-      >
-        <aside className="dashboard-skeleton-sidebar">
-          <div className="skeleton-logo-row">
-            <div className="skeleton-circle" />
-
-            <div>
-              <div className="skeleton-line skeleton-title" />
-              <div className="skeleton-line skeleton-small" />
-            </div>
-          </div>
-
-          <div className="skeleton-nav">
-            <div className="skeleton-line skeleton-nav-item" />
-            <div className="skeleton-line skeleton-nav-item" />
-            <div className="skeleton-line skeleton-nav-item" />
-          </div>
-        </aside>
-
-        <section className="dashboard-skeleton-page">
-          <div className="dashboard-skeleton-header">
-            <div className="skeleton-line skeleton-heading" />
-            <div className="skeleton-line skeleton-subheading" />
-          </div>
-
-          <div className="dashboard-skeleton-cards">
-            <div className="skeleton-card" />
-            <div className="skeleton-card" />
-            <div className="skeleton-card" />
-            <div className="skeleton-card" />
-          </div>
-
-          <div className="dashboard-skeleton-panels">
-            <div className="skeleton-panel skeleton-panel-large" />
-            <div className="skeleton-panel" />
-          </div>
-
-          <div className="dashboard-skeleton-panels lower">
-            <div className="skeleton-panel" />
-            <div className="skeleton-panel" />
-          </div>
-        </section>
-      </div>
-    );
-  };
-
-  return (
-    <>
-      <ScrollToTop />
-
-      <div className="app-shell">
-        {!hideAppChrome && (
-          <Header
-            lang={lang}
-            onLanguageChange={handleLanguageChange}
-            isLoggedIn={isLoggedIn}
-            onLogout={handleLogout}
-          />
-        )}
-
+      <>
+        <ScrollToTop />
         <Routes>
-          <Route
-            path="/"
-            element={
-              <main className="app-main">
-                <HeroSection key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/about"
-            element={
-              <main className="app-main">
-                <AboutSection key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/contact"
-            element={
-              <main className="app-main">
-                <ContactPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/pricing"
-            element={
-              <main className="app-main">
-                <PricingPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/team"
-            element={
-              <main className="app-main">
-                <TeamPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/reset-password"
-            element={
-              <main className="app-main">
-                <ResetPasswordPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/signup"
-            element={
-              <main className="app-main">
-                <SignUpPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/forgot-password"
-            element={
-              <main className="app-main">
-                <ForgotPasswordPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/login"
-            element={
-              authChecked && isLoggedIn ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <main className="app-main">
-                  <LoginPage
-                    key={lang}
-                    lang={lang}
-                    onLoginSuccess={handleLoginSuccess}
-                  />
-                </main>
-              )
-            }
-          />
-
           <Route
             path="/dashboard"
             element={
               !authChecked ? (
                 renderDashboardSkeleton("Loading dashboard")
               ) : isLoggedIn ? (
-                <Dashboard lang={lang} onLogout={handleLogout} user={user} />
+                <Dashboard
+                  lang={lang}
+                  onLogout={handleLogout}
+                  user={user}
+                  onLanguageChange={handleLanguageChange}
+                />
               ) : (
                 <Navigate to="/login" replace />
               )
@@ -349,8 +236,8 @@ export default function App() {
                     lang={lang}
                     user={user}
                     onLogout={handleLogout}
+                    onLanguageChange={handleLanguageChange}
                   />
-
                   <main className="admin-dashboard-page page-builder-dashboard-page">
                     <PageBuilder />
                   </main>
@@ -363,8 +250,109 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+      </>
+    );
+  }
 
-        {!hideAppChrome && <Footer lang={lang} />}
+  /* ─────────────────────────────────────────────────────────
+     PUBLIC ROUTES — wrapped in app-shell as normal
+  ───────────────────────────────────────────────────────── */
+  return (
+    <>
+      <ScrollToTop />
+      <div className="app-shell">
+        <Header
+          lang={lang}
+          onLanguageChange={handleLanguageChange}
+          isLoggedIn={isLoggedIn}
+          onLogout={handleLogout}
+        />
+
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <main className="app-main">
+                <HeroSection key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/about"
+            element={
+              <main className="app-main">
+                <AboutSection key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/contact"
+            element={
+              <main className="app-main">
+                <ContactPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/pricing"
+            element={
+              <main className="app-main">
+                <PricingPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/team"
+            element={
+              <main className="app-main">
+                <TeamPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <main className="app-main">
+                <ResetPasswordPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <main className="app-main">
+                <SignUpPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <main className="app-main">
+                <ForgotPasswordPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              authChecked && isLoggedIn ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <main className="app-main">
+                  <LoginPage
+                    key={lang}
+                    lang={lang}
+                    onLoginSuccess={handleLoginSuccess}
+                  />
+                </main>
+              )
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+
+        <Footer lang={lang} />
       </div>
     </>
   );

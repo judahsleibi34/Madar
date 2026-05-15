@@ -1,7 +1,5 @@
 /* ============================================================
-   DASHBOARD — CLEAN FIXED VERSION
-   Replace your entire src/styles/admin/dashboard.css with this file.
-   This removes the conflicting repeated responsive/RTL blocks.
+   DASHBOARD
    ============================================================ */
 
 /* ============================================================
@@ -31,27 +29,26 @@ body,
    DASHBOARD LAYOUT
    ============================================================ */
 
+/* KEY FIX: no min-height/height on the layout itself.
+   Let the content column be as tall as it needs to be.
+   The browser window scrolls — not any inner container. */
 .admin-dashboard-layout {
   display: flex;
   flex-direction: row;
   width: 100%;
-  min-height: 100vh;
   background: #f5f2ee;
-  overflow-x: hidden;
 }
 
-.admin-dashboard-layout[dir="rtl"] {
-  direction: rtl;
-}
-
-.admin-dashboard-layout[dir="ltr"] {
-  direction: ltr;
-}
+.admin-dashboard-layout[dir="rtl"] { direction: rtl; }
+.admin-dashboard-layout[dir="ltr"] { direction: ltr; }
 
 /* ============================================================
    SIDEBAR
    ============================================================ */
 
+/* KEY FIX: height:100vh + position:sticky + align-self:flex-start
+   is the correct combo. The layout must NOT have its own height/
+   overflow constraints — fixed in the layout rule above. */
 .admin-sidebar {
   flex: 0 0 260px;
   width: 260px;
@@ -77,19 +74,9 @@ body,
   border-left: 1px solid rgba(26, 39, 68, 0.12);
 }
 
-.admin-sidebar-top {
-  flex: 0 0 auto;
-}
-
-.admin-sidebar-bottom {
-  margin-top: auto;
-  padding-top: 24px;
-  flex: 0 0 auto;
-}
-
-.admin-sidebar-user-top {
-  margin-bottom: 24px;
-}
+.admin-sidebar-top    { flex: 0 0 auto; }
+.admin-sidebar-bottom { margin-top: auto; padding-top: 24px; flex: 0 0 auto; }
+.admin-sidebar-user-top { margin-bottom: 24px; }
 
 .admin-sidebar-brand {
   display: flex;
@@ -172,9 +159,49 @@ body,
   color: #8b2a1a;
 }
 
-.admin-sidebar-nav button svg {
-  flex-shrink: 0;
+.admin-sidebar-nav button svg { flex-shrink: 0; }
+
+/* ============================================================
+   LANGUAGE TOGGLE
+   ============================================================ */
+
+.admin-sidebar-bottom .admin-sidebar-lang {
+  width: 100%;
+  border: 1px solid rgba(26, 39, 68, 0.22);
+  border-radius: 14px;
+  background: transparent;
+  color: #1a2744;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: start;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  pointer-events: all;
 }
+
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang {
+  direction: rtl;
+  flex-direction: row;
+  text-align: right;
+  justify-content: flex-start;
+}
+
+.admin-sidebar-bottom .admin-sidebar-lang:hover {
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.admin-sidebar-bottom .admin-sidebar-lang:hover svg {
+  color: #ffffff;
+}
+
+.admin-sidebar-lang svg { flex-shrink: 0; }
 
 /* ============================================================
    SIDEBAR LOGOUT + USER
@@ -210,9 +237,7 @@ body,
   color: #6e2014;
 }
 
-.admin-sidebar-logout svg {
-  flex-shrink: 0;
-}
+.admin-sidebar-logout svg { flex-shrink: 0; }
 
 .admin-sidebar-user {
   width: 100%;
@@ -250,13 +275,9 @@ body,
   object-fit: cover;
 }
 
-.admin-sidebar-user-info {
-  min-width: 0;
-}
+.admin-sidebar-user-info { min-width: 0; }
 
-.admin-dashboard-layout[dir="rtl"] .admin-sidebar-user-info {
-  text-align: right;
-}
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-user-info { text-align: right; }
 
 .admin-sidebar-user-info strong {
   display: block;
@@ -289,7 +310,6 @@ body,
   flex: 1 1 0;
   min-width: 0;
   width: auto;
-  min-height: 100vh;
   background:
     radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
@@ -479,9 +499,7 @@ body,
   line-height: 1.6;
 }
 
-.cash-panel {
-  min-height: 430px;
-}
+.cash-panel { min-height: 430px; }
 
 .cash-chart {
   height: 300px;
@@ -564,11 +582,7 @@ body,
   text-align: end;
 }
 
-.metric-row {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
+.metric-row { display: flex; flex-direction: column; gap: 9px; }
 
 .metric-row-header {
   display: flex;
@@ -576,17 +590,8 @@ body,
   justify-content: space-between;
 }
 
-.metric-row-header span {
-  color: #3a3530;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.metric-row-header strong {
-  color: #8b2a1a;
-  font-size: 14px;
-  font-weight: 900;
-}
+.metric-row-header span { color: #3a3530; font-size: 14px; font-weight: 800; }
+.metric-row-header strong { color: #8b2a1a; font-size: 14px; font-weight: 900; }
 
 .metric-track {
   height: 11px;
@@ -630,11 +635,7 @@ body,
   border: 12px solid transparent;
 }
 
-.uptime-circle div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.uptime-circle div { display: flex; flex-direction: column; gap: 4px; }
 
 .uptime-circle strong {
   color: #ffffff;
@@ -669,6 +670,7 @@ body,
   padding: 28px 20px;
   position: sticky;
   top: 0;
+  align-self: flex-start;
   height: 100vh;
 }
 
@@ -712,11 +714,7 @@ body,
 .skeleton-heading     { width: min(420px, 70%); height: 46px; margin-bottom: 14px; }
 .skeleton-subheading  { width: min(720px, 90%); height: 18px; }
 
-.dashboard-skeleton-header {
-  width: min(1280px, 100%);
-  margin: 0 auto 28px;
-}
-
+.dashboard-skeleton-header  { width: min(1280px, 100%); margin: 0 auto 28px; }
 .dashboard-skeleton-cards {
   width: min(1280px, 100%);
   margin: 0 auto 22px;
@@ -749,9 +747,7 @@ body,
   border: 1px solid rgba(26, 39, 68, 0.08);
 }
 
-.skeleton-panel-large {
-  min-height: 430px;
-}
+.skeleton-panel-large { min-height: 430px; }
 
 @keyframes skeleton-loading {
   0%   { background-position: 120% 0; }
@@ -762,7 +758,6 @@ body,
    RESPONSIVE
    ============================================================ */
 
-/* Tablet: keep sidebar + content horizontal, but simplify dashboard grids */
 @media (max-width: 1200px) {
   .overview-grid,
   .dashboard-skeleton-cards {
@@ -782,7 +777,6 @@ body,
   }
 }
 
-/* Phone: stack sidebar above content */
 @media (max-width: 700px) {
   .admin-dashboard-layout,
   .admin-dashboard-layout[dir="rtl"],
@@ -829,20 +823,20 @@ body,
   }
 
   .admin-sidebar-nav button,
-  .admin-sidebar-logout {
+  .admin-sidebar-logout,
+  .admin-sidebar-bottom .admin-sidebar-lang {
     justify-content: center;
     text-align: center;
   }
 
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar-nav button,
-  .admin-dashboard-layout[dir="rtl"] .admin-sidebar-logout {
+  .admin-dashboard-layout[dir="rtl"] .admin-sidebar-logout,
+  .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang {
     justify-content: center;
     text-align: center;
   }
 
-  .admin-sidebar-user {
-    width: 100%;
-  }
+  .admin-sidebar-user { width: 100%; }
 
   .admin-dashboard-page,
   .dashboard-skeleton-page {
@@ -853,10 +847,7 @@ body,
     padding: 24px 16px 56px;
   }
 
-  .admin-dashboard-shell {
-    width: 100%;
-    max-width: none;
-  }
+  .admin-dashboard-shell { width: 100%; max-width: none; }
 
   .admin-dashboard-header {
     flex-direction: column;
@@ -865,119 +856,66 @@ body,
     margin-bottom: 22px;
   }
 
-  .admin-dashboard-header h1 {
-    font-size: 30px;
-    letter-spacing: -0.03em;
-  }
-
-  .admin-dashboard-header p {
-    font-size: 15px;
-  }
+  .admin-dashboard-header h1 { font-size: 30px; letter-spacing: -0.03em; }
+  .admin-dashboard-header p  { font-size: 15px; }
 
   .dashboard-skeleton-cards,
   .dashboard-skeleton-panels,
-  .dashboard-skeleton-panels.lower {
-    width: 100%;
-  }
+  .dashboard-skeleton-panels.lower { width: 100%; }
 
-  .cash-chart {
-    gap: 10px;
-    overflow-x: auto;
-  }
+  .cash-chart { gap: 10px; overflow-x: auto; }
+  .cash-bar span { display: none; }
 
-  .cash-bar span {
-    display: none;
-  }
-
-  .dashboard-panel {
-    padding: 20px;
-    border-radius: 22px;
-  }
+  .dashboard-panel { padding: 20px; border-radius: 22px; }
 }
 
-/* Small phone */
 @media (max-width: 520px) {
-  .admin-sidebar-nav {
-    grid-template-columns: 1fr;
-  }
+  .admin-sidebar-nav { grid-template-columns: 1fr; }
 
   .overview-grid,
-  .dashboard-skeleton-cards {
-    grid-template-columns: 1fr;
-  }
+  .dashboard-skeleton-cards { grid-template-columns: 1fr; }
 
-  .overview-card {
-    min-height: 145px;
-    padding: 22px;
-  }
-
-  .overview-card h2 {
-    font-size: 36px;
-  }
+  .overview-card { min-height: 145px; padding: 22px; }
+  .overview-card h2 { font-size: 36px; }
 
   .overview-icon,
-  .panel-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-  }
+  .panel-icon { width: 42px; height: 42px; border-radius: 14px; }
 
   .admin-dashboard-page,
-  .dashboard-skeleton-page {
-    padding: 22px 14px 50px;
-  }
+  .dashboard-skeleton-page { padding: 22px 14px 50px; }
 
-  .server-info-list div {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .metric-row-header {
-    gap: 12px;
-  }
+  .server-info-list div { align-items: flex-start; flex-direction: column; }
+  .metric-row-header { gap: 12px; }
 }
 
 /* ============================================================
-   DASHBOARD SIDEBAR ENDPOINTS
+   SIDEBAR MISC
    ============================================================ */
 
 .admin-sidebar-nav button span,
-.admin-sidebar-logout span {
-  display: inline-block;
-}
+.admin-sidebar-logout span,
+.admin-sidebar-lang span { display: inline-block; }
 
-.admin-sidebar-nav button {
-  user-select: none;
-}
+.admin-sidebar-nav button { user-select: none; }
 
 .admin-sidebar-nav button.active {
   background: rgba(139, 42, 26, 0.08);
   color: #8b2a1a;
 }
 
-/* Page builder inside dashboard shell */
-.page-builder-dashboard-page {
-  padding: 0;
-}
+/* ============================================================
+   PAGE BUILDER INSIDE DASHBOARD
+   ============================================================ */
 
-.page-builder-dashboard-page .builder {
-  width: 100%;
-  min-height: 100vh;
-}
+.page-builder-dashboard-page { padding: 0; }
 
-/* Avoid nested builder overflow */
+.page-builder-dashboard-page .builder { width: 100%; min-height: 100vh; }
+
 .page-builder-dashboard-page .canvas-wrapper,
 .page-builder-dashboard-page .inspector,
-.page-builder-dashboard-page .sidebar {
-  min-width: 0;
-}
+.page-builder-dashboard-page .sidebar { min-width: 0; }
 
 @media (max-width: 768px) {
-  .page-builder-dashboard-page {
-    padding: 0;
-  }
-
-  .page-builder-dashboard-page .builder {
-    min-height: auto;
-  }
+  .page-builder-dashboard-page { padding: 0; }
+  .page-builder-dashboard-page .builder { min-height: auto; }
 }
