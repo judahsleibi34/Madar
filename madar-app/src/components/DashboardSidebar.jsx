@@ -5,6 +5,7 @@ import {
   Settings,
   LogOut,
   Grid2X2,
+  Languages,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -18,8 +19,8 @@ const sidebarText = {
     settings: "Settings",
     logout: "Logout",
     fallbackName: "User",
+    switchLang: "AR",
   },
-
   ar: {
     title: "لوحة التحكم",
     subtitle: "مدار",
@@ -29,10 +30,16 @@ const sidebarText = {
     settings: "الإعدادات",
     logout: "تسجيل الخروج",
     fallbackName: "مستخدم",
+    switchLang: "EN",
   },
 };
 
-export default function DashboardSidebar({ lang = "en", user, onLogout }) {
+export default function DashboardSidebar({
+  lang = "en",
+  user,
+  onLogout,
+  onLanguageChange,
+}) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -45,6 +52,10 @@ export default function DashboardSidebar({ lang = "en", user, onLogout }) {
   const isActive = (path) => {
     if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
+  };
+
+  const handleLangToggle = () => {
+    onLanguageChange?.(lang === "en" ? "ar" : "en");
   };
 
   return (
@@ -97,7 +108,20 @@ export default function DashboardSidebar({ lang = "en", user, onLogout }) {
       </div>
 
       <div className="admin-sidebar-bottom">
-        <button type="button" className="admin-sidebar-logout" onClick={onLogout}>
+        <button
+          type="button"
+          className="admin-sidebar-lang"
+          onClick={handleLangToggle}
+        >
+          <Languages size={18} />
+          <span>{t.switchLang}</span>
+        </button>
+
+        <button
+          type="button"
+          className="admin-sidebar-logout"
+          onClick={onLogout}
+        >
           <LogOut size={18} />
           <span>{t.logout}</span>
         </button>

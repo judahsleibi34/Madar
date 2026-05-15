@@ -158,7 +158,12 @@ function MetricRow({ label, value, percent }) {
   );
 }
 
-export default function Dashboard({ lang = "en", onLogout, user }) {
+export default function Dashboard({
+  lang = "en",
+  onLogout,
+  user,
+  onLanguageChange,
+}) {
   useLayoutEffect(() => {
     forceScrollTop();
 
@@ -192,7 +197,12 @@ export default function Dashboard({ lang = "en", onLogout, user }) {
 
   return (
     <div className="admin-dashboard-layout" dir={isRtl ? "rtl" : "ltr"}>
-      <DashboardSidebar lang={lang} user={user} onLogout={onLogout} />
+      <DashboardSidebar
+        lang={lang}
+        user={user}
+        onLogout={onLogout}
+        onLanguageChange={onLanguageChange}
+      />
 
       <main className="admin-dashboard-page">
         <div className="admin-dashboard-shell">
