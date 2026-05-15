@@ -1,0 +1,429 @@
+/* ============================================================
+   REGISTER / SIGN UP PAGE
+   ============================================================ */
+
+.register-page {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 60px 5% 90px;
+  color: #1a2744;
+}
+
+.register-card {
+  width: 100%;
+  max-width: 460px;
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.16);
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.register-card h1 {
+  margin: 0 0 6px;
+  color: #1a2744;
+  font-size: 28px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.register-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.register-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #1a2744;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.register-card input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(26, 39, 68, 0.18);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1a2744;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+}
+
+.register-card input:focus {
+  border-color: #8b2a1a;
+  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08);
+}
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field input {
+  padding-right: 48px;
+  padding-left: 14px;
+}
+
+.password-field button {
+  position: absolute;
+  right: 12px;
+  left: auto;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: #6d7484;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+html[dir="rtl"] .password-field input {
+  padding-right: 48px;
+  padding-left: 14px;
+  text-align: right;
+}
+
+html[dir="rtl"] .password-field button {
+  right: 12px;
+  left: auto;
+}
+
+.register-card span {
+  color: #8b2a1a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.register-submit {
+  margin-top: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: #8b2a1a;
+  color: #ffffff;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.register-submit:hover {
+  background: #6e2014;
+}
+
+html[dir="rtl"] .register-card {
+  text-align: right;
+}
+
+html[dir="rtl"] .register-card h1 {
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .register-page {
+    padding: 40px 5% 70px;
+  }
+
+  .register-card {
+    padding: 24px;
+  }
+
+  .register-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   LOGIN PAGE
+   ============================================================ */
+
+.login-page {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 60px 5% 90px;
+  color: #1a2744;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.16);
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.login-heading h1 {
+  margin: 0 0 8px;
+  color: #1a2744;
+  font-size: 30px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.login-heading p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #1a2744;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(26, 39, 68, 0.18);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1a2744;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+}
+
+.login-card input:focus {
+  border-color: #8b2a1a;
+  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08);
+}
+
+.login-card span {
+  color: #8b2a1a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.login-options {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.login-options a,
+.login-signup-text a {
+  color: #8b2a1a;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.login-options a:hover,
+.login-signup-text a:hover {
+  text-decoration: underline;
+}
+
+.login-submit {
+  margin-top: 4px;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: #8b2a1a;
+  color: #ffffff;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.login-submit:hover {
+  background: #6e2014;
+}
+
+.login-signup-text {
+  margin: 0;
+  color: #3a3530;
+  text-align: center;
+  font-size: 14px;
+}
+
+html[dir="rtl"] .login-card {
+  text-align: right;
+}
+
+html[dir="rtl"] .login-heading {
+  text-align: center;
+}
+
+html[dir="rtl"] .login-signup-text {
+  text-align: center;
+}
+
+html[dir="rtl"] .login-options {
+  justify-content: flex-start;
+}
+
+@media (max-width: 600px) {
+  .login-page {
+    padding: 40px 5% 70px;
+  }
+
+  .login-card {
+    padding: 24px;
+  }
+}
+
+.form-status-message {
+  color: #8b2a1a;
+  background-color: rgba(139, 42, 26, 0.07);
+  border: 1px solid rgba(139, 42, 26, 0.25);
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0;
+  direction: inherit;
+  unicode-bidi: plaintext;
+}
+
+/* ============================================================
+   FORGOT PASSWORD PAGE FIX
+   ============================================================ */
+
+.forgot-page {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 60px 5% 90px;
+  color: #1a2744;
+}
+
+.forgot-card {
+  width: 100%;
+  max-width: 520px;
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.16);
+  border-radius: 18px;
+  padding: 40px;
+  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.forgot-card h1 {
+  margin: 0 0 8px;
+  color: #1a2744;
+  font-size: 34px;
+  font-weight: 800;
+  font-family: inherit;
+  text-align: center;
+}
+
+.forgot-card p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.forgot-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #1a2744;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.forgot-card input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(26, 39, 68, 0.18);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1a2744;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+}
+
+.forgot-card input:focus {
+  border-color: #8b2a1a;
+  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08);
+}
+
+.forgot-card button {
+  margin-top: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: #8b2a1a;
+  color: #ffffff;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.forgot-card button:hover {
+  background: #6e2014;
+  box-shadow: 0 8px 20px rgba(139, 42, 26, 0.22);
+}
+
+html[dir="rtl"] .forgot-card {
+  text-align: right;
+}
+
+html[dir="rtl"] .forgot-card h1,
+html[dir="rtl"] .forgot-card p,
+html[dir="rtl"] .forgot-card .form-status-message {
+  text-align: center;
+}
+
+html[dir="rtl"] .forgot-card label {
+  text-align: right;
+}
+
+html[dir="rtl"] .forgot-card input {
+  text-align: right;
+}
+
+html[dir="rtl"] .forgot-card .form-status-message {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .forgot-page {
+    padding: 40px 5% 70px;
+  }
+
+  .forgot-card {
+    padding: 28px;
+  }
+
+  .forgot-card h1 {
+    font-size: 28px;
+  }
+}

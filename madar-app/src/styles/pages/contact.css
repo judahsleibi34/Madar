@@ -1,0 +1,135 @@
+/* ============================================================
+   CONTACT PAGE
+   ============================================================ */
+
+.contact-page {
+  flex: 1;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 60px 5% 80px;
+  width: 100%;
+}
+
+.contact-hero {
+  margin-bottom: 48px;
+}
+
+.contact-hero h1 {
+  margin: 0 0 12px 0;
+  color: #1a2744;
+  font-size: 42px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.contact-hero p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.contact-content {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contact-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #1a2744;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.contact-form input,
+.contact-form textarea {
+  padding: 12px 16px;
+  border: 1px solid rgba(26, 39, 68, 0.18);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
+  color: #1a2744;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.2s ease;
+  resize: vertical;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  border-color: #8b2a1a;
+}
+
+.contact-form button {
+  align-self: center;
+  padding: 12px 32px;
+  background: #8b2a1a;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.contact-form button:hover {
+  background: #6e2014;
+}
+
+.contact-info-card {
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.08);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  text-align: center;
+  align-items: center;
+}
+
+.contact-info-card h2 {
+  margin: 0;
+  color: #1a2744;
+  font-size: 20px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.contact-info-card strong {
+  display: block;
+  color: #8b2a1a;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.contact-info-card p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* direction:ltr keeps the number rendering correctly in both LTR & RTL contexts;
+   text-align is intentionally NOT set here so it inherits from the parent
+   (.footer-contact is centered; .contact-info-card flows naturally). */
+.phone-number {
+  direction: ltr;
+  unicode-bidi: isolate;
+}

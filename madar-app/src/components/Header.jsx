@@ -10,7 +10,6 @@ const navItems = {
     { id: "team", label: "Madar Team", path: "/team" },
     { id: "about", label: "About Us", path: "/about" },
     { id: "contact", label: "Contact Us", path: "/contact" },
-    
   ],
   ar: [
     { id: "home", label: "الرئيسية", path: "/" },
@@ -19,7 +18,6 @@ const navItems = {
     { id: "team", label: "فريق مدار", path: "/team" },
     { id: "about", label: "من نحن", path: "/about" },
     { id: "contact", label: "تواصل معنا", path: "/contact" },
-    
   ],
 };
 
@@ -28,11 +26,13 @@ const authLabels = {
     login: "Log In",
     signup: "Sign Up",
     logout: "Logout",
+    dashboard: "Dashboard",
   },
   ar: {
     login: "تسجيل الدخول",
     signup: "إنشاء حساب",
     logout: "تسجيل الخروج",
+    dashboard: "لوحة التحكم",
   },
 };
 
@@ -55,6 +55,17 @@ export default function Header({
   const auth = authLabels[lang] || authLabels.en;
   const currentLang =
     langOptions.find((item) => item.code === lang) || langOptions[0];
+
+  const finalNavItems = isLoggedIn
+    ? [
+        ...items,
+        {
+          id: "dashboard",
+          label: auth.dashboard,
+          path: "/dashboard",
+        },
+      ]
+    : items;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -109,7 +120,7 @@ export default function Header({
       </Link>
 
       <nav className="nav-menu" aria-label="Main navigation">
-        {items.map((item) => (
+        {finalNavItems.map((item) => (
           <NavLink
             key={item.id}
             to={item.path}
@@ -205,7 +216,7 @@ export default function Header({
           className="mobile-menu"
           aria-label="Mobile navigation"
         >
-          {items.map((item) => (
+          {finalNavItems.map((item) => (
             <NavLink
               key={item.id}
               to={item.path}

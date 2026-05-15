@@ -1,0 +1,173 @@
+/* ============================================================
+   HERO
+   ============================================================ */
+
+.hero-section {
+  flex: 1;
+  padding: 80px 5% 0 5%;
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+}
+
+.hero-content {
+  flex: 1.05;
+  max-width: 720px;
+}
+
+.hero-visual {
+  flex: 0.95;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.hero-title {
+  margin: 0 0 20px 0;
+  color: #1a2744;
+  font-size: 42px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.hero-subtitle {
+  margin: 40px 0 12px 0;
+  color: #1a2744;
+  font-size: 26px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.hero-description {
+  margin: 0 0 20px 0;
+  color: #3a3530;
+  font-size: 18px;
+  line-height: 1.8;
+  font-family: inherit;
+}
+
+.arabic-name {
+  color: #8b2a1a;
+  font-weight: 800;
+  font-size: 22px;
+  font-family: inherit;
+}
+
+/* ============================================================
+   ORBIT VISUAL
+   ============================================================ */
+
+.orbit-wrapper {
+  position: relative;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.center-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 130px;
+  height: 130px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #8b2a1a;
+  box-shadow: 0 24px 60px rgba(26, 39, 68, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.center-core span {
+  color: #8b2a1a;
+  font-weight: 800;
+  font-size: 18px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid rgba(139, 42, 26, 0.15);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation-name: rotateOrbit;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.orbit-one {
+  width: 180px;
+  height: 180px;
+  animation-duration: 8s;
+}
+
+.orbit-two {
+  width: 270px;
+  height: 270px;
+  animation-duration: 12s;
+  animation-direction: reverse;
+}
+
+.orbit-three {
+  width: 360px;
+  height: 360px;
+  animation-duration: 18s;
+}
+
+.orbit-dot {
+  position: absolute;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #8b2a1a;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: inherit;
+  box-shadow: 0 12px 30px rgba(26, 39, 68, 0.12);
+  border: 1px solid rgba(139, 42, 26, 0.2);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.orbit-one .orbit-dot {
+  top: 50%;
+  right: -36px;
+  transform: translateY(-50%) rotate(80deg);
+}
+
+.orbit-two .orbit-dot {
+  bottom: 22px;
+  left: 20px;
+  transform: rotate(45deg);
+}
+
+.orbit-three .orbit-dot {
+  top: 20px;
+  right: 30px;
+  transform: rotate(20deg);
+}
+
+@keyframes rotateOrbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ============================================================
+   ABOUT
+   ============================================================ */
+
+.about-section {
+  margin-left: 80px;
+  margin-right: auto;
+  max-width: 1060px;
+  padding-bottom: 80px;
+}

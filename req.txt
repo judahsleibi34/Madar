@@ -2,6 +2,8 @@ to install react run these
 npm create vite@latest madar-app -- --template react
 npm install react-router-dom
 npm install framer-motion
+npm install lucide-react
+
 cd madar-app
 npm install
 npm run dev

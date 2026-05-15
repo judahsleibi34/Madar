@@ -15,7 +15,7 @@ const pageText = {
     button: "Create Account",
     loading: "Creating Account...",
     success: "Account created! Redirecting to login...",
-    serverError: "Could not connect to backend.",
+    serverError: "Server error",
     required: "This field is required.",
     invalidEmail: "Please enter a valid email address.",
     alreadyRegistered: "This email is already registered. Please log in.", // ✅

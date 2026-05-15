@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Response, Request
+from requests import session
 from database import supabase
 from classes import SignUpRequest, LogIn
 import os
@@ -178,3 +179,63 @@ def log_out(response: Response):
     return {
         "message": "Logged out successfully"
     }
+
+@router.post("/user_info")
+def user_info(request: Request):
+    access_token = request.cookies.get("madar_access_token")
+
+    if not access_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Not logged in"
+        )
+
+    try:
+        auth_user = supabase.auth.get_user(access_token)
+
+        if not auth_user or not getattr(auth_user, "user", None):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired session"
+            )
+
+        user_response = supabase.table("users").select(
+            "id, auth_id, first_name, last_name, email"
+        ).eq(
+            "auth_id", auth_user.user.id
+        ).single().execute()
+
+        if not user_response.data:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
+
+        user_data = user_response.data
+
+        first_name = user_data.get("first_name") or ""
+        last_name = user_data.get("last_name") or ""
+        full_name = f"{first_name} {last_name}".strip() or "Admin User"
+
+        return {
+            "success": True,
+            "user": {
+                "id": user_data.get("id"),
+                "auth_id": user_data.get("auth_id"),
+                "first_name": first_name,
+                "last_name": last_name,
+                "name": full_name,
+                "email": user_data.get("email"),
+                "avatar": "",
+            }
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        print("USER INFO ERROR:", repr(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Could not fetch user info"
+        )

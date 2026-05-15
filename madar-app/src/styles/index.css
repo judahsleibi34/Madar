@@ -1,0 +1,25 @@
+/* Main CSS entrypoint
+   Import order preserves the original cascade:
+   1) tokens/base
+   2) layout + public sections/pages
+   3) shared button overrides
+   4) dashboard/admin
+*/
+
+@import "./core/tokens.css";
+@import "./core/base.css";
+
+@import "./layout/header.css";
+@import "./sections/home.css";
+@import "./pages/contact.css";
+@import "./layout/footer.css";
+@import "./utils/rtl.css";
+@import "./utils/responsive.css";
+
+@import "./pages/auth.css";
+@import "./pages/pricing.css";
+@import "./pages/team.css";
+
+@import "./shared/buttons.css";
+
+@import "./admin/dashboard.css";

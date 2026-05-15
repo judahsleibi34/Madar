@@ -1,0 +1,108 @@
+/* ============================================================
+   GLOBAL MADAR GRADIENT BUTTON SYSTEM
+   Applies to main buttons across the whole website
+   ============================================================ */
+
+/* Main action buttons across pages */
+.btn-signup,
+.register-submit,
+.login-submit,
+.forgot-card button,
+.contact-form button,
+.plan-btn.primary,
+.pricing-card:hover .plan-btn,
+.primary-action,
+.small-action {
+  border: none;
+  background: var(--madar-gradient);
+  color: #ffffff;
+  box-shadow: var(--madar-button-shadow);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.btn-signup:hover,
+.register-submit:hover,
+.login-submit:hover,
+.forgot-card button:hover,
+.contact-form button:hover,
+.plan-btn.primary:hover,
+.pricing-card:hover .plan-btn:hover,
+.primary-action:hover,
+.small-action:hover {
+  background: var(--madar-gradient-hover);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: var(--madar-button-shadow-hover);
+}
+
+/* Outline/secondary buttons: gradient on hover */
+.btn-login,
+.plan-btn,
+.secondary-action,
+.lang-toggle {
+  background: transparent;
+  color: var(--madar-navy);
+  border: 1.5px solid rgba(26, 39, 68, 0.25);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.btn-login:hover,
+.plan-btn:hover,
+.secondary-action:hover,
+.lang-toggle:hover {
+  background: var(--madar-gradient);
+  border-color: transparent;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: var(--madar-button-shadow-hover);
+}
+
+/* Mobile language/auth buttons */
+.lang-mobile-btn,
+.mobile-menu-auth .btn-login,
+.mobile-menu-auth .btn-signup {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.lang-mobile-btn:hover,
+.lang-mobile-btn.active,
+.mobile-menu-auth .btn-login:hover,
+.mobile-menu-auth .btn-signup:hover {
+  background: var(--madar-gradient);
+  border-color: transparent;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: var(--madar-button-shadow);
+}
+
+/* Icon/social buttons */
+.profile-icon-link:hover {
+  background: var(--madar-gradient);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: var(--madar-button-shadow-hover);
+}
+
+/* Avoid weird gradient on tiny dropdown language choices */
+.lang-dropdown button:hover,
+.lang-dropdown button.active {
+  background: rgba(139, 42, 26, 0.07);
+  color: var(--madar-red);
+  transform: none;
+  box-shadow: none;
+}
