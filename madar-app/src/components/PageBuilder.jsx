@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import "../styles/admin/PageBuilder.css";
 
-const createId = (prefix) => `${prefix}_${crypto.randomUUID()}`;
+const createId = (prefix) => `${prefix}_${crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2)}`}`;
 
 const createEmptyAction = () => ({
   type: "none",

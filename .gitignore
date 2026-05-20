@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.venv
 madar_back_end/.env
 madar_back_end/madar_backend_env/
 madar_back_end/__pycache__/
