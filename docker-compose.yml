@@ -5,7 +5,7 @@ services:
     container_name: madar-backend
     restart: unless-stopped
     environment:
-      FRONTEND_URLS: "http://192.168.1.75:3000,http://localhost:3000"
+      FRONTEND_URLS: ${FRONTEND_URLS}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
