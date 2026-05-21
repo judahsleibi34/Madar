@@ -919,3 +919,69 @@ body,
   .page-builder-dashboard-page { padding: 0; }
   .page-builder-dashboard-page .builder { min-height: auto; }
 }
+
+/* ============================================================
+   PAGE BUILDER ROUTE: MINIMIZED DASHBOARD SIDEBAR
+   ============================================================ */
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar {
+  flex: 0 0 84px;
+  width: 84px;
+  min-width: 84px;
+  max-width: 84px;
+  padding: 22px 12px;
+  align-items: center;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-brand {
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-brand div,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav button span,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-logout span,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang span,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-user-info {
+  display: none !important;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-icon,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-avatar {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 16px;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav {
+  width: 100%;
+  align-items: center;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav button,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-logout,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang {
+  width: 56px;
+  height: 52px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 16px;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-user {
+  width: 56px;
+  height: 56px;
+  padding: 5px;
+  justify-content: center;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-bottom {
+  width: 100%;
+  align-items: center;
+}
+
+.admin-dashboard-layout:has(.page-builder) .page-builder-dashboard-page,
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page {
+  padding: 0;
+}
