@@ -1,3 +1,16 @@
+/* :root {
+  --madar-bg: #f5f2ee;
+  --madar-navy: #1a2744;
+  --madar-navy-dark: #111b31;
+  --madar-red: #8b2a1a;
+  --madar-red-dark: #6e2014;
+  --madar-cream: #f5f2ee;
+  --madar-gradient: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  --madar-gradient-hover: linear-gradient(135deg, #111b31 0%, #6e2014 100%);
+  --madar-button-shadow: 0 10px 24px rgba(139, 42, 26, 0.22);
+  --madar-button-shadow-hover: 0 14px 30px rgba(139, 42, 26, 0.3);
+} */
+
 /* Shared design tokens */
 :root {
   --madar-bg: #f5f2ee;
@@ -10,4 +23,28 @@
   --madar-gradient-hover: linear-gradient(135deg, #111b31 0%, #6e2014 100%);
   --madar-button-shadow: 0 10px 24px rgba(139, 42, 26, 0.22);
   --madar-button-shadow-hover: 0 14px 30px rgba(139, 42, 26, 0.3);
+}
+
+/* ============================================================
+   DARK ADMIN TOKENS
+   These are used by dashboard.css and PageBuilder.css.
+   The public website pages can still use their own light styling.
+   ============================================================ */
+:root {
+  --admin-bg: #0f1413;
+  --admin-surface: #151b1a;
+  --admin-surface-2: #1b2221;
+  --admin-surface-3: #202827;
+  --admin-border: rgba(216, 251, 255, 0.10);
+  --admin-border-strong: rgba(216, 251, 255, 0.20);
+  --admin-text: #f4f1ec;
+  --admin-muted: #b9b3aa;
+  --admin-soft: #8ca3a0;
+  --admin-cyan: #d8fbff;
+  --admin-navy: #223154;
+  --admin-red: #8b2a1a;
+  --admin-red-bright: #c84931;
+  --admin-danger: #ef4444;
+  --admin-gradient: linear-gradient(135deg, #223154 0%, #8b2a1a 100%);
+  --admin-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
 }
