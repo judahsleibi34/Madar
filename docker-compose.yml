@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./madar_back_end
+    container_name: madar-backend
+    restart: unless-stopped
+    environment:
+      FRONTEND_URLS: ${FRONTEND_URLS}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+    ports:
+      - "8001:8000"
+
+  frontend:
+    build:
+      context: ./madar-app
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: madar-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
