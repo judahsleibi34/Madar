@@ -56,3 +56,4 @@ def password_rest(payload: PasswordReset):
     except Exception as e:
         print("RESET PASSWORD ERROR:", repr(e))
         raise HTTPException(status_code=400, detail=str(e))
+

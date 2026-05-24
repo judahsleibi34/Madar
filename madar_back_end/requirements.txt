@@ -1,5 +1,14 @@
 fastapi
-uvicorn
+uvicorn[standard]
 supabase
 python-dotenv
 pydantic[email]
+
+pandas
+openpyxl
+xlrd
+requests
+python-multipart
+
+matplotlib
+seaborn

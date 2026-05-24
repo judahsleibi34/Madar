@@ -1,0 +1,728 @@
+/* ============================================================
+   Madar App Builder v4 — Forms / Data / Runtime
+   ============================================================ */
+
+.runtime-form {
+  display: grid;
+  gap: 16px;
+}
+
+.runtime-form-header h3 {
+  margin: 0 0 5px;
+  color: var(--madar-text);
+  font-size: 24px;
+}
+
+.runtime-form-header p,
+.runtime-form-section-header p {
+  margin: 0;
+  color: var(--madar-muted);
+}
+
+.runtime-form-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--madar-border);
+}
+
+.runtime-form-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.runtime-form-section-header h4 {
+  margin: 0 0 4px;
+  color: var(--madar-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.runtime-question label {
+  display: grid;
+  gap: 7px;
+  font-weight: 850;
+  color: var(--madar-text);
+}
+
+.runtime-question small {
+  color: var(--madar-muted);
+  font-weight: 600;
+}
+
+.runtime-question strong {
+  color: #dc2626;
+  font-size: 12px;
+}
+
+.choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.choice-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.choice-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.choice-pills button {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(26, 39, 68, 0.08);
+  color: var(--madar-text);
+  font-weight: 850;
+}
+
+.choice-pills button.active {
+  background: var(--madar-navy);
+  color: #ffffff;
+}
+
+.scale-choice,
+.rating-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.scale-choice > span {
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.scale-choice button,
+.rating-choice button {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  padding: 0;
+  background: rgba(26, 39, 68, 0.08);
+  color: var(--madar-text);
+  font-weight: 900;
+}
+
+.scale-choice button.active,
+.rating-choice button.active {
+  background: var(--madar-navy);
+  color: #ffffff;
+}
+
+.runtime-submit {
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 900;
+  justify-self: start;
+}
+
+.runtime-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mock-table {
+  border: 1px solid var(--madar-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.mock-table-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  border-top: 1px solid var(--madar-border);
+}
+
+.mock-table-row:first-child {
+  border-top: none;
+}
+
+.mock-table-row span {
+  min-width: 0;
+  padding: 10px 12px;
+  color: rgba(26, 39, 68, 0.74);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-table-head {
+  background: rgba(26, 39, 68, 0.05);
+  font-weight: 950;
+}
+
+.form-sections-stack {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.forms-google-workspace {
+  background: #f6f2fb;
+}
+
+.google-form-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  gap: 18px;
+  align-items: start;
+}
+
+.google-form-list,
+.google-form-actions {
+  position: sticky;
+  top: 146px;
+}
+
+.google-form-document {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.google-form-title-card,
+.google-section-card,
+.google-question-card,
+.google-form-actions section {
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(26, 39, 68, 0.08);
+}
+
+.google-form-title-card {
+  display: grid;
+  gap: 8px;
+  padding: 22px;
+  border-top: 9px solid var(--madar-red);
+}
+
+.google-form-title-input {
+  border: none !important;
+  border-bottom: 1px solid rgba(26, 39, 68, 0.18) !important;
+  border-radius: 0 !important;
+  padding: 8px 0 !important;
+  font-size: 30px;
+  font-weight: 850;
+}
+
+.google-form-description-input,
+.section-description-input {
+  min-height: 44px !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(26, 39, 68, 0.14) !important;
+  border-radius: 0 !important;
+  padding: 8px 0 !important;
+}
+
+.compact-form-connect {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  margin-bottom: 0 !important;
+}
+
+.compact-form-connect > label {
+  display: none !important;
+}
+
+.google-add-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.google-add-strip button,
+.add-question-wide {
+  border-radius: 6px;
+  background: rgba(26, 39, 68, 0.06);
+  color: var(--madar-text);
+  font-weight: 850;
+}
+
+.google-add-strip .add-section-control {
+  margin-left: auto;
+  background: rgba(139, 42, 26, 0.1);
+  color: var(--madar-red);
+}
+
+.google-section-card {
+  padding: 16px;
+  border-left: 6px solid var(--madar-red);
+  border-radius: 8px;
+}
+
+.google-section-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.google-question-card {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 16px;
+  border-left: 5px solid transparent;
+}
+
+.google-question-card.active,
+.google-question-card:focus-within {
+  border-left-color: var(--madar-red);
+}
+
+.google-question-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 12px;
+  align-items: start;
+}
+
+.question-title-input {
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.options-editor {
+  min-height: 82px;
+}
+
+.question-secondary-grid,
+.scale-editor {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scale-editor {
+  grid-template-columns: 80px 80px minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.scale-editor label,
+.inline-setting {
+  display: grid;
+  gap: 6px;
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.question-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(26, 39, 68, 0.1);
+  padding-top: 12px;
+  margin-top: 14px;
+}
+
+.question-footer-actions span {
+  margin-right: auto;
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.question-footer-actions button {
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.add-question-wide {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.google-form-actions {
+  display: grid;
+  gap: 14px;
+}
+
+.google-form-actions section,
+.google-form-actions details {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.form-connect-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(180px, 0.6fr) auto;
+  gap: 14px;
+  align-items: end;
+  border: 1px solid rgba(139, 42, 26, 0.22);
+  border-radius: 18px;
+  padding: 14px;
+  margin-bottom: 16px;
+  background: rgba(139, 42, 26, 0.045);
+}
+
+.form-connect-card strong {
+  display: block;
+  color: var(--madar-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.form-connect-card p {
+  margin: 5px 0 0;
+  color: var(--madar-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.form-connect-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.form-connect-actions button {
+  white-space: nowrap;
+}
+
+.connected-placement-list {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid rgba(139, 42, 26, 0.14);
+}
+
+.connected-placement-list span {
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.connected-placement-list button {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #ffffff;
+  color: var(--madar-text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.form-section-card {
+  background: var(--madar-surface);
+  border: 1px solid var(--madar-border);
+  border-radius: 24px;
+  box-shadow: var(--madar-shadow-sm);
+  padding: 16px;
+  border-left: 6px solid transparent;
+}
+
+.form-section-card:focus-within {
+  border-left-color: var(--madar-red);
+}
+
+.section-title-input {
+  width: 100%;
+  border: none !important;
+  border-bottom: 2px solid rgba(26, 39, 68, 0.14) !important;
+  border-radius: 0 !important;
+  padding: 8px 0 10px !important;
+  color: var(--madar-text);
+  background: transparent !important;
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 950;
+  margin-bottom: 14px;
+}
+
+.question-type-buttons {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.question-card {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 230px;
+  gap: 14px;
+  border: 1px solid var(--madar-border);
+  border-radius: 18px;
+  padding: 14px;
+  background: #ffffff;
+  margin-top: 12px;
+}
+
+.question-card.active {
+  border-color: var(--madar-red);
+  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.1);
+}
+
+.question-number {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--madar-gradient);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 950;
+}
+
+.question-main,
+.question-settings {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.form-side-settings {
+  position: sticky;
+  top: 146px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.responses-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.responses-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.automations-grid {
+  margin-top: 18px;
+}
+
+.automation-card.active,
+.role-card.active {
+  border-color: var(--madar-red);
+}
+
+.when-box,
+.then-step {
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(26, 39, 68, 0.05);
+  display: grid;
+  gap: 3px;
+}
+
+.role-card {
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+}
+
+.roles-list {
+  max-height: 720px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.publish-card p {
+  color: var(--madar-muted);
+}
+
+.publish-card strong {
+  color: var(--madar-text);
+}
+
+.empty-connected {
+  border: 1px dashed var(--madar-border-strong);
+  border-radius: 16px;
+  padding: 16px;
+  color: var(--madar-muted);
+  text-align: center;
+  font-weight: 850;
+  background: rgba(26, 39, 68, 0.03);
+}
+
+/* Google-style form editor overrides. Keep these after the legacy form builder
+   rules so question cards do not inherit the older three-column layout. */
+.forms-google-workspace .google-form-layout {
+  grid-template-columns: 220px minmax(0, 1fr) 340px;
+}
+
+.forms-google-workspace .google-form-document,
+.forms-google-workspace .google-section-card,
+.forms-google-workspace .google-question-card,
+.forms-google-workspace .question-main {
+  min-width: 0;
+}
+
+.forms-google-workspace .google-question-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 14px !important;
+  padding: 18px !important;
+  margin-top: 14px !important;
+  border-radius: 16px !important;
+  align-items: stretch !important;
+}
+
+.forms-google-workspace .google-question-topline {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 220px !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+.forms-google-workspace .question-title-input,
+.forms-google-workspace .google-question-topline select,
+.forms-google-workspace .question-main > input,
+.forms-google-workspace .question-secondary-grid input,
+.forms-google-workspace .scale-editor input,
+.forms-google-workspace .options-editor {
+  width: 100% !important;
+}
+
+.forms-google-workspace .question-secondary-grid,
+.forms-google-workspace .scale-editor {
+  min-width: 0;
+}
+
+.forms-google-workspace .options-editor {
+  min-height: 112px !important;
+  line-height: 1.45;
+}
+
+.forms-google-workspace .question-footer-actions {
+  width: 100%;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(26, 39, 68, 0.1);
+}
+
+.forms-google-workspace .question-footer-actions span {
+  flex: 1 1 120px;
+  margin-right: 0;
+}
+
+.forms-google-workspace .question-footer-actions .checkbox-control {
+  flex: 0 0 auto !important;
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: rgba(26, 39, 68, 0.06);
+  color: var(--madar-text);
+  font-weight: 900;
+}
+
+.forms-google-workspace input[type="checkbox"] {
+  accent-color: var(--madar-red);
+}
+
+.forms-google-workspace .question-footer-actions button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0 13px;
+  background: rgba(26, 39, 68, 0.08);
+  color: var(--madar-text);
+  font-weight: 900;
+  box-shadow: none;
+}
+
+.forms-google-workspace .question-footer-actions button:hover {
+  background: rgba(139, 42, 26, 0.1);
+  color: var(--madar-red);
+}
+
+.forms-google-workspace .question-footer-actions .danger-lite,
+.forms-google-workspace .google-section-header .danger-lite {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0 13px;
+  background: rgba(139, 42, 26, 0.1) !important;
+  color: var(--madar-red) !important;
+  font-weight: 900;
+}
+
+.forms-google-workspace .google-section-header .danger-lite:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.forms-google-workspace .google-form-actions {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.forms-google-workspace .google-form-actions section {
+  border-radius: 14px;
+}
+
+.forms-google-workspace .google-form-actions button {
+  min-height: 42px;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: rgba(26, 39, 68, 0.08);
+  color: var(--madar-text);
+  font-weight: 900;
+  box-shadow: none;
+}
+
+.forms-google-workspace .google-form-actions button:hover {
+  background: rgba(139, 42, 26, 0.1);
+  color: var(--madar-red);
+}
+
+.forms-google-workspace .google-form-actions .primary-action {
+  background: var(--madar-gradient) !important;
+  color: #ffffff !important;
+  box-shadow: var(--madar-red-shadow);
+}
+
+.forms-google-workspace .google-form-actions .primary-action:hover {
+  background: var(--madar-gradient-hover) !important;
+  color: #ffffff !important;
+}
+
+.forms-google-workspace .connected-placement-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.forms-google-workspace .connected-placement-list span {
+  color: var(--madar-muted);
+}
+
+.forms-google-workspace .connected-placement-list button {
+  min-height: 34px;
+  justify-content: flex-start;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: rgba(26, 39, 68, 0.06);
+  color: var(--madar-text);
+  text-align: left;
+}
+
+.forms-google-workspace .runtime-submit {
+  background: var(--madar-gradient) !important;
+  color: #ffffff !important;
+  box-shadow: var(--madar-red-shadow);
+}
+
+.forms-google-workspace .runtime-submit:disabled {
+  background: var(--madar-gradient) !important;
+  color: #ffffff !important;
+  opacity: 0.52;
+}

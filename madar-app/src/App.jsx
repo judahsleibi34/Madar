@@ -22,6 +22,7 @@ import ResetPasswordPage from "./components/ResetPasswordPage";
 import Dashboard from "./components/Dashboard";
 import Footer from "./components/Footer";
 import PageBuilder from "./components/PageBuilder";
+import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
 import DashboardSidebar from "./components/DashboardSidebar";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
@@ -40,11 +41,13 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Dashboard routes must render outside app-shell to avoid the
-  // flex column scroll trap that prevents window-level scrolling.
+  const isTenantSiteRoute = location.pathname.startsWith("/site/");
+
   const isDashboardRoute =
     location.pathname.startsWith("/dashboard") ||
-    location.pathname.startsWith("/page-builder");
+    location.pathname.startsWith("/page-builder") ||
+    location.pathname.startsWith("/builder-responses") ||
+    location.pathname.startsWith("/builder-data");
 
   const normalizeUser = (userInfo) => {
     const firstName = userInfo?.first_name || "";
@@ -54,6 +57,7 @@ export default function App() {
       `${firstName} ${lastName}`.trim() ||
       userInfo?.username ||
       "User";
+
     return {
       id: userInfo?.id || "",
       auth_id: userInfo?.auth_id || "",
@@ -70,7 +74,9 @@ export default function App() {
       method: "POST",
       credentials: "include",
     });
+
     if (!response.ok) throw new Error("Could not fetch user info");
+
     const data = await response.json();
     return normalizeUser(data.user);
   };
@@ -88,18 +94,23 @@ export default function App() {
           method: "GET",
           credentials: "include",
         });
+
         if (!statusResponse.ok) {
           setIsLoggedIn(false);
           setUser(null);
           return;
         }
+
         const statusData = await statusResponse.json();
+
         if (statusData.logged_in !== true) {
           setIsLoggedIn(false);
           setUser(null);
           return;
         }
+
         const userInfo = await fetchUserInfo();
+
         setIsLoggedIn(true);
         setUser(userInfo);
       } catch (error) {
@@ -110,6 +121,7 @@ export default function App() {
         setAuthChecked(true);
       }
     };
+
     checkAuth();
   }, []);
 
@@ -119,16 +131,23 @@ export default function App() {
   };
 
   const handleLoginSuccess = async () => {
+    const params = new URLSearchParams(location.search);
+    const returnTo = params.get("returnTo");
+
     try {
       const userInfo = await fetchUserInfo();
+
       setIsLoggedIn(true);
       setUser(userInfo);
-      navigate("/dashboard", { replace: true });
+
+      navigate(returnTo || "/dashboard", { replace: true });
     } catch (error) {
       console.error("Could not load user info after login:", error);
+
       setIsLoggedIn(true);
       setUser(null);
-      navigate("/dashboard", { replace: true });
+
+      navigate(returnTo || "/dashboard", { replace: true });
     }
   };
 
@@ -162,27 +181,32 @@ export default function App() {
             <div className="skeleton-line skeleton-small" />
           </div>
         </div>
+
         <div className="skeleton-nav">
           <div className="skeleton-line skeleton-nav-item" />
           <div className="skeleton-line skeleton-nav-item" />
           <div className="skeleton-line skeleton-nav-item" />
         </div>
       </aside>
+
       <section className="dashboard-skeleton-page">
         <div className="dashboard-skeleton-header">
           <div className="skeleton-line skeleton-heading" />
           <div className="skeleton-line skeleton-subheading" />
         </div>
+
         <div className="dashboard-skeleton-cards">
           <div className="skeleton-card" />
           <div className="skeleton-card" />
           <div className="skeleton-card" />
           <div className="skeleton-card" />
         </div>
+
         <div className="dashboard-skeleton-panels">
           <div className="skeleton-panel skeleton-panel-large" />
           <div className="skeleton-panel" />
         </div>
+
         <div className="dashboard-skeleton-panels lower">
           <div className="skeleton-panel" />
           <div className="skeleton-panel" />
@@ -191,18 +215,42 @@ export default function App() {
     </div>
   );
 
-  /* ─────────────────────────────────────────────────────────
-     DASHBOARD ROUTES — rendered bare, NO app-shell wrapper.
-     This is the critical fix: app-shell's flex-column layout
-     was acting as a scroll container, trapping scroll inside
-     .admin-dashboard-page instead of letting the browser
-     window scroll. Without the wrapper, window scroll works
-     and position:sticky on the sidebar behaves correctly.
-  ───────────────────────────────────────────────────────── */
+  const renderDashboardShell = (children) => (
+    <div
+      className="admin-dashboard-layout"
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <DashboardSidebar
+        lang={lang}
+        user={user}
+        onLogout={handleLogout}
+        onLanguageChange={handleLanguageChange}
+      />
+
+      <main className="admin-dashboard-page page-builder-dashboard-page">
+        {children}
+      </main>
+    </div>
+  );
+
+  if (isTenantSiteRoute) {
+    return (
+      <>
+        <ScrollToTop />
+
+        <Routes>
+          <Route path="/site/:subdomain/*" element={<TenantSiteRuntime />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </>
+    );
+  }
+
   if (isDashboardRoute) {
     return (
       <>
         <ScrollToTop />
+
         <Routes>
           <Route
             path="/dashboard"
@@ -228,20 +276,49 @@ export default function App() {
               !authChecked ? (
                 renderDashboardSkeleton("Loading page builder")
               ) : isLoggedIn ? (
-                <div
-                  className="admin-dashboard-layout"
-                  dir={lang === "ar" ? "rtl" : "ltr"}
-                >
-                  <DashboardSidebar
-                    lang={lang}
-                    user={user}
-                    onLogout={handleLogout}
-                    onLanguageChange={handleLanguageChange}
+                renderDashboardShell(
+                  <PageBuilder key="page-builder-main" />
+                )
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/builder-responses"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton("Loading submissions")
+              ) : isLoggedIn ? (
+                renderDashboardShell(
+                  <PageBuilder
+                    key="builder-responses-page"
+                    initialTab="responses"
+                    visibleTabIds={["responses"]}
+                    hideWorkspaceTabs={true}
                   />
-                  <main className="admin-dashboard-page page-builder-dashboard-page">
-                    <PageBuilder />
-                  </main>
-                </div>
+                )
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/builder-data"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton("Loading data logs")
+              ) : isLoggedIn ? (
+                renderDashboardShell(
+                  <PageBuilder
+                    key="builder-data-page"
+                    initialTab="data"
+                    visibleTabIds={["data"]}
+                    hideWorkspaceTabs={true}
+                  />
+                )
               ) : (
                 <Navigate to="/login" replace />
               )
@@ -254,12 +331,10 @@ export default function App() {
     );
   }
 
-  /* ─────────────────────────────────────────────────────────
-     PUBLIC ROUTES — wrapped in app-shell as normal
-  ───────────────────────────────────────────────────────── */
   return (
     <>
       <ScrollToTop />
+
       <div className="app-shell">
         <Header
           lang={lang}
@@ -277,6 +352,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/about"
             element={
@@ -285,6 +361,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/contact"
             element={
@@ -293,6 +370,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/pricing"
             element={
@@ -301,6 +379,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/team"
             element={
@@ -309,6 +388,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/reset-password"
             element={
@@ -317,6 +397,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/signup"
             element={
@@ -325,6 +406,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/forgot-password"
             element={
@@ -333,6 +415,7 @@ export default function App() {
               </main>
             }
           />
+
           <Route
             path="/login"
             element={
@@ -349,6 +432,7 @@ export default function App() {
               )
             }
           />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 

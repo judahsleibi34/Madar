@@ -239,3 +239,4 @@ def user_info(request: Request):
             status_code=500,
             detail="Could not fetch user info"
         )
+

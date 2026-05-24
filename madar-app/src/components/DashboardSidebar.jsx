@@ -6,6 +6,8 @@ import {
   LogOut,
   Grid2X2,
   Languages,
+  Database,
+  ClipboardList,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -16,6 +18,8 @@ const sidebarText = {
     home: "Home",
     dashboard: "Dashboard",
     pageBuilder: "Page Builder",
+    responses: "Submissions",
+    data: "Data Logs",
     settings: "Settings",
     logout: "Logout",
     fallbackName: "User",
@@ -98,6 +102,24 @@ export default function DashboardSidebar({
           >
             <PanelsTopLeft size={18} />
             <span>{t.pageBuilder}</span>
+          </button>
+
+          <button
+            type="button"
+            className={isActive("/builder-responses") ? "active" : ""}
+            onClick={() => navigate("/builder-responses")}
+          >
+            <ClipboardList size={18} />
+            <span>{t.responses || "Responses"}</span>
+          </button>
+
+          <button
+            type="button"
+            className={isActive("/builder-data") ? "active" : ""}
+            onClick={() => navigate("/builder-data")}
+          >
+            <Database size={18} />
+            <span>{t.data || "Data"}</span>
           </button>
 
           <button type="button">
