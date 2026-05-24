@@ -7,7 +7,16 @@ from auth import router as login_sign_up_router
 from forget_password import router as forget_password_router
 from contact_us import router as contact_us_router
 
-app = FastAPI()
+from data_analysis.data_routes import router as data_router
+from data_analysis.cleaning_routes import router as cleaning_router
+from data_analysis.analysis_routes import router as analysis_router
+from data_analysis.visualization_routes import router as visualization_router
+
+
+app = FastAPI(
+    title="Madar Backend",
+    version="1.0.0"
+)
 
 FRONTEND_URLS = os.getenv(
     "FRONTEND_URLS",
@@ -28,3 +37,9 @@ app.include_router(server_status_router)
 app.include_router(login_sign_up_router)
 app.include_router(forget_password_router)
 app.include_router(contact_us_router)
+
+app.include_router(data_router)
+app.include_router(cleaning_router)
+app.include_router(analysis_router)
+app.include_router(visualization_router)
+

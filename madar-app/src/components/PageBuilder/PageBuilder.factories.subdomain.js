@@ -9,7 +9,6 @@ export const createPosition = () => ({
 export const createAction = (type = "none", overrides = {}) => ({
   type,
   pageId: "",
-  sectionId: "",
   formId: "",
   url: "",
   message: "",
@@ -19,9 +18,6 @@ export const createAction = (type = "none", overrides = {}) => ({
 
 export const createField = (label = "Untitled field", type = "shortText", overrides = {}) => {
   const meta = fieldTypes.find((field) => field.id === type);
-  const choiceDefaults = ["dropdown", "radio", "checkboxes", "status"].includes(type)
-    ? ["Option 1", "Option 2"]
-    : [];
 
   return {
     id: createId("field"),
@@ -31,13 +27,8 @@ export const createField = (label = "Untitled field", type = "shortText", overri
     required: false,
     helpText: "",
     placeholder: meta?.label || "",
-    options: choiceDefaults,
+    options: ["Option 1", "Option 2"],
     defaultValue: "",
-    scaleMin: 1,
-    scaleMax: 5,
-    scaleMinLabel: "Low",
-    scaleMaxLabel: "High",
-    maxRating: 5,
     width: "full",
     ...overrides,
   };
@@ -355,8 +346,6 @@ export const createPage = (name = "Home", sections = [], overrides = {}) => ({
   slug: name.toLowerCase() === "home" ? "/" : `/${slugify(name)}`,
   backgroundColor: "#ffffff",
   visibility: "public",
-  showInNavigation: true,
-  pageType: "main",
   sections,
   ...overrides,
 });
@@ -445,6 +434,9 @@ export const createProject = ({
   users,
   publish: {
     environment: "local",
+    subdomain: "",
+    siteBaseDomain: "madar.app",
+    customDomain: "",
     lastSavedAt: "",
     lastPublishedAt: "",
   },

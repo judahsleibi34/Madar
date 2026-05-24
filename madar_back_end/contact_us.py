@@ -21,3 +21,4 @@ def create_contact_message(contact: ContactMessage):
     except Exception as e:
         print("CONTACT ERROR:", repr(e))
         raise HTTPException(status_code=400, detail=str(e))
+

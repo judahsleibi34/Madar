@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "../../styles/admin/PageBuilder/PageBuilder.css";
 
 import {
@@ -13,7 +13,6 @@ import {
   elementTypes,
   fieldTypes,
   workflowStepTypes,
-  permissionGroups,
   defaultSiteChrome,
   starterSystems,
 } from "./PageBuilder.constants";
@@ -24,6 +23,7 @@ import {
 
 import {
   createField,
+  createCollection,
   createForm,
   getFormSections,
   getFormFields,
@@ -32,9 +32,6 @@ import {
   createRow,
   createSection,
   createPage,
-  createRole,
-  createUser,
-  createWorkflow,
   cloneWithNewIds,
   createPosition,
 } from "./PageBuilder.factories";
@@ -43,12 +40,17 @@ import {
   heroSection,
   formSection,
   responsesSection,
+  loginSection,
   sectionLibrary,
   buildStarterProject,
   createInitialProject,
 } from "./PageBuilder.starters";
-import BuilderResponsesPage from "./BuilderResponsesPage";
-import BuilderAnalysisPage from "./BuilderAnalysisPage";
+
+import AuthBlock from "./AuthBlock";
+import PageBuilderUsers from "./PageBuilderUsers";
+import ReservationBlock from "./ReservationBlock";
+import { useCurrentBuilderUser } from "./useCurrentBuilderUser";
+import { getTenantLoginTarget, sanitizeSubdomain } from "./PageBuilder.routing";
 
 const splitLines = (value) =>
   String(value || "")
@@ -57,119 +59,137 @@ const splitLines = (value) =>
     .filter(Boolean);
 
 const getFieldType = (type) => fieldTypes.find((item) => item.id === type) || fieldTypes[0];
-const getFieldOptions = (field) => (field.options || []).filter(Boolean);
-const scaleRange = (field) => {
-  const min = Number(field.scaleMin || 1);
-  const max = Math.max(min, Number(field.scaleMax || 5));
-  return Array.from({ length: max - min + 1 }, (_, index) => String(min + index));
+
+const reservationFieldOptions = [
+  { id: "name", label: "Name" },
+  { id: "contact", label: "Contact" },
+  { id: "service", label: "Service" },
+  { id: "date", label: "Date" },
+  { id: "time", label: "Time" },
+  { id: "guests", label: "Guests" },
+  { id: "notes", label: "Notes" },
+];
+
+const getReservationBlockConfig = (element) => {
+  const lines = splitLines(element.content);
+  const reservation = element.reservation || {};
+
+  return {
+    title: reservation.title || lines[0] || "Book a reservation",
+    description:
+      reservation.description ||
+      lines[1] ||
+      "Choose a service, date, and time. We will confirm availability with you.",
+    services: Array.isArray(reservation.services) && reservation.services.length > 0
+      ? reservation.services
+      : lines.slice(2),
+    fields: Array.isArray(reservation.fields) && reservation.fields.length > 0
+      ? reservation.fields
+      : reservationFieldOptions.map((field) => field.id),
+    submitLabel: reservation.submitLabel || "Request reservation",
+  };
 };
 
-const mainBuilderHiddenTabs = ["data", "responses"];
-const internalPageNames = new Set([
-  "review responses",
-  "responses",
-  "reports",
-  "orders",
-  "submit request",
-  "submit report",
-  "place order",
-]);
+const serializeReservationBlockConfig = (config) =>
+  [
+    config.title,
+    config.description,
+    ...(config.services || []),
+  ]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .join("\n");
 
-const getSectionElements = (section) => {
-  const autoElements = (section.rows || []).flatMap((row) =>
-    (row.columns || []).flatMap((column) => column.elements || [])
-  );
+const getAuthBlockConfig = (element) => {
+  const lines = splitLines(element.content);
+  const auth = element.auth || {};
+  const isRegister = element.type === "registrationBlock";
+  const storedTitle = auth.title || lines[0] || "";
+  const storedButtonText = auth.buttonText || lines[2] || "";
+  const hasLoginCopy = ["log in", "login"].includes(storedTitle.toLowerCase()) ||
+    ["log in", "login"].includes(storedButtonText.toLowerCase());
+  const hasRegisterCopy = ["register", "registration"].includes(storedTitle.toLowerCase()) ||
+    ["create account", "register"].includes(storedButtonText.toLowerCase());
 
-  return [...autoElements, ...(section.freeElements || [])];
+  return {
+    mode: isRegister ? "register" : "login",
+    title:
+      isRegister && hasLoginCopy
+        ? "Register"
+        : !isRegister && hasRegisterCopy
+          ? "Log in"
+          : storedTitle || (isRegister ? "Register" : "Log in"),
+    subtitle:
+      isRegister && hasLoginCopy
+        ? "Create an account to save requests, reservations, and private activity."
+        : !isRegister && hasRegisterCopy
+          ? "Access your account and continue to your workspace."
+          : auth.subtitle ||
+            lines[1] ||
+            (isRegister
+        ? "Create an account to save requests, reservations, and private activity."
+        : "Access your account and continue to your workspace."),
+    buttonText:
+      isRegister && hasLoginCopy
+        ? "Create Account"
+        : !isRegister && hasRegisterCopy
+          ? "Log in"
+          : storedButtonText || (isRegister ? "Create Account" : "Log in"),
+    switchText:
+      isRegister && hasLoginCopy
+        ? "Already registered?"
+        : !isRegister && hasRegisterCopy
+          ? "Don't have an account?"
+          : auth.switchText || (isRegister ? "Already registered?" : "Don't have an account?"),
+    switchActionText:
+      isRegister && hasLoginCopy
+        ? "Log in"
+        : !isRegister && hasRegisterCopy
+          ? "Create account"
+          : auth.switchActionText || (isRegister ? "Log in" : "Create account"),
+  };
 };
 
-const isMetricsSection = (section) =>
-  section?.name?.toLowerCase().includes("metric") ||
-  getSectionElements(section).some((element) => element.type === "metric");
+const serializeAuthBlockConfig = (config) =>
+  [config.title, config.subtitle, config.buttonText]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .join("\n");
 
-const isResponsesSection = (section) =>
-  getSectionElements(section).some((element) => element.type === "responsesTable");
-
-const hasFormSection = (page) =>
-  (page.sections || []).some((section) =>
-    getSectionElements(section).some((element) => element.type === "formBlock")
-  );
-
-const removeDuplicateFormHeadings = (section) => ({
-  ...section,
-  rows: (section.rows || []).map((row) => ({
-    ...row,
-    columns: (row.columns || []).map((column) => {
-      const hasFormBlock = (column.elements || []).some((element) => element.type === "formBlock");
-      if (!hasFormBlock) return column;
-
-      return {
-        ...column,
-        elements: column.elements.filter(
-          (element) =>
-            !(
-              element.type === "heading" &&
-              String(element.content || "").trim().toLowerCase() === "submit your information"
-            )
-        ),
-      };
-    }),
-  })),
-});
-
-const cleanBuilderProject = (project) => {
-  if (!project?.pages?.length) return project;
-
-  const formSectionsToKeep = project.pages
-    .slice(1)
-    .flatMap((page) => page.sections || [])
-    .filter((section) =>
-      getSectionElements(section).some((element) => element.type === "formBlock")
-    );
-
-  const cleanedPages = project.pages
-    .filter((page, index) => index === 0 || !internalPageNames.has(String(page.name || "").toLowerCase()))
-    .map((page, index) => {
-      const baseSections = (page.sections || []).filter(
-        (section) => !isMetricsSection(section) && !isResponsesSection(section)
-      );
-      const sections =
-        index === 0 && !hasFormSection({ ...page, sections: baseSections })
-          ? [...baseSections, ...formSectionsToKeep]
-          : baseSections;
-
-      return {
-        ...page,
-        sections: sections.map(removeDuplicateFormHeadings),
-        showInNavigation: index === 0 ? true : page.showInNavigation,
-      };
-    })
-    .filter((page, index) => index === 0 || (page.sections || []).length > 0);
-
-  const pages = cleanedPages.length ? cleanedPages : project.pages;
+const migrateProject = (project) => {
+  const currentSiteChrome = project.siteChrome || {};
+  const currentPublish = project.publish || {};
 
   return {
     ...project,
-    activePageId: pages.some((page) => page.id === project.activePageId)
-      ? project.activePageId
-      : pages[0]?.id || "",
     siteChrome: {
-      ...project.siteChrome,
-      footerShopLinks: String(project.siteChrome?.footerShopLinks || "")
-        .split("\n")
-        .filter((item) => !["Responses", "Reports", "Orders"].includes(item.trim()))
-        .join("\n"),
+      ...defaultSiteChrome,
+      ...currentSiteChrome,
+      headerButtonLabel:
+        !currentSiteChrome.headerButtonLabel ||
+        currentSiteChrome.headerButtonLabel.toLowerCase() === "contact"
+          ? "Login"
+          : currentSiteChrome.headerButtonLabel,
+      authPageSlug: currentSiteChrome.authPageSlug || "/login",
     },
-    pages,
+    publish: {
+      environment: "local",
+      subdomain: "",
+      siteBaseDomain: "madar.app",
+      customDomain: "",
+      lastSavedAt: "",
+      lastPublishedAt: "",
+      ...currentPublish,
+    },
   };
 };
 
 const loadInitialProject = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return cleanBuilderProject(raw ? JSON.parse(raw) : createInitialProject());
+    return raw ? migrateProject(JSON.parse(raw)) : migrateProject(createInitialProject());
   } catch {
-    return cleanBuilderProject(createInitialProject());
+    return migrateProject(createInitialProject());
   }
 };
 
@@ -179,7 +199,7 @@ export default function PageBuilder({
   hideWorkspaceTabs = false,
 } = {}) {
   const [project, setProject] = useState(loadInitialProject);
-  const [activeTab, setActiveTab] = useState(initialTab || "design");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [designPanel, setDesignPanel] = useState("Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
@@ -188,7 +208,10 @@ export default function PageBuilder({
   const [dragState, setDragState] = useState(null);
   const [runtimeAnswers, setRuntimeAnswers] = useState({});
   const [runtimeErrors, setRuntimeErrors] = useState({});
+  const [, setRuntimeReservations] = useState([]);
   const [toast, setToast] = useState("");
+
+  useCurrentBuilderUser(setProject);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
@@ -202,6 +225,11 @@ export default function PageBuilder({
   const activeForm = useMemo(
     () => project.forms.find((form) => form.id === project.activeFormId) || project.forms[0],
     [project.forms, project.activeFormId]
+  );
+
+  const activeCollection = useMemo(
+    () => project.collections.find((collection) => collection.id === project.activeCollectionId) || project.collections[0],
+    [project.collections, project.activeCollectionId]
   );
 
   const activeWorkflow = useMemo(
@@ -252,6 +280,57 @@ export default function PageBuilder({
     return project.roles.find((role) => role.id === selected.id) || null;
   }, [project.roles, selected]);
 
+  const getColumnDisplayName = (columnIndex = 0, columnCount = 1) => {
+    if (columnCount <= 1) return "Full width";
+    if (columnCount === 2) return columnIndex === 0 ? "Left half" : "Right half";
+    if (columnCount === 3) return ["Left third", "Middle third", "Right third"][columnIndex] || `Column ${columnIndex + 1}`;
+    if (columnCount === 4) return `Quarter ${columnIndex + 1}`;
+    return `Column ${columnIndex + 1}`;
+  };
+
+  const getColumnOptionLabel = (section, row, columnIndex, sectionIndex = 0) => {
+    const rawSectionName = section?.name || "Untitled section";
+    const baseSectionName = rawSectionName.replace(/\s+section$/i, "").trim() || rawSectionName;
+    const friendlyNames = {
+      Hero: "Hero area",
+      Login: "Login form",
+      Registration: "Registration form",
+      Reservation: "Reservation form",
+      Form: "Form area",
+      Metrics: "Metrics area",
+      Responses: "Responses area",
+      "Responses Overview": "Responses area",
+    };
+    const duplicateCount = (activePage?.sections || []).filter((item) => item.name === rawSectionName).length;
+    const duplicateNumber = (activePage?.sections || [])
+      .slice(0, sectionIndex + 1)
+      .filter((item) => item.name === rawSectionName).length;
+    const sectionName = `${friendlyNames[baseSectionName] || baseSectionName}${
+      duplicateCount > 1 ? ` ${duplicateNumber}` : ""
+    }`;
+    const rows = section?.rows || [];
+    const columns = row?.columns || [];
+
+    const columnLabel = getColumnDisplayName(columnIndex, columns.length);
+    if (columns.length === 1 && rows.length === 1) {
+      return sectionName;
+    }
+
+    if (rows.length <= 1) {
+      return `${sectionName}: ${columnLabel}`;
+    }
+
+    return `${sectionName}: row ${rows.findIndex((item) => item.id === row.id) + 1}, ${columnLabel}`;
+  };
+
+  const getSectionLayerElements = (section) => {
+    if (section.mode === "free") return section.freeElements || [];
+
+    return (section.rows || []).flatMap((row) =>
+      (row.columns || []).flatMap((column) => column.elements || [])
+    );
+  };
+
   const showToast = (message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2200);
@@ -283,6 +362,15 @@ export default function PageBuilder({
     }));
   };
 
+  const updateActiveCollection = (updater) => {
+    updateProject((prev) => ({
+      ...prev,
+      collections: prev.collections.map((collection) =>
+        collection.id === prev.activeCollectionId ? updater(collection) : collection
+      ),
+    }));
+  };
+
   const updateActiveWorkflow = (updater) => {
     updateProject((prev) => ({
       ...prev,
@@ -300,6 +388,11 @@ export default function PageBuilder({
   const selectForm = (formId) => {
     updateProject((prev) => ({ ...prev, activeFormId: formId }));
     setSelected({ type: "form", id: formId });
+  };
+
+  const selectCollection = (collectionId) => {
+    updateProject((prev) => ({ ...prev, activeCollectionId: collectionId }));
+    setSelected({ type: "collection", id: collectionId });
   };
 
   const selectWorkflow = (workflowId) => {
@@ -516,6 +609,30 @@ export default function PageBuilder({
   const smartAddElement = (type) => {
     const element = createElement(type, type === "formBlock" || type === "responsesTable" ? { connectedFormId: project.activeFormId } : {});
 
+    if (type === "loginBlock" || type === "registrationBlock") {
+      const section = createSection({
+        name: type === "registrationBlock" ? "Registration Section" : "Login Section",
+        layout: { width: "medium", paddingY: "large", background: "#fbfaf8" },
+        rows: [createRow([createColumn([element])])],
+      });
+
+      updateSections((sections) => [...sections, section]);
+      setSelected({ type: "element", id: element.id });
+      return;
+    }
+
+    if (type === "reservationBlock") {
+      const section = createSection({
+        name: "Reservation Section",
+        layout: { width: "full", paddingY: "medium" },
+        rows: [createRow([createColumn([element])])],
+      });
+
+      updateSections((sections) => [...sections, section]);
+      setSelected({ type: "element", id: element.id });
+      return;
+    }
+
     if (selectedSection?.mode === "free") {
       updateSections((sections) =>
         sections.map((section) =>
@@ -601,6 +718,76 @@ export default function PageBuilder({
         };
       })
     );
+  };
+
+  const updateSelectedReservationBlock = (updates) => {
+    if (!selectedElement || selectedElement.type !== "reservationBlock") return;
+
+    const nextConfig = {
+      ...getReservationBlockConfig(selectedElement),
+      ...updates,
+    };
+
+    updateSelectedElement({
+      reservation: nextConfig,
+      content: serializeReservationBlockConfig(nextConfig),
+    });
+  };
+
+  const updateSelectedAuthBlock = (updates) => {
+    if (!selectedElement || !["loginBlock", "registrationBlock"].includes(selectedElement.type)) return;
+
+    const nextConfig = {
+      ...getAuthBlockConfig(selectedElement),
+      ...updates,
+    };
+
+    updateSelectedElement({
+      auth: nextConfig,
+      content: serializeAuthBlockConfig(nextConfig),
+    });
+  };
+
+  const moveSelectedReservationToWideSection = () => {
+    if (!selectedElement || selectedElement.type !== "reservationBlock") return;
+
+    const elementToMove = { ...selectedElement, mode: "auto" };
+    const section = createSection({
+      name: "Reservation Section",
+      layout: { width: "full", paddingY: "medium" },
+      rows: [createRow([createColumn([elementToMove])])],
+    });
+
+    updateSections((sections) => {
+      const cleanedSections = sections
+        .map((item) => {
+          if (item.mode === "free") {
+            return {
+              ...item,
+              freeElements: item.freeElements.filter((element) => element.id !== selectedElement.id),
+            };
+          }
+
+          return {
+            ...item,
+            rows: item.rows
+              .map((row) => ({
+                ...row,
+                columns: row.columns.map((column) => ({
+                  ...column,
+                  elements: column.elements.filter((element) => element.id !== selectedElement.id),
+                })),
+              }))
+              .filter((row) => row.columns.some((column) => column.elements.length > 0)),
+          };
+        })
+        .filter((item) => item.mode === "free" || item.rows.length > 0);
+
+      return [...cleanedSections, section];
+    });
+
+    setSelected({ type: "element", id: selectedElement.id });
+    showToast("Reservation moved to a wide section.");
   };
 
   const deleteSelectedElement = () => {
@@ -738,91 +925,6 @@ export default function PageBuilder({
     );
   };
 
-  const getFriendlySectionName = (section) => {
-    const name = section?.name || "Page area";
-    const normalized = name.toLowerCase();
-
-    if (normalized.includes("hero")) return "Top area";
-    if (normalized.includes("metric")) return "Stats area";
-    if (normalized.includes("form")) return "Form area";
-    if (normalized.includes("response")) return "Responses area";
-    if (normalized.includes("login")) return "Login area";
-    if (normalized.includes("reservation")) return "Booking area";
-    if (normalized.includes("footer")) return "Footer area";
-    if (normalized.includes("header")) return "Header area";
-
-    return name;
-  };
-
-  const getFriendlyPlacementName = (section, row, rowIndex, columnIndex) => {
-    const sectionName = getFriendlySectionName(section);
-    const rows = section.rows || [];
-    const columnCount = row.columns?.length || Number(row.layout?.columns) || 1;
-
-    if (columnCount <= 1) {
-      return rows.length > 1 ? `${sectionName} - row ${rowIndex + 1}` : sectionName;
-    }
-
-    if ((section.name || "").toLowerCase().includes("metric")) {
-      return `Stat area ${columnIndex + 1}`;
-    }
-
-    if ((section.name || "").toLowerCase().includes("hero") && columnCount === 2) {
-      return columnIndex === 0 ? "Intro content area" : "Supporting content area";
-    }
-
-    const placementNames = {
-      2: ["Main content area", "Side content area"],
-      3: ["Left content area", "Center content area", "Right content area"],
-      4: ["Area 1", "Area 2", "Area 3", "Area 4"],
-    };
-    const placement = placementNames[columnCount]?.[columnIndex] || `Area ${columnIndex + 1}`;
-    return rows.length > 1 ? `${sectionName} - row ${rowIndex + 1}, ${placement}` : `${sectionName} - ${placement}`;
-  };
-
-  const getColumnOptionLabel = (section, row, rowIndex, columnIndex) => {
-    return getFriendlyPlacementName(section, row, rowIndex, columnIndex);
-  };
-
-  const getSectionLayerElements = (section) => {
-    if (section.mode === "free") return section.freeElements || [];
-
-    return (section.rows || []).flatMap((row) =>
-      (row.columns || []).flatMap((column) => column.elements || [])
-    );
-  };
-
-  const getElementLayerBaseLabel = (element, fallbackIndex = 0) => {
-    const firstLine = splitLines(element.content)[0];
-
-    if (element.type === "metric") return firstLine || "Metric";
-    if (element.type === "heading") return "Headline";
-    if (element.type === "text") return "Description";
-    if (element.type === "button") return firstLine || "Button";
-    if (element.type === "card") return firstLine || "Info card";
-    if (element.type === "formBlock") {
-      const form = project.forms.find((item) => item.id === element.connectedFormId);
-      return form?.title || "Form";
-    }
-    if (element.type === "responsesTable") {
-      const form = project.forms.find((item) => item.id === element.connectedFormId);
-      return form ? `${form.title} responses` : "Responses";
-    }
-
-    return element.name || `Component ${fallbackIndex + 1}`;
-  };
-
-  const getElementLayerLabel = (element, elementIndex, elements) => {
-    const baseLabel = getElementLayerBaseLabel(element, elementIndex);
-    const duplicateIndex =
-      elements
-        .slice(0, elementIndex + 1)
-        .filter((item, index) => getElementLayerBaseLabel(item, index) === baseLabel).length;
-    const duplicateCount = elements.filter((item, index) => getElementLayerBaseLabel(item, index) === baseLabel).length;
-
-    return duplicateCount > 1 ? `${baseLabel} ${duplicateIndex}` : baseLabel;
-  };
-
   const getFreePositionBasis = (key) => {
     if (key === "x" || key === "width") return viewports[viewport] || viewports.desktop;
 
@@ -914,6 +1016,40 @@ export default function PageBuilder({
     reader.readAsDataURL(file);
   };
 
+  const addCollection = () => {
+    const collection = createCollection(`Collection ${project.collections.length + 1}`);
+    updateProject((prev) => ({
+      ...prev,
+      collections: [...prev.collections, collection],
+      activeCollectionId: collection.id,
+    }));
+    setSelected({ type: "collection", id: collection.id });
+  };
+
+  const addFieldToCollection = () => {
+    const field = createField(`Field ${activeCollection.fields.length + 1}`);
+    updateActiveCollection((collection) => ({
+      ...collection,
+      fields: [...collection.fields, field],
+    }));
+  };
+
+  const updateCollectionField = (fieldId, updates) => {
+    updateActiveCollection((collection) => ({
+      ...collection,
+      fields: collection.fields.map((field) =>
+        field.id === fieldId ? { ...field, ...updates } : field
+      ),
+    }));
+  };
+
+  const deleteCollectionField = (fieldId) => {
+    updateActiveCollection((collection) => ({
+      ...collection,
+      fields: collection.fields.filter((field) => field.id !== fieldId),
+    }));
+  };
+
   const addForm = () => {
     const form = createForm(`Form ${project.forms.length + 1}`, [createField("Question 1", "shortText")]);
     updateProject((prev) => ({
@@ -943,11 +1079,7 @@ export default function PageBuilder({
   const addFieldToForm = (type = "shortText", sectionId = null) => {
     if (!activeForm) return;
     const meta = getFieldType(type);
-    const field = createField(meta.label, type, {
-      options: ["dropdown", "radio", "checkboxes", "status"].includes(type)
-        ? ["Option 1", "Option 2"]
-        : [],
-    });
+    const field = createField(meta.label, type);
     const targetSectionId = sectionId || getFormSections(activeForm)[0]?.id;
 
     updateActiveForm((form) => ({
@@ -968,19 +1100,7 @@ export default function PageBuilder({
       sections: getFormSections(form).map((section) => ({
         ...section,
         fields: (section.fields || []).map((field) =>
-          field.id === fieldId
-            ? (() => {
-                const nextType = updates.type || field.type;
-                const isChoice = ["dropdown", "radio", "checkboxes", "status"].includes(nextType);
-                const nextOptions = updates.options || field.options || [];
-
-                return {
-                  ...field,
-                  ...updates,
-                  options: isChoice ? (nextOptions.length ? nextOptions : ["Option 1", "Option 2"]) : [],
-                };
-              })()
-            : field
+          field.id === fieldId ? { ...field, ...updates } : field
         ),
       })),
     }));
@@ -1094,79 +1214,6 @@ export default function PageBuilder({
     }));
   };
 
-  const addRole = () => {
-    const role = createRole(`Role ${project.roles.length + 1}`);
-    updateProject((prev) => ({
-      ...prev,
-      roles: [...prev.roles, role],
-      activeRoleId: role.id,
-    }));
-    setSelected({ type: "role", id: role.id });
-  };
-
-  const updateRole = (roleId, updates) => {
-    updateProject((prev) => ({
-      ...prev,
-      roles: prev.roles.map((role) =>
-        role.id === roleId
-          ? {
-              ...role,
-              ...updates,
-              permissions: { ...role.permissions, ...(updates.permissions || {}) },
-            }
-          : role
-      ),
-    }));
-  };
-
-  const addUser = () => {
-    const user = createUser(
-      `User ${project.users.length + 1}`,
-      `user${project.users.length + 1}@madar.local`,
-      project.roles[0]?.id || ""
-    );
-
-    updateProject((prev) => ({
-      ...prev,
-      users: [...prev.users, user],
-    }));
-  };
-
-  const updateUser = (userId, updates) => {
-  updateProject((prev) => ({
-    ...prev,
-    users: prev.users.map((user) => (user.id === userId ? { ...user, ...updates } : user)),
-  }));
-};
-
-  const deleteUser = (userId) => {
-  const user = project.users.find((item) => item.id === userId);
-
-  if (!user) return;
-
-  const isMainAdmin = user.email === "admin@madar.local";
-
-  if (isMainAdmin) {
-    alert("You cannot delete the main admin user.");
-    return;
-  }
-
-  if (!window.confirm(`Delete user "${user.name}"?`)) return;
-
-  updateProject((prev) => ({
-    ...prev,
-    users: prev.users.filter((item) => item.id !== userId),
-  }));
-
-  showToast("User deleted.");
-};
-
-  const getResponseCount = () =>
-    project.forms.reduce((total, form) => total + (form.responses?.length || 0), 0);
-
-  const getSavedRecordCount = () =>
-    project.collections.reduce((total, collection) => total + (collection.records?.length || 0), 0);
-
   const setAnswer = (formId, fieldId, value) => {
     setRuntimeAnswers((prev) => ({
       ...prev,
@@ -1184,15 +1231,7 @@ export default function PageBuilder({
   };
 
   const submitRuntimeForm = (form) => {
-    const enteredAnswers = runtimeAnswers[form.id] || {};
-    const answers = getFormFields(form).reduce((acc, field) => {
-      if (enteredAnswers[field.id] !== undefined) {
-        acc[field.id] = enteredAnswers[field.id];
-      } else if (field.defaultValue) {
-        acc[field.id] = field.defaultValue;
-      }
-      return acc;
-    }, {});
+    const answers = runtimeAnswers[form.id] || {};
     const nextErrors = {};
 
     getFormFields(form).forEach((field) => {
@@ -1236,6 +1275,19 @@ export default function PageBuilder({
     showToast(form.successMessage);
   };
 
+  const submitRuntimeReservation = (elementId, reservation) => {
+    setRuntimeReservations((prev) => [
+      {
+        id: createId("reservation"),
+        elementId,
+        ...reservation,
+      },
+      ...prev,
+    ]);
+
+    showToast("Reservation request submitted.");
+  };
+
   const runElementAction = (element) => {
     const action = element.action || {};
 
@@ -1252,6 +1304,16 @@ export default function PageBuilder({
     if (action.type === "showMessage" && action.message) {
       showToast(action.message);
     }
+  };
+
+  const updatePublishSettings = (updates) => {
+    updateProject((prev) => ({
+      ...prev,
+      publish: {
+        ...(prev.publish || {}),
+        ...updates,
+      },
+    }));
   };
 
   const saveProject = () => {
@@ -1295,7 +1357,7 @@ export default function PageBuilder({
       },
     }));
 
-    showToast("Go Live status updated locally.");
+    showToast("Published locally. Backend connection comes later.");
   };
 
   const exportProject = () => {
@@ -1445,7 +1507,7 @@ export default function PageBuilder({
   };
 
   const renderFieldInput = (form, field, disabled = false) => {
-    const value = runtimeAnswers[form.id]?.[field.id] || field.defaultValue || "";
+    const value = runtimeAnswers[form.id]?.[field.id] || "";
     const error = runtimeErrors[field.id];
     const meta = getFieldType(field.type);
 
@@ -1457,7 +1519,7 @@ export default function PageBuilder({
 
     let inputNode = null;
 
-    if (["text", "email", "tel", "number", "date", "time", "url"].includes(meta.input)) {
+    if (["text", "email", "tel", "number", "date"].includes(meta.input)) {
       inputNode = <input type={meta.input} placeholder={field.placeholder} {...common} />;
     } else if (meta.input === "textarea") {
       inputNode = <textarea placeholder={field.placeholder} {...common} />;
@@ -1465,7 +1527,7 @@ export default function PageBuilder({
       inputNode = (
         <select {...common}>
           <option value="">Choose...</option>
-          {getFieldOptions(field).map((option) => (
+          {field.options.map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
         </select>
@@ -1473,7 +1535,7 @@ export default function PageBuilder({
     } else if (meta.input === "radio") {
       inputNode = (
         <div className="choice-list">
-          {getFieldOptions(field).map((option) => (
+          {field.options.map((option) => (
             <label key={option}>
               <input
                 type="radio"
@@ -1494,7 +1556,7 @@ export default function PageBuilder({
 
       inputNode = (
         <div className="choice-list">
-          {getFieldOptions(field).map((option) => (
+          {field.options.map((option) => (
             <label key={option}>
               <input
                 type="checkbox"
@@ -1509,41 +1571,6 @@ export default function PageBuilder({
               />
               <span>{option}</span>
             </label>
-          ))}
-        </div>
-      );
-    } else if (meta.input === "linearScale") {
-      inputNode = (
-        <div className="scale-choice">
-          <span>{field.scaleMinLabel || field.scaleMin || 1}</span>
-          {scaleRange(field).map((option) => (
-            <button
-              type="button"
-              key={option}
-              disabled={disabled}
-              className={value === option ? "active" : ""}
-              onClick={() => setAnswer(form.id, field.id, option)}
-            >
-              {option}
-            </button>
-          ))}
-          <span>{field.scaleMaxLabel || field.scaleMax || 5}</span>
-        </div>
-      );
-    } else if (meta.input === "rating") {
-      const maxRating = Math.max(2, Math.min(10, Number(field.maxRating || 5)));
-      inputNode = (
-        <div className="rating-choice">
-          {Array.from({ length: maxRating }, (_, index) => String(index + 1)).map((option) => (
-            <button
-              type="button"
-              key={option}
-              disabled={disabled}
-              className={Number(value) >= Number(option) ? "active" : ""}
-              onClick={() => setAnswer(form.id, field.id, option)}
-            >
-              {option}
-            </button>
           ))}
         </div>
       );
@@ -1564,16 +1591,7 @@ export default function PageBuilder({
         </div>
       );
     } else if (meta.input === "file") {
-      inputNode = (
-        <input
-          type="file"
-          disabled={disabled}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            setAnswer(form.id, field.id, file ? { name: file.name, size: file.size, type: file.type } : "");
-          }}
-        />
-      );
+      inputNode = <input type="file" disabled={disabled} />;
     }
 
     return (
@@ -1591,7 +1609,7 @@ export default function PageBuilder({
     );
   };
 
-  const renderConnectedForm = (formId, { allowInteraction = preview } = {}) => {
+  const renderConnectedForm = (formId) => {
     const form = project.forms.find((item) => item.id === formId) || project.forms[0];
     if (!form) return <div className="empty-connected">No form selected.</div>;
 
@@ -1609,20 +1627,20 @@ export default function PageBuilder({
               {section.description && <p>{section.description}</p>}
             </div>
 
-            {(section.fields || []).map((field) => renderFieldInput(form, field, !allowInteraction))}
+            {(section.fields || []).map((field) => renderFieldInput(form, field, !preview))}
           </div>
         ))}
 
         <button
           type="button"
           className="runtime-submit"
-          disabled={!allowInteraction}
+          disabled={!preview}
           onClick={() => submitRuntimeForm(form)}
         >
           Submit
         </button>
 
-        {!allowInteraction && <p className="builder-note">Enable Preview to test this form.</p>}
+        {!preview && <p className="builder-note">Enable Preview to test this form.</p>}
       </div>
     );
   };
@@ -1653,7 +1671,7 @@ export default function PageBuilder({
             <div className="mock-table-row" key={response.id}>
               <span>{response.status || "New"}</span>
               {fields.map((field) => (
-                <span key={field.id}>{formatSavedValue(response.answers?.[field.id])}</span>
+                <span key={field.id}>{response.answers?.[field.id] || "—"}</span>
               ))}
             </div>
           ))}
@@ -1748,11 +1766,85 @@ export default function PageBuilder({
       return <div key={element.id} {...commonProps}>{renderConnectedForm(element.connectedFormId)}</div>;
     }
 
+    if (element.type === "loginBlock" || element.type === "registrationBlock") {
+      const authConfig = getAuthBlockConfig(element);
+
+      return (
+        <div key={element.id} {...commonProps}>
+          <AuthBlock
+            {...authConfig}
+            disabled={!preview}
+            onLogin={() => showToast("Logged in. Redirecting to the login workspace.")}
+            onRegister={() => showToast("Account created. Please log in.")}
+          />
+        </div>
+      );
+    }
+
+    if (element.type === "reservationBlock") {
+      const reservationConfig = getReservationBlockConfig(element);
+
+      return (
+        <div key={element.id} {...commonProps}>
+          <ReservationBlock
+            {...reservationConfig}
+            disabled={!preview}
+            submitLabel={reservationConfig.submitLabel}
+            onSubmit={(reservation) => submitRuntimeReservation(element.id, reservation)}
+          />
+        </div>
+      );
+    }
+
     if (element.type === "responsesTable") {
       return <div key={element.id} {...commonProps}>{renderResponsesTable(element.connectedFormId)}</div>;
     }
 
     return <div key={element.id} {...commonProps}>{element.content}</div>;
+  };
+
+  const openOrCreateLoginPage = () => {
+    const site = project.siteChrome || defaultSiteChrome;
+    const targetSlug = site.authPageSlug || "/login";
+
+    const existingLoginPage = project.pages.find((page) => {
+      const pageName = String(page.name || "").toLowerCase().trim();
+      const pageSlug = String(page.slug || "").toLowerCase().trim();
+
+      return pageSlug === targetSlug || pageName === "login";
+    });
+
+    if (preview) {
+      window.location.href = getTenantLoginTarget(project);
+      return;
+    }
+
+    if (existingLoginPage) {
+      selectPage(existingLoginPage.id);
+      setActiveTab("design");
+      setDesignPanel("Pages");
+      return;
+    }
+
+    const loginPage = createPage("Login", [createLoginPageSection()]);
+    loginPage.slug = targetSlug;
+    loginPage.visibility = "public";
+
+    updateProject((prev) => ({
+      ...prev,
+      siteChrome: {
+        ...(prev.siteChrome || defaultSiteChrome),
+        headerButtonLabel: "Login",
+        authPageSlug: targetSlug,
+      },
+      pages: [...prev.pages, loginPage],
+      activePageId: loginPage.id,
+    }));
+
+    setSelected({ type: "page", id: loginPage.id });
+    setActiveTab("design");
+    setDesignPanel("Pages");
+    showToast("Login page created.");
   };
 
   const renderSiteHeader = () => {
@@ -1799,9 +1891,16 @@ export default function PageBuilder({
             ))}
           </nav>
 
-          <button type="button" className="built-site-cta">
-            {site.headerButtonLabel || "Contact"}
-          </button>
+          <button
+          type="button"
+          className="built-site-cta"
+          onClick={(event) => {
+            event.stopPropagation();
+            openOrCreateLoginPage();
+          }}
+        >
+          {site.headerButtonLabel || "Login"}
+        </button>
         </div>
       </header>
     );
@@ -1872,7 +1971,7 @@ export default function PageBuilder({
           <div className="ecommerce-footer-contact">
             <h4>Contact</h4>
             <div className="footer-language-pill">
-              <span>|</span>
+              <span>◎</span>
               <strong>{site.footerLanguageLabel || "AR"}</strong>
             </div>
             <p>{site.contactEmail || "info@madar.com"}</p>
@@ -1881,7 +1980,7 @@ export default function PageBuilder({
         </div>
 
         <div className="ecommerce-footer-bottom">
-          <p>(c) 2026 {site.footerStoreName || site.brand || "Your Website"}. {site.rights || "All rights reserved."}</p>
+          <p>© 2026 {site.footerStoreName || site.brand || "Your Website"}. {site.rights || "All rights reserved."}</p>
           <button type="button" className="powered-by-madar">Powered by Madar</button>
         </div>
       </footer>
@@ -1936,56 +2035,60 @@ export default function PageBuilder({
           {designPanel === "Layers" && (
             <section className="builder-panel">
               <h2>Layers</h2>
-              <p className="panel-help">Page outline. Select a section or component to edit it.</p>
-              <div className="layer-add-actions">
-                <button type="button" onClick={() => setModal("section")}>
-                  Add page area
-                </button>
-                {[
-                  ["heading", "Headline"],
-                  ["text", "Description"],
-                  ["button", "Button"],
-                  ["image", "Image"],
-                  ["formBlock", "Form"],
-                ].map(([type, label]) => (
-                  <button type="button" key={type} onClick={() => smartAddElement(type)}>
-                    Add {label}
-                  </button>
-                ))}
-              </div>
               <div className="layer-tree">
-                {activePage?.sections.map((section, sectionIndex) => {
-                  const elements = getSectionLayerElements(section);
+                {activePage?.sections.map((section) => (
+                  <div key={section.id} className="layer-item">
+                    <button
+                      type="button"
+                      className={selected.id === section.id ? "active" : ""}
+                      onClick={() => setSelected({ type: "section", id: section.id })}
+                    >
+                      ▾ {section.name}
+                    </button>
 
-                  return (
-                    <div key={section.id} className="layer-item">
-                      <button
-                        type="button"
-                        className={selected.id === section.id ? "active" : ""}
-                        onClick={() => setSelected({ type: "section", id: section.id })}
-                      >
-                        {section.name || `Section ${sectionIndex + 1}`}
-                      </button>
-
-                      <div className="layer-children">
-                        {elements.length > 0 ? (
-                          elements.map((element, elementIndex) => (
+                    <div className="layer-children">
+                      {section.mode === "free"
+                        ? section.freeElements.map((element) => (
                             <button
                               type="button"
                               key={element.id}
                               className={selected.id === element.id ? "active" : ""}
                               onClick={() => setSelected({ type: "element", id: element.id })}
                             >
-                              {getElementLayerLabel(element, elementIndex, elements)}
+                              {element.name}
                             </button>
                           ))
-                        ) : (
-                          <span className="layer-empty">No components yet</span>
-                        )}
-                      </div>
+                        : section.rows.map((row) =>
+                            row.columns.map((column, index) => {
+                              const columnCount = row.columns?.length || 1;
+
+                              return (
+                              <div key={column.id} className="layer-column">
+                                <button
+                                  type="button"
+                                  className={selected.id === column.id ? "active" : ""}
+                                  onClick={() => setSelected({ type: "column", id: column.id })}
+                                >
+                                  {getColumnDisplayName(index, columnCount)}
+                                </button>
+
+                                {column.elements.map((element) => (
+                                  <button
+                                    type="button"
+                                    key={element.id}
+                                    className={selected.id === element.id ? "active" : ""}
+                                    onClick={() => setSelected({ type: "element", id: element.id })}
+                                  >
+                                    {element.name}
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                            })
+                          )}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </section>
           )}
@@ -1995,7 +2098,7 @@ export default function PageBuilder({
               <h2>Add Elements</h2>
               <p className="panel-help">Select a section or column, then add an element.</p>
 
-              {["Content", "Dashboard", "Connected"].map((group) => (
+              {["Content", "Dashboard", "Auth", "Connected"].map((group) => (
                 <div key={group} className="add-group">
                   <span>{group}</span>
                   {elementTypes
@@ -2140,7 +2243,8 @@ export default function PageBuilder({
           <label>Brand name<input value={project.siteChrome?.brand || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), brand: event.target.value } }))} /></label>
           <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
           <label className="upload-image-button">Upload logo<input type="file" accept="image/*" onChange={(event) => uploadSiteLogo(event.target.files?.[0])} /></label>
-          <label>Header button<input value={project.siteChrome?.headerButtonLabel || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerButtonLabel: event.target.value } }))} /></label>
+          <label>Header login button<input value={project.siteChrome?.headerButtonLabel || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerButtonLabel: event.target.value } }))} /></label>
+<label>Login page slug<input value={project.siteChrome?.authPageSlug || "/login"} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), authPageSlug: event.target.value || "/login" } }))} /></label>
           <label>Header alignment<select value={project.siteChrome?.headerAlign || "center"} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerAlign: event.target.value } }))}>
             <option value="left">Left</option>
             <option value="center">Center</option>
@@ -2207,30 +2311,75 @@ export default function PageBuilder({
         <div className="inspector-group">
           <h3>Element</h3>
           <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
-          <label>Content<textarea value={selectedElement.content} onChange={(event) => updateSelectedElement({ content: event.target.value })} /></label>
+          {["loginBlock", "registrationBlock"].includes(selectedElement.type) ? (
+            <details open>
+              <summary>Auth content</summary>
+              <label>Title<input value={getAuthBlockConfig(selectedElement).title} onChange={(event) => updateSelectedAuthBlock({ title: event.target.value })} /></label>
+              <label>Subtitle<textarea value={getAuthBlockConfig(selectedElement).subtitle} onChange={(event) => updateSelectedAuthBlock({ subtitle: event.target.value })} /></label>
+              <label>Button text<input value={getAuthBlockConfig(selectedElement).buttonText} onChange={(event) => updateSelectedAuthBlock({ buttonText: event.target.value })} /></label>
+              <label>Switch text<input value={getAuthBlockConfig(selectedElement).switchText} onChange={(event) => updateSelectedAuthBlock({ switchText: event.target.value })} /></label>
+              <label>Switch action<input value={getAuthBlockConfig(selectedElement).switchActionText} onChange={(event) => updateSelectedAuthBlock({ switchActionText: event.target.value })} /></label>
+            </details>
+          ) : selectedElement.type === "reservationBlock" ? (
+            <details open>
+              <summary>Reservation content</summary>
+              <label>Title<input value={getReservationBlockConfig(selectedElement).title} onChange={(event) => updateSelectedReservationBlock({ title: event.target.value })} /></label>
+              <label>Description<textarea value={getReservationBlockConfig(selectedElement).description} onChange={(event) => updateSelectedReservationBlock({ description: event.target.value })} /></label>
+              <label>Services<textarea value={getReservationBlockConfig(selectedElement).services.join("\n")} onChange={(event) => updateSelectedReservationBlock({ services: splitLines(event.target.value) })} /></label>
+              <label>Button text<input value={getReservationBlockConfig(selectedElement).submitLabel} onChange={(event) => updateSelectedReservationBlock({ submitLabel: event.target.value })} /></label>
+              <div className="reservation-field-picker">
+                <strong>Needed data</strong>
+                {reservationFieldOptions.map((field) => {
+                  const config = getReservationBlockConfig(selectedElement);
+                  const checked = config.fields.includes(field.id);
+
+                  return (
+                    <label className="checkbox-control" key={field.id}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => {
+                          const nextFields = event.target.checked
+                            ? [...config.fields, field.id]
+                            : config.fields.filter((item) => item !== field.id);
+
+                          updateSelectedReservationBlock({
+                            fields: nextFields.length > 0 ? nextFields : [field.id],
+                          });
+                        }}
+                      />
+                      {field.label}
+                    </label>
+                  );
+                })}
+              </div>
+              <button type="button" className="full-width-action" onClick={moveSelectedReservationToWideSection}>Move to wide section</button>
+            </details>
+          ) : (
+            <label>Content<textarea value={selectedElement.content} onChange={(event) => updateSelectedElement({ content: event.target.value })} /></label>
+          )}
           <label>Text color<input type="color" value={selectedElement.styles.color || "#1a2744"} onChange={(event) => updateSelectedElement({ styles: { color: event.target.value } })} /></label>
           <label>Background<input type="color" value={selectedElement.styles.backgroundColor || "#ffffff"} onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })} /></label>
           <label>Font size<input value={selectedElement.styles.fontSize || ""} placeholder="Example: 18px" onChange={(event) => updateSelectedElement({ styles: { fontSize: event.target.value } })} /></label>
           <label>Border radius<input value={selectedElement.styles.borderRadius || ""} placeholder="Example: 16px" onChange={(event) => updateSelectedElement({ styles: { borderRadius: event.target.value } })} /></label>
           {selectedElement.mode !== "free" && (
-            <label>
-              Component width
-              <select
-                value={selectedElement.styles.width || "auto"}
-                onChange={(event) =>
-                  updateSelectedElement({
-                    styles: { width: event.target.value === "auto" ? "" : event.target.value },
-                  })
-                }
-              >
-                <option value="auto">Auto - content width</option>
-                <option value="100%">Full - 100%</option>
-                <option value="75%">Wide - 75%</option>
-                <option value="50%">Half - 50%</option>
-                <option value="33.333%">Third - 33%</option>
-                <option value="25%">Quarter - 25%</option>
-              </select>
-            </label>
+            <details open>
+              <summary>Size and placement</summary>
+              <label>Width ratio<select value={selectedElement.styles.width || "auto"} onChange={(event) => updateSelectedElement({ styles: { width: event.target.value === "auto" ? "" : event.target.value } })}>
+                <option value="auto">Natural size</option>
+                <option value="100%">Full width</option>
+                <option value="75%">Wide - 3/4</option>
+                <option value="50%">Half - 1/2</option>
+                <option value="33.333%">Small - 1/3</option>
+              </select></label>
+              <label>Placement<select value={selectedElement.styles.alignSelf || "auto"} onChange={(event) => updateSelectedElement({ styles: { alignSelf: event.target.value } })}>
+                <option value="auto">Use column setting</option>
+                <option value="flex-start">Left</option>
+                <option value="center">Center</option>
+                <option value="flex-end">Right</option>
+                <option value="stretch">Stretch</option>
+              </select></label>
+            </details>
           )}
 
           {(selectedElement.type === "formBlock" || selectedElement.type === "responsesTable") && (
@@ -2294,11 +2443,11 @@ export default function PageBuilder({
             </div>
             {findElementLocation(selectedElement.id)?.isFree === false && (
               <label>Move this element to<select value={findElementLocation(selectedElement.id)?.columnId || ""} onChange={(event) => moveSelectedElementToColumn(event.target.value)}>
-                {activePage?.sections.flatMap((section) =>
-                  (section.rows || []).flatMap((row, rowIndex) =>
+                {activePage?.sections.flatMap((section, sectionIndex) =>
+                  (section.rows || []).flatMap((row) =>
                     row.columns.map((column, columnIndex) => (
                       <option key={column.id} value={column.id}>
-                        {getColumnOptionLabel(section, row, rowIndex, columnIndex)}
+                        {getColumnOptionLabel(section, row, columnIndex, sectionIndex)}
                       </option>
                     ))
                   )
@@ -2313,44 +2462,58 @@ export default function PageBuilder({
     </aside>
   );
 
-  const formatSavedValue = (value) => {
-    if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
-    if (value === true) return "Yes";
-    if (value === false) return "No";
-    if (value === null || value === undefined || value === "") return "—";
-    if (typeof value === "object" && value.name) return value.name;
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
-  };
   const renderDataTab = () => (
-    <BuilderAnalysisPage
-      project={project}
-      getResponseCount={getResponseCount}
-      getSavedRecordCount={getSavedRecordCount}
-      selectForm={selectForm}
-      setActiveTab={setActiveTab}
-      getFormFields={getFormFields}
-    />
+    <div className="workspace-page">
+      <div className="workspace-header">
+        <div>
+          <h2>Data Logs</h2>
+          <p>Manage the records and collections created from forms, logs, requests, orders, reports, and other system data.</p>
+        </div>
+        <button type="button" onClick={addCollection}>+ Collection</button>
+      </div>
+
+      <div className="forms-layout">
+        <aside className="object-list">
+          {project.collections.map((collection) => (
+            <button key={collection.id} type="button" className={activeCollection?.id === collection.id ? "active" : ""} onClick={() => selectCollection(collection.id)}>
+              <strong>{collection.name}</strong>
+              <span>{collection.fields.length} fields · {(collection.records || []).length} records</span>
+            </button>
+          ))}
+        </aside>
+
+        <section className="form-editor">
+          {activeCollection && (
+            <>
+              <div className="editor-card-header">
+                <h3>{activeCollection.name}</h3>
+                <button type="button" onClick={addFieldToCollection}>+ Field</button>
+              </div>
+
+              <label>Collection name<input value={activeCollection.name} onChange={(event) => updateActiveCollection((collection) => ({ ...collection, name: event.target.value }))} /></label>
+              <label>Description<textarea value={activeCollection.description} onChange={(event) => updateActiveCollection((collection) => ({ ...collection, description: event.target.value }))} /></label>
+
+              <div className="field-list">
+                {activeCollection.fields.map((field) => (
+                  <div className="field-row" key={field.id}>
+                    <input value={field.label} onChange={(event) => updateCollectionField(field.id, { label: event.target.value })} />
+                    <select value={field.type} onChange={(event) => updateCollectionField(field.id, { type: event.target.value })}>
+                      {fieldTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
+                    </select>
+                    <label className="checkbox-control compact-check"><input type="checkbox" checked={field.required} onChange={(event) => updateCollectionField(field.id, { required: event.target.checked })} /> Required</label>
+                    <button type="button" className="danger-lite" onClick={() => deleteCollectionField(field.id)}>Delete</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
   );
 
   const renderFormsTab = () => {
-    const commonFieldTypes = [
-      "shortText",
-      "paragraph",
-      "email",
-      "phone",
-      "url",
-      "number",
-      "date",
-      "time",
-      "dropdown",
-      "radio",
-      "checkboxes",
-      "yesNo",
-      "linearScale",
-      "rating",
-      "file",
-    ];
+    const commonFieldTypes = ["shortText", "paragraph", "email", "phone", "dropdown", "radio", "checkboxes", "date"];
     const placements = activeForm ? getFormPlacements(activeForm.id) : [];
 
     return (
@@ -2358,7 +2521,7 @@ export default function PageBuilder({
       <div className="workspace-header">
         <div>
           <h2>Forms</h2>
-          <p>Build forms like a document, preview them live, and place them on any page.</p>
+          <p>Create the form first. Then place it on any design page with one click.</p>
         </div>
         <button type="button" onClick={addForm}>+ Form</button>
       </div>
@@ -2368,7 +2531,7 @@ export default function PageBuilder({
           {project.forms.map((form) => (
             <button key={form.id} type="button" className={activeForm?.id === form.id ? "active" : ""} onClick={() => selectForm(form.id)}>
               <strong>{form.title}</strong>
-              <span>{getFormFields(form).length} fields / {form.responses.length} responses</span>
+              <span>{getFormFields(form).length} fields · {form.responses.length} responses</span>
             </button>
           ))}
         </aside>
@@ -2410,24 +2573,9 @@ export default function PageBuilder({
                               {fieldTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
                             </select>
                           </div>
-                          <div className="question-secondary-grid">
-                            <input value={field.helpText || ""} placeholder="Help text shown under the question" onChange={(event) => updateFormField(field.id, { helpText: event.target.value })} />
-                            <input value={field.placeholder || ""} placeholder="Placeholder text" onChange={(event) => updateFormField(field.id, { placeholder: event.target.value })} />
-                            <input value={field.defaultValue || ""} placeholder="Default answer" onChange={(event) => updateFormField(field.id, { defaultValue: event.target.value })} />
-                          </div>
+                          <input value={field.placeholder || ""} placeholder="Help text or placeholder" onChange={(event) => updateFormField(field.id, { placeholder: event.target.value })} />
                           {["dropdown", "radio", "checkboxes", "status"].includes(field.type) && (
                             <textarea className="options-editor" value={(field.options || []).join("\n")} placeholder="One option per line" onChange={(event) => updateFormField(field.id, { options: splitLines(event.target.value) })} />
-                          )}
-                          {field.type === "linearScale" && (
-                            <div className="scale-editor">
-                              <label>From<input type="number" min="0" max="10" value={field.scaleMin || 1} onChange={(event) => updateFormField(field.id, { scaleMin: Number(event.target.value) })} /></label>
-                              <label>To<input type="number" min="2" max="10" value={field.scaleMax || 5} onChange={(event) => updateFormField(field.id, { scaleMax: Number(event.target.value) })} /></label>
-                              <label>Low label<input value={field.scaleMinLabel || ""} onChange={(event) => updateFormField(field.id, { scaleMinLabel: event.target.value })} /></label>
-                              <label>High label<input value={field.scaleMaxLabel || ""} onChange={(event) => updateFormField(field.id, { scaleMaxLabel: event.target.value })} /></label>
-                            </div>
-                          )}
-                          {field.type === "rating" && (
-                            <label className="inline-setting">Max rating<input type="number" min="2" max="10" value={field.maxRating || 5} onChange={(event) => updateFormField(field.id, { maxRating: Number(event.target.value) })} /></label>
                           )}
                         </div>
                         <div className="question-footer-actions">
@@ -2500,7 +2648,7 @@ export default function PageBuilder({
 
           <section>
             <h3>Preview</h3>
-            {activeForm && renderConnectedForm(activeForm.id, { allowInteraction: true })}
+            {activeForm && renderConnectedForm(activeForm.id)}
           </section>
 
         </aside>
@@ -2524,7 +2672,7 @@ export default function PageBuilder({
           {project.workflows.map((workflow) => (
             <button key={workflow.id} type="button" className={activeWorkflow?.id === workflow.id ? "active" : ""} onClick={() => selectWorkflow(workflow.id)}>
               <strong>{workflow.name}</strong>
-              <span>{workflow.enabled ? "Enabled" : "Disabled"} / {workflow.steps.length} steps</span>
+              <span>{workflow.enabled ? "Enabled" : "Disabled"} · {workflow.steps.length} steps</span>
             </button>
           ))}
         </aside>
@@ -2561,117 +2709,6 @@ export default function PageBuilder({
     </div>
   );
 
-  const renderUsersTab = () => (
-  <div className="workspace-page">
-    <div className="workspace-header">
-      <div>
-        <h2>Users & Roles</h2>
-        <p>Front-end-only mock users and permissions. Backend auth comes later.</p>
-      </div>
-
-      <div className="header-actions">
-        <button type="button" onClick={addUser}>+ User</button>
-        <button type="button" onClick={addRole}>+ Role</button>
-      </div>
-    </div>
-
-    <div className="users-grid">
-      <section className="dashboard-panel">
-        <h3>Team Members</h3>
-
-        <div className="user-list">
-          {project.users.map((user) => {
-            const isMainAdmin = user.email === "admin@madar.local";
-
-            return (
-              <div className="user-row" key={user.id}>
-                <div className="user-row-main">
-                  <strong>{user.name}</strong>
-                  <span>{user.email}</span>
-                </div>
-
-                <select
-                  value={user.roleId}
-                  onChange={(event) => updateUser(user.id, { roleId: event.target.value })}
-                >
-                  {project.roles.map((role) => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={user.status}
-                  onChange={(event) => updateUser(user.id, { status: event.target.value })}
-                >
-                  <option>Active</option>
-                  <option>Invited</option>
-                  <option>Disabled</option>
-                </select>
-
-                <button
-                  type="button"
-                  className="danger-lite user-delete-button"
-                  disabled={isMainAdmin}
-                  title={isMainAdmin ? "Main admin cannot be deleted" : "Delete user"}
-                  onClick={() => deleteUser(user.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="dashboard-panel">
-        <h3>Roles</h3>
-
-        <div className="roles-list">
-          {project.roles.map((role) => (
-            <div
-              className={`role-card ${selectedRole?.id === role.id ? "active" : ""}`}
-              key={role.id}
-              onClick={() => setSelected({ type: "role", id: role.id })}
-            >
-              <input
-                value={role.name}
-                onChange={(event) => updateRole(role.id, { name: event.target.value })}
-              />
-
-              <textarea
-                value={role.description}
-                placeholder="Role description"
-                onChange={(event) => updateRole(role.id, { description: event.target.value })}
-              />
-
-              {permissionGroups.map((group) => (
-                <div className="permission-group" key={group.title}>
-                  <strong>{group.title}</strong>
-
-                  {group.permissions.map((permission) => (
-                    <label className="checkbox-control" key={permission.key}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(role.permissions[permission.key])}
-                        onChange={(event) =>
-                          updateRole(role.id, {
-                            permissions: { [permission.key]: event.target.checked },
-                          })
-                        }
-                      />
-                      {permission.label}
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  </div>
-);
-
   const renderThemeTab = () => (
     <div className="workspace-page">
       <div className="workspace-header">
@@ -2704,55 +2741,154 @@ export default function PageBuilder({
   );
 
   const renderResponsesTab = () => (
-    <BuilderResponsesPage
-      project={project}
-      activeForm={activeForm}
-      selectForm={selectForm}
-      setActiveTab={setActiveTab}
-      getFormFields={getFormFields}
-      formatSavedValue={formatSavedValue}
-      showToast={showToast}
-    />
-  );
-
-  const renderPublishTab = () => (
     <div className="workspace-page">
       <div className="workspace-header">
         <div>
-          <h2>Publish</h2>
-          <p>Local-only save, load, export, and mock publishing for now.</p>
+          <h2>Submissions</h2>
+          <p>Review form submissions and collected data from the system.</p>
         </div>
       </div>
 
-      <div className="publish-grid">
-        <section className="publish-card">
-          <h3>Status</h3>
-          <p>Project: <strong>{project.name}</strong></p>
-          <p>State: <strong>{project.status}</strong></p>
-          <p>Last saved: <strong>{project.publish.lastSavedAt || "Not saved yet"}</strong></p>
-          <p>Last published: <strong>{project.publish.lastPublishedAt || "Not published yet"}</strong></p>
-        </section>
-
-        <section className="publish-card">
-          <h3>Actions</h3>
-          <div className="publish-actions">
-            <button type="button" onClick={saveProject}>Save locally</button>
-            <button type="button" onClick={loadProject}>Load local save</button>
-            <button type="button" onClick={exportProject}>Copy JSON export</button>
-            <button type="button" className="primary-action go-live-action" onClick={publishProject}>Go Live</button>
-          </div>
-        </section>
+      <div className="responses-grid">
+        {project.forms.map((form) => (
+          <section className="responses-page-card" key={form.id}>
+            <div className="responses-page-header">
+              <div>
+                <h3>{form.title}</h3>
+                <p>{form.responses.length} responses</p>
+              </div>
+            </div>
+            {renderResponsesTable(form.id)}
+          </section>
+        ))}
       </div>
     </div>
   );
+
+  const renderPublishTab = () => {
+    const subdomain = project.publish?.subdomain || "";
+    const siteBaseDomain = project.publish?.siteBaseDomain || "madar.app";
+    const customDomain = project.publish?.customDomain || "";
+    const localSiteUrl = `/site/${subdomain || "my-site"}`;
+    const productionUrl = customDomain
+      ? `https://${customDomain}`
+      : `https://${subdomain || "my-site"}.${siteBaseDomain}`;
+
+    return (
+      <div className="workspace-page">
+        <div className="workspace-header">
+          <div>
+            <h2>Publish</h2>
+            <p>Configure the public website URL, subdomain, local preview, and mock publishing.</p>
+          </div>
+        </div>
+
+        <div className="publish-grid">
+          <section className="publish-card">
+            <h3>Status</h3>
+            <p>Project: <strong>{project.name}</strong></p>
+            <p>State: <strong>{project.status}</strong></p>
+            <p>Local URL: <strong>{localSiteUrl}</strong></p>
+            <p>Production URL: <strong>{productionUrl}</strong></p>
+            <p>Last saved: <strong>{project.publish?.lastSavedAt || "Not saved yet"}</strong></p>
+            <p>Last published: <strong>{project.publish?.lastPublishedAt || "Not published yet"}</strong></p>
+          </section>
+
+          <section className="publish-card">
+            <h3>Website Address</h3>
+
+            <label>
+              Subdomain
+              <input
+                value={subdomain}
+                placeholder="my-business"
+                onChange={(event) =>
+                  updatePublishSettings({
+                    subdomain: sanitizeSubdomain(event.target.value),
+                  })
+                }
+              />
+            </label>
+
+            <label>
+              Base domain
+              <input
+                value={siteBaseDomain}
+                placeholder="madar.app"
+                onChange={(event) =>
+                  updatePublishSettings({
+                    siteBaseDomain: event.target.value.trim(),
+                  })
+                }
+              />
+            </label>
+
+            <label>
+              Custom domain later
+              <input
+                value={customDomain}
+                placeholder="www.customer.com"
+                onChange={(event) =>
+                  updatePublishSettings({
+                    customDomain: event.target.value.trim().toLowerCase(),
+                  })
+                }
+              />
+            </label>
+
+            <div className="publish-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = localSiteUrl;
+                }}
+              >
+                Open local site
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `${localSiteUrl}/login`;
+                }}
+              >
+                Open login
+              </button>
+            </div>
+          </section>
+
+          <section className="publish-card">
+            <h3>Actions</h3>
+            <div className="publish-actions">
+              <button type="button" onClick={saveProject}>Save locally</button>
+              <button type="button" onClick={loadProject}>Load local save</button>
+              <button type="button" onClick={exportProject}>Copy JSON export</button>
+              <button type="button" className="primary-action" onClick={publishProject}>Publish mock</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  };
 
   const renderActiveTab = () => {
     if (activeTab === "design") return renderDesignTab();
     if (activeTab === "data") return renderDataTab();
     if (activeTab === "forms") return renderFormsTab();
     if (activeTab === "responses") return renderResponsesTab();
-    if (activeTab === "workflows") return renderWorkflowsTab();
-    if (activeTab === "users") return renderUsersTab();
+
+    if (activeTab === "users") {
+      return (
+        <PageBuilderUsers
+          project={project}
+          updateProject={updateProject}
+          selectedRole={selectedRole}
+          setSelected={setSelected}
+          showToast={showToast}
+        />
+      );
+    }
+
     if (activeTab === "theme") return renderThemeTab();
     if (activeTab === "publish") return renderPublishTab();
     return renderDesignTab();
@@ -2761,11 +2897,7 @@ export default function PageBuilder({
   const renderWorkspaceNavigator = () => (
     <nav className="workspace-tabs" aria-label="Builder workspaces">
       {builderTabs
-        .filter((tab) =>
-          visibleTabIds
-            ? visibleTabIds.includes(tab.id)
-            : !mainBuilderHiddenTabs.includes(tab.id)
-        )
+        .filter((tab) => !visibleTabIds || visibleTabIds.includes(tab.id))
         .map((tab) => (
         <button
           type="button"
@@ -2813,13 +2945,11 @@ export default function PageBuilder({
             <p>{activeHelper}</p>
           </div>
 
-          {!hideWorkspaceTabs && (
-            <div className="builder-topbar-actions">
-              <button type="button" onClick={() => setPreview((value) => !value)}>{preview ? "Exit Preview" : "Preview"}</button>
-              <button type="button" onClick={saveProject}>Save</button>
-              <button type="button" className="primary-action go-live-action" onClick={publishProject}>Go Live</button>
-            </div>
-          )}
+          <div className="builder-topbar-actions">
+            <button type="button" onClick={() => setPreview((value) => !value)}>{preview ? "Exit Preview" : "Preview"}</button>
+            <button type="button" onClick={saveProject}>Save</button>
+            <button type="button" className="primary-action" onClick={publishProject}>Publish</button>
+          </div>
         </header>
 
         {!preview && !hideWorkspaceTabs && (
@@ -2860,7 +2990,7 @@ export default function PageBuilder({
           <div className="builder-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <h2>Add Section</h2>
-              <button type="button" onClick={() => setModal(null)}>Close</button>
+              <button type="button" onClick={() => setModal(null)}>×</button>
             </div>
             <div className="section-library-grid">
               {sectionLibrary.map((section) => (
@@ -2880,7 +3010,7 @@ export default function PageBuilder({
           <div className="builder-modal wide" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <h2>Choose Starter</h2>
-              <button type="button" onClick={() => setModal(null)}>Close</button>
+              <button type="button" onClick={() => setModal(null)}>×</button>
             </div>
             <div className="starter-grid">
               {starterSystems.map((starter) => (
@@ -2898,9 +3028,3 @@ export default function PageBuilder({
     </div>
   );
 }
-
-
-
-
-
-

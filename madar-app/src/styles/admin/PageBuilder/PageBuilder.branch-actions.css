@@ -1,0 +1,23 @@
+/* ============================================================
+   PageBuilder — Main pages / branch pages / button actions
+   ============================================================ */
+
+.page-builder .checkbox-control {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.page-builder .checkbox-control input {
+  width: auto !important;
+  min-width: auto !important;
+}
+
+.page-builder .compact-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.page-builder details[open] > summary {
+  color: var(--madar-red);
+}

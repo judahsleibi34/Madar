@@ -1,0 +1,107 @@
+/* ============================================================
+   Page Builder — Go Live + Delete Modal fixes
+   Paste at the bottom of src/styles/admin/PageBuilder/PageBuilder.app.css
+   ============================================================ */
+
+.page-builder .go-live-action {
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.24) !important;
+}
+
+.page-builder .go-live-action:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #111b31 0%, #6e2014 100%) !important;
+  color: #ffffff !important;
+}
+
+.page-builder .page-actions-grid .danger-lite,
+.page-builder .compact-actions .danger-lite {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(170px, 100%);
+  text-align: center;
+}
+
+.page-builder .page-delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(7px);
+}
+
+.page-builder .page-delete-modal {
+  width: min(430px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  border-radius: 28px;
+  padding: 26px;
+  background: #ffffff;
+  border: 1px solid rgba(139, 42, 26, 0.18);
+  color: var(--madar-text);
+  text-align: center;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
+}
+
+.page-builder .page-delete-modal-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: rgba(139, 42, 26, 0.1);
+  color: var(--madar-red);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.page-builder .page-delete-modal-copy h2 {
+  margin: 0;
+  color: var(--madar-text);
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.page-builder .page-delete-modal-copy p {
+  margin: 10px 0 0;
+  color: var(--madar-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.page-builder .page-delete-modal-copy strong {
+  color: var(--madar-text);
+}
+
+.page-builder .page-delete-modal-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.page-builder .page-delete-modal-actions button {
+  min-height: 48px;
+  border-radius: 14px;
+  padding: 0 16px;
+  font-weight: 950;
+}
+
+.page-builder .page-delete-modal-secondary {
+  background: rgba(26, 39, 68, 0.08) !important;
+  color: var(--madar-text) !important;
+}
+
+.page-builder .page-delete-modal-danger {
+  background: var(--madar-red) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.22) !important;
+}

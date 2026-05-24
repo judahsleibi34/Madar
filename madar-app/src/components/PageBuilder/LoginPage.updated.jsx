@@ -45,6 +45,10 @@ export const formSection = (formId = "") =>
     rows: [
       createRow([
         createColumn([
+          createElement("heading", {
+            content: "Submit your information",
+            styles: { fontSize: "34px" },
+          }),
           createElement("formBlock", {
             connectedFormId: formId,
           }),
@@ -230,7 +234,9 @@ export const buildStarterProject = (starterId = "website") => {
     });
 
     const pages = [
-      createPage("Portal Home", [heroSection(), formSection(form.id)]),
+      createPage("Portal Home", [heroSection(), metricsSection()]),
+      createPage("Submit Request", [formSection(form.id)]),
+      createPage("Review Responses", [responsesSection(form.id)]),
     ];
 
     return createProject({
@@ -259,7 +265,9 @@ export const buildStarterProject = (starterId = "website") => {
     });
 
     const pages = [
-      createPage("Monitoring Home", [heroSection(), formSection(form.id)]),
+      createPage("Monitoring Dashboard", [heroSection(), metricsSection()]),
+      createPage("Submit Report", [formSection(form.id)]),
+      createPage("Reports", [responsesSection(form.id)]),
     ];
 
     return createProject({
@@ -290,7 +298,9 @@ export const buildStarterProject = (starterId = "website") => {
     });
 
     const pages = [
-      createPage("Store Home", [heroSection(), formSection(form.id)]),
+      createPage("Store Home", [heroSection()]),
+      createPage("Place Order", [formSection(form.id)]),
+      createPage("Orders", [metricsSection(), responsesSection(form.id)]),
     ];
 
     return createProject({
@@ -337,10 +347,11 @@ export const buildStarterProject = (starterId = "website") => {
     siteChrome: {
     ...defaultSiteChrome,
     headerButtonLabel: "Login",
-    footerShopLinks: "Home\nLogin\nContact",
+    footerShopLinks: "Home\nLogin\nContact\nResponses",
     },
     pages: [
       createPage("Home", [heroSection(), formSection(form.id)]),
+      createPage("Responses", [responsesSection(form.id)]),
     ],
     forms: [form],
     collections: [collection],

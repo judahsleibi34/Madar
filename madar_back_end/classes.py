@@ -18,3 +18,4 @@ class LogIn(BaseModel):
 class PasswordReset(BaseModel):
     access_token: str
     password: str
+
