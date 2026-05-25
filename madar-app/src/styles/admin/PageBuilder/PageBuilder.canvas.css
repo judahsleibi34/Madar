@@ -22,6 +22,7 @@
   min-height: calc(100vh - 182px);
   border-radius: 24px;
   border: 1px solid var(--madar-border);
+  direction: ltr;
   overflow: hidden;
   box-shadow: var(--madar-shadow-md);
   margin: 0 auto;
@@ -41,6 +42,21 @@
 
 .builder-canvas.viewport-mobile {
   max-width: 390px;
+}
+
+.page-builder .builder-canvas.viewport-desktop {
+  width: 1200px;
+  max-width: none;
+}
+
+.page-builder .builder-canvas.viewport-tablet {
+  width: 768px;
+  max-width: none;
+}
+
+.page-builder .builder-canvas.viewport-mobile {
+  width: 390px;
+  max-width: none;
 }
 
 .built-site-header {
@@ -313,6 +329,7 @@
 }
 
 .builder-element {
+  box-sizing: border-box;
   max-width: 100%;
   border: 2px solid transparent;
 }
@@ -349,7 +366,6 @@
 .builder-element-responsesTable,
 .builder-element-list,
 .builder-element-embed {
-  width: 100%;
   padding: 24px;
   box-shadow: 0 12px 28px rgba(26, 39, 68, 0.1);
   display: flex;
@@ -397,7 +413,7 @@
 }
 
 .free-canvas-section {
-  overflow: auto;
+  overflow: hidden;
 }
 
 .free-canvas-toolbar {
@@ -424,11 +440,41 @@
 .free-canvas-frame {
   position: relative;
   margin: 0 auto;
+  max-width: 100%;
 }
 
 .free-canvas-section .builder-element {
   cursor: grab;
   user-select: none;
+}
+
+.builder-element-carousel,
+.builder-element-carouselCards,
+.builder-element-carouselSplit,
+.builder-element-circularGallery {
+  min-width: 0;
+}
+
+.carousel-position-frame {
+  display: flex;
+  width: 100%;
+  grid-column: 1 / -1;
+}
+
+.carousel-position-frame.justify-start {
+  justify-content: flex-start;
+}
+
+.carousel-position-frame.justify-center {
+  justify-content: center;
+}
+
+.carousel-position-frame.justify-end {
+  justify-content: flex-end;
+}
+
+.carousel-position-inner {
+  min-width: 0;
 }
 
 .ecommerce-style-footer {

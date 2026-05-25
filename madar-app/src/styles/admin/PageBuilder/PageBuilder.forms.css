@@ -55,6 +55,140 @@
   font-size: 12px;
 }
 
+.runtime-quiz-form {
+  display: grid;
+  gap: 18px;
+}
+
+.quiz-runtime-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.quiz-runtime-meta span {
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fbfaf8;
+  color: var(--madar-text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.quiz-start-panel {
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 22px;
+  padding: 20px;
+  background: #fbfaf8;
+  display: grid;
+  gap: 10px;
+}
+
+.quiz-start-panel strong {
+  color: var(--madar-text);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.quiz-start-panel p {
+  margin: 0;
+  color: var(--madar-muted);
+  line-height: 1.55;
+}
+
+.quiz-question-stage {
+  border-color: rgba(139, 42, 26, 0.18);
+}
+
+.quiz-navigation {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.quiz-navigation button {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: rgba(26, 39, 68, 0.08);
+  color: var(--madar-text);
+  font-weight: 900;
+}
+
+.quiz-navigation button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.runtime-question textarea,
+.runtime-question select {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(26, 39, 68, 0.14);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  color: var(--madar-text);
+  box-shadow: 0 1px 0 rgba(26, 39, 68, 0.03), inset 0 0 0 1px transparent;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.35;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.runtime-question textarea {
+  min-height: 118px;
+  resize: vertical;
+}
+
+.runtime-question input::placeholder,
+.runtime-question textarea::placeholder {
+  color: rgba(83, 98, 122, 0.7);
+  font-weight: 650;
+}
+
+.runtime-question select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--madar-muted) 50%),
+    linear-gradient(135deg, var(--madar-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) 50%,
+    calc(100% - 14px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 40px;
+}
+
+.runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.runtime-question textarea:focus,
+.runtime-question select:focus {
+  border-color: rgba(139, 42, 26, 0.42);
+  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.1);
+  outline: none;
+}
+
+.runtime-question input:read-only,
+.runtime-question textarea:read-only {
+  background: #fbfaf8;
+}
+
+.runtime-question input[type="file"] {
+  width: 100%;
+  min-height: 54px;
+  border: 1px dashed rgba(139, 42, 26, 0.28);
+  border-radius: 16px;
+  padding: 13px 14px;
+  background: rgba(139, 42, 26, 0.04);
+  color: var(--madar-text);
+  font-weight: 800;
+}
+
 .choice-list {
   display: grid;
   gap: 8px;
@@ -63,7 +197,13 @@
 .choice-list label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 46px;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #ffffff;
+  font-weight: 800;
 }
 
 .choice-pills {
@@ -167,22 +307,41 @@
   background: #f6f2fb;
 }
 
+.forms-top-stack {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
 .google-form-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 280px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
-.google-form-list,
+.google-form-list {
+  position: static;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+}
+
+.google-form-list button {
+  flex: 0 0 240px;
+  min-height: 82px;
+  text-align: left;
+}
+
 .google-form-actions {
-  position: sticky;
-  top: 146px;
+  position: static;
 }
 
 .google-form-document {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -198,17 +357,17 @@
 
 .google-form-title-card {
   display: grid;
-  gap: 8px;
-  padding: 22px;
-  border-top: 9px solid var(--madar-red);
+  gap: 6px;
+  padding: 16px 18px;
+  border-top: 7px solid var(--madar-red);
 }
 
 .google-form-title-input {
   border: none !important;
   border-bottom: 1px solid rgba(26, 39, 68, 0.18) !important;
   border-radius: 0 !important;
-  padding: 8px 0 !important;
-  font-size: 30px;
+  padding: 5px 0 !important;
+  font-size: 22px;
   font-weight: 850;
 }
 
@@ -218,7 +377,7 @@
   border: none !important;
   border-bottom: 1px solid rgba(26, 39, 68, 0.14) !important;
   border-radius: 0 !important;
-  padding: 8px 0 !important;
+  padding: 5px 0 !important;
 }
 
 .compact-form-connect {
@@ -232,20 +391,30 @@
 
 .google-add-strip {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
   background: #ffffff;
   border: 1px solid rgba(26, 39, 68, 0.1);
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
 }
 
 .google-add-strip button,
 .add-question-wide {
+  flex: 0 0 auto;
   border-radius: 6px;
   background: rgba(26, 39, 68, 0.06);
   color: var(--madar-text);
   font-weight: 850;
+}
+
+.google-add-strip button {
+  min-height: 32px;
+  padding: 5px 9px;
+  font-size: 13px;
+  line-height: 1.1;
 }
 
 .google-add-strip .add-section-control {
@@ -255,7 +424,7 @@
 }
 
 .google-section-card {
-  padding: 16px;
+  padding: 14px;
   border-left: 6px solid var(--madar-red);
   border-radius: 8px;
 }
@@ -345,7 +514,7 @@
 
 .google-form-actions {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .google-form-actions section,
@@ -398,6 +567,32 @@
   align-items: center;
   padding-top: 10px;
   border-top: 1px solid rgba(139, 42, 26, 0.14);
+}
+
+.forms-settings-top {
+  grid-template-columns: minmax(220px, 0.85fr) minmax(280px, 1.2fr) minmax(280px, 1fr) minmax(220px, 0.8fr);
+  align-items: stretch;
+}
+
+.forms-settings-top > section,
+.forms-settings-top > details {
+  min-width: 0;
+}
+
+.form-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-panel-actions button {
+  flex: 1 1 130px;
+}
+
+.form-preview-panel summary {
+  cursor: pointer;
+  color: var(--madar-text);
+  font-weight: 950;
 }
 
 .connected-placement-list span {
@@ -551,7 +746,8 @@
 /* Google-style form editor overrides. Keep these after the legacy form builder
    rules so question cards do not inherit the older three-column layout. */
 .forms-google-workspace .google-form-layout {
-  grid-template-columns: 220px minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
 
 .forms-google-workspace .google-form-document,
@@ -564,16 +760,16 @@
 .forms-google-workspace .google-question-card {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
-  gap: 14px !important;
-  padding: 18px !important;
-  margin-top: 14px !important;
-  border-radius: 16px !important;
+  gap: 12px !important;
+  padding: 15px !important;
+  margin-top: 12px !important;
+  border-radius: 12px !important;
   align-items: stretch !important;
 }
 
 .forms-google-workspace .google-question-topline {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) 220px !important;
+  grid-template-columns: minmax(0, 1fr) 190px !important;
   gap: 12px !important;
   align-items: start !important;
 }
@@ -661,7 +857,241 @@
 
 .forms-google-workspace .google-form-actions {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.forms-google-workspace .quiz-settings-panel {
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fbfaf8;
+  display: grid;
+  gap: 12px;
+}
+
+.forms-google-workspace .quiz-settings-summary {
+  align-content: space-between;
+}
+
+.forms-google-workspace .quiz-settings-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.forms-google-workspace .quiz-settings-header h3 {
+  margin: 0;
+  color: var(--madar-text);
+  font-size: 17px;
+  font-weight: 950;
+}
+
+.forms-google-workspace .quiz-settings-header p {
+  margin: 5px 0 0;
+  color: var(--madar-muted);
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+.forms-google-workspace .quiz-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.forms-google-workspace .quiz-options-trigger {
+  width: fit-content;
+}
+
+.quiz-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(11, 18, 32, 0.34);
+  animation: quizBackdropIn 0.18s ease-out;
+}
+
+.quiz-options-drawer {
+  width: min(480px, calc(100vw - 28px));
+  height: 100%;
+  overflow-y: auto;
+  background: #ffffff;
+  border-left: 1px solid rgba(26, 39, 68, 0.12);
+  box-shadow: -22px 0 55px rgba(26, 39, 68, 0.18);
+  padding: 22px;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  animation: quizDrawerIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.quiz-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(26, 39, 68, 0.12);
+}
+
+.quiz-drawer-header span {
+  color: var(--madar-red);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quiz-drawer-header h3 {
+  margin: 4px 0 6px;
+  color: var(--madar-text);
+  font-size: 26px;
+  font-weight: 950;
+}
+
+.quiz-drawer-header p {
+  margin: 0;
+  color: var(--madar-muted);
+  line-height: 1.45;
+}
+
+.quiz-drawer-header button {
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: rgba(26, 39, 68, 0.08);
+  color: var(--madar-text);
+  font-weight: 900;
+}
+
+.quiz-drawer-grid label {
+  border: 1px solid rgba(26, 39, 68, 0.1);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fbfaf8;
+  color: var(--madar-text);
+  font-weight: 850;
+}
+
+.quiz-drawer-grid input,
+.quiz-drawer-grid select {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@keyframes quizBackdropIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes quizDrawerIn {
+  from {
+    transform: translateX(32px);
+    opacity: 0.7;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.forms-google-workspace .quiz-question-settings {
+  border-top: 1px solid rgba(26, 39, 68, 0.1);
+  padding-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.forms-google-workspace .quiz-question-settings input,
+.forms-google-workspace .quiz-question-settings select,
+.forms-google-workspace .quiz-question-settings textarea,
+.forms-google-workspace .quiz-settings-grid input {
+  width: 100%;
+}
+
+.quiz-answer-key {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(139, 42, 26, 0.14);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(139, 42, 26, 0.045);
+}
+
+.quiz-answer-key strong,
+.quiz-answer-key label {
+  color: var(--madar-text);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.quiz-answer-key p {
+  margin: 0;
+  color: var(--madar-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.quiz-answer-key.is-muted {
+  border-color: rgba(26, 39, 68, 0.1);
+  background: rgba(26, 39, 68, 0.04);
+}
+
+.quiz-answer-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quiz-answer-options .checkbox-control {
+  flex: 0 1 auto;
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 11px;
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+}
+
+.quiz-answer-key textarea {
+  min-height: 78px !important;
+}
+
+@media (max-width: 1100px) {
+  .forms-settings-top {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .forms-google-workspace .quiz-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .forms-google-workspace .quiz-settings-header {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 760px) {
+  .google-form-list button {
+    flex-basis: 210px;
+  }
+
+  .forms-settings-top {
+    grid-template-columns: 1fr;
+  }
+
+  .quiz-options-drawer {
+    width: 100vw;
+    padding: 18px;
+  }
 }
 
 .forms-google-workspace .google-form-actions section {

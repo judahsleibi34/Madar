@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 class ContactMessage(BaseModel):
     name: str
@@ -14,6 +15,13 @@ class SignUpRequest(BaseModel):
 class LogIn(BaseModel): 
     email: EmailStr
     password: str
+
+class UserProfileUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    avatar: Optional[str] = None
 
 class PasswordReset(BaseModel):
     access_token: str

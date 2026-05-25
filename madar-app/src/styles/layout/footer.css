@@ -76,13 +76,7 @@
 .footer-links-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 24px;
-}
-
-.footer-links-grid a:last-child {
-  grid-column: 1 / -1;
-  text-align: center;
-  justify-self: center;
+  gap: 8px 18px;
 }
 
 .footer-links-grid a,
@@ -92,7 +86,8 @@
   text-decoration: none;
   font-weight: 600;
   font-size: 15px;
-  padding: 4px 0;
+  padding: 4px 8px;
+  border-radius: 8px;
 }
 
 .footer-links-grid a:hover,

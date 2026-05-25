@@ -39,6 +39,8 @@ export const createField = (label = "Untitled field", type = "shortText", overri
     scaleMaxLabel: "High",
     maxRating: 5,
     width: "full",
+    quizCorrectAnswer: type === "checkboxes" ? [] : "",
+    quizPoints: 1,
     ...overrides,
   };
 };
@@ -86,6 +88,19 @@ export const createForm = (title = "Untitled Form", fields = [], overrides = {})
     description: "Use this form to collect information.",
     successMessage: "Thank you. Your response has been submitted.",
     connectedCollectionId: "",
+    mode: "form",
+    quiz: {
+      lockScreen: false,
+      totalTimeLimitSec: 0,
+      questionTimeLimitSec: 0,
+      showQuestionTimer: true,
+      showTotalTimer: true,
+      scoring: "automatic",
+      passingScore: 70,
+      showResults: true,
+      allowRetakes: true,
+      maxRetakes: 0,
+    },
     sections: [createFormSection("Section 1", defaultFields)],
     responses: [],
     ...overrides,
@@ -173,6 +188,67 @@ export const createElement = (type = "text", overrides = {}) => {
         backgroundColor: "#ffffff",
         borderRadius: "22px",
         alignSelf: "stretch",
+      },
+    },
+    carousel: {
+      name: "Lightswind Carousel",
+      carouselVariant: "lightswind",
+      autoScroll: true,
+      autoScrollMs: 4000,
+      content:
+        "Launch faster\nShowcase products, services, or featured content with a clean carousel.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop\n\nCollect attention\nUse large visuals, concise copy, and simple navigation for high-impact sections.\nhttps://images.unsplash.com/photo-1497215728101-856f4ea42174?w=1200&auto=format&fit=crop\n\nStay flexible\nEdit slide text and image URLs directly from the Page Builder inspector.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop",
+      styles: {
+        ...base.styles,
+        backgroundColor: "#ffffff",
+        borderRadius: "26px",
+        alignSelf: "stretch",
+        "--carousel-height": "410px",
+      },
+    },
+    carouselCards: {
+      name: "Card Carousel",
+      carouselVariant: "cards",
+      autoScroll: true,
+      autoScrollMs: 4000,
+      content:
+        "Featured service\nPresent one offer at a time with a clean card and supporting image.\nhttps://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&auto=format&fit=crop\n\nProduct highlight\nUse this variant for offers, collections, packages, or case studies.\nhttps://images.unsplash.com/photo-1497215728101-856f4ea42174?w=1200&auto=format&fit=crop\n\nCustomer story\nMove through compact slides without taking over the full page section.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&auto=format&fit=crop",
+      styles: {
+        ...base.styles,
+        backgroundColor: "#ffffff",
+        borderRadius: "24px",
+        alignSelf: "stretch",
+        "--carousel-height": "340px",
+      },
+    },
+    carouselSplit: {
+      name: "Split Carousel",
+      carouselVariant: "split",
+      autoScroll: true,
+      autoScrollMs: 4000,
+      content:
+        "Strategy and execution\nPair focused text with a strong image area for services or announcements.\nhttps://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&auto=format&fit=crop\n\nBuilt for teams\nShow process steps, onboarding, or operational features in a balanced layout.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop\n\nReady to publish\nUse the same slide format: title, description, and image URL.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop",
+      styles: {
+        ...base.styles,
+        backgroundColor: "#ffffff",
+        borderRadius: "24px",
+        alignSelf: "stretch",
+        "--carousel-height": "360px",
+      },
+    },
+    circularGallery: {
+      name: "Circular Gallery",
+      carouselVariant: "circular",
+      autoScroll: true,
+      autoScrollMs: 5000,
+      content:
+        "Studio workspace\nA warm workspace for planning and operations.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop\n\nTeam session\nPeople collaborating around a product launch.\nhttps://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&auto=format&fit=crop\n\nProduct desk\nClean desk scene with business tools.\nhttps://images.unsplash.com/photo-1497215728101-856f4ea42174?w=1200&auto=format&fit=crop\n\nService meeting\nClient service conversation in progress.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&auto=format&fit=crop\n\nAnalytics view\nDashboard and operations review moment.\nhttps://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&auto=format&fit=crop\n\nLaunch planning\nPlanning board for growth and execution.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop",
+      styles: {
+        ...base.styles,
+        backgroundColor: "#ffffff",
+        borderRadius: "26px",
+        alignSelf: "stretch",
+        "--carousel-height": "460px",
+        "--gallery-depth": "360px",
       },
     },
     list: {

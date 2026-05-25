@@ -5,7 +5,7 @@ import logo from "../assets/madar_header.svg";
 const navItems = {
   en: [
     { id: "home", label: "Home", path: "/" },
-    { id: "features", label: "Features", path: "/features" },
+    { id: "features", label: "Product Tour", path: "/features" },
     { id: "pricing", label: "Plans and Pricing", path: "/pricing" },
     { id: "team", label: "Madar Team", path: "/team" },
     { id: "about", label: "About Us", path: "/about" },
@@ -13,7 +13,7 @@ const navItems = {
   ],
   ar: [
     { id: "home", label: "الرئيسية", path: "/" },
-    { id: "features", label: "المميزات", path: "/features" },
+    { id: "features", label: "جولة المنتج", path: "/features" },
     { id: "pricing", label: "الخطط والأسعار", path: "/pricing" },
     { id: "team", label: "فريق مدار", path: "/team" },
     { id: "about", label: "من نحن", path: "/about" },

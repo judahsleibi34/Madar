@@ -15,11 +15,24 @@ router = APIRouter(
 
 
 UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+PREVIEW_LIMIT = 100
 
 
 class ReadDataRequest(BaseModel):
     input_path: str
+
+
+def build_dataset_response(df, *, file_path: str, original_filename: str | None = None):
+    return {
+        "file_path": file_path,
+        "original_filename": original_filename or file_path,
+        "rows": int(len(df)),
+        "columns": [sanitize_for_json(column) for column in df.columns],
+        "preview": dataframe_preview(df, PREVIEW_LIMIT),
+    }
 
 
 @router.post("/read")
@@ -28,47 +41,57 @@ def read_data(request: ReadDataRequest):
         reader = DataReadingNormal(request.input_path)
         df = reader.read()
 
-        return {
-            "rows": int(len(df)),
-            "columns": list(df.columns),
-            "preview": dataframe_preview(df, 10)
-        }
+        return build_dataset_response(
+            df,
+            file_path=request.input_path,
+            original_filename=request.input_path,
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail=sanitize_for_json(str(e)),
+        )
 
 
 @router.post("/upload")
 async def upload_data(file: UploadFile = File(...)):
     try:
-        file_extension = Path(file.filename).suffix.lower()
+        filename = file.filename or ""
+        file_extension = Path(filename).suffix.lower()
 
         if file_extension not in [".csv", ".xls", ".xlsx"]:
             raise HTTPException(
                 status_code=400,
-                detail="Only .csv, .xls, and .xlsx files are supported"
+                detail="Only .csv, .xls, and .xlsx files are supported",
+            )
+
+        content = await file.read()
+
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded file is empty",
             )
 
         unique_filename = f"{uuid4().hex}{file_extension}"
         file_path = UPLOAD_DIR / unique_filename
-
-        content = await file.read()
         file_path.write_bytes(content)
 
         reader = DataReadingNormal(str(file_path))
         df = reader.read()
 
-        return {
-            "file_path": str(file_path),
-            "original_filename": file.filename,
-            "rows": int(len(df)),
-            "columns": list(df.columns),
-            "preview": dataframe_preview(df, 10)
-        }
+        return build_dataset_response(
+            df,
+            file_path=str(file_path),
+            original_filename=filename,
+        )
 
     except HTTPException:
         raise
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=sanitize_for_json(str(e)))
-
+        raise HTTPException(
+            status_code=400,
+            detail=sanitize_for_json(str(e)),
+        )

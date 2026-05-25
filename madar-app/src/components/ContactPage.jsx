@@ -1,3 +1,5 @@
+import GradientText from "./GradientText";
+
 const contactText = {
   en: {
     title: "Contact Us",
@@ -30,7 +32,7 @@ export default function ContactPage({ lang = "en" }) {
   return (
     <main className="contact-page">
       <section className="contact-hero">
-        <h1>{t.title}</h1>
+        <h1><GradientText pauseOnHover>{t.title}</GradientText></h1>
         <p>{t.subtitle}</p>
       </section>
 
@@ -55,7 +57,7 @@ export default function ContactPage({ lang = "en" }) {
         </form>
 
         <div className="contact-info-card">
-          <h2>{t.infoTitle}</h2>
+          <h2><GradientText pauseOnHover>{t.infoTitle}</GradientText></h2>
 
           <div>
             <strong>{t.emailLabel}</strong>

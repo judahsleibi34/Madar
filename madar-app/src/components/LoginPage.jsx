@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 console.log("LOGIN API_URL:", API_URL);
@@ -39,9 +39,13 @@ const pageText = {
   },
 };
 
-export default function LoginPage({ lang = "en", onLoginSuccess }) {
+export default function LoginPage({
+  lang = "en",
+  onLoginSuccess,
+  signupPath = "/signup",
+  forgotPasswordPath = "/forgot-password",
+}) {
   const t = pageText[lang] || pageText.en;
-  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -202,7 +206,7 @@ export default function LoginPage({ lang = "en", onLoginSuccess }) {
         </label>
 
         <div className="login-options">
-          <Link to="/forgot-password">{t.forgotPassword}</Link>
+          <Link to={forgotPasswordPath}>{t.forgotPassword}</Link>
         </div>
 
         <button className="login-submit" type="submit" disabled={isSubmitting}>
@@ -210,7 +214,7 @@ export default function LoginPage({ lang = "en", onLoginSuccess }) {
         </button>
 
         <p className="login-signup-text">
-          {t.noAccount} <Link to="/signup">{t.signup}</Link>
+          {t.noAccount} <Link to={signupPath}>{t.signup}</Link>
         </p>
       </form>
     </main>

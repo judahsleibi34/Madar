@@ -10,6 +10,9 @@
   padding: 0 32px;
   column-gap: 32px;
   position: relative;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(26, 39, 68, 0.08);
+  box-shadow: 0 8px 24px rgba(26, 39, 68, 0.05);
 }
 
 .brand {
@@ -90,6 +93,11 @@
   background: transparent;
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.site-header .btn-signup {
+  background: #8b2a1a;
+  border-color: #8b2a1a;
 }
 
 .btn-login:hover {

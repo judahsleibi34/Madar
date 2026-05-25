@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Routes,
   Route,
@@ -17,9 +17,11 @@ import ScrollToTop from "./components/ScrollToTop";
 import LoginPage from "./components/LoginPage";
 import SignUpPage from "./components/SignUpPage";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
+import FeaturesPage from "./components/FeaturesPage";
 import PricingPage from "./components/PricingPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
 import Dashboard from "./components/Dashboard";
+import SettingsPage from "./components/SettingsPage";
 import Footer from "./components/Footer";
 import PageBuilder from "./components/PageBuilder";
 import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
@@ -47,9 +49,10 @@ export default function App() {
     location.pathname.startsWith("/dashboard") ||
     location.pathname.startsWith("/page-builder") ||
     location.pathname.startsWith("/builder-responses") ||
-    location.pathname.startsWith("/builder-data");
+    location.pathname.startsWith("/builder-data") ||
+    location.pathname.startsWith("/settings");
 
-  const normalizeUser = (userInfo) => {
+  const normalizeUser = useCallback((userInfo) => {
     const firstName = userInfo?.first_name || "";
     const lastName = userInfo?.last_name || "";
     const fullName =
@@ -65,11 +68,14 @@ export default function App() {
       last_name: lastName,
       name: fullName,
       email: userInfo?.email || "",
+      phone: userInfo?.phone || "",
       avatar: userInfo?.avatar || userInfo?.avatar_url || "",
+      created_at: userInfo?.created_at || "",
+      updated_at: userInfo?.updated_at || "",
     };
-  };
+  }, []);
 
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = useCallback(async () => {
     const response = await fetch(`${API_URL}/user_info`, {
       method: "POST",
       credentials: "include",
@@ -79,7 +85,7 @@ export default function App() {
 
     const data = await response.json();
     return normalizeUser(data.user);
-  };
+  }, [normalizeUser]);
 
   useEffect(() => {
     localStorage.setItem(LANG_STORAGE_KEY, lang);
@@ -123,7 +129,7 @@ export default function App() {
     };
 
     checkAuth();
-  }, []);
+  }, [fetchUserInfo]);
 
   const handleLanguageChange = (code) => {
     if (code !== "ar" && code !== "en") return;
@@ -215,23 +221,28 @@ export default function App() {
     </div>
   );
 
-  const renderDashboardShell = (children) => (
+  const renderDashboardShell = (children, isPageBuilderShell = false, options = {}) => {
+    const shellLang = options.lang || lang;
+
+    return (
     <div
       className="admin-dashboard-layout"
-      dir={lang === "ar" ? "rtl" : "ltr"}
+      dir={shellLang === "ar" ? "rtl" : "ltr"}
     >
       <DashboardSidebar
-        lang={lang}
+        lang={shellLang}
         user={user}
         onLogout={handleLogout}
-        onLanguageChange={handleLanguageChange}
+        onLanguageChange={options.hideLanguage ? undefined : handleLanguageChange}
+        hideLanguage={options.hideLanguage}
       />
 
-      <main className="admin-dashboard-page page-builder-dashboard-page">
+      <main className={`admin-dashboard-page${isPageBuilderShell ? " page-builder-dashboard-page" : ""}`}>
         {children}
       </main>
     </div>
-  );
+    );
+  };
 
   if (isTenantSiteRoute) {
     return (
@@ -277,7 +288,9 @@ export default function App() {
                 renderDashboardSkeleton("Loading page builder")
               ) : isLoggedIn ? (
                 renderDashboardShell(
-                  <PageBuilder key="page-builder-main" />
+                  <PageBuilder key="page-builder-main" templateLang={lang} />,
+                  true,
+                  { lang: "en", hideLanguage: true }
                 )
               ) : (
                 <Navigate to="/login" replace />
@@ -297,7 +310,9 @@ export default function App() {
                     initialTab="responses"
                     visibleTabIds={["responses"]}
                     hideWorkspaceTabs={true}
-                  />
+                    lang={lang}
+                  />,
+                  true
                 )
               ) : (
                 <Navigate to="/login" replace />
@@ -317,6 +332,27 @@ export default function App() {
                     initialTab="data"
                     visibleTabIds={["data"]}
                     hideWorkspaceTabs={true}
+                    lang={lang}
+                  />,
+                  true
+                )
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton("Loading settings")
+              ) : isLoggedIn ? (
+                renderDashboardShell(
+                  <SettingsPage
+                    lang={lang}
+                    user={user}
+                    onUserUpdated={(nextUser) => setUser(normalizeUser(nextUser))}
                   />
                 )
               ) : (
@@ -354,6 +390,15 @@ export default function App() {
           />
 
           <Route
+            path="/demo"
+            element={
+              <main className="app-main builder-demo-main" dir="ltr" lang="en">
+                <PageBuilder key="page-builder-demo" demoMode lang="en" templateLang={lang} />
+              </main>
+            }
+          />
+
+          <Route
             path="/about"
             element={
               <main className="app-main">
@@ -367,6 +412,15 @@ export default function App() {
             element={
               <main className="app-main">
                 <ContactPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+
+          <Route
+            path="/features"
+            element={
+              <main className="app-main">
+                <FeaturesPage key={lang} lang={lang} />
               </main>
             }
           />

@@ -43,7 +43,7 @@ const pageText = {
   },
 };
 
-export default function SignUpPage({ lang = "en" }) {
+export default function SignUpPage({ lang = "en", loginPath = "/login", onSignupSuccess }) {
   const t = pageText[lang] || pageText.en;
   const navigate = useNavigate(); // ✅ THIS WAS MISSING
 
@@ -168,7 +168,14 @@ export default function SignUpPage({ lang = "en" }) {
   }
 
       setStatusMessage(t.success);
-      setTimeout(() => navigate("/login"), 1500);
+      setTimeout(() => {
+        if (onSignupSuccess) {
+          onSignupSuccess();
+          return;
+        }
+
+        navigate(loginPath);
+      }, 1500);
     } catch (error) {
       console.error(error);
       setStatusMessage(t.serverError);

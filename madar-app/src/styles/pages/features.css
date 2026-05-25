@@ -1,0 +1,222 @@
+/* ============================================================
+   FEATURES PAGE
+   ============================================================ */
+
+.features-page {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 64px 5% 90px;
+  color: #1a2744;
+}
+
+.features-hero {
+  max-width: 780px;
+  margin: 0 auto 34px;
+  text-align: center;
+}
+
+.features-hero span {
+  display: inline-flex;
+  margin-bottom: 12px;
+  color: #8b2a1a;
+  font-size: 13px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.features-hero h1 {
+  margin: 0;
+  color: #1a2744;
+  font-size: clamp(36px, 5vw, 58px);
+  line-height: 1.04;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+}
+
+.features-hero p {
+  margin: 16px auto 0;
+  max-width: 720px;
+  color: #6d7484;
+  font-size: 17px;
+  line-height: 1.7;
+  font-weight: 700;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.features-demo-panel {
+  margin: 0 0 22px;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 22px;
+  background: #ffffff;
+  padding: 24px;
+  box-shadow: 0 16px 38px rgba(26, 39, 68, 0.07);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.9fr) auto;
+  gap: 22px;
+  align-items: center;
+}
+
+.features-demo-copy {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.features-demo-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  box-shadow: 0 10px 24px rgba(139, 42, 26, 0.18);
+}
+
+.features-demo-copy h2 {
+  margin: 0;
+  color: #1a2744;
+  font-size: 26px;
+  line-height: 1.14;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+}
+
+.features-demo-copy p {
+  margin: 10px 0 0;
+  color: #3a3530;
+  font-size: 15px;
+  line-height: 1.65;
+  font-weight: 650;
+}
+
+.features-demo-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #3a3530;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 750;
+}
+
+.features-demo-cta {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 12px;
+  background: #8b2a1a;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 850;
+  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.2);
+  transition: background 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+
+.features-demo-cta:hover {
+  background: #6e2014;
+  transform: translateY(-1px);
+}
+
+.feature-card {
+  min-width: 0;
+  min-height: 250px;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 22px;
+  background: #ffffff;
+  padding: 24px;
+  box-shadow: 0 16px 38px rgba(26, 39, 68, 0.07);
+  display: grid;
+  align-content: start;
+  gap: 13px;
+}
+
+.feature-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  box-shadow: 0 10px 24px rgba(139, 42, 26, 0.18);
+}
+
+.feature-card h2 {
+  margin: 0;
+  color: #1a2744;
+  font-size: 22px;
+  line-height: 1.18;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+}
+
+.feature-card p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 15px;
+  line-height: 1.65;
+  font-weight: 650;
+}
+
+html[dir="rtl"] .features-page {
+  text-align: right;
+}
+
+html[dir="rtl"] .features-hero {
+  text-align: center;
+}
+
+html[dir="rtl"] .features-demo-list {
+  padding-right: 18px;
+  padding-left: 0;
+}
+
+@media (max-width: 900px) {
+  .features-demo-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .features-demo-cta {
+    justify-self: start;
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .features-page {
+    padding: 44px 5% 64px;
+  }
+
+  .features-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .features-demo-panel {
+    padding: 20px;
+  }
+
+  .features-demo-copy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feature-card {
+    min-height: auto;
+  }
+}

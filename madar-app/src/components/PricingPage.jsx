@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import GradientText from "./GradientText";
 
 const pageText = {
   en: {
@@ -119,7 +120,15 @@ export default function PricingPage({ lang = "en" }) {
   return (
     <main className="pricing-page">
       <div className="pricing-header">
-        <h1>{t.header}</h1>
+        <h1>
+          {lang === "en" ? (
+            <>
+              <GradientText pauseOnHover>Flexible plans</GradientText> for every need
+            </>
+          ) : (
+            <GradientText pauseOnHover>{t.header}</GradientText>
+          )}
+        </h1>
         <p>{t.subheader}</p>
       </div>
 
@@ -134,7 +143,7 @@ export default function PricingPage({ lang = "en" }) {
             )}
 
             <div className="plan-top">
-              <p className="plan-name">{plan.name}</p>
+              <p className="plan-name"><GradientText pauseOnHover>{plan.name}</GradientText></p>
               <div className="plan-price">
                 <span className="amount">${plan.price}</span>
                 <span className="period">{t.perMonth}</span>
