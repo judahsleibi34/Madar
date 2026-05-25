@@ -26,6 +26,8 @@ const sidebarText = {
     switchLang: "AR",
   },
   ar: {
+    responses: "\u0627\u0644\u0631\u062f\u0648\u062f",
+    data: "\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a",
     title: "لوحة التحكم",
     subtitle: "مدار",
     home: "الرئيسية",
@@ -43,6 +45,7 @@ export default function DashboardSidebar({
   user,
   onLogout,
   onLanguageChange,
+  hideLanguage = false,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -122,7 +125,11 @@ export default function DashboardSidebar({
             <span>{t.data || "Data"}</span>
           </button>
 
-          <button type="button">
+          <button
+            type="button"
+            className={isActive("/settings") ? "active" : ""}
+            onClick={() => navigate("/settings")}
+          >
             <Settings size={18} />
             <span>{t.settings}</span>
           </button>
@@ -130,25 +137,23 @@ export default function DashboardSidebar({
       </div>
 
       <div className="admin-sidebar-bottom">
-        <button
-          type="button"
-          className="admin-sidebar-lang"
-          onClick={handleLangToggle}
-        >
-          <Languages size={18} />
-          <span>{t.switchLang}</span>
-        </button>
+        {!hideLanguage && (
+          <button
+            type="button"
+            className="admin-sidebar-lang"
+            onClick={handleLangToggle}
+          >
+            <Languages size={18} />
+            <span>{t.switchLang}</span>
+          </button>
+        )}
 
         <button
           type="button"
-          className="admin-sidebar-logout"
-          onClick={onLogout}
+          className="admin-sidebar-user"
+          onClick={() => navigate("/settings")}
+          aria-label={t.settings}
         >
-          <LogOut size={18} />
-          <span>{t.logout}</span>
-        </button>
-
-        <div className="admin-sidebar-user">
           {user?.avatar ? (
             <img
               className="admin-sidebar-avatar"
@@ -163,7 +168,16 @@ export default function DashboardSidebar({
             <strong>{displayName}</strong>
             {displayEmail && <span>{displayEmail}</span>}
           </div>
-        </div>
+        </button>
+
+        <button
+          type="button"
+          className="admin-sidebar-logout"
+          onClick={onLogout}
+        >
+          <LogOut size={18} />
+          <span>{t.logout}</span>
+        </button>
       </div>
     </aside>
   );

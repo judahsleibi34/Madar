@@ -70,6 +70,10 @@ export const elementTypes = [
   { id: "button", label: "Button", group: "Content" },
   { id: "image", label: "Image", group: "Content" },
   { id: "card", label: "Card", group: "Content" },
+  { id: "carousel", label: "Lightswind Carousel", group: "Collection" },
+  { id: "carouselCards", label: "Card Carousel", group: "Collection" },
+  { id: "carouselSplit", label: "Split Carousel", group: "Collection" },
+  { id: "circularGallery", label: "Circular Gallery", group: "Collection" },
   { id: "list", label: "List", group: "Content" },
   { id: "divider", label: "Divider", group: "Content" },
   { id: "embed", label: "Embed", group: "Content" },
@@ -189,6 +193,11 @@ export const defaultSiteChrome = {
 };
 
 export const starterSystems = [
+  { id: "showcase", title: "Builder Demo", category: "Demo", subtitle: "Full default template with pages, forms, data, media, auth, and workflows.", tags: ["All features", "Demo"] },
+  { id: "cms", title: "CMS Content Hub", category: "CMS", subtitle: "Editorial pages, intake forms, publishing workflow, content records, and team roles.", tags: ["Content", "Publishing", "Approvals"] },
+  { id: "ecommerce", title: "Ecommerce Storefront", category: "Commerce", subtitle: "Product showcase, order intake, customer records, fulfillment status, and booking-ready operations.", tags: ["Products", "Orders", "Customers"] },
+  { id: "hrFinance", title: "HR & Finance Portal", category: "Operations", subtitle: "Employee requests, budget approvals, reimbursements, payroll support, and role-based review.", tags: ["HR", "Finance", "Approvals"] },
+  { id: "meal", title: "MEAL Project Coordination", category: "Projects", subtitle: "Monitoring, evaluation, accountability, learning, field reports, indicators, and partner follow-up.", tags: ["MEAL", "Projects", "Reports"] },
   { id: "website", title: "Website + Contact Form", subtitle: "Website, contact form, responses, and basic roles." },
   { id: "requests", title: "Request / Approval Portal", subtitle: "HR, finance, procurement, and internal approvals." },
   { id: "reports", title: "Monitoring / Reporting Hub", subtitle: "Activity reports, dashboards, and review workflows." },

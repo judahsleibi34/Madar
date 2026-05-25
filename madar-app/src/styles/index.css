@@ -12,6 +12,7 @@
 @import "./layout/header.css";
 @import "./sections/home.css";
 @import "./pages/contact.css";
+@import "./pages/features.css";
 @import "./layout/footer.css";
 @import "./utils/rtl.css";
 @import "./utils/responsive.css";
@@ -21,8 +22,28 @@
 @import "./pages/team.css";
 
 @import "./shared/buttons.css";
+@import "./shared/gradient-text.css";
+@import "./shared/split-text.css";
 
 @import "./admin/dashboard.css";
+
+.builder-demo-main {
+  min-height: calc(100vh - 110px);
+  padding: 0 24px 32px;
+}
+
+.builder-demo-main .page-builder {
+  border: 1px solid rgba(26, 39, 68, 0.1);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+}
+
+@media (max-width: 900px) {
+  .builder-demo-main {
+    padding: 0 16px 24px;
+  }
+}
 
 /* ============================================================
    Tenant Site Runtime — Header / Login / Footer

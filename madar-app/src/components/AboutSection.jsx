@@ -1,4 +1,6 @@
 import FadeIn from "./FadeIn";
+import GradientText from "./GradientText";
+import SplitText from "./SplitText";
 
 const content = {
   en: {
@@ -50,12 +52,14 @@ export default function AboutSection({ lang }) {
   return (
     <section id="about" className="about-section">
       <FadeIn delay={0}>
-        <h1 className="hero-title">{t.title}</h1>
+        <h1 className="hero-title">
+          {lang === "en" ? <>About <GradientText pauseOnHover>Madar</GradientText></> : <GradientText pauseOnHover>{t.title}</GradientText>}
+        </h1>
       </FadeIn>
 
       <FadeIn delay={0.15}>
         <p className="hero-description">
-          <span className="arabic-name">{t.name}</span> {t.description}
+          <SplitText className="arabic-name">{t.name}</SplitText> {t.description}
         </p>
       </FadeIn>
 
@@ -64,17 +68,17 @@ export default function AboutSection({ lang }) {
       </FadeIn>
 
       <FadeIn delay={0.35}>
-        <h2 className="hero-subtitle">{t.purposeTitle}</h2>
+        <h2 className="hero-subtitle"><GradientText pauseOnHover>{t.purposeTitle}</GradientText></h2>
         <p className="hero-description">{t.purpose}</p>
       </FadeIn>
 
       <FadeIn delay={0.45}>
-        <h2 className="hero-subtitle">{t.differenceTitle}</h2>
+        <h2 className="hero-subtitle"><GradientText pauseOnHover>{t.differenceTitle}</GradientText></h2>
         <p className="hero-description">{t.difference}</p>
       </FadeIn>
 
       <FadeIn delay={0.55}>
-        <h2 className="hero-subtitle">{t.visionTitle}</h2>
+        <h2 className="hero-subtitle"><GradientText pauseOnHover>{t.visionTitle}</GradientText></h2>
         <p className="hero-description">{t.vision}</p>
       </FadeIn>
     </section>

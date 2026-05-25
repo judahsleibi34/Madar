@@ -1,13 +1,62 @@
 from fastapi import APIRouter, HTTPException, Response, Request
 from requests import session
 from database import supabase
-from classes import SignUpRequest, LogIn
+from classes import SignUpRequest, LogIn, UserProfileUpdate
 import os
 
 router = APIRouter()
 
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")
+
+
+def build_user_payload(user_data):
+    first_name = user_data.get("first_name") or ""
+    last_name = user_data.get("last_name") or ""
+    full_name = f"{first_name} {last_name}".strip() or "Admin User"
+
+    return {
+        "id": user_data.get("id"),
+        "auth_id": user_data.get("auth_id"),
+        "first_name": first_name,
+        "last_name": last_name,
+        "name": full_name,
+        "email": user_data.get("email"),
+        "phone": user_data.get("phone") or "",
+        "avatar": user_data.get("avatar") or user_data.get("avatar_url") or "",
+        "created_at": user_data.get("created_at"),
+        "updated_at": user_data.get("updated_at"),
+    }
+
+
+def get_authenticated_user_row(request: Request):
+    access_token = request.cookies.get("madar_access_token")
+
+    if not access_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Not logged in"
+        )
+
+    auth_user = supabase.auth.get_user(access_token)
+
+    if not auth_user or not getattr(auth_user, "user", None):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired session"
+        )
+
+    user_response = supabase.table("users").select("*").eq(
+        "auth_id", auth_user.user.id
+    ).single().execute()
+
+    if not user_response.data:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    return auth_user.user, user_response.data
 
 
 @router.post("/signup")
@@ -69,7 +118,7 @@ def login(user: LogIn, response: Response):
             )
 
         user_response = supabase.table("users").select(
-            "id, auth_id, first_name, last_name, email"
+            "*"
         ).eq(
             "auth_id", auth_response.user.id
         ).single().execute()
@@ -97,13 +146,7 @@ def login(user: LogIn, response: Response):
 
         return {
             "message": "User is logged in",
-            "user": {
-                "id": user_response.data["id"],
-                "auth_id": user_response.data["auth_id"],
-                "email": user_response.data["email"],
-                "first_name": user_response.data["first_name"],
-                "last_name": user_response.data["last_name"],
-            }
+            "user": build_user_payload(user_response.data)
         }
 
     except HTTPException:
@@ -136,20 +179,14 @@ def user_status(request: Request):
             }
 
         user_response = supabase.table("users").select(
-            "id, auth_id, first_name, last_name, email"
+            "*"
         ).eq(
             "auth_id", auth_user.user.id
         ).single().execute()
 
         return {
             "logged_in": True,
-            "user": {
-                "id": user_response.data["id"],
-                "auth_id": user_response.data["auth_id"],
-                "email": user_response.data["email"],
-                "first_name": user_response.data["first_name"],
-                "last_name": user_response.data["last_name"],
-            }
+            "user": build_user_payload(user_response.data)
         }
 
     except Exception as e:
@@ -182,52 +219,12 @@ def log_out(response: Response):
 
 @router.post("/user_info")
 def user_info(request: Request):
-    access_token = request.cookies.get("madar_access_token")
-
-    if not access_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Not logged in"
-        )
-
     try:
-        auth_user = supabase.auth.get_user(access_token)
-
-        if not auth_user or not getattr(auth_user, "user", None):
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid or expired session"
-            )
-
-        user_response = supabase.table("users").select(
-            "id, auth_id, first_name, last_name, email"
-        ).eq(
-            "auth_id", auth_user.user.id
-        ).single().execute()
-
-        if not user_response.data:
-            raise HTTPException(
-                status_code=404,
-                detail="User not found"
-            )
-
-        user_data = user_response.data
-
-        first_name = user_data.get("first_name") or ""
-        last_name = user_data.get("last_name") or ""
-        full_name = f"{first_name} {last_name}".strip() or "Admin User"
+        _, user_data = get_authenticated_user_row(request)
 
         return {
             "success": True,
-            "user": {
-                "id": user_data.get("id"),
-                "auth_id": user_data.get("auth_id"),
-                "first_name": first_name,
-                "last_name": last_name,
-                "name": full_name,
-                "email": user_data.get("email"),
-                "avatar": "",
-            }
+            "user": build_user_payload(user_data)
         }
 
     except HTTPException:
@@ -238,5 +235,55 @@ def user_info(request: Request):
         raise HTTPException(
             status_code=500,
             detail="Could not fetch user info"
+        )
+
+
+@router.put("/user_profile")
+def update_user_profile(profile: UserProfileUpdate, request: Request):
+    try:
+        _, user_data = get_authenticated_user_row(request)
+
+        update_payload = {}
+
+        if profile.first_name is not None:
+            update_payload["first_name"] = profile.first_name.strip()
+        if profile.last_name is not None:
+            update_payload["last_name"] = profile.last_name.strip()
+        if profile.email is not None:
+            update_payload["email"] = str(profile.email).strip().lower()
+        if profile.phone is not None:
+            update_payload["phone"] = profile.phone.strip()
+        if profile.avatar is not None:
+            update_payload["avatar"] = profile.avatar.strip()
+
+        if not update_payload:
+            return {
+                "success": True,
+                "user": build_user_payload(user_data)
+            }
+
+        update_response = supabase.table("users").update(update_payload).eq(
+            "auth_id", user_data.get("auth_id")
+        ).execute()
+
+        updated_user = update_response.data[0] if update_response.data else {
+            **user_data,
+            **update_payload,
+        }
+
+        return {
+            "success": True,
+            "message": "User profile updated",
+            "user": build_user_payload(updated_user)
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        print("USER PROFILE UPDATE ERROR:", repr(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Could not update user profile"
         )
 

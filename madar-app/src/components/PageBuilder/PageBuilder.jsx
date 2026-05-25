@@ -49,6 +49,8 @@ import {
 } from "./PageBuilder.starters";
 import BuilderResponsesPage from "./BuilderResponsesPage";
 import BuilderAnalysisPage from "./BuilderAnalysisPage";
+import { getLocalTenantPath } from "./PageBuilder.routing";
+import PageBuilderCarousel from "./PageBuilderCarousel";
 
 const splitLines = (value) =>
   String(value || "")
@@ -56,7 +58,225 @@ const splitLines = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const carouselElementTypes = new Set(["carousel", "carouselCards", "carouselSplit", "circularGallery"]);
+
+const normalizeElementAlignSelf = (value) => {
+  if (!value || value === "auto") return undefined;
+  if (value === "left") return "flex-start";
+  if (value === "right") return "flex-end";
+  return value;
+};
+
+const getElementLayoutWidth = (value, alignSelf = "auto") => {
+  const placement = normalizeElementAlignSelf(alignSelf);
+
+  if (placement === "stretch") return "100%";
+
+  if (!value || value === "auto") return undefined;
+  return value;
+};
+
+const getElementAlignControlValue = (value) =>
+  normalizeElementAlignSelf(value) || "auto";
+
+const getComponentPositionClass = (position) => {
+  const normalized = normalizeElementAlignSelf(position);
+  if (position === "Left" || normalized === "flex-start") return "justify-start";
+  if (position === "Center" || normalized === "center") return "justify-center";
+  if (position === "Right" || normalized === "flex-end") return "justify-end";
+  return "justify-center";
+};
+
+const getCarouselWidthValue = (element) => {
+  const width = element.styles?.width;
+  if (!width || width === "auto") return "100%";
+  return width;
+};
+
+const getElementPlacementMargins = (value) => {
+  const placement = normalizeElementAlignSelf(value);
+
+  if (placement === "center") {
+    return { marginLeft: "auto", marginRight: "auto" };
+  }
+
+  if (placement === "flex-end") {
+    return { marginLeft: "auto", marginRight: "0" };
+  }
+
+  if (placement === "flex-start") {
+    return { marginLeft: "0", marginRight: "auto" };
+  }
+
+  return { marginLeft: undefined, marginRight: undefined };
+};
+
+const isDirectionalElementPlacement = (value) =>
+  ["flex-start", "center", "flex-end", "left", "right"].includes(value);
+
+const getClosestColumnIdFromEvent = (event) => {
+  const columns = Array.from(event.currentTarget.querySelectorAll("[data-column-id]"));
+  if (columns.length === 0) return "";
+
+  const point = { x: event.clientX, y: event.clientY };
+  let closest = { id: "", distance: Number.POSITIVE_INFINITY };
+
+  columns.forEach((column) => {
+    const rect = column.getBoundingClientRect();
+    const center = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+    const distance = Math.hypot(point.x - center.x, point.y - center.y);
+
+    if (distance < closest.distance) {
+      closest = { id: column.dataset.columnId || "", distance };
+    }
+  });
+
+  return closest.id;
+};
+
+const getCarouselVariant = (element) => {
+  if (element.carouselVariant) return element.carouselVariant;
+  if (element.type === "carouselCards") return "cards";
+  if (element.type === "carouselSplit") return "split";
+  if (element.type === "circularGallery") return "circular";
+  return "lightswind";
+};
+
+const getRowCarouselElements = (row) =>
+  (row.columns || []).flatMap((column) =>
+    (column.elements || []).filter((element) => carouselElementTypes.has(element.type))
+  );
+
 const getFieldType = (type) => fieldTypes.find((item) => item.id === type) || fieldTypes[0];
+const singleAnswerQuizTypes = new Set(["dropdown", "radio", "status", "yesNo", "linearScale", "rating"]);
+const textAnswerQuizTypes = new Set(["shortText", "paragraph", "email", "phone", "url", "number", "money"]);
+const correctableQuizTypes = new Set([...singleAnswerQuizTypes, "checkboxes", ...textAnswerQuizTypes]);
+
+const normalizeQuizAnswer = (value) => String(value ?? "").trim().toLowerCase();
+
+const hasQuizAnswerKey = (field = {}) => {
+  if (!correctableQuizTypes.has(field.type)) return false;
+  if (field.type === "checkboxes") return Array.isArray(field.quizCorrectAnswer) && field.quizCorrectAnswer.length > 0;
+  if (textAnswerQuizTypes.has(field.type)) {
+    return Array.isArray(field.quizCorrectAnswer)
+      ? field.quizCorrectAnswer.some((answer) => String(answer || "").trim())
+      : Boolean(String(field.quizCorrectAnswer || "").trim());
+  }
+  return Boolean(String(field.quizCorrectAnswer || "").trim());
+};
+
+const isQuizAnswerCorrect = (field = {}, answer) => {
+  if (!hasQuizAnswerKey(field)) return null;
+
+  if (field.type === "checkboxes") {
+    const expected = Array.isArray(field.quizCorrectAnswer) ? field.quizCorrectAnswer.map(normalizeQuizAnswer).sort() : [];
+    const received = Array.isArray(answer) ? answer.map(normalizeQuizAnswer).sort() : [];
+    return expected.length === received.length && expected.every((item, index) => item === received[index]);
+  }
+
+  if (textAnswerQuizTypes.has(field.type)) {
+    const expectedAnswers = Array.isArray(field.quizCorrectAnswer)
+      ? field.quizCorrectAnswer
+      : splitLines(field.quizCorrectAnswer);
+    const received = normalizeQuizAnswer(answer);
+    return expectedAnswers.map(normalizeQuizAnswer).includes(received);
+  }
+
+  return normalizeQuizAnswer(field.quizCorrectAnswer) === normalizeQuizAnswer(answer);
+};
+
+const gradeQuizResponse = (form = {}, answers = {}) => {
+  const settings = getQuizSettings(form);
+  const fields = getFormFields(form);
+
+  if (settings.scoring === "completion") {
+    const answered = fields.filter((field) => {
+      const value = answers[field.id];
+      return value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length > 0);
+    }).length;
+    const score = fields.length ? Math.round((answered / fields.length) * 100) : 0;
+    return {
+      mode: "completion",
+      correct: answered,
+      total: fields.length,
+      score,
+      passed: score >= Number(settings.passingScore || 0),
+      passingScore: Number(settings.passingScore || 0),
+    };
+  }
+
+  if (settings.scoring === "manual") {
+    return {
+      mode: "manual",
+      correct: 0,
+      total: 0,
+      score: null,
+      passed: null,
+      passingScore: Number(settings.passingScore || 0),
+    };
+  }
+
+  const keyedFields = fields.filter(hasQuizAnswerKey);
+  const correct = keyedFields.filter((field) => isQuizAnswerCorrect(field, answers[field.id])).length;
+  const score = keyedFields.length ? Math.round((correct / keyedFields.length) * 100) : null;
+
+  return {
+    mode: "automatic",
+    correct,
+    total: keyedFields.length,
+    score,
+    passed: score === null ? null : score >= Number(settings.passingScore || 0),
+    passingScore: Number(settings.passingScore || 0),
+  };
+};
+
+const getModernFieldPlaceholder = (field = {}) => {
+  const customPlaceholder = String(field.placeholder || "").trim();
+  const genericPlaceholders = new Set([
+    "",
+    "Short answer",
+    "Paragraph",
+    "Email",
+    "Phone number",
+    "Website URL",
+    "Number",
+    "Money amount",
+    "Date",
+    "Time",
+    "Dropdown",
+    "Single choice",
+    "Checkboxes",
+    "Yes / No",
+    "Linear scale",
+    "Rating",
+    "Status",
+    "File upload",
+  ]);
+
+  if (!genericPlaceholders.has(customPlaceholder)) return customPlaceholder;
+
+  const label = String(field.label || "").toLowerCase();
+
+  if (field.type === "email" || label.includes("email")) return "name@company.com";
+  if (field.type === "phone" || label.includes("phone")) return "+972 50 123 4567";
+  if (field.type === "url" || label.includes("website")) return "https://yourcompany.com";
+  if (field.type === "money" || label.includes("budget") || label.includes("amount")) return "Example: 7,500";
+  if (field.type === "number" || label.includes("size")) return "Example: 12";
+  if (field.type === "date") return "Select a date";
+  if (field.type === "time") return "Select a time";
+  if (field.type === "dropdown" || field.type === "status") return "Select an option";
+  if (field.type === "radio") return "Choose one option";
+  if (field.type === "checkboxes") return "Select all that apply";
+  if (field.type === "paragraph" || label.includes("summary") || label.includes("details")) {
+    return "Briefly describe what you need...";
+  }
+  if (label.includes("name")) return "e.g. Sarah Haddad";
+
+  return "Type your answer";
+};
 const getFieldOptions = (field) => (field.options || []).filter(Boolean);
 const scaleRange = (field) => {
   const min = Number(field.scaleMin || 1);
@@ -64,7 +284,97 @@ const scaleRange = (field) => {
   return Array.from({ length: max - min + 1 }, (_, index) => String(min + index));
 };
 
+const formatQuizTime = (seconds = 0) => {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+};
+
+const getQuizSettings = (form = {}) => ({
+  lockScreen: false,
+  totalTimeLimitSec: 0,
+  questionTimeLimitSec: 0,
+  showQuestionTimer: true,
+  showTotalTimer: true,
+  scoring: "automatic",
+  passingScore: 70,
+  showResults: true,
+  allowRetakes: true,
+  maxRetakes: 0,
+  ...(form.quiz || {}),
+});
+
 const mainBuilderHiddenTabs = ["data", "responses"];
+const templateModalText = {
+  en: {
+    eyebrow: "Template library",
+    title: "Choose a builder template",
+    description:
+      "Start from a focused operating system, then edit pages, forms, data, roles, workflows, and theme values.",
+    close: "Close",
+  },
+  ar: {
+    eyebrow: "مكتبة القوالب",
+    title: "اختر قالبا للمنشئ",
+    description:
+      "ابدأ من نظام عمل جاهز، ثم عدل الصفحات والنماذج والبيانات والأدوار وسير العمل والثيم.",
+    close: "إغلاق",
+  },
+};
+
+const starterArabicText = {
+  showcase: {
+    category: "تجربة",
+    title: "عرض شامل للمنشئ",
+    subtitle: "قالب افتراضي كامل يعرض الصفحات والنماذج والبيانات والوسائط وتسجيل الدخول وسير العمل.",
+    tags: ["كل الميزات", "تجربة"],
+  },
+  cms: {
+    category: "إدارة محتوى",
+    title: "مركز إدارة المحتوى",
+    subtitle: "صفحات تحريرية، نماذج استقبال، سير نشر، سجلات محتوى، وأدوار فريق.",
+    tags: ["محتوى", "نشر", "موافقات"],
+  },
+  ecommerce: {
+    category: "تجارة",
+    title: "واجهة متجر إلكتروني",
+    subtitle: "عرض منتجات، استقبال طلبات، سجلات عملاء، حالة تنفيذ، وعمليات جاهزة للحجز.",
+    tags: ["منتجات", "طلبات", "عملاء"],
+  },
+  hrFinance: {
+    category: "عمليات",
+    title: "بوابة الموارد البشرية والمالية",
+    subtitle: "طلبات موظفين، موافقات ميزانية، تعويضات، دعم رواتب، ومراجعة حسب الأدوار.",
+    tags: ["موارد بشرية", "مالية", "موافقات"],
+  },
+  meal: {
+    category: "مشاريع",
+    title: "تنسيق مشاريع المتابعة والتقييم",
+    subtitle: "متابعة وتقييم ومساءلة وتعلم وتقارير ميدانية ومؤشرات ومتابعة الشركاء.",
+    tags: ["متابعة وتقييم", "مشاريع", "تقارير"],
+  },
+  website: {
+    title: "موقع ونموذج تواصل",
+    subtitle: "موقع، نموذج تواصل، ردود، وأدوار أساسية.",
+  },
+  requests: {
+    title: "بوابة طلبات وموافقات",
+    subtitle: "موارد بشرية ومالية ومشتريات وموافقات داخلية.",
+  },
+  reports: {
+    title: "مركز متابعة وتقارير",
+    subtitle: "تقارير نشاط ولوحات متابعة وسير مراجعة.",
+  },
+  orders: {
+    title: "نظام طلبات وحجوزات",
+    subtitle: "طلبات عملاء وحجوزات خدمات وتتبع حالة.",
+  },
+  blank: {
+    title: "نظام فارغ مخصص",
+    subtitle: "ابدأ من صفحة واحدة ونموذج واحد ودور مدير.",
+  },
+};
 const internalPageNames = new Set([
   "review responses",
   "responses",
@@ -177,22 +487,32 @@ export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
   hideWorkspaceTabs = false,
+  lang = "en",
+  demoMode = false,
+  templateLang = lang,
 } = {}) {
-  const [project, setProject] = useState(loadInitialProject);
+  const [project, setProject] = useState(() =>
+    demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
+  );
   const [activeTab, setActiveTab] = useState(initialTab || "design");
   const [designPanel, setDesignPanel] = useState("Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
   const [selected, setSelected] = useState({ type: "page", id: null });
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(() => (hideWorkspaceTabs ? null : "starter"));
   const [dragState, setDragState] = useState(null);
+  const [insertTarget, setInsertTarget] = useState(null);
   const [runtimeAnswers, setRuntimeAnswers] = useState({});
   const [runtimeErrors, setRuntimeErrors] = useState({});
+  const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
+  const [activeTopbarAction, setActiveTopbarAction] = useState("");
+  const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
 
   useEffect(() => {
+    if (demoMode) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
-  }, [project]);
+  }, [demoMode, project]);
 
   const activePage = useMemo(
     () => project.pages.find((page) => page.id === project.activePageId) || project.pages[0],
@@ -515,12 +835,29 @@ export default function PageBuilder({
 
   const smartAddElement = (type) => {
     const element = createElement(type, type === "formBlock" || type === "responsesTable" ? { connectedFormId: project.activeFormId } : {});
+    const selectedElementLocation = selectedElement ? findElementLocation(selectedElement.id) : null;
 
     if (selectedSection?.mode === "free") {
+      const freeElement =
+        insertTarget?.sectionId === selectedSection.id && insertTarget.mode === "free"
+          ? {
+              ...element,
+              mode: "free",
+              position: {
+                ...element.position,
+                [viewport]: {
+                  ...element.position[viewport],
+                  x: insertTarget.x,
+                  y: insertTarget.y,
+                },
+              },
+            }
+          : { ...element, mode: "free" };
+
       updateSections((sections) =>
         sections.map((section) =>
           section.id === selectedSection.id
-            ? { ...section, freeElements: [...section.freeElements, { ...element, mode: "free" }] }
+            ? { ...section, freeElements: [...section.freeElements, freeElement] }
             : section
         )
       );
@@ -528,7 +865,22 @@ export default function PageBuilder({
       return;
     }
 
-    let targetColumnId = selectedColumn?.id;
+    const insertTargetColumnExists = activePage.sections.some((section) =>
+      (section.rows || []).some((row) =>
+        (row.columns || []).some((column) => column.id === insertTarget?.columnId)
+      )
+    );
+
+    let targetColumnId =
+      selectedElementLocation?.isFree === false
+        ? selectedElementLocation.columnId
+        : selectedColumn?.id || (insertTargetColumnExists ? insertTarget.columnId : "");
+    const afterElementId =
+      selectedElementLocation?.isFree === false
+        ? selectedElement.id
+        : insertTarget?.columnId === targetColumnId
+          ? insertTarget.afterElementId
+          : "";
 
     if (!targetColumnId && selectedSection?.mode === "auto") {
       targetColumnId = selectedSection.rows?.[0]?.columns?.[0]?.id;
@@ -554,11 +906,22 @@ export default function PageBuilder({
         ...section,
         rows: section.rows.map((row) => ({
           ...row,
-          columns: row.columns.map((column) =>
-            column.id === targetColumnId
-              ? { ...column, elements: [...column.elements, element] }
-              : column
-          ),
+          columns: row.columns.map((column) => {
+            if (column.id !== targetColumnId) return column;
+
+            if (!afterElementId) {
+              return { ...column, elements: [...column.elements, element] };
+            }
+
+            const insertIndex = column.elements.findIndex((item) => item.id === afterElementId);
+            if (insertIndex < 0) {
+              return { ...column, elements: [...column.elements, element] };
+            }
+
+            const elements = [...column.elements];
+            elements.splice(insertIndex + 1, 0, element);
+            return { ...column, elements };
+          }),
         })),
       }))
     );
@@ -689,23 +1052,80 @@ export default function PageBuilder({
   const moveSelectedElement = (direction) => {
     if (!selectedElement) return;
     const location = findElementLocation(selectedElement.id);
-    if (!location || location.isFree) return;
+    if (!location) return;
+
+    if (location.isFree) {
+      updateSections((sections) =>
+        sections.map((section) => {
+          if (section.id !== location.sectionId) return section;
+
+          const freeElements = [...(section.freeElements || [])];
+          const targetIndex = direction === "up" ? location.elementIndex - 1 : location.elementIndex + 1;
+          if (targetIndex < 0 || targetIndex >= freeElements.length) return section;
+
+          [freeElements[location.elementIndex], freeElements[targetIndex]] = [
+            freeElements[targetIndex],
+            freeElements[location.elementIndex],
+          ];
+          return { ...section, freeElements };
+        })
+      );
+      return;
+    }
 
     updateSections((sections) =>
-      sections.map((section) => ({
-        ...section,
-        rows: section.rows.map((row) => ({
-          ...row,
-          columns: row.columns.map((column) => {
-            if (column.id !== location.columnId) return column;
-            const elements = [...column.elements];
-            const targetIndex = direction === "up" ? location.elementIndex - 1 : location.elementIndex + 1;
-            if (targetIndex < 0 || targetIndex >= elements.length) return column;
-            [elements[location.elementIndex], elements[targetIndex]] = [elements[targetIndex], elements[location.elementIndex]];
-            return { ...column, elements };
-          }),
-        })),
-      }))
+      sections.map((section) => {
+        if (section.id !== location.sectionId) return section;
+
+        const slots = [];
+        (section.rows || []).forEach((row, rowIndex) => {
+          (row.columns || []).forEach((column, columnIndex) => {
+            (column.elements || []).forEach((element, elementIndex) => {
+              slots.push({ rowIndex, columnIndex, elementIndex, element });
+            });
+          });
+        });
+
+        const currentSlotIndex = slots.findIndex((slot) => slot.element.id === selectedElement.id);
+        const targetSlotIndex = direction === "up" ? currentSlotIndex - 1 : currentSlotIndex + 1;
+        if (currentSlotIndex < 0 || targetSlotIndex < 0 || targetSlotIndex >= slots.length) return section;
+
+        const currentSlot = slots[currentSlotIndex];
+        const targetSlot = slots[targetSlotIndex];
+
+        return {
+          ...section,
+          rows: section.rows.map((row, rowIndex) => ({
+            ...row,
+            columns: row.columns.map((column, columnIndex) => {
+              const isCurrentColumn =
+                rowIndex === currentSlot.rowIndex && columnIndex === currentSlot.columnIndex;
+              const isTargetColumn =
+                rowIndex === targetSlot.rowIndex && columnIndex === targetSlot.columnIndex;
+
+              if (!isCurrentColumn && !isTargetColumn) return column;
+
+              const elements = [...column.elements];
+
+              if (isCurrentColumn && isTargetColumn) {
+                [elements[currentSlot.elementIndex], elements[targetSlot.elementIndex]] = [
+                  elements[targetSlot.elementIndex],
+                  elements[currentSlot.elementIndex],
+                ];
+                return { ...column, elements };
+              }
+
+              if (isCurrentColumn) {
+                elements[currentSlot.elementIndex] = targetSlot.element;
+                return { ...column, elements };
+              }
+
+              elements[targetSlot.elementIndex] = currentSlot.element;
+              return { ...column, elements };
+            }),
+          })),
+        };
+      })
     );
   };
 
@@ -866,6 +1286,93 @@ export default function PageBuilder({
     });
   };
 
+  const updateSelectedElementPlacement = (alignSelf) => {
+    if (!selectedElement) return;
+
+    const currentWidth = selectedElement.styles.width || "";
+    const shouldMakeMovable =
+      isDirectionalElementPlacement(alignSelf) &&
+      (!currentWidth || currentWidth === "auto" || currentWidth === "100%");
+
+    const nextElement = {
+      ...selectedElement,
+      styles: {
+        ...selectedElement.styles,
+        alignSelf,
+        ...(shouldMakeMovable ? { width: "70%" } : {}),
+      },
+    };
+
+    if (carouselElementTypes.has(selectedElement.type)) {
+      updateSelectedElement({ styles: nextElement.styles });
+      return;
+    }
+
+    const location = findElementLocation(selectedElement.id);
+    const targetColumnIndexByPlacement = (columns) => {
+      const placement = normalizeElementAlignSelf(alignSelf);
+      if (placement === "flex-start") return 0;
+      if (placement === "flex-end") return columns.length - 1;
+      if (placement === "center") return Math.floor((columns.length - 1) / 2);
+      return -1;
+    };
+
+    if (!location || location.isFree) {
+      updateSelectedElement({ styles: nextElement.styles });
+      return;
+    }
+
+    updateSections((sections) =>
+      sections.map((section) => {
+        if (section.id !== location.sectionId) return section;
+
+        return {
+          ...section,
+          rows: section.rows.map((row) => {
+            if (row.id !== location.rowId) return row;
+
+            const targetColumnIndex = targetColumnIndexByPlacement(row.columns || []);
+            const targetColumn = targetColumnIndex >= 0 ? row.columns[targetColumnIndex] : null;
+
+            return {
+              ...row,
+              columns: row.columns.map((column) => {
+                if (!targetColumn || column.id === location.columnId) {
+                  return {
+                    ...column,
+                    elements: column.elements.map((element) =>
+                      element.id === selectedElement.id ? nextElement : element
+                    ),
+                  };
+                }
+
+                if (column.id !== targetColumn.id) return column;
+
+                const sourceColumn = row.columns.find((item) => item.id === location.columnId);
+                const sourceIndex = sourceColumn?.elements.findIndex((item) => item.id === selectedElement.id) ?? -1;
+                const insertIndex = Math.min(
+                  Math.max(sourceIndex, 0),
+                  column.elements.length
+                );
+                const elements = [...column.elements];
+                elements.splice(insertIndex, 0, nextElement);
+
+                return { ...column, elements };
+              }).map((column) =>
+                targetColumn && column.id === location.columnId && column.id !== targetColumn.id
+                  ? {
+                      ...column,
+                      elements: column.elements.filter((element) => element.id !== selectedElement.id),
+                    }
+                  : column
+              ),
+            };
+          }),
+        };
+      })
+    );
+  };
+
   const uploadImageForSelectedElement = (file) => {
     if (!file || !selectedElement || selectedElement.type !== "image") return;
 
@@ -912,6 +1419,16 @@ export default function PageBuilder({
 
     reader.onerror = () => alert("Could not read this logo. Please try another file.");
     reader.readAsDataURL(file);
+  };
+
+  const updateActiveFormQuiz = (updates) => {
+    updateActiveForm((form) => ({
+      ...form,
+      quiz: {
+        ...getQuizSettings(form),
+        ...updates,
+      },
+    }));
   };
 
   const addForm = () => {
@@ -973,11 +1490,15 @@ export default function PageBuilder({
                 const nextType = updates.type || field.type;
                 const isChoice = ["dropdown", "radio", "checkboxes", "status"].includes(nextType);
                 const nextOptions = updates.options || field.options || [];
+                const typeChanged = updates.type && updates.type !== field.type;
 
                 return {
                   ...field,
                   ...updates,
                   options: isChoice ? (nextOptions.length ? nextOptions : ["Option 1", "Option 2"]) : [],
+                  ...(typeChanged
+                    ? { quizCorrectAnswer: nextType === "checkboxes" ? [] : "" }
+                    : {}),
                 };
               })()
             : field
@@ -993,6 +1514,85 @@ export default function PageBuilder({
         section.id === sectionId ? { ...section, ...updates } : section
       ),
     }));
+  };
+
+  const renderQuizAnswerKeyEditor = (field) => {
+    if (!correctableQuizTypes.has(field.type)) {
+      return (
+        <div className="quiz-answer-key is-muted">
+          <strong>Correct answer</strong>
+          <p>This field type is not automatically graded.</p>
+        </div>
+      );
+    }
+
+    if (field.type === "checkboxes") {
+      const selectedAnswers = Array.isArray(field.quizCorrectAnswer) ? field.quizCorrectAnswer : [];
+
+      return (
+        <div className="quiz-answer-key">
+          <strong>Correct answers</strong>
+          <div className="quiz-answer-options">
+            {getFieldOptions(field).map((option) => (
+              <label className="checkbox-control" key={option}>
+                <input
+                  type="checkbox"
+                  checked={selectedAnswers.includes(option)}
+                  onChange={(event) => {
+                    const nextAnswers = event.target.checked
+                      ? [...selectedAnswers, option]
+                      : selectedAnswers.filter((answer) => answer !== option);
+                    updateFormField(field.id, { quizCorrectAnswer: nextAnswers });
+                  }}
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (singleAnswerQuizTypes.has(field.type)) {
+      const options =
+        field.type === "yesNo"
+          ? ["Yes", "No"]
+          : field.type === "linearScale"
+            ? scaleRange(field)
+            : field.type === "rating"
+              ? Array.from({ length: Math.max(2, Math.min(10, Number(field.maxRating || 5))) }, (_, index) => String(index + 1))
+              : getFieldOptions(field);
+
+      return (
+        <div className="quiz-answer-key">
+          <label>
+            Correct answer
+            <select
+              value={field.quizCorrectAnswer || ""}
+              onChange={(event) => updateFormField(field.id, { quizCorrectAnswer: event.target.value })}
+            >
+              <option value="">Select the correct answer</option>
+              {options.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      );
+    }
+
+    return (
+      <div className="quiz-answer-key">
+        <label>
+          Accepted answers
+          <textarea
+            value={Array.isArray(field.quizCorrectAnswer) ? field.quizCorrectAnswer.join("\n") : field.quizCorrectAnswer || ""}
+            placeholder="One accepted answer per line"
+            onChange={(event) => updateFormField(field.id, { quizCorrectAnswer: splitLines(event.target.value) })}
+          />
+        </label>
+      </div>
+    );
   };
 
   const duplicateFormField = (fieldId) => {
@@ -1052,6 +1652,61 @@ export default function PageBuilder({
       })),
     }));
     setSelected({ type: "form", id: activeForm?.id });
+  };
+
+  const startQuizSession = (form) => {
+    const fields = getFormFields(form);
+    if (fields.length === 0) return;
+
+    const settings = getQuizSettings(form);
+    const firstLimit = Number(fields[0]?.quizTimeLimitSec || settings.questionTimeLimitSec || 0);
+
+    setQuizSessions((prev) => ({
+      ...prev,
+      [form.id]: {
+        active: true,
+        currentIndex: 0,
+        totalRemaining: Number(settings.totalTimeLimitSec || 0),
+        questionRemaining: firstLimit,
+      },
+    }));
+
+    if (settings.lockScreen && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => undefined);
+    }
+  };
+
+  const resetQuizSession = (formId) => {
+    setQuizSessions((prev) => {
+      const next = { ...prev };
+      delete next[formId];
+      return next;
+    });
+  };
+
+  const moveQuizQuestion = (form, direction) => {
+    const fields = getFormFields(form);
+    const settings = getQuizSettings(form);
+
+    setQuizSessions((prev) => {
+      const current = prev[form.id];
+      if (!current) return prev;
+
+      const nextIndex =
+        direction === "next"
+          ? Math.min(fields.length - 1, current.currentIndex + 1)
+          : Math.max(0, current.currentIndex - 1);
+      const nextLimit = Number(fields[nextIndex]?.quizTimeLimitSec || settings.questionTimeLimitSec || 0);
+
+      return {
+        ...prev,
+        [form.id]: {
+          ...current,
+          currentIndex: nextIndex,
+          questionRemaining: nextLimit,
+        },
+      };
+    });
   };
 
   const addWorkflow = () => {
@@ -1183,7 +1838,7 @@ export default function PageBuilder({
     });
   };
 
-  const submitRuntimeForm = (form) => {
+  const submitRuntimeForm = (form, { skipValidation = false } = {}) => {
     const enteredAnswers = runtimeAnswers[form.id] || {};
     const answers = getFormFields(form).reduce((acc, field) => {
       if (enteredAnswers[field.id] !== undefined) {
@@ -1195,29 +1850,42 @@ export default function PageBuilder({
     }, {});
     const nextErrors = {};
 
-    getFormFields(form).forEach((field) => {
-      if (!field.required) return;
-      const value = answers[field.id];
+    if (!skipValidation) {
+      getFormFields(form).forEach((field) => {
+        if (!field.required) return;
+        const value = answers[field.id];
 
-      if (
-        value === undefined ||
-        value === null ||
-        value === "" ||
-        (Array.isArray(value) && value.length === 0)
-      ) {
-        nextErrors[field.id] = "This field is required.";
-      }
-    });
+        if (
+          value === undefined ||
+          value === null ||
+          value === "" ||
+          (Array.isArray(value) && value.length === 0)
+        ) {
+          nextErrors[field.id] = "This field is required.";
+        }
+      });
+    }
 
     setRuntimeErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) return;
 
+    const quizResult = form.mode === "quiz" ? gradeQuizResponse(form, answers) : null;
+    const responseStatus =
+      quizResult?.passed === true
+        ? "Passed"
+        : quizResult?.passed === false
+          ? "Failed"
+          : form.mode === "quiz"
+            ? "Submitted"
+            : "New";
+
     const response = {
       id: createId("response"),
       createdAt: new Date().toISOString(),
-      status: "New",
+      status: responseStatus,
       answers,
+      ...(quizResult ? { quiz: quizResult } : {}),
     };
 
     updateProject((prev) => ({
@@ -1233,7 +1901,19 @@ export default function PageBuilder({
     }));
 
     setRuntimeAnswers((prev) => ({ ...prev, [form.id]: {} }));
-    showToast(form.successMessage);
+    resetQuizSession(form.id);
+    if (form.mode === "quiz" && document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => undefined);
+    }
+    if (form.mode === "quiz" && quizResult && getQuizSettings(form).showResults) {
+      if (quizResult.score === null) {
+        showToast("Quiz submitted. This quiz needs manual review.");
+      } else {
+        showToast(`Quiz submitted. Score: ${quizResult.score}% (${quizResult.correct}/${quizResult.total}).`);
+      }
+    } else {
+      showToast(form.successMessage);
+    }
   };
 
   const runElementAction = (element) => {
@@ -1254,21 +1934,38 @@ export default function PageBuilder({
     }
   };
 
-  const saveProject = () => {
-    const nextProject = {
-      ...project,
-      publish: {
-        ...project.publish,
-        lastSavedAt: new Date().toISOString(),
-      },
-    };
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProject));
+  const persistProject = (nextProject, message) => {
+    if (!demoMode) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProject));
+    }
     setProject(nextProject);
-    showToast("Saved locally.");
+    showToast(message);
+    return nextProject;
+  };
+
+  const saveProject = () => {
+    setActiveTopbarAction("save");
+    persistProject(
+      {
+        ...project,
+        publish: {
+          ...project.publish,
+          lastSavedAt: new Date().toISOString(),
+        },
+      },
+      demoMode ? "Demo changes stay until refresh." : "Saved locally."
+    );
   };
 
   const loadProject = () => {
+    if (demoMode) {
+      const freshProject = cleanBuilderProject(createInitialProject());
+      setProject(freshProject);
+      setSelected({ type: "page", id: freshProject.activePageId });
+      showToast("Default demo template loaded.");
+      return;
+    }
+
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       alert("No saved project found.");
@@ -1286,16 +1983,25 @@ export default function PageBuilder({
   };
 
   const publishProject = () => {
-    updateProject((prev) => ({
-      ...prev,
+    setActiveTopbarAction("publish");
+    const publishedProject = {
+      ...project,
       status: "published",
       publish: {
-        ...prev.publish,
+        ...project.publish,
+        lastSavedAt: new Date().toISOString(),
         lastPublishedAt: new Date().toISOString(),
       },
-    }));
+    };
 
-    showToast("Go Live status updated locally.");
+    persistProject(
+      publishedProject,
+      demoMode ? "Demo publish status updated until refresh." : "Site is live locally."
+    );
+
+    if (!demoMode) {
+      window.open(getLocalTenantPath(publishedProject), "_blank", "noopener,noreferrer");
+    }
   };
 
   const exportProject = () => {
@@ -1377,30 +2083,55 @@ export default function PageBuilder({
 
   const getElementStyle = (element) => {
     const isSelected = selected.type === "element" && selected.id === element.id;
+    const placementMargins = getElementPlacementMargins(element.styles.alignSelf);
+    const layoutWidth =
+      getElementLayoutWidth(element.styles.width, element.styles.alignSelf) ||
+      (carouselElementTypes.has(element.type) ? "100%" : undefined);
 
     return {
       ...element.styles,
+      "--builder-element-width": layoutWidth || "auto",
+      "--builder-element-align": normalizeElementAlignSelf(element.styles.alignSelf) || "auto",
+      "--builder-element-color": element.styles.color || "inherit",
+      "--builder-element-bg": element.styles.backgroundColor || "transparent",
+      "--builder-element-radius": element.styles.borderRadius || "0",
+      "--builder-element-font-size": element.styles.fontSize || "inherit",
+      "--builder-element-text-align": element.styles.textAlign || "inherit",
       position: "relative",
       transform: undefined,
-      width: element.styles.width || undefined,
-      minHeight: undefined,
+      width: layoutWidth,
+      minHeight: element.styles.minHeight || undefined,
       maxWidth: "100%",
-      alignSelf:
-        element.styles.alignSelf === "auto" ? undefined : element.styles.alignSelf,
+      alignSelf: normalizeElementAlignSelf(element.styles.alignSelf),
+      ...placementMargins,
       zIndex: isSelected ? 5 : 1,
     };
   };
 
   const getFreeElementStyle = (element) => {
     const pos = element.position?.[viewport] || createPosition()[viewport];
+    const location = findElementLocation(element.id);
+    const section = activePage?.sections.find((item) => item.id === location?.sectionId);
+    const viewportWidth = viewports[viewport] || viewports.desktop;
+    const sectionHeight = Number(section?.layout?.minHeight) || 560;
+    const left = `${((Number(pos.x) || 0) / viewportWidth) * 100}%`;
+    const top = `${((Number(pos.y) || 0) / sectionHeight) * 100}%`;
+    const width = `${((Number(pos.width) || 240) / viewportWidth) * 100}%`;
+    const minHeight = `${((Number(pos.height) || 80) / sectionHeight) * 100}%`;
 
     return {
       ...element.styles,
+      "--builder-element-color": element.styles.color || "inherit",
+      "--builder-element-bg": element.styles.backgroundColor || "transparent",
+      "--builder-element-radius": element.styles.borderRadius || "0",
+      "--builder-element-font-size": element.styles.fontSize || "inherit",
+      "--builder-element-text-align": element.styles.textAlign || "inherit",
       position: "absolute",
-      left: `${pos.x}px`,
-      top: `${pos.y}px`,
-      width: `${pos.width}px`,
-      minHeight: `${pos.height}px`,
+      left,
+      top,
+      width,
+      minHeight,
+      maxWidth: `calc(100% - ${left})`,
     };
   };
 
@@ -1448,6 +2179,7 @@ export default function PageBuilder({
     const value = runtimeAnswers[form.id]?.[field.id] || field.defaultValue || "";
     const error = runtimeErrors[field.id];
     const meta = getFieldType(field.type);
+    const placeholder = getModernFieldPlaceholder(field);
 
     const common = {
       disabled,
@@ -1458,13 +2190,13 @@ export default function PageBuilder({
     let inputNode = null;
 
     if (["text", "email", "tel", "number", "date", "time", "url"].includes(meta.input)) {
-      inputNode = <input type={meta.input} placeholder={field.placeholder} {...common} />;
+      inputNode = <input type={meta.input} placeholder={placeholder} {...common} />;
     } else if (meta.input === "textarea") {
-      inputNode = <textarea placeholder={field.placeholder} {...common} />;
+      inputNode = <textarea placeholder={placeholder} {...common} />;
     } else if (meta.input === "select") {
       inputNode = (
         <select {...common}>
-          <option value="">Choose...</option>
+          <option value="">{placeholder}</option>
           {getFieldOptions(field).map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
@@ -1591,36 +2323,170 @@ export default function PageBuilder({
     );
   };
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setQuizSessions((prev) => {
+        let changed = false;
+        const next = { ...prev };
+
+        Object.entries(prev).forEach(([formId, session]) => {
+          if (!session?.active) return;
+
+          const nextSession = { ...session };
+          if (nextSession.totalRemaining > 0) {
+            nextSession.totalRemaining -= 1;
+            changed = true;
+          }
+
+          if (nextSession.questionRemaining > 0) {
+            nextSession.questionRemaining -= 1;
+            changed = true;
+          }
+
+          next[formId] = nextSession;
+        });
+
+        return changed ? next : prev;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    Object.entries(quizSessions).forEach(([formId, session]) => {
+      if (!session?.active) return;
+      const form = project.forms.find((item) => item.id === formId);
+      if (!form) return;
+      const fields = getFormFields(form);
+
+      if (session.totalRemaining === 0 && getQuizSettings(form).totalTimeLimitSec > 0) {
+        submitRuntimeForm(form, { skipValidation: true });
+        return;
+      }
+
+      if (session.questionRemaining === 0) {
+        const questionLimit = Number(fields[session.currentIndex]?.quizTimeLimitSec || getQuizSettings(form).questionTimeLimitSec || 0);
+        if (questionLimit <= 0) return;
+
+        if (session.currentIndex >= fields.length - 1) {
+          submitRuntimeForm(form, { skipValidation: true });
+        } else {
+          moveQuizQuestion(form, "next");
+        }
+      }
+    });
+  }, [quizSessions, project.forms]);
+
   const renderConnectedForm = (formId, { allowInteraction = preview } = {}) => {
     const form = project.forms.find((item) => item.id === formId) || project.forms[0];
     if (!form) return <div className="empty-connected">No form selected.</div>;
+    const isQuiz = form.mode === "quiz";
+    const quizSettings = getQuizSettings(form);
+    const quizFields = getFormFields(form);
+    const quizSession = quizSessions[form.id];
+    const quizStarted = !isQuiz || quizSession?.active;
+    const currentQuestionIndex = Math.min(quizSession?.currentIndex || 0, Math.max(quizFields.length - 1, 0));
+    const currentField = quizFields[currentQuestionIndex];
 
     return (
-      <div className="runtime-form">
+      <div className={`runtime-form ${isQuiz ? "runtime-quiz-form" : ""} ${quizSettings.lockScreen ? "runtime-quiz-lockable" : ""}`}>
         <div className="runtime-form-header">
           <h3>{form.title}</h3>
           <p>{form.description}</p>
+          {isQuiz && (
+            <div className="quiz-runtime-meta">
+              <span>{quizFields.length} questions</span>
+              {quizSettings.totalTimeLimitSec > 0 && (
+                <span>Total: {formatQuizTime(quizStarted ? quizSession?.totalRemaining : quizSettings.totalTimeLimitSec)}</span>
+              )}
+              {quizSettings.questionTimeLimitSec > 0 && (
+                <span>Per question: {formatQuizTime(quizSettings.questionTimeLimitSec)}</span>
+              )}
+              {quizSettings.lockScreen && <span>Focus mode</span>}
+            </div>
+          )}
         </div>
 
-        {getFormSections(form).map((section) => (
-          <div className="runtime-form-section" key={section.id}>
+        {isQuiz && !quizStarted ? (
+          <div className="quiz-start-panel">
+            <strong>Ready to start?</strong>
+            <p>
+              {quizSettings.lockScreen
+                ? "This quiz opens in focus mode. Timers begin when you start."
+                : "Timers begin when you start the quiz."}
+            </p>
+            <button
+              type="button"
+              className="runtime-submit"
+              disabled={!allowInteraction || quizFields.length === 0}
+              onClick={() => startQuizSession(form)}
+            >
+              Start quiz
+            </button>
+          </div>
+        ) : isQuiz ? (
+          <div className="runtime-form-section quiz-question-stage">
             <div className="runtime-form-section-header">
-              <h4>{section.title}</h4>
-              {section.description && <p>{section.description}</p>}
+              <h4>Question {currentQuestionIndex + 1} of {quizFields.length}</h4>
+              {quizSession?.questionRemaining > 0 && (
+                <p>Question time: {formatQuizTime(quizSession.questionRemaining)}</p>
+              )}
             </div>
 
-            {(section.fields || []).map((field) => renderFieldInput(form, field, !allowInteraction))}
-          </div>
-        ))}
+            {currentField && renderFieldInput(form, currentField, !allowInteraction)}
 
-        <button
-          type="button"
-          className="runtime-submit"
-          disabled={!allowInteraction}
-          onClick={() => submitRuntimeForm(form)}
-        >
-          Submit
-        </button>
+            <div className="quiz-navigation">
+              <button
+                type="button"
+                disabled={!allowInteraction || currentQuestionIndex === 0}
+                onClick={() => moveQuizQuestion(form, "previous")}
+              >
+                Previous
+              </button>
+              {currentQuestionIndex < quizFields.length - 1 ? (
+                <button
+                  type="button"
+                  disabled={!allowInteraction}
+                  onClick={() => moveQuizQuestion(form, "next")}
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="runtime-submit"
+                  disabled={!allowInteraction}
+                  onClick={() => submitRuntimeForm(form)}
+                >
+                  Submit quiz
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {getFormSections(form).map((section) => (
+              <div className="runtime-form-section" key={section.id}>
+                <div className="runtime-form-section-header">
+                  <h4>{section.title}</h4>
+                  {section.description && <p>{section.description}</p>}
+                </div>
+
+                {(section.fields || []).map((field) => renderFieldInput(form, field, !allowInteraction))}
+              </div>
+            ))}
+
+            <button
+              type="button"
+              className="runtime-submit"
+              disabled={!allowInteraction}
+              onClick={() => submitRuntimeForm(form)}
+            >
+              Submit
+            </button>
+          </>
+        )}
 
         {!allowInteraction && <p className="builder-note">Enable Preview to test this form.</p>}
       </div>
@@ -1633,6 +2499,7 @@ export default function PageBuilder({
 
     const fields = getFormFields(form).slice(0, 4);
     const responses = form.responses;
+    const isQuiz = form.mode === "quiz";
 
     return (
       <div className="responses-preview">
@@ -1644,6 +2511,7 @@ export default function PageBuilder({
         <div className="mock-table">
           <div className="mock-table-row mock-table-head">
             <span>Status</span>
+            {isQuiz && <span>Score</span>}
             {fields.map((field) => (
               <span key={field.id}>{field.label}</span>
             ))}
@@ -1652,6 +2520,7 @@ export default function PageBuilder({
           {(responses.length ? responses : [{ id: "sample", status: "Sample", answers: {} }]).map((response) => (
             <div className="mock-table-row" key={response.id}>
               <span>{response.status || "New"}</span>
+              {isQuiz && <span>{response.quiz?.score === null || response.quiz?.score === undefined ? "-" : `${response.quiz.score}%`}</span>}
               {fields.map((field) => (
                 <span key={field.id}>{formatSavedValue(response.answers?.[field.id])}</span>
               ))}
@@ -1671,7 +2540,24 @@ export default function PageBuilder({
       onMouseDown: (event) => startDrag(event, element),
       onClick: (event) => {
         event.stopPropagation();
-        if (!preview) setSelected({ type: "element", id: element.id });
+        if (!preview) {
+          const location = findElementLocation(element.id);
+          if (location?.isFree === false) {
+            setInsertTarget({
+              sectionId: location.sectionId,
+              mode: "auto",
+              columnId: location.columnId,
+              afterElementId: element.id,
+            });
+          } else if (location?.isFree) {
+            setInsertTarget({
+              sectionId: location.sectionId,
+              mode: "free",
+              afterElementId: element.id,
+            });
+          }
+          setSelected({ type: "element", id: element.id });
+        }
       },
     };
 
@@ -1709,6 +2595,42 @@ export default function PageBuilder({
           {String(element.content || "").split("\n").map((line, index) => (
             <span key={`${element.id}_${index}`}>{line}</span>
           ))}
+        </div>
+      );
+    }
+
+    if (carouselElementTypes.has(element.type)) {
+      const carouselWidth = getCarouselWidthValue(element);
+      const carouselFrameStyle = {
+        ...commonProps.style,
+        width: "100%",
+        maxWidth: "100%",
+        alignSelf: "stretch",
+        marginLeft: undefined,
+        marginRight: undefined,
+        "--builder-element-width": "100%",
+        "--builder-element-align": "stretch",
+      };
+
+      return (
+        <div
+          key={element.id}
+          {...commonProps}
+          className={`${commonProps.className} carousel-position-frame ${getComponentPositionClass(element.styles.alignSelf)}`}
+          style={carouselFrameStyle}
+        >
+          <div
+            className="carousel-position-inner"
+            style={{ width: carouselWidth, maxWidth: carouselWidth }}
+          >
+            <PageBuilderCarousel
+              autoScroll={Boolean(element.autoScroll)}
+              autoScrollMs={element.autoScrollMs}
+              content={element.content}
+              name={element.name}
+              variant={getCarouselVariant(element)}
+            />
+          </div>
         </div>
       );
     }
@@ -1892,32 +2814,33 @@ export default function PageBuilder({
     <div className="builder-layout">
       {!preview && (
         <aside className="builder-sidebar">
-          <div className="panel-mode-select">
-            <label>
-              Editing panel
-              <select value={designPanel} onChange={(event) => setDesignPanel(event.target.value)}>
-                {designPanels.map((panel) => <option key={panel} value={panel}>{panel}</option>)}
-              </select>
-            </label>
-          </div>
+          <div className="builder-side-panel">
+            <div className="panel-mode-select">
+              <label>
+                Editing panel
+                <select value={designPanel} onChange={(event) => setDesignPanel(event.target.value)}>
+                  {designPanels.map((panel) => <option key={panel} value={panel}>{panel}</option>)}
+                </select>
+              </label>
+            </div>
 
-          {designPanel === "Pages" && (
-            <section className="builder-panel">
-              <h2>Pages</h2>
-              <p className="panel-help">Create public pages, dashboards, forms, and review screens.</p>
+            {designPanel === "Pages" && (
+              <section className="builder-panel">
+                <h2>Pages</h2>
+                <p className="panel-help">Create public pages, dashboards, forms, and review screens.</p>
 
-              <select value={activePage?.id || ""} onChange={(event) => selectPage(event.target.value)}>
-                {project.pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
-              </select>
+                <select value={activePage?.id || ""} onChange={(event) => selectPage(event.target.value)}>
+                  {project.pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
+                </select>
 
-              <div className="compact-actions">
-                <button type="button" onClick={addPage}>+ Page</button>
-                <button type="button" onClick={duplicatePage}>Duplicate</button>
-                <button type="button" onClick={() => setModal("starter")}>Starter</button>
-                <button type="button" className="danger-lite" onClick={deleteActivePage}>Delete</button>
-              </div>
-            </section>
-          )}
+                <div className="compact-actions">
+                  <button type="button" onClick={addPage}>+ Page</button>
+                  <button type="button" onClick={duplicatePage}>Duplicate</button>
+                  <button type="button" onClick={() => setModal("starter")}>Starter</button>
+                  <button type="button" className="danger-lite" onClick={deleteActivePage}>Delete</button>
+                </div>
+              </section>
+            )}
 
           {designPanel === "Sections" && (
             <section className="builder-panel">
@@ -1961,7 +2884,7 @@ export default function PageBuilder({
                     <div key={section.id} className="layer-item">
                       <button
                         type="button"
-                        className={selected.id === section.id ? "active" : ""}
+                        className={`layer-section-button ${selected.id === section.id ? "active" : ""}`}
                         onClick={() => setSelected({ type: "section", id: section.id })}
                       >
                         {section.name || `Section ${sectionIndex + 1}`}
@@ -1973,7 +2896,7 @@ export default function PageBuilder({
                             <button
                               type="button"
                               key={element.id}
-                              className={selected.id === element.id ? "active" : ""}
+                              className={`layer-element-button ${selected.id === element.id ? "active" : ""}`}
                               onClick={() => setSelected({ type: "element", id: element.id })}
                             >
                               {getElementLayerLabel(element, elementIndex, elements)}
@@ -1995,7 +2918,7 @@ export default function PageBuilder({
               <h2>Add Elements</h2>
               <p className="panel-help">Select a section or column, then add an element.</p>
 
-              {["Content", "Dashboard", "Connected"].map((group) => (
+                {["Content", "Collection", "Dashboard", "Connected"].map((group) => (
                 <div key={group} className="add-group">
                   <span>{group}</span>
                   {elementTypes
@@ -2009,6 +2932,7 @@ export default function PageBuilder({
               ))}
             </section>
           )}
+          </div>
         </aside>
       )}
 
@@ -2020,7 +2944,7 @@ export default function PageBuilder({
       >
         <div
           className={`builder-canvas viewport-${viewport}`}
-          style={{ maxWidth: preview ? `${viewports[viewport]}px` : undefined }}
+          style={{ width: `${viewports[viewport]}px` }}
         >
           {renderSiteHeader()}
 
@@ -2035,7 +2959,17 @@ export default function PageBuilder({
                   style={{ backgroundColor: section.layout.background, minHeight: section.layout.minHeight }}
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (!preview) setSelected({ type: "section", id: section.id });
+                    if (!preview) {
+                      const frame = event.currentTarget.querySelector(".free-canvas-frame");
+                      const rect = frame?.getBoundingClientRect();
+                      setInsertTarget({
+                        sectionId: section.id,
+                        mode: "free",
+                        x: rect ? Math.max(0, Math.round(event.clientX - rect.left)) : 40,
+                        y: rect ? Math.max(0, Math.round(event.clientY - rect.top)) : 40,
+                      });
+                      setSelected({ type: "section", id: section.id });
+                    }
                   }}
                 >
                   {!preview && (
@@ -2047,7 +2981,7 @@ export default function PageBuilder({
 
                   <div
                     className="free-canvas-frame"
-                    style={{ width: `${viewports[viewport]}px`, minHeight: `${section.layout.minHeight}px` }}
+                    style={{ width: `min(100%, ${viewports[viewport]}px)`, minHeight: `${section.layout.minHeight}px` }}
                   >
                     {section.freeElements.map((element) => renderElement(element, true))}
                   </div>
@@ -2062,7 +2996,16 @@ export default function PageBuilder({
                 style={{ backgroundColor: section.layout.background }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (!preview) setSelected({ type: "section", id: section.id });
+                  if (!preview) {
+                    const columnId = getClosestColumnIdFromEvent(event);
+                      setInsertTarget({
+                        sectionId: section.id,
+                        mode: "auto",
+                        columnId,
+                        afterElementId: "",
+                      });
+                    setSelected({ type: "section", id: section.id });
+                  }
                 }}
               >
                 {section.rows.map((row) => (
@@ -2076,19 +3019,31 @@ export default function PageBuilder({
                       return (
                         <div
                           key={column.id}
+                          data-column-id={column.id}
                           className={`site-column column-align-${column.layout.align} ${columnSelected ? "is-selected" : ""}`}
                           onClick={(event) => {
                             event.stopPropagation();
-                            if (!preview) setSelected({ type: "column", id: column.id });
+                            if (!preview) {
+                              setInsertTarget({
+                                sectionId: section.id,
+                                mode: "auto",
+                                columnId: column.id,
+                                afterElementId: "",
+                              });
+                              setSelected({ type: "column", id: column.id });
+                            }
                           }}
                         >
-                          {column.elements.map((element) => renderElement(element, false))}
+                          {column.elements
+                            .filter((element) => !carouselElementTypes.has(element.type))
+                            .map((element) => renderElement(element, false))}
                           {!preview && column.elements.length === 0 && (
                             <div className="empty-column">Select this column, then add an element.</div>
                           )}
                         </div>
                       );
                     })}
+                    {getRowCarouselElements(row).map((element) => renderElement(element, false))}
                   </div>
                 ))}
               </section>
@@ -2105,10 +3060,11 @@ export default function PageBuilder({
 
   const renderInspector = () => (
     <aside className="builder-inspector">
-      <div className="inspector-title">
-        <h2>Inspector</h2>
-        <span>{selected.type}</span>
-      </div>
+      <div className="builder-side-panel">
+        <div className="inspector-title">
+          <h2>Inspector</h2>
+          <span>{selected.type}</span>
+        </div>
 
       {selected.type === "page" && activePage && (
         <div className="inspector-group">
@@ -2207,30 +3163,135 @@ export default function PageBuilder({
         <div className="inspector-group">
           <h3>Element</h3>
           <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
+          {carouselElementTypes.has(selectedElement.type) && (
+            <p className="builder-note">
+              Use one slide per block: title, description, image URL. Separate slides with a blank line.
+            </p>
+          )}
           <label>Content<textarea value={selectedElement.content} onChange={(event) => updateSelectedElement({ content: event.target.value })} /></label>
           <label>Text color<input type="color" value={selectedElement.styles.color || "#1a2744"} onChange={(event) => updateSelectedElement({ styles: { color: event.target.value } })} /></label>
           <label>Background<input type="color" value={selectedElement.styles.backgroundColor || "#ffffff"} onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })} /></label>
           <label>Font size<input value={selectedElement.styles.fontSize || ""} placeholder="Example: 18px" onChange={(event) => updateSelectedElement({ styles: { fontSize: event.target.value } })} /></label>
           <label>Border radius<input value={selectedElement.styles.borderRadius || ""} placeholder="Example: 16px" onChange={(event) => updateSelectedElement({ styles: { borderRadius: event.target.value } })} /></label>
+          <label>Text alignment<select value={selectedElement.styles.textAlign || "left"} onChange={(event) => updateSelectedElement({ styles: { textAlign: event.target.value } })}>{alignmentOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
           {selectedElement.mode !== "free" && (
-            <label>
-              Component width
-              <select
-                value={selectedElement.styles.width || "auto"}
-                onChange={(event) =>
-                  updateSelectedElement({
-                    styles: { width: event.target.value === "auto" ? "" : event.target.value },
-                  })
-                }
-              >
-                <option value="auto">Auto - content width</option>
-                <option value="100%">Full - 100%</option>
-                <option value="75%">Wide - 75%</option>
-                <option value="50%">Half - 50%</option>
-                <option value="33.333%">Third - 33%</option>
-                <option value="25%">Quarter - 25%</option>
-              </select>
-            </label>
+            <>
+              <label>
+                Component width
+                <select
+                  value={
+                    selectedElement.styles.width ||
+                    (carouselElementTypes.has(selectedElement.type) ? "100%" : "auto")
+                  }
+                  onChange={(event) => {
+                    const width = event.target.value === "auto" ? "" : event.target.value;
+                    updateSelectedElement({
+                      styles: {
+                        width,
+                        ...(width === "100%" ? { alignSelf: "stretch" } : {}),
+                      },
+                    });
+                  }}
+                >
+                  {!carouselElementTypes.has(selectedElement.type) && (
+                    <option value="auto">Auto - content width</option>
+                  )}
+                  <option value="100%">Full - 100%</option>
+                  <option value="70%">Comfort - 70%</option>
+                  <option value="75%">Wide - 75%</option>
+                  <option value="50%">Half - 50%</option>
+                  <option value="33.333%">Third - 33%</option>
+                  <option value="25%">Quarter - 25%</option>
+                </select>
+              </label>
+              <label>
+                Minimum height
+                <input
+                  value={selectedElement.styles.minHeight || ""}
+                  placeholder="Example: 320px"
+                  onChange={(event) => updateSelectedElement({ styles: { minHeight: event.target.value } })}
+                />
+              </label>
+              <label>
+                Component position
+                <select
+                  value={getElementAlignControlValue(selectedElement.styles.alignSelf)}
+                  onChange={(event) => updateSelectedElementPlacement(event.target.value)}
+                >
+                  <option value="auto">Default</option>
+                  <option value="flex-start">Left</option>
+                  <option value="center">Center</option>
+                  <option value="flex-end">Right</option>
+                  <option value="stretch">Stretch full width</option>
+                </select>
+              </label>
+              {carouselElementTypes.has(selectedElement.type) && (
+                <>
+                  <label>
+                    Carousel height
+                    <select
+                      value={selectedElement.styles["--carousel-height"] || ""}
+                      onChange={(event) =>
+                        updateSelectedElement({
+                          styles: { "--carousel-height": event.target.value },
+                        })
+                      }
+                    >
+                      <option value="">Default</option>
+                      <option value="260px">Small - 260px</option>
+                      <option value="340px">Medium - 340px</option>
+                      <option value="420px">Large - 420px</option>
+                      <option value="520px">Tall - 520px</option>
+                    </select>
+                  </label>
+                  <label>
+                    Auto scroll
+                    <select
+                      value={selectedElement.autoScroll ? "on" : "off"}
+                      onChange={(event) =>
+                        updateSelectedElement({ autoScroll: event.target.value === "on" })
+                      }
+                    >
+                      <option value="on">On</option>
+                      <option value="off">Off</option>
+                    </select>
+                  </label>
+                  <label>
+                    Auto scroll timing
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={(Number(selectedElement.autoScrollMs) || 4000) / 1000}
+                      onChange={(event) =>
+                        updateSelectedElement({
+                          autoScrollMs: Math.max(1000, Number(event.target.value || 4) * 1000),
+                        })
+                      }
+                    />
+                  </label>
+                  {selectedElement.type === "circularGallery" && (
+                    <label>
+                      Gallery depth
+                      <select
+                        value={selectedElement.styles["--gallery-depth"] || ""}
+                        onChange={(event) =>
+                          updateSelectedElement({
+                            styles: { "--gallery-depth": event.target.value },
+                          })
+                        }
+                      >
+                        <option value="">Default</option>
+                        <option value="220px">Tight</option>
+                        <option value="300px">Medium</option>
+                        <option value="360px">Deep</option>
+                        <option value="440px">Wide ring</option>
+                      </select>
+                    </label>
+                  )}
+                </>
+              )}
+            </>
           )}
 
           {(selectedElement.type === "formBlock" || selectedElement.type === "responsesTable") && (
@@ -2310,6 +3371,7 @@ export default function PageBuilder({
           <button type="button" className="danger-button" onClick={deleteSelectedElement}>Delete Element</button>
         </div>
       )}
+      </div>
     </aside>
   );
 
@@ -2325,6 +3387,7 @@ export default function PageBuilder({
   const renderDataTab = () => (
     <BuilderAnalysisPage
       project={project}
+      lang={lang}
       getResponseCount={getResponseCount}
       getSavedRecordCount={getSavedRecordCount}
       selectForm={selectForm}
@@ -2363,16 +3426,102 @@ export default function PageBuilder({
         <button type="button" onClick={addForm}>+ Form</button>
       </div>
 
-      <div className="google-form-layout">
-        <aside className="object-list google-form-list">
+      <div className="forms-top-stack">
+        <section className="object-list google-form-list forms-form-strip" aria-label="Forms">
           {project.forms.map((form) => (
             <button key={form.id} type="button" className={activeForm?.id === form.id ? "active" : ""} onClick={() => selectForm(form.id)}>
               <strong>{form.title}</strong>
               <span>{getFormFields(form).length} fields / {form.responses.length} responses</span>
             </button>
           ))}
-        </aside>
+        </section>
 
+        <section className="forms-settings-top google-form-actions">
+          <section className="quiz-settings-panel quiz-settings-summary">
+            <div className="quiz-settings-header">
+              <div>
+                <h3>Quiz Settings</h3>
+                <p>{activeForm?.mode === "quiz" ? "Quiz mode is enabled for this form." : "Keep this as a form or turn it into a timed quiz."}</p>
+              </div>
+              <label className="checkbox-control">
+                <input
+                  type="checkbox"
+                  checked={activeForm?.mode === "quiz"}
+                  onChange={(event) =>
+                    updateActiveForm((form) => ({
+                      ...form,
+                      mode: event.target.checked ? "quiz" : "form",
+                      quiz: getQuizSettings(form),
+                    }))
+                  }
+                />
+                Quiz
+              </label>
+            </div>
+            <button type="button" className="quiz-options-trigger" onClick={() => setQuizOptionsOpen(true)}>
+              Quiz options
+            </button>
+          </section>
+
+          <section className="form-placement-panel">
+            <h3>Place Form</h3>
+            <label>
+              Page
+              <select value={project.activePageId || ""} onChange={(event) => selectPage(event.target.value)}>
+                {project.pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
+              </select>
+            </label>
+            <div className="form-panel-actions">
+              <button type="button" className="primary-action" onClick={() => addConnectedFormSectionToPage(activeForm?.id)}>
+                Add to page
+              </button>
+              <button type="button" onClick={() => addConnectedResponsesSectionToPage(activeForm?.id)}>
+                Add responses
+              </button>
+            </div>
+            {placements.length > 0 && (
+              <div className="connected-placement-list">
+                <span>Placed on:</span>
+                {placements.map((placement) => (
+                  <button
+                    type="button"
+                    key={`${placement.pageId}_${placement.sectionName}`}
+                    onClick={() => {
+                      selectPage(placement.pageId);
+                      setActiveTab("design");
+                      setDesignPanel("Layers");
+                    }}
+                  >
+                    {placement.pageName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="form-save-panel">
+            <h3>Save Data</h3>
+            <label>
+              Save submissions to
+              <select value={activeForm?.connectedCollectionId || ""} onChange={(event) => updateActiveForm((form) => ({ ...form, connectedCollectionId: event.target.value }))}>
+                <option value="">Form submissions only</option>
+                {project.collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Success message
+              <textarea value={activeForm?.successMessage || ""} onChange={(event) => updateActiveForm((form) => ({ ...form, successMessage: event.target.value }))} />
+            </label>
+          </section>
+
+          <details className="form-preview-panel">
+            <summary>Preview</summary>
+            {activeForm && renderConnectedForm(activeForm.id, { allowInteraction: true })}
+          </details>
+        </section>
+      </div>
+
+      <div className="google-form-layout">
         <main className="google-form-document">
           {activeForm && (
             <>
@@ -2429,6 +3578,21 @@ export default function PageBuilder({
                           {field.type === "rating" && (
                             <label className="inline-setting">Max rating<input type="number" min="2" max="10" value={field.maxRating || 5} onChange={(event) => updateFormField(field.id, { maxRating: Number(event.target.value) })} /></label>
                           )}
+                          {activeForm.mode === "quiz" && (
+                            <div className="quiz-question-settings">
+                              {renderQuizAnswerKeyEditor(field)}
+                              <label>
+                                Question time override (seconds)
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={Number(field.quizTimeLimitSec || 0)}
+                                  placeholder="Use default"
+                                  onChange={(event) => updateFormField(field.id, { quizTimeLimitSec: Math.max(0, Number(event.target.value || 0)) })}
+                                />
+                              </label>
+                            </div>
+                          )}
                         </div>
                         <div className="question-footer-actions">
                           <span>Question {sectionIndex + 1}.{(section.fields || []).findIndex((item) => item.id === field.id) + 1}</span>
@@ -2448,63 +3612,110 @@ export default function PageBuilder({
           )}
         </main>
 
-        <aside className="form-side-settings google-form-actions">
-          <section>
-            <h3>Place Form</h3>
-            <label>
-              Page
-              <select value={project.activePageId || ""} onChange={(event) => selectPage(event.target.value)}>
-                {project.pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
-              </select>
-            </label>
-            <button type="button" className="primary-action" onClick={() => addConnectedFormSectionToPage(activeForm?.id)}>
-              Add to page
-            </button>
-            <button type="button" onClick={() => addConnectedResponsesSectionToPage(activeForm?.id)}>
-              Add responses
-            </button>
-            {placements.length > 0 && (
-              <div className="connected-placement-list">
-                <span>Placed on:</span>
-                {placements.map((placement) => (
-                  <button
-                    type="button"
-                    key={`${placement.pageId}_${placement.sectionName}`}
-                    onClick={() => {
-                      selectPage(placement.pageId);
-                      setActiveTab("design");
-                      setDesignPanel("Layers");
-                    }}
-                  >
-                    {placement.pageName}
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section>
-            <h3>Save Data</h3>
-            <label>
-              Save submissions to
-              <select value={activeForm?.connectedCollectionId || ""} onChange={(event) => updateActiveForm((form) => ({ ...form, connectedCollectionId: event.target.value }))}>
-                <option value="">Form submissions only</option>
-                {project.collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
-              </select>
-            </label>
-            <label>
-              Success message
-              <textarea value={activeForm?.successMessage || ""} onChange={(event) => updateActiveForm((form) => ({ ...form, successMessage: event.target.value }))} />
-            </label>
-          </section>
-
-          <section>
-            <h3>Preview</h3>
-            {activeForm && renderConnectedForm(activeForm.id, { allowInteraction: true })}
-          </section>
-
-        </aside>
       </div>
+      {quizOptionsOpen && (
+        <div className="quiz-drawer-backdrop" onClick={() => setQuizOptionsOpen(false)}>
+          <aside className="quiz-options-drawer" aria-label="Quiz options" onClick={(event) => event.stopPropagation()}>
+            <div className="quiz-drawer-header">
+              <div>
+                <span>Quiz features</span>
+                <h3>Quiz Options</h3>
+                <p>Control timing, focus mode, scoring, results, and retakes for this form.</p>
+              </div>
+              <button type="button" onClick={() => setQuizOptionsOpen(false)}>Close</button>
+            </div>
+
+            <div className="quiz-settings-grid quiz-drawer-grid">
+              <label className="checkbox-control">
+                <input
+                  type="checkbox"
+                  checked={activeForm?.mode === "quiz"}
+                  onChange={(event) =>
+                    updateActiveForm((form) => ({
+                      ...form,
+                      mode: event.target.checked ? "quiz" : "form",
+                      quiz: getQuizSettings(form),
+                    }))
+                  }
+                />
+                Enable quiz mode
+              </label>
+              <label className="checkbox-control">
+                <input
+                  type="checkbox"
+                  checked={Boolean(getQuizSettings(activeForm).lockScreen)}
+                  onChange={(event) => updateActiveFormQuiz({ lockScreen: event.target.checked })}
+                />
+                Lock screen in focus mode
+              </label>
+              <label>
+                Total time limit (minutes)
+                <input
+                  type="number"
+                  min="0"
+                  value={Math.round(Number(getQuizSettings(activeForm).totalTimeLimitSec || 0) / 60)}
+                  onChange={(event) => updateActiveFormQuiz({ totalTimeLimitSec: Math.max(0, Number(event.target.value || 0) * 60) })}
+                />
+              </label>
+              <label>
+                Default time per question (seconds)
+                <input
+                  type="number"
+                  min="0"
+                  value={Number(getQuizSettings(activeForm).questionTimeLimitSec || 0)}
+                  onChange={(event) => updateActiveFormQuiz({ questionTimeLimitSec: Math.max(0, Number(event.target.value || 0)) })}
+                />
+              </label>
+              <label>
+                Scoring
+                <select
+                  value={getQuizSettings(activeForm).scoring}
+                  onChange={(event) => updateActiveFormQuiz({ scoring: event.target.value })}
+                >
+                  <option value="automatic">Automatic</option>
+                  <option value="manual">Manual review</option>
+                  <option value="completion">Completion only</option>
+                </select>
+              </label>
+              <label>
+                Required passing score (%)
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={Number(getQuizSettings(activeForm).passingScore || 0)}
+                  onChange={(event) => updateActiveFormQuiz({ passingScore: Math.min(100, Math.max(0, Number(event.target.value || 0))) })}
+                />
+              </label>
+              <label className="checkbox-control">
+                <input
+                  type="checkbox"
+                  checked={Boolean(getQuizSettings(activeForm).showResults)}
+                  onChange={(event) => updateActiveFormQuiz({ showResults: event.target.checked })}
+                />
+                Show results after submit
+              </label>
+              <label className="checkbox-control">
+                <input
+                  type="checkbox"
+                  checked={Boolean(getQuizSettings(activeForm).allowRetakes)}
+                  onChange={(event) => updateActiveFormQuiz({ allowRetakes: event.target.checked })}
+                />
+                Allow retakes
+              </label>
+              <label>
+                Max retakes
+                <input
+                  type="number"
+                  min="0"
+                  value={Number(getQuizSettings(activeForm).maxRetakes || 0)}
+                  onChange={(event) => updateActiveFormQuiz({ maxRetakes: Math.max(0, Number(event.target.value || 0)) })}
+                />
+              </label>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
   };
@@ -2706,6 +3917,7 @@ export default function PageBuilder({
   const renderResponsesTab = () => (
     <BuilderResponsesPage
       project={project}
+      lang={lang}
       activeForm={activeForm}
       selectForm={selectForm}
       setActiveTab={setActiveTab}
@@ -2786,6 +3998,16 @@ export default function PageBuilder({
       : activeTab === "data"
         ? "Prototype collections and fields in front-end state."
         : "");
+  const templateCopy = templateModalText[templateLang] || templateModalText.en;
+  const getStarterDisplay = (starter) => {
+    if (templateLang !== "ar") return starter;
+    const translated = starterArabicText[starter.id] || {};
+    return {
+      ...starter,
+      ...translated,
+      tags: translated.tags || starter.tags,
+    };
+  };
 
   return (
     <div
@@ -2815,9 +4037,44 @@ export default function PageBuilder({
 
           {!hideWorkspaceTabs && (
             <div className="builder-topbar-actions">
-              <button type="button" onClick={() => setPreview((value) => !value)}>{preview ? "Exit Preview" : "Preview"}</button>
-              <button type="button" onClick={saveProject}>Save</button>
-              <button type="button" className="primary-action go-live-action" onClick={publishProject}>Go Live</button>
+              <button
+                type="button"
+                className={activeTopbarAction === "templates" ? "action-active" : ""}
+                onClick={() => {
+                  setActiveTopbarAction("templates");
+                  setModal("starter");
+                }}
+              >
+                Templates
+              </button>
+              <button
+                type="button"
+                className={activeTopbarAction === "preview" ? "action-active" : ""}
+                onClick={() => {
+                  setActiveTopbarAction("preview");
+                  setPreview((value) => !value);
+                }}
+              >
+                {preview ? "Exit Preview" : "Preview"}
+              </button>
+              {!demoMode && (
+                <>
+                  <button
+                    type="button"
+                    className={activeTopbarAction === "save" ? "action-active" : ""}
+                    onClick={saveProject}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className={`primary-action go-live-action ${activeTopbarAction === "publish" ? "action-active" : ""}`}
+                    onClick={publishProject}
+                  >
+                    Go Live
+                  </button>
+                </>
+              )}
             </div>
           )}
         </header>
@@ -2877,18 +4134,38 @@ export default function PageBuilder({
 
       {modal === "starter" && (
         <div className="builder-modal-backdrop" onClick={() => setModal(null)}>
-          <div className="builder-modal wide" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="builder-modal wide template-picker-modal"
+            dir={templateLang === "ar" ? "rtl" : "ltr"}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="modal-header">
-              <h2>Choose Starter</h2>
-              <button type="button" onClick={() => setModal(null)}>Close</button>
+              <div>
+                <span className="modal-eyebrow">{templateCopy.eyebrow}</span>
+                <h2>{templateCopy.title}</h2>
+                <p>{templateCopy.description}</p>
+              </div>
+              <button type="button" onClick={() => setModal(null)}>{templateCopy.close}</button>
             </div>
             <div className="starter-grid">
-              {starterSystems.map((starter) => (
+              {starterSystems.map((starter) => {
+                const displayStarter = getStarterDisplay(starter);
+
+                return (
                 <button type="button" className="starter-card" key={starter.id} onClick={() => applyStarter(starter.id)}>
-                  <strong>{starter.title}</strong>
-                  <p>{starter.subtitle}</p>
+                  {displayStarter.category && <span>{displayStarter.category}</span>}
+                  <strong>{displayStarter.title}</strong>
+                  <p>{displayStarter.subtitle}</p>
+                  {Array.isArray(displayStarter.tags) && displayStarter.tags.length > 0 && (
+                    <em>
+                      {displayStarter.tags.map((tag) => (
+                        <i key={tag}>{tag}</i>
+                      ))}
+                    </em>
+                  )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

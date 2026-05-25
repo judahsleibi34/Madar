@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
+import GradientText from "./GradientText";
 import OrbitVisual from "./OrbitVisual";
+import SplitText from "./SplitText";
 
 const content = {
   en: {
@@ -26,7 +28,13 @@ export default function HeroSection({ lang }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0, ease: [0.25, 0.1, 0.25, 1] }}
         >
-          {t.title}
+          {lang === "en" ? (
+            <>
+              Welcome to <GradientText pauseOnHover>Madar</GradientText>
+            </>
+          ) : (
+            t.title
+          )}
         </motion.h1>
         <motion.p
           className="hero-description"
@@ -34,7 +42,7 @@ export default function HeroSection({ lang }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
         >
-          <span className="arabic-name">{t.name}</span> {t.description}
+          <SplitText className="arabic-name">{t.name}</SplitText> {t.description}
         </motion.p>
       </div>
       <motion.div

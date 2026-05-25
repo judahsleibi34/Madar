@@ -1,4 +1,5 @@
 import FadeIn from "./FadeIn";
+import GradientText from "./GradientText";
 import judahImage from "../assets/team/Judah.jpg";
 import judahCv from "../assets/team/Judah_Sleibi_CV.pdf";
 import salibaCv from "../assets/team/SalibaRishmawiCV.pdf";
@@ -205,7 +206,7 @@ export default function TeamPage({ lang = "en" }) {
     <main className="team-page">
       <FadeIn>
         <section className="team-hero">
-          <h1>{t.title}</h1>
+          <h1><GradientText pauseOnHover>{t.title}</GradientText></h1>
           <p>{t.subtitle}</p>
         </section>
       </FadeIn>
@@ -226,7 +227,7 @@ export default function TeamPage({ lang = "en" }) {
 
               <div className="profile-content">
                 <h2>{member.name}</h2>
-                <p className="profile-role">{member.role}</p>
+                <p className="profile-role"><GradientText pauseOnHover>{member.role}</GradientText></p>
                 <p className="profile-description">{member.description}</p>
 
                 {member.links?.length > 0 && (
