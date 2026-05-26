@@ -4,6 +4,8 @@ services:
       context: ./madar_back_end
     container_name: madar-backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       FRONTEND_URLS: ${FRONTEND_URLS}
       SUPABASE_URL: ${SUPABASE_URL}
