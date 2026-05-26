@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ImagePlus, Save, Store, UserRound } from "lucide-react";
 import {
   STORAGE_KEY,
@@ -10,7 +10,7 @@ import {
   sanitizeSubdomain,
 } from "./PageBuilder/PageBuilder.routing";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const readBuilderProject = () => {
   try {
@@ -28,6 +28,36 @@ const getInitialAccountForm = (user) => ({
   phone: user?.phone || "",
   avatar: user?.avatar || "",
 });
+
+const getApiErrorMessage = (detail, fallback) => {
+  if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((error) => {
+        const field = Array.isArray(error.loc) ? error.loc.at(-1) : "";
+        return [field, error.msg].filter(Boolean).join(": ");
+      })
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return fallback;
+};
+
+const buildProfilePayload = (form) => {
+  const payload = {
+    first_name: form.first_name.trim(),
+    last_name: form.last_name.trim(),
+    phone: form.phone.trim(),
+    avatar: form.avatar.trim(),
+  };
+
+  const email = form.email.trim();
+  if (email) payload.email = email;
+
+  return payload;
+};
 
 const settingsCopy = {
   en: {
@@ -59,6 +89,7 @@ const settingsCopy = {
     accountSaved: "Account settings saved.",
     websiteSaved: "Website settings saved.",
     accountError: "Could not update account settings.",
+    sessionExpired: "Your session expired. Please log in again.",
     userAlt: "User",
     userFallback: "U",
   },
@@ -90,6 +121,7 @@ const settingsCopy = {
     accountSaved: "تم حفظ إعدادات الملف الشخصي.",
     websiteSaved: "تم حفظ تفاصيل الموقع.",
     accountError: "تعذر حفظ إعدادات الملف الشخصي.",
+    sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
     userAlt: "المستخدم",
     userFallback: "م",
   },
@@ -124,6 +156,47 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setAccountForm((prev) => ({ ...prev, [field]: value }));
     setStatus("");
   };
+
+  useEffect(() => {
+    setAccountForm(getInitialAccountForm(user));
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAccount = async () => {
+      try {
+        const response = await fetch(`${API_URL}/user_info`, {
+          method: "POST",
+          credentials: "include",
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          if (!cancelled && response.status === 401) {
+            setStatus(t.sessionExpired);
+          }
+          return;
+        }
+
+        if (!cancelled && data.user) {
+          setAccountForm(getInitialAccountForm(data.user));
+          onUserUpdated?.(data.user);
+        }
+      } catch {
+        if (!cancelled) {
+          setStatus(t.accountError);
+        }
+      }
+    };
+
+    loadAccount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onUserUpdated, t.accountError, t.sessionExpired]);
 
   const updateSiteField = (field, value) => {
     setProject((prev) => {
@@ -171,13 +244,17 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(accountForm),
+        body: JSON.stringify(buildProfilePayload(accountForm)),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data.detail || t.accountError);
+        if (response.status === 401) {
+          throw new Error(t.sessionExpired);
+        }
+
+        throw new Error(getApiErrorMessage(data.detail, t.accountError));
       }
 
       onUserUpdated?.(data.user);

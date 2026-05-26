@@ -3,19 +3,23 @@
    ============================================================ */
 
 .features-page {
-  width: min(1120px, 100%);
+  width: 100%;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 64px 5% 90px;
   color: #1a2744;
+  overflow-x: hidden;
 }
 
 .features-hero {
+  width: 100%;
   max-width: 780px;
   margin: 0 auto 34px;
   text-align: center;
+  overflow: hidden;
 }
 
-.features-hero span {
+.features-hero > span {
   display: inline-flex;
   margin-bottom: 12px;
   color: #8b2a1a;
@@ -28,10 +32,13 @@
 .features-hero h1 {
   margin: 0;
   color: #1a2744;
-  font-size: clamp(36px, 5vw, 58px);
-  line-height: 1.04;
+  max-width: 100%;
+  font-size: clamp(36px, 4.6vw, 58px);
+  line-height: 1.06;
   font-weight: 950;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.035em;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .features-hero p {
@@ -44,12 +51,15 @@
 }
 
 .features-grid {
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 
 .features-demo-panel {
+  width: 100%;
+  min-width: 0;
   margin: 0 0 22px;
   border: 1px solid rgba(26, 39, 68, 0.12);
   border-radius: 22px;
@@ -88,6 +98,7 @@
   line-height: 1.14;
   font-weight: 950;
   letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
 }
 
 .features-demo-copy p {
@@ -96,6 +107,7 @@
   font-size: 15px;
   line-height: 1.65;
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .features-demo-list {
@@ -162,6 +174,7 @@
   line-height: 1.18;
   font-weight: 950;
   letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
 }
 
 .feature-card p {
@@ -170,6 +183,7 @@
   font-size: 15px;
   line-height: 1.65;
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 html[dir="rtl"] .features-page {
@@ -186,6 +200,16 @@ html[dir="rtl"] .features-demo-list {
 }
 
 @media (max-width: 900px) {
+  .features-page {
+    max-width: 100%;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  .features-hero h1 {
+    font-size: clamp(34px, 7vw, 48px);
+  }
+
   .features-demo-panel {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -201,7 +225,23 @@ html[dir="rtl"] .features-demo-list {
 
 @media (max-width: 620px) {
   .features-page {
-    padding: 44px 5% 64px;
+    width: 100%;
+    padding: 36px 20px 60px;
+  }
+
+  .features-hero {
+    margin-bottom: 28px;
+  }
+
+  .features-hero h1 {
+    font-size: clamp(30px, 7.8vw, 34px);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+  }
+
+  .features-hero p {
+    font-size: 16px;
+    line-height: 1.55;
   }
 
   .features-grid {
@@ -209,14 +249,65 @@ html[dir="rtl"] .features-demo-list {
   }
 
   .features-demo-panel {
-    padding: 20px;
+    padding: 22px;
+    border-radius: 20px;
+    gap: 18px;
   }
 
   .features-demo-copy {
     grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .features-demo-copy h2 {
+    font-size: 28px;
+    line-height: 1.12;
+  }
+
+  .features-demo-list {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .features-demo-cta {
+    width: 100%;
+    justify-self: stretch;
   }
 
   .feature-card {
     min-height: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .features-page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .features-hero h1 {
+    font-size: clamp(28px, 7.6vw, 32px);
+    letter-spacing: -0.015em;
+  }
+
+  .features-hero p {
+    font-size: 15px;
+  }
+
+  .features-demo-panel,
+  .feature-card {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .features-demo-icon,
+  .feature-card-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+  }
+
+  .features-demo-copy h2 {
+    font-size: 26px;
   }
 }

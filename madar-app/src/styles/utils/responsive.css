@@ -4,8 +4,27 @@
 
 @media (max-width: 900px) {
   .site-header {
+    grid-template-columns: minmax(0, 1fr) auto;
     min-height: auto;
     padding: 20px;
+    column-gap: 14px;
+    overflow: hidden;
+  }
+
+  .brand {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .brand-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-right {
+    grid-column: 2;
+    justify-self: end;
+    min-width: max-content;
   }
 
   .header-right .lang-switcher {

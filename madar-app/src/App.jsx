@@ -27,7 +27,7 @@ import PageBuilder from "./components/PageBuilder";
 import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
 import DashboardSidebar from "./components/DashboardSidebar";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 const LANG_STORAGE_KEY = "madar-lang";
 
 export default function App() {
@@ -81,7 +81,11 @@ export default function App() {
       credentials: "include",
     });
 
-    if (!response.ok) throw new Error("Could not fetch user info");
+    if (!response.ok) {
+      const error = new Error("Could not fetch user info");
+      error.status = response.status;
+      throw error;
+    }
 
     const data = await response.json();
     return normalizeUser(data.user);
@@ -150,10 +154,10 @@ export default function App() {
     } catch (error) {
       console.error("Could not load user info after login:", error);
 
-      setIsLoggedIn(true);
+      setIsLoggedIn(false);
       setUser(null);
 
-      navigate(returnTo || "/dashboard", { replace: true });
+      navigate("/login", { replace: true });
     }
   };
 
@@ -172,6 +176,10 @@ export default function App() {
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }
   };
+
+  const handleUserUpdated = useCallback((nextUser) => {
+    setUser(normalizeUser(nextUser));
+  }, [normalizeUser]);
 
   const renderDashboardSkeleton = (label = "Loading dashboard") => (
     <div
@@ -352,7 +360,7 @@ export default function App() {
                   <SettingsPage
                     lang={lang}
                     user={user}
-                    onUserUpdated={(nextUser) => setUser(normalizeUser(nextUser))}
+                    onUserUpdated={handleUserUpdated}
                   />
                 )
               ) : (

@@ -10,3 +10,9 @@ npm run dev
 
 pip install fastapi uvicorn
 pip install supabase python-dotenv
+
+npm install -g supabase
+supabase link --project-ref oquixrqilhwvzcynvkpk
+supabase db push
+
+madar_back\Scripts\activate
