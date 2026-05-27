@@ -13,8 +13,11 @@ services:
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      AVATAR_UPLOAD_DIR: ${AVATAR_UPLOAD_DIR:-avatar_uploads}
     ports:
       - "8001:8000"
+    volumes:
+      - ./backend/avatar_uploads:/app/avatar_uploads
 
   frontend:
     build:

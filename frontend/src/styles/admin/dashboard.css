@@ -290,6 +290,18 @@ body,
   box-shadow: 0 10px 24px rgba(139, 42, 26, 0.22);
   font-size: 18px;
   font-weight: 900;
+  overflow: hidden;
+}
+
+.admin-sidebar-avatar img,
+.admin-sidebar-avatar span {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.admin-sidebar-avatar img {
   object-fit: cover;
 }
 

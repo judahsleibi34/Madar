@@ -11,6 +11,21 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL || "/api";
+
+const resolveMediaUrl = (value) => {
+  if (!value) return "";
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:")
+  ) {
+    return value;
+  }
+
+  return `${API_URL}${value.startsWith("/") ? value : `/${value}`}`;
+};
+
 const sidebarText = {
   en: {
     title: "Dashboard",
@@ -54,6 +69,7 @@ export default function DashboardSidebar({
 
   const displayName = user?.name || t.fallbackName;
   const displayEmail = user?.email || "";
+  const avatarUrl = resolveMediaUrl(user?.avatar || "");
   const avatarLetter = displayName.trim().charAt(0).toUpperCase() || "U";
 
   const isActive = (path) => {
@@ -154,7 +170,13 @@ export default function DashboardSidebar({
           onClick={() => navigate("/settings")}
           aria-label={t.settings}
         >
-          <div className="admin-sidebar-avatar">{avatarLetter}</div>
+          <div className="admin-sidebar-avatar">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={displayName} />
+            ) : (
+              <span>{avatarLetter}</span>
+            )}
+          </div>
 
           <div className="admin-sidebar-user-info">
             <strong>{displayName}</strong>

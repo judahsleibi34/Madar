@@ -1,7 +1,9 @@
 import os
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from data_analysis.analysis_routes import router as analysis_router
 from data_analysis.cleaning_routes import router as cleaning_router
@@ -22,6 +24,8 @@ FRONTEND_URLS = os.getenv(
     "http://localhost:3000,http://localhost:5173",
 ).split(",")
 FRONTEND_URLS = [url.strip() for url in FRONTEND_URLS if url.strip()]
+AVATAR_UPLOAD_DIR = Path(os.getenv("AVATAR_UPLOAD_DIR", "avatar_uploads"))
+AVATAR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def require_authenticated_user(request: Request, response: Response):
@@ -34,6 +38,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.mount(
+    "/avatar_uploads",
+    StaticFiles(directory=str(AVATAR_UPLOAD_DIR)),
+    name="avatar_uploads",
 )
 
 

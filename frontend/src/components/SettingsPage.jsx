@@ -11,6 +11,8 @@ import {
 } from "./PageBuilder/PageBuilder.routing";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const readBuilderProject = () => {
   try {
@@ -66,6 +68,19 @@ const buildProfilePayload = (form) => {
   return payload;
 };
 
+const resolveMediaUrl = (value) => {
+  if (!value) return "";
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:")
+  ) {
+    return value;
+  }
+
+  return `${API_URL}${value.startsWith("/") ? value : `/${value}`}`;
+};
+
 const settingsCopy = {
   en: {
     eyebrow: "Workspace settings",
@@ -97,8 +112,12 @@ const settingsCopy = {
     websiteDescriptionLabel: "Website description",
     saveWebsite: "Save website details",
     accountSaved: "Account settings saved.",
+    avatarUploaded: "Profile photo updated.",
     websiteSaved: "Website settings saved.",
     accountError: "Could not update account settings.",
+    avatarUploadError: "Could not upload profile photo.",
+    invalidAvatarType: "Please upload a PNG, JPG, or WebP image.",
+    avatarTooLarge: "Profile photo must be 5MB or smaller.",
     sessionExpired: "Your session expired. Please log in again.",
     userAlt: "User",
     userFallback: "U",
@@ -132,8 +151,12 @@ const settingsCopy = {
     websiteDescriptionLabel: "وصف الموقع",
     saveWebsite: "حفظ تفاصيل الموقع",
     accountSaved: "تم حفظ إعدادات الملف الشخصي.",
+    avatarUploaded: "تم تحديث صورة الملف الشخصي.",
     websiteSaved: "تم حفظ تفاصيل الموقع.",
     accountError: "تعذر حفظ إعدادات الملف الشخصي.",
+    avatarUploadError: "تعذر رفع صورة الملف الشخصي.",
+    invalidAvatarType: "يرجى رفع صورة بصيغة PNG أو JPG أو WebP.",
+    avatarTooLarge: "يجب ألا يتجاوز حجم صورة الملف الشخصي 5MB.",
     sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
     userAlt: "المستخدم",
     userFallback: "م",
@@ -147,6 +170,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
   const [project, setProject] = useState(readBuilderProject);
   const [status, setStatus] = useState("");
   const [isSavingAccount, setIsSavingAccount] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
 
   const isArabic = lang === "ar";
@@ -261,6 +285,61 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     reader.readAsDataURL(file);
   };
 
+  const uploadAvatar = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!AVATAR_MIME_TYPES.has(file.type)) {
+      setStatus(t.invalidAvatarType);
+      return;
+    }
+
+    if (file.size > AVATAR_MAX_BYTES) {
+      setStatus(t.avatarTooLarge);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setIsUploadingAvatar(true);
+    setStatus("");
+
+    try {
+      const response = await fetch(`${API_URL}/user/avatar`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error(t.sessionExpired);
+        }
+
+        throw new Error(getApiErrorMessage(data.detail, t.avatarUploadError));
+      }
+
+      const nextUser = data.user || {};
+      const nextAvatar = nextUser.avatar || data.avatar || "";
+
+      if (nextAvatar) {
+        updateAccountField("avatar", nextAvatar);
+      }
+
+      onUserUpdated?.(nextUser);
+      setStatus(t.avatarUploaded);
+    } catch (error) {
+      setStatus(error.message || t.avatarUploadError);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const saveAccount = async (event) => {
     event.preventDefault();
     setIsSavingAccount(true);
@@ -349,7 +428,14 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
           <div className="settings-profile-summary">
             <div className="settings-profile-avatar">
-              <span>{getAvatarLetter(accountForm, t.userFallback)}</span>
+              {accountForm.avatar ? (
+                <img
+                  src={resolveMediaUrl(accountForm.avatar)}
+                  alt={accountForm.first_name || accountForm.email || t.userAlt}
+                />
+              ) : (
+                <span>{getAvatarLetter(accountForm, t.userFallback)}</span>
+              )}
             </div>
 
             <div>
@@ -358,15 +444,12 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             </div>
 
             <label className="settings-file-button settings-profile-upload">
-              {t.uploadProfilePhoto}
+              {isUploadingAvatar ? t.saving : t.uploadProfilePhoto}
               <input
                 type="file"
-                accept="image/*"
-                onChange={(event) =>
-                  readImageFile(event.target.files?.[0], (value) =>
-                    updateAccountField("avatar", value)
-                  )
-                }
+                accept="image/png,image/jpeg,image/webp"
+                disabled={isUploadingAvatar}
+                onChange={uploadAvatar}
               />
             </label>
           </div>

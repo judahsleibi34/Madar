@@ -24,8 +24,10 @@ build/
 # Runtime data
 uploads/
 generated_charts/
+avatar_uploads/
 backend/uploads/
 backend/generated_charts/
+backend/avatar_uploads/
 
 # Secrets and local config
 .env
