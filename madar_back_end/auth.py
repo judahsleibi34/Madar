@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Response, Request
-from database import supabase
+from database import service_supabase, supabase
 from classes import SignUpRequest, LogIn, UserProfileUpdate
 import os
 
@@ -97,7 +97,7 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
             detail="Invalid or expired session"
         )
 
-    user_response = supabase.table("users").select("*").eq(
+    user_response = service_supabase.table("users").select("*").eq(
         "auth_id", auth_user.id
     ).single().execute()
 
@@ -129,7 +129,7 @@ def signup(user: SignUpRequest):
         if not response.user:
             raise HTTPException(status_code=400, detail="Could not create user")
 
-        user_insert = supabase.table("users").insert({
+        user_insert = service_supabase.table("users").insert({
             "auth_id": str(response.user.id),
             "first_name": user.first_name,
             "last_name": user.last_name,
@@ -149,7 +149,7 @@ def signup(user: SignUpRequest):
 
     except Exception as e:
         print("SIGNUP ERROR:", repr(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Could not create account")
 
 
 @router.post("/login")
@@ -168,7 +168,7 @@ def login(user: LogIn, response: Response):
                 detail="Invalid email or password"
             )
 
-        user_response = supabase.table("users").select(
+        user_response = service_supabase.table("users").select(
             "*"
         ).eq(
             "auth_id", auth_response.user.id
@@ -277,7 +277,7 @@ def update_user_profile(profile: UserProfileUpdate, request: Request, response: 
                 "user": build_user_payload(user_data)
             }
 
-        update_response = supabase.table("users").update(update_payload).eq(
+        update_response = service_supabase.table("users").update(update_payload).eq(
             "auth_id", user_data.get("auth_id")
         ).execute()
 
@@ -301,4 +301,3 @@ def update_user_profile(profile: UserProfileUpdate, request: Request, response: 
             status_code=500,
             detail="Could not update user profile"
         )
-

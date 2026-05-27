@@ -1,13 +1,17 @@
 from fastapi import APIRouter, HTTPException
-from database import supabase
+from database import service_supabase, supabase
 from supabase import create_client
 from classes import PasswordReset
 import os
 
 router = APIRouter()
-FRONTEND_URL = os.getenv("FRONTEND_URLS", "http://localhost:5173")
+FRONTEND_URL = (
+    os.getenv("FRONTEND_URL")
+    or os.getenv("FRONTEND_URLS", "http://localhost:5173").split(",")[0].strip()
+)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+RESET_MESSAGE = "If that email is registered, a password reset link has been sent."
 
 admin_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -18,23 +22,23 @@ def forgot_password(payload: dict):
         if not email:
             raise HTTPException(status_code=400, detail="Email is required")
 
-        user = supabase.table("users").select("id").eq("email", email).single().execute()
+        user = service_supabase.table("users").select("id").eq("email", email).single().execute()
 
         if not user.data:
-            raise HTTPException(status_code=404, detail="This email is not registered. Please sign up first.")
+            return {"message": RESET_MESSAGE}
 
         supabase.auth.reset_password_email(
             email,
             options={"redirect_to": f"{FRONTEND_URL}/reset-password"}
         )
 
-        return {"message": "Password reset email sent"}
+        return {"message": RESET_MESSAGE}
 
     except HTTPException:
         raise
     except Exception as e:
         print("FORGOT PASSWORD ERROR:", repr(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        return {"message": RESET_MESSAGE}
     
 @router.post("/password_rest")
 def password_rest(payload: PasswordReset): 
@@ -55,5 +59,4 @@ def password_rest(payload: PasswordReset):
         raise
     except Exception as e:
         print("RESET PASSWORD ERROR:", repr(e))
-        raise HTTPException(status_code=400, detail=str(e))
-
+        raise HTTPException(status_code=400, detail="Could not reset password")

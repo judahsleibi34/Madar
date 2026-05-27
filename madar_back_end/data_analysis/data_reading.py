@@ -1,7 +1,10 @@
 import math
+import ipaddress
+import os
+import socket
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import pandas as pd
 import requests
@@ -38,14 +41,15 @@ class DataReadingNormal:
             raise RuntimeError(f"Failed to read data: {error}") from error
 
     def _read_local_file(self, file_path: str) -> pd.DataFrame:
-        extension = self._get_extension(file_path)
+        safe_path = self._resolve_uploaded_file(file_path)
+        extension = self._get_extension(str(safe_path))
 
         if extension == ".csv":
-            with open(file_path, "rb") as file:
+            with open(safe_path, "rb") as file:
                 return self._read_csv_bytes(file.read())
 
         if extension in [".xls", ".xlsx"]:
-            df = pd.read_excel(file_path)
+            df = pd.read_excel(safe_path)
             return self._normalize_dataframe(df)
 
         raise ValueError(
@@ -56,8 +60,7 @@ class DataReadingNormal:
     def _read_from_url_or_api(self, url: str) -> pd.DataFrame:
         extension = self._get_extension(url)
 
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, timeout=30, headers=headers)
+        response = self._fetch_public_url(url)
         response.raise_for_status()
 
         content_type = response.headers.get("Content-Type", "").lower()
@@ -82,8 +85,7 @@ class DataReadingNormal:
     def _read_google_sheet(self, url: str) -> pd.DataFrame:
         csv_url = self._google_sheet_to_csv_url(url)
 
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(csv_url, timeout=30, headers=headers)
+        response = self._fetch_public_url(csv_url)
 
         if not response.ok:
             raise ValueError(
@@ -171,7 +173,7 @@ class DataReadingNormal:
     def _google_sheet_to_csv_url(self, url: str) -> str:
         parsed = urlparse(url)
 
-        if "docs.google.com" not in parsed.netloc:
+        if parsed.hostname != "docs.google.com":
             raise ValueError("Not a valid Google Sheets URL")
 
         if "/pubhtml" in parsed.path or parsed.path.endswith("/pub"):
@@ -225,6 +227,65 @@ class DataReadingNormal:
         parsed = urlparse(value)
         return (
             parsed.scheme in ["http", "https"]
-            and "docs.google.com" in parsed.netloc
+            and parsed.hostname == "docs.google.com"
             and "/spreadsheets/" in parsed.path
         )
+
+    def _resolve_uploaded_file(self, file_path: str) -> Path:
+        upload_root = Path(os.getenv("DATA_UPLOAD_DIR", "uploads")).resolve()
+        requested = Path(file_path)
+        resolved = (Path.cwd() / requested).resolve() if not requested.is_absolute() else requested.resolve()
+
+        if upload_root != resolved and upload_root not in resolved.parents:
+            raise ValueError("Only uploaded data files can be read")
+
+        if not resolved.is_file():
+            raise ValueError("Uploaded data file was not found")
+
+        return resolved
+
+    def _fetch_public_url(self, url: str) -> requests.Response:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        current_url = url
+
+        for _ in range(5):
+            self._validate_public_url(current_url)
+            response = requests.get(
+                current_url,
+                timeout=30,
+                headers=headers,
+                allow_redirects=False,
+            )
+
+            if response.is_redirect:
+                location = response.headers.get("Location")
+                if not location:
+                    raise ValueError("URL redirected without a location")
+                current_url = urljoin(current_url, location)
+                continue
+
+            return response
+
+        raise ValueError("URL redirected too many times")
+
+    def _validate_public_url(self, url: str) -> None:
+        parsed = urlparse(url)
+        if parsed.scheme not in ["http", "https"] or not parsed.hostname:
+            raise ValueError("Only public HTTP or HTTPS URLs are supported")
+
+        try:
+            addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+        except socket.gaierror as error:
+            raise ValueError("Could not resolve data URL host") from error
+
+        for address in addresses:
+            ip = ipaddress.ip_address(address[4][0])
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+                or ip.is_unspecified
+            ):
+                raise ValueError("Private or local network URLs are not allowed")

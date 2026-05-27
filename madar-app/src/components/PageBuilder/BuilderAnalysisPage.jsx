@@ -1959,7 +1959,11 @@ export default function BuilderAnalysisPage({
     setAnalysisError("");
 
     try {
-      const response = await fetch(`${API_URL}/data/upload`, { method: "POST", body: payload });
+      const response = await fetch(`${API_URL}/data/upload`, {
+        method: "POST",
+        credentials: "include",
+        body: payload,
+      });
       const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.detail || "The data could not be loaded.");
       setDataset(data);
@@ -1987,6 +1991,7 @@ export default function BuilderAnalysisPage({
     try {
       const response = await fetch(`${API_URL}/data/read`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input_path: inputPath }),
       });
@@ -2064,6 +2069,7 @@ export default function BuilderAnalysisPage({
     try {
       const response = await fetch(`${API_URL}${paths[type]}`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input_path: dataset.file_path }),
       });
@@ -2091,6 +2097,7 @@ export default function BuilderAnalysisPage({
     try {
       const response = await fetch(`${API_URL}/analysis/run`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           input_path: dataset.file_path,

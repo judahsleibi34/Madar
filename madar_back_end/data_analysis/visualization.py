@@ -1,6 +1,7 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -227,7 +228,9 @@ class DataVisualization:
             legend.get_frame().set_alpha(0.9)
 
     def _save_plot(self, save_path: str) -> str:
-        path = Path(save_path)
+        output_root = Path(os.getenv("CHART_OUTPUT_DIR", "generated_charts")).resolve()
+        requested = Path(save_path)
+        path = (output_root / requested.name).resolve()
 
         if path.suffix.lower() not in [".png", ".jpg", ".jpeg", ".svg", ".pdf"]:
             raise ValueError("save_path must end with .png, .jpg, .jpeg, .svg, or .pdf")
@@ -252,4 +255,3 @@ class DataVisualization:
 
         if missing_columns:
             raise ValueError(f"Columns not found: {missing_columns}")
-

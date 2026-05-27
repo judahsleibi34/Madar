@@ -1,5 +1,6 @@
 from pathlib import Path
 from uuid import uuid4
+import os
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
@@ -14,11 +15,12 @@ router = APIRouter(
 )
 
 
-UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR = Path(os.getenv("DATA_UPLOAD_DIR", "uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 PREVIEW_LIMIT = 100
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
 
 
 class ReadDataRequest(BaseModel):
@@ -72,6 +74,12 @@ async def upload_data(file: UploadFile = File(...)):
             raise HTTPException(
                 status_code=400,
                 detail="Uploaded file is empty",
+            )
+
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="Uploaded file is too large",
             )
 
         unique_filename = f"{uuid4().hex}{file_extension}"
