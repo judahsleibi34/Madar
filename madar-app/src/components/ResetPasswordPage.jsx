@@ -70,7 +70,7 @@ export default function ResetPasswordPage({ lang = "en" }) {
     setError("");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/password_rest`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/auth/password-reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ access_token: accessToken, password }),

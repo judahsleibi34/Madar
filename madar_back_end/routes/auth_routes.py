@@ -1,7 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response, Request
 from database import supabase
 from classes import SignUpRequest, LogIn
-router = APIRouter()
+from services.auth_service import (
+    set_auth_cookies,
+    delete_auth_cookies,
+    build_user_payload,
+    get_authenticated_user_row,
+)
+
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/signup")
@@ -38,16 +45,16 @@ def signup(user: SignUpRequest):
                 "email": clean_email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
-            }
+            },
         }
 
     except Exception as e:
         print("SIGNUP ERROR:", repr(e))
         raise HTTPException(status_code=400, detail=str(e))
-    
+
 
 @router.post("/login")
-def login(user: LogIn):
+def login(user: LogIn, response: Response):
     try:
         clean_email = user.email.strip().lower()
 
@@ -57,39 +64,52 @@ def login(user: LogIn):
         })
 
         if not auth_response.user or not auth_response.session:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid email or password"
-            )
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        user_response = supabase.table("users").select(
-            "id, auth_id, first_name, last_name, email"
-        ).eq(
+        user_response = supabase.table("users").select("*").eq(
             "auth_id", auth_response.user.id
         ).single().execute()
 
+        set_auth_cookies(
+            response,
+            auth_response.session.access_token,
+            auth_response.session.refresh_token,
+        )
+
         return {
             "message": "User is logged in",
-            "user": {
-                "id": user_response.data["id"],
-                "auth_id": user_response.data["auth_id"],
-                "email": user_response.data["email"],
-                "first_name": user_response.data["first_name"],
-                "last_name": user_response.data["last_name"],
-            },
-            "session": {
-                "access_token": auth_response.session.access_token,
-                "refresh_token": auth_response.session.refresh_token,
-                "expires_at": auth_response.session.expires_at,
-            }
+            "user": build_user_payload(user_response.data),
         }
 
     except HTTPException:
         raise
     except Exception as e:
         print("LOGIN ERROR:", repr(e))
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password"
-        )
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
+
+@router.get("/user_status")
+def user_status(request: Request, response: Response):
+    try:
+        _, user_data = get_authenticated_user_row(request, response)
+
+        return {
+            "logged_in": True,
+            "user": build_user_payload(user_data),
+        }
+
+    except Exception as e:
+        print("ME ERROR:", repr(e))
+        return {
+            "logged_in": False,
+            "user": None,
+        }
+
+
+@router.post("/log_out")
+def log_out(response: Response):
+    delete_auth_cookies(response)
+
+    return {
+        "message": "Logged out successfully"
+    }

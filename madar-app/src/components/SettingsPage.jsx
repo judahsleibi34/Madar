@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImagePlus, Save, Store, UserRound } from "lucide-react";
+import { ImagePlus, Save, Store } from "lucide-react";
 import {
   STORAGE_KEY,
   defaultSiteChrome,
@@ -28,6 +28,13 @@ const getInitialAccountForm = (user) => ({
   phone: user?.phone || "",
   avatar: user?.avatar || "",
 });
+
+const getAvatarLetter = (accountForm, fallback) => {
+  return (accountForm.first_name || accountForm.email || fallback)
+    .trim()
+    .slice(0, 1)
+    .toUpperCase();
+};
 
 const getApiErrorMessage = (detail, fallback) => {
   if (typeof detail === "string") return detail;
@@ -63,9 +70,11 @@ const settingsCopy = {
   en: {
     eyebrow: "Workspace settings",
     title: "Profile and website settings",
-    subtitle: "Keep your personal details, brand, and public website information up to date.",
+    subtitle:
+      "Keep your personal details, brand, and public website information up to date.",
     profileTitle: "Your profile",
-    profileDescription: "This information helps personalize your workspace and customer-facing pages.",
+    profileDescription:
+      "This information helps personalize your workspace and customer-facing pages.",
     profilePhotoUrl: "Profile photo URL",
     uploadProfilePhoto: "Upload photo",
     firstName: "First name",
@@ -75,7 +84,8 @@ const settingsCopy = {
     saveProfile: "Save profile",
     saving: "Saving...",
     websiteTitle: "Website details",
-    websiteDescription: "Set the name, contact details, and logo visitors see on your website.",
+    websiteDescription:
+      "Set the name, contact details, and logo visitors see on your website.",
     websiteLogoAlt: "Website logo",
     uploadLogo: "Upload logo",
     subdomainName: "Subdomain name",
@@ -98,8 +108,10 @@ const settingsCopy = {
     title: "إعدادات الملف الشخصي والموقع",
     subtitle: "حدّث بياناتك الشخصية وهوية العلامة ومعلومات الموقع العامة.",
     profileTitle: "ملفك الشخصي",
-    profileDescription: "تساعد هذه المعلومات في تخصيص مساحة عملك وصفحاتك أمام العملاء.",
+    profileDescription:
+      "تساعد هذه المعلومات في تخصيص مساحة عملك وصفحاتك أمام العملاء.",
     profilePhotoUrl: "رابط صورة الملف الشخصي",
+    uploadProfilePhoto: "رفع صورة",
     firstName: "الاسم الأول",
     lastName: "اسم العائلة",
     email: "البريد الإلكتروني",
@@ -107,7 +119,8 @@ const settingsCopy = {
     saveProfile: "حفظ الملف الشخصي",
     saving: "جارٍ الحفظ...",
     websiteTitle: "تفاصيل الموقع",
-    websiteDescription: "حدد الاسم وبيانات التواصل والشعار الذي يراه زوار موقعك.",
+    websiteDescription:
+      "حدد الاسم وبيانات التواصل والشعار الذي يراه زوار موقعك.",
     websiteLogoAlt: "شعار الموقع",
     uploadLogo: "رفع الشعار",
     subdomainName: "اسم النطاق الفرعي",
@@ -128,29 +141,42 @@ const settingsCopy = {
 };
 
 export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
-  const [accountForm, setAccountForm] = useState(() => getInitialAccountForm(user));
+  const [accountForm, setAccountForm] = useState(() =>
+    getInitialAccountForm(user)
+  );
   const [project, setProject] = useState(readBuilderProject);
   const [status, setStatus] = useState("");
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
+
   const isArabic = lang === "ar";
   const t = settingsCopy[isArabic ? "ar" : "en"];
-  const uploadProfileLabel = isArabic ? "\u0631\u0641\u0639 \u0635\u0648\u0631\u0629" : t.uploadProfilePhoto;
 
   const siteChrome = {
     ...defaultSiteChrome,
     ...(project.siteChrome || {}),
   };
 
-  const siteForm = useMemo(() => ({
-    subdomain: getProjectSubdomain(project),
-    brand: siteChrome.brand || "",
-    footerStoreName: siteChrome.footerStoreName || "",
-    logoUrl: siteChrome.logoUrl || "",
-    contactEmail: siteChrome.contactEmail || "",
-    phone: siteChrome.phone || "",
-    description: siteChrome.description || "",
-  }), [project, siteChrome.brand, siteChrome.contactEmail, siteChrome.description, siteChrome.footerStoreName, siteChrome.logoUrl, siteChrome.phone]);
+  const siteForm = useMemo(
+    () => ({
+      subdomain: getProjectSubdomain(project),
+      brand: siteChrome.brand || "",
+      footerStoreName: siteChrome.footerStoreName || "",
+      logoUrl: siteChrome.logoUrl || "",
+      contactEmail: siteChrome.contactEmail || "",
+      phone: siteChrome.phone || "",
+      description: siteChrome.description || "",
+    }),
+    [
+      project,
+      siteChrome.brand,
+      siteChrome.contactEmail,
+      siteChrome.description,
+      siteChrome.footerStoreName,
+      siteChrome.logoUrl,
+      siteChrome.phone,
+    ]
+  );
 
   const updateAccountField = (field, value) => {
     setAccountForm((prev) => ({ ...prev, [field]: value }));
@@ -166,7 +192,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadAccount = async () => {
       try {
-        const response = await fetch(`${API_URL}/user_info`, {
+        const response = await fetch(`${API_URL}/user/info`, {
           method: "POST",
           credentials: "include",
         });
@@ -223,6 +249,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         },
       };
     });
+
     setStatus("");
   };
 
@@ -240,7 +267,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setStatus("");
 
     try {
-      const response = await fetch(`${API_URL}/user_profile`, {
+      const response = await fetch(`${API_URL}/user/profile`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -307,21 +334,22 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
       {status && <div className="settings-status">{status}</div>}
 
       <div className="settings-grid">
-        <form className="settings-card settings-profile-card" onSubmit={saveAccount}>
+        <form
+          className="settings-card settings-profile-card"
+          onSubmit={saveAccount}
+        >
           <div className="settings-profile-cover">
             <div>
               <span>{t.eyebrow}</span>
-              <strong>{accountForm.first_name || accountForm.email || t.userAlt}</strong>
+              <strong>
+                {accountForm.first_name || accountForm.email || t.userAlt}
+              </strong>
             </div>
           </div>
 
           <div className="settings-profile-summary">
             <div className="settings-profile-avatar">
-              {accountForm.avatar ? (
-                <img src={accountForm.avatar} alt={accountForm.first_name || t.userAlt} />
-              ) : (
-                <span>{(accountForm.first_name || accountForm.email || t.userFallback).trim().slice(0, 1).toUpperCase()}</span>
-              )}
+              <span>{getAvatarLetter(accountForm, t.userFallback)}</span>
             </div>
 
             <div>
@@ -330,11 +358,15 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             </div>
 
             <label className="settings-file-button settings-profile-upload">
-              {uploadProfileLabel}
+              {t.uploadProfilePhoto}
               <input
                 type="file"
                 accept="image/*"
-                onChange={(event) => readImageFile(event.target.files?.[0], (value) => updateAccountField("avatar", value))}
+                onChange={(event) =>
+                  readImageFile(event.target.files?.[0], (value) =>
+                    updateAccountField("avatar", value)
+                  )
+                }
               />
             </label>
           </div>
@@ -343,32 +375,68 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             <div className="settings-form-grid">
               <label>
                 {t.firstName}
-                <input value={accountForm.first_name} onChange={(event) => updateAccountField("first_name", event.target.value)} />
+                <input
+                  value={accountForm.first_name}
+                  onChange={(event) =>
+                    updateAccountField("first_name", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.lastName}
-                <input value={accountForm.last_name} onChange={(event) => updateAccountField("last_name", event.target.value)} />
+                <input
+                  value={accountForm.last_name}
+                  onChange={(event) =>
+                    updateAccountField("last_name", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.email}
-                <input type="email" value={accountForm.email} onChange={(event) => updateAccountField("email", event.target.value)} />
+                <input
+                  type="email"
+                  value={accountForm.email}
+                  onChange={(event) =>
+                    updateAccountField("email", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.phoneNumber}
-                <input type="tel" value={accountForm.phone} placeholder="+972 ..." onChange={(event) => updateAccountField("phone", event.target.value)} />
+                <input
+                  type="tel"
+                  value={accountForm.phone}
+                  placeholder="+972 ..."
+                  onChange={(event) =>
+                    updateAccountField("phone", event.target.value)
+                  }
+                />
               </label>
             </div>
           </div>
 
-          <button className="settings-save-button" type="submit" disabled={isSavingAccount}>
+          <button
+            className="settings-save-button"
+            type="submit"
+            disabled={isSavingAccount}
+          >
             <Save size={18} />
             {isSavingAccount ? t.saving : t.saveProfile}
           </button>
         </form>
 
-        <form className="settings-card settings-card-horizontal" onSubmit={saveSiteSettings}>
+        <form
+          className="settings-card settings-card-horizontal"
+          onSubmit={saveSiteSettings}
+        >
           <div className="settings-card-heading">
-            <div className="settings-card-icon"><Store size={20} /></div>
+            <div className="settings-card-icon">
+              <Store size={20} />
+            </div>
+
             <div>
               <h2>{t.websiteTitle}</h2>
               <p>{t.websiteDescription}</p>
@@ -378,16 +446,26 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
           <div className="settings-card-content">
             <div className="settings-logo-preview">
               {siteForm.logoUrl ? (
-                <img src={siteForm.logoUrl} alt={siteForm.brand || t.websiteLogoAlt} />
+                <img
+                  src={siteForm.logoUrl}
+                  alt={siteForm.brand || t.websiteLogoAlt}
+                />
               ) : (
-                <div><ImagePlus size={26} /></div>
+                <div>
+                  <ImagePlus size={26} />
+                </div>
               )}
+
               <label className="settings-file-button">
                 {t.uploadLogo}
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(event) => readImageFile(event.target.files?.[0], (value) => updateSiteField("logoUrl", value))}
+                  onChange={(event) =>
+                    readImageFile(event.target.files?.[0], (value) =>
+                      updateSiteField("logoUrl", value)
+                    )
+                  }
                 />
               </label>
             </div>
@@ -395,36 +473,83 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             <div className="settings-form-grid">
               <label>
                 {t.subdomainName}
-                <input value={siteForm.subdomain} onChange={(event) => updateSiteField("subdomain", event.target.value)} />
+                <input
+                  value={siteForm.subdomain}
+                  onChange={(event) =>
+                    updateSiteField("subdomain", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.logoUrl}
-                <input value={siteForm.logoUrl} onChange={(event) => updateSiteField("logoUrl", event.target.value)} />
+                <input
+                  value={siteForm.logoUrl}
+                  onChange={(event) =>
+                    updateSiteField("logoUrl", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.brandName}
-                <input value={siteForm.brand} onChange={(event) => updateSiteField("brand", event.target.value)} />
+                <input
+                  value={siteForm.brand}
+                  onChange={(event) =>
+                    updateSiteField("brand", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.footerName}
-                <input value={siteForm.footerStoreName} onChange={(event) => updateSiteField("footerStoreName", event.target.value)} />
+                <input
+                  value={siteForm.footerStoreName}
+                  onChange={(event) =>
+                    updateSiteField("footerStoreName", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.contactEmail}
-                <input type="email" value={siteForm.contactEmail} onChange={(event) => updateSiteField("contactEmail", event.target.value)} />
+                <input
+                  type="email"
+                  value={siteForm.contactEmail}
+                  onChange={(event) =>
+                    updateSiteField("contactEmail", event.target.value)
+                  }
+                />
               </label>
+
               <label>
                 {t.contactPhone}
-                <input type="tel" value={siteForm.phone} onChange={(event) => updateSiteField("phone", event.target.value)} />
+                <input
+                  type="tel"
+                  value={siteForm.phone}
+                  onChange={(event) =>
+                    updateSiteField("phone", event.target.value)
+                  }
+                />
               </label>
+
               <label className="settings-wide-field">
                 {t.websiteDescriptionLabel}
-                <textarea value={siteForm.description} onChange={(event) => updateSiteField("description", event.target.value)} />
+                <textarea
+                  value={siteForm.description}
+                  onChange={(event) =>
+                    updateSiteField("description", event.target.value)
+                  }
+                />
               </label>
             </div>
           </div>
 
-          <button className="settings-save-button" type="submit" disabled={isSavingSite}>
+          <button
+            className="settings-save-button"
+            type="submit"
+            disabled={isSavingSite}
+          >
             <Save size={18} />
             {isSavingSite ? t.saving : t.saveWebsite}
           </button>

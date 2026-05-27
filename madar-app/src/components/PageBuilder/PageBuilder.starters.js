@@ -568,7 +568,7 @@ export const buildStarterProject = (starterId = "website") => {
       answers: {
         [fields[0].id]: "Sample Customer",
         [fields[1].id]: "customer@example.com",
-        [fields[2].id]: "+972 0599203857",
+        [fields[2].id]: "+972599203857",
         [fields[3].id]: "https://madar.com",
         [fields[4].id]: "Launch a service portal with intake, booking, reporting, and approvals.",
         [fields[5].id]: "Operations",

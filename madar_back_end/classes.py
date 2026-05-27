@@ -27,3 +27,11 @@ class PasswordReset(BaseModel):
     access_token: str
     password: str
 
+class WebsiteSettingsUpdate(BaseModel):
+    subdomain: Optional[str] = None
+    brand: Optional[str] = None
+    footer_store_name: Optional[str] = None
+    logo_url: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    description: Optional[str] = None

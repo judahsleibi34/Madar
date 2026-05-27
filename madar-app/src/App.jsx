@@ -76,7 +76,7 @@ export default function App() {
   }, []);
 
   const fetchUserInfo = useCallback(async () => {
-    const response = await fetch(`${API_URL}/user_info`, {
+    const response = await fetch(`${API_URL}/user/info`, {
       method: "POST",
       credentials: "include",
     });
@@ -100,7 +100,7 @@ export default function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const statusResponse = await fetch(`${API_URL}/user_status`, {
+        const statusResponse = await fetch(`${API_URL}/auth/user_status`, {
           method: "GET",
           credentials: "include",
         });
@@ -163,7 +163,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL}/log_out`, {
+      await fetch(`${API_URL}/auth/log_out`, {
         method: "POST",
         credentials: "include",
       });

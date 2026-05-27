@@ -154,15 +154,7 @@ export default function DashboardSidebar({
           onClick={() => navigate("/settings")}
           aria-label={t.settings}
         >
-          {user?.avatar ? (
-            <img
-              className="admin-sidebar-avatar"
-              src={user.avatar}
-              alt={displayName}
-            />
-          ) : (
-            <div className="admin-sidebar-avatar">{avatarLetter}</div>
-          )}
+          <div className="admin-sidebar-avatar">{avatarLetter}</div>
 
           <div className="admin-sidebar-user-info">
             <strong>{displayName}</strong>
