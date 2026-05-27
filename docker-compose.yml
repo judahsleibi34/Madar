@@ -1,7 +1,7 @@
 services:
   backend:
     build:
-      context: ./madar_back_end
+      context: ./backend
     container_name: madar-backend
     restart: unless-stopped
     env_file:
@@ -18,7 +18,7 @@ services:
 
   frontend:
     build:
-      context: ./madar-app
+      context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL}
     container_name: madar-frontend

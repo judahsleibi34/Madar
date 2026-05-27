@@ -1,9 +1,0 @@
-# for backend 
-cd madar_back_end
-uvicorn app:app --reload
-
-# for frontend
-cd madar-app
-npm run dev
-
-pip install fastapi uvicorn python-dotenv supabase pydantic[email] pandas seaborn matplotlib python-multipart

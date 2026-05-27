@@ -12,8 +12,8 @@ node_modules/
 .venv/
 venv/
 env/
-madar_back_end/madar_back/
-madar_back_end/madar_backend_env/
+backend/madar_back/
+backend/madar_backend_env/
 
 # Build output
 dist/
@@ -24,14 +24,14 @@ build/
 # Runtime data
 uploads/
 generated_charts/
-madar_back_end/uploads/
-madar_back_end/generated_charts/
+backend/uploads/
+backend/generated_charts/
 
 # Secrets and local config
 .env
 *.env
 *.local
-madar_back_end/.env
+backend/.env
 
 # Python cache
 __pycache__/
