@@ -179,7 +179,7 @@ export const defaultSiteChrome = {
   authPageSlug: "/login",
   description: "An adaptive business management platform for creating and managing digital systems.",
   contactEmail: "info@madar.com",
-  phone: "+972 0599203857",
+  phone: "+972599203857",
   footerStoreName: "Madar",
   rights: "All rights reserved.",
   footerShopTitle: "Pages",

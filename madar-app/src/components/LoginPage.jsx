@@ -99,7 +99,7 @@ export default function LoginPage({
     setStatusMessage("");
 
     try {
-      const response = await fetch(`${API_URL}/login`, {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         credentials: "include",
         headers: {

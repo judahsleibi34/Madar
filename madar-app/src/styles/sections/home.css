@@ -65,8 +65,9 @@
   border-radius: 50%;
   flex-shrink: 0;
   background:
-    radial-gradient(circle at center, rgba(26, 39, 68, 0.06) 0 24%, transparent 25%),
-    radial-gradient(circle at center, transparent 0 48%, rgba(139, 42, 26, 0.035) 49%, transparent 62%);
+    radial-gradient(circle at center, rgba(16, 33, 63, 0.08) 0 24%, transparent 25%),
+    radial-gradient(circle at center, transparent 0 48%, rgba(159, 47, 31, 0.07) 49%, transparent 62%),
+    radial-gradient(circle at center, transparent 0 72%, rgba(159, 47, 31, 0.08) 73%, transparent 76%);
 }
 
 .center-core {
@@ -78,12 +79,12 @@
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(248, 246, 243, 0.92)),
-    radial-gradient(circle at 35% 25%, rgba(139, 42, 26, 0.12), transparent 42%);
-  border: 2px solid rgba(26, 39, 68, 0.88);
+    radial-gradient(circle at 35% 25%, rgba(159, 47, 31, 0.14), transparent 42%),
+    linear-gradient(145deg, #ffffff, #fff7ef);
+  border: 3px solid #10213f;
   box-shadow:
-    0 24px 60px rgba(26, 39, 68, 0.14),
-    inset 0 0 0 6px rgba(139, 42, 26, 0.06);
+    0 24px 60px rgba(16, 33, 63, 0.16),
+    inset 0 0 0 7px rgba(159, 47, 31, 0.055);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,8 +92,8 @@
 }
 
 .center-core span {
-  color: #1a2744;
-  font-weight: 800;
+  color: #10213f;
+  font-weight: 900;
   font-size: 18px;
   font-family: inherit;
   white-space: nowrap;
@@ -102,7 +103,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  border: 1px solid rgba(26, 39, 68, 0.2);
+  border: 1.5px solid rgba(16, 33, 63, 0.2);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -115,7 +116,7 @@
   width: 180px;
   height: 180px;
   animation-duration: 8s;
-  border-color: rgba(139, 42, 26, 0.38);
+  border-color: rgba(159, 47, 31, 0.40);  /* stronger */
 }
 
 .orbit-two {
@@ -123,27 +124,29 @@
   height: 270px;
   animation-duration: 12s;
   animation-direction: reverse;
-  border-color: rgba(26, 39, 68, 0.22);
+  border-color: rgba(16, 33, 63, 0.30);   /* stronger */
 }
 
 .orbit-three {
   width: 360px;
   height: 360px;
   animation-duration: 18s;
-  border-color: rgba(139, 42, 26, 0.18);
+  border-color: rgba(159, 47, 31, 0.25);  /* stronger */
 }
 
 .orbit-dot {
   position: absolute;
-  padding: 8px 12px;
+  padding: 9px 13px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #1a2744;
+  background: #fff7ef;
+  color: #10213f;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
   font-family: inherit;
-  box-shadow: 0 14px 34px rgba(26, 39, 68, 0.14);
-  border: 1px solid rgba(26, 39, 68, 0.16);
+  box-shadow:
+    0 14px 34px rgba(16, 33, 63, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(16, 33, 63, 0.16);
   white-space: nowrap;
   pointer-events: auto;
 }
@@ -152,30 +155,37 @@
   top: 50%;
   right: -36px;
   transform: translateY(-50%) rotate(80deg);
-  color: #8b2a1a;
-  border-color: rgba(139, 42, 26, 0.28);
+  background: #fff7ef;
+  color: #9f2f1f;
+  border-color: rgba(159, 47, 31, 0.40);  /* stronger */
 }
 
 .orbit-two .orbit-dot {
   bottom: 22px;
   left: 20px;
   transform: rotate(45deg);
-  background: #1a2744;
-  color: #ffffff;
-  border-color: rgba(26, 39, 68, 0.22);
+  background: #10213f;                     /* flat, no gradient */
+  color: #fff7ef;                          /* warm white text */
+  border-color: rgba(16, 33, 63, 0.40);   /* stronger */
 }
 
 .orbit-three .orbit-dot {
   top: 20px;
   right: 30px;
   transform: rotate(20deg);
-  color: #8b2a1a;
-  border-color: rgba(139, 42, 26, 0.28);
+  background: #9f2f1f;                     /* flat, no gradient */
+  color: #fff7ef;                          /* warm white text */
+  border-color: rgba(159, 47, 31, 0.45);  /* stronger */
 }
 
 @keyframes rotateOrbit {
-  from { transform: translate(-50%, -50%) rotate(0deg); }
-  to   { transform: translate(-50%, -50%) rotate(360deg); }
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 /* ============================================================

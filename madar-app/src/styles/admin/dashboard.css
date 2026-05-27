@@ -50,28 +50,38 @@ body,
    is the correct combo. The layout must NOT have its own height/
    overflow constraints — fixed in the layout rule above. */
 .admin-sidebar {
-  flex: 0 0 260px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+
   width: 260px;
   min-width: 260px;
   max-width: 260px;
   height: 100vh;
-  position: sticky;
-  top: 0;
-  align-self: flex-start;
+
   background: #ffffff;
   padding: 28px 18px;
   display: flex;
   flex-direction: column;
   border-right: 1px solid rgba(26, 39, 68, 0.12);
   border-left: none;
-  z-index: 5;
+  z-index: 50;
+
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .admin-dashboard-layout[dir="rtl"] .admin-sidebar {
+  left: auto;
+  right: 0;
   border-right: none;
   border-left: 1px solid rgba(26, 39, 68, 0.12);
+}
+
+.admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
+  margin-left: 0;
+  margin-right: 260px;
 }
 
 .admin-sidebar-top    { flex: 0 0 auto; }
@@ -318,6 +328,7 @@ body,
   flex: 1 1 0;
   min-width: 0;
   width: auto;
+  margin-left: 260px;
   background:
     radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
@@ -1230,8 +1241,10 @@ body,
   .dashboard-skeleton-page {
     flex: none;
     width: 100%;
-    min-width: 0;
+    min-width: 0; 
     min-height: 0;
+    margin-left: 0;
+    margin-right: 0;
     padding: 24px 16px 56px;
   }
 

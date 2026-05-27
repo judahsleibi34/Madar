@@ -1,5 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-export const USER_INFO_PATH = import.meta.env.VITE_USER_INFO_PATH || "/user_info";
+export const USER_INFO_PATH = import.meta.env.VITE_USER_INFO_PATH || "/user/info";
 
 export const getApiUrl = (path) => `${API_BASE_URL}${path}`;
 
