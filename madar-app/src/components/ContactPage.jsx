@@ -67,7 +67,7 @@ export default function ContactPage({ lang = "en" }) {
           <div>
             <strong>{t.phoneLabel}</strong>
             <p dir="ltr" className="phone-number">
-              +972 0599203857
+              +972599203857
             </p>
           </div>
         </div>

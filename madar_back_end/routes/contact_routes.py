@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException
+
 from classes import ContactMessage
 from database import service_supabase
 
-router = APIRouter()
+router = APIRouter(tags=["Contact"])
+
 
 @router.post("/contact")
 def create_contact_message(contact: ContactMessage):
@@ -15,7 +17,7 @@ def create_contact_message(contact: ContactMessage):
 
         return {
             "status": "received",
-            "message": "Message sent successfully"
+            "message": "Message sent successfully",
         }
 
     except Exception as e:

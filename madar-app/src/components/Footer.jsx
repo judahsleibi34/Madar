@@ -77,7 +77,7 @@ export default function Footer({ lang = "en" }) {
           <h4>{t.contactTitle}</h4>
           <p>info@madar.com</p>
           <p dir="ltr" className="phone-number">
-            +972 0599203857
+            +972599203857
           </p>
         </div>
       </div>

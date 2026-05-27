@@ -2798,7 +2798,7 @@ export default function PageBuilder({
               <strong>{site.footerLanguageLabel || "AR"}</strong>
             </div>
             <p>{site.contactEmail || "info@madar.com"}</p>
-            <p dir="ltr">{site.phone || "+972 0599203857"}</p>
+            <p dir="ltr">{site.phone || "+972599203857"}</p>
           </div>
         </div>
 
