@@ -7,25 +7,28 @@ import {
   useLocation,
 } from "react-router-dom";
 
-import TeamPage from "./components/TeamPage";
-import Header from "./components/Header";
-import HeroSection from "./components/HeroSection";
-import AboutSection from "./components/AboutSection";
-import ContactPage from "./components/ContactPage";
-import ScrollToTop from "./components/ScrollToTop";
+import TeamPage from "./components/MainPages/TeamPage";
+import Header from "./components/MainPages/Header";
+import HeroSection from "./components/MainPages/HeroSection";
+import AboutSection from "./components/MainPages/AboutSection";
+import ContactPage from "./components/MainPages/ContactPage";
+import FeaturesPage from "./components/MainPages/FeaturesPage";
+import PricingPage from "./components/MainPages/PricingPage";
+import Footer from "./components/MainPages/Footer";
 
-import LoginPage from "./components/LoginPage";
-import SignUpPage from "./components/SignUpPage";
-import ForgotPasswordPage from "./components/ForgotPasswordPage";
-import FeaturesPage from "./components/FeaturesPage";
-import PricingPage from "./components/PricingPage";
-import ResetPasswordPage from "./components/ResetPasswordPage";
-import Dashboard from "./components/Dashboard";
-import SettingsPage from "./components/SettingsPage";
-import Footer from "./components/Footer";
+import LoginPage from "./components/AuthPages/LoginPage";
+import SignUpPage from "./components/AuthPages/SignUpPage";
+import ForgotPasswordPage from "./components/AuthPages/ForgotPasswordPage";
+import ResetPasswordPage from "./components/AuthPages/ResetPasswordPage";
+
+import Dashboard from "./components/DashboardBuilder/Dashboard";
+import DashboardSidebar from "./components/DashboardBuilder/DashboardSidebar";
+import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
+import SettingsPage from "./components/DashboardBuilder/SettingsPage";
+import MyPlanPage from "./components/MainPages/MyPlanPage";
+
 import PageBuilder from "./components/PageBuilder";
 import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
-import DashboardSidebar from "./components/DashboardSidebar";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const LANG_STORAGE_KEY = "madar-lang";
@@ -50,6 +53,7 @@ export default function App() {
     location.pathname.startsWith("/page-builder") ||
     location.pathname.startsWith("/builder-responses") ||
     location.pathname.startsWith("/builder-data") ||
+    location.pathname.startsWith("/my-plan") ||
     location.pathname.startsWith("/settings");
 
   const normalizeUser = useCallback((userInfo) => {
@@ -351,6 +355,19 @@ export default function App() {
           />
 
           <Route
+              path="/my-plan"
+              element={
+                !authChecked ? (
+                  renderDashboardSkeleton("Loading my plan")
+                ) : isLoggedIn ? (
+                  renderDashboardShell(<MyPlanPage lang={lang} />)
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+
+          <Route
             path="/settings"
             element={
               !authChecked ? (
@@ -481,8 +498,52 @@ export default function App() {
           <Route
             path="/login"
             element={
-              authChecked && isLoggedIn ? (
-                <Navigate to="/dashboard" replace />
+              !authChecked ? (
+                <main
+                  className="already-signed-page"
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                >
+                  <section className="already-signed-container">
+                    <div className="auth-skeleton-card" aria-label="Checking your session">
+                      <div className="auth-skeleton-line auth-skeleton-title" />
+                      <div className="auth-skeleton-line auth-skeleton-text" />
+
+                      <div className="auth-skeleton-actions">
+                        <div className="auth-skeleton-button primary" />
+                        <div className="auth-skeleton-button secondary" />
+                      </div>
+                    </div>
+                  </section>
+                </main>
+              ) : isLoggedIn ? (
+                <main
+                  className="already-signed-page"
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                >
+                  <section className="already-signed-container">
+                   <div className="already-signed-card">
+                      <h1>
+                        {lang === "ar" ? "أنت مسجل الدخول بالفعل" : "You are already signed in"}
+                      </h1>
+
+                      <p>
+                        {lang === "ar"
+                          ? "يمكنك المتابعة إلى لوحة التحكم أو تسجيل الخروج واستخدام حساب آخر."
+                          : "You can continue to your dashboard or log out and use another account."}
+                      </p>
+
+                      <div className="already-signed-actions">
+                        <button type="button" onClick={() => navigate("/dashboard")}>
+                          {lang === "ar" ? "المتابعة إلى لوحة التحكم" : "Continue to dashboard"}
+                        </button>
+
+                        <button type="button" onClick={handleLogout}>
+                          {lang === "ar" ? "تسجيل الخروج" : "Log out"}
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                </main>
               ) : (
                 <main className="app-main">
                   <LoginPage

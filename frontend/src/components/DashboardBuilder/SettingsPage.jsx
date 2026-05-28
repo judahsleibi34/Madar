@@ -3,12 +3,12 @@ import { ImagePlus, Save, Store } from "lucide-react";
 import {
   STORAGE_KEY,
   defaultSiteChrome,
-} from "./PageBuilder/PageBuilder.constants";
-import { createInitialProject } from "./PageBuilder/PageBuilder.starters";
+} from "../PageBuilder/PageBuilder.constants";
+import { createInitialProject } from "../PageBuilder/PageBuilder.starters";
 import {
   getProjectSubdomain,
   sanitizeSubdomain,
-} from "./PageBuilder/PageBuilder.routing";
+} from "../PageBuilder/PageBuilder.routing";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -70,6 +70,7 @@ const buildProfilePayload = (form) => {
 
 const resolveMediaUrl = (value) => {
   if (!value) return "";
+
   if (
     value.startsWith("http://") ||
     value.startsWith("https://") ||
@@ -78,7 +79,18 @@ const resolveMediaUrl = (value) => {
     return value;
   }
 
-  return `${API_URL}${value.startsWith("/") ? value : `/${value}`}`;
+  return value.startsWith("/") ? value : `/${value}`;
+};
+
+const isDirectImageUrl = (url) => {
+  if (!url || typeof url !== "string") return false;
+
+  const cleanUrl = url.trim();
+
+  if (cleanUrl.startsWith("data:image/")) return true;
+  if (cleanUrl.startsWith("/")) return true;
+
+  return /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(cleanUrl);
 };
 
 const settingsCopy = {
@@ -118,6 +130,8 @@ const settingsCopy = {
     avatarUploadError: "Could not upload profile photo.",
     invalidAvatarType: "Please upload a PNG, JPG, or WebP image.",
     avatarTooLarge: "Profile photo must be 5MB or smaller.",
+    invalidLogoUrl:
+      "Please use a direct image URL ending in .png, .jpg, .webp, .gif, or .svg.",
     sessionExpired: "Your session expired. Please log in again.",
     userAlt: "User",
     userFallback: "U",
@@ -157,6 +171,8 @@ const settingsCopy = {
     avatarUploadError: "تعذر رفع صورة الملف الشخصي.",
     invalidAvatarType: "يرجى رفع صورة بصيغة PNG أو JPG أو WebP.",
     avatarTooLarge: "يجب ألا يتجاوز حجم صورة الملف الشخصي 5MB.",
+    invalidLogoUrl:
+      "يرجى استخدام رابط صورة مباشر ينتهي بـ .png أو .jpg أو .webp أو .gif أو .svg.",
     sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
     userAlt: "المستخدم",
     userFallback: "م",
@@ -372,9 +388,16 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     }
   };
 
-  const saveSiteSettings = (event) => {
+  const saveSiteSettings = async (event) => {
     event.preventDefault();
+
+    if (siteForm.logoUrl && !isDirectImageUrl(siteForm.logoUrl)) {
+      setStatus(t.invalidLogoUrl);
+      return;
+    }
+
     setIsSavingSite(true);
+    setStatus("");
 
     const nextProject = {
       ...project,
@@ -394,11 +417,45 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
       },
     };
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProject));
-    setProject(nextProject);
-    setIsSavingSite(false);
-    setStatus(t.websiteSaved);
+    try {
+      const response = await fetch(`${API_URL}/website/settings`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subdomain: sanitizeSubdomain(siteForm.subdomain),
+          brand: siteForm.brand,
+          footer_store_name: siteForm.footerStoreName,
+          logo_url: siteForm.logoUrl,
+          contact_email: siteForm.contactEmail,
+          phone: siteForm.phone,
+          description: siteForm.description,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error(t.sessionExpired);
+        }
+
+        throw new Error(getApiErrorMessage(data.detail, t.accountError));
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProject));
+      setProject(nextProject);
+      setStatus(t.websiteSaved);
+    } catch (error) {
+      setStatus(error.message || t.accountError);
+    } finally {
+      setIsSavingSite(false);
+    }
   };
+
+  const canShowLogoImage = isDirectImageUrl(siteForm.logoUrl);
 
   return (
     <section className="settings-page" dir={isArabic ? "rtl" : "ltr"}>
@@ -432,6 +489,9 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
                 <img
                   src={resolveMediaUrl(accountForm.avatar)}
                   alt={accountForm.first_name || accountForm.email || t.userAlt}
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
                 />
               ) : (
                 <span>{getAvatarLetter(accountForm, t.userFallback)}</span>
@@ -528,14 +588,22 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
           <div className="settings-card-content">
             <div className="settings-logo-preview">
-              {siteForm.logoUrl ? (
+              {canShowLogoImage ? (
                 <img
                   src={siteForm.logoUrl}
                   alt={siteForm.brand || t.websiteLogoAlt}
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                    event.currentTarget.parentElement?.classList.add(
+                      "logo-load-failed"
+                    );
+                  }}
                 />
               ) : (
-                <div>
-                  <ImagePlus size={26} />
+                <div className="settings-logo-fallback">
+                  {siteForm.brand
+                    ? siteForm.brand.slice(0, 1).toUpperCase()
+                    : <ImagePlus size={26} />}
                 </div>
               )}
 

@@ -751,6 +751,34 @@ body,
   background: #fbfaf8;
 }
 
+.settings-logo-fallback {
+  width: 104px;
+  height: 104px;
+  border-radius: 20px;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  background: #f3f5f8;
+  display: grid;
+  place-items: center;
+  font-size: 38px;
+  font-weight: 950;
+  color: #1a2744;
+}
+
+.settings-logo-preview.logo-load-failed::after {
+  content: "Logo";
+  width: 104px;
+  height: 104px;
+  border-radius: 20px;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  background: #f3f5f8;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  color: #1a2744;
+  font-size: 15px;
+  font-weight: 950;
+}
+
 .settings-avatar-row img,
 .settings-avatar-row > div,
 .settings-logo-preview img,
@@ -1526,4 +1554,325 @@ body,
 .admin-dashboard-layout:has(.page-builder) .page-builder-dashboard-page,
 .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page {
   padding: 0;
+}
+
+/* ============================================================
+   AUTH / LOGIN / ALREADY SIGNED IN PAGE
+   ============================================================ */
+
+.auth-page,
+.login-page,
+.already-signed-page {
+  flex: 1;
+  width: 100%;
+  min-height: calc(100vh - 96px - 180px);
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
+    #f5f2ee;
+  color: #1a2744;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0 5%;
+}
+
+.auth-container,
+.login-container,
+.already-signed-container {
+  width: min(620px, 100%);
+  margin: 0 auto;
+}
+
+.auth-card,
+.login-card,
+.already-signed-card,
+.auth-skeleton-card {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 24px;
+  padding: 34px 30px;
+  box-shadow: 0 20px 48px rgba(26, 39, 68, 0.08);
+  text-align: center;
+}
+
+.auth-card::after,
+.login-card::after,
+.already-signed-card::after,
+.auth-skeleton-card::after {
+  content: "";
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  top: -82px;
+  right: -72px;
+  border-radius: 999px;
+  background: #8b2a1a;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.auth-card h1,
+.login-card h1,
+.already-signed-card h1 {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto 12px;
+  color: #1a2744;
+  font-size: clamp(30px, 3.2vw, 42px);
+  line-height: 1.08;
+  font-weight: 950;
+  letter-spacing: -0.045em;
+  text-align: center;
+}
+
+.auth-card p,
+.login-card p,
+.already-signed-card p {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto 24px;
+  color: #3a3530;
+  max-width: 520px;
+  font-size: 15.5px;
+  line-height: 1.65;
+  text-align: center;
+}
+
+.auth-actions,
+.login-actions,
+.already-signed-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.auth-actions button,
+.login-actions button,
+.already-signed-actions button,
+.auth-actions a,
+.login-actions a,
+.already-signed-actions a {
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 14px;
+  min-height: 46px;
+  padding: 11px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 950;
+  text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.auth-actions button:first-child,
+.login-actions button:first-child,
+.already-signed-actions button:first-child,
+.auth-actions a:first-child,
+.login-actions a:first-child,
+.already-signed-actions a:first-child {
+  border: 0;
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.2);
+}
+
+.auth-actions button:not(:first-child),
+.login-actions button:not(:first-child),
+.already-signed-actions button:not(:first-child),
+.auth-actions a:not(:first-child),
+.login-actions a:not(:first-child),
+.already-signed-actions a:not(:first-child) {
+  border: 1px solid rgba(139, 42, 26, 0.28);
+  background: rgba(139, 42, 26, 0.06);
+  color: #8b2a1a;
+  box-shadow: none;
+}
+
+.auth-actions button:hover,
+.login-actions button:hover,
+.already-signed-actions button:hover,
+.auth-actions a:hover,
+.login-actions a:hover,
+.already-signed-actions a:hover {
+  transform: translateY(-1px);
+}
+
+.auth-actions button:first-child:hover,
+.login-actions button:first-child:hover,
+.already-signed-actions button:first-child:hover,
+.auth-actions a:first-child:hover,
+.login-actions a:first-child:hover,
+.already-signed-actions a:first-child:hover {
+  box-shadow: 0 16px 32px rgba(139, 42, 26, 0.24);
+}
+
+.auth-actions button:not(:first-child):hover,
+.login-actions button:not(:first-child):hover,
+.already-signed-actions button:not(:first-child):hover,
+.auth-actions a:not(:first-child):hover,
+.login-actions a:not(:first-child):hover,
+.already-signed-actions a:not(:first-child):hover {
+  background: rgba(139, 42, 26, 0.1);
+  border-color: rgba(139, 42, 26, 0.38);
+}
+
+/* ============================================================
+   AUTH SKELETON
+   ============================================================ */
+
+.auth-skeleton-line,
+.auth-skeleton-button {
+  position: relative;
+  z-index: 1;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(26, 39, 68, 0.08),
+    rgba(139, 42, 26, 0.14),
+    rgba(26, 39, 68, 0.08)
+  );
+  background-size: 220% 100%;
+  animation: auth-skeleton-loading 1.1s ease-in-out infinite;
+}
+
+.auth-skeleton-title {
+  width: min(420px, 85%);
+  height: 38px;
+  margin: 0 auto 18px;
+}
+
+.auth-skeleton-text {
+  width: min(500px, 92%);
+  height: 16px;
+  margin: 0 auto 26px;
+}
+
+.auth-skeleton-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  align-items: center;
+}
+
+.auth-skeleton-button {
+  height: 46px;
+}
+
+.auth-skeleton-button.primary {
+  width: 190px;
+}
+
+.auth-skeleton-button.secondary {
+  width: 88px;
+}
+
+@keyframes auth-skeleton-loading {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+/* ============================================================
+   RTL SUPPORT
+   ============================================================ */
+
+.auth-page[dir="rtl"],
+.login-page[dir="rtl"],
+.already-signed-page[dir="rtl"] {
+  direction: rtl;
+}
+
+.auth-page[dir="ltr"],
+.login-page[dir="ltr"],
+.already-signed-page[dir="ltr"] {
+  direction: ltr;
+}
+
+.auth-page[dir="rtl"] .auth-card::after,
+.login-page[dir="rtl"] .login-card::after,
+.already-signed-page[dir="rtl"] .already-signed-card::after,
+.already-signed-page[dir="rtl"] .auth-skeleton-card::after {
+  right: auto;
+  left: -72px;
+}
+
+/* ============================================================
+   RESPONSIVE AUTH PAGE
+   ============================================================ */
+
+@media (max-width: 700px) {
+  .auth-page,
+  .login-page,
+  .already-signed-page {
+    min-height: calc(100vh - 86px - 160px);
+    padding: 32px 16px;
+  }
+
+  .auth-container,
+  .login-container,
+  .already-signed-container {
+    width: min(100%, 520px);
+  }
+
+  .auth-card,
+  .login-card,
+  .already-signed-card,
+  .auth-skeleton-card {
+    padding: 28px 22px;
+    border-radius: 22px;
+  }
+
+  .auth-card h1,
+  .login-card h1,
+  .already-signed-card h1 {
+    font-size: 30px;
+    letter-spacing: -0.03em;
+  }
+
+  .auth-card p,
+  .login-card p,
+  .already-signed-card p {
+    font-size: 15px;
+  }
+
+  .auth-actions,
+  .login-actions,
+  .already-signed-actions,
+  .auth-skeleton-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .auth-actions button,
+  .login-actions button,
+  .already-signed-actions button,
+  .auth-actions a,
+  .login-actions a,
+  .already-signed-actions a,
+  .auth-skeleton-button.primary,
+  .auth-skeleton-button.secondary {
+    width: 100%;
+  }
 }

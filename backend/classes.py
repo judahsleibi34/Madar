@@ -1,9 +1,9 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Literal
 
 class ContactMessage(BaseModel):
     name: str
-    email: EmailStr
+    phone: str
     message: str
 
 class SignUpRequest(BaseModel):
@@ -22,6 +22,8 @@ class UserProfileUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     avatar: Optional[str] = None
+    subscription_type: Optional[str] = None
+    payment_status: Optional[str] = None 
 
 class PasswordReset(BaseModel):
     access_token: str
@@ -35,3 +37,14 @@ class WebsiteSettingsUpdate(BaseModel):
     contact_email: Optional[EmailStr] = None
     phone: Optional[str] = None
     description: Optional[str] = None
+    
+class SubscriptionRequest(BaseModel):
+    subscription_type: Literal["full_platform", "individual_builder"]
+    plan: Literal["starter", "pro", "business", "basic", "premium"]
+    builder_type: Optional[
+        Literal["website", "forms", "quiz", "reservation", "reports", "data"]
+    ] = None
+    
+    
+    
+    

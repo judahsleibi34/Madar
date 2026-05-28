@@ -16,3 +16,4 @@ service_supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY,
 )
+

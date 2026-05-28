@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import GradientText from "./GradientText";
-import OrbitVisual from "./OrbitVisual";
-import SplitText from "./SplitText";
+import GradientText from "../Animations/GradientText";
+import OrbitVisual from "../Animations/OrbitVisual";
+import SplitText from "../Animations/SplitText";
 
 const content = {
   en: {

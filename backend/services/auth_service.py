@@ -58,6 +58,8 @@ def build_user_payload(user_data):
         "email": user_data.get("email"),
         "phone": user_data.get("phone") or "",
         "avatar": user_data.get("avatar") or user_data.get("avatar_url") or "",
+        "subscription_type": user_data.get("subscription_type") or "",
+        "payment_status": user_data.get("payment_status") or "",
         "created_at": user_data.get("created_at"),
         "updated_at": user_data.get("updated_at"),
     }

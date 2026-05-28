@@ -1,0 +1,547 @@
+/* ============================================================
+   MY PLAN PAGE
+   File: src/components/Dashboard/MyPlanPage.css
+   ============================================================ */
+
+.my-plan-page {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  color: #1a2744;
+}
+
+.my-plan-page[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+.my-plan-page[dir="ltr"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+
+.my-plan-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 28px;
+  margin-bottom: 26px;
+}
+
+.my-plan-kicker {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #8b2a1a;
+  font-size: 13px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.my-plan-page[dir="rtl"] .my-plan-kicker {
+  letter-spacing: 0;
+}
+
+.my-plan-hero h1 {
+  margin: 0;
+  color: #1a2744;
+  font-size: clamp(38px, 5vw, 58px);
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.06em;
+}
+
+.my-plan-page[dir="rtl"] .my-plan-hero h1 {
+  letter-spacing: -0.03em;
+}
+
+.my-plan-hero p {
+  max-width: 680px;
+  margin: 12px 0 0;
+  color: #6d7484;
+  font-size: 17px;
+  line-height: 1.7;
+  font-weight: 750;
+}
+
+.my-plan-hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+.my-plan-primary-btn,
+.my-plan-secondary-btn {
+  border-radius: 16px;
+  min-height: 48px;
+  padding: 13px 18px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 950;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.my-plan-primary-btn {
+  border: 0;
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.2);
+}
+
+.my-plan-secondary-btn {
+  border: 1px solid rgba(26, 39, 68, 0.16);
+  background: #ffffff;
+  color: #1a2744;
+}
+
+.my-plan-primary-btn:hover,
+.my-plan-secondary-btn:hover {
+  transform: translateY(-1px);
+}
+
+.my-plan-primary-btn:hover {
+  box-shadow: 0 16px 34px rgba(139, 42, 26, 0.24);
+}
+
+.my-plan-secondary-btn:hover {
+  border-color: rgba(139, 42, 26, 0.28);
+}
+
+/* ============================================================
+   TOP GRID
+   ============================================================ */
+
+.my-plan-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.7fr);
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.my-plan-current-card,
+.my-plan-feature-card,
+.my-plan-usage-card,
+.my-plan-builder-card {
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+}
+
+/* ============================================================
+   CURRENT PLAN CARD
+   ============================================================ */
+
+.my-plan-current-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 30px;
+}
+
+.my-plan-current-card::after {
+  content: "";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  right: -90px;
+  top: -110px;
+  border-radius: 999px;
+  background: #8b2a1a;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.my-plan-page[dir="rtl"] .my-plan-current-card::after {
+  right: auto;
+  left: -90px;
+}
+
+.my-plan-card-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.my-plan-card-top span,
+.my-plan-card-top strong {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.my-plan-card-top span {
+  color: #6d7484;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.my-plan-page[dir="rtl"] .my-plan-card-top span {
+  letter-spacing: 0;
+}
+
+.my-plan-card-top strong {
+  color: #8b2a1a;
+  border-radius: 999px;
+  background: rgba(139, 42, 26, 0.08);
+  padding: 8px 12px;
+}
+
+.my-plan-price-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.my-plan-price-row h2 {
+  margin: 0;
+  color: #1a2744;
+  font-size: clamp(42px, 5vw, 68px);
+  line-height: 0.95;
+  font-weight: 950;
+  letter-spacing: -0.07em;
+}
+
+.my-plan-page[dir="rtl"] .my-plan-price-row h2 {
+  letter-spacing: -0.03em;
+}
+
+.my-plan-price-row div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #8b2a1a;
+}
+
+.my-plan-price-row div strong {
+  font-size: 42px;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+}
+
+.my-plan-price-row div span {
+  color: #6d7484;
+  font-weight: 850;
+}
+
+.my-plan-current-card > p {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+  margin: 18px 0 26px;
+  color: #3a3530;
+  line-height: 1.7;
+  font-weight: 750;
+}
+
+.my-plan-meta-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.my-plan-meta-grid div {
+  border-radius: 18px;
+  background: #fbfaf8;
+  border: 1px solid rgba(26, 39, 68, 0.08);
+  padding: 16px;
+}
+
+.my-plan-meta-grid span {
+  display: block;
+  color: #6d7484;
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.my-plan-meta-grid strong {
+  color: #1a2744;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+/* ============================================================
+   FEATURE CARD
+   ============================================================ */
+
+.my-plan-feature-card {
+  border-radius: 28px;
+  padding: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 38%),
+    linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  color: #ffffff;
+}
+
+.my-plan-page[dir="rtl"] .my-plan-feature-card {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 38%),
+    linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+}
+
+.my-plan-builder-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 950;
+  margin-bottom: 22px;
+}
+
+.my-plan-feature-card span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.my-plan-page[dir="rtl"] .my-plan-feature-card span {
+  letter-spacing: 0;
+}
+
+.my-plan-feature-card h2 {
+  margin: 8px 0 12px;
+  color: #ffffff;
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.my-plan-feature-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.65;
+  font-weight: 750;
+}
+
+.my-plan-feature-card > strong {
+  display: inline-flex;
+  margin-top: 16px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+
+.my-plan-section {
+  margin-top: 22px;
+}
+
+.my-plan-section-header {
+  margin-bottom: 14px;
+}
+
+.my-plan-section-header h2 {
+  margin: 0;
+  color: #1a2744;
+  font-size: 28px;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+/* ============================================================
+   USAGE
+   ============================================================ */
+
+.my-plan-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.my-plan-usage-card {
+  border-radius: 22px;
+  padding: 20px;
+}
+
+.my-plan-usage-card div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.my-plan-usage-card span {
+  color: #6d7484;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.my-plan-usage-card strong {
+  color: #1a2744;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.my-plan-progress-track {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(26, 39, 68, 0.08);
+}
+
+.my-plan-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1a2744 0%, #8b2a1a 100%);
+}
+
+/* ============================================================
+   BUILDER CARDS
+   ============================================================ */
+
+.my-plan-builders-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.my-plan-builder-card {
+  border-radius: 22px;
+  padding: 20px;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.my-plan-builder-card.active {
+  border-color: rgba(139, 42, 26, 0.42);
+  box-shadow: 0 22px 52px rgba(139, 42, 26, 0.12);
+  transform: translateY(-2px);
+}
+
+.my-plan-builder-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.my-plan-builder-mini-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  color: #ffffff;
+  font-size: 19px;
+  font-weight: 950;
+}
+
+.my-plan-builder-card-top strong {
+  color: #8b2a1a;
+  font-size: 12px;
+  font-weight: 950;
+  border-radius: 999px;
+  background: rgba(139, 42, 26, 0.08);
+  padding: 7px 10px;
+}
+
+.my-plan-builder-card h3 {
+  margin: 0 0 8px;
+  color: #1a2744;
+  font-size: 19px;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+}
+
+.my-plan-builder-card p {
+  margin: 0;
+  color: #6d7484;
+  line-height: 1.55;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.my-plan-builder-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.my-plan-builder-footer span {
+  color: #1a2744;
+  font-weight: 950;
+}
+
+.my-plan-builder-footer em {
+  color: #8b2a1a;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 1100px) {
+  .my-plan-grid,
+  .my-plan-builders-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .my-plan-usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .my-plan-hero {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 620px) {
+  .my-plan-usage-grid,
+  .my-plan-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .my-plan-hero-actions {
+    width: 100%;
+  }
+
+  .my-plan-primary-btn,
+  .my-plan-secondary-btn {
+    width: 100%;
+  }
+
+  .my-plan-price-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

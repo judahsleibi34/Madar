@@ -1,4 +1,4 @@
-import GradientText from "./GradientText";
+import GradientText from "../Animations/GradientText";
 
 const contactText = {
   en: {
