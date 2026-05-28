@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Link } from "react-router-dom";
-import logo from "../assets/madar_header.svg";
+import logo from "../../assets/MadarTemplates/madar_header.svg";
 
 const navItems = {
   en: [

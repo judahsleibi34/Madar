@@ -38,14 +38,37 @@ def update_website_settings(
                 "website": None,
             }
 
-        update_payload["user_id"] = user_data["id"]
+        user_id = user_data["id"]
 
-        save_response = supabase.table("website_settings").upsert(
-            update_payload,
-            on_conflict="user_id",
-        ).execute()
+        existing_response = supabase.table("website_settings").select("*").eq(
+            "user_id", user_id
+        ).maybe_single().execute()
 
-        updated_website = save_response.data[0] if save_response.data else update_payload
+        existing_website = existing_response.data
+
+        if existing_website:
+            save_response = supabase.table("website_settings").update(
+                update_payload
+            ).eq(
+                "id", existing_website["id"]
+            ).execute()
+        else:
+            tenant_id = user_data.get("tenant_id") or user_id
+
+            insert_payload = {
+                **update_payload,
+                "user_id": user_id,
+                "tenant_id": tenant_id,
+            }
+
+            save_response = supabase.table("website_settings").insert(
+                insert_payload
+            ).execute()
+
+        updated_website = save_response.data[0] if save_response.data else {
+            **(existing_website or {}),
+            **update_payload,
+        }
 
         return {
             "success": True,

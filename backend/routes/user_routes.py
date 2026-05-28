@@ -57,6 +57,10 @@ def update_user_profile(
             update_payload["phone"] = profile.phone.strip()
         if profile.avatar is not None:
             update_payload["avatar"] = profile.avatar.strip()
+        if profile.subscription_type is not None: 
+            update_payload["subscription_type"] = profile.subscription_type.strip()
+        if profile.payment_status is not None: 
+            update_payload["payment_status"] = profile.payment_status.strip()
 
         if not update_payload:
             return {

@@ -1,9 +1,9 @@
-import FadeIn from "./FadeIn";
-import GradientText from "./GradientText";
-import judahImage from "../assets/team/Judah.jpg";
-import judahCv from "../assets/team/Judah_Sleibi_CV.pdf";
-import salibaCv from "../assets/team/SalibaRishmawiCV.pdf";
-import salibaImage from "../assets/team/Saliba.jpeg";
+import FadeIn from "../Animations/FadeIn";
+import GradientText from "../Animations/GradientText";
+import judahImage from "../../assets/TeamInformation/Judah.jpg";
+import judahCv from "../../assets/TeamInformation/Judah_Sleibi_CV.pdf";
+import salibaCv from "../../assets/TeamInformation/SalibaRishmawiCV.pdf";
+import salibaImage from "../../assets/TeamInformation/Saliba.jpeg";
 
 const icons = {
   linkedin: (

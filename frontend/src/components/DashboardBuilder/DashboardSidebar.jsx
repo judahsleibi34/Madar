@@ -8,13 +8,13 @@ import {
   Languages,
   Database,
   ClipboardList,
+  CreditCard,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "/api";
-
 const resolveMediaUrl = (value) => {
   if (!value) return "";
+
   if (
     value.startsWith("http://") ||
     value.startsWith("https://") ||
@@ -23,7 +23,7 @@ const resolveMediaUrl = (value) => {
     return value;
   }
 
-  return `${API_URL}${value.startsWith("/") ? value : `/${value}`}`;
+  return value.startsWith("/") ? value : `/${value}`;
 };
 
 const sidebarText = {
@@ -39,6 +39,7 @@ const sidebarText = {
     logout: "Logout",
     fallbackName: "User",
     switchLang: "AR",
+    plan: "My Plan",
   },
   ar: {
     responses: "\u0627\u0644\u0631\u062f\u0648\u062f",
@@ -52,6 +53,7 @@ const sidebarText = {
     logout: "تسجيل الخروج",
     fallbackName: "مستخدم",
     switchLang: "EN",
+    plan: "خطتي",
   },
 };
 
@@ -143,6 +145,15 @@ export default function DashboardSidebar({
 
           <button
             type="button"
+            className={isActive("/my-plan") ? "active" : ""}
+            onClick={() => navigate("/my-plan")}
+          >
+            <CreditCard size={18} />
+            <span>{t.plan}</span>
+          </button>
+
+          <button
+            type="button"
             className={isActive("/settings") ? "active" : ""}
             onClick={() => navigate("/settings")}
           >
@@ -172,7 +183,13 @@ export default function DashboardSidebar({
         >
           <div className="admin-sidebar-avatar">
             {avatarUrl ? (
-              <img src={avatarUrl} alt={displayName} />
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                }}
+              />
             ) : (
               <span>{avatarLetter}</span>
             )}
@@ -196,3 +213,4 @@ export default function DashboardSidebar({
     </aside>
   );
 }
+

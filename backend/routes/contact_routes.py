@@ -11,7 +11,7 @@ def create_contact_message(contact: ContactMessage):
     try:
         service_supabase.table("contacts").insert({
             "name": contact.name,
-            "email": contact.email,
+            "phone": contact.phone,
             "message": contact.message,
         }).execute()
 

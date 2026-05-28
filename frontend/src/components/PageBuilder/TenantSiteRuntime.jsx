@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import ForgotPasswordPage from "../ForgotPasswordPage";
-import LoginPage from "../LoginPage";
-import SignUpPage from "../SignUpPage";
+import ForgotPasswordPage from "../AuthPages/ForgotPasswordPage";
+import LoginPage from "../AuthPages/LoginPage";
+import SignUpPage from "../AuthPages/SignUpPage";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "./PageBuilder.constants";
 import { getFormSections } from "./PageBuilder.factories";
 import "../../styles/admin/PageBuilder/PageBuilder.css";

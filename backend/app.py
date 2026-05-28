@@ -16,6 +16,7 @@ from routes.server_status_routes import router as server_status_router
 from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
 from services.auth_service import get_authenticated_user_row
+from routes.features_routes import router as features_router
 
 app = FastAPI()
 
@@ -58,6 +59,7 @@ app.include_router(website_router)
 app.include_router(password_router)
 app.include_router(server_status_router)
 app.include_router(contact_router)
+app.include_router(features_router)
 
 protected_data_dependencies = [Depends(require_authenticated_user)]
 
@@ -65,3 +67,4 @@ app.include_router(data_router, dependencies=protected_data_dependencies)
 app.include_router(cleaning_router, dependencies=protected_data_dependencies)
 app.include_router(analysis_router, dependencies=protected_data_dependencies)
 app.include_router(visualization_router, dependencies=protected_data_dependencies)
+

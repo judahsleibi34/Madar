@@ -8,7 +8,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import GradientText from "./GradientText";
+import GradientText from "../Animations/GradientText";
 
 const featureText = {
   en: {

@@ -1,6 +1,6 @@
-import FadeIn from "./FadeIn";
-import GradientText from "./GradientText";
-import SplitText from "./SplitText";
+import FadeIn from "../Animations/FadeIn";
+import GradientText from "../Animations/GradientText";
+import SplitText from "../Animations/SplitText";
 
 const content = {
   en: {
