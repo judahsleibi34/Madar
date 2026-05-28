@@ -1,0 +1,18 @@
+to install react run these 
+npm create vite@latest madar-app -- --template react
+npm install react-router-dom
+npm install framer-motion
+npm install lucide-react
+
+cd madar-app
+npm install
+npm run dev
+
+pip install fastapi uvicorn
+pip install supabase python-dotenv
+
+npm install -g supabase
+supabase link --project-ref oquixrqilhwvzcynvkpk
+supabase db push
+
+.\madar_back_end\madar_back\Scripts\Activate.ps1
