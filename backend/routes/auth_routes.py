@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 
 from database import service_supabase, supabase
 from classes import SignUpRequest, LogIn, UpdatePassword
