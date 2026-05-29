@@ -25,6 +25,7 @@ import Dashboard from "./components/DashboardBuilder/Dashboard";
 import DashboardSidebar from "./components/DashboardBuilder/DashboardSidebar";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import SettingsPage from "./components/DashboardBuilder/SettingsPage";
+import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage";
 import MyPlanPage from "./components/MainPages/MyPlanPage";
 
 import PageBuilder from "./components/PageBuilder";
@@ -68,12 +69,15 @@ export default function App() {
     return {
       id: userInfo?.id || "",
       auth_id: userInfo?.auth_id || "",
+      tenant_id: userInfo?.tenant_id || "",
       first_name: firstName,
       last_name: lastName,
       name: fullName,
       email: userInfo?.email || "",
       phone: userInfo?.phone || "",
       avatar: userInfo?.avatar || userInfo?.avatar_url || "",
+      subscription_type: userInfo?.subscription_type || "",
+      payment_status: userInfo?.payment_status || "",
       created_at: userInfo?.created_at || "",
       updated_at: userInfo?.updated_at || "",
     };
@@ -83,7 +87,12 @@ export default function App() {
     const response = await fetch(`${API_URL}/user/info`, {
       method: "POST",
       credentials: "include",
+      cache: "no-store",
     });
+
+    if (response.status === 401) {
+      return null;
+    }
 
     if (!response.ok) {
       const error = new Error("Could not fetch user info");
@@ -107,6 +116,7 @@ export default function App() {
         const statusResponse = await fetch(`${API_URL}/auth/user_status`, {
           method: "GET",
           credentials: "include",
+          cache: "no-store",
         });
 
         if (!statusResponse.ok) {
@@ -125,6 +135,12 @@ export default function App() {
 
         const userInfo = await fetchUserInfo();
 
+        if (!userInfo) {
+          setIsLoggedIn(false);
+          setUser(null);
+          return;
+        }
+
         setIsLoggedIn(true);
         setUser(userInfo);
       } catch (error) {
@@ -139,6 +155,84 @@ export default function App() {
     checkAuth();
   }, [fetchUserInfo]);
 
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    let cancelled = false;
+
+    const keepAlive = async (reason = "interval") => {
+      try {
+        console.log(`[KEEP ALIVE] ping started: ${reason}`);
+
+        const response = await fetch(`${API_URL}/auth/user_status`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        console.log("[KEEP ALIVE] status:", response.status);
+
+        if (!response.ok) {
+          if (!cancelled) {
+            setIsLoggedIn(false);
+            setUser(null);
+          }
+          return;
+        }
+
+        const data = await response.json();
+
+        console.log("[KEEP ALIVE] response:", data);
+
+        if (data.logged_in !== true) {
+          if (!cancelled) {
+            setIsLoggedIn(false);
+            setUser(null);
+          }
+          return;
+        }
+
+        if (data.user && !cancelled) {
+          setUser(normalizeUser(data.user));
+        }
+      } catch (error) {
+        console.error("[KEEP ALIVE] failed:", error);
+      }
+    };
+
+    keepAlive("mounted");
+
+    const intervalId = window.setInterval(() => {
+      keepAlive("interval");
+    }, 60 * 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        keepAlive("tab-visible");
+      }
+    };
+
+    const handleFocus = () => {
+      keepAlive("window-focus");
+    };
+
+    const handleOnline = () => {
+      keepAlive("network-online");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [isLoggedIn, normalizeUser]);
+
   const handleLanguageChange = (code) => {
     if (code !== "ar" && code !== "en") return;
     setLang(code);
@@ -150,6 +244,10 @@ export default function App() {
 
     try {
       const userInfo = await fetchUserInfo();
+
+      if (!userInfo) {
+        throw new Error("Login succeeded but user info was unauthorized");
+      }
 
       setIsLoggedIn(true);
       setUser(userInfo);
@@ -181,9 +279,12 @@ export default function App() {
     }
   };
 
-  const handleUserUpdated = useCallback((nextUser) => {
-    setUser(normalizeUser(nextUser));
-  }, [normalizeUser]);
+  const handleUserUpdated = useCallback(
+    (nextUser) => {
+      setUser(normalizeUser(nextUser));
+    },
+    [normalizeUser]
+  );
 
   const renderDashboardSkeleton = (label = "Loading dashboard") => (
     <div
@@ -233,26 +334,36 @@ export default function App() {
     </div>
   );
 
-  const renderDashboardShell = (children, isPageBuilderShell = false, options = {}) => {
+  const renderDashboardShell = (
+    children,
+    isPageBuilderShell = false,
+    options = {}
+  ) => {
     const shellLang = options.lang || lang;
 
     return (
-    <div
-      className="admin-dashboard-layout"
-      dir={shellLang === "ar" ? "rtl" : "ltr"}
-    >
-      <DashboardSidebar
-        lang={shellLang}
-        user={user}
-        onLogout={handleLogout}
-        onLanguageChange={options.hideLanguage ? undefined : handleLanguageChange}
-        hideLanguage={options.hideLanguage}
-      />
+      <div
+        className="admin-dashboard-layout"
+        dir={shellLang === "ar" ? "rtl" : "ltr"}
+      >
+        <DashboardSidebar
+          lang={shellLang}
+          user={user}
+          onLogout={handleLogout}
+          onLanguageChange={
+            options.hideLanguage ? undefined : handleLanguageChange
+          }
+          hideLanguage={options.hideLanguage}
+        />
 
-      <main className={`admin-dashboard-page${isPageBuilderShell ? " page-builder-dashboard-page" : ""}`}>
-        {children}
-      </main>
-    </div>
+        <main
+          className={`admin-dashboard-page${
+            isPageBuilderShell ? " page-builder-dashboard-page" : ""
+          }`}
+        >
+          {children}
+        </main>
+      </div>
     );
   };
 
@@ -355,17 +466,17 @@ export default function App() {
           />
 
           <Route
-              path="/my-plan"
-              element={
-                !authChecked ? (
-                  renderDashboardSkeleton("Loading my plan")
-                ) : isLoggedIn ? (
-                  renderDashboardShell(<MyPlanPage lang={lang} />)
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
+            path="/my-plan"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton("Loading my plan")
+              ) : isLoggedIn ? (
+                renderDashboardShell(<MyPlanPage lang={lang} />)
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
 
           <Route
             path="/settings"
@@ -380,6 +491,19 @@ export default function App() {
                     onUserUpdated={handleUserUpdated}
                   />
                 )
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/settings/change-password"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton("Loading password settings")
+              ) : isLoggedIn ? (
+                renderDashboardShell(<ChangePasswordPage lang={lang} />)
               ) : (
                 <Navigate to="/login" replace />
               )
@@ -418,7 +542,12 @@ export default function App() {
             path="/demo"
             element={
               <main className="app-main builder-demo-main" dir="ltr" lang="en">
-                <PageBuilder key="page-builder-demo" demoMode lang="en" templateLang={lang} />
+                <PageBuilder
+                  key="page-builder-demo"
+                  demoMode
+                  lang="en"
+                  templateLang={lang}
+                />
               </main>
             }
           />
@@ -504,7 +633,10 @@ export default function App() {
                   dir={lang === "ar" ? "rtl" : "ltr"}
                 >
                   <section className="already-signed-container">
-                    <div className="auth-skeleton-card" aria-label="Checking your session">
+                    <div
+                      className="auth-skeleton-card"
+                      aria-label="Checking your session"
+                    >
                       <div className="auth-skeleton-line auth-skeleton-title" />
                       <div className="auth-skeleton-line auth-skeleton-text" />
 
@@ -521,9 +653,11 @@ export default function App() {
                   dir={lang === "ar" ? "rtl" : "ltr"}
                 >
                   <section className="already-signed-container">
-                   <div className="already-signed-card">
+                    <div className="already-signed-card">
                       <h1>
-                        {lang === "ar" ? "أنت مسجل الدخول بالفعل" : "You are already signed in"}
+                        {lang === "ar"
+                          ? "أنت مسجل الدخول بالفعل"
+                          : "You are already signed in"}
                       </h1>
 
                       <p>
@@ -533,8 +667,13 @@ export default function App() {
                       </p>
 
                       <div className="already-signed-actions">
-                        <button type="button" onClick={() => navigate("/dashboard")}>
-                          {lang === "ar" ? "المتابعة إلى لوحة التحكم" : "Continue to dashboard"}
+                        <button
+                          type="button"
+                          onClick={() => navigate("/dashboard")}
+                        >
+                          {lang === "ar"
+                            ? "المتابعة إلى لوحة التحكم"
+                            : "Continue to dashboard"}
                         </button>
 
                         <button type="button" onClick={handleLogout}>

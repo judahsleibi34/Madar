@@ -10,10 +10,9 @@ const navItems = {
   ],
   ar: [
     { id: "home", label: "الرئيسية", path: "/" },
-    { id: "about", label: "من نحن", path: "/about" },
-    { id: "features", label: "المميزات", path: "/features" },
-    { id: "contact", label: "تواصل معنا", path: "/contact" },
+    { id: "features", label: "جولة المنتج", path: "/features" },
     { id: "pricing", label: "الخطط والأسعار", path: "/pricing" },
+    { id: "contact", label: "تواصل معنا", path: "/contact" },
   ],
 };
 
@@ -21,100 +20,116 @@ const footerText = {
   en: {
     brand: "Madar",
     description:
-      "An adaptive business management platform for creating and managing digital systems.",
-    linksTitle: "Links",
-    contactTitle: "Contact",
+      "An adaptive business management platform for creating, managing, and scaling digital systems.",
+    linksTitle: "Company",
+    contactTitle: "Get in touch",
+    emailLabel: "Email",
+    phoneLabel: "Phone",
+    followLabel: "Follow us",
     rights: "All rights reserved.",
   },
   ar: {
     brand: "مدار",
-    description: "منصة إدارة أعمال مرنة لإنشاء وإدارة الأنظمة الرقمية.",
-    linksTitle: "الروابط",
+    description: "منصة إدارة أعمال مرنة لإنشاء وإدارة وتوسيع الأنظمة الرقمية.",
+    linksTitle: "الشركة",
     contactTitle: "تواصل معنا",
+    emailLabel: "البريد الإلكتروني",
+    phoneLabel: "الهاتف",
+    followLabel: "تابعنا",
     rights: "جميع الحقوق محفوظة.",
   },
 };
 
 export default function Footer({ lang = "en" }) {
   const t = footerText[lang] || footerText.en;
-  const items = (navItems[lang] || navItems.en).filter(
-    (item) => item.id !== "about"
-  );
+  const items = navItems[lang] || navItems.en;
 
   return (
     <footer className="site-footer">
-      <div className="footer-content">
-        <div className="footer-brand">
-          <div className="footer-logo-row">
-            <img className="footer-logo" src={logo} alt="Madar logo" />
-            <h3>{t.brand}</h3>
-          </div>
+      <div className="footer-bg-orb footer-bg-orb-one" />
+      <div className="footer-bg-orb footer-bg-orb-two" />
 
-          <p>{t.description}</p>
-        </div>
+      <div className="footer-shell">
+        <div className="footer-main">
+          <section className="footer-brand" aria-label="Madar footer brand">
+            <NavLink to="/" className="footer-logo-link" aria-label="Madar Home">
+              <img className="footer-logo" src={logo} alt="Madar logo" />
+              <span>{t.brand}</span>
+            </NavLink>
 
-        <div className="footer-links">
-          <h4>{t.linksTitle}</h4>
+            <p>{t.description}</p>
+          </section>
 
-          <div className="footer-links-grid">
-            {items.map((item) => (
-              <NavLink
-                key={item.id}
-                to={item.path}
-                end={item.path === "/"}
-                className={({ isActive }) => (isActive ? "active" : "")}
+          <nav className="footer-links" aria-label="Footer navigation">
+            <h4>{t.linksTitle}</h4>
+
+            <div className="footer-links-grid">
+              {items.map((item) => (
+                <NavLink
+                  key={item.id}
+                  to={item.path}
+                  end={item.path === "/"}
+                  className={({ isActive }) =>
+                    isActive ? "footer-link active" : "footer-link"
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </nav>
+
+          <section className="footer-contact" aria-label="Footer contact">
+            <h4>{t.contactTitle}</h4>
+
+            <div className="footer-contact-list">
+              <a href="mailto:info@madar.com">
+                <span>{t.emailLabel}</span>
+                <strong>info@madar.com</strong>
+              </a>
+
+              <a href="tel:+972599203857" dir="ltr">
+                <span>{t.phoneLabel}</span>
+                <strong>+972 599 203 857</strong>
+              </a>
+            </div>
+
+            <div className="footer-social-row">
+              <span>{t.followLabel}</span>
+
+              <a
+                className="footer-social-link"
+                href="https://www.instagram.com/maadar_ps/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Madar Instagram"
+                title="Instagram"
               >
-                {item.id === "features"
-                  ? lang === "ar"
-                    ? "جولة المنتج"
-                    : "Product Tour"
-                  : item.label}
-              </NavLink>
-            ))}
-          </div>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                </svg>
+              </a>
+            </div>
+          </section>
         </div>
 
-        <div className="footer-contact">
-          <h4>{t.contactTitle}</h4>
-
-          <p>info@madar.com</p>
-
-          <p dir="ltr" className="phone-number">
-            +972599203857
+        <div className="footer-bottom">
+          <p>
+            © 2026 {t.brand}. {t.rights}
           </p>
-
-          <a
-            className="footer-social-link"
-            href="https://www.instagram.com/maadar_ps/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Madar Instagram"
-            title="Instagram"
-          >
-            <svg
-              className="footer-social-svg"
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-            </svg>
-          </a>
         </div>
-      </div>
-
-      <div className="footer-bottom">
-        <p>
-          © 2026 {t.brand}. {t.rights}
-        </p>
       </div>
     </footer>
   );

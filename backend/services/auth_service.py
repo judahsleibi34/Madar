@@ -1,11 +1,15 @@
 import os
-from fastapi import HTTPException, Response, Request
+
+from fastapi import HTTPException, Request, Response
+
 from database import service_supabase, supabase
 
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")
-ACCESS_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+
+# 15 minutes
+ACCESS_COOKIE_MAX_AGE = 60 * 15
+REFRESH_COOKIE_MAX_AGE = 60 * 15
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
@@ -16,6 +20,7 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
         max_age=ACCESS_COOKIE_MAX_AGE,
+        path="/",
     )
 
     response.set_cookie(
@@ -25,6 +30,7 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
         max_age=REFRESH_COOKIE_MAX_AGE,
+        path="/",
     )
 
 
@@ -34,6 +40,7 @@ def delete_auth_cookies(response: Response):
         httponly=True,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
+        path="/",
     )
 
     response.delete_cookie(
@@ -41,6 +48,7 @@ def delete_auth_cookies(response: Response):
         httponly=True,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
+        path="/",
     )
 
 
@@ -72,30 +80,43 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
     if not access_token and not refresh_token:
         raise HTTPException(status_code=401, detail="Not logged in")
 
+    auth_user = None
+    next_access_token = access_token
+    next_refresh_token = refresh_token
+
     try:
         if access_token and refresh_token:
-            auth_response = supabase.auth.set_session(access_token, refresh_token)
-            auth_user = auth_response.user
-
-            if response and auth_response.session:
-                set_auth_cookies(
-                    response,
-                    auth_response.session.access_token,
-                    auth_response.session.refresh_token,
+            try:
+                auth_response = supabase.auth.set_session(
+                    access_token,
+                    refresh_token,
                 )
+
+                auth_user = getattr(auth_response, "user", None)
+
+                if getattr(auth_response, "session", None):
+                    next_access_token = auth_response.session.access_token
+                    next_refresh_token = auth_response.session.refresh_token
+
+            except Exception as session_error:
+                print("AUTH SET SESSION ERROR:", repr(session_error))
+
+                auth_response = supabase.auth.refresh_session(refresh_token)
+                auth_user = getattr(auth_response, "user", None)
+
+                if getattr(auth_response, "session", None):
+                    next_access_token = auth_response.session.access_token
+                    next_refresh_token = auth_response.session.refresh_token
 
         elif refresh_token:
             auth_response = supabase.auth.refresh_session(refresh_token)
-            auth_user = auth_response.user
+            auth_user = getattr(auth_response, "user", None)
 
-            if response and auth_response.session:
-                set_auth_cookies(
-                    response,
-                    auth_response.session.access_token,
-                    auth_response.session.refresh_token,
-                )
+            if getattr(auth_response, "session", None):
+                next_access_token = auth_response.session.access_token
+                next_refresh_token = auth_response.session.refresh_token
 
-        else:
+        elif access_token:
             auth_response = supabase.auth.get_user(access_token)
             auth_user = getattr(auth_response, "user", None)
 
@@ -106,9 +127,20 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
     if not auth_user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
-    user_response = service_supabase.table("users").select("*").eq(
-        "auth_id", auth_user.id
-    ).single().execute()
+    if response and next_access_token and next_refresh_token:
+        set_auth_cookies(
+            response,
+            next_access_token,
+            next_refresh_token,
+        )
+
+    user_response = (
+        service_supabase.table("users")
+        .select("*")
+        .eq("auth_id", auth_user.id)
+        .single()
+        .execute()
+    )
 
     if not user_response.data:
         raise HTTPException(status_code=404, detail="User not found")
