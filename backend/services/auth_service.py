@@ -60,6 +60,7 @@ def build_user_payload(user_data):
     return {
         "id": user_data.get("id"),
         "auth_id": user_data.get("auth_id"),
+        "tenant_id": user_data.get("tenant_id"),
         "first_name": first_name,
         "last_name": last_name,
         "name": full_name,

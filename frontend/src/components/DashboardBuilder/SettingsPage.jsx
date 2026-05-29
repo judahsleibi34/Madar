@@ -10,6 +10,7 @@ import {
   getProjectSubdomain,
   sanitizeSubdomain,
 } from "../PageBuilder/PageBuilder.routing";
+import { resolveMediaUrl } from "../../utils/media";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -67,20 +68,6 @@ const buildProfilePayload = (form) => {
   if (email) payload.email = email;
 
   return payload;
-};
-
-const resolveMediaUrl = (value) => {
-  if (!value) return "";
-
-  if (
-    value.startsWith("http://") ||
-    value.startsWith("https://") ||
-    value.startsWith("data:")
-  ) {
-    return value;
-  }
-
-  return value.startsWith("/") ? value : `/${value}`;
 };
 
 const isDirectImageUrl = (url) => {

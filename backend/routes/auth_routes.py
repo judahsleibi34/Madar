@@ -80,6 +80,21 @@ def signup(user: SignUpRequest):
 
         signup_complete = True
 
+        if not user_insert.data:
+            raise HTTPException(status_code=400, detail="Could not create account")
+
+        local_user = user_insert.data[0]
+
+        service_supabase.table("tenant_memberships").insert({
+            "tenant_id": tenant_id,
+            "user_id": local_user["id"],
+            "auth_id": auth_user_id,
+            "role": "owner",
+            "status": "active",
+        }).execute()
+
+        signup_complete = True
+
         return {
             "message": "Signup request sent successfully",
             "user": {
@@ -98,6 +113,35 @@ def signup(user: SignUpRequest):
     except Exception as e:
         print("SIGNUP ERROR:", repr(e))
         raise HTTPException(status_code=400, detail="Could not create account")
+    finally:
+        if not signup_complete and auth_user_id:
+            try:
+                service_supabase.table("tenant_memberships").delete().eq(
+                    "auth_id", auth_user_id
+                ).execute()
+            except Exception as cleanup_error:
+                print("SIGNUP MEMBERSHIP CLEANUP ERROR:", repr(cleanup_error))
+
+            try:
+                service_supabase.table("users").delete().eq(
+                    "auth_id", auth_user_id
+                ).execute()
+            except Exception as cleanup_error:
+                print("SIGNUP USER CLEANUP ERROR:", repr(cleanup_error))
+
+        if not signup_complete and tenant_id is not None:
+            try:
+                service_supabase.table("tenants").delete().eq(
+                    "tenant_id", tenant_id
+                ).execute()
+            except Exception as cleanup_error:
+                print("SIGNUP TENANT CLEANUP ERROR:", repr(cleanup_error))
+
+        if not signup_complete and auth_user_id:
+            try:
+                service_supabase.auth.admin.delete_user(auth_user_id)
+            except Exception as cleanup_error:
+                print("SIGNUP AUTH CLEANUP ERROR:", repr(cleanup_error))
 
     finally:
         if not signup_complete and auth_user_id:
