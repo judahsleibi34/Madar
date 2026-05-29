@@ -13,44 +13,110 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/signup")
 def signup(user: SignUpRequest):
+    auth_user_id = None
+    tenant_id = None
+    signup_complete = False
+
     try:
         clean_email = user.email.strip().lower()
+        first_name = user.first_name.strip()
+        last_name = user.last_name.strip()
+        owner_name = f"{first_name} {last_name}".strip()
 
-        response = supabase.auth.sign_up({
+        auth_response = service_supabase.auth.admin.create_user({
             "email": clean_email,
             "password": user.password,
-            "options": {
-                "data": {
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                }
+            "email_confirm": True,
+            "user_metadata": {
+                "first_name": first_name,
+                "last_name": last_name,
             },
         })
 
-        if not response.user:
+        if not auth_response.user:
             raise HTTPException(status_code=400, detail="Could not create user")
 
-        user_insert = service_supabase.table("users").insert({
-            "auth_id": str(response.user.id),
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": clean_email,
+        auth_user_id = str(auth_response.user.id)
+
+        tenant_insert = service_supabase.table("tenants").insert({
+            "brand_name": "",
+            "owner_name": owner_name,
         }).execute()
+
+        if not tenant_insert.data:
+            raise HTTPException(status_code=400, detail="Could not create account")
+
+        tenant_id = tenant_insert.data[0]["tenant_id"]
+
+        user_insert = service_supabase.table("users").insert({
+            "auth_id": auth_user_id,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": clean_email,
+            "tenant_id": tenant_id,
+        }).execute()
+
+        if not user_insert.data:
+            raise HTTPException(status_code=400, detail="Could not create account")
+
+        local_user = user_insert.data[0]
+
+        service_supabase.table("tenant_memberships").insert({
+            "tenant_id": tenant_id,
+            "user_id": local_user["id"],
+            "auth_id": auth_user_id,
+            "role": "owner",
+            "status": "active",
+        }).execute()
+
+        signup_complete = True
 
         return {
             "message": "Signup request sent successfully",
             "user": {
-                "auth_id": response.user.id,
-                "local_id": user_insert.data[0]["id"] if user_insert.data else None,
+                "auth_id": auth_user_id,
+                "local_id": local_user["id"],
+                "tenant_id": tenant_id,
                 "email": clean_email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
+                "first_name": first_name,
+                "last_name": last_name,
             },
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("SIGNUP ERROR:", repr(e))
         raise HTTPException(status_code=400, detail="Could not create account")
+    finally:
+        if not signup_complete and auth_user_id:
+            try:
+                service_supabase.table("tenant_memberships").delete().eq(
+                    "auth_id", auth_user_id
+                ).execute()
+            except Exception as cleanup_error:
+                print("SIGNUP MEMBERSHIP CLEANUP ERROR:", repr(cleanup_error))
+
+            try:
+                service_supabase.table("users").delete().eq(
+                    "auth_id", auth_user_id
+                ).execute()
+            except Exception as cleanup_error:
+                print("SIGNUP USER CLEANUP ERROR:", repr(cleanup_error))
+
+        if not signup_complete and tenant_id is not None:
+            try:
+                service_supabase.table("tenants").delete().eq(
+                    "tenant_id", tenant_id
+                ).execute()
+            except Exception as cleanup_error:
+                print("SIGNUP TENANT CLEANUP ERROR:", repr(cleanup_error))
+
+        if not signup_complete and auth_user_id:
+            try:
+                service_supabase.auth.admin.delete_user(auth_user_id)
+            except Exception as cleanup_error:
+                print("SIGNUP AUTH CLEANUP ERROR:", repr(cleanup_error))
 
 
 @router.post("/login")

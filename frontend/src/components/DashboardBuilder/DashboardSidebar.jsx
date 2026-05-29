@@ -11,20 +11,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-const resolveMediaUrl = (value) => {
-  if (!value) return "";
-
-  if (
-    value.startsWith("http://") ||
-    value.startsWith("https://") ||
-    value.startsWith("data:")
-  ) {
-    return value;
-  }
-
-  return value.startsWith("/") ? value : `/${value}`;
-};
+import { resolveMediaUrl } from "../../utils/media";
 
 const sidebarText = {
   en: {
@@ -213,4 +200,3 @@ export default function DashboardSidebar({
     </aside>
   );
 }
-
