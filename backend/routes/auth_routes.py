@@ -24,51 +24,59 @@ def signup(user: SignUpRequest):
         last_name = user.last_name.strip()
         owner_name = f"{first_name} {last_name}".strip()
 
-        auth_response = service_supabase.auth.admin.create_user({
-            "email": clean_email,
-            "password": user.password,
-            "email_confirm": True,
-            "user_metadata": {
-                "first_name": first_name,
-                "last_name": last_name,
-            },
-        })
+        auth_response = service_supabase.auth.admin.create_user(
+            {
+                "email": clean_email,
+                "password": user.password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "first_name": first_name,
+                    "last_name": last_name,
+                },
+            }
+        )
 
         if not auth_response.user:
             raise HTTPException(status_code=400, detail="Could not create user")
 
         auth_user_id = str(auth_response.user.id)
 
-        tenant_insert = service_supabase.table("tenants").insert({
-            "brand_name": "",
-            "owner_name": owner_name,
-        }).execute()
+        tenant_insert = service_supabase.table("tenants").insert(
+            {
+                "brand_name": "",
+                "owner_name": owner_name,
+            }
+        ).execute()
 
         if not tenant_insert.data:
             raise HTTPException(status_code=400, detail="Could not create account")
 
         tenant_id = tenant_insert.data[0]["tenant_id"]
 
-        user_insert = service_supabase.table("users").insert({
-            "auth_id": auth_user_id,
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": clean_email,
-            "tenant_id": tenant_id,
-        }).execute()
+        user_insert = service_supabase.table("users").insert(
+            {
+                "auth_id": auth_user_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": clean_email,
+                "tenant_id": tenant_id,
+            }
+        ).execute()
 
         if not user_insert.data:
             raise HTTPException(status_code=400, detail="Could not create account")
 
         local_user = user_insert.data[0]
 
-        service_supabase.table("tenant_memberships").insert({
-            "tenant_id": tenant_id,
-            "user_id": local_user["id"],
-            "auth_id": auth_user_id,
-            "role": "owner",
-            "status": "active",
-        }).execute()
+        service_supabase.table("tenant_memberships").insert(
+            {
+                "tenant_id": tenant_id,
+                "user_id": local_user["id"],
+                "auth_id": auth_user_id,
+                "role": "owner",
+                "status": "active",
+            }
+        ).execute()
 
         signup_complete = True
 
@@ -127,17 +135,23 @@ def login(user: LogIn, response: Response):
     try:
         clean_email = user.email.strip().lower()
 
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": clean_email,
-            "password": user.password,
-        })
+        auth_response = supabase.auth.sign_in_with_password(
+            {
+                "email": clean_email,
+                "password": user.password,
+            }
+        )
 
         if not auth_response.user or not auth_response.session:
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        user_response = service_supabase.table("users").select("*").eq(
-            "auth_id", auth_response.user.id
-        ).single().execute()
+        user_response = (
+            service_supabase.table("users")
+            .select("*")
+            .eq("auth_id", auth_response.user.id)
+            .single()
+            .execute()
+        )
 
         if not user_response.data:
             raise HTTPException(status_code=404, detail="User not found")
@@ -220,10 +234,12 @@ def change_password(
             )
 
         try:
-            verify_response = supabase.auth.sign_in_with_password({
-                "email": clean_email,
-                "password": current_password,
-            })
+            verify_response = supabase.auth.sign_in_with_password(
+                {
+                    "email": clean_email,
+                    "password": current_password,
+                }
+            )
 
             if not verify_response.user:
                 raise HTTPException(
@@ -257,10 +273,12 @@ def change_password(
             )
 
         try:
-            new_session = supabase.auth.sign_in_with_password({
-                "email": clean_email,
-                "password": new_password,
-            })
+            new_session = supabase.auth.sign_in_with_password(
+                {
+                    "email": clean_email,
+                    "password": new_password,
+                }
+            )
 
             if new_session.session:
                 set_auth_cookies(
