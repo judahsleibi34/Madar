@@ -41,27 +41,35 @@ def signup(user: SignUpRequest):
 
         auth_user_id = str(auth_response.user.id)
 
-        tenant_insert = service_supabase.table("tenants").insert(
-            {
-                "brand_name": "",
-                "owner_name": owner_name,
-            }
-        ).execute()
+        tenant_insert = (
+            service_supabase.table("tenants")
+            .insert(
+                {
+                    "brand_name": "",
+                    "owner_name": owner_name,
+                }
+            )
+            .execute()
+        )
 
         if not tenant_insert.data:
             raise HTTPException(status_code=400, detail="Could not create account")
 
         tenant_id = tenant_insert.data[0]["tenant_id"]
 
-        user_insert = service_supabase.table("users").insert(
-            {
-                "auth_id": auth_user_id,
-                "first_name": first_name,
-                "last_name": last_name,
-                "email": clean_email,
-                "tenant_id": tenant_id,
-            }
-        ).execute()
+        user_insert = (
+            service_supabase.table("users")
+            .insert(
+                {
+                    "auth_id": auth_user_id,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "email": clean_email,
+                    "tenant_id": tenant_id,
+                }
+            )
+            .execute()
+        )
 
         if not user_insert.data:
             raise HTTPException(status_code=400, detail="Could not create account")
@@ -77,21 +85,6 @@ def signup(user: SignUpRequest):
                 "status": "active",
             }
         ).execute()
-
-        signup_complete = True
-
-        if not user_insert.data:
-            raise HTTPException(status_code=400, detail="Could not create account")
-
-        local_user = user_insert.data[0]
-
-        service_supabase.table("tenant_memberships").insert({
-            "tenant_id": tenant_id,
-            "user_id": local_user["id"],
-            "auth_id": auth_user_id,
-            "role": "owner",
-            "status": "active",
-        }).execute()
 
         signup_complete = True
 
@@ -113,35 +106,6 @@ def signup(user: SignUpRequest):
     except Exception as e:
         print("SIGNUP ERROR:", repr(e))
         raise HTTPException(status_code=400, detail="Could not create account")
-    finally:
-        if not signup_complete and auth_user_id:
-            try:
-                service_supabase.table("tenant_memberships").delete().eq(
-                    "auth_id", auth_user_id
-                ).execute()
-            except Exception as cleanup_error:
-                print("SIGNUP MEMBERSHIP CLEANUP ERROR:", repr(cleanup_error))
-
-            try:
-                service_supabase.table("users").delete().eq(
-                    "auth_id", auth_user_id
-                ).execute()
-            except Exception as cleanup_error:
-                print("SIGNUP USER CLEANUP ERROR:", repr(cleanup_error))
-
-        if not signup_complete and tenant_id is not None:
-            try:
-                service_supabase.table("tenants").delete().eq(
-                    "tenant_id", tenant_id
-                ).execute()
-            except Exception as cleanup_error:
-                print("SIGNUP TENANT CLEANUP ERROR:", repr(cleanup_error))
-
-        if not signup_complete and auth_user_id:
-            try:
-                service_supabase.auth.admin.delete_user(auth_user_id)
-            except Exception as cleanup_error:
-                print("SIGNUP AUTH CLEANUP ERROR:", repr(cleanup_error))
 
     finally:
         if not signup_complete and auth_user_id:
