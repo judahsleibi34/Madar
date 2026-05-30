@@ -435,3 +435,141 @@
     text-align: center;
   }
 }
+
+/* ============================================================
+   GLOBAL PUBLIC DARK THEME
+   Applies to home + public pages after logout too
+   ============================================================ */
+
+[data-theme="dark"] body,
+body.theme-dark {
+  background: #0f1726;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .app-shell,
+body.theme-dark .app-shell {
+  background: #0f1726;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .site-header,
+[data-theme="dark"] header,
+body.theme-dark .site-header,
+body.theme-dark header {
+  background: rgba(15, 23, 38, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .app-main,
+body.theme-dark .app-main {
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.18), transparent 34%),
+    radial-gradient(circle at top right, rgba(26, 39, 68, 0.36), transparent 36%),
+    linear-gradient(135deg, #0f1726 0%, #111827 48%, #15101a 100%);
+  color: #f8fafc;
+}
+
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+body.theme-dark h1,
+body.theme-dark h2,
+body.theme-dark h3,
+body.theme-dark h4 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] p,
+[data-theme="dark"] li,
+body.theme-dark p,
+body.theme-dark li {
+  color: rgba(248, 250, 252, 0.74);
+}
+
+[data-theme="dark"] a,
+body.theme-dark a {
+  color: inherit;
+}
+
+[data-theme="dark"] .site-header a,
+[data-theme="dark"] header a,
+body.theme-dark .site-header a,
+body.theme-dark header a {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .site-header a.active,
+[data-theme="dark"] header a.active,
+body.theme-dark .site-header a.active,
+body.theme-dark header a.active {
+  color: #d48a75;
+}
+
+[data-theme="dark"] button,
+body.theme-dark button {
+  color: inherit;
+}
+
+[data-theme="dark"] .footer,
+[data-theme="dark"] footer,
+body.theme-dark .footer,
+body.theme-dark footer {
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.22), transparent 32%),
+    linear-gradient(135deg, #090d16 0%, #111827 60%, #15101a 100%);
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .footer p,
+[data-theme="dark"] footer p,
+body.theme-dark .footer p,
+body.theme-dark footer p {
+  color: rgba(248, 250, 252, 0.72);
+}
+
+[data-theme="dark"] .footer a,
+[data-theme="dark"] footer a,
+body.theme-dark .footer a,
+body.theme-dark footer a {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .pricing-card,
+[data-theme="dark"] .team-card,
+[data-theme="dark"] .contact-card,
+[data-theme="dark"] .about-card,
+[data-theme="dark"] .demo-card,
+body.theme-dark .feature-card,
+body.theme-dark .pricing-card,
+body.theme-dark .team-card,
+body.theme-dark .contact-card,
+body.theme-dark .about-card,
+body.theme-dark .demo-card {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(139, 42, 26, 0.28)) border-box;
+  border: 1px solid transparent;
+  color: #f8fafc;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+body.theme-dark input,
+body.theme-dark textarea,
+body.theme-dark select {
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder,
+body.theme-dark input::placeholder,
+body.theme-dark textarea::placeholder {
+  color: rgba(248, 250, 252, 0.42);
+}

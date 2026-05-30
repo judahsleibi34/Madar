@@ -1,4 +1,14 @@
 /* ============================================================
+   GLOBAL DASHBOARD BOX SIZING
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================
    DASHBOARD LAYOUT
    ============================================================ */
 
@@ -6,14 +16,19 @@
   display: flex;
   flex-direction: row;
   width: 100%;
+  min-height: 100vh;
   background: #f5f2ee;
+  direction: ltr;
+  overflow-x: hidden;
 }
 
-.admin-dashboard-layout[dir="rtl"] {
-  direction: rtl;
-}
-
+.admin-dashboard-layout.is-ltr,
 .admin-dashboard-layout[dir="ltr"] {
+  direction: ltr;
+}
+
+.admin-dashboard-layout.is-rtl,
+.admin-dashboard-layout[dir="rtl"] {
   direction: ltr;
 }
 
@@ -21,46 +36,39 @@
    DASHBOARD MAIN PAGE
    ============================================================ */
 
-.admin-dashboard-layout {
-  min-height: 100vh;
-  background: #f5f2ee;
-}
-
 .admin-dashboard-page {
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
-    radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
-    #f5f2ee;
-}
-
-.admin-dashboard-page {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   width: auto;
+  min-height: 100vh;
+
   margin-left: 260px;
+  margin-right: 0;
+
   background:
     radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
     #f5f2ee;
+
   padding: 44px 5% 70px;
   color: #1a2744;
   overflow-x: hidden;
 }
 
+.admin-dashboard-layout.is-rtl .admin-dashboard-page,
 .admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
+  margin-left: 0;
+  margin-right: 260px;
   direction: rtl;
   text-align: right;
 }
 
+.admin-dashboard-layout.is-ltr .admin-dashboard-page,
 .admin-dashboard-layout[dir="ltr"] .admin-dashboard-page {
+  margin-left: 260px;
+  margin-right: 0;
   direction: ltr;
   text-align: left;
-}
-
-.admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
-  margin-left: 0;
-  margin-right: 260px;
 }
 
 .admin-dashboard-shell {
@@ -102,7 +110,8 @@
   position: fixed;
   top: 14px;
   left: 14px;
-  z-index: 120;
+  right: auto;
+  z-index: 130;
   width: 46px;
   height: 46px;
   border: 0;
@@ -117,6 +126,7 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
+.admin-dashboard-layout.is-rtl .dashboard-mobile-menu-button,
 .admin-dashboard-layout[dir="rtl"] .dashboard-mobile-menu-button {
   left: auto;
   right: 14px;
@@ -128,4 +138,345 @@
 
 .dashboard-sidebar-backdrop {
   display: none;
+}
+
+/* ============================================================
+   Dashboard shell when PageBuilder is open
+   Fixed: sidebar stays compact, PageBuilder gets full width
+   ============================================================ */
+
+.admin-dashboard-layout-builder {
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+  display: block !important;
+  overflow: hidden;
+  background: var(--madar-bg, #f5f2ee);
+}
+
+/* Compact the outer dashboard sidebar in builder mode */
+.admin-dashboard-layout-builder .admin-sidebar,
+.admin-dashboard-layout-builder .dashboard-sidebar {
+  position: fixed !important;
+  inset: 0 auto 0 0 !important;
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  flex: none !important;
+  z-index: 120 !important;
+  overflow: hidden !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+/* RTL safety */
+.admin-dashboard-layout-builder.is-rtl .admin-sidebar,
+.admin-dashboard-layout-builder[dir="rtl"] .admin-sidebar,
+.admin-dashboard-layout-builder.is-rtl .dashboard-sidebar,
+.admin-dashboard-layout-builder[dir="rtl"] .dashboard-sidebar {
+  inset: 0 0 0 auto !important;
+}
+
+/* The PageBuilder page starts after the compact dashboard sidebar */
+.admin-dashboard-layout-builder .admin-dashboard-page.page-builder-dashboard-page,
+.admin-dashboard-layout-builder.is-ltr .admin-dashboard-page.page-builder-dashboard-page,
+.admin-dashboard-layout-builder[dir="ltr"] .admin-dashboard-page.page-builder-dashboard-page {
+  margin-left: 76px !important;
+  margin-right: 0 !important;
+  width: calc(100vw - 76px) !important;
+  max-width: calc(100vw - 76px) !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+.admin-dashboard-layout-builder.is-rtl .admin-dashboard-page.page-builder-dashboard-page,
+.admin-dashboard-layout-builder[dir="rtl"] .admin-dashboard-page.page-builder-dashboard-page {
+  margin-left: 0 !important;
+  margin-right: 76px !important;
+  width: calc(100vw - 76px) !important;
+  max-width: calc(100vw - 76px) !important;
+}
+
+/* Hide text inside outer dashboard sidebar only in builder mode */
+.admin-dashboard-layout-builder .admin-sidebar span,
+.admin-dashboard-layout-builder .admin-sidebar strong,
+.admin-dashboard-layout-builder .admin-sidebar p,
+.admin-dashboard-layout-builder .admin-sidebar h1,
+.admin-dashboard-layout-builder .admin-sidebar h2,
+.admin-dashboard-layout-builder .admin-sidebar h3,
+.admin-dashboard-layout-builder .admin-sidebar small,
+.admin-dashboard-layout-builder .dashboard-sidebar span,
+.admin-dashboard-layout-builder .dashboard-sidebar strong,
+.admin-dashboard-layout-builder .dashboard-sidebar p,
+.admin-dashboard-layout-builder .dashboard-sidebar h1,
+.admin-dashboard-layout-builder .dashboard-sidebar h2,
+.admin-dashboard-layout-builder .dashboard-sidebar h3,
+.admin-dashboard-layout-builder .dashboard-sidebar small {
+  display: none !important;
+}
+
+.admin-dashboard-layout-builder .admin-sidebar button,
+.admin-dashboard-layout-builder .admin-sidebar a,
+.admin-dashboard-layout-builder .dashboard-sidebar button,
+.admin-dashboard-layout-builder .dashboard-sidebar a {
+  justify-content: center !important;
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.admin-dashboard-layout-builder .admin-sidebar svg,
+.admin-dashboard-layout-builder .dashboard-sidebar svg {
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+
+/* PageBuilder root fills the remaining screen */
+.admin-dashboard-layout-builder .page-builder {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.admin-dashboard-layout-builder .builder-desktop-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
+}
+
+/* Builder top area */
+.page-builder-dashboard-page .builder-topbar {
+  flex: 0 0 auto;
+  top: 0;
+}
+
+.page-builder-dashboard-page .builder-subbar,
+.page-builder-dashboard-page .preview-device-toolbar {
+  flex: 0 0 auto;
+  top: 68px;
+}
+
+/* Builder main grid */
+.admin-dashboard-layout-builder .builder-layout {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 260px minmax(0, 1fr) 320px !important;
+  overflow: hidden !important;
+}
+
+.admin-dashboard-layout-builder .builder-sidebar,
+.admin-dashboard-layout-builder .builder-inspector {
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+
+.admin-dashboard-layout-builder .builder-canvas-shell {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+/* Keep the canvas from pushing the whole layout wider */
+.admin-dashboard-layout-builder .builder-canvas {
+  max-width: 100%;
+}
+
+/* Responsive builder columns */
+@media (max-width: 1280px) {
+  .admin-dashboard-layout-builder .builder-layout {
+    grid-template-columns: 230px minmax(0, 1fr) 290px !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .admin-dashboard-layout-builder .builder-layout {
+    grid-template-columns: 220px minmax(0, 1fr) 260px !important;
+  }
+}
+
+/* Mobile safety */
+@media (max-width: 900px) {
+  .admin-dashboard-layout-builder {
+    display: block !important;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .admin-dashboard-layout-builder .admin-sidebar,
+  .admin-dashboard-layout-builder .dashboard-sidebar {
+    display: none !important;
+  }
+
+  .admin-dashboard-layout-builder .admin-dashboard-page.page-builder-dashboard-page,
+  .admin-dashboard-layout-builder.is-ltr .admin-dashboard-page.page-builder-dashboard-page,
+  .admin-dashboard-layout-builder[dir="ltr"] .admin-dashboard-page.page-builder-dashboard-page,
+  .admin-dashboard-layout-builder.is-rtl .admin-dashboard-page.page-builder-dashboard-page,
+  .admin-dashboard-layout-builder[dir="rtl"] .admin-dashboard-page.page-builder-dashboard-page {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+  }
+}
+
+.theme-dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+.theme-dark body,
+[data-theme="dark"] body {
+  background: #0f1726;
+}
+
+.theme-dark .admin-dashboard-layout,
+[data-theme="dark"] .admin-dashboard-layout {
+  background: #0f1726 !important;
+}
+
+.theme-dark .admin-dashboard-page,
+[data-theme="dark"] .admin-dashboard-page {
+  color: #f8fafc !important;
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.24), transparent 34%),
+    radial-gradient(circle at top right, rgba(26, 39, 68, 0.44), transparent 36%),
+    linear-gradient(135deg, #0f1726 0%, #111827 48%, #15101a 100%) !important;
+}
+
+.theme-dark .admin-dashboard-header h1,
+[data-theme="dark"] .admin-dashboard-header h1 {
+  color: #f8fafc !important;
+}
+
+.theme-dark .admin-dashboard-header p,
+[data-theme="dark"] .admin-dashboard-header p {
+  color: rgba(248, 250, 252, 0.72) !important;
+}
+
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(139, 42, 26, 0.28)) border-box !important;
+  border: 1px solid transparent !important;
+  color: #f8fafc !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28) !important;
+}
+
+.theme-dark .overview-card p,
+.theme-dark .dashboard-panel p,
+.theme-dark .dashboard-panel small,
+[data-theme="dark"] .overview-card p,
+[data-theme="dark"] .dashboard-panel p,
+[data-theme="dark"] .dashboard-panel small {
+  color: rgba(248, 250, 252, 0.68) !important;
+}
+
+.theme-dark .overview-card h2,
+.theme-dark .dashboard-panel h2,
+.theme-dark .dashboard-panel h3,
+.theme-dark .server-info-list strong,
+.theme-dark .metric-row-header strong,
+[data-theme="dark"] .overview-card h2,
+[data-theme="dark"] .dashboard-panel h2,
+[data-theme="dark"] .dashboard-panel h3,
+[data-theme="dark"] .server-info-list strong,
+[data-theme="dark"] .metric-row-header strong {
+  color: #ffffff !important;
+}
+
+.theme-dark .overview-sub,
+[data-theme="dark"] .overview-sub {
+  color: rgba(248, 250, 252, 0.76) !important;
+}
+
+.theme-dark .overview-icon,
+.theme-dark .panel-icon,
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon {
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 40px rgba(139, 42, 26, 0.24) !important;
+}
+
+.theme-dark .metric-track,
+[data-theme="dark"] .metric-track {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.theme-dark .metric-track > div,
+[data-theme="dark"] .metric-track > div {
+  background: linear-gradient(135deg, #8b2a1a 0%, #d48a75 100%) !important;
+}
+
+.theme-dark .cash-bar,
+[data-theme="dark"] .cash-bar {
+  background: linear-gradient(180deg, #d48a75 0%, #8b2a1a 100%) !important;
+  box-shadow: 0 18px 34px rgba(139, 42, 26, 0.22) !important;
+}
+
+.theme-dark .cash-bar span,
+[data-theme="dark"] .cash-bar span {
+  color: #ffffff !important;
+}
+
+.theme-dark .cash-bar-item small,
+[data-theme="dark"] .cash-bar-item small {
+  color: rgba(248, 250, 252, 0.68) !important;
+}
+
+.theme-dark .server-info-list div,
+[data-theme="dark"] .server-info-list div {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.theme-dark .server-info-list span,
+.theme-dark .metric-row-header span,
+[data-theme="dark"] .server-info-list span,
+[data-theme="dark"] .metric-row-header span {
+  color: rgba(248, 250, 252, 0.72) !important;
+}
+
+.theme-dark .uptime-circle,
+[data-theme="dark"] .uptime-circle {
+  background:
+    radial-gradient(circle, rgba(139, 42, 26, 0.2), transparent 58%),
+    rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(139, 42, 26, 0.32) !important;
+}
+
+.theme-dark .uptime-circle strong,
+[data-theme="dark"] .uptime-circle strong {
+  color: #ffffff !important;
+}
+
+.theme-dark .uptime-circle span,
+[data-theme="dark"] .uptime-circle span {
+  color: rgba(248, 250, 252, 0.68) !important;
 }

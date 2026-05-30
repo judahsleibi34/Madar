@@ -31,6 +31,8 @@ import MyPlanPage from "./components/MainPages/MyPlanPage";
 import PageBuilder from "./components/PageBuilder";
 import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
 
+import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
+
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const LANG_STORAGE_KEY = "madar-lang";
 
@@ -39,6 +41,8 @@ export default function App() {
     const savedLang = localStorage.getItem(LANG_STORAGE_KEY);
     return savedLang === "ar" || savedLang === "en" ? savedLang : "en";
   });
+
+  const [themeMode, setThemeMode] = useState(readStoredThemeMode);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -101,7 +105,7 @@ export default function App() {
     }
 
     const data = await response.json();
-    return normalizeUser(data.user);
+    return normalizeUser(data.user || data);
   }, [normalizeUser]);
 
   useEffect(() => {
@@ -109,6 +113,35 @@ export default function App() {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   }, [lang]);
+
+  useEffect(() => {
+    applyThemeMode(themeMode);
+  }, [themeMode]);
+
+  useEffect(() => {
+    const handleThemeEvent = (event) => {
+      const nextMode = event.detail?.mode === "dark" ? "dark" : "light";
+      setThemeMode(nextMode);
+    };
+
+    const handleStorage = (event) => {
+      if (event.key !== "madar-theme-mode") return;
+      setThemeMode(event.newValue === "dark" ? "dark" : "light");
+    };
+
+    window.addEventListener("madar-theme-change", handleThemeEvent);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("madar-theme-change", handleThemeEvent);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const handleThemeModeChange = useCallback((nextMode) => {
+    const safeMode = applyThemeMode(nextMode);
+    setThemeMode(safeMode);
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -160,17 +193,13 @@ export default function App() {
 
     let cancelled = false;
 
-    const keepAlive = async (reason = "interval") => {
+    const keepAlive = async () => {
       try {
-        console.log(`[KEEP ALIVE] ping started: ${reason}`);
-
         const response = await fetch(`${API_URL}/auth/user_status`, {
           method: "GET",
           credentials: "include",
           cache: "no-store",
         });
-
-        console.log("[KEEP ALIVE] status:", response.status);
 
         if (!response.ok) {
           if (!cancelled) {
@@ -181,8 +210,6 @@ export default function App() {
         }
 
         const data = await response.json();
-
-        console.log("[KEEP ALIVE] response:", data);
 
         if (data.logged_in !== true) {
           if (!cancelled) {
@@ -200,35 +227,27 @@ export default function App() {
       }
     };
 
-    keepAlive("mounted");
-
     const intervalId = window.setInterval(() => {
-      keepAlive("interval");
+      keepAlive();
     }, 60 * 1000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        keepAlive("tab-visible");
+        keepAlive();
       }
     };
 
-    const handleFocus = () => {
-      keepAlive("window-focus");
-    };
-
     const handleOnline = () => {
-      keepAlive("network-online");
+      keepAlive();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
     window.addEventListener("online", handleOnline);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
       window.removeEventListener("online", handleOnline);
     };
   }, [isLoggedIn, normalizeUser]);
@@ -274,6 +293,7 @@ export default function App() {
     } finally {
       setIsLoggedIn(false);
       setUser(null);
+      applyThemeMode(themeMode);
       navigate("/", { replace: true });
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }
@@ -343,10 +363,13 @@ export default function App() {
 
     return (
       <div
-        className="admin-dashboard-layout"
-        dir={shellLang === "ar" ? "rtl" : "ltr"}
+        className={`admin-dashboard-layout ${
+          shellLang === "ar" ? "is-rtl" : "is-ltr"
+        }`}
+        dir="ltr"
       >
         <DashboardSidebar
+          id="dashboard-sidebar"
           lang={shellLang}
           user={user}
           onLogout={handleLogout}
@@ -354,12 +377,15 @@ export default function App() {
             options.hideLanguage ? undefined : handleLanguageChange
           }
           hideLanguage={options.hideLanguage}
+          themeMode={themeMode}
+          onThemeModeChange={handleThemeModeChange}
         />
 
         <main
           className={`admin-dashboard-page${
             isPageBuilderShell ? " page-builder-dashboard-page" : ""
           }`}
+          dir={shellLang === "ar" ? "rtl" : "ltr"}
         >
           {children}
         </main>
@@ -397,6 +423,8 @@ export default function App() {
                   onLogout={handleLogout}
                   user={user}
                   onLanguageChange={handleLanguageChange}
+                  themeMode={themeMode}
+                  onThemeModeChange={handleThemeModeChange}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -411,7 +439,12 @@ export default function App() {
                 renderDashboardSkeleton("Loading page builder")
               ) : isLoggedIn ? (
                 renderDashboardShell(
-                  <PageBuilder key="page-builder-main" templateLang={lang} />,
+                  <PageBuilder
+                    key="page-builder-main"
+                    templateLang={lang}
+                    appThemeMode={themeMode}
+                    onAppThemeModeChange={handleThemeModeChange}
+                  />,
                   true,
                   { lang: "en", hideLanguage: true }
                 )
@@ -434,6 +467,9 @@ export default function App() {
                     visibleTabIds={["responses"]}
                     hideWorkspaceTabs={true}
                     lang={lang}
+                    templateLang={lang}
+                    appThemeMode={themeMode}
+                    onAppThemeModeChange={handleThemeModeChange}
                   />,
                   true
                 )
@@ -456,6 +492,9 @@ export default function App() {
                     visibleTabIds={["data"]}
                     hideWorkspaceTabs={true}
                     lang={lang}
+                    templateLang={lang}
+                    appThemeMode={themeMode}
+                    onAppThemeModeChange={handleThemeModeChange}
                   />,
                   true
                 )
@@ -526,6 +565,8 @@ export default function App() {
           onLanguageChange={handleLanguageChange}
           isLoggedIn={isLoggedIn}
           onLogout={handleLogout}
+          themeMode={themeMode}
+          onThemeModeChange={handleThemeModeChange}
         />
 
         <Routes>
@@ -547,6 +588,8 @@ export default function App() {
                   demoMode
                   lang="en"
                   templateLang={lang}
+                  appThemeMode={themeMode}
+                  onAppThemeModeChange={handleThemeModeChange}
                 />
               </main>
             }

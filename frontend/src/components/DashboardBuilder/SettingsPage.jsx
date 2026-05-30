@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ImagePlus, KeyRound, Save, Store, X } from "lucide-react";
+import { ImagePlus, KeyRound, Save, X } from "lucide-react";
 import SmartLink from "../SmartLink";
 import {
   STORAGE_KEY,
@@ -29,16 +29,12 @@ const readBuilderProject = () => {
 const readApiResponse = async (response) => {
   const text = await response.text();
 
-  if (!text) {
-    return {};
-  }
+  if (!text) return {};
 
   try {
     return JSON.parse(text);
   } catch {
-    return {
-      detail: text,
-    };
+    return { detail: text };
   }
 };
 
@@ -296,6 +292,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     ]
   );
 
+  const canShowLogoImage = isDirectImageUrl(siteForm.logoUrl);
+
   const showNotification = (type, message) => {
     setNotification({ type, message });
 
@@ -436,8 +434,12 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
           if (!cancelled && response.status === 401) {
             showNotification("error", t.sessionExpired);
           } else if (!cancelled) {
-            showNotification("error", getApiErrorMessage(data.detail, t.accountError));
+            showNotification(
+              "error",
+              getApiErrorMessage(data.detail, t.accountError)
+            );
           }
+
           return;
         }
 
@@ -602,9 +604,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
       const response = await fetch(`${API_URL}/website/settings`, {
         method: "PUT",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subdomain: sanitizeSubdomain(siteForm.subdomain),
           brand: siteForm.brand,
@@ -635,8 +635,6 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
       setIsSavingSite(false);
     }
   };
-
-  const canShowLogoImage = isDirectImageUrl(siteForm.logoUrl);
 
   return (
     <section className="settings-page" dir={isArabic ? "rtl" : "ltr"}>
@@ -785,23 +783,19 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         </form>
 
         <form
-          className="settings-card settings-card-horizontal"
+          className="settings-card settings-profile-card settings-website-card"
           onSubmit={saveSiteSettings}
           noValidate
         >
-          <div className="settings-card-heading">
-            <div className="settings-card-icon">
-              <Store size={20} />
-            </div>
-
+          <div className="settings-profile-cover">
             <div>
-              <h2>{t.websiteTitle}</h2>
-              <p>{t.websiteDescription}</p>
+              <span>{t.websiteTitle}</span>
+              <strong>{siteForm.brand || t.websiteLogoAlt}</strong>
             </div>
           </div>
 
-          <div className="settings-card-content">
-            <div className="settings-logo-preview">
+          <div className="settings-profile-summary">
+            <div className="settings-profile-avatar">
               {canShowLogoImage ? (
                 <img
                   src={resolveMediaUrl(siteForm.logoUrl)}
@@ -814,29 +808,36 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
                   }}
                 />
               ) : (
-                <div className="settings-logo-fallback">
+                <span>
                   {siteForm.brand ? (
                     siteForm.brand.slice(0, 1).toUpperCase()
                   ) : (
-                    <ImagePlus size={26} />
+                    <ImagePlus size={30} />
                   )}
-                </div>
+                </span>
               )}
-
-              <label className="settings-file-button">
-                {t.uploadLogo}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) =>
-                    readImageFile(event.target.files?.[0], (value) =>
-                      updateSiteField("logoUrl", value)
-                    )
-                  }
-                />
-              </label>
             </div>
 
+            <div>
+              <h2>{t.websiteTitle}</h2>
+              <p>{t.websiteDescription}</p>
+            </div>
+
+            <label className="settings-file-button settings-profile-upload">
+              {t.uploadLogo}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) =>
+                  readImageFile(event.target.files?.[0], (value) =>
+                    updateSiteField("logoUrl", value)
+                  )
+                }
+              />
+            </label>
+          </div>
+
+          <div className="settings-profile-body">
             <div className="settings-form-grid">
               <label>
                 {t.subdomainName}
@@ -936,7 +937,9 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             </div>
           </div>
 
-          <div className="settings-website-actions">
+          <div className="settings-profile-actions settings-website-profile-actions">
+            <div />
+
             <button
               className="settings-save-button"
               type="submit"

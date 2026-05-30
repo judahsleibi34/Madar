@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Link } from "react-router-dom";
+import { Moon, Sun } from "lucide-react";
 import logo from "../../assets/MadarTemplates/madar_header.svg";
 
 const navItems = {
@@ -31,6 +32,9 @@ const authLabels = {
     closeMenu: "Close menu",
     menu: "Menu",
     language: "Language",
+    switchLight: "Switch to light mode",
+    switchDark: "Switch to dark mode",
+    appearance: "Appearance",
   },
   ar: {
     login: "تسجيل الدخول",
@@ -41,6 +45,9 @@ const authLabels = {
     closeMenu: "إغلاق القائمة",
     menu: "القائمة",
     language: "اللغة",
+    switchLight: "التبديل إلى الوضع الفاتح",
+    switchDark: "التبديل إلى الوضع الداكن",
+    appearance: "المظهر",
   },
 };
 
@@ -54,12 +61,15 @@ export default function Header({
   onLanguageChange,
   isLoggedIn = false,
   onLogout,
+  themeMode = "light",
+  onThemeModeChange,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef(null);
 
   const isRTL = lang === "ar";
+  const isDark = themeMode === "dark";
   const items = navItems[lang] || navItems.en;
   const auth = authLabels[lang] || authLabels.en;
   const currentLang =
@@ -71,6 +81,12 @@ export default function Header({
 
   const closeMenu = () => {
     setMenuOpen(false);
+  };
+
+  const handleThemeClick = () => {
+    if (typeof onThemeModeChange === "function") {
+      onThemeModeChange(isDark ? "light" : "dark");
+    }
   };
 
   useEffect(() => {
@@ -163,6 +179,16 @@ export default function Header({
         </nav>
 
         <div className="header-right">
+          <button
+            type="button"
+            className={`header-theme-toggle ${isDark ? "is-dark" : "is-light"}`}
+            onClick={handleThemeClick}
+            aria-label={isDark ? auth.switchLight : auth.switchDark}
+            title={isDark ? auth.switchLight : auth.switchDark}
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
           {isLoggedIn ? (
             <button type="button" className="btn-signup" onClick={handleLogout}>
               {auth.logout}
@@ -287,6 +313,18 @@ export default function Header({
 
             <div className="mobile-menu-body">
               <div className="mobile-menu-title">{auth.menu}</div>
+
+              <button
+                type="button"
+                className={`mobile-theme-toggle ${isDark ? "is-dark" : "is-light"}`}
+                onClick={handleThemeClick}
+              >
+                <span>
+                  {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                  {auth.appearance}
+                </span>
+                <strong>{isDark ? "Dark" : "Light"}</strong>
+              </button>
 
               <nav className="mobile-menu-links" aria-label="Mobile menu links">
                 {finalNavItems.map((item) => (

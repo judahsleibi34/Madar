@@ -38,10 +38,6 @@
   line-height: 1.6;
 }
 
-/* ============================================================
-   FLOATING NOTIFICATION / TOAST
-   ============================================================ */
-
 .settings-toast {
   position: fixed;
   top: 24px;
@@ -145,31 +141,24 @@
   }
 }
 
-/* ============================================================
-   GRID / CARDS
-   ============================================================ */
-
 .settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 18px;
   align-items: start;
 }
 
 .settings-card {
   min-width: 0;
   border: 1px solid rgba(26, 39, 68, 0.12);
-  border-radius: 20px;
+  border-radius: 24px;
   background: #ffffff;
-  padding: 26px;
   box-shadow: 0 16px 38px rgba(26, 39, 68, 0.07);
-  display: grid;
-  gap: 20px;
 }
 
 .settings-profile-card {
-  padding: 0;
   overflow: hidden;
+  display: grid;
   gap: 0;
 }
 
@@ -274,161 +263,14 @@
 .settings-profile-body {
   padding: 24px 28px 28px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
-
-.settings-profile-url-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-  padding: 16px;
-  border: 1px solid rgba(26, 39, 68, 0.08);
-  border-radius: 18px;
-  background: #fbfaf8;
-}
-
-.settings-card-horizontal {
-  grid-template-columns: minmax(230px, 0.38fr) minmax(0, 1fr);
-  gap: 22px;
-  align-items: start;
-}
-
-.settings-card-horizontal .settings-card-heading,
-.settings-card-horizontal .settings-card-content,
-.settings-card-horizontal .settings-website-actions {
-  grid-column: 1 / -1;
-}
-
-.settings-card-content {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(230px, 0.42fr) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.settings-card-heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  max-width: 760px;
-}
-
-.settings-card-heading h2 {
-  margin: 0;
-  color: #1a2744;
-  font-size: 25px;
-  font-weight: 950;
-  letter-spacing: -0.03em;
-}
-
-.settings-card-heading p {
-  margin: 5px 0 0;
-  color: #6d7484;
-  line-height: 1.5;
-  font-weight: 750;
-}
-
-.settings-card-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  color: #ffffff;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
-  box-shadow: 0 10px 24px rgba(139, 42, 26, 0.18);
-  flex: 0 0 46px;
-}
-
-.settings-page[dir="rtl"] .settings-header,
-.settings-page[dir="rtl"] .settings-card {
-  text-align: right;
-}
-
-/* ============================================================
-   AVATAR / LOGO PREVIEWS
-   ============================================================ */
-
-.settings-avatar-row,
-.settings-logo-preview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-  padding: 16px;
-  border: 1px solid rgba(26, 39, 68, 0.08);
-  border-radius: 18px;
-  background: #fbfaf8;
-}
-
-.settings-logo-fallback {
-  width: 104px;
-  height: 104px;
-  border-radius: 20px;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  background: #f3f5f8;
-  display: grid;
-  place-items: center;
-  font-size: 38px;
-  font-weight: 950;
-  color: #1a2744;
-}
-
-.settings-logo-preview.logo-load-failed::after {
-  content: "Logo";
-  width: 104px;
-  height: 104px;
-  border-radius: 20px;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  background: #f3f5f8;
-  display: grid;
-  place-items: center;
-  justify-self: center;
-  color: #1a2744;
-  font-size: 15px;
-  font-weight: 950;
-}
-
-.settings-avatar-row img,
-.settings-avatar-row > div,
-.settings-logo-preview img,
-.settings-logo-preview > div {
-  justify-self: center;
-}
-
-.settings-avatar-row img,
-.settings-avatar-row > div,
-.settings-logo-preview img,
-.settings-logo-preview > div {
-  width: 104px;
-  height: 104px;
-  border-radius: 20px;
-  display: grid;
-  place-items: center;
-  object-fit: cover;
-  background: #f3f5f8;
-  color: #1a2744;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  font-size: 34px;
-  font-weight: 950;
-}
-
-/* ============================================================
-   FORM
-   ============================================================ */
 
 .settings-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-}
-
-.settings-form-grid.single {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .settings-card label {
@@ -500,10 +342,6 @@
   display: none;
 }
 
-/* ============================================================
-   BUTTONS / ACTIONS
-   ============================================================ */
-
 .settings-save-button {
   width: 280px;
   max-width: 100%;
@@ -523,10 +361,6 @@
     transform 0.2s ease,
     box-shadow 0.2s ease,
     opacity 0.2s ease;
-}
-
-.settings-page[dir="rtl"] .settings-save-button {
-  justify-self: end;
 }
 
 .settings-save-button:hover {
@@ -581,22 +415,16 @@
   box-shadow: 0 12px 24px rgba(139, 42, 26, 0.12);
 }
 
-.settings-reset-password-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-  transform: none;
-}
-
 .settings-profile-actions .settings-save-button {
   grid-column: 3;
   justify-self: end;
   width: 280px;
-  max-width: 100%;
   margin: 0;
 }
 
-.settings-profile-card .settings-profile-actions .settings-save-button {
-  margin: 0;
+.settings-page[dir="rtl"] .settings-header,
+.settings-page[dir="rtl"] .settings-card {
+  text-align: right;
 }
 
 .settings-page[dir="rtl"] .settings-profile-actions {
@@ -613,30 +441,65 @@
   justify-self: end;
 }
 
-.settings-website-actions {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 4px;
+.settings-website-card {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
 }
 
-.settings-website-actions .settings-save-button {
-  width: 280px;
-  max-width: 100%;
-  margin: 0;
+.settings-website-card .settings-profile-avatar {
+  background: #ffffff;
 }
 
-.settings-page[dir="rtl"] .settings-website-actions {
-  justify-content: flex-start;
+.settings-website-card .settings-profile-avatar span {
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  color: #ffffff;
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
+.settings-website-card .settings-profile-avatar svg {
+  width: 32px;
+  height: 32px;
+}
+
+.settings-website-profile-actions {
+  grid-template-columns: 1fr 280px;
+}
+
+.settings-website-profile-actions .settings-save-button {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.settings-page[dir="rtl"] .settings-website-profile-actions {
+  direction: rtl;
+  grid-template-columns: 1fr 280px;
+}
+
+.settings-page[dir="rtl"]
+  .settings-website-profile-actions
+  .settings-save-button {
+  grid-column: 2;
+  justify-self: end;
+}
 
 @media (max-width: 900px) {
-  .settings-card-content {
+  .settings-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-profile-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-profile-upload {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-top: 0;
+  }
+
+  .settings-page[dir="rtl"] .settings-profile-upload {
+    justify-self: end;
   }
 }
 
@@ -657,16 +520,44 @@
     width: auto;
   }
 
+  .settings-profile-cover {
+    min-height: 138px;
+    padding: 20px;
+  }
+
   .settings-profile-summary {
     margin: 0 18px;
+    padding-top: 20px;
     grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .settings-page[dir="rtl"] .settings-profile-summary {
+    justify-items: end;
+  }
+
+  .settings-profile-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 24px;
+    margin-top: -70px;
+  }
+
+  .settings-profile-avatar img,
+  .settings-profile-avatar span {
+    border-radius: 19px;
+  }
+
+  .settings-profile-summary h2 {
+    margin-top: 0;
   }
 
   .settings-profile-body {
-    padding: 24px 18px 28px;
+    padding: 22px 18px 24px;
   }
 
-  .settings-profile-actions {
+  .settings-profile-actions,
+  .settings-website-profile-actions {
     width: calc(100% - 36px);
     margin: 0 18px 24px;
     display: flex;
@@ -676,27 +567,11 @@
 
   .settings-profile-actions .settings-save-button,
   .settings-reset-password-button,
-  .settings-website-actions .settings-save-button {
+  .settings-website-profile-actions .settings-save-button {
     width: 100%;
-  }
-
-  .settings-website-actions {
-    justify-content: stretch;
-  }
-
-  .settings-form-grid {
-    grid-template-columns: 1fr;
   }
 
   .settings-profile-upload {
     min-width: 0;
-  }
-
-  .settings-card-content {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-card {
-    padding: 20px;
   }
 }
