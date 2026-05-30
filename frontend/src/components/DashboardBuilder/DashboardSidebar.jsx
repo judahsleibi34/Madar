@@ -1,47 +1,52 @@
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Home,
   LayoutDashboard,
-  PanelsTopLeft,
+  Grid2X2,
+  ClipboardList,
+  Database,
+  CreditCard,
   Settings,
   LogOut,
-  Grid2X2,
   Languages,
-  Database,
-  ClipboardList,
-  CreditCard,
 } from "lucide-react";
-import { useLocation } from "react-router-dom";
-import SmartLink from "../SmartLink";
-import { resolveMediaUrl } from "../../utils/media";
 
-const sidebarText = {
+import ThemeToggle from "../ThemeChanger/ThemeToggle";
+import {
+  applyThemeMode,
+  readStoredThemeMode,
+  normalizeThemeMode,
+} from "../../utils/themeMode";
+
+const labels = {
   en: {
-    title: "Dashboard",
-    subtitle: "Madar",
+    brand: "Madar",
+    subtitle: "Admin Panel",
     home: "Home",
     dashboard: "Dashboard",
     pageBuilder: "Page Builder",
-    responses: "Submissions",
-    data: "Data Logs",
+    submissions: "Submissions",
+    dataLogs: "Data Logs",
+    myPlan: "My Plan",
     settings: "Settings",
-    logout: "Logout",
-    fallbackName: "User",
-    switchLang: "AR",
-    plan: "My Plan",
+    language: "العربية",
+    logout: "Log out",
+    themeMode: "Theme",
   },
   ar: {
-    responses: "الردود",
-    data: "البيانات",
-    title: "لوحة التحكم",
-    subtitle: "مدار",
+    brand: "مدار",
+    subtitle: "لوحة التحكم",
     home: "الرئيسية",
     dashboard: "لوحة التحكم",
     pageBuilder: "منشئ الصفحات",
+    submissions: "النماذج",
+    dataLogs: "سجلات البيانات",
+    myPlan: "خطتي",
     settings: "الإعدادات",
+    language: "English",
     logout: "تسجيل الخروج",
-    fallbackName: "مستخدم",
-    switchLang: "EN",
-    plan: "خطتي",
+    themeMode: "الثيم",
   },
 };
 
@@ -53,138 +58,224 @@ export default function DashboardSidebar({
   onLanguageChange,
   onNavigate,
   hideLanguage = false,
+  compact = false,
+  themeMode,
+  onThemeModeChange,
 }) {
+  const navigate = useNavigate();
   const location = useLocation();
+  const t = labels[lang] || labels.en;
 
-  const t = sidebarText[lang] || sidebarText.en;
+  const [internalThemeMode, setInternalThemeMode] = useState(() => {
+    if (themeMode === "dark" || themeMode === "light") {
+      return themeMode;
+    }
 
-  const displayName = user?.name || t.fallbackName;
-  const displayEmail = user?.email || "";
-  const avatarUrl = resolveMediaUrl(user?.avatar || "");
-  const avatarLetter = displayName.trim().charAt(0).toUpperCase() || "U";
+    return readStoredThemeMode();
+  });
+
+  const activeThemeMode =
+    themeMode === "dark" || themeMode === "light"
+      ? normalizeThemeMode(themeMode)
+      : internalThemeMode;
+
+  useEffect(() => {
+    applyThemeMode(activeThemeMode);
+  }, [activeThemeMode]);
+
+  useEffect(() => {
+    const handleThemeStorage = (event) => {
+      if (event.key !== "madar-theme-mode") return;
+
+      const nextMode = event.newValue === "dark" ? "dark" : "light";
+      setInternalThemeMode(nextMode);
+      applyThemeMode(nextMode);
+    };
+
+    const handleThemeEvent = (event) => {
+      const nextMode = event.detail?.mode === "dark" ? "dark" : "light";
+      setInternalThemeMode(nextMode);
+    };
+
+    window.addEventListener("storage", handleThemeStorage);
+    window.addEventListener("madar-theme-change", handleThemeEvent);
+
+    return () => {
+      window.removeEventListener("storage", handleThemeStorage);
+      window.removeEventListener("madar-theme-change", handleThemeEvent);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (themeMode === "dark" || themeMode === "light") {
+      setInternalThemeMode(themeMode);
+      applyThemeMode(themeMode);
+    }
+  }, [themeMode]);
+
+  const handleThemeChange = (nextMode) => {
+    const safeMode = applyThemeMode(nextMode);
+
+    setInternalThemeMode(safeMode);
+
+    if (typeof onThemeModeChange === "function") {
+      onThemeModeChange(safeMode);
+    }
+  };
+
+  const goTo = (path) => {
+    navigate(path);
+
+    if (typeof onNavigate === "function") {
+      onNavigate();
+    }
+  };
 
   const isActive = (path) => {
-    if (path === "/") return location.pathname === "/";
-    return location.pathname.startsWith(path);
+    if (path === "/") {
+      return location.pathname === "/";
+    }
+
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  const handleLangToggle = () => {
-    onLanguageChange?.(lang === "en" ? "ar" : "en");
-  };
-
-  const navItems = [
+  const navItemsTop = [
     {
-      path: "/",
       label: t.home,
-      icon: <Home size={18} />,
+      path: "/",
+      icon: Home,
     },
     {
-      path: "/dashboard",
       label: t.dashboard,
-      icon: <LayoutDashboard size={18} />,
+      path: "/dashboard",
+      icon: LayoutDashboard,
     },
     {
-      path: "/page-builder",
       label: t.pageBuilder,
-      icon: <PanelsTopLeft size={18} />,
+      path: "/page-builder",
+      icon: Grid2X2,
     },
     {
+      label: t.submissions,
       path: "/builder-responses",
-      label: t.responses || "Responses",
-      icon: <ClipboardList size={18} />,
+      icon: ClipboardList,
     },
     {
+      label: t.dataLogs,
       path: "/builder-data",
-      label: t.data || "Data",
-      icon: <Database size={18} />,
+      icon: Database,
     },
     {
+      label: t.myPlan,
       path: "/my-plan",
-      label: t.plan,
-      icon: <CreditCard size={18} />,
-    },
-    {
-      path: "/settings",
-      label: t.settings,
-      icon: <Settings size={18} />,
+      icon: CreditCard,
     },
   ];
 
-  return (
-    <aside id={id} className="admin-sidebar">
-      <div className="admin-sidebar-top">
-        <div className="admin-sidebar-brand">
-          <div className="admin-sidebar-icon">
-            <Grid2X2 size={22} />
-          </div>
+  const displayName = user?.name || user?.email || "Madar User";
+  const displayEmail = user?.email || "";
+  const avatarLetter = displayName.trim().slice(0, 1).toUpperCase() || "M";
 
-          <div>
-            <strong>{t.title}</strong>
+  return (
+    <aside
+      id={id}
+      className={`admin-sidebar ${compact ? "is-compact" : ""}`}
+      aria-label="Dashboard sidebar"
+    >
+      <div className="admin-sidebar-top">
+        <button
+          type="button"
+          className="admin-sidebar-brand"
+          onClick={() => goTo("/dashboard")}
+          title={t.brand}
+        >
+          <span className="admin-sidebar-icon" aria-hidden="true">
+            M
+          </span>
+
+          <span className="admin-sidebar-brand-text">
+            <strong>{t.brand}</strong>
             <span>{t.subtitle}</span>
-          </div>
-        </div>
+          </span>
+        </button>
 
         <nav className="admin-sidebar-nav" aria-label="Dashboard navigation">
-          {navItems.map((item) => (
-            <SmartLink
-              key={item.path}
-              to={item.path}
-              className={isActive(item.path) ? "active" : ""}
-              onClick={onNavigate}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </SmartLink>
-          ))}
+          {navItemsTop.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <button
+                type="button"
+                key={item.path}
+                className={isActive(item.path) ? "active" : ""}
+                onClick={() => goTo(item.path)}
+                title={item.label}
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+
+          <ThemeToggle
+            mode={activeThemeMode}
+            onChange={handleThemeChange}
+            label={t.themeMode}
+            compact={compact}
+            className="admin-sidebar-theme-row"
+          />
+
+          <button
+            type="button"
+            className={isActive("/settings") ? "active" : ""}
+            onClick={() => goTo("/settings")}
+            title={t.settings}
+          >
+            <Settings size={18} />
+            <span>{t.settings}</span>
+          </button>
         </nav>
       </div>
 
       <div className="admin-sidebar-bottom">
-        {!hideLanguage && (
+        {!hideLanguage && typeof onLanguageChange === "function" && (
           <button
             type="button"
             className="admin-sidebar-lang"
-            onClick={handleLangToggle}
+            onClick={() => onLanguageChange(lang === "ar" ? "en" : "ar")}
+            title={t.language}
           >
             <Languages size={18} />
-            <span>{t.switchLang}</span>
+            <span>{t.language}</span>
           </button>
         )}
-
-        <SmartLink
-          to="/settings"
-          className={`admin-sidebar-user${isActive("/settings") ? " active" : ""}`}
-          aria-label={t.settings}
-          onClick={onNavigate}
-        >
-          <div className="admin-sidebar-avatar">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={displayName}
-                onError={(event) => {
-                  event.currentTarget.style.display = "none";
-                }}
-              />
-            ) : (
-              <span>{avatarLetter}</span>
-            )}
-          </div>
-
-          <div className="admin-sidebar-user-info">
-            <strong>{displayName}</strong>
-            {displayEmail && <span>{displayEmail}</span>}
-          </div>
-        </SmartLink>
 
         <button
           type="button"
           className="admin-sidebar-logout"
           onClick={onLogout}
+          title={t.logout}
         >
           <LogOut size={18} />
           <span>{t.logout}</span>
         </button>
+
+        <div className="admin-sidebar-user" title={displayName}>
+          {user?.avatar ? (
+            <img
+              className="admin-sidebar-avatar"
+              src={user.avatar}
+              alt={displayName}
+            />
+          ) : (
+            <span className="admin-sidebar-avatar">{avatarLetter}</span>
+          )}
+
+          <div className="admin-sidebar-user-info">
+            <strong>{displayName}</strong>
+            {displayEmail && <span>{displayEmail}</span>}
+          </div>
+        </div>
       </div>
     </aside>
   );

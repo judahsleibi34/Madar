@@ -1244,3 +1244,302 @@ summary {
   color: #ffffff !important;
   box-shadow: 0 14px 30px rgba(139, 42, 26, 0.22) !important;
 }
+
+/* ============================================================
+   Theme Mode Patch
+   Light / Dark support for builder shell
+   ============================================================ */
+
+.page-builder.theme-dark {
+  --madar-shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --madar-shadow-md: 0 18px 45px rgba(0, 0, 0, 0.3);
+  --madar-red-shadow: 0 12px 28px rgba(194, 65, 12, 0.22);
+
+  background: var(--madar-bg);
+  color: var(--madar-text);
+}
+
+.page-builder.theme-dark .builder-topbar,
+.page-builder.theme-dark .builder-subbar,
+.page-builder.theme-dark .preview-device-toolbar {
+  background: rgba(17, 24, 39, 0.96);
+  color: var(--madar-text);
+  border-color: var(--madar-border);
+}
+
+.page-builder.theme-dark .builder-sidebar,
+.page-builder.theme-dark .builder-inspector,
+.page-builder.theme-dark .workspace-header,
+.page-builder.theme-dark .object-list,
+.page-builder.theme-dark .form-editor,
+.page-builder.theme-dark .form-side-settings,
+.page-builder.theme-dark .responses-page-card,
+.page-builder.theme-dark .dashboard-panel,
+.page-builder.theme-dark .publish-card,
+.page-builder.theme-dark .automation-card,
+.page-builder.theme-dark .role-card,
+.page-builder.theme-dark .theme-control,
+.page-builder.theme-dark .builder-modal {
+  background: var(--madar-surface);
+  color: var(--madar-text);
+  border-color: var(--madar-border);
+}
+
+.page-builder.theme-dark .workspace-page {
+  background:
+    radial-gradient(circle at top left, rgba(194, 65, 12, 0.12), transparent 32%),
+    linear-gradient(180deg, #0f172a 0%, var(--madar-bg) 100%);
+}
+
+.page-builder.theme-dark .builder-layout {
+  background: var(--madar-bg);
+}
+
+.page-builder.theme-dark .panel-mode-select,
+.page-builder.theme-dark .row-editor-card,
+.page-builder.theme-dark .field-row,
+.page-builder.theme-dark .user-row,
+.page-builder.theme-dark .page-kind-summary,
+.page-builder.theme-dark .section-card,
+.page-builder.theme-dark .starter-card,
+.page-builder.theme-dark .page-create-card {
+  background: var(--madar-surface-soft) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+.page-builder.theme-dark input,
+.page-builder.theme-dark textarea,
+.page-builder.theme-dark select {
+  background: #0f172a;
+  color: var(--madar-text);
+  border-color: var(--madar-border-strong);
+}
+
+.page-builder.theme-dark input::placeholder,
+.page-builder.theme-dark textarea::placeholder {
+  color: rgba(248, 250, 252, 0.42);
+}
+
+.page-builder.theme-dark details {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: var(--madar-border);
+}
+
+.page-builder.theme-dark .workspace-tabs,
+.page-builder.theme-dark .viewport-switcher {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--madar-border);
+}
+
+.page-builder.theme-dark .workspace-tabs button,
+.page-builder.theme-dark .viewport-switcher button,
+.page-builder.theme-dark .builder-topbar-actions > button,
+.page-builder.theme-dark .compact-actions button,
+.page-builder.theme-dark .workspace-header button,
+.page-builder.theme-dark .question-type-buttons button,
+.page-builder.theme-dark .responses-page-header button,
+.page-builder.theme-dark .publish-actions button,
+.page-builder.theme-dark .editor-card-header button,
+.page-builder.theme-dark .builder-modal button {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--madar-text);
+}
+
+.page-builder.theme-dark .workspace-tabs button.active,
+.page-builder.theme-dark .viewport-switcher button.active {
+  background: var(--madar-gradient);
+  color: #ffffff;
+}
+
+.page-builder.theme-dark .add-group button,
+.page-builder.theme-dark .layer-tree button,
+.page-builder.theme-dark .object-list button {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--madar-text);
+}
+
+.page-builder.theme-dark .add-group button:hover,
+.page-builder.theme-dark .layer-tree button:hover,
+.page-builder.theme-dark .object-list button:hover,
+.page-builder.theme-dark .object-list button.active,
+.page-builder.theme-dark .layer-tree button.active {
+  background: var(--madar-gradient);
+  color: #ffffff;
+}
+
+.page-builder.theme-dark .builder-toast {
+  background: var(--madar-surface);
+  color: var(--madar-text);
+  border-color: var(--madar-border);
+}
+
+.page-builder.theme-dark .starter-card i {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--madar-text);
+  border-color: var(--madar-border);
+}
+
+/* ============================================================
+   PageBuilder topbar alignment + Sidebar Theme Switcher
+   Final patch
+   ============================================================ */
+
+/* Topbar keeps brand on the left, but keeps actions visually centered */
+.page-builder .builder-topbar {
+  position: sticky;
+  top: 0;
+  min-height: 68px;
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 18px;
+  padding: 0 22px;
+}
+
+.page-builder .builder-brand {
+  grid-column: 1;
+  min-width: 0;
+  justify-self: start;
+}
+
+.page-builder .builder-brand h1,
+.page-builder .builder-brand p {
+  margin-left: 0;
+  text-align: left;
+}
+
+.page-builder .builder-topbar-actions {
+  grid-column: 2;
+  justify-self: center;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  flex-wrap: nowrap !important;
+  min-width: max-content;
+}
+
+.page-builder .builder-topbar-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  white-space: nowrap;
+  border-radius: 12px;
+}
+
+/* Theme toggle should never appear in the builder header */
+.page-builder .builder-topbar-actions .theme-toggle {
+  display: none !important;
+}
+
+/* Make the internal builder sidebar visually clear */
+.page-builder .builder-sidebar {
+  background: var(--madar-surface, #ffffff);
+  border-right: 1px solid var(--madar-border, rgba(26, 39, 68, 0.12));
+}
+
+.page-builder .builder-sidebar .builder-side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Theme switcher inside builder sidebar */
+.page-builder .builder-sidebar-theme {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  margin: 0 0 16px;
+  border: 1px solid var(--madar-border, rgba(26, 39, 68, 0.12));
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.85),
+      rgba(255, 255, 255, 0.45)
+    ),
+    var(--madar-surface, #ffffff);
+  box-shadow: 0 12px 30px rgba(26, 39, 68, 0.06);
+}
+
+.page-builder .builder-sidebar-theme > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.page-builder .builder-sidebar-theme span {
+  color: var(--madar-muted, #6d7484);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-builder .builder-sidebar-theme strong {
+  color: var(--madar-text, #1a2744);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+/* Smaller theme toggle inside sidebar */
+.page-builder .builder-sidebar-theme .theme-toggle {
+  min-height: 34px;
+  padding: 5px 8px;
+  flex-shrink: 0;
+}
+
+.page-builder .builder-sidebar-theme .theme-toggle-label {
+  display: none;
+}
+
+.page-builder.theme-dark .builder-sidebar-theme {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.025)
+    ),
+    var(--madar-surface, #111827);
+  border-color: var(--madar-border, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
+}
+
+/* Dashboard shell safety */
+.page-builder-dashboard-page .builder-topbar {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Responsive: on smaller screens, actions move right to avoid covering title */
+@media (max-width: 1200px) {
+  .page-builder .builder-topbar {
+    grid-template-columns: minmax(180px, 1fr) auto;
+  }
+
+  .page-builder .builder-topbar-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 900px) {
+  .page-builder .builder-topbar {
+    display: flex !important;
+    justify-content: space-between;
+  }
+
+  .page-builder .builder-topbar-actions {
+    justify-content: flex-end;
+    overflow-x: auto;
+    min-width: 0;
+  }
+}
+

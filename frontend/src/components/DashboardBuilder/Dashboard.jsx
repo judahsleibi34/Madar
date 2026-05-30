@@ -105,7 +105,10 @@ function forceScrollTop() {
     window.history.scrollRestoration = "manual";
   }
 
-  window.scrollTo(0, 0);
+  window.scrollTo({
+    top: 0,
+    behavior: "instant",
+  });
 
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
@@ -113,19 +116,16 @@ function forceScrollTop() {
   const root = document.getElementById("root");
   if (root) {
     root.scrollTop = 0;
-    root.scrollLeft = 0;
   }
 
   const dashboardPage = document.querySelector(".admin-dashboard-page");
   if (dashboardPage) {
     dashboardPage.scrollTop = 0;
-    dashboardPage.scrollLeft = 0;
   }
 
   const dashboardLayout = document.querySelector(".admin-dashboard-layout");
   if (dashboardLayout) {
     dashboardLayout.scrollTop = 0;
-    dashboardLayout.scrollLeft = 0;
   }
 }
 
@@ -171,6 +171,8 @@ export default function Dashboard({
   onLogout,
   user,
   onLanguageChange,
+  themeMode = "light",
+  onThemeModeChange,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -216,8 +218,10 @@ export default function Dashboard({
 
   return (
     <div
-      className={`admin-dashboard-layout${sidebarOpen ? " sidebar-open" : ""}`}
-      dir={isRtl ? "rtl" : "ltr"}
+      className={`admin-dashboard-layout ${isRtl ? "is-rtl" : "is-ltr"}${
+        sidebarOpen ? " sidebar-open" : ""
+      }`}
+      dir="ltr"
     >
       <button
         type="button"
@@ -244,9 +248,11 @@ export default function Dashboard({
         onLogout={handleLogout}
         onLanguageChange={onLanguageChange}
         onNavigate={closeSidebar}
+        themeMode={themeMode}
+        onThemeModeChange={onThemeModeChange}
       />
 
-      <main className="admin-dashboard-page">
+      <main className="admin-dashboard-page" dir={isRtl ? "rtl" : "ltr"}>
         <div className="admin-dashboard-shell">
           <header className="admin-dashboard-header">
             <div>

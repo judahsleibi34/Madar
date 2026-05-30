@@ -25,23 +25,40 @@ export const viewports = {
 };
 
 export const builderTabs = [
-  { id: "design", label: "Pages", helper: "Design screens, sections, layout, and visual elements." },
-  { id: "forms", label: "Forms", helper: "Create forms and place them on pages." },
-  { id: "data", label: "Data", helper: "Manage collections and saved records." },
-  { id: "responses", label: "Responses", helper: "Review submitted form answers." },
-  { id: "workflows", label: "Workflows", helper: "Prototype what happens after a form is submitted." },
-  { id: "users", label: "Users", helper: "Manage mock team members, roles, and permissions." },
-  { id: "theme", label: "Theme", helper: "Control global colors, typography, spacing, and radius." },
-  { id: "publish", label: "Publish", helper: "Preview, save locally, export JSON, and publish mock status." },
+  {
+    id: "design",
+    label: "Pages",
+    helper: "Design screens, sections, layout, and visual elements.",
+  },
+  {
+    id: "forms",
+    label: "Forms",
+    helper: "Create forms and place them on pages.",
+  },
+  {
+    id: "users",
+    label: "Users",
+    helper: "Manage mock team members, roles, and permissions.",
+  },
+  {
+    id: "theme",
+    label: "Theme",
+    helper: "Control global colors, typography, spacing, and radius.",
+  },
+  {
+    id: "publish",
+    label: "Publish",
+    helper: "Preview, save locally, export JSON, and publish mock status.",
+  },
 ];
 
 export const designPanels = ["Pages", "Sections", "Layers", "Elements"];
 
 export const sectionWidths = [
-  { value: "small", label: "Small - 50% page width" },
-  { value: "medium", label: "Medium - 70% page width" },
-  { value: "large", label: "Large - 90% page width" },
-  { value: "full", label: "Full - 100% page width" },
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+  { value: "full", label: "Full" },
 ];
 
 export const spacingOptions = [
@@ -70,17 +87,10 @@ export const elementTypes = [
   { id: "button", label: "Button", group: "Content" },
   { id: "image", label: "Image", group: "Content" },
   { id: "card", label: "Card", group: "Content" },
-  { id: "carousel", label: "Lightswind Carousel", group: "Collection" },
-  { id: "carouselCards", label: "Card Carousel", group: "Collection" },
-  { id: "carouselSplit", label: "Split Carousel", group: "Collection" },
-  { id: "circularGallery", label: "Circular Gallery", group: "Collection" },
   { id: "list", label: "List", group: "Content" },
   { id: "divider", label: "Divider", group: "Content" },
   { id: "embed", label: "Embed", group: "Content" },
   { id: "metric", label: "Metric", group: "Dashboard" },
-  { id: "loginBlock", label: "Login", group: "Auth" },
-  { id: "registrationBlock", label: "Registration", group: "Auth" },
-  { id: "reservationBlock", label: "Reservation", group: "Connected" },
   { id: "formBlock", label: "Form Block", group: "Connected" },
   { id: "responsesTable", label: "Responses Table", group: "Connected" },
 ];
@@ -90,17 +100,13 @@ export const fieldTypes = [
   { id: "paragraph", label: "Paragraph", group: "Basic", input: "textarea" },
   { id: "email", label: "Email", group: "Contact", input: "email" },
   { id: "phone", label: "Phone number", group: "Contact", input: "tel" },
-  { id: "url", label: "Website URL", group: "Contact", input: "url" },
   { id: "number", label: "Number", group: "Business", input: "number" },
   { id: "money", label: "Money amount", group: "Business", input: "number" },
   { id: "date", label: "Date", group: "Business", input: "date" },
-  { id: "time", label: "Time", group: "Business", input: "time" },
   { id: "dropdown", label: "Dropdown", group: "Choice", input: "select" },
   { id: "radio", label: "Single choice", group: "Choice", input: "radio" },
   { id: "checkboxes", label: "Checkboxes", group: "Choice", input: "checkboxes" },
   { id: "yesNo", label: "Yes / No", group: "Choice", input: "yesNo" },
-  { id: "linearScale", label: "Linear scale", group: "Choice", input: "linearScale" },
-  { id: "rating", label: "Rating", group: "Choice", input: "rating" },
   { id: "status", label: "Status", group: "Workflow", input: "select" },
   { id: "file", label: "File upload", group: "Advanced", input: "file" },
 ];
@@ -155,6 +161,7 @@ export const defaultPermissions = {
 };
 
 export const defaultTheme = {
+  mode: "light",
   name: "Madar Light",
   background: "#f5f2ee",
   surface: "#ffffff",
@@ -169,17 +176,51 @@ export const defaultTheme = {
   fontFamily: "Inter",
 };
 
+export const themePresets = {
+  light: {
+    mode: "light",
+    name: "Madar Light",
+    background: "#f5f2ee",
+    surface: "#ffffff",
+    softSurface: "#fbfaf8",
+    text: "#1a2744",
+    muted: "#6d7484",
+    primary: "#1a2744",
+    accent: "#8b2a1a",
+    accentDark: "#6e2014",
+    border: "rgba(26, 39, 68, 0.12)",
+    radius: 18,
+    fontFamily: "Inter",
+  },
+
+  dark: {
+    mode: "dark",
+    name: "Madar Dark",
+    background: "#0f172a",
+    surface: "#111827",
+    softSurface: "#1f2937",
+    text: "#f8fafc",
+    muted: "#94a3b8",
+    primary: "#e5e7eb",
+    accent: "#c2410c",
+    accentDark: "#9a3412",
+    border: "rgba(255, 255, 255, 0.12)",
+    radius: 18,
+    fontFamily: "Inter",
+  },
+};
+
 export const defaultSiteChrome = {
   showHeader: true,
   showFooter: true,
   brand: "Madar",
   logoUrl: "",
   headerAlign: "center",
-  headerButtonLabel: "Login",
-  authPageSlug: "/login",
-  description: "An adaptive business management platform for creating and managing digital systems.",
+  headerButtonLabel: "Contact",
+  description:
+    "An adaptive business management platform for creating and managing digital systems.",
   contactEmail: "info@madar.com",
-  phone: "+972599203857",
+  phone: "+972 0599203857",
   footerStoreName: "Madar",
   rights: "All rights reserved.",
   footerShopTitle: "Pages",
@@ -193,14 +234,29 @@ export const defaultSiteChrome = {
 };
 
 export const starterSystems = [
-  { id: "showcase", title: "Builder Demo", category: "Demo", subtitle: "Full default template with pages, forms, data, media, auth, and workflows.", tags: ["All features", "Demo"] },
-  { id: "cms", title: "CMS Content Hub", category: "CMS", subtitle: "Editorial pages, intake forms, publishing workflow, content records, and team roles.", tags: ["Content", "Publishing", "Approvals"] },
-  { id: "ecommerce", title: "Ecommerce Storefront", category: "Commerce", subtitle: "Product showcase, order intake, customer records, fulfillment status, and booking-ready operations.", tags: ["Products", "Orders", "Customers"] },
-  { id: "hrFinance", title: "HR & Finance Portal", category: "Operations", subtitle: "Employee requests, budget approvals, reimbursements, payroll support, and role-based review.", tags: ["HR", "Finance", "Approvals"] },
-  { id: "meal", title: "MEAL Project Coordination", category: "Projects", subtitle: "Monitoring, evaluation, accountability, learning, field reports, indicators, and partner follow-up.", tags: ["MEAL", "Projects", "Reports"] },
-  { id: "website", title: "Website + Contact Form", subtitle: "Website, contact form, responses, and basic roles." },
-  { id: "requests", title: "Request / Approval Portal", subtitle: "HR, finance, procurement, and internal approvals." },
-  { id: "reports", title: "Monitoring / Reporting Hub", subtitle: "Activity reports, dashboards, and review workflows." },
-  { id: "orders", title: "Orders / Booking System", subtitle: "Customer orders, service bookings, and tracking." },
-  { id: "blank", title: "Blank Custom System", subtitle: "Start clean with one page, one form, and admin role." },
+  {
+    id: "website",
+    title: "Website + Contact Form",
+    subtitle: "Website, contact form, responses, and basic roles.",
+  },
+  {
+    id: "requests",
+    title: "Request / Approval Portal",
+    subtitle: "HR, finance, procurement, and internal approvals.",
+  },
+  {
+    id: "reports",
+    title: "Monitoring / Reporting Hub",
+    subtitle: "Activity reports, dashboards, and review workflows.",
+  },
+  {
+    id: "orders",
+    title: "Orders / Booking System",
+    subtitle: "Customer orders, service bookings, and tracking.",
+  },
+  {
+    id: "blank",
+    title: "Blank Custom System",
+    subtitle: "Start clean with one page, one form, and admin role.",
+  },
 ];

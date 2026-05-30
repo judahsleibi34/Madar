@@ -1,6 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import "../../styles/admin/PageBuilder/index.css";
-
 import {
   STORAGE_KEY,
   viewports,
@@ -51,6 +50,18 @@ import BuilderResponsesPage from "./BuilderResponsesPage";
 import BuilderAnalysisPage from "./BuilderAnalysisPage";
 import { getLocalTenantPath } from "./PageBuilder.routing";
 import PageBuilderCarousel from "./PageBuilderCarousel";
+import PageBuilderTopbar from "./PageBuilderTopbar";
+import PageBuilderSubbar from "./PageBuilderSubbar";
+import PageBuilderThemeTab from "./PageBuilderThemeTab";
+import PageBuilderPublishTab from "./PageBuilderPublishTab";
+import PageBuilderUsersTab from "./PageBuilderUsersTab";
+import PageBuilderWorkflowsTab from "./PageBuilderWorkflowsTab";
+
+import {
+  applyThemeModeToProject,
+  getPageBuilderThemeClassName,
+  getPageBuilderThemeVars,
+} from "./PageBuilder.theme";
 
 const splitLines = (value) =>
   String(value || "")
@@ -490,6 +501,8 @@ export default function PageBuilder({
   lang = "en",
   demoMode = false,
   templateLang = lang,
+  appThemeMode = "light",
+  onAppThemeModeChange,
 } = {}) {
   const [project, setProject] = useState(() =>
     demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
@@ -580,6 +593,21 @@ export default function PageBuilder({
   const updateProject = (updater) => {
     setProject((prev) => updater(prev));
   };
+
+  const setThemeMode = (mode) => {
+    updateProject((prev) => applyThemeModeToProject(prev, mode));
+
+    if (typeof onAppThemeModeChange === "function") {
+      onAppThemeModeChange(mode);
+    }
+  };
+
+  useEffect(() => {
+    if (!appThemeMode) return;
+    if (project.theme?.mode === appThemeMode) return;
+
+    setProject((prev) => applyThemeModeToProject(prev, appThemeMode));
+  }, [appThemeMode, project.theme?.mode]);
 
   const updateActivePage = (updater) => {
     updateProject((prev) => ({
@@ -3721,197 +3749,39 @@ export default function PageBuilder({
   };
 
   const renderWorkflowsTab = () => (
-    <div className="workspace-page">
-      <div className="workspace-header">
-        <div>
-          <h2>Workflows</h2>
-          <p>Front-end workflow prototypes. These describe what backend automation should do later.</p>
-        </div>
-        <button type="button" onClick={addWorkflow}>+ Workflow</button>
-      </div>
-
-      <div className="forms-layout">
-        <aside className="object-list">
-          {project.workflows.map((workflow) => (
-            <button key={workflow.id} type="button" className={activeWorkflow?.id === workflow.id ? "active" : ""} onClick={() => selectWorkflow(workflow.id)}>
-              <strong>{workflow.name}</strong>
-              <span>{workflow.enabled ? "Enabled" : "Disabled"} / {workflow.steps.length} steps</span>
-            </button>
-          ))}
-        </aside>
-
-        <section className="form-editor">
-          {activeWorkflow && (
-            <>
-              <div className="editor-card-header">
-                <h3>{activeWorkflow.name}</h3>
-                <button type="button" onClick={addWorkflowStep}>+ Step</button>
-              </div>
-
-              <label>Workflow name<input value={activeWorkflow.name} onChange={(event) => updateActiveWorkflow((workflow) => ({ ...workflow, name: event.target.value }))} /></label>
-              <label>Connected form<select value={activeWorkflow.formId || ""} onChange={(event) => updateActiveWorkflow((workflow) => ({ ...workflow, formId: event.target.value }))}>{project.forms.map((form) => <option key={form.id} value={form.id}>{form.title}</option>)}</select></label>
-              <label className="checkbox-control"><input type="checkbox" checked={activeWorkflow.enabled} onChange={(event) => updateActiveWorkflow((workflow) => ({ ...workflow, enabled: event.target.checked }))} /> Enabled</label>
-
-              <div className="automations-grid">
-                {activeWorkflow.steps.map((step, index) => (
-                  <div className="automation-card" key={step.id}>
-                    <div className="automation-card-header">
-                      <strong>Step {index + 1}</strong>
-                      <button type="button" className="danger-lite" onClick={() => deleteWorkflowStep(step.id)}>Delete</button>
-                    </div>
-                    <label>Type<select value={step.type} onChange={(event) => updateWorkflowStep(step.id, { type: event.target.value })}>{workflowStepTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}</select></label>
-                    <label>Label<input value={step.label} onChange={(event) => updateWorkflowStep(step.id, { label: event.target.value })} /></label>
-                    <label>Details<textarea value={step.details} onChange={(event) => updateWorkflowStep(step.id, { details: event.target.value })} /></label>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-    </div>
+    <PageBuilderWorkflowsTab
+      project={project}
+      activeWorkflow={activeWorkflow}
+      workflowStepTypes={workflowStepTypes}
+      selectWorkflow={selectWorkflow}
+      addWorkflow={addWorkflow}
+      addWorkflowStep={addWorkflowStep}
+      updateActiveWorkflow={updateActiveWorkflow}
+      updateWorkflowStep={updateWorkflowStep}
+      deleteWorkflowStep={deleteWorkflowStep}
+    />
   );
 
   const renderUsersTab = () => (
-  <div className="workspace-page">
-    <div className="workspace-header">
-      <div>
-        <h2>Users & Roles</h2>
-        <p>Front-end-only mock users and permissions. Backend auth comes later.</p>
-      </div>
-
-      <div className="header-actions">
-        <button type="button" onClick={addUser}>+ User</button>
-        <button type="button" onClick={addRole}>+ Role</button>
-      </div>
-    </div>
-
-    <div className="users-grid">
-      <section className="dashboard-panel">
-        <h3>Team Members</h3>
-
-        <div className="user-list">
-          {project.users.map((user) => {
-            const isMainAdmin = user.email === "admin@madar.local";
-
-            return (
-              <div className="user-row" key={user.id}>
-                <div className="user-row-main">
-                  <strong>{user.name}</strong>
-                  <span>{user.email}</span>
-                </div>
-
-                <select
-                  value={user.roleId}
-                  onChange={(event) => updateUser(user.id, { roleId: event.target.value })}
-                >
-                  {project.roles.map((role) => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={user.status}
-                  onChange={(event) => updateUser(user.id, { status: event.target.value })}
-                >
-                  <option>Active</option>
-                  <option>Invited</option>
-                  <option>Disabled</option>
-                </select>
-
-                <button
-                  type="button"
-                  className="danger-lite user-delete-button"
-                  disabled={isMainAdmin}
-                  title={isMainAdmin ? "Main admin cannot be deleted" : "Delete user"}
-                  onClick={() => deleteUser(user.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="dashboard-panel">
-        <h3>Roles</h3>
-
-        <div className="roles-list">
-          {project.roles.map((role) => (
-            <div
-              className={`role-card ${selectedRole?.id === role.id ? "active" : ""}`}
-              key={role.id}
-              onClick={() => setSelected({ type: "role", id: role.id })}
-            >
-              <input
-                value={role.name}
-                onChange={(event) => updateRole(role.id, { name: event.target.value })}
-              />
-
-              <textarea
-                value={role.description}
-                placeholder="Role description"
-                onChange={(event) => updateRole(role.id, { description: event.target.value })}
-              />
-
-              {permissionGroups.map((group) => (
-                <div className="permission-group" key={group.title}>
-                  <strong>{group.title}</strong>
-
-                  {group.permissions.map((permission) => (
-                    <label className="checkbox-control" key={permission.key}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(role.permissions[permission.key])}
-                        onChange={(event) =>
-                          updateRole(role.id, {
-                            permissions: { [permission.key]: event.target.checked },
-                          })
-                        }
-                      />
-                      {permission.label}
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  </div>
-);
+    <PageBuilderUsersTab
+      project={project}
+      selectedRole={selectedRole}
+      permissionGroups={permissionGroups}
+      addUser={addUser}
+      addRole={addRole}
+      updateUser={updateUser}
+      updateRole={updateRole}
+      deleteUser={deleteUser}
+      setSelected={setSelected}
+    />
+  );
 
   const renderThemeTab = () => (
-    <div className="workspace-page">
-      <div className="workspace-header">
-        <div>
-          <h2>Theme</h2>
-          <p>Global design system values applied to the builder and preview shell.</p>
-        </div>
-      </div>
-
-      <section className="theme-grid">
-        {[
-          ["background", "App background"],
-          ["surface", "Surface"],
-          ["softSurface", "Soft surface"],
-          ["text", "Text"],
-          ["muted", "Muted"],
-          ["primary", "Primary"],
-          ["accent", "Accent"],
-          ["accentDark", "Accent dark"],
-        ].map(([key, label]) => (
-          <label className="theme-control" key={key}>
-            {label}
-            <input type="color" value={project.theme[key]} onChange={(event) => updateProject((prev) => ({ ...prev, theme: { ...prev.theme, [key]: event.target.value } }))} />
-          </label>
-        ))}
-        <label className="theme-control">Radius<input type="number" value={project.theme.radius} onChange={(event) => updateProject((prev) => ({ ...prev, theme: { ...prev.theme, radius: Number(event.target.value) } }))} /></label>
-        <label className="theme-control">Font family<input value={project.theme.fontFamily} onChange={(event) => updateProject((prev) => ({ ...prev, theme: { ...prev.theme, fontFamily: event.target.value } }))} /></label>
-      </section>
-    </div>
+    <PageBuilderThemeTab
+      project={project}
+      updateProject={updateProject}
+      setThemeMode={setThemeMode}
+    />
   );
 
   const renderResponsesTab = () => (
@@ -3928,34 +3798,13 @@ export default function PageBuilder({
   );
 
   const renderPublishTab = () => (
-    <div className="workspace-page">
-      <div className="workspace-header">
-        <div>
-          <h2>Publish</h2>
-          <p>Local-only save, load, export, and mock publishing for now.</p>
-        </div>
-      </div>
-
-      <div className="publish-grid">
-        <section className="publish-card">
-          <h3>Status</h3>
-          <p>Project: <strong>{project.name}</strong></p>
-          <p>State: <strong>{project.status}</strong></p>
-          <p>Last saved: <strong>{project.publish.lastSavedAt || "Not saved yet"}</strong></p>
-          <p>Last published: <strong>{project.publish.lastPublishedAt || "Not published yet"}</strong></p>
-        </section>
-
-        <section className="publish-card">
-          <h3>Actions</h3>
-          <div className="publish-actions">
-            <button type="button" onClick={saveProject}>Save locally</button>
-            <button type="button" onClick={loadProject}>Load local save</button>
-            <button type="button" onClick={exportProject}>Copy JSON export</button>
-            <button type="button" className="primary-action go-live-action" onClick={publishProject}>Go Live</button>
-          </div>
-        </section>
-      </div>
-    </div>
+    <PageBuilderPublishTab
+      project={project}
+      saveProject={saveProject}
+      loadProject={loadProject}
+      exportProject={exportProject}
+      publishProject={publishProject}
+    />
   );
 
   const renderActiveTab = () => {
@@ -4011,96 +3860,38 @@ export default function PageBuilder({
 
   return (
     <div
-      className={`page-builder ${preview ? "preview-mode" : ""}`}
-      style={{
-        "--madar-bg": project.theme.background,
-        "--madar-surface": project.theme.surface,
-        "--madar-surface-soft": project.theme.softSurface,
-        "--madar-text": project.theme.text,
-        "--madar-muted": project.theme.muted,
-        "--madar-navy": project.theme.primary,
-        "--madar-red": project.theme.accent,
-        "--madar-red-dark": project.theme.accentDark,
-        "--madar-radius": `${project.theme.radius}px`,
-        fontFamily: project.theme.fontFamily,
-      }}
+      className={getPageBuilderThemeClassName({
+        mode: project.theme?.mode || "light",
+        preview,
+      })}
+      style={getPageBuilderThemeVars(project.theme)}
       onMouseMove={handleMouseMove}
       onMouseUp={() => setDragState(null)}
       onMouseLeave={() => setDragState(null)}
     >
       <div className="builder-desktop-shell">
-        <header className="builder-topbar">
-          <div className="builder-brand">
-            <h1>{project.name}</h1>
-            <p>{activeHelper}</p>
-          </div>
+        <PageBuilderTopbar
+          project={project}
+          activeHelper={activeHelper}
+          hideWorkspaceTabs={hideWorkspaceTabs}
+          preview={preview}
+          demoMode={demoMode}
+          activeTopbarAction={activeTopbarAction}
+          setActiveTopbarAction={setActiveTopbarAction}
+          setModal={setModal}
+          setPreview={setPreview}
+          saveProject={saveProject}
+          publishProject={publishProject}
+        />
 
-          {!hideWorkspaceTabs && (
-            <div className="builder-topbar-actions">
-              <button
-                type="button"
-                className={activeTopbarAction === "templates" ? "action-active" : ""}
-                onClick={() => {
-                  setActiveTopbarAction("templates");
-                  setModal("starter");
-                }}
-              >
-                Templates
-              </button>
-              <button
-                type="button"
-                className={activeTopbarAction === "preview" ? "action-active" : ""}
-                onClick={() => {
-                  setActiveTopbarAction("preview");
-                  setPreview((value) => !value);
-                }}
-              >
-                {preview ? "Exit Preview" : "Preview"}
-              </button>
-              {!demoMode && (
-                <>
-                  <button
-                    type="button"
-                    className={activeTopbarAction === "save" ? "action-active" : ""}
-                    onClick={saveProject}
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    className={`primary-action go-live-action ${activeTopbarAction === "publish" ? "action-active" : ""}`}
-                    onClick={publishProject}
-                  >
-                    Go Live
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </header>
-
-        {!preview && !hideWorkspaceTabs && (
-          <div className="builder-subbar">
-            {renderWorkspaceNavigator()}
-          </div>
-        )}
-
-        {preview && (
-          <div className="preview-device-toolbar">
-            <div className="viewport-switcher">
-              {Object.keys(viewports).map((item) => (
-                <button
-                  type="button"
-                  key={item}
-                  className={viewport === item ? "active" : ""}
-                  onClick={() => setViewport(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <PageBuilderSubbar
+          preview={preview}
+          hideWorkspaceTabs={hideWorkspaceTabs}
+          viewports={viewports}
+          viewport={viewport}
+          setViewport={setViewport}
+          renderWorkspaceNavigator={renderWorkspaceNavigator}
+        />
 
         {renderActiveTab()}
       </div>

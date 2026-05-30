@@ -26,17 +26,42 @@
    ============================================================ */
 
 @media (max-width: 700px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .admin-dashboard-layout,
+  .admin-dashboard-layout.is-rtl,
+  .admin-dashboard-layout.is-ltr,
   .admin-dashboard-layout[dir="rtl"],
   .admin-dashboard-layout[dir="ltr"],
   .dashboard-skeleton-layout {
+    display: block;
     flex-direction: column;
     width: 100%;
+    max-width: 100vw;
     min-height: 100vh;
+    overflow-x: hidden;
+    direction: ltr;
   }
 
   .dashboard-mobile-menu-button {
-    display: inline-flex;
+    display: inline-flex !important;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    right: auto;
+    z-index: 130;
+  }
+
+  .admin-dashboard-layout.is-rtl .dashboard-mobile-menu-button,
+  .admin-dashboard-layout[dir="rtl"] .dashboard-mobile-menu-button {
+    left: auto;
+    right: 14px;
   }
 
   .dashboard-sidebar-backdrop {
@@ -58,11 +83,12 @@
   }
 
   .admin-sidebar {
-    position: fixed;
+    position: fixed !important;
     top: 0;
     bottom: 0;
     left: 0;
-    z-index: 110;
+    right: auto;
+    z-index: 120;
 
     width: min(320px, calc(100vw - 44px));
     min-width: min(320px, calc(100vw - 44px));
@@ -78,7 +104,7 @@
     border-left: none;
     border-bottom: none;
 
-    transform: translateX(-105%);
+    transform: translateX(-100%);
     transition: transform 0.24s ease;
 
     overflow-y: auto;
@@ -89,15 +115,21 @@
     transform: translateX(0);
   }
 
+  .admin-dashboard-layout.is-rtl .admin-sidebar,
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar {
     left: auto;
     right: 0;
+    direction: rtl;
+    text-align: right;
+
     border-right: none;
     border-left: 1px solid rgba(26, 39, 68, 0.12);
     border-bottom: none;
-    transform: translateX(105%);
+
+    transform: translateX(100%);
   }
 
+  .admin-dashboard-layout.is-rtl.sidebar-open .admin-sidebar,
   .admin-dashboard-layout[dir="rtl"].sidebar-open .admin-sidebar {
     transform: translateX(0);
   }
@@ -125,10 +157,15 @@
     text-align: start;
   }
 
+  .admin-dashboard-layout.is-rtl .admin-sidebar-nav a,
+  .admin-dashboard-layout.is-rtl .admin-sidebar-nav button,
+  .admin-dashboard-layout.is-rtl .admin-sidebar-logout,
+  .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang,
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar-nav a,
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar-nav button,
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar-logout,
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang {
+    direction: rtl;
     justify-content: flex-start;
     text-align: right;
   }
@@ -141,16 +178,32 @@
   .dashboard-skeleton-page {
     flex: none;
     width: 100%;
+    max-width: 100vw;
     min-width: 0;
     min-height: 0;
-    margin-left: 0;
-    margin-right: 0;
-    padding: 82px 16px 56px;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 82px 14px 50px;
+    overflow-x: hidden;
   }
 
-  .admin-dashboard-shell {
+  .admin-dashboard-layout.is-rtl .admin-dashboard-page,
+  .admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
+    direction: rtl;
+    text-align: right;
+  }
+
+  .admin-dashboard-layout.is-ltr .admin-dashboard-page,
+  .admin-dashboard-layout[dir="ltr"] .admin-dashboard-page {
+    direction: ltr;
+    text-align: left;
+  }
+
+  .admin-dashboard-shell,
+  .settings-page {
     width: 100%;
-    max-width: none;
+    max-width: 100%;
+    margin-inline: auto;
   }
 
   .admin-dashboard-header {

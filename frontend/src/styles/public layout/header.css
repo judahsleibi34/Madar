@@ -919,3 +919,234 @@ html[data-darkreader-scheme] .hamburger span {
     font-size: 15px;
   }
 }
+
+/* ============================================================
+   HEADER THEME TOGGLE
+   ============================================================ */
+
+.header-theme-toggle {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border: 1.5px solid rgba(26, 39, 68, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #102345;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.header-theme-toggle:hover {
+  color: #8b2a1a;
+  background: rgba(139, 42, 26, 0.055);
+  border-color: rgba(139, 42, 26, 0.38);
+  transform: translateY(-1px);
+}
+
+.header-theme-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.12);
+}
+
+/* ============================================================
+   HEADER DARK MODE
+   ============================================================ */
+
+[data-theme="dark"] .site-header,
+body.theme-dark .site-header {
+  background: rgba(15, 23, 38, 0.96);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .brand-name,
+[data-theme="dark"] .nav-menu a,
+body.theme-dark .brand-name,
+body.theme-dark .nav-menu a {
+  color: rgba(248, 250, 252, 0.9);
+}
+
+[data-theme="dark"] .nav-menu a:hover,
+[data-theme="dark"] .nav-menu a.active,
+body.theme-dark .nav-menu a:hover,
+body.theme-dark .nav-menu a.active {
+  color: #d48a75;
+}
+
+[data-theme="dark"] .btn-login,
+[data-theme="dark"] .lang-toggle,
+[data-theme="dark"] .header-theme-toggle,
+body.theme-dark .btn-login,
+body.theme-dark .lang-toggle,
+body.theme-dark .header-theme-toggle {
+  background: rgba(255, 255, 255, 0.055);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+[data-theme="dark"] .btn-login:hover,
+[data-theme="dark"] .lang-toggle:hover,
+[data-theme="dark"] .header-theme-toggle:hover,
+body.theme-dark .btn-login:hover,
+body.theme-dark .lang-toggle:hover,
+body.theme-dark .header-theme-toggle:hover {
+  background: rgba(139, 42, 26, 0.18);
+  color: #ffffff;
+  border-color: rgba(212, 138, 117, 0.42);
+}
+
+[data-theme="dark"] .lang-dropdown,
+body.theme-dark .lang-dropdown {
+  background: #111827;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+}
+
+[data-theme="dark"] .lang-dropdown button,
+body.theme-dark .lang-dropdown button {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .lang-dropdown button:hover,
+[data-theme="dark"] .lang-dropdown button.active,
+body.theme-dark .lang-dropdown button:hover,
+body.theme-dark .lang-dropdown button.active {
+  background: rgba(139, 42, 26, 0.2);
+  color: #ffffff;
+}
+
+/* ============================================================
+   MOBILE THEME TOGGLE
+   ============================================================ */
+
+.mobile-theme-toggle {
+  width: 100%;
+  min-height: 52px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(26, 39, 68, 0.08);
+  border-radius: 16px;
+  background: rgba(26, 39, 68, 0.055);
+  color: #102345;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
+  cursor: pointer;
+}
+
+.mobile-theme-toggle span {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.mobile-theme-toggle strong {
+  font-size: 13px;
+  font-weight: 950;
+  color: #8b2a1a;
+}
+
+[data-theme="dark"] .mobile-menu,
+body.theme-dark .mobile-menu {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(139, 42, 26, 0.2), transparent 28%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(15, 23, 42, 0.99));
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .mobile-menu-head,
+body.theme-dark .mobile-menu-head {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .mobile-menu-brand span,
+[data-theme="dark"] .mobile-menu-title,
+[data-theme="dark"] .mobile-menu-lang-wrap > span,
+body.theme-dark .mobile-menu-brand span,
+body.theme-dark .mobile-menu-title,
+body.theme-dark .mobile-menu-lang-wrap > span {
+  color: rgba(248, 250, 252, 0.78);
+}
+
+[data-theme="dark"] .mobile-menu-links a,
+[data-theme="dark"] .mobile-theme-toggle,
+body.theme-dark .mobile-menu-links a,
+body.theme-dark .mobile-theme-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .mobile-theme-toggle strong,
+body.theme-dark .mobile-theme-toggle strong {
+  color: #d48a75;
+}
+
+/* ============================================================
+   AUTH PAGE DARK FIX
+   Stops white text on white login card
+   ============================================================ */
+
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .login-card,
+[data-theme="dark"] .signup-card,
+[data-theme="dark"] .forgot-card,
+[data-theme="dark"] .reset-card,
+body.theme-dark .auth-card,
+body.theme-dark .login-card,
+body.theme-dark .signup-card,
+body.theme-dark .forgot-card,
+body.theme-dark .reset-card {
+  background:
+    linear-gradient(#111827, #111827) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(139, 42, 26, 0.28)) border-box !important;
+  border: 1px solid transparent !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .auth-card h1,
+[data-theme="dark"] .auth-card h2,
+[data-theme="dark"] .login-card h1,
+[data-theme="dark"] .login-card h2,
+[data-theme="dark"] .signup-card h1,
+[data-theme="dark"] .signup-card h2,
+body.theme-dark .auth-card h1,
+body.theme-dark .auth-card h2,
+body.theme-dark .login-card h1,
+body.theme-dark .login-card h2,
+body.theme-dark .signup-card h1,
+body.theme-dark .signup-card h2 {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .auth-card p,
+[data-theme="dark"] .login-card p,
+[data-theme="dark"] .signup-card p,
+body.theme-dark .auth-card p,
+body.theme-dark .login-card p,
+body.theme-dark .signup-card p {
+  color: rgba(248, 250, 252, 0.7) !important;
+}
+
+[data-theme="dark"] .auth-card label,
+[data-theme="dark"] .login-card label,
+[data-theme="dark"] .signup-card label,
+body.theme-dark .auth-card label,
+body.theme-dark .login-card label,
+body.theme-dark .signup-card label {
+  color: #f8fafc !important;
+}
