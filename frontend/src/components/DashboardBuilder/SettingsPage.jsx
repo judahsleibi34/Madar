@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ImagePlus, KeyRound, Save, Store } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ImagePlus, KeyRound, Save, Store, X } from "lucide-react";
+import SmartLink from "../SmartLink";
 import {
   STORAGE_KEY,
   defaultSiteChrome,
@@ -25,6 +26,22 @@ const readBuilderProject = () => {
   }
 };
 
+const readApiResponse = async (response) => {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      detail: text,
+    };
+  }
+};
+
 const getInitialAccountForm = (user) => ({
   first_name: user?.first_name || "",
   last_name: user?.last_name || "",
@@ -41,16 +58,24 @@ const getAvatarLetter = (accountForm, fallback) => {
 };
 
 const getApiErrorMessage = (detail, fallback) => {
-  if (typeof detail === "string") return detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
 
   if (Array.isArray(detail)) {
-    return detail
+    const message = detail
       .map((error) => {
         const field = Array.isArray(error.loc) ? error.loc.at(-1) : "";
         return [field, error.msg].filter(Boolean).join(": ");
       })
       .filter(Boolean)
       .join(" ");
+
+    return message || fallback;
+  }
+
+  if (detail && typeof detail === "object") {
+    return detail.message || detail.error || fallback;
   }
 
   return fallback;
@@ -70,6 +95,10 @@ const buildProfilePayload = (form) => {
   return payload;
 };
 
+const isValidEmail = (value) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+};
+
 const isDirectImageUrl = (url) => {
   if (!url || typeof url !== "string") return false;
 
@@ -77,9 +106,34 @@ const isDirectImageUrl = (url) => {
 
   if (cleanUrl.startsWith("data:image/")) return true;
   if (cleanUrl.startsWith("/")) return true;
+  if (cleanUrl.startsWith("http://")) return true;
+  if (cleanUrl.startsWith("https://")) return true;
 
   return /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(cleanUrl);
 };
+
+function SettingsNotification({ notification, isArabic, label, onClose }) {
+  if (!notification) return null;
+
+  return createPortal(
+    <div
+      className={`settings-toast settings-toast-${notification.type} ${
+        isArabic ? "settings-toast-rtl" : ""
+      }`}
+      role="alert"
+      aria-live="polite"
+    >
+      <div className="settings-toast-content">
+        <span>{notification.message}</span>
+      </div>
+
+      <button type="button" aria-label={label} onClick={onClose}>
+        <X size={16} />
+      </button>
+    </div>,
+    document.body
+  );
+}
 
 const settingsCopy = {
   en: {
@@ -87,6 +141,7 @@ const settingsCopy = {
     title: "Profile and website settings",
     subtitle:
       "Keep your personal details, brand, and public website information up to date.",
+
     profileTitle: "Your profile",
     profileDescription:
       "This information helps personalize your workspace and customer-facing pages.",
@@ -98,6 +153,7 @@ const settingsCopy = {
     saveProfile: "Save profile",
     changePassword: "Change password",
     saving: "Saving...",
+
     websiteTitle: "Website details",
     websiteDescription:
       "Set the name, contact details, and logo visitors see on your website.",
@@ -111,6 +167,7 @@ const settingsCopy = {
     contactPhone: "Contact phone",
     websiteDescriptionLabel: "Website description",
     saveWebsite: "Save website details",
+
     accountSaved: "Account settings saved.",
     avatarUploaded: "Profile photo updated.",
     websiteSaved: "Website settings saved.",
@@ -121,13 +178,26 @@ const settingsCopy = {
     invalidLogoUrl:
       "Please use a direct image URL ending in .png, .jpg, .webp, .gif, or .svg.",
     sessionExpired: "Your session expired. Please log in again.",
+
     userAlt: "User",
     userFallback: "U",
+
+    firstNameRequired: "First name is required.",
+    lastNameRequired: "Last name is required.",
+    emailRequired: "Email is required.",
+    emailInvalid: "Please enter a valid email address.",
+    subdomainRequired: "Subdomain name is required.",
+    brandRequired: "Brand name is required.",
+    contactEmailInvalid: "Please enter a valid contact email.",
+    fixErrors: "Please fix the highlighted fields.",
+    closeNotification: "Close notification",
   },
+
   ar: {
     eyebrow: "إعدادات مساحة العمل",
     title: "إعدادات الملف الشخصي والموقع",
     subtitle: "حدّث بياناتك الشخصية وهوية العلامة ومعلومات الموقع العامة.",
+
     profileTitle: "ملفك الشخصي",
     profileDescription:
       "تساعد هذه المعلومات في تخصيص مساحة عملك وصفحاتك أمام العملاء.",
@@ -139,6 +209,7 @@ const settingsCopy = {
     saveProfile: "حفظ الملف الشخصي",
     changePassword: "تغيير كلمة المرور",
     saving: "جارٍ الحفظ...",
+
     websiteTitle: "تفاصيل الموقع",
     websiteDescription:
       "حدد الاسم وبيانات التواصل والشعار الذي يراه زوار موقعك.",
@@ -152,6 +223,7 @@ const settingsCopy = {
     contactPhone: "هاتف التواصل",
     websiteDescriptionLabel: "وصف الموقع",
     saveWebsite: "حفظ تفاصيل الموقع",
+
     accountSaved: "تم حفظ إعدادات الملف الشخصي.",
     avatarUploaded: "تم تحديث صورة الملف الشخصي.",
     websiteSaved: "تم حفظ تفاصيل الموقع.",
@@ -162,25 +234,41 @@ const settingsCopy = {
     invalidLogoUrl:
       "يرجى استخدام رابط صورة مباشر ينتهي بـ .png أو .jpg أو .webp أو .gif أو .svg.",
     sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
+
     userAlt: "المستخدم",
     userFallback: "م",
+
+    firstNameRequired: "الاسم الأول مطلوب.",
+    lastNameRequired: "اسم العائلة مطلوب.",
+    emailRequired: "البريد الإلكتروني مطلوب.",
+    emailInvalid: "يرجى إدخال بريد إلكتروني صحيح.",
+    subdomainRequired: "اسم النطاق الفرعي مطلوب.",
+    brandRequired: "اسم العلامة مطلوب.",
+    contactEmailInvalid: "يرجى إدخال بريد تواصل صحيح.",
+    fixErrors: "يرجى تصحيح الحقول المحددة.",
+    closeNotification: "إغلاق الإشعار",
   },
 };
 
 export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
-  const navigate = useNavigate();
-
   const [accountForm, setAccountForm] = useState(() =>
     getInitialAccountForm(user)
   );
+
   const [project, setProject] = useState(readBuilderProject);
-  const [status, setStatus] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [notification, setNotification] = useState(null);
+
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   const isArabic = lang === "ar";
   const t = settingsCopy[isArabic ? "ar" : "en"];
+
+  const avatarUrl = resolveMediaUrl(accountForm.avatar);
+  const shouldShowAvatarImage = Boolean(avatarUrl) && !avatarLoadFailed;
 
   const siteChrome = {
     ...defaultSiteChrome,
@@ -208,51 +296,28 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     ]
   );
 
-  const updateAccountField = (field, value) => {
-    setAccountForm((prev) => ({ ...prev, [field]: value }));
-    setStatus("");
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+
+    window.clearTimeout(window.__settingsNotificationTimer);
+    window.__settingsNotificationTimer = window.setTimeout(() => {
+      setNotification(null);
+    }, 3500);
   };
 
-  useEffect(() => {
-    setAccountForm(getInitialAccountForm(user));
-  }, [user]);
+  const clearNotification = () => {
+    setNotification(null);
+    window.clearTimeout(window.__settingsNotificationTimer);
+  };
 
-  useEffect(() => {
-    let cancelled = false;
+  const updateAccountField = (field, value) => {
+    setAccountForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: "" }));
 
-    const loadAccount = async () => {
-      try {
-        const response = await fetch(`${API_URL}/user/info`, {
-          method: "POST",
-          credentials: "include",
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          if (!cancelled && response.status === 401) {
-            setStatus(t.sessionExpired);
-          }
-          return;
-        }
-
-        if (!cancelled && data.user) {
-          setAccountForm(getInitialAccountForm(data.user));
-          onUserUpdated?.(data.user);
-        }
-      } catch {
-        if (!cancelled) {
-          setStatus(t.accountError);
-        }
-      }
-    };
-
-    loadAccount();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [onUserUpdated, t.accountError, t.sessionExpired]);
+    if (field === "avatar") {
+      setAvatarLoadFailed(false);
+    }
+  };
 
   const updateSiteField = (field, value) => {
     setProject((prev) => {
@@ -280,8 +345,120 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
       };
     });
 
-    setStatus("");
+    setFieldErrors((prev) => ({ ...prev, [field]: "" }));
   };
+
+  const validateAccountForm = () => {
+    const errors = {};
+
+    if (!accountForm.first_name.trim()) {
+      errors.first_name = t.firstNameRequired;
+    }
+
+    if (!accountForm.last_name.trim()) {
+      errors.last_name = t.lastNameRequired;
+    }
+
+    if (!accountForm.email.trim()) {
+      errors.email = t.emailRequired;
+    } else if (!isValidEmail(accountForm.email)) {
+      errors.email = t.emailInvalid;
+    }
+
+    setFieldErrors((prev) => ({
+      ...prev,
+      first_name: errors.first_name || "",
+      last_name: errors.last_name || "",
+      email: errors.email || "",
+    }));
+
+    return errors;
+  };
+
+  const validateWebsiteForm = () => {
+    const errors = {};
+
+    if (!siteForm.subdomain.trim()) {
+      errors.subdomain = t.subdomainRequired;
+    }
+
+    if (!siteForm.brand.trim()) {
+      errors.brand = t.brandRequired;
+    }
+
+    if (siteForm.contactEmail.trim() && !isValidEmail(siteForm.contactEmail)) {
+      errors.contactEmail = t.contactEmailInvalid;
+    }
+
+    if (siteForm.logoUrl.trim() && !isDirectImageUrl(siteForm.logoUrl)) {
+      errors.logoUrl = t.invalidLogoUrl;
+    }
+
+    setFieldErrors((prev) => ({
+      ...prev,
+      subdomain: errors.subdomain || "",
+      brand: errors.brand || "",
+      contactEmail: errors.contactEmail || "",
+      logoUrl: errors.logoUrl || "",
+    }));
+
+    return errors;
+  };
+
+  useEffect(() => {
+    setAccountForm(getInitialAccountForm(user));
+    setAvatarLoadFailed(false);
+  }, [user]);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [accountForm.avatar]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(window.__settingsNotificationTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAccount = async () => {
+      try {
+        const response = await fetch(`${API_URL}/user/info`, {
+          method: "POST",
+          credentials: "include",
+        });
+
+        const data = await readApiResponse(response);
+
+        if (!response.ok) {
+          if (!cancelled && response.status === 401) {
+            showNotification("error", t.sessionExpired);
+          } else if (!cancelled) {
+            showNotification("error", getApiErrorMessage(data.detail, t.accountError));
+          }
+          return;
+        }
+
+        if (!cancelled && data.user) {
+          setAccountForm(getInitialAccountForm(data.user));
+          setAvatarLoadFailed(false);
+          onUserUpdated?.(data.user);
+        }
+      } catch {
+        if (!cancelled) {
+          showNotification("error", t.accountError);
+        }
+      }
+    };
+
+    loadAccount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onUserUpdated, t.accountError, t.sessionExpired]);
 
   const readImageFile = (file, callback) => {
     if (!file) return;
@@ -298,12 +475,12 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     if (!file) return;
 
     if (!AVATAR_MIME_TYPES.has(file.type)) {
-      setStatus(t.invalidAvatarType);
+      showNotification("error", t.invalidAvatarType);
       return;
     }
 
     if (file.size > AVATAR_MAX_BYTES) {
-      setStatus(t.avatarTooLarge);
+      showNotification("error", t.avatarTooLarge);
       return;
     }
 
@@ -311,7 +488,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     formData.append("file", file);
 
     setIsUploadingAvatar(true);
-    setStatus("");
+    setAvatarLoadFailed(false);
 
     try {
       const response = await fetch(`${API_URL}/user/avatar`, {
@@ -320,7 +497,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         body: formData,
       });
 
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -334,13 +511,14 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
       const nextAvatar = nextUser.avatar || data.avatar || "";
 
       if (nextAvatar) {
-        updateAccountField("avatar", nextAvatar);
+        setAccountForm((prev) => ({ ...prev, avatar: nextAvatar }));
+        setAvatarLoadFailed(false);
       }
 
       onUserUpdated?.(nextUser);
-      setStatus(t.avatarUploaded);
+      showNotification("success", data.message || t.avatarUploaded);
     } catch (error) {
-      setStatus(error.message || t.avatarUploadError);
+      showNotification("error", error.message || t.avatarUploadError);
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -348,8 +526,15 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
   const saveAccount = async (event) => {
     event.preventDefault();
+
+    const errors = validateAccountForm();
+
+    if (Object.keys(errors).length > 0) {
+      showNotification("error", t.fixErrors);
+      return;
+    }
+
     setIsSavingAccount(true);
-    setStatus("");
 
     try {
       const response = await fetch(`${API_URL}/user/profile`, {
@@ -359,7 +544,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         body: JSON.stringify(buildProfilePayload(accountForm)),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -369,10 +554,15 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         throw new Error(getApiErrorMessage(data.detail, t.accountError));
       }
 
-      onUserUpdated?.(data.user);
-      setStatus(t.accountSaved);
+      if (data.user) {
+        setAccountForm(getInitialAccountForm(data.user));
+        setAvatarLoadFailed(false);
+        onUserUpdated?.(data.user);
+      }
+
+      showNotification("success", data.message || t.accountSaved);
     } catch (error) {
-      setStatus(error.message || t.accountError);
+      showNotification("error", error.message || t.accountError);
     } finally {
       setIsSavingAccount(false);
     }
@@ -381,13 +571,14 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
   const saveSiteSettings = async (event) => {
     event.preventDefault();
 
-    if (siteForm.logoUrl && !isDirectImageUrl(siteForm.logoUrl)) {
-      setStatus(t.invalidLogoUrl);
+    const errors = validateWebsiteForm();
+
+    if (Object.keys(errors).length > 0) {
+      showNotification("error", t.fixErrors);
       return;
     }
 
     setIsSavingSite(true);
-    setStatus("");
 
     const nextProject = {
       ...project,
@@ -425,7 +616,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         }),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -437,9 +628,9 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProject));
       setProject(nextProject);
-      setStatus(t.websiteSaved);
+      showNotification("success", data.message || t.websiteSaved);
     } catch (error) {
-      setStatus(error.message || t.accountError);
+      showNotification("error", error.message || t.accountError);
     } finally {
       setIsSavingSite(false);
     }
@@ -449,6 +640,13 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
   return (
     <section className="settings-page" dir={isArabic ? "rtl" : "ltr"}>
+      <SettingsNotification
+        notification={notification}
+        isArabic={isArabic}
+        label={t.closeNotification}
+        onClose={clearNotification}
+      />
+
       <header className="settings-header">
         <div>
           <p>{t.eyebrow}</p>
@@ -457,12 +655,11 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         </div>
       </header>
 
-      {status && <div className="settings-status">{status}</div>}
-
       <div className="settings-grid">
         <form
           className="settings-card settings-profile-card"
           onSubmit={saveAccount}
+          noValidate
         >
           <div className="settings-profile-cover">
             <div>
@@ -475,13 +672,11 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
           <div className="settings-profile-summary">
             <div className="settings-profile-avatar">
-              {accountForm.avatar ? (
+              {shouldShowAvatarImage ? (
                 <img
-                  src={resolveMediaUrl(accountForm.avatar)}
+                  src={avatarUrl}
                   alt={accountForm.first_name || accountForm.email || t.userAlt}
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
+                  onError={() => setAvatarLoadFailed(true)}
                 />
               ) : (
                 <span>{getAvatarLetter(accountForm, t.userFallback)}</span>
@@ -510,20 +705,32 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
                 {t.firstName}
                 <input
                   value={accountForm.first_name}
+                  className={fieldErrors.first_name ? "field-has-error" : ""}
                   onChange={(event) =>
                     updateAccountField("first_name", event.target.value)
                   }
                 />
+                {fieldErrors.first_name && (
+                  <span className="settings-field-error">
+                    {fieldErrors.first_name}
+                  </span>
+                )}
               </label>
 
               <label>
                 {t.lastName}
                 <input
                   value={accountForm.last_name}
+                  className={fieldErrors.last_name ? "field-has-error" : ""}
                   onChange={(event) =>
                     updateAccountField("last_name", event.target.value)
                   }
                 />
+                {fieldErrors.last_name && (
+                  <span className="settings-field-error">
+                    {fieldErrors.last_name}
+                  </span>
+                )}
               </label>
 
               <label>
@@ -531,10 +738,16 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
                 <input
                   type="email"
                   value={accountForm.email}
+                  className={fieldErrors.email ? "field-has-error" : ""}
                   onChange={(event) =>
                     updateAccountField("email", event.target.value)
                   }
                 />
+                {fieldErrors.email && (
+                  <span className="settings-field-error">
+                    {fieldErrors.email}
+                  </span>
+                )}
               </label>
 
               <label>
@@ -552,14 +765,13 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
           </div>
 
           <div className="settings-profile-actions">
-            <button
+            <SmartLink
+              to="/settings/change-password"
               className="settings-reset-password-button"
-              type="button"
-              onClick={() => navigate("/settings/change-password")}
             >
               <KeyRound size={18} />
               {t.changePassword}
-            </button>
+            </SmartLink>
 
             <button
               className="settings-save-button"
@@ -575,6 +787,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         <form
           className="settings-card settings-card-horizontal"
           onSubmit={saveSiteSettings}
+          noValidate
         >
           <div className="settings-card-heading">
             <div className="settings-card-icon">
@@ -591,7 +804,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             <div className="settings-logo-preview">
               {canShowLogoImage ? (
                 <img
-                  src={siteForm.logoUrl}
+                  src={resolveMediaUrl(siteForm.logoUrl)}
                   alt={siteForm.brand || t.websiteLogoAlt}
                   onError={(event) => {
                     event.currentTarget.style.display = "none";
@@ -629,30 +842,48 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
                 {t.subdomainName}
                 <input
                   value={siteForm.subdomain}
+                  className={fieldErrors.subdomain ? "field-has-error" : ""}
                   onChange={(event) =>
                     updateSiteField("subdomain", event.target.value)
                   }
                 />
+                {fieldErrors.subdomain && (
+                  <span className="settings-field-error">
+                    {fieldErrors.subdomain}
+                  </span>
+                )}
               </label>
 
               <label>
                 {t.logoUrl}
                 <input
                   value={siteForm.logoUrl}
+                  className={fieldErrors.logoUrl ? "field-has-error" : ""}
                   onChange={(event) =>
                     updateSiteField("logoUrl", event.target.value)
                   }
                 />
+                {fieldErrors.logoUrl && (
+                  <span className="settings-field-error">
+                    {fieldErrors.logoUrl}
+                  </span>
+                )}
               </label>
 
               <label>
                 {t.brandName}
                 <input
                   value={siteForm.brand}
+                  className={fieldErrors.brand ? "field-has-error" : ""}
                   onChange={(event) =>
                     updateSiteField("brand", event.target.value)
                   }
                 />
+                {fieldErrors.brand && (
+                  <span className="settings-field-error">
+                    {fieldErrors.brand}
+                  </span>
+                )}
               </label>
 
               <label>
@@ -670,10 +901,16 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
                 <input
                   type="email"
                   value={siteForm.contactEmail}
+                  className={fieldErrors.contactEmail ? "field-has-error" : ""}
                   onChange={(event) =>
                     updateSiteField("contactEmail", event.target.value)
                   }
                 />
+                {fieldErrors.contactEmail && (
+                  <span className="settings-field-error">
+                    {fieldErrors.contactEmail}
+                  </span>
+                )}
               </label>
 
               <label>
@@ -699,14 +936,16 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             </div>
           </div>
 
-          <button
-            className="settings-save-button"
-            type="submit"
-            disabled={isSavingSite}
-          >
-            <Save size={18} />
-            {isSavingSite ? t.saving : t.saveWebsite}
-          </button>
+          <div className="settings-website-actions">
+            <button
+              className="settings-save-button"
+              type="submit"
+              disabled={isSavingSite}
+            >
+              <Save size={18} />
+              {isSavingSite ? t.saving : t.saveWebsite}
+            </button>
+          </div>
         </form>
       </div>
     </section>

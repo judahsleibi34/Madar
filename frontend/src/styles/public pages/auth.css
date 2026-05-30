@@ -321,20 +321,26 @@ html[dir="rtl"] .register-card h1 {
   font-size: 14px;
 }
 
+/* Smaller, quieter, centered status message */
 .form-status-message {
   position: relative;
   z-index: 1;
+  width: fit-content;
+  max-width: 88%;
   color: #8b2a1a;
-  background-color: rgba(139, 42, 26, 0.07);
-  border: 1px solid rgba(139, 42, 26, 0.25);
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 800;
-  text-align: left;
-  margin: 0;
+  background-color: rgba(139, 42, 26, 0.045);
+  border: 1px solid rgba(139, 42, 26, 0.14);
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
+  margin: -2px auto 2px;
   direction: inherit;
   unicode-bidi: plaintext;
+  box-shadow: none;
+  align-self: center;
 }
 
 /* ============================================================
@@ -357,9 +363,7 @@ html[dir="rtl"] .register-card h1 {
 .login-page[dir="ltr"] .login-card span,
 .login-card[dir="ltr"] span,
 .login-page[dir="ltr"] .login-signup-text,
-.login-card[dir="ltr"] .login-signup-text,
-.login-page[dir="ltr"] .form-status-message,
-.login-card[dir="ltr"] .form-status-message {
+.login-card[dir="ltr"] .login-signup-text {
   text-align: left;
 }
 
@@ -372,6 +376,14 @@ html[dir="rtl"] .register-card h1 {
 .login-page[dir="ltr"] .login-options,
 .login-card[dir="ltr"] .login-options {
   justify-content: flex-end;
+}
+
+.login-page[dir="ltr"] .form-status-message,
+.login-card[dir="ltr"] .form-status-message {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  align-self: center;
 }
 
 /* ============================================================
@@ -408,10 +420,7 @@ html[dir="rtl"] .login-card label,
 html[dir="rtl"] .login-card span,
 .login-page[dir="rtl"] .login-signup-text,
 .login-card[dir="rtl"] .login-signup-text,
-html[dir="rtl"] .login-signup-text,
-.login-page[dir="rtl"] .form-status-message,
-.login-card[dir="rtl"] .form-status-message,
-html[dir="rtl"] .form-status-message {
+html[dir="rtl"] .login-signup-text {
   text-align: right;
 }
 
@@ -438,6 +447,15 @@ html[dir="rtl"] .login-card input[dir="ltr"] {
 .login-card[dir="rtl"] .login-options,
 html[dir="rtl"] .login-options {
   justify-content: flex-start;
+}
+
+.login-page[dir="rtl"] .form-status-message,
+.login-card[dir="rtl"] .form-status-message,
+html[dir="rtl"] .form-status-message {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  align-self: center;
 }
 
 .login-page[dir="rtl"] .password-field input,
@@ -467,6 +485,15 @@ html[dir="rtl"] .password-field button {
 
   .login-heading h1 {
     font-size: 30px;
+  }
+
+  .form-status-message {
+    max-width: 92%;
+    font-size: 11.5px;
+    padding: 6px 10px;
+    margin-left: auto;
+    margin-right: auto;
+    align-self: center;
   }
 }
 
@@ -581,6 +608,8 @@ html[dir="rtl"] .forgot-card .form-status-message {
   direction: ltr;
   unicode-bidi: isolate;
   text-align: center;
+  margin-inline: auto;
+  align-self: center;
 }
 
 @media (max-width: 600px) {

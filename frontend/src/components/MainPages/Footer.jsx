@@ -41,19 +41,22 @@ const footerText = {
 };
 
 export default function Footer({ lang = "en" }) {
-  const t = footerText[lang] || footerText.en;
-  const items = navItems[lang] || navItems.en;
+  const currentLang = lang === "ar" ? "ar" : "en";
+  const isAr = currentLang === "ar";
+  const t = footerText[currentLang];
+  const items = navItems[currentLang];
 
   return (
-    <footer className="site-footer">
-      <div className="footer-bg-orb footer-bg-orb-one" />
-      <div className="footer-bg-orb footer-bg-orb-two" />
-
+    <footer
+      className={`site-footer ${isAr ? "footer-ar" : "footer-en"}`}
+      dir={isAr ? "rtl" : "ltr"}
+      lang={currentLang}
+    >
       <div className="footer-shell">
         <div className="footer-main">
-          <section className="footer-brand" aria-label="Madar footer brand">
-            <NavLink to="/" className="footer-logo-link" aria-label="Madar Home">
-              <img className="footer-logo" src={logo} alt="Madar logo" />
+          <section className="footer-brand" aria-label={`${t.brand} footer brand`}>
+            <NavLink to="/" className="footer-logo-link" aria-label={`${t.brand} Home`}>
+              <img className="footer-logo" src={logo} alt={`${t.brand} logo`} />
               <span>{t.brand}</span>
             </NavLink>
 
@@ -83,20 +86,18 @@ export default function Footer({ lang = "en" }) {
             <h4>{t.contactTitle}</h4>
 
             <div className="footer-contact-list">
-              <a href="mailto:info@madar.com">
+              <a href="mailto:info@madar.com" className="footer-contact-item">
                 <span>{t.emailLabel}</span>
-                <strong>info@madar.com</strong>
+                <strong dir="ltr">info@madar.com</strong>
               </a>
 
-              <a href="tel:+972599203857" dir="ltr">
+              <a href="tel:+972599203857" className="footer-contact-item">
                 <span>{t.phoneLabel}</span>
-                <strong>+972 599 203 857</strong>
+                <strong dir="ltr">+972 599 203 857</strong>
               </a>
             </div>
 
             <div className="footer-social-row">
-              <span>{t.followLabel}</span>
-
               <a
                 className="footer-social-link"
                 href="https://www.instagram.com/maadar_ps/"
@@ -121,6 +122,8 @@ export default function Footer({ lang = "en" }) {
                   <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
                 </svg>
               </a>
+
+              <span>{t.followLabel}</span>
             </div>
           </section>
         </div>

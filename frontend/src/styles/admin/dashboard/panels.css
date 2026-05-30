@@ -1,0 +1,221 @@
+/* ============================================================
+   DASHBOARD GRIDS + PANELS
+   ============================================================ */
+
+.admin-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.8fr);
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.admin-dashboard-grid.lower {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
+}
+
+.dashboard-panel {
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid rgba(26, 39, 68, 0.12);
+  border-radius: 26px;
+  padding: 28px;
+  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+}
+
+.dashboard-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 26px;
+}
+
+.dashboard-panel h2 {
+  margin: 0 0 6px;
+  color: #1a2744;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.dashboard-panel p {
+  margin: 0;
+  color: #6d7484;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.cash-panel {
+  min-height: 430px;
+}
+
+.cash-chart {
+  height: 300px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+  padding-top: 28px;
+}
+
+.cash-bar-item {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
+  text-align: center;
+}
+
+.cash-bar {
+  position: relative;
+  min-height: 44px;
+  border-radius: 18px 18px 8px 8px;
+  background: linear-gradient(180deg, #1a2744 0%, #8b2a1a 100%);
+  box-shadow: 0 14px 28px rgba(139, 42, 26, 0.18);
+}
+
+.cash-bar span {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #8b2a1a;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.cash-bar-item small {
+  color: #3a3530;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ============================================================
+   SERVER + METRICS
+   ============================================================ */
+
+.server-info-list,
+.metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.server-info-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #fbfaf8;
+  border: 1px solid rgba(26, 39, 68, 0.08);
+}
+
+.server-info-list span {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #3a3530;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.server-info-list strong {
+  color: #8b2a1a;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: end;
+}
+
+.metric-row {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.metric-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-row-header span {
+  color: #3a3530;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.metric-row-header strong {
+  color: #8b2a1a;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.metric-track {
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(26, 39, 68, 0.08);
+  overflow: hidden;
+}
+
+.metric-track div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1a2744 0%, #8b2a1a 100%);
+}
+
+.uptime-panel {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.14), transparent 42%),
+    linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  color: #ffffff;
+}
+
+.uptime-panel h2 {
+  color: #ffffff;
+}
+
+.uptime-panel p {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.uptime-circle {
+  width: 180px;
+  height: 180px;
+  margin-bottom: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(#1a2744, #1a2744) padding-box,
+    conic-gradient(#ffffff 0 92%, rgba(255, 255, 255, 0.28) 92% 100%) border-box;
+  border: 12px solid transparent;
+}
+
+.uptime-circle div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uptime-circle strong {
+  color: #ffffff;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.uptime-circle span {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 13px;
+  font-weight: 800;
+}

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import "../../styles/admin/PageBuilder/PageBuilder.css";
+import "../../styles/admin/PageBuilder/index.css";
 
 import {
   STORAGE_KEY,
