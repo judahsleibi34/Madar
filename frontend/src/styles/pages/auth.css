@@ -159,66 +159,108 @@ html[dir="rtl"] .register-card h1 {
 }
 
 .login-card {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   max-width: 440px;
   background: #ffffff;
-  border: 1px solid rgba(26, 39, 68, 0.16);
-  border-radius: 18px;
-  padding: 32px;
-  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  border: 1px solid rgba(26, 39, 68, 0.14);
+  border-radius: 22px;
+  padding: 34px;
+  box-shadow:
+    0 22px 55px rgba(26, 39, 68, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  text-align: left;
+}
+
+.login-card::before {
+  content: "";
+  position: absolute;
+  top: -58px;
+  right: -58px;
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  background: rgba(139, 42, 26, 0.11);
+  pointer-events: none;
+}
+
+.login-heading {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  text-align: left;
 }
 
 .login-heading h1 {
   margin: 0 0 8px;
   color: #1a2744;
-  font-size: 30px;
-  font-weight: 800;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
   font-family: inherit;
+  text-align: left;
 }
 
 .login-heading p {
+  max-width: 330px;
   margin: 0;
   color: #3a3530;
   font-size: 15px;
   line-height: 1.7;
+  text-align: left;
 }
 
 .login-card label {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
   color: #1a2744;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
+  text-align: left;
 }
 
 .login-card input {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid rgba(26, 39, 68, 0.18);
+  border: 1px solid rgba(26, 39, 68, 0.2);
   border-radius: 12px;
   background: #ffffff;
   color: #1a2744;
   font-size: 15px;
+  font-weight: 650;
   font-family: inherit;
   outline: none;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
 
 .login-card input:focus {
   border-color: #8b2a1a;
+  background: #fffdfb;
   box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08);
 }
 
 .login-card span {
   color: #8b2a1a;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  text-align: left;
 }
 
 .login-options {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   margin-top: -4px;
@@ -227,7 +269,7 @@ html[dir="rtl"] .register-card h1 {
 .login-options a,
 .login-signup-text a {
   color: #8b2a1a;
-  font-weight: 800;
+  font-weight: 900;
   text-decoration: none;
 }
 
@@ -237,44 +279,179 @@ html[dir="rtl"] .register-card h1 {
 }
 
 .login-submit {
+  position: relative;
+  z-index: 1;
   margin-top: 4px;
   width: 100%;
   border: none;
   border-radius: 12px;
-  background: #8b2a1a;
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
   color: #ffffff;
   padding: 14px 24px;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 900;
   font-family: inherit;
   cursor: pointer;
+  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.22);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
 }
 
 .login-submit:hover {
-  background: #6e2014;
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 18px 38px rgba(139, 42, 26, 0.28);
+}
+
+.login-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+  transform: none;
+  box-shadow: none;
 }
 
 .login-signup-text {
+  position: relative;
+  z-index: 1;
   margin: 0;
   color: #3a3530;
-  text-align: center;
+  text-align: left;
   font-size: 14px;
 }
 
+.form-status-message {
+  position: relative;
+  z-index: 1;
+  color: #8b2a1a;
+  background-color: rgba(139, 42, 26, 0.07);
+  border: 1px solid rgba(139, 42, 26, 0.25);
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: left;
+  margin: 0;
+  direction: inherit;
+  unicode-bidi: plaintext;
+}
+
+/* ============================================================
+   LOGIN LTR / ENGLISH
+   ============================================================ */
+
+.login-page[dir="ltr"] .login-card,
+.login-card[dir="ltr"] {
+  text-align: left;
+}
+
+.login-page[dir="ltr"] .login-heading,
+.login-card[dir="ltr"] .login-heading,
+.login-page[dir="ltr"] .login-heading h1,
+.login-card[dir="ltr"] .login-heading h1,
+.login-page[dir="ltr"] .login-heading p,
+.login-card[dir="ltr"] .login-heading p,
+.login-page[dir="ltr"] .login-card label,
+.login-card[dir="ltr"] label,
+.login-page[dir="ltr"] .login-card span,
+.login-card[dir="ltr"] span,
+.login-page[dir="ltr"] .login-signup-text,
+.login-card[dir="ltr"] .login-signup-text,
+.login-page[dir="ltr"] .form-status-message,
+.login-card[dir="ltr"] .form-status-message {
+  text-align: left;
+}
+
+.login-page[dir="ltr"] .login-heading p,
+.login-card[dir="ltr"] .login-heading p {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.login-page[dir="ltr"] .login-options,
+.login-card[dir="ltr"] .login-options {
+  justify-content: flex-end;
+}
+
+/* ============================================================
+   LOGIN RTL / ARABIC
+   ============================================================ */
+
+.login-page[dir="rtl"] .login-card,
+.login-card[dir="rtl"],
 html[dir="rtl"] .login-card {
   text-align: right;
 }
 
-html[dir="rtl"] .login-heading {
-  text-align: center;
+.login-page[dir="rtl"] .login-card::before,
+.login-card[dir="rtl"]::before,
+html[dir="rtl"] .login-card::before {
+  right: auto;
+  left: -58px;
 }
 
-html[dir="rtl"] .login-signup-text {
-  text-align: center;
+.login-page[dir="rtl"] .login-heading,
+.login-card[dir="rtl"] .login-heading,
+html[dir="rtl"] .login-heading,
+.login-page[dir="rtl"] .login-heading h1,
+.login-card[dir="rtl"] .login-heading h1,
+html[dir="rtl"] .login-heading h1,
+.login-page[dir="rtl"] .login-heading p,
+.login-card[dir="rtl"] .login-heading p,
+html[dir="rtl"] .login-heading p,
+.login-page[dir="rtl"] .login-card label,
+.login-card[dir="rtl"] label,
+html[dir="rtl"] .login-card label,
+.login-page[dir="rtl"] .login-card span,
+.login-card[dir="rtl"] span,
+html[dir="rtl"] .login-card span,
+.login-page[dir="rtl"] .login-signup-text,
+.login-card[dir="rtl"] .login-signup-text,
+html[dir="rtl"] .login-signup-text,
+.login-page[dir="rtl"] .form-status-message,
+.login-card[dir="rtl"] .form-status-message,
+html[dir="rtl"] .form-status-message {
+  text-align: right;
 }
 
+.login-page[dir="rtl"] .login-heading p,
+.login-card[dir="rtl"] .login-heading p,
+html[dir="rtl"] .login-heading p {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.login-page[dir="rtl"] .login-card input,
+.login-card[dir="rtl"] input,
+html[dir="rtl"] .login-card input {
+  text-align: right;
+}
+
+.login-page[dir="rtl"] .login-card input[dir="ltr"],
+.login-card[dir="rtl"] input[dir="ltr"],
+html[dir="rtl"] .login-card input[dir="ltr"] {
+  text-align: left;
+}
+
+.login-page[dir="rtl"] .login-options,
+.login-card[dir="rtl"] .login-options,
 html[dir="rtl"] .login-options {
   justify-content: flex-start;
+}
+
+.login-page[dir="rtl"] .password-field input,
+.login-card[dir="rtl"] .password-field input,
+html[dir="rtl"] .password-field input {
+  padding-right: 48px;
+  padding-left: 14px;
+}
+
+.login-page[dir="rtl"] .password-field button,
+.login-card[dir="rtl"] .password-field button,
+html[dir="rtl"] .password-field button {
+  right: 12px;
+  left: auto;
 }
 
 @media (max-width: 600px) {
@@ -283,22 +460,14 @@ html[dir="rtl"] .login-options {
   }
 
   .login-card {
-    padding: 24px;
+    max-width: 100%;
+    padding: 26px;
+    border-radius: 20px;
   }
-}
 
-.form-status-message {
-  color: #8b2a1a;
-  background-color: rgba(139, 42, 26, 0.07);
-  border: 1px solid rgba(139, 42, 26, 0.25);
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  margin: 0;
-  direction: inherit;
-  unicode-bidi: plaintext;
+  .login-heading h1 {
+    font-size: 30px;
+  }
 }
 
 /* ============================================================

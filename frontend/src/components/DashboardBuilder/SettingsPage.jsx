@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImagePlus, Save, Store } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ImagePlus, KeyRound, Save, Store } from "lucide-react";
 import {
   STORAGE_KEY,
   defaultSiteChrome,
@@ -89,13 +90,13 @@ const settingsCopy = {
     profileTitle: "Your profile",
     profileDescription:
       "This information helps personalize your workspace and customer-facing pages.",
-    profilePhotoUrl: "Profile photo URL",
     uploadProfilePhoto: "Upload photo",
     firstName: "First name",
     lastName: "Last name",
     email: "Email",
     phoneNumber: "Phone number",
     saveProfile: "Save profile",
+    changePassword: "Change password",
     saving: "Saving...",
     websiteTitle: "Website details",
     websiteDescription:
@@ -130,13 +131,13 @@ const settingsCopy = {
     profileTitle: "ملفك الشخصي",
     profileDescription:
       "تساعد هذه المعلومات في تخصيص مساحة عملك وصفحاتك أمام العملاء.",
-    profilePhotoUrl: "رابط صورة الملف الشخصي",
     uploadProfilePhoto: "رفع صورة",
     firstName: "الاسم الأول",
     lastName: "اسم العائلة",
     email: "البريد الإلكتروني",
     phoneNumber: "رقم الهاتف",
     saveProfile: "حفظ الملف الشخصي",
+    changePassword: "تغيير كلمة المرور",
     saving: "جارٍ الحفظ...",
     websiteTitle: "تفاصيل الموقع",
     websiteDescription:
@@ -167,6 +168,8 @@ const settingsCopy = {
 };
 
 export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
+  const navigate = useNavigate();
+
   const [accountForm, setAccountForm] = useState(() =>
     getInitialAccountForm(user)
   );
@@ -548,14 +551,25 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             </div>
           </div>
 
-          <button
-            className="settings-save-button"
-            type="submit"
-            disabled={isSavingAccount}
-          >
-            <Save size={18} />
-            {isSavingAccount ? t.saving : t.saveProfile}
-          </button>
+          <div className="settings-profile-actions">
+            <button
+              className="settings-reset-password-button"
+              type="button"
+              onClick={() => navigate("/settings/change-password")}
+            >
+              <KeyRound size={18} />
+              {t.changePassword}
+            </button>
+
+            <button
+              className="settings-save-button"
+              type="submit"
+              disabled={isSavingAccount}
+            >
+              <Save size={18} />
+              {isSavingAccount ? t.saving : t.saveProfile}
+            </button>
+          </div>
         </form>
 
         <form
@@ -588,9 +602,11 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
                 />
               ) : (
                 <div className="settings-logo-fallback">
-                  {siteForm.brand
-                    ? siteForm.brand.slice(0, 1).toUpperCase()
-                    : <ImagePlus size={26} />}
+                  {siteForm.brand ? (
+                    siteForm.brand.slice(0, 1).toUpperCase()
+                  ) : (
+                    <ImagePlus size={26} />
+                  )}
                 </div>
               )}
 

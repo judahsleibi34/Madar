@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-console.log("LOGIN API_URL:", API_URL);
 
 const pageText = {
   en: {
@@ -46,6 +45,7 @@ export default function LoginPage({
   forgotPasswordPath = "/forgot-password",
 }) {
   const t = pageText[lang] || pageText.en;
+  const pageDir = lang === "ar" ? "rtl" : "ltr";
 
   const [formData, setFormData] = useState({
     email: "",
@@ -114,42 +114,34 @@ export default function LoginPage({
       const data = await response.json();
 
       if (!response.ok) {
-      if (response.status === 422 && Array.isArray(data.detail)) {
-        const emailError = data.detail.find((error) =>
-          error.loc?.includes("email")
-        );
+        if (response.status === 422 && Array.isArray(data.detail)) {
+          const emailError = data.detail.find((error) =>
+            error.loc?.includes("email")
+          );
 
-        if (emailError) {
-          setErrors((prev) => ({
-            ...prev,
-            email: t.invalidEmail,
-          }));
+          if (emailError) {
+            setErrors((prev) => ({
+              ...prev,
+              email: t.invalidEmail,
+            }));
+            return;
+          }
+
+          setStatusMessage(t.loginFailed);
           return;
         }
 
-        setStatusMessage(t.loginFailed);
+        setStatusMessage(
+          typeof data.detail === "string" ? data.detail : t.loginFailed
+        );
         return;
       }
 
-      setStatusMessage(
-        typeof data.detail === "string" ? data.detail : t.loginFailed
-      );
-      return;
-    }
-
       setStatusMessage(t.success);
-      console.log("Login response:", data);
-
-      // if (onLoginSuccess) {
-      //   onLoginSuccess();
-      // }
-
-      // setTimeout(() => navigate("/pricing"), 1500);
 
       if (onLoginSuccess) {
         onLoginSuccess(data.user);
       }
-
     } catch (error) {
       console.error(error);
       setStatusMessage(t.serverError);
@@ -159,8 +151,8 @@ export default function LoginPage({
   };
 
   return (
-    <main className="login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
+    <main className="login-page" dir={pageDir}>
+      <form className="login-card" onSubmit={handleSubmit} dir={pageDir}>
         <div className="login-heading">
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
@@ -172,6 +164,7 @@ export default function LoginPage({
 
         <label>
           {t.email}
+
           <input
             type="email"
             name="email"
@@ -180,11 +173,13 @@ export default function LoginPage({
             onChange={handleChange}
             dir="ltr"
           />
+
           {errors.email && <span>{errors.email}</span>}
         </label>
 
         <label>
           {t.password}
+
           <div className="password-field">
             <input
               type={showPassword ? "text" : "password"}
@@ -194,6 +189,7 @@ export default function LoginPage({
               onChange={handleChange}
               dir="ltr"
             />
+
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
@@ -202,6 +198,7 @@ export default function LoginPage({
               👁
             </button>
           </div>
+
           {errors.password && <span>{errors.password}</span>}
         </label>
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
 
 class ContactMessage(BaseModel):
@@ -45,6 +45,8 @@ class SubscriptionRequest(BaseModel):
         Literal["website", "forms", "quiz", "reservation", "reports", "data"]
     ] = None
     
-    
+class UpdatePassword(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
     
     

@@ -65,9 +65,9 @@
   border-radius: 50%;
   flex-shrink: 0;
   background:
-    radial-gradient(circle at center, rgba(16, 33, 63, 0.08) 0 24%, transparent 25%),
-    radial-gradient(circle at center, transparent 0 48%, rgba(159, 47, 31, 0.07) 49%, transparent 62%),
-    radial-gradient(circle at center, transparent 0 72%, rgba(159, 47, 31, 0.08) 73%, transparent 76%);
+    radial-gradient(circle at center, rgba(255, 247, 239, 0.92) 0 24%, transparent 25%),
+    radial-gradient(circle at center, transparent 0 48%, rgba(139, 42, 26, 0.11) 49%, transparent 62%),
+    radial-gradient(circle at center, transparent 0 72%, rgba(26, 39, 68, 0.08) 73%, transparent 76%);
 }
 
 .center-core {
@@ -79,12 +79,12 @@
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 25%, rgba(159, 47, 31, 0.14), transparent 42%),
+    radial-gradient(circle at 35% 25%, rgba(139, 42, 26, 0.16), transparent 42%),
     linear-gradient(145deg, #ffffff, #fff7ef);
-  border: 3px solid #10213f;
+  border: 3px solid #1a2744;
   box-shadow:
-    0 24px 60px rgba(16, 33, 63, 0.16),
-    inset 0 0 0 7px rgba(159, 47, 31, 0.055);
+    0 24px 60px rgba(26, 39, 68, 0.16),
+    inset 0 0 0 7px rgba(139, 42, 26, 0.055);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -92,7 +92,7 @@
 }
 
 .center-core span {
-  color: #10213f;
+  color: #1a2744;
   font-weight: 900;
   font-size: 18px;
   font-family: inherit;
@@ -103,7 +103,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  border: 1.5px solid rgba(16, 33, 63, 0.2);
+  border: 1.5px solid rgba(26, 39, 68, 0.2);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -116,7 +116,7 @@
   width: 180px;
   height: 180px;
   animation-duration: 8s;
-  border-color: rgba(159, 47, 31, 0.40);  /* stronger */
+  border-color: rgba(139, 42, 26, 0.38);
 }
 
 .orbit-two {
@@ -124,29 +124,26 @@
   height: 270px;
   animation-duration: 12s;
   animation-direction: reverse;
-  border-color: rgba(16, 33, 63, 0.30);   /* stronger */
+  border-color: rgba(26, 39, 68, 0.28);
 }
 
 .orbit-three {
   width: 360px;
   height: 360px;
   animation-duration: 18s;
-  border-color: rgba(159, 47, 31, 0.25);  /* stronger */
+  border-color: rgba(139, 42, 26, 0.24);
 }
 
 .orbit-dot {
   position: absolute;
   padding: 9px 13px;
   border-radius: 999px;
-  background: #fff7ef;
-  color: #10213f;
+  background: linear-gradient(145deg, #ffffff, #fff7ef);
+  color: #1a2744;
   font-size: 13px;
   font-weight: 900;
   font-family: inherit;
-  box-shadow:
-    0 14px 34px rgba(16, 33, 63, 0.14),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(16, 33, 63, 0.16);
+  border: 1px solid rgba(26, 39, 68, 0.16);
   white-space: nowrap;
   pointer-events: auto;
 }
@@ -155,27 +152,42 @@
   top: 50%;
   right: -36px;
   transform: translateY(-50%) rotate(80deg);
-  background: #fff7ef;
-  color: #9f2f1f;
-  border-color: rgba(159, 47, 31, 0.40);  /* stronger */
+  background:
+    linear-gradient(145deg, #ffffff 0%, #fff7ef 48%, #f2dfd3 100%);
+  color: #8b2a1a;
+  border: 1px solid rgba(139, 42, 26, 0.34);
+  box-shadow:
+    0 14px 30px rgba(139, 42, 26, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -8px 16px rgba(139, 42, 26, 0.06);
 }
 
 .orbit-two .orbit-dot {
   bottom: 22px;
   left: 20px;
   transform: rotate(45deg);
-  background: #10213f;                     /* flat, no gradient */
-  color: #fff7ef;                          /* warm white text */
-  border-color: rgba(16, 33, 63, 0.40);   /* stronger */
+  background:
+    linear-gradient(145deg, #24385f 0%, #10213f 48%, #07152b 100%);
+  color: #fff7ef;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 16px 34px rgba(16, 33, 63, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.2);
 }
 
 .orbit-three .orbit-dot {
   top: 20px;
   right: 30px;
   transform: rotate(20deg);
-  background: #9f2f1f;                     /* flat, no gradient */
-  color: #fff7ef;                          /* warm white text */
-  border-color: rgba(159, 47, 31, 0.45);  /* stronger */
+  background:
+    linear-gradient(145deg, #c04a32 0%, #9f2f1f 45%, #6f1f14 100%);
+  color: #fff7ef;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 16px 34px rgba(139, 42, 26, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.18);
 }
 
 @keyframes rotateOrbit {
