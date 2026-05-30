@@ -1,31 +1,41 @@
 /* Main CSS entrypoint
-   Import order preserves the original cascade:
-   1) tokens/base
-   2) layout + public sections/pages
-   3) shared button overrides
-   4) dashboard/admin
+   Import order:
+   1) core tokens/base
+   2) public layout + public pages
+   3) global utilities
+   4) shared components
+   5) admin/dashboard/PageBuilder
 */
 
 @import "./core/tokens.css";
 @import "./core/base.css";
 
-@import "./layout/header.css";
-@import "./sections/home.css";
-@import "./pages/contact.css";
-@import "./pages/features.css";
-@import "./layout/footer.css";
+@import "./public layout/header.css";
+@import "./public pages/home.css";
+@import "./public pages/contact.css";
+@import "./public pages/features.css";
+@import "./public layout/footer.css";
+
 @import "./utils/rtl.css";
 @import "./utils/responsive.css";
 
-@import "./pages/auth.css";
-@import "./pages/pricing.css";
-@import "./pages/team.css";
+@import "./public pages/auth.css";
+@import "./public pages/pricing.css";
+@import "./public pages/team.css";
+@import "./public pages/subscription-modal.css";
 
 @import "./shared/buttons.css";
 @import "./shared/gradient-text.css";
 @import "./shared/split-text.css";
 
-@import "./admin/dashboard.css";
+@import "./admin/dashboard/index.css";
+@import "./admin/MyPlanPage.css";
+@import "./admin/PageBuilder/index.css";
+
+/* ============================================================
+   TEMP: Builder demo route styles
+   We will move this later into PageBuilder files.
+   ============================================================ */
 
 .builder-demo-main {
   min-height: calc(100vh - 110px);
@@ -46,7 +56,9 @@
 }
 
 /* ============================================================
-   Tenant Site Runtime — Header / Login / Footer
+   TEMP: Tenant Site Runtime — Header / Login / Footer
+   We will move this later into:
+   styles/admin/PageBuilder/tenant-runtime.css
    ============================================================ */
 
 .tenant-site-runtime {

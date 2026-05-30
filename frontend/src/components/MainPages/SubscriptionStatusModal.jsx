@@ -1,4 +1,4 @@
-import "../../styles/pages/subscription-modal.css";
+import "../../styles/public pages/subscription-modal.css";
 
 export default function SubscriptionStatusModal({
   open,

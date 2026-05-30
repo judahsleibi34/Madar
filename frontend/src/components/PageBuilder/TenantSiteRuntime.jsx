@@ -5,7 +5,7 @@ import LoginPage from "../AuthPages/LoginPage";
 import SignUpPage from "../AuthPages/SignUpPage";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "./PageBuilder.constants";
 import { getFormSections } from "./PageBuilder.factories";
-import "../../styles/admin/PageBuilder/PageBuilder.css";
+import "../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "./PageBuilderCarousel";
 
 const splitLines = (value) =>

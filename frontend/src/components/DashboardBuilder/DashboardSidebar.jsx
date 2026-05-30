@@ -10,7 +10,8 @@ import {
   ClipboardList,
   CreditCard,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import SmartLink from "../SmartLink";
 import { resolveMediaUrl } from "../../utils/media";
 
 const sidebarText = {
@@ -29,8 +30,8 @@ const sidebarText = {
     plan: "My Plan",
   },
   ar: {
-    responses: "\u0627\u0644\u0631\u062f\u0648\u062f",
-    data: "\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a",
+    responses: "الردود",
+    data: "البيانات",
     title: "لوحة التحكم",
     subtitle: "مدار",
     home: "الرئيسية",
@@ -45,13 +46,14 @@ const sidebarText = {
 };
 
 export default function DashboardSidebar({
+  id,
   lang = "en",
   user,
   onLogout,
   onLanguageChange,
+  onNavigate,
   hideLanguage = false,
 }) {
-  const navigate = useNavigate();
   const location = useLocation();
 
   const t = sidebarText[lang] || sidebarText.en;
@@ -70,8 +72,46 @@ export default function DashboardSidebar({
     onLanguageChange?.(lang === "en" ? "ar" : "en");
   };
 
+  const navItems = [
+    {
+      path: "/",
+      label: t.home,
+      icon: <Home size={18} />,
+    },
+    {
+      path: "/dashboard",
+      label: t.dashboard,
+      icon: <LayoutDashboard size={18} />,
+    },
+    {
+      path: "/page-builder",
+      label: t.pageBuilder,
+      icon: <PanelsTopLeft size={18} />,
+    },
+    {
+      path: "/builder-responses",
+      label: t.responses || "Responses",
+      icon: <ClipboardList size={18} />,
+    },
+    {
+      path: "/builder-data",
+      label: t.data || "Data",
+      icon: <Database size={18} />,
+    },
+    {
+      path: "/my-plan",
+      label: t.plan,
+      icon: <CreditCard size={18} />,
+    },
+    {
+      path: "/settings",
+      label: t.settings,
+      icon: <Settings size={18} />,
+    },
+  ];
+
   return (
-    <aside className="admin-sidebar">
+    <aside id={id} className="admin-sidebar">
       <div className="admin-sidebar-top">
         <div className="admin-sidebar-brand">
           <div className="admin-sidebar-icon">
@@ -85,68 +125,17 @@ export default function DashboardSidebar({
         </div>
 
         <nav className="admin-sidebar-nav" aria-label="Dashboard navigation">
-          <button
-            type="button"
-            className={isActive("/") ? "active" : ""}
-            onClick={() => navigate("/")}
-          >
-            <Home size={18} />
-            <span>{t.home}</span>
-          </button>
-
-          <button
-            type="button"
-            className={isActive("/dashboard") ? "active" : ""}
-            onClick={() => navigate("/dashboard")}
-          >
-            <LayoutDashboard size={18} />
-            <span>{t.dashboard}</span>
-          </button>
-
-          <button
-            type="button"
-            className={isActive("/page-builder") ? "active" : ""}
-            onClick={() => navigate("/page-builder")}
-          >
-            <PanelsTopLeft size={18} />
-            <span>{t.pageBuilder}</span>
-          </button>
-
-          <button
-            type="button"
-            className={isActive("/builder-responses") ? "active" : ""}
-            onClick={() => navigate("/builder-responses")}
-          >
-            <ClipboardList size={18} />
-            <span>{t.responses || "Responses"}</span>
-          </button>
-
-          <button
-            type="button"
-            className={isActive("/builder-data") ? "active" : ""}
-            onClick={() => navigate("/builder-data")}
-          >
-            <Database size={18} />
-            <span>{t.data || "Data"}</span>
-          </button>
-
-          <button
-            type="button"
-            className={isActive("/my-plan") ? "active" : ""}
-            onClick={() => navigate("/my-plan")}
-          >
-            <CreditCard size={18} />
-            <span>{t.plan}</span>
-          </button>
-
-          <button
-            type="button"
-            className={isActive("/settings") ? "active" : ""}
-            onClick={() => navigate("/settings")}
-          >
-            <Settings size={18} />
-            <span>{t.settings}</span>
-          </button>
+          {navItems.map((item) => (
+            <SmartLink
+              key={item.path}
+              to={item.path}
+              className={isActive(item.path) ? "active" : ""}
+              onClick={onNavigate}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </SmartLink>
+          ))}
         </nav>
       </div>
 
@@ -162,11 +151,11 @@ export default function DashboardSidebar({
           </button>
         )}
 
-        <button
-          type="button"
-          className="admin-sidebar-user"
-          onClick={() => navigate("/settings")}
+        <SmartLink
+          to="/settings"
+          className={`admin-sidebar-user${isActive("/settings") ? " active" : ""}`}
           aria-label={t.settings}
+          onClick={onNavigate}
         >
           <div className="admin-sidebar-avatar">
             {avatarUrl ? (
@@ -186,7 +175,7 @@ export default function DashboardSidebar({
             <strong>{displayName}</strong>
             {displayEmail && <span>{displayEmail}</span>}
           </div>
-        </button>
+        </SmartLink>
 
         <button
           type="button"

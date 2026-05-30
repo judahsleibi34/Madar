@@ -1,0 +1,131 @@
+/* ============================================================
+   DASHBOARD LAYOUT
+   ============================================================ */
+
+.admin-dashboard-layout {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  background: #f5f2ee;
+}
+
+.admin-dashboard-layout[dir="rtl"] {
+  direction: rtl;
+}
+
+.admin-dashboard-layout[dir="ltr"] {
+  direction: ltr;
+}
+
+/* ============================================================
+   DASHBOARD MAIN PAGE
+   ============================================================ */
+
+.admin-dashboard-layout {
+  min-height: 100vh;
+  background: #f5f2ee;
+}
+
+.admin-dashboard-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
+    #f5f2ee;
+}
+
+.admin-dashboard-page {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  margin-left: 260px;
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
+    #f5f2ee;
+  padding: 44px 5% 70px;
+  color: #1a2744;
+  overflow-x: hidden;
+}
+
+.admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
+  direction: rtl;
+  text-align: right;
+}
+
+.admin-dashboard-layout[dir="ltr"] .admin-dashboard-page {
+  direction: ltr;
+  text-align: left;
+}
+
+.admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
+  margin-left: 0;
+  margin-right: 260px;
+}
+
+.admin-dashboard-shell {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+}
+
+.admin-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+
+.admin-dashboard-header h1 {
+  margin: 0 0 10px;
+  color: #1a2744;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+}
+
+.admin-dashboard-header p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 17px;
+  line-height: 1.7;
+  max-width: 720px;
+}
+
+/* ============================================================
+   DASHBOARD MOBILE MENU BUTTON
+   ============================================================ */
+
+.dashboard-mobile-menu-button {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 120;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  color: #ffffff;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 14px 30px rgba(139, 42, 26, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.admin-dashboard-layout[dir="rtl"] .dashboard-mobile-menu-button {
+  left: auto;
+  right: 14px;
+}
+
+.dashboard-mobile-menu-button:hover {
+  background: linear-gradient(135deg, #111b31 0%, #6e2014 100%);
+}
+
+.dashboard-sidebar-backdrop {
+  display: none;
+}

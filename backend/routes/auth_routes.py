@@ -12,6 +12,81 @@ from services.auth_service import (
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
+def normalize_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def get_local_user_by_email(clean_email: str):
+    if not clean_email:
+        return None
+
+    result = (
+        service_supabase.table("users")
+        .select("*")
+        .eq("email", clean_email)
+        .limit(1)
+        .execute()
+    )
+
+    if result.data:
+        return result.data[0]
+
+    return None
+
+
+def get_local_user_by_auth_id(auth_id: str):
+    if not auth_id:
+        return None
+
+    result = (
+        service_supabase.table("users")
+        .select("*")
+        .eq("auth_id", str(auth_id))
+        .limit(1)
+        .execute()
+    )
+
+    if result.data:
+        return result.data[0]
+
+    return None
+
+
+def assert_email_is_available(clean_email: str, allowed_auth_id: str | None = None):
+    existing_user = get_local_user_by_email(clean_email)
+
+    if not existing_user:
+        return
+
+    existing_auth_id = str(existing_user.get("auth_id") or "")
+
+    if allowed_auth_id and existing_auth_id == str(allowed_auth_id):
+        return
+
+    raise HTTPException(
+        status_code=409,
+        detail="Email is already registered",
+    )
+
+
+def get_auth_error_message(error: Exception) -> str:
+    raw_message = str(error).lower()
+
+    if "already" in raw_message and "registered" in raw_message:
+        return "Email is already registered"
+
+    if "already" in raw_message and "exists" in raw_message:
+        return "Email is already registered"
+
+    if "duplicate" in raw_message:
+        return "Email is already registered"
+
+    if "unique" in raw_message:
+        return "Email is already registered"
+
+    return ""
+
+
 @router.post("/signup")
 def signup(user: SignUpRequest):
     auth_user_id = None
@@ -19,27 +94,56 @@ def signup(user: SignUpRequest):
     signup_complete = False
 
     try:
-        clean_email = user.email.strip().lower()
+        clean_email = normalize_email(user.email)
         first_name = user.first_name.strip()
         last_name = user.last_name.strip()
         owner_name = f"{first_name} {last_name}".strip()
 
-        auth_response = service_supabase.auth.admin.create_user(
-            {
-                "email": clean_email,
-                "password": user.password,
-                "email_confirm": True,
-                "user_metadata": {
-                    "first_name": first_name,
-                    "last_name": last_name,
-                },
-            }
-        )
+        if not clean_email:
+            raise HTTPException(status_code=400, detail="Email is required")
+
+        if not first_name or not last_name:
+            raise HTTPException(
+                status_code=400,
+                detail="First name and last name are required",
+            )
+
+        if not user.password or len(user.password.strip()) < 8:
+            raise HTTPException(
+                status_code=400,
+                detail="Password must be at least 8 characters",
+            )
+
+        assert_email_is_available(clean_email)
+
+        try:
+            auth_response = service_supabase.auth.admin.create_user(
+                {
+                    "email": clean_email,
+                    "password": user.password,
+                    "email_confirm": True,
+                    "user_metadata": {
+                        "first_name": first_name,
+                        "last_name": last_name,
+                    },
+                }
+            )
+
+        except Exception as auth_create_error:
+            print("SIGNUP AUTH CREATE ERROR:", repr(auth_create_error))
+            friendly_message = get_auth_error_message(auth_create_error)
+
+            if friendly_message:
+                raise HTTPException(status_code=409, detail=friendly_message)
+
+            raise HTTPException(status_code=400, detail="Could not create user")
 
         if not auth_response.user:
             raise HTTPException(status_code=400, detail="Could not create user")
 
         auth_user_id = str(auth_response.user.id)
+
+        assert_email_is_available(clean_email, allowed_auth_id=auth_user_id)
 
         tenant_insert = (
             service_supabase.table("tenants")
@@ -57,19 +161,29 @@ def signup(user: SignUpRequest):
 
         tenant_id = tenant_insert.data[0]["tenant_id"]
 
-        user_insert = (
-            service_supabase.table("users")
-            .insert(
-                {
-                    "auth_id": auth_user_id,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "email": clean_email,
-                    "tenant_id": tenant_id,
-                }
+        try:
+            user_insert = (
+                service_supabase.table("users")
+                .insert(
+                    {
+                        "auth_id": auth_user_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": clean_email,
+                        "tenant_id": tenant_id,
+                    }
+                )
+                .execute()
             )
-            .execute()
-        )
+
+        except Exception as user_insert_error:
+            print("SIGNUP USER INSERT ERROR:", repr(user_insert_error))
+            friendly_message = get_auth_error_message(user_insert_error)
+
+            if friendly_message:
+                raise HTTPException(status_code=409, detail=friendly_message)
+
+            raise HTTPException(status_code=400, detail="Could not create account")
 
         if not user_insert.data:
             raise HTTPException(status_code=400, detail="Could not create account")
@@ -141,7 +255,10 @@ def signup(user: SignUpRequest):
 @router.post("/login")
 def login(user: LogIn, response: Response):
     try:
-        clean_email = user.email.strip().lower()
+        clean_email = normalize_email(user.email)
+
+        if not clean_email:
+            raise HTTPException(status_code=400, detail="Email is required")
 
         auth_response = supabase.auth.sign_in_with_password(
             {
@@ -153,16 +270,51 @@ def login(user: LogIn, response: Response):
         if not auth_response.user or not auth_response.session:
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        user_response = (
-            service_supabase.table("users")
-            .select("*")
-            .eq("auth_id", auth_response.user.id)
-            .single()
-            .execute()
-        )
+        auth_user_id = str(auth_response.user.id)
+        local_user = get_local_user_by_auth_id(auth_user_id)
 
-        if not user_response.data:
-            raise HTTPException(status_code=404, detail="User not found")
+        if not local_user:
+            raise HTTPException(
+                status_code=404,
+                detail="Local user profile not found",
+            )
+
+        local_email = normalize_email(local_user.get("email"))
+
+        if local_email != clean_email:
+            existing_email_user = get_local_user_by_email(clean_email)
+
+            if (
+                existing_email_user
+                and str(existing_email_user.get("auth_id")) != auth_user_id
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Email is already linked to another user",
+                )
+
+            try:
+                update_response = (
+                    service_supabase.table("users")
+                    .update({"email": clean_email})
+                    .eq("auth_id", auth_user_id)
+                    .execute()
+                )
+
+            except Exception as email_sync_error:
+                print("LOGIN EMAIL SYNC ERROR:", repr(email_sync_error))
+                raise HTTPException(
+                    status_code=409,
+                    detail="Could not sync login email",
+                )
+
+            if not update_response.data:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Could not sync user email",
+                )
+
+            local_user = update_response.data[0]
 
         set_auth_cookies(
             response,
@@ -172,7 +324,7 @@ def login(user: LogIn, response: Response):
 
         return {
             "message": "User is logged in",
-            "user": build_user_payload(user_response.data),
+            "user": build_user_payload(local_user),
         }
 
     except HTTPException:
@@ -216,7 +368,7 @@ def change_password(
     try:
         auth_user, user_data = get_authenticated_user_row(request, response)
 
-        clean_email = (user_data.get("email") or "").strip().lower()
+        clean_email = normalize_email(user_data.get("email"))
         current_password = payload.current_password.strip()
         new_password = payload.new_password.strip()
 

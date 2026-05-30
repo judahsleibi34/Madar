@@ -1,4 +1,4 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useState } from "react";
 
 import {
   Activity,
@@ -8,10 +8,12 @@ import {
   DollarSign,
   FolderKanban,
   HardDrive,
+  Menu,
   Server,
   TrendingUp,
   Users,
   Wifi,
+  X,
 } from "lucide-react";
 
 import DashboardSidebar from "./DashboardSidebar";
@@ -51,6 +53,9 @@ const dashboardText = {
     cashSubtitle: "Monthly revenue performance",
 
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
+
+    openMenu: "Open dashboard menu",
+    closeMenu: "Close dashboard menu",
   },
 
   ar: {
@@ -87,6 +92,9 @@ const dashboardText = {
     cashSubtitle: "أداء الإيرادات الشهرية",
 
     months: ["ينا", "فبر", "مار", "أبر", "ماي", "يون", "يول", "أغس"],
+
+    openMenu: "فتح قائمة لوحة التحكم",
+    closeMenu: "إغلاق قائمة لوحة التحكم",
   },
 };
 
@@ -164,6 +172,8 @@ export default function Dashboard({
   user,
   onLanguageChange,
 }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   useLayoutEffect(() => {
     forceScrollTop();
 
@@ -195,13 +205,45 @@ export default function Dashboard({
   const maxCash = Math.max(...cashData);
   const isRtl = lang === "ar";
 
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
+
+  const handleLogout = () => {
+    closeSidebar();
+    onLogout?.();
+  };
+
   return (
-    <div className="admin-dashboard-layout" dir={isRtl ? "rtl" : "ltr"}>
+    <div
+      className={`admin-dashboard-layout${sidebarOpen ? " sidebar-open" : ""}`}
+      dir={isRtl ? "rtl" : "ltr"}
+    >
+      <button
+        type="button"
+        className="dashboard-mobile-menu-button"
+        onClick={() => setSidebarOpen((open) => !open)}
+        aria-label={sidebarOpen ? t.closeMenu : t.openMenu}
+        aria-expanded={sidebarOpen}
+        aria-controls="dashboard-sidebar"
+      >
+        {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
+      </button>
+
+      <button
+        type="button"
+        className="dashboard-sidebar-backdrop"
+        onClick={closeSidebar}
+        aria-label={t.closeMenu}
+      />
+
       <DashboardSidebar
+        id="dashboard-sidebar"
         lang={lang}
         user={user}
-        onLogout={onLogout}
+        onLogout={handleLogout}
         onLanguageChange={onLanguageChange}
+        onNavigate={closeSidebar}
       />
 
       <main className="admin-dashboard-page">

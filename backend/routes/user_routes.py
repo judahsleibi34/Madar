@@ -1,22 +1,117 @@
 import os
-from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, Response, Request, UploadFile
-from database import service_supabase
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
+
 from classes import UserProfileUpdate
-from services.auth_service import get_authenticated_user_row, build_user_payload
+from database import service_supabase
+from services.auth_service import build_user_payload, get_authenticated_user_row
 
 router = APIRouter(prefix="/user", tags=["User"])
 
-AVATAR_UPLOAD_DIR = Path(os.getenv("AVATAR_UPLOAD_DIR", "avatar_uploads"))
-AVATAR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+
+AVATAR_BUCKET = "avatars"
 AVATAR_MAX_BYTES = 5 * 1024 * 1024
+
 AVATAR_EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/webp": ".webp",
 }
+
+
+def normalize_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def detect_image_content_type(content: bytes, uploaded_content_type: str = "") -> str:
+    uploaded_content_type = (uploaded_content_type or "").strip().lower()
+
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+
+    if content.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+
+    if len(content) >= 12 and content[0:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "image/webp"
+
+    if uploaded_content_type in AVATAR_EXTENSIONS:
+        return uploaded_content_type
+
+    return ""
+
+
+def get_storage_public_url(bucket: str, path: str) -> str:
+    if not SUPABASE_URL:
+        raise HTTPException(
+            status_code=500,
+            detail="SUPABASE_URL is not configured",
+        )
+
+    clean_path = path.strip().lstrip("/")
+    encoded_path = quote(clean_path, safe="/")
+
+    return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{encoded_path}"
+
+
+def upload_avatar_to_storage(storage_path: str, content: bytes, content_type: str):
+    try:
+        print("AVATAR DETECTED CONTENT TYPE:", content_type)
+        print("AVATAR STORAGE PATH:", storage_path)
+
+        result = service_supabase.storage.from_(AVATAR_BUCKET).upload(
+            path=storage_path,
+            file=content,
+            file_options={
+                "content-type": content_type,
+                "cache-control": "3600",
+                "upsert": "true",
+            },
+        )
+
+        print("AVATAR STORAGE UPLOAD RESULT:", result)
+        return result
+
+    except Exception as storage_error:
+        print("AVATAR STORAGE UPLOAD ERROR:", repr(storage_error))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not upload profile photo: {storage_error}",
+        )
+
+
+def delete_old_avatar_if_storage_url(old_avatar: str, auth_id: str):
+    if not old_avatar:
+        return
+
+    marker = f"/storage/v1/object/public/{AVATAR_BUCKET}/"
+
+    if marker not in old_avatar:
+        return
+
+    try:
+        storage_path = old_avatar.split(marker, 1)[1].split("?", 1)[0]
+
+        if not storage_path.startswith(f"users/{auth_id}/"):
+            return
+
+        service_supabase.storage.from_(AVATAR_BUCKET).remove([storage_path])
+
+    except Exception as cleanup_error:
+        print("OLD AVATAR CLEANUP ERROR:", repr(cleanup_error))
+
+
+def is_duplicate_error(error: Exception) -> bool:
+    raw_message = str(error).lower()
+
+    return (
+        "duplicate" in raw_message
+        or "unique" in raw_message
+        or "already exists" in raw_message
+    )
 
 
 @router.post("/info")
@@ -31,6 +126,7 @@ def user_info(request: Request, response: Response):
 
     except HTTPException:
         raise
+
     except Exception as e:
         print("USER INFO ERROR:", repr(e))
         raise HTTPException(status_code=500, detail="Could not fetch user info")
@@ -49,17 +145,45 @@ def update_user_profile(
 
         if profile.first_name is not None:
             update_payload["first_name"] = profile.first_name.strip()
+
         if profile.last_name is not None:
             update_payload["last_name"] = profile.last_name.strip()
+
         if profile.email is not None:
-            update_payload["email"] = str(profile.email).strip().lower()
+            clean_email = normalize_email(str(profile.email))
+
+            if not clean_email:
+                raise HTTPException(status_code=400, detail="Email is required")
+
+            existing_user = (
+                service_supabase.table("users")
+                .select("id, auth_id, email")
+                .eq("email", clean_email)
+                .limit(1)
+                .execute()
+            )
+
+            if existing_user.data:
+                existing = existing_user.data[0]
+
+                if str(existing.get("auth_id")) != str(user_data.get("auth_id")):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Email is already registered",
+                    )
+
+            update_payload["email"] = clean_email
+
         if profile.phone is not None:
             update_payload["phone"] = profile.phone.strip()
+
         if profile.avatar is not None:
             update_payload["avatar"] = profile.avatar.strip()
-        if profile.subscription_type is not None: 
+
+        if profile.subscription_type is not None:
             update_payload["subscription_type"] = profile.subscription_type.strip()
-        if profile.payment_status is not None: 
+
+        if profile.payment_status is not None:
             update_payload["payment_status"] = profile.payment_status.strip()
 
         if not update_payload:
@@ -68,14 +192,36 @@ def update_user_profile(
                 "user": build_user_payload(user_data),
             }
 
-        update_response = service_supabase.table("users").update(update_payload).eq(
-            "auth_id", user_data.get("auth_id")
-        ).execute()
+        try:
+            update_response = (
+                service_supabase.table("users")
+                .update(update_payload)
+                .eq("auth_id", user_data.get("auth_id"))
+                .execute()
+            )
 
-        updated_user = update_response.data[0] if update_response.data else {
-            **user_data,
-            **update_payload,
-        }
+        except Exception as update_error:
+            print("USER PROFILE UPDATE DB ERROR:", repr(update_error))
+
+            if is_duplicate_error(update_error):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Email is already registered",
+                )
+
+            raise HTTPException(
+                status_code=500,
+                detail="Could not update user profile",
+            )
+
+        updated_user = (
+            update_response.data[0]
+            if update_response.data
+            else {
+                **user_data,
+                **update_payload,
+            }
+        )
 
         return {
             "success": True,
@@ -85,6 +231,7 @@ def update_user_profile(
 
     except HTTPException:
         raise
+
     except Exception as e:
         print("USER PROFILE UPDATE ERROR:", repr(e))
         raise HTTPException(status_code=500, detail="Could not update user profile")
@@ -99,33 +246,86 @@ async def upload_user_avatar(
     try:
         _, user_data = get_authenticated_user_row(request, response)
 
-        extension = AVATAR_EXTENSIONS.get(file.content_type or "")
-        if not extension:
-            raise HTTPException(
-                status_code=400,
-                detail="Please upload a PNG, JPG, or WebP image.",
-            )
+        auth_id = str(user_data.get("auth_id") or "").strip()
+
+        if not auth_id:
+            raise HTTPException(status_code=400, detail="User auth id not found")
 
         content = await file.read()
+
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="Please upload a valid image file.",
+            )
+
         if len(content) > AVATAR_MAX_BYTES:
             raise HTTPException(
                 status_code=400,
                 detail="Profile photo must be 5MB or smaller.",
             )
 
-        filename = f"{user_data.get('auth_id')}-{uuid4().hex}{extension}"
-        avatar_path = AVATAR_UPLOAD_DIR / filename
-        avatar_path.write_bytes(content)
+        content_type = detect_image_content_type(
+            content=content,
+            uploaded_content_type=file.content_type or "",
+        )
 
-        avatar_url = f"/avatar_uploads/{filename}"
-        update_response = service_supabase.table("users").update({
-            "avatar": avatar_url,
-        }).eq("auth_id", user_data.get("auth_id")).execute()
+        if not content_type:
+            raise HTTPException(
+                status_code=400,
+                detail="Please upload a PNG, JPG, or WebP image.",
+            )
 
-        updated_user = update_response.data[0] if update_response.data else {
-            **user_data,
-            "avatar": avatar_url,
-        }
+        extension = AVATAR_EXTENSIONS[content_type]
+        filename = f"{uuid4().hex}{extension}"
+        storage_path = f"users/{auth_id}/{filename}"
+
+        upload_avatar_to_storage(
+            storage_path=storage_path,
+            content=content,
+            content_type=content_type,
+        )
+
+        avatar_url = get_storage_public_url(AVATAR_BUCKET, storage_path)
+
+        try:
+            update_response = (
+                service_supabase.table("users")
+                .update(
+                    {
+                        "avatar": avatar_url,
+                    }
+                )
+                .eq("auth_id", auth_id)
+                .execute()
+            )
+
+        except Exception as db_error:
+            print("AVATAR DB UPDATE ERROR:", repr(db_error))
+
+            try:
+                service_supabase.storage.from_(AVATAR_BUCKET).remove([storage_path])
+            except Exception as cleanup_error:
+                print("AVATAR STORAGE ROLLBACK ERROR:", repr(cleanup_error))
+
+            raise HTTPException(
+                status_code=500,
+                detail="Could not save profile photo",
+            )
+
+        updated_user = (
+            update_response.data[0]
+            if update_response.data
+            else {
+                **user_data,
+                "avatar": avatar_url,
+            }
+        )
+
+        delete_old_avatar_if_storage_url(
+            old_avatar=str(user_data.get("avatar") or ""),
+            auth_id=auth_id,
+        )
 
         return {
             "success": True,
@@ -135,6 +335,7 @@ async def upload_user_avatar(
 
     except HTTPException:
         raise
+
     except Exception as e:
         print("USER AVATAR UPLOAD ERROR:", repr(e))
         raise HTTPException(status_code=500, detail="Could not upload profile photo")
