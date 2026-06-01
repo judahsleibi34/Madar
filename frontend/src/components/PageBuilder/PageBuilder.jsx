@@ -47,7 +47,7 @@ import {
   createInitialProject,
 } from "./PageBuilder.starters";
 import BuilderResponsesPage from "./BuilderResponsesPage";
-import BuilderAnalysisPage from "./BuilderAnalysisPage";
+import DataAnalysisWorkspace from "./DataAnalysisWorkspace";
 import { getLocalTenantPath } from "./PageBuilder.routing";
 import PageBuilderCarousel from "./PageBuilderCarousel";
 import PageBuilderTopbar from "./PageBuilderTopbar";
@@ -317,6 +317,138 @@ const getQuizSettings = (form = {}) => ({
 });
 
 const mainBuilderHiddenTabs = ["data", "responses"];
+const builderWorkspaceCopy = {
+  en: {
+    projectNames: {
+      "Madar Builder Demo": "Madar Builder Demo",
+    },
+    topbar: {
+      templates: "Templates",
+      preview: "Preview",
+      exitPreview: "Exit Preview",
+      save: "Save",
+      goLive: "Go Live",
+    },
+    tabs: {
+      design: {
+        label: "Pages",
+        helper: "Design screens, sections, layout, and visual elements.",
+      },
+      forms: {
+        label: "Forms",
+        helper: "Create forms and place them on pages.",
+      },
+      users: {
+        label: "Users",
+        helper: "Manage team members, roles, and permissions.",
+      },
+      theme: {
+        label: "Theme",
+        helper: "Control global colors, typography, spacing, and radius.",
+      },
+      publish: {
+        label: "Publish",
+        helper: "Preview, save locally, export JSON, and publish status.",
+      },
+      responses: {
+        label: "Responses",
+        helper: "Review submitted form answers.",
+      },
+      data: {
+        label: "Data",
+        helper: "Review, clean, and analyze your collected data.",
+      },
+    },
+  },
+  ar: {
+    projectNames: {
+      "Madar Builder Demo": "عرض منشئ مدار",
+    },
+    topbar: {
+      templates: "القوالب",
+      preview: "معاينة",
+      exitPreview: "إنهاء المعاينة",
+      save: "حفظ",
+      goLive: "نشر",
+    },
+    tabs: {
+      design: {
+        label: "الصفحات",
+        helper: "صمم الشاشات والأقسام والتخطيط والعناصر المرئية.",
+      },
+      forms: {
+        label: "النماذج",
+        helper: "أنشئ النماذج وضعها داخل الصفحات.",
+      },
+      users: {
+        label: "المستخدمون",
+        helper: "أدر أعضاء الفريق والأدوار والصلاحيات.",
+      },
+      theme: {
+        label: "الثيم",
+        helper: "تحكم في الألوان والخطوط والمسافات والزوايا.",
+      },
+      publish: {
+        label: "النشر",
+        helper: "عاين واحفظ وصدّر JSON وانشر الحالة.",
+      },
+      responses: {
+        label: "الردود",
+        helper: "راجع إجابات النماذج المرسلة.",
+      },
+      data: {
+        label: "البيانات",
+        helper: "راجع ونظف وحلل البيانات التي تم جمعها.",
+      },
+    },
+  },
+};
+const mobileBlockerCopy = {
+  en: {
+    design: {
+      title: "Desktop builder only",
+      message:
+        "The page builder is designed for tablet and desktop editing. Use a wider screen to build layouts, forms, workflows, and themes comfortably.",
+    },
+    data: {
+      title: "Data workspace needs more room",
+      message:
+        "Data review, cleaning, and reporting are designed for tablet and desktop screens. Use a wider screen to inspect tables and generate reports comfortably.",
+    },
+    responses: {
+      title: "Submissions are easier on a wider screen",
+      message:
+        "Response review is designed for tablet and desktop screens. Use a wider screen to scan submissions, compare answers, and export data comfortably.",
+    },
+    default: {
+      title: "Desktop workspace only",
+      message:
+        "This workspace is designed for tablet and desktop screens. Use a wider screen for the best editing experience.",
+    },
+  },
+  ar: {
+    design: {
+      title: "المنشئ مخصص للشاشات الكبيرة",
+      message:
+        "منشئ الصفحات مصمم للتحرير على الأجهزة اللوحية وشاشات سطح المكتب. استخدم شاشة أوسع لبناء الصفحات والنماذج وسير العمل والثيمات بسهولة.",
+    },
+    data: {
+      title: "مساحة البيانات تحتاج شاشة أوسع",
+      message:
+        "مراجعة البيانات وتنظيفها وإنشاء التقارير مصممة للأجهزة اللوحية وشاشات سطح المكتب. استخدم شاشة أوسع لقراءة الجداول والعمل براحة.",
+    },
+    responses: {
+      title: "مراجعة الردود أسهل على شاشة أوسع",
+      message:
+        "مراجعة الردود مصممة للأجهزة اللوحية وشاشات سطح المكتب. استخدم شاشة أوسع لمقارنة الإجابات وتصدير البيانات براحة.",
+    },
+    default: {
+      title: "مساحة العمل مخصصة للشاشات الكبيرة",
+      message:
+        "مساحة العمل هذه مصممة للأجهزة اللوحية وشاشات سطح المكتب. استخدم شاشة أوسع للحصول على أفضل تجربة.",
+    },
+  },
+};
 const templateModalText = {
   en: {
     eyebrow: "Template library",
@@ -3413,16 +3545,14 @@ export default function PageBuilder({
     return String(value);
   };
   const renderDataTab = () => (
-    <BuilderAnalysisPage
-      project={project}
-      lang={lang}
-      getResponseCount={getResponseCount}
-      getSavedRecordCount={getSavedRecordCount}
-      selectForm={selectForm}
-      setActiveTab={setActiveTab}
-      getFormFields={getFormFields}
-    />
-  );
+  <DataAnalysisWorkspace
+    project={project}
+    lang={lang}
+    selectForm={selectForm}
+    setActiveTab={setActiveTab}
+    getFormFields={getFormFields}
+  />
+);
 
   const renderFormsTab = () => {
     const commonFieldTypes = [
@@ -3819,8 +3949,10 @@ export default function PageBuilder({
     return renderDesignTab();
   };
 
+  const builderCopy = builderWorkspaceCopy[lang] || builderWorkspaceCopy.en;
+
   const renderWorkspaceNavigator = () => (
-    <nav className="workspace-tabs" aria-label="Builder workspaces">
+    <nav className="workspace-tabs" aria-label={lang === "ar" ? "مساحات عمل المنشئ" : "Builder workspaces"}>
       {builderTabs
         .filter((tab) =>
           visibleTabIds
@@ -3834,20 +3966,23 @@ export default function PageBuilder({
           className={activeTab === tab.id ? "active" : ""}
           onClick={() => setActiveTab(tab.id)}
         >
-          {tab.label}
+          {builderCopy.tabs[tab.id]?.label || tab.label}
         </button>
       ))}
     </nav>
   );
 
   const activeHelper =
+    builderCopy.tabs[activeTab]?.helper ||
     builderTabs.find((tab) => tab.id === activeTab)?.helper ||
-    (activeTab === "responses"
-      ? "Review submitted form answers."
-      : activeTab === "data"
-        ? "Prototype collections and fields in front-end state."
-        : "");
+    "";
   const templateCopy = templateModalText[templateLang] || templateModalText.en;
+  const projectDisplayName =
+    builderCopy.projectNames[project.name] ||
+    project.name;
+  const mobileCopy =
+    (mobileBlockerCopy[lang] || mobileBlockerCopy.en)[activeTab] ||
+    (mobileBlockerCopy[lang] || mobileBlockerCopy.en).default;
   const getStarterDisplay = (starter) => {
     if (templateLang !== "ar") return starter;
     const translated = starterArabicText[starter.id] || {};
@@ -3872,10 +4007,12 @@ export default function PageBuilder({
       <div className="builder-desktop-shell">
         <PageBuilderTopbar
           project={project}
+          displayName={projectDisplayName}
           activeHelper={activeHelper}
           hideWorkspaceTabs={hideWorkspaceTabs}
           preview={preview}
           demoMode={demoMode}
+          copy={builderCopy.topbar}
           activeTopbarAction={activeTopbarAction}
           setActiveTopbarAction={setActiveTopbarAction}
           setModal={setModal}
@@ -3898,8 +4035,8 @@ export default function PageBuilder({
 
       <div className="builder-mobile-blocker">
         <div>
-          <h2>Desktop builder only</h2>
-          <p>The builder workspace is designed for tablet/desktop editing. The pages you build still include mobile preview behavior.</p>
+          <h2>{mobileCopy.title}</h2>
+          <p>{mobileCopy.message}</p>
         </div>
       </div>
 

@@ -32,6 +32,16 @@ def inspect_data(request: InputPathRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/prepare-report")
+def preparation_report(request: InputPathRequest):
+    try:
+        cleaner = DataCleaning(request.input_path)
+        return sanitize_for_json(cleaner.preparation_report())
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/statistics")
 def statistical_inspection(request: InputPathRequest):
     try:

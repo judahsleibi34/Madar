@@ -34,6 +34,7 @@
 
 /* ============================================================
    DASHBOARD MAIN PAGE
+   Normal dashboard pages use full 260px sidebar.
    ============================================================ */
 
 .admin-dashboard-page {
@@ -102,6 +103,89 @@
 }
 
 /* ============================================================
+   PAGEBUILDER SINGLE-TAB DASHBOARD PAGES
+   Used by /builder-data and /builder-responses.
+   These pages use the compact icon sidebar, so content starts
+   after 76px, not 260px.
+   ============================================================ */
+
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
+  margin-left: 76px !important;
+  margin-right: 0 !important;
+  width: calc(100vw - 76px) !important;
+  max-width: calc(100vw - 76px) !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
+    #f5f2ee !important;
+}
+
+.admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
+.admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
+  margin-left: 0 !important;
+  margin-right: 76px !important;
+  width: calc(100vw - 76px) !important;
+  max-width: calc(100vw - 76px) !important;
+  direction: rtl;
+  text-align: right;
+}
+
+/* Keep the data/responses workspace visually aligned */
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .page-builder {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 100vh;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-desktop-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-main,
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-workspace,
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-panel {
+  min-width: 0 !important;
+}
+
+/* The data analysis page itself */
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .daw-page {
+  width: min(1560px, calc(100vw - 130px)) !important;
+  max-width: none !important;
+  margin-left: clamp(28px, 3vw, 54px) !important;
+  margin-right: auto !important;
+  padding-top: 26px;
+  padding-bottom: 56px;
+}
+
+.admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .daw-page,
+.admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .daw-page {
+  margin-left: clamp(28px, 3vw, 54px) !important;
+  margin-right: clamp(28px, 3vw, 54px) !important;
+}
+
+/* Better alignment for builder demo header above the data page */
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-topbar,
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-header,
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-demo-header {
+  padding-left: clamp(28px, 3vw, 54px) !important;
+  padding-right: clamp(28px, 3vw, 54px) !important;
+}
+
+.admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-topbar,
+.admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-header,
+.admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-demo-header,
+.admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-topbar,
+.admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-header,
+.admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-demo-header {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ============================================================
    DASHBOARD MOBILE MENU BUTTON
    ============================================================ */
 
@@ -141,8 +225,9 @@
 }
 
 /* ============================================================
-   Dashboard shell when PageBuilder is open
-   Fixed: sidebar stays compact, PageBuilder gets full width
+   FULL PAGE BUILDER EDITOR
+   Used only by /page-builder.
+   Compact sidebar stays compact and the builder fills screen.
    ============================================================ */
 
 .admin-dashboard-layout-builder {
@@ -342,6 +427,10 @@
   }
 }
 
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+
 .theme-dark,
 [data-theme="dark"] {
   color-scheme: dark;
@@ -360,6 +449,14 @@
 .theme-dark .admin-dashboard-page,
 [data-theme="dark"] .admin-dashboard-page {
   color: #f8fafc !important;
+  background:
+    radial-gradient(circle at top left, rgba(139, 42, 26, 0.24), transparent 34%),
+    radial-gradient(circle at top right, rgba(26, 39, 68, 0.44), transparent 36%),
+    linear-gradient(135deg, #0f1726 0%, #111827 48%, #15101a 100%) !important;
+}
+
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
   background:
     radial-gradient(circle at top left, rgba(139, 42, 26, 0.24), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.44), transparent 36%),
@@ -479,4 +576,32 @@
 .theme-dark .uptime-circle span,
 [data-theme="dark"] .uptime-circle span {
   color: rgba(248, 250, 252, 0.68) !important;
+}
+
+/* ============================================================
+   RESPONSIVE DASHBOARD PAGES
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .admin-dashboard-page,
+  .admin-dashboard-layout.is-ltr .admin-dashboard-page,
+  .admin-dashboard-layout[dir="ltr"] .admin-dashboard-page,
+  .admin-dashboard-layout.is-rtl .admin-dashboard-page,
+  .admin-dashboard-layout[dir="rtl"] .admin-dashboard-page,
+  .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
+  .admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
+  .admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 72px 18px 48px !important;
+  }
+
+  .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .daw-page {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-top: 0;
+  }
 }

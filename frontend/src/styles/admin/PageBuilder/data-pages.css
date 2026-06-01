@@ -763,7 +763,8 @@
 }
 
 .page-builder .analysis-field select,
-.page-builder .analysis-field input {
+.page-builder .analysis-field input,
+.page-builder .analysis-field textarea {
   min-height: 42px;
   border: 1px solid var(--madar-border);
   border-radius: 8px;
@@ -773,6 +774,57 @@
   font: inherit;
   font-size: 13px;
   font-weight: 850;
+}
+
+.page-builder .analysis-field textarea {
+  min-height: 104px;
+  padding: 11px 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.page-builder .analysis-assistant-panel {
+  background: linear-gradient(180deg, rgba(26, 39, 68, 0.05), rgba(255, 255, 255, 0));
+}
+
+.page-builder .analysis-assistant-submit {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.page-builder .analysis-assistant-thread {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.page-builder .analysis-assistant-thread article {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--madar-border);
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.page-builder .analysis-assistant-thread strong,
+.page-builder .analysis-assistant-thread p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .analysis-assistant-thread strong {
+  color: var(--madar-text);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .analysis-assistant-thread p {
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .page-builder .analysis-form-grid,
