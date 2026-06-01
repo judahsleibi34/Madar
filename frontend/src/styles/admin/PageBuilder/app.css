@@ -1409,6 +1409,31 @@ summary {
   text-align: left;
 }
 
+.admin-dashboard-layout.is-rtl .page-builder .builder-topbar,
+.admin-dashboard-layout[dir="rtl"] .page-builder .builder-topbar,
+.page-builder[dir="rtl"] .builder-topbar {
+  direction: rtl;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+}
+
+.admin-dashboard-layout.is-rtl .page-builder .builder-brand,
+.admin-dashboard-layout[dir="rtl"] .page-builder .builder-brand,
+.page-builder[dir="rtl"] .builder-brand {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.admin-dashboard-layout.is-rtl .page-builder .builder-brand h1,
+.admin-dashboard-layout.is-rtl .page-builder .builder-brand p,
+.admin-dashboard-layout[dir="rtl"] .page-builder .builder-brand h1,
+.admin-dashboard-layout[dir="rtl"] .page-builder .builder-brand p,
+.page-builder[dir="rtl"] .builder-brand h1,
+.page-builder[dir="rtl"] .builder-brand p {
+  margin-left: 0;
+  margin-right: 0;
+  text-align: right;
+}
+
 .page-builder .builder-topbar-actions {
   grid-column: 2;
   justify-self: center;

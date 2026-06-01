@@ -2,6 +2,8 @@ import math
 import ipaddress
 import os
 import socket
+import time
+from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -20,25 +22,77 @@ class DataReadingNormal:
         "windows-1256",
         "utf-16",
     ]
+    SHARED_CACHE_MAX_ITEMS = int(os.getenv("DATAFRAME_CACHE_MAX_ITEMS", "16"))
+    URL_CACHE_SECONDS = int(os.getenv("DATAFRAME_URL_CACHE_SECONDS", "60"))
+    _shared_df_cache: OrderedDict[str, pd.DataFrame] = OrderedDict()
 
     def __init__(self, input_path: str) -> None:
         if not input_path:
             raise ValueError("input_path is required")
 
         self.input_path = input_path
+        self._cached_df: pd.DataFrame | None = None
 
-    def read(self) -> pd.DataFrame:
+    def read(self, refresh: bool = False) -> pd.DataFrame:
+        if self._cached_df is not None and not refresh:
+            return self._cached_df.copy(deep=True)
+
         try:
+            cache_key = None if refresh else self._shared_cache_key()
+            if cache_key:
+                cached = self._get_shared_cache(cache_key)
+                if cached is not None:
+                    self._cached_df = cached.copy(deep=True)
+                    return cached.copy(deep=True)
+
             if self._is_google_sheets_url(self.input_path):
-                return self._read_google_sheet(self.input_path)
+                df = self._read_google_sheet(self.input_path)
 
-            if self._is_url(self.input_path):
-                return self._read_from_url_or_api(self.input_path)
+            elif self._is_url(self.input_path):
+                df = self._read_from_url_or_api(self.input_path)
 
-            return self._read_local_file(self.input_path)
+            else:
+                df = self._read_local_file(self.input_path)
+
+            self._cached_df = df.copy(deep=True)
+            if cache_key:
+                self._set_shared_cache(cache_key, df)
+            return df.copy(deep=True)
 
         except Exception as error:
             raise RuntimeError(f"Failed to read data: {error}") from error
+
+    def clear_cache(self) -> None:
+        self._cached_df = None
+
+    @classmethod
+    def clear_shared_cache(cls) -> None:
+        cls._shared_df_cache.clear()
+
+    def _shared_cache_key(self) -> str | None:
+        if self._is_url(self.input_path):
+            ttl = max(self.URL_CACHE_SECONDS, 1)
+            bucket = int(time.time() // ttl)
+            return f"url:{bucket}:{self.input_path}"
+
+        safe_path = self._resolve_uploaded_file(self.input_path)
+        stat = safe_path.stat()
+        return f"file:{safe_path}:{stat.st_size}:{stat.st_mtime_ns}"
+
+    @classmethod
+    def _get_shared_cache(cls, key: str) -> pd.DataFrame | None:
+        cached = cls._shared_df_cache.get(key)
+        if cached is None:
+            return None
+        cls._shared_df_cache.move_to_end(key)
+        return cached.copy(deep=True)
+
+    @classmethod
+    def _set_shared_cache(cls, key: str, df: pd.DataFrame) -> None:
+        cls._shared_df_cache[key] = df.copy(deep=True)
+        cls._shared_df_cache.move_to_end(key)
+        while len(cls._shared_df_cache) > cls.SHARED_CACHE_MAX_ITEMS:
+            cls._shared_df_cache.popitem(last=False)
 
     def _read_local_file(self, file_path: str) -> pd.DataFrame:
         safe_path = self._resolve_uploaded_file(file_path)

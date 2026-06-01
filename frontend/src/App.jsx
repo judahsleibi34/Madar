@@ -36,6 +36,8 @@ import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const LANG_STORAGE_KEY = "madar-lang";
 
+let authBootstrapPromise = null;
+
 export default function App() {
   const [lang, setLang] = useState(() => {
     const savedLang = localStorage.getItem(LANG_STORAGE_KEY);
@@ -94,7 +96,7 @@ export default function App() {
       cache: "no-store",
     });
 
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       return null;
     }
 
@@ -107,6 +109,63 @@ export default function App() {
     const data = await response.json();
     return normalizeUser(data.user || data);
   }, [normalizeUser]);
+
+  const bootstrapAuth = useCallback(async () => {
+    try {
+      const statusResponse = await fetch(`${API_URL}/auth/user_status`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (statusResponse.status === 401 || statusResponse.status === 403) {
+        return {
+          loggedIn: false,
+          user: null,
+        };
+      }
+
+      if (!statusResponse.ok) {
+        return {
+          loggedIn: false,
+          user: null,
+        };
+      }
+
+      const statusData = await statusResponse.json();
+
+      const loggedIn =
+        statusData.logged_in === true || statusData.authenticated === true;
+
+      if (!loggedIn) {
+        return {
+          loggedIn: false,
+          user: null,
+        };
+      }
+
+      const userInfo = await fetchUserInfo();
+
+      if (!userInfo) {
+        return {
+          loggedIn: false,
+          user: null,
+        };
+      }
+
+      return {
+        loggedIn: true,
+        user: userInfo,
+      };
+    } catch (error) {
+      console.error("Auth check failed:", error);
+
+      return {
+        loggedIn: false,
+        user: null,
+      };
+    }
+  }, [fetchUserInfo]);
 
   useEffect(() => {
     localStorage.setItem(LANG_STORAGE_KEY, lang);
@@ -144,56 +203,78 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    let mounted = true;
+
+    const runInitialAuthCheck = async () => {
       try {
-        const statusResponse = await fetch(`${API_URL}/auth/user_status`, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        });
-
-        if (!statusResponse.ok) {
-          setIsLoggedIn(false);
-          setUser(null);
-          return;
+        if (!authBootstrapPromise) {
+          authBootstrapPromise = bootstrapAuth();
         }
 
-        const statusData = await statusResponse.json();
+        const result = await authBootstrapPromise;
 
-        if (statusData.logged_in !== true) {
-          setIsLoggedIn(false);
-          setUser(null);
-          return;
-        }
+        if (!mounted) return;
 
-        const userInfo = await fetchUserInfo();
-
-        if (!userInfo) {
-          setIsLoggedIn(false);
-          setUser(null);
-          return;
-        }
-
-        setIsLoggedIn(true);
-        setUser(userInfo);
+        setIsLoggedIn(result.loggedIn);
+        setUser(result.user);
       } catch (error) {
-        console.error("Auth check failed:", error);
+        console.error("Initial auth check failed:", error);
+
+        if (!mounted) return;
+
         setIsLoggedIn(false);
         setUser(null);
       } finally {
-        setAuthChecked(true);
+        if (mounted) {
+          setAuthChecked(true);
+        }
       }
     };
 
-    checkAuth();
-  }, [fetchUserInfo]);
+    runInitialAuthCheck();
+
+    return () => {
+      mounted = false;
+    };
+  }, [bootstrapAuth]);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || !authChecked) return;
 
     let cancelled = false;
+    let requestInFlight = false;
+    let lastKeepAliveAt = 0;
+    let softFailureCount = 0;
 
-    const keepAlive = async () => {
+    const KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000;
+    const EVENT_COOLDOWN_MS = 90 * 1000;
+    const MAX_SOFT_FAILURES = 3;
+
+    const clearSession = () => {
+      if (cancelled) return;
+
+      authBootstrapPromise = Promise.resolve({
+        loggedIn: false,
+        user: null,
+      });
+
+      setIsLoggedIn(false);
+      setUser(null);
+    };
+
+    const keepAlive = async (reason = "interval") => {
+      if (cancelled) return;
+      if (requestInFlight) return;
+
+      const now = Date.now();
+
+      if (reason !== "interval" && now - lastKeepAliveAt < EVENT_COOLDOWN_MS) {
+        return;
+      }
+
+      requestInFlight = true;
+      lastKeepAliveAt = now;
+
       try {
         const response = await fetch(`${API_URL}/auth/user_status`, {
           method: "GET",
@@ -201,44 +282,63 @@ export default function App() {
           cache: "no-store",
         });
 
+        if (response.status === 401 || response.status === 403) {
+          clearSession();
+          return;
+        }
+
         if (!response.ok) {
-          if (!cancelled) {
-            setIsLoggedIn(false);
-            setUser(null);
+          softFailureCount += 1;
+
+          if (softFailureCount >= MAX_SOFT_FAILURES) {
+            console.warn("[KEEP ALIVE] repeated backend failures");
           }
+
           return;
         }
 
         const data = await response.json();
 
-        if (data.logged_in !== true) {
-          if (!cancelled) {
-            setIsLoggedIn(false);
-            setUser(null);
-          }
+        const loggedIn =
+          data.logged_in === true || data.authenticated === true;
+
+        if (!loggedIn) {
+          clearSession();
           return;
         }
 
+        softFailureCount = 0;
+
         if (data.user && !cancelled) {
-          setUser(normalizeUser(data.user));
+          const normalizedUser = normalizeUser(data.user);
+
+          authBootstrapPromise = Promise.resolve({
+            loggedIn: true,
+            user: normalizedUser,
+          });
+
+          setUser(normalizedUser);
         }
       } catch (error) {
-        console.error("[KEEP ALIVE] failed:", error);
+        softFailureCount += 1;
+        console.warn("[KEEP ALIVE] temporary failure:", error);
+      } finally {
+        requestInFlight = false;
       }
     };
 
     const intervalId = window.setInterval(() => {
-      keepAlive();
-    }, 60 * 1000);
+      keepAlive("interval");
+    }, KEEP_ALIVE_INTERVAL_MS);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        keepAlive();
+        keepAlive("visibility");
       }
     };
 
     const handleOnline = () => {
-      keepAlive();
+      keepAlive("online");
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -250,7 +350,7 @@ export default function App() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
     };
-  }, [isLoggedIn, normalizeUser]);
+  }, [isLoggedIn, authChecked, normalizeUser]);
 
   const handleLanguageChange = (code) => {
     if (code !== "ar" && code !== "en") return;
@@ -268,14 +368,26 @@ export default function App() {
         throw new Error("Login succeeded but user info was unauthorized");
       }
 
+      authBootstrapPromise = Promise.resolve({
+        loggedIn: true,
+        user: userInfo,
+      });
+
       setIsLoggedIn(true);
+      setAuthChecked(true);
       setUser(userInfo);
 
       navigate(returnTo || "/dashboard", { replace: true });
     } catch (error) {
       console.error("Could not load user info after login:", error);
 
+      authBootstrapPromise = Promise.resolve({
+        loggedIn: false,
+        user: null,
+      });
+
       setIsLoggedIn(false);
+      setAuthChecked(true);
       setUser(null);
 
       navigate("/login", { replace: true });
@@ -291,9 +403,17 @@ export default function App() {
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
+      authBootstrapPromise = Promise.resolve({
+        loggedIn: false,
+        user: null,
+      });
+
       setIsLoggedIn(false);
+      setAuthChecked(true);
       setUser(null);
+
       applyThemeMode(themeMode);
+
       navigate("/", { replace: true });
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }
@@ -301,9 +421,18 @@ export default function App() {
 
   const handleUserUpdated = useCallback(
     (nextUser) => {
-      setUser(normalizeUser(nextUser));
+      const normalizedUser = normalizeUser(nextUser);
+
+      setUser(normalizedUser);
+
+      if (isLoggedIn) {
+        authBootstrapPromise = Promise.resolve({
+          loggedIn: true,
+          user: normalizedUser,
+        });
+      }
     },
-    [normalizeUser]
+    [isLoggedIn, normalizeUser]
   );
 
   const renderDashboardSkeleton = (label = "Loading dashboard") => (
@@ -364,9 +493,9 @@ export default function App() {
     return (
       <div
         className={`admin-dashboard-layout ${
-          shellLang === "ar" ? "is-rtl" : "is-ltr"
-        }`}
-        dir="ltr"
+          isPageBuilderShell ? "admin-dashboard-layout-builder " : ""
+        }${shellLang === "ar" ? "is-rtl" : "is-ltr"}`}
+        dir={shellLang === "ar" ? "rtl" : "ltr"}
       >
         <DashboardSidebar
           id="dashboard-sidebar"
@@ -471,7 +600,7 @@ export default function App() {
                     appThemeMode={themeMode}
                     onAppThemeModeChange={handleThemeModeChange}
                   />,
-                  true
+                  false
                 )
               ) : (
                 <Navigate to="/login" replace />
@@ -496,7 +625,7 @@ export default function App() {
                     appThemeMode={themeMode}
                     onAppThemeModeChange={handleThemeModeChange}
                   />,
-                  true
+                  false
                 )
               ) : (
                 <Navigate to="/login" replace />

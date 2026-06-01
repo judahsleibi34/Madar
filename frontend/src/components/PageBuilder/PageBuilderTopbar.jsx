@@ -1,9 +1,11 @@
 export default function PageBuilderTopbar({
   project,
+  displayName,
   activeHelper,
   hideWorkspaceTabs,
   preview,
   demoMode,
+  copy = {},
   activeTopbarAction,
   setActiveTopbarAction,
   setModal,
@@ -14,7 +16,7 @@ export default function PageBuilderTopbar({
   return (
     <header className="builder-topbar">
       <div className="builder-brand">
-        <h1>{project.name}</h1>
+        <h1>{displayName || project.name}</h1>
         <p>{activeHelper}</p>
       </div>
 
@@ -28,7 +30,7 @@ export default function PageBuilderTopbar({
               setModal("starter");
             }}
           >
-            Templates
+            {copy.templates || "Templates"}
           </button>
 
           <button
@@ -39,7 +41,7 @@ export default function PageBuilderTopbar({
               setPreview((value) => !value);
             }}
           >
-            {preview ? "Exit Preview" : "Preview"}
+            {preview ? copy.exitPreview || "Exit Preview" : copy.preview || "Preview"}
           </button>
 
           {!demoMode && (
@@ -49,7 +51,7 @@ export default function PageBuilderTopbar({
                 className={activeTopbarAction === "save" ? "action-active" : ""}
                 onClick={saveProject}
               >
-                Save
+                {copy.save || "Save"}
               </button>
 
               <button
@@ -59,7 +61,7 @@ export default function PageBuilderTopbar({
                 }`}
                 onClick={publishProject}
               >
-                Go Live
+                {copy.goLive || "Go Live"}
               </button>
             </>
           )}

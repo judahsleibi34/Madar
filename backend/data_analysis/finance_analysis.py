@@ -1,353 +1,224 @@
+from __future__ import annotations
+
 import pandas as pd
 
+from data_analysis.analysis_core import AnalysisBase
 
-class FinanceAnalysis:
-    def __init__(self, df: pd.DataFrame) -> None:
-        if df.empty:
-            raise ValueError("DataFrame is empty")
 
-        self.df = df.copy()
+class FinanceAnalysis(AnalysisBase):
+    domain = "finance"
 
-    def profit_loss_summary(
-        self,
-        revenue_column: str,
-        cost_column: str
-    ) -> dict:
-        self._validate_columns_exist([revenue_column, cost_column])
-        self._validate_numeric_columns([revenue_column, cost_column])
-
-        revenue = self.df[revenue_column].sum()
-        cost = self.df[cost_column].sum()
+    def profit_loss_summary(self, revenue_column: str, cost_column: str) -> dict:
+        report = self.report("profit_loss_summary", "Profit and loss summary", locals())
+        revenue = float(self.numeric(revenue_column).sum())
+        cost = float(self.numeric(cost_column).sum())
         profit = revenue - cost
-        profit_margin = (profit / revenue) * 100 if revenue != 0 else None
+        margin = self.pct(profit, revenue, "Profit margin could not be calculated because total revenue is zero.", report)
 
-        return {
-            "total_revenue": float(revenue),
-            "total_cost": float(cost),
-            "total_profit": float(profit),
-            "profit_margin_percentage": round(float(profit_margin), 2)
-            if profit_margin is not None else None
-        }
+        report.add_kpi("Total revenue", revenue)
+        report.add_kpi("Total cost", cost)
+        report.add_kpi("Total profit", profit)
+        report.add_kpi("Profit margin", margin, "%")
+        report.summary = f"Total revenue is {revenue:,.2f}, total cost is {cost:,.2f}, and profit is {profit:,.2f}."
+        if margin is not None:
+            report.insights.append(f"Profit margin is {margin:.2f}%.")
+        report.add_table("Profit and loss", [{
+            "total_revenue": revenue,
+            "total_cost": cost,
+            "total_profit": profit,
+            "profit_margin_percentage": margin,
+        }])
+        return report.to_dict()
 
-    def add_profit_column(
-        self,
-        revenue_column: str,
-        cost_column: str,
-        profit_column: str = "profit"
-    ) -> pd.DataFrame:
-        self._validate_columns_exist([revenue_column, cost_column])
-        self._validate_numeric_columns([revenue_column, cost_column])
+    def add_profit_column(self, revenue_column: str, cost_column: str, profit_column: str = "profit") -> dict:
+        report = self.report("add_profit_column", "Rows with calculated profit", locals())
+        work = self.df.copy()
+        work[profit_column] = self.numeric(revenue_column) - self.numeric(cost_column)
+        report.summary = f"Calculated '{profit_column}' as {revenue_column} minus {cost_column} for {len(work):,} rows."
+        report.add_kpi("Total profit", float(work[profit_column].sum()))
+        report.add_table("Calculated rows", work.head(100).to_dict(orient="records"))
+        return report.to_dict()
 
-        self.df[profit_column] = self.df[revenue_column] - self.df[cost_column]
-
-        return self.df
-
-    def budget_vs_actual(
-        self,
-        budget_column: str,
-        actual_column: str,
-        group_column: str | None = None
-    ) -> dict | list[dict]:
-        self._validate_columns_exist([budget_column, actual_column])
-        self._validate_numeric_columns([budget_column, actual_column])
-
-        df = self.df.copy()
-        df["variance"] = df[budget_column] - df[actual_column]
-        df["burn_rate_percentage"] = df.apply(
-            lambda row: (row[actual_column] / row[budget_column]) * 100
-            if row[budget_column] != 0 else None,
-            axis=1
-        )
+    def budget_vs_actual(self, budget_column: str, actual_column: str, group_column: str | None = None) -> dict:
+        report = self.report("budget_vs_actual", "Budget vs actual", locals())
+        work = self.df.copy()
+        work[budget_column] = self.numeric(budget_column)
+        work[actual_column] = self.numeric(actual_column)
 
         if group_column:
-            self._validate_columns_exist([group_column])
+            self.validate_columns([group_column])
+            result = work.groupby(group_column, dropna=False)[[budget_column, actual_column]].sum().reset_index()
+        else:
+            result = pd.DataFrame([{budget_column: work[budget_column].sum(), actual_column: work[actual_column].sum()}])
 
-            grouped = (
-                df.groupby(group_column)
-                .agg({
-                    budget_column: "sum",
-                    actual_column: "sum",
-                    "variance": "sum"
-                })
-                .reset_index()
-            )
+        result["variance"] = result[budget_column] - result[actual_column]
+        result["burn_rate_percentage"] = result.apply(
+            lambda row: self.pct(row[actual_column], row[budget_column], "Burn rate could not be calculated for at least one zero budget row.", report),
+            axis=1,
+        )
 
-            grouped["burn_rate_percentage"] = grouped.apply(
-                lambda row: (row[actual_column] / row[budget_column]) * 100
-                if row[budget_column] != 0 else None,
-                axis=1
-            )
+        total_budget = float(result[budget_column].sum())
+        total_actual = float(result[actual_column].sum())
+        report.add_kpi("Total budget", total_budget)
+        report.add_kpi("Total actual", total_actual)
+        report.add_kpi("Variance", float(total_budget - total_actual))
+        report.add_kpi("Burn rate", self.pct(total_actual, total_budget, "Overall burn rate could not be calculated because total budget is zero.", report), "%")
+        report.summary = f"Actual spending is {total_actual:,.2f} against a budget of {total_budget:,.2f}."
+        report.insights.append("Positive variance means budget remains; negative variance means overspend.")
+        report.add_table("Budget vs actual", result.to_dict(orient="records"))
+        if group_column:
+            report.add_chart("Budget vs actual by group", "bar", result.to_dict(orient="records"), group_column, actual_column)
+        return report.to_dict()
 
-            return grouped.to_dict(orient="records")
-
-        total_budget = df[budget_column].sum()
-        total_actual = df[actual_column].sum()
-        variance = total_budget - total_actual
-
-        return {
-            "total_budget": float(total_budget),
-            "total_actual": float(total_actual),
-            "variance": float(variance),
-            "burn_rate_percentage": round(float((total_actual / total_budget) * 100), 2)
-            if total_budget != 0 else None
-        }
-
-    def expense_summary(
-        self,
-        expense_column: str,
-        category_column: str | None = None
-    ) -> dict:
-        self._validate_columns_exist([expense_column])
-        self._validate_numeric_columns([expense_column])
-
-        result = {
-            "total_expense": float(self.df[expense_column].sum()),
-            "average_expense": float(self.df[expense_column].mean()),
-            "max_expense": float(self.df[expense_column].max()),
-            "min_expense": float(self.df[expense_column].min())
-        }
-
+    def expense_summary(self, expense_column: str, category_column: str | None = None) -> dict:
+        report = self.report("expense_summary", "Expense summary", locals())
+        expense = self.numeric(expense_column)
+        report.add_kpi("Total expense", float(expense.sum()))
+        report.add_kpi("Average expense", float(expense.mean()))
+        report.add_kpi("Max expense", float(expense.max()))
+        report.add_kpi("Min expense", float(expense.min()))
+        report.summary = f"Total expense is {expense.sum():,.2f} across {expense.notna().sum():,} valid rows."
         if category_column:
-            self._validate_columns_exist([category_column])
-            result["expense_by_category"] = (
-                self.df.groupby(category_column)[expense_column]
-                .sum()
-                .sort_values(ascending=False)
-                .to_dict()
-            )
+            result = self.group_numeric(category_column, [expense_column], ["count", "sum", "mean"])
+            result = result.sort_values(f"{expense_column}_sum", ascending=False)
+            top = result.iloc[0]
+            report.insights.append(f"The largest expense category is {top[category_column]} with {top[f'{expense_column}_sum']:,.2f}.")
+            report.add_table("Expense by category", result.to_dict(orient="records"))
+            report.add_chart("Expense by category", "bar", result.to_dict(orient="records"), category_column, f"{expense_column}_sum")
+        return report.to_dict()
 
-        return result
+    def revenue_by_group(self, revenue_column: str, group_column: str) -> dict:
+        report = self.report("revenue_by_group", "Revenue by group", locals())
+        result = self.group_numeric(group_column, [revenue_column])
+        result = result.sort_values(f"{revenue_column}_sum", ascending=False)
+        report.summary = f"Revenue is grouped by {group_column} across {len(result):,} groups."
+        if not result.empty:
+            report.insights.append(f"Top revenue group: {result.iloc[0][group_column]}.")
+        report.add_table("Revenue by group", result.to_dict(orient="records"))
+        report.add_chart("Revenue by group", "bar", result.to_dict(orient="records"), group_column, f"{revenue_column}_sum")
+        return report.to_dict()
 
-    def revenue_by_group(
-        self,
-        revenue_column: str,
-        group_column: str
-    ) -> list[dict]:
-        self._validate_columns_exist([revenue_column, group_column])
-        self._validate_numeric_columns([revenue_column])
+    def monthly_summary(self, date_column: str, value_columns: list[str]) -> dict:
+        return self._time_summary("monthly_summary", "Monthly summary", date_column, value_columns, "monthly")
 
-        result = (
-            self.df.groupby(group_column)[revenue_column]
-            .agg(["count", "sum", "mean", "median", "min", "max"])
-            .reset_index()
-        )
+    def daily_summary(self, date_column: str, value_columns: list[str]) -> dict:
+        return self._time_summary("daily_summary", "Daily summary", date_column, value_columns, "daily")
 
-        return result.to_dict(orient="records")
+    def cash_flow_summary(self, inflow_column: str, outflow_column: str) -> dict:
+        report = self.report("cash_flow_summary", "Cash flow summary", locals())
+        inflow = float(self.numeric(inflow_column).sum())
+        outflow = float(self.numeric(outflow_column).sum())
+        net = inflow - outflow
+        report.add_kpi("Total inflow", inflow)
+        report.add_kpi("Total outflow", outflow)
+        report.add_kpi("Net cash flow", net)
+        report.summary = f"Net cash flow is {net:,.2f}, from {inflow:,.2f} inflow and {outflow:,.2f} outflow."
+        report.insights.append("Positive net cash flow indicates more cash entered than left during the selected period." if net >= 0 else "Negative net cash flow indicates cash outflow exceeded inflow.")
+        report.add_table("Cash flow", [{"total_inflow": inflow, "total_outflow": outflow, "net_cash_flow": net}])
+        return report.to_dict()
 
-    def monthly_summary(
-        self,
-        date_column: str,
-        value_columns: list[str]
-    ) -> list[dict]:
-        self._validate_columns_exist([date_column] + value_columns)
-        self._validate_numeric_columns(value_columns)
+    def top_expenses(self, expense_column: str, rows: int = 10) -> dict:
+        report = self.report("top_expenses", "Top expenses", locals())
+        work = self.df.copy()
+        work[expense_column] = self.numeric(expense_column)
+        result = work.sort_values(expense_column, ascending=False).head(rows)
+        report.summary = f"Showing the top {len(result):,} expense rows by {expense_column}."
+        if not result.empty:
+            report.insights.append(f"Largest single expense is {float(result.iloc[0][expense_column]):,.2f}.")
+        report.add_table("Top expenses", result.to_dict(orient="records"))
+        return report.to_dict()
 
-        df = self.df.copy()
-        df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
-        df = df.dropna(subset=[date_column])
-        df["month"] = df[date_column].dt.to_period("M").astype(str)
-
-        summary = df.groupby("month")[value_columns].sum().reset_index()
-
-        return summary.to_dict(orient="records")
-
-    def daily_summary(
-        self,
-        date_column: str,
-        value_columns: list[str]
-    ) -> list[dict]:
-        self._validate_columns_exist([date_column] + value_columns)
-        self._validate_numeric_columns(value_columns)
-
-        df = self.df.copy()
-        df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
-        df = df.dropna(subset=[date_column])
-        df["date"] = df[date_column].dt.date.astype(str)
-
-        summary = df.groupby("date")[value_columns].sum().reset_index()
-
-        return summary.to_dict(orient="records")
-
-    def cash_flow_summary(
-        self,
-        inflow_column: str,
-        outflow_column: str
-    ) -> dict:
-        self._validate_columns_exist([inflow_column, outflow_column])
-        self._validate_numeric_columns([inflow_column, outflow_column])
-
-        total_inflow = self.df[inflow_column].sum()
-        total_outflow = self.df[outflow_column].sum()
-        net_cash_flow = total_inflow - total_outflow
-
-        return {
-            "total_inflow": float(total_inflow),
-            "total_outflow": float(total_outflow),
-            "net_cash_flow": float(net_cash_flow)
-        }
-
-    def top_expenses(
-        self,
-        expense_column: str,
-        rows: int = 10
-    ) -> list[dict]:
-        self._validate_columns_exist([expense_column])
-        self._validate_numeric_columns([expense_column])
-
-        result = (
-            self.df.sort_values(by=expense_column, ascending=False)
-            .head(rows)
-        )
-
-        return result.to_dict(orient="records")
-
-    def financial_ratios(
-        self,
-        revenue_column: str,
-        cost_column: str,
-        expense_column: str | None = None
-    ) -> dict:
-        self._validate_columns_exist([revenue_column, cost_column])
-        self._validate_numeric_columns([revenue_column, cost_column])
-
-        revenue = self.df[revenue_column].sum()
-        cost = self.df[cost_column].sum()
+    def financial_ratios(self, revenue_column: str, cost_column: str, expense_column: str | None = None) -> dict:
+        report = self.report("financial_ratios", "Financial ratios", locals())
+        revenue = float(self.numeric(revenue_column).sum())
+        cost = float(self.numeric(cost_column).sum())
         gross_profit = revenue - cost
-
-        result = {
-            "gross_profit": float(gross_profit),
-            "gross_margin_percentage": round(float((gross_profit / revenue) * 100), 2)
-            if revenue != 0 else None,
-            "cost_to_revenue_percentage": round(float((cost / revenue) * 100), 2)
-            if revenue != 0 else None
-        }
-
+        report.add_kpi("Gross profit", gross_profit)
+        report.add_kpi("Gross margin", self.pct(gross_profit, revenue, "Gross margin could not be calculated because revenue is zero.", report), "%")
+        report.add_kpi("Cost to revenue", self.pct(cost, revenue, "Cost-to-revenue could not be calculated because revenue is zero.", report), "%")
+        row = {"gross_profit": gross_profit}
         if expense_column:
-            self._validate_columns_exist([expense_column])
-            self._validate_numeric_columns([expense_column])
-
-            expense = self.df[expense_column].sum()
+            expense = float(self.numeric(expense_column).sum())
             net_profit = gross_profit - expense
-
-            result["total_expense"] = float(expense)
-            result["net_profit"] = float(net_profit)
-            result["net_margin_percentage"] = round(
-                float((net_profit / revenue) * 100),
-                2
-            ) if revenue != 0 else None
-
-        return result
+            row.update({"total_expense": expense, "net_profit": net_profit})
+            report.add_kpi("Net profit", net_profit)
+            report.add_kpi("Net margin", self.pct(net_profit, revenue, "Net margin could not be calculated because revenue is zero.", report), "%")
+        report.summary = "Financial ratios were calculated from total revenue, cost, and optional expenses."
+        report.add_table("Ratios", [row])
+        return report.to_dict()
 
     def detect_negative_values(self, columns: list[str]) -> dict:
-        self._validate_columns_exist(columns)
-        self._validate_numeric_columns(columns)
-
-        report = {}
-
+        report = self.report("detect_negative_values", "Negative value check", locals())
+        rows = []
         for column in columns:
-            negative_rows = self.df[self.df[column] < 0]
+            values = self.numeric(column)
+            negative_count = int((values < 0).sum())
+            percentage = self.pct(negative_count, len(values)) or 0
+            rows.append({"column": column, "negative_count": negative_count, "negative_percentage": percentage})
+            if negative_count:
+                report.warnings.append(f"{column} contains {negative_count} negative values.")
+        report.summary = f"Checked {len(columns):,} numeric columns for negative values."
+        report.add_table("Negative values", rows)
+        return report.to_dict()
 
-            report[column] = {
-                "negative_count": int(len(negative_rows)),
-                "negative_percentage": round(
-                    float((len(negative_rows) / len(self.df)) * 100),
-                    2
-                ) if len(self.df) > 0 else 0,
-                "sample": negative_rows.head(10).to_dict(orient="records")
-            }
-
-        return report
-
-    def transaction_summary(
-        self,
-        amount_column: str,
-        transaction_id_column: str | None = None
-    ) -> dict:
-        self._validate_columns_exist([amount_column])
-        self._validate_numeric_columns([amount_column])
-
-        result = {
-            "total_amount": float(self.df[amount_column].sum()),
-            "average_amount": float(self.df[amount_column].mean()),
-            "median_amount": float(self.df[amount_column].median()),
-            "min_amount": float(self.df[amount_column].min()),
-            "max_amount": float(self.df[amount_column].max()),
-            "transaction_rows": int(len(self.df))
-        }
-
+    def transaction_summary(self, amount_column: str, transaction_id_column: str | None = None) -> dict:
+        report = self.report("transaction_summary", "Transaction summary", locals())
+        amount = self.numeric(amount_column)
+        report.add_kpi("Total amount", float(amount.sum()))
+        report.add_kpi("Average amount", float(amount.mean()))
+        report.add_kpi("Median amount", float(amount.median()))
+        report.add_kpi("Rows", int(len(self.df)))
         if transaction_id_column:
-            self._validate_columns_exist([transaction_id_column])
-            result["unique_transactions"] = int(self.df[transaction_id_column].nunique())
+            self.validate_columns([transaction_id_column])
+            report.add_kpi("Unique transactions", int(self.df[transaction_id_column].nunique(dropna=True)))
+        report.summary = f"Transaction amount totals {amount.sum():,.2f} over {len(self.df):,} rows."
+        report.add_table("Transaction summary", [{
+            "total_amount": float(amount.sum()),
+            "average_amount": float(amount.mean()),
+            "median_amount": float(amount.median()),
+            "min_amount": float(amount.min()),
+            "max_amount": float(amount.max()),
+            "transaction_rows": int(len(self.df)),
+        }])
+        return report.to_dict()
 
-        return result
-
-    def cost_per_beneficiary(
-        self,
-        cost_column: str,
-        beneficiary_column: str,
-        group_column: str | None = None
-    ) -> dict | list[dict]:
-        self._validate_columns_exist([cost_column, beneficiary_column])
-        self._validate_numeric_columns([cost_column, beneficiary_column])
-
+    def cost_per_beneficiary(self, cost_column: str, beneficiary_column: str, group_column: str | None = None) -> dict:
+        report = self.report("cost_per_beneficiary", "Cost per beneficiary", locals())
+        work = self.df.copy()
+        work[cost_column] = self.numeric(cost_column)
+        work[beneficiary_column] = self.numeric(beneficiary_column)
         if group_column:
-            self._validate_columns_exist([group_column])
-
-            grouped = (
-                self.df.groupby(group_column)
-                .agg({
-                    cost_column: "sum",
-                    beneficiary_column: "sum"
-                })
-                .reset_index()
-            )
-
-            grouped["cost_per_beneficiary"] = grouped.apply(
-                lambda row: row[cost_column] / row[beneficiary_column]
-                if row[beneficiary_column] != 0 else None,
-                axis=1
-            )
-
-            return grouped.to_dict(orient="records")
-
-        total_cost = self.df[cost_column].sum()
-        total_beneficiaries = self.df[beneficiary_column].sum()
-
-        return {
-            "total_cost": float(total_cost),
-            "total_beneficiaries": float(total_beneficiaries),
-            "cost_per_beneficiary": float(total_cost / total_beneficiaries)
-            if total_beneficiaries != 0 else None
-        }
-
-    def donor_funding_summary(
-        self,
-        donor_column: str,
-        amount_column: str
-    ) -> list[dict]:
-        self._validate_columns_exist([donor_column, amount_column])
-        self._validate_numeric_columns([amount_column])
-
-        result = (
-            self.df.groupby(donor_column)[amount_column]
-            .agg(["count", "sum", "mean"])
-            .sort_values(by="sum", ascending=False)
-            .reset_index()
+            self.validate_columns([group_column])
+            result = work.groupby(group_column, dropna=False)[[cost_column, beneficiary_column]].sum().reset_index()
+        else:
+            result = pd.DataFrame([{cost_column: work[cost_column].sum(), beneficiary_column: work[beneficiary_column].sum()}])
+        result["cost_per_beneficiary"] = result.apply(
+            lambda row: self.safe_divide(row[cost_column], row[beneficiary_column], "Cost per beneficiary could not be calculated for at least one zero-beneficiary row.", report),
+            axis=1,
         )
+        report.summary = "Cost per beneficiary was calculated as total cost divided by total beneficiaries."
+        report.add_table("Cost per beneficiary", result.to_dict(orient="records"))
+        if group_column:
+            report.add_chart("Cost per beneficiary by group", "bar", result.to_dict(orient="records"), group_column, "cost_per_beneficiary")
+        return report.to_dict()
 
-        return result.to_dict(orient="records")
+    def donor_funding_summary(self, donor_column: str, amount_column: str) -> dict:
+        report = self.report("donor_funding_summary", "Donor funding summary", locals())
+        result = self.group_numeric(donor_column, [amount_column], ["count", "sum", "mean"])
+        result = result.sort_values(f"{amount_column}_sum", ascending=False)
+        report.summary = f"Funding is summarized across {len(result):,} donors."
+        if not result.empty:
+            report.insights.append(f"Top donor by amount is {result.iloc[0][donor_column]}.")
+        report.add_table("Donor funding", result.to_dict(orient="records"))
+        report.add_chart("Donor funding", "bar", result.to_dict(orient="records"), donor_column, f"{amount_column}_sum")
+        return report.to_dict()
 
-    def _validate_columns_exist(self, columns: list[str]) -> None:
-        missing_columns = [
-            column for column in columns
-            if column not in self.df.columns
-        ]
-
-        if missing_columns:
-            raise ValueError(f"Columns not found: {missing_columns}")
-
-    def _validate_numeric_columns(self, columns: list[str]) -> None:
-        for column in columns:
-            if not pd.api.types.is_numeric_dtype(self.df[column]):
-                raise TypeError(f"Column '{column}' must be numeric")
-
+    def _time_summary(self, report_id: str, title: str, date_column: str, value_columns: list[str], bucket: str) -> dict:
+        report = self.report(report_id, title, locals())
+        result, warnings = self.timeseries_sum(date_column, value_columns, bucket)
+        report.warnings.extend(warnings)
+        report.summary = f"{title} grouped {len(value_columns):,} value columns into {len(result):,} periods."
+        report.add_table(title, result.to_dict(orient="records"))
+        for column in value_columns:
+            report.add_chart(f"{column} by period", "line", result[["period", column]].to_dict(orient="records"), "period", column)
+        return report.to_dict()

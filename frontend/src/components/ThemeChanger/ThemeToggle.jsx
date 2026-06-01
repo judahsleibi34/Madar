@@ -6,9 +6,13 @@ export default function ThemeToggle({
   onChange,
   label = "Theme",
   compact = false,
+  showLabel,
+  showSwitch,
   className = "",
 }) {
   const isDark = mode === "dark";
+  const shouldShowLabel = showLabel ?? !compact;
+  const shouldShowSwitch = showSwitch ?? !compact;
 
   const handleToggle = () => {
     const nextMode = isDark ? "light" : "dark";
@@ -38,10 +42,10 @@ export default function ThemeToggle({
           {isDark ? <Moon size={17} /> : <Sun size={17} />}
         </span>
 
-        {!compact && <span className="theme-toggle-label">{label}</span>}
+        {shouldShowLabel && <span className="theme-toggle-label">{label}</span>}
       </span>
 
-      {!compact && (
+      {shouldShowSwitch && (
         <span className="theme-toggle-switch" aria-hidden="true">
           <span className="theme-toggle-thumb" />
         </span>

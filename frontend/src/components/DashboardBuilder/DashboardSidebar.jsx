@@ -221,7 +221,9 @@ export default function DashboardSidebar({
             mode={activeThemeMode}
             onChange={handleThemeChange}
             label={t.themeMode}
-            compact={compact}
+            compact
+            showLabel
+            showSwitch={false}
             className="admin-sidebar-theme-row"
           />
 

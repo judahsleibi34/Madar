@@ -751,6 +751,15 @@ body.theme-dark {
   color: var(--madar-text) !important;
 }
 
+[data-theme="dark"] .page-builder .analysis-field textarea,
+[data-theme="dark"] .page-builder .analysis-assistant-thread article,
+.theme-dark .page-builder .analysis-field textarea,
+.theme-dark .page-builder .analysis-assistant-thread article {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
 [data-theme="dark"] .page-builder .builder-toast,
 .theme-dark .page-builder .builder-toast {
   background: var(--madar-surface) !important;
