@@ -122,5 +122,17 @@
 
 .theme-dark .theme-toggle-thumb,
 [data-theme="dark"] .theme-toggle-thumb {
-  background: linear-gradient(135deg, #d48a75 0%, #8b2a1a 100%);
+  background: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%);
+  box-shadow: 0 4px 10px rgba(47, 159, 154, 0.22);
+}
+
+.theme-dark .theme-toggle.is-dark .theme-toggle-switch,
+[data-theme="dark"] .theme-toggle.is-dark .theme-toggle-switch {
+  background: rgba(47, 159, 154, 0.18);
+  border-color: rgba(127, 214, 208, 0.38);
+}
+
+.theme-dark .theme-toggle:focus-visible,
+[data-theme="dark"] .theme-toggle:focus-visible {
+  box-shadow: 0 0 0 4px rgba(47, 159, 154, 0.16);
 }
