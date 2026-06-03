@@ -659,6 +659,19 @@ const getDraftProjectFromRecord = (record) => {
   return cleanBuilderProject(record.draft_schema);
 };
 
+const getPreviewCanvasStyle = (viewport, isPreview) => {
+  if (isPreview && viewport === "desktop") {
+    return { width: "100%" };
+  }
+
+  const viewportWidth = viewports[viewport] || viewports.desktop;
+
+  return {
+    width: `${viewportWidth}px`,
+    maxWidth: "100%",
+  };
+};
+
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
@@ -3260,7 +3273,7 @@ export default function PageBuilder({
       >
         <div
           className={`builder-canvas viewport-${viewport}`}
-          style={{ width: `${viewports[viewport]}px` }}
+          style={getPreviewCanvasStyle(viewport, preview)}
         >
           {renderSiteHeader()}
 
