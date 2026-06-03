@@ -190,11 +190,12 @@ def update_website_settings(
             service_supabase.table("website_settings")
             .select("*")
             .eq("user_id", user_id)
-            .maybe_single()
+            .limit(1)
             .execute()
         )
 
-        existing_website = existing_response.data
+        existing_rows = getattr(existing_response, "data", None) or []
+        existing_website = existing_rows[0] if existing_rows else None
 
         if existing_website:
             save_response = (
@@ -251,14 +252,16 @@ def get_website_settings(request: Request, response: Response):
             service_supabase.table("website_settings")
             .select("*")
             .eq("user_id", user_data["id"])
-            .maybe_single()
+            .limit(1)
             .execute()
         )
+
+        website_rows = getattr(website_response, "data", None) or []
 
         return {
             "success": True,
             "message": "Website settings fetched successfully",
-            "website": website_response.data,
+            "website": website_rows[0] if website_rows else None,
         }
 
     except HTTPException:
