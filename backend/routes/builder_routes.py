@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Request, Response
+from fastapi import APIRouter, Body, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from database import service_supabase
@@ -104,6 +104,27 @@ def get_project_for_tenant(project_id: str, tenant_id: int):
 
     return project_rows[0]
 
+
+
+def format_form_submission(row: dict):
+    return {
+        "id": row.get("id"),
+        "form_id": row.get("form_id"),
+        "form_title": row.get("form_title"),
+        "form_version": row.get("form_version"),
+        "createdAt": row.get("submitted_at") or row.get("created_at"),
+        "submitted_at": row.get("submitted_at"),
+        "status": "New" if row.get("status") == "new" else row.get("status"),
+        "answers": row.get("answers") or {},
+        "quiz": row.get("quiz_result"),
+        "field_snapshot": row.get("field_snapshot") or [],
+    }
+
+
+def clamp_pagination(limit: int, offset: int):
+    safe_limit = max(1, min(int(limit or 50), 200))
+    safe_offset = max(0, int(offset or 0))
+    return safe_limit, safe_offset
 
 def first_row(response):
     if not response.data:
@@ -245,6 +266,78 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
     return {
         "success": True,
         "project": first_row(archive_response),
+    }
+
+
+@router.get("/projects/{project_id}/form-submissions")
+def list_builder_form_submissions(
+    project_id: str,
+    request: Request,
+    response: Response,
+    form_id: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    context = require_active_tenant_member(request, response)
+    get_project_for_tenant(project_id, context.tenant_id)
+    safe_limit, safe_offset = clamp_pagination(limit, offset)
+
+    query = (
+        service_supabase.table("builder_form_submissions")
+        .select("*")
+        .eq("tenant_id", context.tenant_id)
+        .eq("project_id", project_id)
+    )
+
+    if form_id:
+        query = query.eq("form_id", form_id.strip())
+
+    submissions_response = (
+        query.order("submitted_at", desc=True)
+        .range(safe_offset, safe_offset + safe_limit - 1)
+        .execute()
+    )
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "submissions": [
+            format_form_submission(row) for row in (submissions_response.data or [])
+        ],
+        "limit": safe_limit,
+        "offset": safe_offset,
+    }
+
+
+@router.get("/projects/{project_id}/form-submissions/{submission_id}")
+def get_builder_form_submission(
+    project_id: str,
+    submission_id: str,
+    request: Request,
+    response: Response,
+):
+    context = require_active_tenant_member(request, response)
+    get_project_for_tenant(project_id, context.tenant_id)
+
+    submission_response = (
+        service_supabase.table("builder_form_submissions")
+        .select("*")
+        .eq("tenant_id", context.tenant_id)
+        .eq("project_id", project_id)
+        .eq("id", submission_id)
+        .limit(1)
+        .execute()
+    )
+
+    submission_rows = getattr(submission_response, "data", None) or []
+    submission = submission_rows[0] if submission_rows else None
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Form submission not found")
+
+    return {
+        "success": True,
+        "submission": format_form_submission(submission),
     }
 
 

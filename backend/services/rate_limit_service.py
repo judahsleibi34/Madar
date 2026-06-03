@@ -27,6 +27,8 @@ PASSWORD_RATE_LIMIT_LIMIT = int(os.getenv("PASSWORD_RATE_LIMIT_LIMIT", "10"))
 PASSWORD_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PASSWORD_RATE_LIMIT_WINDOW_SECONDS", "300"))
 PUBLIC_RATE_LIMIT_LIMIT = int(os.getenv("PUBLIC_RATE_LIMIT_LIMIT", "120"))
 PUBLIC_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PUBLIC_RATE_LIMIT_WINDOW_SECONDS", "60"))
+PUBLIC_FORM_SUBMISSION_RATE_LIMIT_LIMIT = int(os.getenv("PUBLIC_FORM_SUBMISSION_RATE_LIMIT_LIMIT", "20"))
+PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS", "300"))
 
 
 @dataclass
@@ -182,4 +184,18 @@ def enforce_public_rate_limit(request: Request, scope: str, identifier: str | No
         identifier=identifier,
         limit=PUBLIC_RATE_LIMIT_LIMIT,
         window_seconds=PUBLIC_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
+def enforce_public_form_submission_rate_limit(
+    request: Request,
+    scope: str,
+    identifier: str | None = None,
+):
+    return enforce_rate_limit(
+        request,
+        f"public_form_submission:{scope}",
+        identifier=identifier,
+        limit=PUBLIC_FORM_SUBMISSION_RATE_LIMIT_LIMIT,
+        window_seconds=PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
     )
