@@ -4,6 +4,7 @@ import ForgotPasswordPage from "../AuthPages/ForgotPasswordPage";
 import LoginPage from "../AuthPages/LoginPage";
 import SignUpPage from "../AuthPages/SignUpPage";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "./PageBuilder.constants";
+import { fetchPublicSite } from "./PageBuilder.api";
 import { getFormSections } from "./PageBuilder.factories";
 import "../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "./PageBuilderCarousel";
@@ -156,8 +157,30 @@ export default function TenantSiteRuntime() {
 
   const cleanSubdomain = getCleanSubdomain(subdomain);
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
+  const [project, setProject] = useState(() => loadPublishedProject());
 
-  const project = useMemo(() => loadPublishedProject(), []);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBackendPublishedSite = async () => {
+      try {
+        const publicSite = await fetchPublicSite(cleanSubdomain);
+        const publishedProject = publicSite?.project?.published_schema;
+
+        if (!cancelled && publishedProject && typeof publishedProject === "object") {
+          setProject(publishedProject);
+        }
+      } catch (error) {
+        console.warn("Could not load published site from backend:", error);
+      }
+    };
+
+    loadBackendPublishedSite();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanSubdomain]);
   const site = {
     ...defaultSiteChrome,
     ...(project?.siteChrome || {}),
