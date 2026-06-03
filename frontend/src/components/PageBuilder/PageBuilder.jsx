@@ -48,7 +48,7 @@ import {
 } from "./PageBuilder.starters";
 import BuilderResponsesPage from "./BuilderResponsesPage";
 import DataAnalysisWorkspace from "./DataAnalysisWorkspace";
-import { getLocalTenantPath } from "./PageBuilder.routing";
+import { sanitizeSubdomain } from "./PageBuilder.routing";
 import PageBuilderCarousel from "./PageBuilderCarousel";
 import PageBuilderTopbar from "./PageBuilderTopbar";
 import PageBuilderSubbar from "./PageBuilderSubbar";
@@ -59,6 +59,7 @@ import PageBuilderWorkflowsTab from "./PageBuilderWorkflowsTab";
 import {
   createBuilderProject,
   fetchBuilderProject,
+  fetchWebsiteSettings,
   listBuilderProjects,
   publishBuilderProject,
   updateBuilderProject,
@@ -699,6 +700,7 @@ export default function PageBuilder({
   const [runtimeErrors, setRuntimeErrors] = useState({});
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
+  const [liveSitePath, setLiveSitePath] = useState("");
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
 
@@ -2311,8 +2313,21 @@ export default function PageBuilder({
     }
 
     persistProject(publishedProject, "Publishing to backend...");
+    setLiveSitePath("");
+    const liveWindow = window.open("about:blank", "_blank");
 
     try {
+      const websiteSettings = await fetchWebsiteSettings();
+      const publicSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
+
+      if (!publicSubdomain) {
+        if (liveWindow && !liveWindow.closed) {
+          liveWindow.close();
+        }
+        throw new Error("Configure a website subdomain before going live.");
+      }
+
+      const liveSitePath = `/site/${publicSubdomain}/`;
       const payload = {
         name: getBuilderProjectName(publishedProject),
         slug: getBuilderProjectSlug(publishedProject, builderProjectRecord),
@@ -2324,12 +2339,25 @@ export default function PageBuilder({
         : await createBuilderProject(payload);
 
       const publishedRecord = await publishBuilderProject(savedRecord.id);
+
       setBuilderProjectRecord(publishedRecord);
       showToast("Site published to backend.");
-      window.open(getLocalTenantPath(publishedProject), "_blank", "noopener,noreferrer");
+
+      if (liveWindow && !liveWindow.closed) {
+        liveWindow.location.href = liveSitePath;
+      } else {
+        const openedWindow = window.open(liveSitePath, "_blank", "noopener,noreferrer");
+        if (!openedWindow) {
+          setLiveSitePath(liveSitePath);
+          showToast("Site published. Use the open live site link.");
+        }
+      }
     } catch (error) {
+      if (liveWindow && !liveWindow.closed) {
+        liveWindow.close();
+      }
       console.error("Could not publish builder project:", error);
-      showToast("Publish failed. Local draft cache was updated.");
+      showToast(error?.message || "Publish failed. Local draft cache was updated.");
     }
   };
 
@@ -4269,6 +4297,16 @@ export default function PageBuilder({
       )}
 
       {toast && <div className="builder-toast">{toast}</div>}
+      {liveSitePath && (
+        <a
+          className="builder-live-site-link"
+          href={liveSitePath}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open live site
+        </a>
+      )}
     </div>
   );
 }

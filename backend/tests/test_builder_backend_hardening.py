@@ -69,6 +69,11 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                      "draft_schema": {"pages": []},
                      "published_version": 0,
                  },
+             ), \
+             patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
              ):
             response = client.post("/builder/projects/project-1/publish")
 
@@ -91,12 +96,47 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                      "draft_schema": {"version": 1},
                      "published_version": 2,
                  },
+             ), \
+             patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
              ):
             response = client.post("/builder/projects/project-1/publish", json={})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["project"]["published_schema"], {"version": 1})
         self.assertEqual(fake_supabase.query.payload["published_version"], 3)
+
+
+    def test_publish_requires_configured_site_subdomain(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase),              patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()),              patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "draft_schema": {"pages": []},
+                     "published_version": 0,
+                 },
+             ),              patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 side_effect=HTTPException(
+                     status_code=400,
+                     detail="Configure a website subdomain before going live.",
+                 ),
+             ):
+            response = client.post("/builder/projects/project-1/publish")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Configure a website subdomain before going live.",
+        )
 
     def test_member_cannot_archive_project(self):
         with patch(

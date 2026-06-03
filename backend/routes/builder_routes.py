@@ -6,6 +6,7 @@ from fastapi import APIRouter, Body, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from database import service_supabase
+from services.website_settings_service import require_public_subdomain
 from services.tenant_service import (
     TenantContext,
     require_active_tenant_member,
@@ -256,6 +257,7 @@ def publish_builder_project(
 ):
     context = require_builder_write_access(request, response)
     project = get_project_for_tenant(project_id, context.tenant_id)
+    website_settings = require_public_subdomain(context.tenant_id, context.user_id)
 
     publish_payload = {
         "published_schema": assert_json_object(project.get("draft_schema") or {}),
@@ -275,4 +277,8 @@ def publish_builder_project(
     return {
         "success": True,
         "project": first_row(publish_response),
+        "site": {
+            "subdomain": website_settings.get("subdomain"),
+            "tenant_id": website_settings.get("tenant_id"),
+        },
     }

@@ -110,6 +110,17 @@ export const publishBuilderProject = async (projectId) => {
   return data?.project || null;
 };
 
+export const fetchWebsiteSettings = async () => {
+  const response = await fetch(getApiUrl("/website/settings"), {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  const data = await parseJsonResponse(response);
+  return data?.website || null;
+};
+
 export const fetchPublicSite = async (subdomain) => {
   const response = await fetch(getApiUrl(`/public/sites/${subdomain}`), {
     method: "GET",
