@@ -91,3 +91,15 @@ def require_builder_write_access(
         raise HTTPException(status_code=403, detail="Builder write access required")
 
     return context
+
+
+def require_builder_admin_access(
+    request: Request,
+    response: Response | None = None,
+) -> TenantContext:
+    context = get_current_tenant_context(request, response)
+
+    if context.role not in {"owner", "admin"}:
+        raise HTTPException(status_code=403, detail="Builder admin access required")
+
+    return context

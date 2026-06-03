@@ -184,7 +184,12 @@ def update_website_settings(
             }
 
         user_id = user_data["id"]
-        tenant_id = user_data.get("tenant_id") or user_id
+        tenant_id = user_data.get("tenant_id")
+
+        if tenant_id is None:
+            raise HTTPException(status_code=403, detail="User does not belong to a tenant")
+
+        update_payload["tenant_id"] = tenant_id
 
         existing_response = (
             service_supabase.table("website_settings")

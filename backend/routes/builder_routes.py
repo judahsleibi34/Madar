@@ -2,13 +2,14 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Body, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from database import service_supabase
 from services.tenant_service import (
     TenantContext,
     require_active_tenant_member,
+    require_builder_admin_access,
     require_builder_write_access,
 )
 
@@ -229,7 +230,7 @@ def update_builder_project(
 
 @router.delete("/projects/{project_id}")
 def archive_builder_project(project_id: str, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    context = require_builder_admin_access(request, response)
     get_project_for_tenant(project_id, context.tenant_id)
 
     archive_response = (
@@ -249,9 +250,9 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
 @router.post("/projects/{project_id}/publish")
 def publish_builder_project(
     project_id: str,
-    publish: BuilderProjectPublish,
     request: Request,
     response: Response,
+    publish: Optional[BuilderProjectPublish] = Body(default=None),
 ):
     context = require_builder_write_access(request, response)
     project = get_project_for_tenant(project_id, context.tenant_id)
