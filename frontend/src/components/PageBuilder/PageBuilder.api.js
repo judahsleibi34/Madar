@@ -121,6 +121,30 @@ export const fetchWebsiteSettings = async () => {
   return data?.website || null;
 };
 
+export const fetchBuilderFormSubmissions = async (
+  projectId,
+  { form_id, limit = 100, offset = 0 } = {}
+) => {
+  const params = new URLSearchParams();
+
+  if (form_id) params.set("form_id", form_id);
+  if (limit !== undefined && limit !== null) params.set("limit", String(limit));
+  if (offset !== undefined && offset !== null) params.set("offset", String(offset));
+
+  const query = params.toString();
+  const response = await fetch(
+    getApiUrl(`/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`),
+    {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    }
+  );
+
+  const data = await parseJsonResponse(response);
+  return data?.submissions || [];
+};
+
 export const submitPublicFormSubmission = async (subdomain, formId, payload) => {
   const response = await fetch(
     getApiUrl(`/public/sites/${subdomain}/forms/${formId}/submissions`),

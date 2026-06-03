@@ -4114,6 +4114,7 @@ export default function PageBuilder({
   const renderResponsesTab = () => (
     <BuilderResponsesPage
       project={project}
+      builderProjectId={builderProjectRecord?.id || ""}
       lang={lang}
       activeForm={activeForm}
       selectForm={selectForm}
