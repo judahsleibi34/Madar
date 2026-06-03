@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from database import service_supabase, supabase
 from classes import SignUpRequest, LogIn, UpdatePassword
+from services.rate_limit_service import enforce_auth_rate_limit
 from services.auth_service import (
     set_auth_cookies,
     delete_auth_cookies,
@@ -88,7 +89,7 @@ def get_auth_error_message(error: Exception) -> str:
 
 
 @router.post("/signup")
-def signup(user: SignUpRequest):
+def signup(user: SignUpRequest, request: Request):
     auth_user_id = None
     tenant_id = None
     signup_complete = False
@@ -101,6 +102,8 @@ def signup(user: SignUpRequest):
 
         if not clean_email:
             raise HTTPException(status_code=400, detail="Email is required")
+
+        enforce_auth_rate_limit(request, "signup", clean_email)
 
         if not first_name or not last_name:
             raise HTTPException(
@@ -253,12 +256,14 @@ def signup(user: SignUpRequest):
 
 
 @router.post("/login")
-def login(user: LogIn, response: Response):
+def login(user: LogIn, response: Response, request: Request):
     try:
         clean_email = normalize_email(user.email)
 
         if not clean_email:
             raise HTTPException(status_code=400, detail="Email is required")
+
+        enforce_auth_rate_limit(request, "login", clean_email)
 
         auth_response = supabase.auth.sign_in_with_password(
             {

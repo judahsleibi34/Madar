@@ -19,6 +19,7 @@ from routes.website_routes import router as website_router
 from routes.features_routes import router as features_router
 
 from services.auth_service import get_authenticated_user_row
+from services.request_security import get_allowed_origins, validate_cookie_write_origin
 
 app = FastAPI()
 
@@ -41,6 +42,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+ALLOWED_CSRF_ORIGINS = get_allowed_origins(FRONTEND_URLS)
+
+
+@app.middleware("http")
+async def csrf_origin_middleware(request: Request, call_next):
+    blocked_response = validate_cookie_write_origin(request, ALLOWED_CSRF_ORIGINS)
+
+    if blocked_response is not None:
+        return blocked_response
+
+    return await call_next(request)
 
 
 @app.get("/")

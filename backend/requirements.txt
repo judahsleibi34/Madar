@@ -60,3 +60,4 @@ pandas
 seaborn
 matplotlib
 python-multipart
+redis==5.0.8

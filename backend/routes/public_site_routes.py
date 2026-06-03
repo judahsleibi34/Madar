@@ -1,8 +1,9 @@
 import re
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from database import service_supabase
+from services.rate_limit_service import enforce_public_rate_limit
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 
@@ -64,8 +65,9 @@ def resolve_tenant_id(settings: dict):
 
 
 @router.get("/sites/{subdomain}")
-def get_public_site(subdomain: str):
+def get_public_site(subdomain: str, request: Request):
     clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
 
