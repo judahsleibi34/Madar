@@ -250,6 +250,45 @@
   white-space: nowrap;
 }
 
+
+.page-builder .responses-table-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-builder .responses-pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-builder .responses-pagination-controls span {
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.page-builder .responses-refresh-button,
+.page-builder .responses-pagination-controls button {
+  border: 1px solid var(--madar-border);
+  background: var(--madar-surface);
+  color: var(--madar-text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .responses-refresh-button:disabled,
+.page-builder .responses-pagination-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .page-builder .form-info-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

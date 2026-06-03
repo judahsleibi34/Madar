@@ -40,6 +40,11 @@ const responsesText = {
     loadingText: "Fetching the latest saved submissions for this form.",
     errorTitle: "Could not load submissions",
     errorText: "Try again in a moment or confirm you still have access to this project.",
+    refresh: "Refresh",
+    refreshing: "Refreshing...",
+    previous: "Previous",
+    next: "Next",
+    page: "Page",
   },
   ar: {
     kicker: "\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0646\u0645\u0648\u0630\u062c",
@@ -79,6 +84,11 @@ const responsesText = {
     loadingText: "\u064a\u062a\u0645 \u062c\u0644\u0628 \u0623\u062d\u062f\u062b \u0627\u0644\u0631\u062f\u0648\u062f \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0646\u0645\u0648\u0630\u062c.",
     errorTitle: "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0631\u062f\u0648\u062f",
     errorText: "\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649 \u0628\u0639\u062f \u0642\u0644\u064a\u0644 \u0623\u0648 \u062a\u0623\u0643\u062f \u0645\u0646 \u0635\u0644\u0627\u062d\u064a\u0629 \u0627\u0644\u0648\u0635\u0648\u0644.",
+    refresh: "\u062a\u062d\u062f\u064a\u062b",
+    refreshing: "\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u062f\u064a\u062b...",
+    previous: "\u0627\u0644\u0633\u0627\u0628\u0642",
+    next: "\u0627\u0644\u062a\u0627\u0644\u064a",
+    page: "\u0635\u0641\u062d\u0629",
   },
 };
 
@@ -90,6 +100,8 @@ const normalizeBackendResponse = (submission) => ({
   quiz: submission?.quiz || submission?.quiz_result || null,
   backendSubmission: true,
 });
+
+const RESPONSE_PAGE_SIZE = 50;
 
 const getResponseLoadMessage = (error, t) => {
   if (error?.status === 403) {
@@ -120,8 +132,12 @@ export default function BuilderResponsesPage({
   const selectedFormId = selectedForm?.id || "";
   const allForms = project.forms || [];
   const [backendResponsesByForm, setBackendResponsesByForm] = useState({});
+  const [responsePageByForm, setResponsePageByForm] = useState({});
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responsesError, setResponsesError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const selectedPage = responsePageByForm[selectedFormId] || 0;
+  const selectedOffset = selectedPage * RESPONSE_PAGE_SIZE;
 
   useEffect(() => {
     if (!builderProjectId || !selectedFormId) {
@@ -136,8 +152,8 @@ export default function BuilderResponsesPage({
 
     fetchBuilderFormSubmissions(builderProjectId, {
       form_id: selectedFormId,
-      limit: 200,
-      offset: 0,
+      limit: RESPONSE_PAGE_SIZE,
+      offset: selectedOffset,
     })
       .then((submissions) => {
         if (cancelled) return;
@@ -157,7 +173,20 @@ export default function BuilderResponsesPage({
     return () => {
       cancelled = true;
     };
-  }, [builderProjectId, selectedFormId, t]);
+  }, [builderProjectId, selectedFormId, selectedOffset, refreshKey, t]);
+
+  const refreshResponses = () => {
+    if (!builderProjectId || !selectedFormId || responsesLoading) return;
+    setRefreshKey((current) => current + 1);
+  };
+
+  const setSelectedPage = (page) => {
+    if (!builderProjectId || !selectedFormId || responsesLoading) return;
+    setResponsePageByForm((current) => ({
+      ...current,
+      [selectedFormId]: Math.max(0, page),
+    }));
+  };
 
   const getDisplayResponsesForForm = (form) => {
     if (!form) return [];
@@ -184,7 +213,10 @@ export default function BuilderResponsesPage({
   const isQuiz = selectedForm?.mode === "quiz";
   const requiredFields = fields.filter((field) => field.required);
   const optionalFields = Math.max(0, fields.length - requiredFields.length);
-  const latestResponse = responses[0];
+  const latestResponse = selectedPage === 0 ? responses[0] : null;
+  const hasBackendPagination = Boolean(builderProjectId && selectedFormId);
+  const hasNextPage = hasBackendPagination && responses.length === RESPONSE_PAGE_SIZE;
+  const hasPreviousPage = hasBackendPagination && selectedPage > 0;
   const answeredCells = responses.reduce(
     (total, response) =>
       total +
@@ -318,8 +350,43 @@ export default function BuilderResponsesPage({
                   </p>
                 </div>
 
-                <div className="results-count-pill">
-                  {responses.length} {responses.length === 1 ? t.response : t.responses}
+                <div className="responses-table-controls">
+                  {hasBackendPagination && (
+                    <div className="responses-pagination-controls">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPage(selectedPage - 1)}
+                        disabled={!hasPreviousPage || responsesLoading}
+                      >
+                        {t.previous}
+                      </button>
+                      <span>
+                        {t.page} {selectedPage + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPage(selectedPage + 1)}
+                        disabled={!hasNextPage || responsesLoading}
+                      >
+                        {t.next}
+                      </button>
+                    </div>
+                  )}
+
+                  {hasBackendPagination && (
+                    <button
+                      type="button"
+                      className="responses-refresh-button"
+                      onClick={refreshResponses}
+                      disabled={responsesLoading}
+                    >
+                      {responsesLoading ? t.refreshing : t.refresh}
+                    </button>
+                  )}
+
+                  <div className="results-count-pill">
+                    {responses.length} {responses.length === 1 ? t.response : t.responses}
+                  </div>
                 </div>
               </div>
 
