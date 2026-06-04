@@ -1277,3 +1277,224 @@ body.theme-dark .gradient-text[style*="139, 42, 26"] {
   -webkit-background-clip: text !important;
   background-clip: text !important;
 }
+
+/* ============================================================
+   GLOBAL DARK BLUE CONSISTENCY FINAL PASS
+   One last website-wide guard so public, auth, tenant, dashboard,
+   and PageBuilder pages use the same blue/teal dark mode.
+   ============================================================ */
+
+:root[data-theme="dark"],
+body.theme-dark {
+  --madar-bg: #07111f;
+  --madar-surface: #101c2d;
+  --madar-surface-soft: #162235;
+  --madar-text: #f5f7fb;
+  --madar-muted: #aab7c7;
+  --madar-navy: #24385f;
+  --madar-red: #7fd6d0;
+  --madar-red-dark: #4fb7b1;
+  --madar-border: rgba(126, 158, 181, 0.16);
+  --madar-border-strong: rgba(126, 158, 181, 0.26);
+  --madar-gradient: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%);
+  --madar-gradient-hover: linear-gradient(135deg, #5f89a7 0%, #9fe7df 100%);
+  --madar-button-shadow: 0 14px 28px rgba(47, 159, 154, 0.18);
+  --madar-button-shadow-hover: 0 18px 34px rgba(47, 159, 154, 0.22);
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] .app-shell,
+body.theme-dark,
+body.theme-dark .app-shell,
+[data-theme="dark"] .tenant-site-runtime,
+body.theme-dark .tenant-site-runtime {
+  background: #07111f !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .app-main,
+body.theme-dark .app-main,
+[data-theme="dark"] .tenant-runtime-main,
+[data-theme="dark"] .tenant-login-runtime,
+body.theme-dark .tenant-runtime-main,
+body.theme-dark .tenant-login-runtime {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+}
+
+[data-theme="dark"] .site-header,
+[data-theme="dark"] header,
+[data-theme="dark"] .tenant-site-header,
+body.theme-dark .site-header,
+body.theme-dark header,
+body.theme-dark .tenant-site-header {
+  background: rgba(7, 17, 31, 0.96) !important;
+  border-color: rgba(126, 158, 181, 0.18) !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .footer,
+[data-theme="dark"] footer,
+[data-theme="dark"] .tenant-site-footer,
+body.theme-dark .footer,
+body.theme-dark footer,
+body.theme-dark .tenant-site-footer {
+  background:
+    radial-gradient(circle at 86% 12%, rgba(47, 159, 154, 0.1), transparent 24%),
+    linear-gradient(135deg, #050b14 0%, #07111f 56%, #0a0d18 100%) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .features-demo-panel,
+[data-theme="dark"] .pricing-card,
+[data-theme="dark"] .pricing-tabs,
+[data-theme="dark"] .contact-info-card,
+[data-theme="dark"] .contact-form,
+[data-theme="dark"] .team-profile-card,
+[data-theme="dark"] .register-card,
+[data-theme="dark"] .login-card,
+[data-theme="dark"] .forgot-card,
+[data-theme="dark"] .reset-card,
+[data-theme="dark"] .already-signed-card,
+[data-theme="dark"] .builder-gallery-shell,
+[data-theme="dark"] .tenant-runtime-card,
+[data-theme="dark"] .tenant-login-card,
+body.theme-dark .feature-card,
+body.theme-dark .features-demo-panel,
+body.theme-dark .pricing-card,
+body.theme-dark .pricing-tabs,
+body.theme-dark .contact-info-card,
+body.theme-dark .contact-form,
+body.theme-dark .team-profile-card,
+body.theme-dark .register-card,
+body.theme-dark .login-card,
+body.theme-dark .forgot-card,
+body.theme-dark .reset-card,
+body.theme-dark .already-signed-card,
+body.theme-dark .builder-gallery-shell,
+body.theme-dark .tenant-runtime-card,
+body.theme-dark .tenant-login-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border: 1px solid rgba(126, 158, 181, 0.16) !important;
+  color: #f5f7fb !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24) !important;
+}
+
+[data-theme="dark"] .gradient-text,
+body.theme-dark .gradient-text,
+[data-theme="dark"] .features-hero > span,
+[data-theme="dark"] .pricing-header span,
+[data-theme="dark"] .builder-gallery-info span,
+[data-theme="dark"] .profile-role,
+[data-theme="dark"] .contact-info-card strong,
+[data-theme="dark"] .arabic-name,
+[data-theme="dark"] .plan-name,
+[data-theme="dark"] .feature-icon,
+[data-theme="dark"] .tenant-eyebrow,
+body.theme-dark .features-hero > span,
+body.theme-dark .pricing-header span,
+body.theme-dark .builder-gallery-info span,
+body.theme-dark .profile-role,
+body.theme-dark .contact-info-card strong,
+body.theme-dark .arabic-name,
+body.theme-dark .plan-name,
+body.theme-dark .feature-icon,
+body.theme-dark .tenant-eyebrow {
+  color: #7fd6d0 !important;
+  --gradient-text-colors: #7fd6d0, #9fe7df, #ffffff !important;
+}
+
+[data-theme="dark"] .features-demo-cta,
+[data-theme="dark"] .btn-signup,
+[data-theme="dark"] .register-submit,
+[data-theme="dark"] .login-submit,
+[data-theme="dark"] .forgot-card button,
+[data-theme="dark"] .reset-card button,
+[data-theme="dark"] .contact-form button,
+[data-theme="dark"] .plan-btn.primary,
+[data-theme="dark"] .pricing-card:hover .plan-btn,
+[data-theme="dark"] .pricing-card.is-active-plan .plan-btn,
+[data-theme="dark"] .pricing-tabs button.active,
+[data-theme="dark"] .tenant-site-cta,
+[data-theme="dark"] .tenant-runtime-actions button,
+body.theme-dark .features-demo-cta,
+body.theme-dark .btn-signup,
+body.theme-dark .register-submit,
+body.theme-dark .login-submit,
+body.theme-dark .forgot-card button,
+body.theme-dark .reset-card button,
+body.theme-dark .contact-form button,
+body.theme-dark .plan-btn.primary,
+body.theme-dark .pricing-card:hover .plan-btn,
+body.theme-dark .pricing-card.is-active-plan .plan-btn,
+body.theme-dark .pricing-tabs button.active,
+body.theme-dark .tenant-site-cta,
+body.theme-dark .tenant-runtime-actions button {
+  background: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%) !important;
+  border-color: rgba(127, 214, 208, 0.42) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.18) !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus,
+body.theme-dark input:focus,
+body.theme-dark textarea:focus,
+body.theme-dark select:focus {
+  border-color: rgba(127, 214, 208, 0.58) !important;
+  box-shadow: 0 0 0 4px rgba(47, 159, 154, 0.16) !important;
+}
+
+[data-theme="dark"] [style*="#8b2a1a"],
+[data-theme="dark"] [style*="#6e2014"],
+[data-theme="dark"] [style*="#c2410c"],
+[data-theme="dark"] [style*="#9a3412"],
+[data-theme="dark"] [style*="#b6422d"],
+[data-theme="dark"] [style*="139, 42, 26"],
+[data-theme="dark"] [style*="194, 65, 12"],
+body.theme-dark [style*="#8b2a1a"],
+body.theme-dark [style*="#6e2014"],
+body.theme-dark [style*="#c2410c"],
+body.theme-dark [style*="#9a3412"],
+body.theme-dark [style*="#b6422d"],
+body.theme-dark [style*="139, 42, 26"],
+body.theme-dark [style*="194, 65, 12"] {
+  color: #7fd6d0 !important;
+  background: rgba(47, 159, 154, 0.12) !important;
+  border-color: rgba(127, 214, 208, 0.32) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .gradient-text,
+[data-theme="dark"] .gradient-text[style*="#8b2a1a"],
+[data-theme="dark"] .gradient-text[style*="#6e2014"],
+[data-theme="dark"] .gradient-text[style*="#c2410c"],
+[data-theme="dark"] .gradient-text[style*="#9a3412"],
+[data-theme="dark"] .gradient-text[style*="#b6422d"],
+[data-theme="dark"] .gradient-text[style*="139, 42, 26"],
+[data-theme="dark"] .gradient-text[style*="194, 65, 12"],
+body.theme-dark .gradient-text,
+body.theme-dark .gradient-text[style*="#8b2a1a"],
+body.theme-dark .gradient-text[style*="#6e2014"],
+body.theme-dark .gradient-text[style*="#c2410c"],
+body.theme-dark .gradient-text[style*="#9a3412"],
+body.theme-dark .gradient-text[style*="#b6422d"],
+body.theme-dark .gradient-text[style*="139, 42, 26"],
+body.theme-dark .gradient-text[style*="194, 65, 12"] {
+  color: transparent !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(
+    var(--gradient-text-angle, 90deg),
+    var(--gradient-text-colors, #7fd6d0, #9fe7df, #ffffff)
+  ) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}

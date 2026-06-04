@@ -1,6 +1,7 @@
 import math
 import ipaddress
 import os
+import re
 import socket
 import time
 from collections import OrderedDict
@@ -24,13 +25,23 @@ class DataReadingNormal:
     ]
     SHARED_CACHE_MAX_ITEMS = int(os.getenv("DATAFRAME_CACHE_MAX_ITEMS", "16"))
     URL_CACHE_SECONDS = int(os.getenv("DATAFRAME_URL_CACHE_SECONDS", "60"))
+    MAX_REMOTE_BYTES = int(os.getenv("MAX_REMOTE_DATA_BYTES", str(10 * 1024 * 1024)))
+    MAX_ROWS = int(os.getenv("DATAFRAME_MAX_ROWS", "100000"))
+    MAX_COLUMNS = int(os.getenv("DATAFRAME_MAX_COLUMNS", "500"))
     _shared_df_cache: OrderedDict[str, pd.DataFrame] = OrderedDict()
 
-    def __init__(self, input_path: str) -> None:
+    def __init__(
+        self,
+        input_path: str,
+        tenant_id: str | int | None = None,
+        user_id: str | int | None = None,
+    ) -> None:
         if not input_path:
             raise ValueError("input_path is required")
 
         self.input_path = input_path
+        self.tenant_id = tenant_id
+        self.user_id = user_id
         self._cached_df: pd.DataFrame | None = None
 
     def read(self, refresh: bool = False) -> pd.DataFrame:
@@ -60,7 +71,7 @@ class DataReadingNormal:
             return df.copy(deep=True)
 
         except Exception as error:
-            raise RuntimeError(f"Failed to read data: {error}") from error
+            raise RuntimeError("Failed to read data") from error
 
     def clear_cache(self) -> None:
         self._cached_df = None
@@ -181,6 +192,12 @@ class DataReadingNormal:
         df = df.dropna(how="all")
         df = df.dropna(axis=1, how="all")
 
+        if len(df) > self.MAX_ROWS:
+            raise ValueError("Dataset has too many rows")
+
+        if len(df.columns) > self.MAX_COLUMNS:
+            raise ValueError("Dataset has too many columns")
+
         cleaned_columns = []
         seen = {}
 
@@ -289,14 +306,33 @@ class DataReadingNormal:
         upload_root = Path(os.getenv("DATA_UPLOAD_DIR", "uploads")).resolve()
         requested = Path(file_path)
         resolved = (Path.cwd() / requested).resolve() if not requested.is_absolute() else requested.resolve()
+        allowed_root = self._scoped_upload_root(upload_root)
 
-        if upload_root != resolved and upload_root not in resolved.parents:
+        if allowed_root != resolved and allowed_root not in resolved.parents:
             raise ValueError("Only uploaded data files can be read")
 
         if not resolved.is_file():
             raise ValueError("Uploaded data file was not found")
 
         return resolved
+
+    def _scoped_upload_root(self, upload_root: Path) -> Path:
+        if self.tenant_id is None or self.user_id is None:
+            return upload_root
+
+        return (
+            upload_root
+            / self._safe_scope_part("tenant", self.tenant_id)
+            / self._safe_scope_part("user", self.user_id)
+        ).resolve()
+
+    def _safe_scope_part(self, prefix: str, value: str | int) -> str:
+        text = str(value).strip()
+
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", text):
+            raise ValueError("Invalid upload storage scope")
+
+        return f"{prefix}_{text}"
 
     def _fetch_public_url(self, url: str) -> requests.Response:
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -309,18 +345,51 @@ class DataReadingNormal:
                 timeout=30,
                 headers=headers,
                 allow_redirects=False,
+                stream=True,
             )
 
             if response.is_redirect:
+                response.close()
                 location = response.headers.get("Location")
                 if not location:
                     raise ValueError("URL redirected without a location")
                 current_url = urljoin(current_url, location)
                 continue
 
+            self._buffer_limited_response(response)
             return response
 
         raise ValueError("URL redirected too many times")
+
+    def _buffer_limited_response(self, response: requests.Response) -> None:
+        content_length = response.headers.get("Content-Length")
+
+        if content_length:
+            try:
+                if int(content_length) > self.MAX_REMOTE_BYTES:
+                    response.close()
+                    raise ValueError("Remote data file is too large")
+            except ValueError:
+                response.close()
+                raise ValueError("Remote data file is too large")
+
+        chunks = []
+        total = 0
+
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if not chunk:
+                continue
+
+            total += len(chunk)
+
+            if total > self.MAX_REMOTE_BYTES:
+                response.close()
+                raise ValueError("Remote data file is too large")
+
+            chunks.append(chunk)
+
+        response._content = b"".join(chunks)
+        response._content_consumed = True
 
     def _validate_public_url(self, url: str) -> None:
         parsed = urlparse(url)

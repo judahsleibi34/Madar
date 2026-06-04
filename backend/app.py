@@ -3,18 +3,19 @@ import os
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from data_analysis.analysis_routes import router as analysis_router
-from data_analysis.cleaning_routes import router as cleaning_router
-from data_analysis.data_routes import router as data_router
-from data_analysis.visualization_routes import router as visualization_router
+from data_analysis.routes.analysis_routes import router as analysis_router
+from data_analysis.routes.cleaning_routes import router as cleaning_router
+from data_analysis.routes.data_routes import router as data_router
+from data_analysis.routes.visualization_routes import router as visualization_router
 
+from routes.admin_billing_routes import router as admin_billing_router
+from routes.admin_user_routes import router as admin_user_router
 from routes.auth_routes import router as auth_router
-from routes.contact_routes import router as contact_router
+from routes.billing_routes import router as billing_router
 from routes.password_routes import router as password_router
 from routes.server_status_routes import router as server_status_router
 from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
-from routes.features_routes import router as features_router
 
 from services.auth_service import get_authenticated_user_row
 
@@ -51,8 +52,9 @@ app.include_router(user_router)
 app.include_router(website_router)
 app.include_router(password_router)
 app.include_router(server_status_router)
-app.include_router(contact_router)
-app.include_router(features_router)
+app.include_router(billing_router)
+app.include_router(admin_billing_router)
+app.include_router(admin_user_router)
 
 protected_data_dependencies = [Depends(require_authenticated_user)]
 

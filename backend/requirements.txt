@@ -60,3 +60,11 @@ pandas
 seaborn
 matplotlib
 python-multipart
+python-dotenv
+google-genai
+openai
+numpy
+scipy
+scikit-learn
+statsmodels
+openpyxl

@@ -7,9 +7,11 @@ import {
   ClipboardList,
   Database,
   CreditCard,
+  ShieldCheck,
   Settings,
   LogOut,
   Languages,
+  UsersRound,
 } from "lucide-react";
 
 import ThemeToggle from "../ThemeChanger/ThemeToggle";
@@ -174,7 +176,21 @@ export default function DashboardSidebar({
 
   const displayName = user?.name || user?.email || "Madar User";
   const displayEmail = user?.email || "";
+  const isAdminUser = user?.user_type === "admin";
+  const adminLabel = lang === "ar" ? "Admin" : "Admin";
+  const userManagementLabel = lang === "ar" ? "User Management" : "User Management";
   const avatarLetter = displayName.trim().slice(0, 1).toUpperCase() || "M";
+  const visibleNavItemsTop = isAdminUser
+    ? [
+        ...navItemsTop.slice(0, 2),
+        {
+          label: userManagementLabel,
+          path: "/admin/users",
+          icon: UsersRound,
+        },
+        ...navItemsTop.slice(2),
+      ]
+    : navItemsTop;
 
   return (
     <aside
@@ -200,7 +216,7 @@ export default function DashboardSidebar({
         </button>
 
         <nav className="admin-sidebar-nav" aria-label="Dashboard navigation">
-          {navItemsTop.map((item) => {
+          {visibleNavItemsTop.map((item) => {
             const Icon = item.icon;
 
             return (
@@ -274,7 +290,15 @@ export default function DashboardSidebar({
           )}
 
           <div className="admin-sidebar-user-info">
-            <strong>{displayName}</strong>
+            <div className="admin-sidebar-user-title-row">
+              <strong>{displayName}</strong>
+              {isAdminUser && (
+                <span className="admin-sidebar-admin-badge" title={adminLabel}>
+                  <ShieldCheck size={12} />
+                  {adminLabel}
+                </span>
+              )}
+            </div>
             {displayEmail && <span>{displayEmail}</span>}
           </div>
         </div>

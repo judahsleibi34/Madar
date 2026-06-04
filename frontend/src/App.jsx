@@ -26,6 +26,7 @@ import DashboardSidebar from "./components/DashboardBuilder/DashboardSidebar";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import SettingsPage from "./components/DashboardBuilder/SettingsPage";
 import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage";
+import UserManagementPage from "./components/DashboardBuilder/UserManagementPage";
 import MyPlanPage from "./components/MainPages/MyPlanPage";
 
 import PageBuilder from "./components/PageBuilder";
@@ -61,6 +62,7 @@ export default function App() {
     location.pathname.startsWith("/builder-responses") ||
     location.pathname.startsWith("/builder-data") ||
     location.pathname.startsWith("/my-plan") ||
+    location.pathname.startsWith("/admin/users") ||
     location.pathname.startsWith("/settings");
 
   const normalizeUser = useCallback((userInfo) => {
@@ -84,6 +86,7 @@ export default function App() {
       avatar: userInfo?.avatar || userInfo?.avatar_url || "",
       subscription_type: userInfo?.subscription_type || "",
       payment_status: userInfo?.payment_status || "",
+      user_type: userInfo?.user_type || "user",
       created_at: userInfo?.created_at || "",
       updated_at: userInfo?.updated_at || "",
     };
@@ -640,6 +643,21 @@ export default function App() {
                 renderDashboardSkeleton("Loading my plan")
               ) : isLoggedIn ? (
                 renderDashboardShell(<MyPlanPage lang={lang} />)
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton("Loading user management")
+              ) : isLoggedIn ? (
+                renderDashboardShell(
+                  <UserManagementPage lang={lang} currentUser={user} />
+                )
               ) : (
                 <Navigate to="/login" replace />
               )

@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from data_analysis.analysis_core import AnalysisBase
+from data_analysis.core.analysis_core import AnalysisBase
 
 
 class MealAnalysis(AnalysisBase):

@@ -8,6 +8,7 @@ from services.auth_service import (
     build_user_payload,
     get_authenticated_user_row,
 )
+from services.billing_service import get_billing_summary_for_tenant
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -339,10 +340,12 @@ def login(user: LogIn, response: Response):
 def user_status(request: Request, response: Response):
     try:
         _, user_data = get_authenticated_user_row(request, response)
+        user_payload = build_user_payload(user_data)
+        user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
 
         return {
             "logged_in": True,
-            "user": build_user_payload(user_data),
+            "user": user_payload,
         }
 
     except HTTPException:

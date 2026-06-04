@@ -1,4 +1,4 @@
-import re
+﻿import re
 import unicodedata
 import warnings as warning_tools
 from pandas.util import hash_pandas_object
@@ -6,7 +6,7 @@ from pandas.util import hash_pandas_object
 import pandas as pd
 from typing import Any, Literal
 
-from data_analysis.data_reading import DataReadingNormal
+from data_analysis.io.data_reading import DataReadingNormal
 
 
 class DataCleaning(DataReadingNormal):
@@ -14,8 +14,13 @@ class DataCleaning(DataReadingNormal):
     TRUE_VALUES = {"true", "yes", "y", "1", "on", "checked", "\u0646\u0639\u0645", "\u0627\u062c\u0644", "\u0635\u062d"}
     FALSE_VALUES = {"false", "no", "n", "0", "off", "unchecked", "\u0644\u0627", "\u062e\u0637\u0623"}
 
-    def __init__(self, input_path: str) -> None:
-        super().__init__(input_path)
+    def __init__(
+        self,
+        input_path: str,
+        tenant_id: str | int | None = None,
+        user_id: str | int | None = None,
+    ) -> None:
+        super().__init__(input_path, tenant_id=tenant_id, user_id=user_id)
         self._prepared_cache: dict[str, tuple[pd.DataFrame, list[str]]] = {}
         self._profile_cache: dict[tuple[str, int], dict] = {}
 
@@ -743,7 +748,7 @@ class DataCleaning(DataReadingNormal):
             series.astype("string")
             .map(self._normalize_text_value)
             .str.replace(",", "", regex=False)
-            .str.replace(r"[$€£₪%]", "", regex=True)
+            .str.replace(r"[$â‚¬آ£â‚ھ%]", "", regex=True)
             .str.replace(r"^\((.*)\)$", r"-\1", regex=True)
             .str.strip()
         )

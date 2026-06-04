@@ -735,8 +735,7 @@
 }
 
 .page-builder .daw-review-sidebar {
-  position: sticky;
-  top: 16px;
+  position: static;
   display: grid;
   gap: 8px;
 }
@@ -789,10 +788,28 @@
 
 .page-builder .daw-inspection-box {
   min-width: 0;
+  max-height: min(720px, calc(100vh - 260px));
   border: 1px solid var(--daw-card-border);
   border-radius: 20px;
   background: #ffffff;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(139, 42, 26, 0.48) transparent;
+  scrollbar-width: thin;
+}
+
+.page-builder .daw-inspection-box::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.page-builder .daw-inspection-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page-builder .daw-inspection-box::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(139, 42, 26, 0.44);
 }
 
 .page-builder .daw-inspection-box .daw-report-result {
@@ -1222,6 +1239,40 @@
 
 .page-builder .daw-compact-table tr:last-child td {
   border-bottom: 0;
+}
+
+.page-builder .daw-compact-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-compact-pagination div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-builder .daw-compact-pagination button {
+  min-height: 34px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.page-builder .daw-compact-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .page-builder .daw-warning-list {
@@ -1658,6 +1709,7 @@
 .theme-dark .page-builder .daw-group-grid button,
 .theme-dark .page-builder .daw-flow-actions button,
 .theme-dark .page-builder .daw-pagination button,
+.theme-dark .page-builder .daw-compact-pagination button,
 .theme-dark .page-builder .daw-column-menu summary,
 .theme-dark .page-builder .daw-column-menu-panel button,
 .theme-dark .page-builder .daw-toggle,
@@ -1678,6 +1730,7 @@
 [data-theme="dark"] .page-builder .daw-group-grid button,
 [data-theme="dark"] .page-builder .daw-flow-actions button,
 [data-theme="dark"] .page-builder .daw-pagination button,
+[data-theme="dark"] .page-builder .daw-compact-pagination button,
 [data-theme="dark"] .page-builder .daw-column-menu summary,
 [data-theme="dark"] .page-builder .daw-column-menu-panel button,
 [data-theme="dark"] .page-builder .daw-toggle,
@@ -1698,6 +1751,54 @@
   background: rgba(255, 255, 255, 0.055);
   border-color: rgba(255, 255, 255, 0.12);
   color: #f8fafc;
+}
+
+.theme-dark .page-builder .daw-compact-pagination,
+[data-theme="dark"] .page-builder .daw-compact-pagination {
+  color: rgba(203, 213, 225, 0.9);
+}
+
+.theme-dark .page-builder .daw-compact-pagination button,
+[data-theme="dark"] .page-builder .daw-compact-pagination button {
+  background: rgba(15, 23, 38, 0.86);
+  border-color: rgba(148, 163, 184, 0.24);
+  color: #e2e8f0;
+}
+
+.theme-dark .page-builder .daw-compact-pagination button:not(:disabled):hover,
+[data-theme="dark"] .page-builder .daw-compact-pagination button:not(:disabled):hover {
+  background: rgba(105, 211, 207, 0.16);
+  border-color: rgba(105, 211, 207, 0.42);
+  color: #ffffff;
+}
+
+.theme-dark .page-builder .daw-compact-pagination button:disabled,
+[data-theme="dark"] .page-builder .daw-compact-pagination button:disabled {
+  background: rgba(15, 23, 38, 0.52);
+  border-color: rgba(148, 163, 184, 0.14);
+  color: rgba(226, 232, 240, 0.42);
+  opacity: 1;
+}
+
+.theme-dark .page-builder .daw-inspection-box,
+[data-theme="dark"] .page-builder .daw-inspection-box {
+  scrollbar-color: rgba(105, 211, 207, 0.62) rgba(15, 23, 38, 0.38);
+}
+
+.theme-dark .page-builder .daw-inspection-box::-webkit-scrollbar-track,
+[data-theme="dark"] .page-builder .daw-inspection-box::-webkit-scrollbar-track {
+  background: rgba(15, 23, 38, 0.38);
+}
+
+.theme-dark .page-builder .daw-inspection-box::-webkit-scrollbar-thumb,
+[data-theme="dark"] .page-builder .daw-inspection-box::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(15, 23, 38, 0.72);
+  background: rgba(105, 211, 207, 0.72);
+}
+
+.theme-dark .page-builder .daw-inspection-box::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] .page-builder .daw-inspection-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 224, 220, 0.95);
 }
 
 .theme-dark .page-builder .daw-source-tabs button.active,
@@ -1861,6 +1962,11 @@
 
   .page-builder .daw-review-sidebar {
     position: static;
+  }
+
+  .page-builder .daw-inspection-box {
+    max-height: none;
+    overflow: visible;
   }
 
   .page-builder .daw-data-grid-toolbar,
