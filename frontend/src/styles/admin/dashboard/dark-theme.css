@@ -1601,3 +1601,291 @@ body.theme-dark {
 .theme-dark .uptime-panel h2 {
   color: #9fe7df !important;
 }
+
+/* ============================================================
+   DARK MODE BLUE CONSISTENCY FINAL PASS
+   Keeps every dashboard/PageBuilder route on the same blue
+   template. This intentionally comes last because older files
+   still contain red/brown dark-mode paint.
+   ============================================================ */
+
+:root[data-theme="dark"],
+body.theme-dark,
+.theme-dark {
+  --admin-bg: #07111f;
+  --admin-surface: #101c2d;
+  --admin-surface-2: #162235;
+  --admin-surface-3: #1b2a40;
+  --admin-border: rgba(126, 158, 181, 0.16);
+  --admin-border-strong: rgba(126, 158, 181, 0.26);
+  --admin-text: #f5f7fb;
+  --admin-muted: #aab7c7;
+  --admin-soft: #75869a;
+  --admin-cyan: #7fd6d0;
+  --admin-navy: #24385f;
+  --admin-red: #7fd6d0;
+  --admin-red-bright: #9fe7df;
+  --admin-gradient: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%);
+  --madar-bg: #07111f;
+  --madar-surface: #101c2d;
+  --madar-surface-soft: #162235;
+  --madar-text: #f5f7fb;
+  --madar-muted: #aab7c7;
+  --madar-navy: #24385f;
+  --madar-red: #7fd6d0;
+  --madar-red-dark: #4fb7b1;
+  --madar-border: rgba(126, 158, 181, 0.16);
+  --madar-border-strong: rgba(126, 158, 181, 0.26);
+  --madar-gradient: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%);
+  --madar-gradient-hover: linear-gradient(135deg, #5f89a7 0%, #9fe7df 100%);
+  --madar-button-shadow: 0 14px 28px rgba(47, 159, 154, 0.18);
+  --madar-button-shadow-hover: 0 18px 34px rgba(47, 159, 154, 0.22);
+  --madar-red-shadow: 0 12px 28px rgba(47, 159, 154, 0.18);
+}
+
+[data-theme="dark"] .admin-dashboard-layout,
+body.theme-dark .admin-dashboard-layout,
+.theme-dark .admin-dashboard-layout,
+[data-theme="dark"] .page-builder,
+body.theme-dark .page-builder,
+.theme-dark .page-builder,
+.page-builder.theme-dark {
+  background: #07111f !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page,
+body.theme-dark .admin-dashboard-page,
+.theme-dark .admin-dashboard-page,
+[data-theme="dark"] .page-builder .workspace-page,
+body.theme-dark .page-builder .workspace-page,
+.theme-dark .page-builder .workspace-page,
+.page-builder.theme-dark .workspace-page,
+[data-theme="dark"] .page-builder .daw-page,
+body.theme-dark .page-builder .daw-page,
+.theme-dark .page-builder .daw-page {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .page-builder,
+body.theme-dark .page-builder,
+.theme-dark .page-builder,
+.page-builder.theme-dark {
+  --daw-primary-bg: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%);
+  --daw-primary-bg-hover: linear-gradient(135deg, #5f89a7 0%, #9fe7df 100%);
+  --daw-primary-shadow: 0 16px 28px rgba(47, 159, 154, 0.18);
+  --daw-secondary-bg: rgba(255, 255, 255, 0.06);
+  --daw-secondary-bg-hover: rgba(47, 159, 154, 0.14);
+  --daw-secondary-border: rgba(126, 158, 181, 0.16);
+  --daw-secondary-text: #d8eef1;
+  --daw-tab-bg: rgba(255, 255, 255, 0.05);
+  --daw-tab-border: rgba(126, 158, 181, 0.16);
+  --daw-tab-active-bg: rgba(47, 159, 154, 0.16);
+  --daw-tab-active-border: rgba(127, 214, 208, 0.38);
+  --daw-tab-active-text: #9fe7df;
+  --daw-card-bg: rgba(16, 28, 45, 0.98);
+  --daw-card-border: rgba(126, 158, 181, 0.16);
+  --daw-soft-bg: rgba(255, 255, 255, 0.055);
+  --daw-text: #f5f7fb;
+  --daw-muted: #aab7c7;
+  --daw-red: #7fd6d0;
+  --daw-red-dark: #4fb7b1;
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+[data-theme="dark"] .page-builder .builder-sidebar,
+[data-theme="dark"] .page-builder .builder-inspector,
+[data-theme="dark"] .page-builder .workspace-header,
+[data-theme="dark"] .page-builder .object-list,
+[data-theme="dark"] .page-builder .form-editor,
+[data-theme="dark"] .page-builder .form-side-settings,
+[data-theme="dark"] .page-builder .responses-page-card,
+[data-theme="dark"] .page-builder .dashboard-panel,
+[data-theme="dark"] .page-builder .publish-card,
+[data-theme="dark"] .page-builder .automation-card,
+[data-theme="dark"] .page-builder .role-card,
+[data-theme="dark"] .page-builder .theme-control,
+[data-theme="dark"] .page-builder .daw-card,
+[data-theme="dark"] .page-builder .daw-stepper button,
+[data-theme="dark"] .page-builder .daw-source-tabs button,
+[data-theme="dark"] .page-builder .daw-review-sidebar button,
+[data-theme="dark"] .page-builder .daw-group-grid button,
+[data-theme="dark"] .page-builder .daw-flow-actions,
+[data-theme="dark"] .page-builder .daw-report-submit-row,
+[data-theme="dark"] .page-builder .daw-flow-toast,
+[data-theme="dark"] .page-builder .daw-inspection-box,
+[data-theme="dark"] .page-builder .daw-report-summary,
+[data-theme="dark"] .page-builder .daw-report-block,
+[data-theme="dark"] .page-builder .daw-friendly-panel,
+[data-theme="dark"] .page-builder .daw-review-summary-grid article,
+[data-theme="dark"] .page-builder .daw-dataset-stats article,
+[data-theme="dark"] .page-builder .daw-kpi-grid article,
+[data-theme="dark"] .page-builder .daw-object-grid article,
+[data-theme="dark"] .page-builder .daw-chart-list article,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .settings-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-usage-card,
+body.theme-dark .my-plan-builder-card,
+body.theme-dark .page-builder .builder-sidebar,
+body.theme-dark .page-builder .builder-inspector,
+body.theme-dark .page-builder .workspace-header,
+body.theme-dark .page-builder .object-list,
+body.theme-dark .page-builder .form-editor,
+body.theme-dark .page-builder .form-side-settings,
+body.theme-dark .page-builder .responses-page-card,
+body.theme-dark .page-builder .dashboard-panel,
+body.theme-dark .page-builder .publish-card,
+body.theme-dark .page-builder .automation-card,
+body.theme-dark .page-builder .role-card,
+body.theme-dark .page-builder .theme-control,
+body.theme-dark .page-builder .daw-card,
+body.theme-dark .page-builder .daw-stepper button,
+body.theme-dark .page-builder .daw-source-tabs button,
+body.theme-dark .page-builder .daw-review-sidebar button,
+body.theme-dark .page-builder .daw-group-grid button,
+body.theme-dark .page-builder .daw-flow-actions,
+body.theme-dark .page-builder .daw-report-submit-row,
+body.theme-dark .page-builder .daw-flow-toast,
+body.theme-dark .page-builder .daw-inspection-box,
+body.theme-dark .page-builder .daw-report-summary,
+body.theme-dark .page-builder .daw-report-block,
+body.theme-dark .page-builder .daw-friendly-panel,
+body.theme-dark .page-builder .daw-review-summary-grid article,
+body.theme-dark .page-builder .daw-dataset-stats article,
+body.theme-dark .page-builder .daw-kpi-grid article,
+body.theme-dark .page-builder .daw-object-grid article,
+body.theme-dark .page-builder .daw-chart-list article,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+.theme-dark .settings-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card,
+.theme-dark .page-builder .builder-sidebar,
+.theme-dark .page-builder .builder-inspector,
+.theme-dark .page-builder .workspace-header,
+.theme-dark .page-builder .object-list,
+.theme-dark .page-builder .form-editor,
+.theme-dark .page-builder .form-side-settings,
+.theme-dark .page-builder .responses-page-card,
+.theme-dark .page-builder .dashboard-panel,
+.theme-dark .page-builder .publish-card,
+.theme-dark .page-builder .automation-card,
+.theme-dark .page-builder .role-card,
+.theme-dark .page-builder .theme-control,
+.theme-dark .page-builder .daw-card,
+.theme-dark .page-builder .daw-stepper button,
+.theme-dark .page-builder .daw-source-tabs button,
+.theme-dark .page-builder .daw-review-sidebar button,
+.theme-dark .page-builder .daw-group-grid button,
+.theme-dark .page-builder .daw-flow-actions,
+.theme-dark .page-builder .daw-report-submit-row,
+.theme-dark .page-builder .daw-flow-toast,
+.theme-dark .page-builder .daw-inspection-box,
+.theme-dark .page-builder .daw-report-summary,
+.theme-dark .page-builder .daw-report-block,
+.theme-dark .page-builder .daw-friendly-panel,
+.theme-dark .page-builder .daw-review-summary-grid article,
+.theme-dark .page-builder .daw-dataset-stats article,
+.theme-dark .page-builder .daw-kpi-grid article,
+.theme-dark .page-builder .daw-object-grid article,
+.theme-dark .page-builder .daw-chart-list article {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  color: #f5f7fb !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24) !important;
+}
+
+[data-theme="dark"] .page-builder .daw-source-tabs button.active,
+[data-theme="dark"] .page-builder .daw-review-sidebar button.active,
+[data-theme="dark"] .page-builder .daw-group-grid button.active,
+[data-theme="dark"] .page-builder .daw-stepper button.active,
+[data-theme="dark"] .page-builder .daw-flow-actions button.primary,
+[data-theme="dark"] .page-builder .daw-flow-actions button[type="submit"],
+[data-theme="dark"] .page-builder .daw-primary,
+body.theme-dark .page-builder .daw-source-tabs button.active,
+body.theme-dark .page-builder .daw-review-sidebar button.active,
+body.theme-dark .page-builder .daw-group-grid button.active,
+body.theme-dark .page-builder .daw-stepper button.active,
+body.theme-dark .page-builder .daw-flow-actions button.primary,
+body.theme-dark .page-builder .daw-flow-actions button[type="submit"],
+body.theme-dark .page-builder .daw-primary,
+.theme-dark .page-builder .daw-source-tabs button.active,
+.theme-dark .page-builder .daw-review-sidebar button.active,
+.theme-dark .page-builder .daw-group-grid button.active,
+.theme-dark .page-builder .daw-stepper button.active,
+.theme-dark .page-builder .daw-flow-actions button.primary,
+.theme-dark .page-builder .daw-flow-actions button[type="submit"],
+.theme-dark .page-builder .daw-primary {
+  background: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%) !important;
+  border-color: rgba(127, 214, 208, 0.42) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.18) !important;
+}
+
+[data-theme="dark"] .page-builder .daw-stepper button.active span,
+body.theme-dark .page-builder .daw-stepper button.active span,
+.theme-dark .page-builder .daw-stepper button.active span {
+  background: rgba(7, 17, 31, 0.34) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .page-builder .daw-row-index-head,
+[data-theme="dark"] .page-builder .daw-row-index-cell,
+[data-theme="dark"] .page-builder .daw-warning-list,
+body.theme-dark .page-builder .daw-row-index-head,
+body.theme-dark .page-builder .daw-row-index-cell,
+body.theme-dark .page-builder .daw-warning-list,
+.theme-dark .page-builder .daw-row-index-head,
+.theme-dark .page-builder .daw-row-index-cell,
+.theme-dark .page-builder .daw-warning-list {
+  background: rgba(47, 159, 154, 0.1) !important;
+  border-color: rgba(127, 214, 208, 0.24) !important;
+  color: #d8eef1 !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page [style*="#8b2a1a"],
+[data-theme="dark"] .admin-dashboard-page [style*="#6e2014"],
+[data-theme="dark"] .admin-dashboard-page [style*="#c2410c"],
+[data-theme="dark"] .admin-dashboard-page [style*="#9a3412"],
+[data-theme="dark"] .admin-dashboard-page [style*="#b6422d"],
+[data-theme="dark"] .admin-dashboard-page [style*="139, 42, 26"],
+[data-theme="dark"] .admin-dashboard-page [style*="194, 65, 12"],
+[data-theme="dark"] .page-builder [style*="#8b2a1a"],
+[data-theme="dark"] .page-builder [style*="#6e2014"],
+[data-theme="dark"] .page-builder [style*="#c2410c"],
+[data-theme="dark"] .page-builder [style*="#9a3412"],
+[data-theme="dark"] .page-builder [style*="#b6422d"],
+[data-theme="dark"] .page-builder [style*="139, 42, 26"],
+[data-theme="dark"] .page-builder [style*="194, 65, 12"],
+body.theme-dark .admin-dashboard-page [style*="#8b2a1a"],
+body.theme-dark .admin-dashboard-page [style*="#6e2014"],
+body.theme-dark .admin-dashboard-page [style*="#c2410c"],
+body.theme-dark .admin-dashboard-page [style*="#9a3412"],
+body.theme-dark .admin-dashboard-page [style*="#b6422d"],
+body.theme-dark .admin-dashboard-page [style*="139, 42, 26"],
+body.theme-dark .admin-dashboard-page [style*="194, 65, 12"],
+body.theme-dark .page-builder [style*="#8b2a1a"],
+body.theme-dark .page-builder [style*="#6e2014"],
+body.theme-dark .page-builder [style*="#c2410c"],
+body.theme-dark .page-builder [style*="#9a3412"],
+body.theme-dark .page-builder [style*="#b6422d"],
+body.theme-dark .page-builder [style*="139, 42, 26"],
+body.theme-dark .page-builder [style*="194, 65, 12"] {
+  color: #7fd6d0 !important;
+  background: rgba(47, 159, 154, 0.12) !important;
+  border-color: rgba(127, 214, 208, 0.32) !important;
+  box-shadow: none !important;
+}

@@ -22,8 +22,6 @@ class UserProfileUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     avatar: Optional[str] = None
-    subscription_type: Optional[str] = None
-    payment_status: Optional[str] = None 
 
 class PasswordReset(BaseModel):
     access_token: str
@@ -38,12 +36,25 @@ class WebsiteSettingsUpdate(BaseModel):
     phone: Optional[str] = None
     description: Optional[str] = None
     
-class SubscriptionRequest(BaseModel):
+class BillingCheckoutRequest(BaseModel):
     subscription_type: Literal["full_platform", "individual_builder"]
     plan: Literal["starter", "pro", "business", "basic", "premium"]
     builder_type: Optional[
         Literal["website", "forms", "quiz", "reservation", "reports", "data"]
     ] = None
+
+
+class AdminBillingUpdateRequest(BillingCheckoutRequest):
+    tenant_id: int
+    payment_status: Literal["pending", "active", "past_due", "canceled"] = "active"
+
+
+class BillingWebhookUpdateRequest(AdminBillingUpdateRequest):
+    provider_event_id: Optional[str] = None
+
+
+class AdminUserTypeUpdateRequest(BaseModel):
+    user_type: Literal["admin", "user"]
     
 class UpdatePassword(BaseModel):
     current_password: str = Field(..., min_length=1)

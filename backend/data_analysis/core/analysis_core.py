@@ -1,11 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
 
-from data_analysis.analysis_i18n import (
+from data_analysis.core.analysis_i18n import (
     direction_for,
     has_arabic,
     normalize_language,
@@ -85,10 +85,10 @@ class ReportBuilder:
     def to_dict(self) -> dict[str, Any]:
         summary = self.summary
         if self.language == "ar" and (not summary or not has_arabic(summary)):
-            summary = f"تم إنشاء تقرير {self.title} باستخدام {self.rows_used:,} صفوف."
+            summary = f"طھظ… ط¥ظ†ط´ط§ط، طھظ‚ط±ظٹط± {self.title} ط¨ط§ط³طھط®ط¯ط§ظ… {self.rows_used:,} طµظپظˆظپ."
         insights = self.insights
         if self.language == "ar" and not any(has_arabic(item) for item in insights):
-            insights = ["تتوفر النتائج التفصيلية في المؤشرات والجداول والرسوم المرفقة."] + insights
+            insights = ["طھطھظˆظپط± ط§ظ„ظ†طھط§ط¦ط¬ ط§ظ„طھظپطµظٹظ„ظٹط© ظپظٹ ط§ظ„ظ…ط¤ط´ط±ط§طھ ظˆط§ظ„ط¬ط¯ط§ظˆظ„ ظˆط§ظ„ط±ط³ظˆظ… ط§ظ„ظ…ط±ظپظ‚ط©."] + insights
 
         return {
             "report_id": self.report_id,
@@ -159,7 +159,7 @@ class AnalysisBase:
             cleaned = (
                 raw.astype("string")
                 .str.replace(",", "", regex=False)
-                .str.replace(r"[$€£₪%]", "", regex=True)
+                .str.replace(r"[$â‚¬آ£â‚ھ%]", "", regex=True)
                 .str.strip()
             )
             values = pd.to_numeric(cleaned, errors="coerce")
@@ -264,7 +264,7 @@ class AnalysisBase:
                 numeric_source = (
                     series.astype("string")
                     .str.replace(",", "", regex=False)
-                    .str.replace(r"[$€£₪%]", "", regex=True)
+                    .str.replace(r"[$â‚¬آ£â‚ھ%]", "", regex=True)
                     .str.strip()
                 )
             else:

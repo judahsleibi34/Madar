@@ -433,11 +433,19 @@ img.admin-sidebar-avatar {
 
 .admin-sidebar-user-info {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .admin-dashboard-layout.is-rtl .admin-sidebar-user-info,
 .admin-dashboard-layout[dir="rtl"] .admin-sidebar-user-info {
   text-align: right;
+}
+
+.admin-sidebar-user-title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .admin-sidebar-user-info strong {
@@ -449,6 +457,23 @@ img.admin-sidebar-avatar {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.25;
+}
+
+.admin-sidebar-admin-badge {
+  flex: 0 0 auto;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  max-width: 72px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(26, 39, 68, 0.08);
+  color: #8b2a1a !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
 }
 
 .admin-sidebar-user-info span {
@@ -556,6 +581,16 @@ img.admin-sidebar-avatar {
 .theme-dark .admin-sidebar-user-info span,
 [data-theme="dark"] .admin-sidebar-user-info span {
   color: rgba(248, 250, 252, 0.7);
+}
+
+.theme-dark .admin-sidebar-admin-badge,
+[data-theme="dark"] .admin-sidebar-admin-badge {
+  color: #7fd6d0 !important;
+}
+
+.theme-dark .admin-sidebar-admin-badge,
+[data-theme="dark"] .admin-sidebar-admin-badge {
+  background: rgba(47, 159, 154, 0.14);
 }
 
 .theme-dark .admin-sidebar-nav a,

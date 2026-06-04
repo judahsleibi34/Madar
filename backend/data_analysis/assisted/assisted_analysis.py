@@ -1,10 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
 import pandas as pd
 
-from data_analysis.analysis_core import AnalysisBase
+from data_analysis.core.analysis_core import AnalysisBase
 
 
 class AssistedAnalysis(AnalysisBase):
@@ -23,7 +23,7 @@ class AssistedAnalysis(AnalysisBase):
         if not q:
             report.set_summary(
                 "Ask a question or provide a custom metric definition to calculate a new indicator.",
-                "اكتب سؤالا أو وفر تعريف مؤشر مخصص لحساب قيمة جديدة.",
+                "ط§ظƒطھط¨ ط³ط¤ط§ظ„ط§ ط£ظˆ ظˆظپط± طھط¹ط±ظٹظپ ظ…ط¤ط´ط± ظ…ط®طµطµ ظ„ط­ط³ط§ط¨ ظ‚ظٹظ…ط© ط¬ط¯ظٹط¯ط©.",
             )
             report.add_table("Column suggestions", self._column_rows())
             return report.to_dict()
@@ -38,14 +38,14 @@ class AssistedAnalysis(AnalysisBase):
                     "missing_percentage": self.pct(missing, len(self.df)) or 0,
                 })
             rows = sorted(rows, key=lambda row: row["missing_count"], reverse=True)
-            report.set_summary("Missing values were calculated for every column.", "تم حساب القيم المفقودة لكل عمود.")
+            report.set_summary("Missing values were calculated for every column.", "طھظ… ط­ط³ط§ط¨ ط§ظ„ظ‚ظٹظ… ط§ظ„ظ…ظپظ‚ظˆط¯ط© ظ„ظƒظ„ ط¹ظ…ظˆط¯.")
             report.add_table("Missing values", rows)
             return report.to_dict()
 
         if any(term in q for term in ["correlation", "corr", "relationship"]):
             if len(numeric_cols) < 2:
                 report.warnings.append("At least two numeric columns are required for correlation analysis.")
-                report.set_summary("Correlation could not be calculated.", "لا يمكن حساب الارتباط بدون عمودين رقميين على الأقل.")
+                report.set_summary("Correlation could not be calculated.", "ظ„ط§ ظٹظ…ظƒظ† ط­ط³ط§ط¨ ط§ظ„ط§ط±طھط¨ط§ط· ط¨ط¯ظˆظ† ط¹ظ…ظˆط¯ظٹظ† ط±ظ‚ظ…ظٹظٹظ† ط¹ظ„ظ‰ ط§ظ„ط£ظ‚ظ„.")
                 return report.to_dict()
             numeric_df = pd.DataFrame({column: self.numeric(column) for column in numeric_cols})
             corr = numeric_df.corr().stack().reset_index()
@@ -53,36 +53,36 @@ class AssistedAnalysis(AnalysisBase):
             corr = corr[corr["column_a"] < corr["column_b"]]
             corr["absolute_correlation"] = corr["correlation"].abs()
             corr = corr.sort_values("absolute_correlation", ascending=False).head(10)
-            report.set_summary("Strongest numeric correlations were calculated.", "تم حساب أقوى الارتباطات بين الأعمدة الرقمية.")
+            report.set_summary("Strongest numeric correlations were calculated.", "طھظ… ط­ط³ط§ط¨ ط£ظ‚ظˆظ‰ ط§ظ„ط§ط±طھط¨ط§ط·ط§طھ ط¨ظٹظ† ط§ظ„ط£ط¹ظ…ط¯ط© ط§ظ„ط±ظ‚ظ…ظٹط©.")
             report.add_table("Strongest correlations", corr.to_dict(orient="records"))
             return report.to_dict()
 
         if any(term in q for term in ["mean", "average", "avg"]):
             rows = self._numeric_summary_rows(numeric_cols, ["mean"])
-            report.set_summary("Averages were calculated for numeric columns.", "تم حساب المتوسطات للأعمدة الرقمية.")
+            report.set_summary("Averages were calculated for numeric columns.", "طھظ… ط­ط³ط§ط¨ ط§ظ„ظ…طھظˆط³ط·ط§طھ ظ„ظ„ط£ط¹ظ…ط¯ط© ط§ظ„ط±ظ‚ظ…ظٹط©.")
             report.add_table("Averages", rows)
             return report.to_dict()
 
         if "median" in q:
             rows = self._numeric_summary_rows(numeric_cols, ["median"])
-            report.set_summary("Medians were calculated for numeric columns.", "تم حساب الوسيط للأعمدة الرقمية.")
+            report.set_summary("Medians were calculated for numeric columns.", "طھظ… ط­ط³ط§ط¨ ط§ظ„ظˆط³ظٹط· ظ„ظ„ط£ط¹ظ…ط¯ط© ط§ظ„ط±ظ‚ظ…ظٹط©.")
             report.add_table("Medians", rows)
             return report.to_dict()
 
         if any(term in q for term in ["sum", "total"]):
             rows = self._numeric_summary_rows(numeric_cols, ["sum"])
-            report.set_summary("Totals were calculated for numeric columns.", "تم حساب المجاميع للأعمدة الرقمية.")
+            report.set_summary("Totals were calculated for numeric columns.", "طھظ… ط­ط³ط§ط¨ ط§ظ„ظ…ط¬ط§ظ…ظٹط¹ ظ„ظ„ط£ط¹ظ…ط¯ط© ط§ظ„ط±ظ‚ظ…ظٹط©.")
             report.add_table("Totals", rows)
             return report.to_dict()
 
         if any(term in q for term in ["summary", "describe", "overview"]):
-            report.set_summary("Dataset overview and column profiles are ready.", "النظرة العامة على البيانات وملفات الأعمدة جاهزة.")
+            report.set_summary("Dataset overview and column profiles are ready.", "ط§ظ„ظ†ط¸ط±ط© ط§ظ„ط¹ط§ظ…ط© ط¹ظ„ظ‰ ط§ظ„ط¨ظٹط§ظ†ط§طھ ظˆظ…ظ„ظپط§طھ ط§ظ„ط£ط¹ظ…ط¯ط© ط¬ط§ظ‡ط²ط©.")
             report.add_table("Column suggestions", self._column_rows())
             return report.to_dict()
 
         report.set_summary(
             "No fixed offline rule matched this question. The backend prepared dataset context and suggested columns for a future chatbot or assisted UI.",
-            "لم يتم العثور على قاعدة محلية ثابتة لهذا السؤال. جهزت الواجهة الخلفية سياق البيانات واقتراحات الأعمدة للاستخدام لاحقا.",
+            "ظ„ظ… ظٹطھظ… ط§ظ„ط¹ط«ظˆط± ط¹ظ„ظ‰ ظ‚ط§ط¹ط¯ط© ظ…ط­ظ„ظٹط© ط«ط§ط¨طھط© ظ„ظ‡ط°ط§ ط§ظ„ط³ط¤ط§ظ„. ط¬ظ‡ط²طھ ط§ظ„ظˆط§ط¬ظ‡ط© ط§ظ„ط®ظ„ظپظٹط© ط³ظٹط§ظ‚ ط§ظ„ط¨ظٹط§ظ†ط§طھ ظˆط§ظ‚طھط±ط§ط­ط§طھ ط§ظ„ط£ط¹ظ…ط¯ط© ظ„ظ„ط§ط³طھط®ط¯ط§ظ… ظ„ط§ط­ظ‚ط§.",
         )
         report.add_table("Column suggestions", self._column_rows())
         report.add_table("Prompt-ready context", [{
@@ -105,7 +105,7 @@ class AssistedAnalysis(AnalysisBase):
                 rows = self._group_or_total_count(group_column)
             else:
                 rows = self._aggregate(value_column, operation, group_column)
-            report.set_summary(f"Custom metric '{label}' was calculated using {operation}.", f"تم حساب المؤشر المخصص '{label}' باستخدام {operation}.")
+            report.set_summary(f"Custom metric '{label}' was calculated using {operation}.", f"طھظ… ط­ط³ط§ط¨ ط§ظ„ظ…ط¤ط´ط± ط§ظ„ظ…ط®طµطµ '{label}' ط¨ط§ط³طھط®ط¯ط§ظ… {operation}.")
             report.add_table(str(label), rows)
             if group_column:
                 report.add_chart(str(label), "bar", rows, group_column, "value")
@@ -117,7 +117,7 @@ class AssistedAnalysis(AnalysisBase):
             numerator_column = metric.get("numerator_column")
             denominator_column = metric.get("denominator_column")
             rows = self._rate(numerator_column, denominator_column, group_column)
-            report.set_summary(f"Custom metric '{label}' was calculated as numerator divided by denominator.", f"تم حساب المؤشر المخصص '{label}' بقسمة البسط على المقام.")
+            report.set_summary(f"Custom metric '{label}' was calculated as numerator divided by denominator.", f"طھظ… ط­ط³ط§ط¨ ط§ظ„ظ…ط¤ط´ط± ط§ظ„ظ…ط®طµطµ '{label}' ط¨ظ‚ط³ظ…ط© ط§ظ„ط¨ط³ط· ط¹ظ„ظ‰ ط§ظ„ظ…ظ‚ط§ظ….")
             report.add_table(str(label), rows)
             if group_column:
                 report.add_chart(str(label), "bar", rows, group_column, "value")
@@ -129,7 +129,7 @@ class AssistedAnalysis(AnalysisBase):
             actual_column = metric.get("actual_column") or metric.get("left_column")
             target_column = metric.get("target_column") or metric.get("right_column")
             rows = self._difference(actual_column, target_column, group_column)
-            report.set_summary(f"Custom metric '{label}' was calculated as actual minus target.", f"تم حساب المؤشر المخصص '{label}' كفرق بين الفعلي والهدف.")
+            report.set_summary(f"Custom metric '{label}' was calculated as actual minus target.", f"طھظ… ط­ط³ط§ط¨ ط§ظ„ظ…ط¤ط´ط± ط§ظ„ظ…ط®طµطµ '{label}' ظƒظپط±ظ‚ ط¨ظٹظ† ط§ظ„ظپط¹ظ„ظٹ ظˆط§ظ„ظ‡ط¯ظپ.")
             report.add_table(str(label), rows)
             if rows and not group_column:
                 report.add_kpi(str(label), rows[0].get("value"))

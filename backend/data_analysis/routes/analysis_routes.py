@@ -1,14 +1,15 @@
-from typing import Any
+﻿from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from data_analysis.data_cleaning import DataCleaning
-from data_analysis.analysis_catalog import ANALYSIS_CATALOG
-from data_analysis.analysis_i18n import direction_for, localized_catalog, normalize_language, normalize_symbols
-from data_analysis.analysis_router import AnalysisRouter
-from data_analysis.assisted_analysis import AssistedAnalysis
-from data_analysis.response_utils import sanitize_for_json
+from data_analysis.cleaning.data_cleaning import DataCleaning
+from data_analysis.core.analysis_catalog import ANALYSIS_CATALOG
+from data_analysis.core.analysis_i18n import direction_for, localized_catalog, normalize_language, normalize_symbols
+from data_analysis.router import AnalysisRouter
+from data_analysis.assisted.assisted_analysis import AssistedAnalysis
+from data_analysis.core.response_utils import sanitize_for_json
+from data_analysis.routes.data_routes import get_storage_scope
 
 
 router = APIRouter(
@@ -59,9 +60,10 @@ def analysis_catalog(language: str = "en"):
 
 
 @router.post("/run")
-def run_analysis(request: AnalysisRunRequest):
+def run_analysis(request: AnalysisRunRequest, fastapi_request: Request, response: Response):
     try:
-        cleaner = DataCleaning(request.input_path)
+        tenant_id, user_id = get_storage_scope(fastapi_request, response)
+        cleaner = DataCleaning(request.input_path, tenant_id=tenant_id, user_id=user_id)
 
         if request.cleaning_actions:
             df = cleaner.apply_pipeline(request.cleaning_actions)
@@ -91,14 +93,19 @@ def run_analysis(request: AnalysisRunRequest):
             "results": results
         })
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        print("ANALYSIS RUN ERROR:", type(error).__name__)
+        raise HTTPException(status_code=400, detail="Could not run analysis.")
 
 
 @router.post("/assist")
-def assisted_analysis(request: AssistedAnalysisRequest):
+def assisted_analysis(request: AssistedAnalysisRequest, fastapi_request: Request, response: Response):
     try:
-        cleaner = DataCleaning(request.input_path)
+        tenant_id, user_id = get_storage_scope(fastapi_request, response)
+        cleaner = DataCleaning(request.input_path, tenant_id=tenant_id, user_id=user_id)
 
         if request.cleaning_actions:
             df = cleaner.apply_pipeline(request.cleaning_actions)
@@ -127,6 +134,10 @@ def assisted_analysis(request: AssistedAnalysisRequest):
             "result": result,
         })
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        print("ASSISTED ANALYSIS ERROR:", type(error).__name__)
+        raise HTTPException(status_code=400, detail="Could not run assisted analysis.")
 

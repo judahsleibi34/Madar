@@ -49,3 +49,13 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# AI environment files
+backend/.env.ai
+backend/.env.ai.local
+
+# AI env files
+backend/.env.ai
+backend/.env.ai.dev
+backend/.env.ai.production
+backend/.env.ai.local
