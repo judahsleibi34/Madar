@@ -6,6 +6,8 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
+import { Menu, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import TeamPage from "./components/MainPages/TeamPage";
 import Header from "./components/MainPages/Header";
@@ -27,32 +29,64 @@ import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import SettingsPage from "./components/DashboardBuilder/SettingsPage";
 import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage";
 import UserManagementPage from "./components/DashboardBuilder/UserManagementPage";
+import UserDashboard from "./components/DashboardBuilder/UserDashboard";
 import MyPlanPage from "./components/MainPages/MyPlanPage";
 
 import PageBuilder from "./components/PageBuilder";
 import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
 
 import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
+import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
+
+import "./components/DashboardBuilder/DashboardShellFix.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-const LANG_STORAGE_KEY = "madar-lang";
 
 let authBootstrapPromise = null;
 
-export default function App() {
-  const [lang, setLang] = useState(() => {
-    const savedLang = localStorage.getItem(LANG_STORAGE_KEY);
-    return savedLang === "ar" || savedLang === "en" ? savedLang : "en";
-  });
+function normalizeUserType(value) {
+  return String(value || "user").trim().toLowerCase();
+}
 
+function RestrictedAccessWindow({
+  title = "Restricted area",
+  message = "This page is not available for your account type.",
+  actionLabel = "Go back to dashboard",
+  onAction,
+}) {
+  return (
+    <section className="restricted-access-page">
+      <div className="restricted-access-card" role="status">
+        <div className="restricted-access-content">
+          <p className="restricted-access-eyebrow">Restricted area</p>
+          <h1>{title}</h1>
+          <p>{message}</p>
+        </div>
+
+        <button type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const { t, i18n } = useTranslation(["auth", "dashboard", "common"]);
+  const [lang, setLang] = useState(getCurrentLanguage);
   const [themeMode, setThemeMode] = useState(readStoredThemeMode);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState(null);
+  const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  const normalizedUserType = normalizeUserType(user?.user_type);
+  const isAdminUser = normalizedUserType === "admin";
+  const isRegularUser = !isAdminUser;
 
   const isTenantSiteRoute = location.pathname.startsWith("/site/");
 
@@ -86,7 +120,7 @@ export default function App() {
       avatar: userInfo?.avatar || userInfo?.avatar_url || "",
       subscription_type: userInfo?.subscription_type || "",
       payment_status: userInfo?.payment_status || "",
-      user_type: userInfo?.user_type || "user",
+      user_type: normalizeUserType(userInfo?.user_type),
       created_at: userInfo?.created_at || "",
       updated_at: userInfo?.updated_at || "",
     };
@@ -171,14 +205,42 @@ export default function App() {
   }, [fetchUserInfo]);
 
   useEffect(() => {
-    localStorage.setItem(LANG_STORAGE_KEY, lang);
-    document.documentElement.lang = lang;
-    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    const safeLanguage = lang === "ar" ? "ar" : "en";
+    const direction = safeLanguage === "ar" ? "rtl" : "ltr";
+
+    document.documentElement.lang = safeLanguage;
+    document.documentElement.dir = direction;
+    document.body.dir = direction;
+
+    setAppLanguage(safeLanguage);
   }, [lang]);
+
+  useEffect(() => {
+    const handleI18nLanguageChange = (nextLanguage) => {
+      const safeLanguage = nextLanguage?.split("-")[0] === "ar" ? "ar" : "en";
+      setLang(safeLanguage);
+    };
+
+    i18n.on("languageChanged", handleI18nLanguageChange);
+
+    return () => {
+      i18n.off("languageChanged", handleI18nLanguageChange);
+    };
+  }, [i18n]);
 
   useEffect(() => {
     applyThemeMode(themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    const closeSidebarTimer = window.setTimeout(() => {
+      setDashboardSidebarOpen(false);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(closeSidebarTimer);
+    };
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleThemeEvent = (event) => {
@@ -357,7 +419,42 @@ export default function App() {
 
   const handleLanguageChange = (code) => {
     if (code !== "ar" && code !== "en") return;
-    setLang(code);
+    setLang(setAppLanguage(code));
+  };
+
+  const getSafePostLoginPath = (userInfo, returnTo) => {
+    const nextUserType = normalizeUserType(userInfo?.user_type);
+    const nextUserIsAdmin = nextUserType === "admin";
+
+    let nextPath = returnTo || "/dashboard";
+
+    const adminOnlyPaths = ["/admin/users"];
+
+    const userOnlyPaths = [
+      "/page-builder",
+      "/builder-responses",
+      "/builder-data",
+      "/my-plan",
+      "/settings",
+    ];
+
+    const isAdminOnlyPath = adminOnlyPaths.some((path) =>
+      nextPath.startsWith(path)
+    );
+
+    const isUserOnlyPath = userOnlyPaths.some((path) =>
+      nextPath.startsWith(path)
+    );
+
+    if (nextUserIsAdmin && isUserOnlyPath) {
+      nextPath = "/dashboard";
+    }
+
+    if (!nextUserIsAdmin && isAdminOnlyPath) {
+      nextPath = "/dashboard";
+    }
+
+    return nextPath;
   };
 
   const handleLoginSuccess = async () => {
@@ -380,7 +477,7 @@ export default function App() {
       setAuthChecked(true);
       setUser(userInfo);
 
-      navigate(returnTo || "/dashboard", { replace: true });
+      navigate(getSafePostLoginPath(userInfo, returnTo), { replace: true });
     } catch (error) {
       console.error("Could not load user info after login:", error);
 
@@ -398,6 +495,8 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    setDashboardSidebarOpen(false);
+
     try {
       await fetch(`${API_URL}/auth/log_out`, {
         method: "POST",
@@ -438,7 +537,11 @@ export default function App() {
     [isLoggedIn, normalizeUser]
   );
 
-  const renderDashboardSkeleton = (label = "Loading dashboard") => (
+  const goBackToDashboard = () => {
+    navigate("/dashboard", { replace: true });
+  };
+
+  const renderDashboardSkeleton = (label = t("dashboard:loading.dashboard")) => (
     <div
       className="dashboard-skeleton-layout"
       aria-label={label}
@@ -492,14 +595,43 @@ export default function App() {
     options = {}
   ) => {
     const shellLang = options.lang || lang;
+    const isShellRtl = shellLang === "ar";
+
+    const openMenuLabel = t("common:navigation.openMenu");
+    const closeMenuLabel = t("common:navigation.closeMenu");
+
+    const closeDashboardSidebar = () => setDashboardSidebarOpen(false);
 
     return (
       <div
-        className={`admin-dashboard-layout ${
-          isPageBuilderShell ? "admin-dashboard-layout-builder " : ""
-        }${shellLang === "ar" ? "is-rtl" : "is-ltr"}`}
-        dir={shellLang === "ar" ? "rtl" : "ltr"}
+        className={[
+          "admin-dashboard-layout",
+          isPageBuilderShell ? "admin-dashboard-layout-builder" : "",
+          isShellRtl ? "is-rtl" : "is-ltr",
+          dashboardSidebarOpen ? "sidebar-open" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        dir={isShellRtl ? "rtl" : "ltr"}
       >
+        <button
+          type="button"
+          className="dashboard-mobile-menu-button"
+          onClick={() => setDashboardSidebarOpen((open) => !open)}
+          aria-label={dashboardSidebarOpen ? closeMenuLabel : openMenuLabel}
+          aria-expanded={dashboardSidebarOpen}
+          aria-controls="dashboard-sidebar"
+        >
+          {dashboardSidebarOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+
+        <button
+          type="button"
+          className="dashboard-sidebar-backdrop"
+          onClick={closeDashboardSidebar}
+          aria-label={closeMenuLabel}
+        />
+
         <DashboardSidebar
           id="dashboard-sidebar"
           lang={shellLang}
@@ -511,19 +643,33 @@ export default function App() {
           hideLanguage={options.hideLanguage}
           themeMode={themeMode}
           onThemeModeChange={handleThemeModeChange}
+          onNavigate={closeDashboardSidebar}
         />
 
         <main
-          className={`admin-dashboard-page${
-            isPageBuilderShell ? " page-builder-dashboard-page" : ""
-          }`}
-          dir={shellLang === "ar" ? "rtl" : "ltr"}
+          className={[
+            "admin-dashboard-page",
+            isPageBuilderShell ? "page-builder-dashboard-page" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          dir={isShellRtl ? "rtl" : "ltr"}
         >
           {children}
         </main>
       </div>
     );
   };
+
+  const renderRestrictedPage = (message) =>
+    renderDashboardShell(
+      <RestrictedAccessWindow
+        title="Restricted area"
+        message={message}
+        actionLabel="Go back to dashboard"
+        onAction={goBackToDashboard}
+      />
+    );
 
   if (isTenantSiteRoute) {
     return (
@@ -548,18 +694,27 @@ export default function App() {
             path="/dashboard"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading dashboard")
-              ) : isLoggedIn ? (
-                <Dashboard
-                  lang={lang}
-                  onLogout={handleLogout}
-                  user={user}
-                  onLanguageChange={handleLanguageChange}
-                  themeMode={themeMode}
-                  onThemeModeChange={handleThemeModeChange}
-                />
-              ) : (
+                renderDashboardSkeleton(t("dashboard:loading.dashboard"))
+              ) : !isLoggedIn ? (
                 <Navigate to="/login" replace />
+              ) : isAdminUser ? (
+                renderDashboardShell(
+                  <Dashboard
+                    lang={lang}
+                    user={user}
+                    themeMode={themeMode}
+                    onThemeModeChange={handleThemeModeChange}
+                  />
+                )
+              ) : (
+                renderDashboardShell(
+                  <UserDashboard
+                    lang={lang}
+                    user={user}
+                    themeMode={themeMode}
+                    onThemeModeChange={handleThemeModeChange}
+                  />
+                )
               )
             }
           />
@@ -568,8 +723,10 @@ export default function App() {
             path="/page-builder"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading page builder")
-              ) : isLoggedIn ? (
+                renderDashboardSkeleton(t("dashboard:loading.pageBuilder"))
+              ) : !isLoggedIn ? (
+                <Navigate to="/login" replace />
+              ) : isRegularUser ? (
                 renderDashboardShell(
                   <PageBuilder
                     key="page-builder-main"
@@ -581,7 +738,9 @@ export default function App() {
                   { lang: "en", hideLanguage: true }
                 )
               ) : (
-                <Navigate to="/login" replace />
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
               )
             }
           />
@@ -590,8 +749,10 @@ export default function App() {
             path="/builder-responses"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading submissions")
-              ) : isLoggedIn ? (
+                renderDashboardSkeleton(t("dashboard:loading.submissions"))
+              ) : !isLoggedIn ? (
+                <Navigate to="/login" replace />
+              ) : isRegularUser ? (
                 renderDashboardShell(
                   <PageBuilder
                     key="builder-responses-page"
@@ -606,7 +767,9 @@ export default function App() {
                   false
                 )
               ) : (
-                <Navigate to="/login" replace />
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
               )
             }
           />
@@ -615,8 +778,10 @@ export default function App() {
             path="/builder-data"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading data logs")
-              ) : isLoggedIn ? (
+                renderDashboardSkeleton(t("dashboard:loading.dataLogs"))
+              ) : !isLoggedIn ? (
+                <Navigate to="/login" replace />
+              ) : isRegularUser ? (
                 renderDashboardShell(
                   <PageBuilder
                     key="builder-data-page"
@@ -631,7 +796,9 @@ export default function App() {
                   false
                 )
               ) : (
-                <Navigate to="/login" replace />
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
               )
             }
           />
@@ -640,11 +807,15 @@ export default function App() {
             path="/my-plan"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading my plan")
-              ) : isLoggedIn ? (
+                renderDashboardSkeleton(t("dashboard:loading.myPlan"))
+              ) : !isLoggedIn ? (
+                <Navigate to="/login" replace />
+              ) : isRegularUser ? (
                 renderDashboardShell(<MyPlanPage lang={lang} />)
               ) : (
-                <Navigate to="/login" replace />
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
               )
             }
           />
@@ -653,13 +824,17 @@ export default function App() {
             path="/admin/users"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading user management")
-              ) : isLoggedIn ? (
+                renderDashboardSkeleton(t("dashboard:loading.userManagement"))
+              ) : !isLoggedIn ? (
+                <Navigate to="/login" replace />
+              ) : isAdminUser ? (
                 renderDashboardShell(
                   <UserManagementPage lang={lang} currentUser={user} />
                 )
               ) : (
-                <Navigate to="/login" replace />
+                renderRestrictedPage(
+                  "This page is only available for admin accounts."
+                )
               )
             }
           />
@@ -668,8 +843,10 @@ export default function App() {
             path="/settings"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading settings")
-              ) : isLoggedIn ? (
+                renderDashboardSkeleton(t("dashboard:loading.settings"))
+              ) : !isLoggedIn ? (
+                <Navigate to="/login" replace />
+              ) : isRegularUser ? (
                 renderDashboardShell(
                   <SettingsPage
                     lang={lang}
@@ -678,7 +855,9 @@ export default function App() {
                   />
                 )
               ) : (
-                <Navigate to="/login" replace />
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
               )
             }
           />
@@ -687,11 +866,15 @@ export default function App() {
             path="/settings/change-password"
             element={
               !authChecked ? (
-                renderDashboardSkeleton("Loading password settings")
-              ) : isLoggedIn ? (
+                renderDashboardSkeleton(t("dashboard:loading.passwordSettings"))
+              ) : !isLoggedIn ? (
+                <Navigate to="/login" replace />
+              ) : isRegularUser ? (
                 renderDashboardShell(<ChangePasswordPage lang={lang} />)
               ) : (
-                <Navigate to="/login" replace />
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
               )
             }
           />
@@ -825,7 +1008,7 @@ export default function App() {
                   <section className="already-signed-container">
                     <div
                       className="auth-skeleton-card"
-                      aria-label="Checking your session"
+                      aria-label={t("auth:login.checkingSession")}
                     >
                       <div className="auth-skeleton-line auth-skeleton-title" />
                       <div className="auth-skeleton-line auth-skeleton-text" />
@@ -844,30 +1027,22 @@ export default function App() {
                 >
                   <section className="already-signed-container">
                     <div className="already-signed-card">
-                      <h1>
-                        {lang === "ar"
-                          ? "أنت مسجل الدخول بالفعل"
-                          : "You are already signed in"}
-                      </h1>
+                      <h1>{t("auth:login.alreadySignedInTitle")}</h1>
 
-                      <p>
-                        {lang === "ar"
-                          ? "يمكنك المتابعة إلى لوحة التحكم أو تسجيل الخروج واستخدام حساب آخر."
-                          : "You can continue to your dashboard or log out and use another account."}
-                      </p>
+                      <p>{t("auth:login.alreadySignedInBody")}</p>
 
                       <div className="already-signed-actions">
                         <button
                           type="button"
-                          onClick={() => navigate("/dashboard")}
+                          onClick={() =>
+                            navigate("/dashboard", { replace: true })
+                          }
                         >
-                          {lang === "ar"
-                            ? "المتابعة إلى لوحة التحكم"
-                            : "Continue to dashboard"}
+                          {t("auth:login.continueToDashboard")}
                         </button>
 
                         <button type="button" onClick={handleLogout}>
-                          {lang === "ar" ? "تسجيل الخروج" : "Log out"}
+                          {t("common:actions.logout")}
                         </button>
                       </div>
                     </div>

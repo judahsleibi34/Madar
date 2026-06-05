@@ -1,38 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-console.log("LOGIN API_URL:", API_URL);
-
-const pageText = {
-  en: {
-    title: "Forgot Password",
-    subtitle: "Enter your email and we'll send you a reset link.",
-    email: "Email",
-    button: "Send Reset Link",
-    loading: "Sending...",
-    success: "Reset link sent! Check your email.",
-    serverError: "Server unavailable. Try again later.",
-    required: "This field is required.",
-    invalidEmail: "Please enter a valid email address.",
-    notFound: "This email is not registered. Please sign up first.",
-
-  },
-  ar: {
-    title: "نسيت كلمة المرور",
-    subtitle: "أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.",
-    email: "البريد الإلكتروني",
-    button: "إرسال رابط الإعادة",
-    loading: "جاري الإرسال...",
-    success: "تم الإرسال! تحقق من بريدك الإلكتروني.",
-    serverError: "الخادم غير متاح. حاول لاحقًا.",
-    required: "هذا الحقل مطلوب.",
-    invalidEmail: "يرجى إدخال بريد إلكتروني صحيح.",
-    notFound: "هذا البريد الإلكتروني غير مسجل. يرجى إنشاء حساب أولاً.",
-  },
-};
 
 export default function ForgotPasswordPage({ lang = "en" }) {
-  const t = pageText[lang] || pageText.en;
+  const { t } = useTranslation("auth");
+  const pageDir = lang === "ar" ? "rtl" : "ltr";
 
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -40,26 +13,29 @@ export default function ForgotPasswordPage({ lang = "en" }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const handleChange = (e) => {
-    setEmail(e.target.value);
+  const handleChange = (event) => {
+    setEmail(event.target.value);
     setError("");
     setStatusMessage("");
   };
 
   const validateForm = () => {
     if (!email.trim()) {
-      setError(t.required);
+      setError(t("validation.required"));
       return false;
     }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError(t.invalidEmail);
+      setError(t("validation.invalidEmail"));
       return false;
     }
+
     return true;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -76,29 +52,30 @@ export default function ForgotPasswordPage({ lang = "en" }) {
 
       if (!response.ok) {
         if (response.status === 404) {
-          setStatusMessage(t.notFound);
+          setStatusMessage(t("forgotPassword.notFound"));
           return;
         }
-        setStatusMessage(data.detail || "Something went wrong.");
+
+        setStatusMessage(data.detail || t("forgotPassword.unknownError"));
         return;
       }
 
-      setStatusMessage(t.success);
+      setStatusMessage(t("forgotPassword.success"));
       setSent(true);
     } catch (error) {
       console.error(error);
-      setStatusMessage(t.serverError);
+      setStatusMessage(t("forgotPassword.serverError"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
+    <main className="login-page" dir={pageDir}>
+      <form className="login-card" onSubmit={handleSubmit} dir={pageDir}>
         <div className="login-heading">
-          <h1>{t.title}</h1>
-          <p>{t.subtitle}</p>
+          <h1>{t("forgotPassword.title")}</h1>
+          <p>{t("forgotPassword.subtitle")}</p>
         </div>
 
         {statusMessage && (
@@ -108,11 +85,11 @@ export default function ForgotPasswordPage({ lang = "en" }) {
         {!sent && (
           <>
             <label>
-              {t.email}
+              {t("forgotPassword.email")}
               <input
                 type="email"
                 name="email"
-                placeholder={t.email}
+                placeholder={t("forgotPassword.email")}
                 value={email}
                 onChange={handleChange}
                 dir="ltr"
@@ -121,7 +98,7 @@ export default function ForgotPasswordPage({ lang = "en" }) {
             </label>
 
             <button className="login-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? t.loading : t.button}
+              {isSubmitting ? t("forgotPassword.loading") : t("forgotPassword.submit")}
             </button>
           </>
         )}

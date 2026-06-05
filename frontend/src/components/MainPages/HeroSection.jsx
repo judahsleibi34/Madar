@@ -1,23 +1,12 @@
 import { motion } from "framer-motion";
+import { Trans, useTranslation } from "react-i18next";
+
 import GradientText from "../Animations/GradientText";
 import OrbitVisual from "../Animations/OrbitVisual";
 import SplitText from "../Animations/SplitText";
 
-const content = {
-  en: {
-    title: "Welcome to Madar",
-    name: "Madar",
-    description: "is an adaptive business management platform designed to help organizations create and manage their own digital systems based on their unique needs.",
-  },
-  ar: {
-    title: "أهلاً بك في مدار",
-    name: "مدار",
-    description: "منصة إدارة أعمال تكيفية صُممت لمساعدة المؤسسات على إنشاء وإدارة أنظمتها الرقمية الخاصة بناءً على احتياجاتها الفعلية.",
-  },
-};
-
 export default function HeroSection({ lang }) {
-  const t = content[lang];
+  const { t } = useTranslation("public");
 
   return (
     <section id="home" className="hero-section">
@@ -28,13 +17,13 @@ export default function HeroSection({ lang }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0, ease: [0.25, 0.1, 0.25, 1] }}
         >
-          {lang === "en" ? (
-            <>
-              Welcome to <GradientText pauseOnHover>Madar</GradientText>
-            </>
-          ) : (
-            t.title
-          )}
+          <Trans
+            ns="public"
+            i18nKey="hero.titleRich"
+            components={{
+              brand: <GradientText pauseOnHover />,
+            }}
+          />
         </motion.h1>
         <motion.p
           className="hero-description"
@@ -42,7 +31,8 @@ export default function HeroSection({ lang }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
         >
-          <SplitText className="arabic-name">{t.name}</SplitText> {t.description}
+          <SplitText className="arabic-name">{t("hero.name")}</SplitText>{" "}
+          {t("hero.description")}
         </motion.p>
       </div>
       <motion.div

@@ -40,7 +40,7 @@
 .user-management-stats article,
 .user-management-row,
 .user-management-toolbar,
-.user-management-notice {
+.user-management-toast {
   background: #ffffff;
   border: 1px solid rgba(26, 39, 68, 0.12);
   border-radius: 20px;
@@ -100,6 +100,11 @@
   gap: 14px;
 }
 
+.user-management-skeleton-list {
+  display: grid;
+  gap: 14px;
+}
+
 .user-management-pagination {
   display: flex;
   align-items: center;
@@ -146,22 +151,37 @@
 
 .user-management-row {
   display: grid;
-  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.45fr) minmax(132px, auto);
-  grid-template-areas:
-    "profile role role"
-    "profile plan action";
-  align-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas: "identity management";
+  align-items: stretch;
   column-gap: 18px;
-  row-gap: 14px;
   padding: 20px;
 }
 
+.user-management-half {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 14px;
+}
+
+.user-management-identity-half {
+  grid-area: identity;
+  justify-items: start;
+}
+
+.user-management-management-half {
+  grid-area: management;
+  justify-items: stretch;
+}
+
 .user-management-profile {
-  grid-area: profile;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 56px;
 }
 
 .user-management-avatar {
@@ -206,18 +226,14 @@
 }
 
 .user-management-controls {
-  grid-area: role;
-  grid-template-columns: minmax(180px, 280px) minmax(132px, max-content);
+  grid-template-columns: minmax(140px, 190px) minmax(118px, max-content);
   align-items: end;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .user-management-plan-grid {
-  grid-area: plan;
-  grid-template-columns:
-    minmax(180px, 1.35fr)
-    minmax(120px, 0.8fr)
-    minmax(130px, 0.85fr)
-    minmax(130px, 0.85fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
 }
 
@@ -250,7 +266,8 @@
 }
 
 .user-management-primary,
-.user-management-secondary {
+.user-management-secondary,
+.user-management-danger {
   min-height: 42px;
   border-radius: 12px;
   display: inline-flex;
@@ -266,9 +283,36 @@
   white-space: nowrap;
 }
 
+.user-management-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.user-management-actions .user-management-primary {
+  grid-area: auto;
+}
+
+.user-management-actions > button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 92px;
+}
+
+.user-management-actions > .user-management-primary {
+  min-width: 132px;
+}
+
+.user-management-actions > .user-management-danger {
+  min-width: 92px;
+}
+
 .user-management-primary {
-  grid-area: action;
-  align-self: end;
   border: 0;
   color: #ffffff;
   background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
@@ -280,36 +324,157 @@
   background: #ffffff;
 }
 
+.user-management-danger {
+  color: #b42318;
+  background: rgba(180, 35, 24, 0.08);
+  border-color: rgba(180, 35, 24, 0.22);
+}
+
+.user-management-danger:hover:not(:disabled) {
+  color: #ffffff;
+  background: #b42318;
+  border-color: #b42318;
+}
+
 .user-management-header > .user-management-secondary {
   align-self: center;
   margin-top: 0;
 }
 
 .user-management-primary:disabled,
-.user-management-secondary:disabled {
+.user-management-secondary:disabled,
+.user-management-danger:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-.user-management-notice {
+.user-management-toast-wrap {
+  position: fixed;
+  z-index: 50;
+  top: 24px;
+  right: 24px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.user-management-toast {
   min-height: 48px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
+  border-radius: 14px;
   font-weight: 850;
+  color: #1a2744;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+  animation: user-management-toast-in 180ms ease-out;
 }
 
-.user-management-notice.success {
+.user-management-toast.success {
   color: #0f766e;
   border-color: rgba(15, 118, 110, 0.24);
-  background: rgba(15, 118, 110, 0.08);
+  background: #ecfdf5;
 }
 
-.user-management-notice.error {
+.user-management-toast.error {
   color: #b42318;
   border-color: rgba(180, 35, 24, 0.24);
-  background: rgba(180, 35, 24, 0.08);
+  background: #fff1f2;
+}
+
+.user-management-page .page-delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(3, 10, 24, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.user-management-page .page-delete-modal {
+  width: min(430px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  border: 1px solid rgba(180, 35, 24, 0.22);
+  border-radius: 24px;
+  padding: 26px;
+  background: #ffffff;
+  color: #1a2744;
+  text-align: center;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+}
+
+.user-management-page .page-delete-modal-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: rgba(180, 35, 24, 0.1);
+  color: #b42318;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.user-management-page .page-delete-modal-copy h2 {
+  margin: 0;
+  color: #1a2744;
+  font-size: 26px;
+  line-height: 1.12;
+  font-weight: 950;
+}
+
+.user-management-page .page-delete-modal-copy p {
+  margin: 10px 0 0;
+  color: #6d7484;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.user-management-page .page-delete-modal-copy strong {
+  color: #1a2744;
+}
+
+.user-management-page .page-delete-modal-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.user-management-page .page-delete-modal-actions button {
+  min-height: 46px;
+  border-radius: 14px;
+  padding: 0 16px;
+  font-weight: 950;
+}
+
+.user-management-page .page-delete-modal-secondary {
+  background: rgba(26, 39, 68, 0.08);
+  color: #1a2744;
+}
+
+.user-management-page .page-delete-modal-danger {
+  background: #b42318;
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(180, 35, 24, 0.22);
+}
+
+@keyframes user-management-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .user-management-empty {
@@ -321,16 +486,144 @@
   font-weight: 900;
 }
 
+.user-management-skeleton-row {
+  pointer-events: none;
+}
+
+.user-management-skeleton-avatar,
+.user-management-skeleton-line {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    rgba(26, 39, 68, 0.08) 0%,
+    rgba(26, 39, 68, 0.15) 42%,
+    rgba(26, 39, 68, 0.08) 84%
+  );
+  background-size: 220% 100%;
+  animation: user-management-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.user-management-skeleton-avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 16px;
+}
+
+.user-management-skeleton-profile-lines,
+.user-management-skeleton-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.user-management-skeleton-line {
+  border-radius: 999px;
+}
+
+.user-management-skeleton-line.name {
+  width: min(180px, 70%);
+  height: 18px;
+}
+
+.user-management-skeleton-line.email {
+  width: min(240px, 86%);
+  height: 12px;
+}
+
+.user-management-skeleton-line.tenant {
+  width: min(130px, 58%);
+  height: 12px;
+}
+
+.user-management-skeleton-line.label {
+  width: 58px;
+  height: 10px;
+}
+
+.user-management-skeleton-line.input,
+.user-management-skeleton-line.button,
+.user-management-skeleton-line.action {
+  height: 42px;
+  border-radius: 12px;
+}
+
+.user-management-skeleton-line.input {
+  width: 100%;
+}
+
+.user-management-skeleton-line.button {
+  width: 132px;
+  align-self: end;
+}
+
+.user-management-skeleton-line.action {
+  grid-area: action;
+  width: 132px;
+  align-self: end;
+}
+
+@keyframes user-management-skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-management-skeleton-avatar,
+  .user-management-skeleton-line {
+    animation: none;
+  }
+}
+
 .admin-dashboard-layout.is-rtl .user-management-header,
 .admin-dashboard-layout[dir="rtl"] .user-management-header,
 .admin-dashboard-layout.is-rtl .user-management-profile,
 .admin-dashboard-layout[dir="rtl"] .user-management-profile,
 .admin-dashboard-layout.is-rtl .user-management-toolbar,
 .admin-dashboard-layout[dir="rtl"] .user-management-toolbar,
-.admin-dashboard-layout.is-rtl .user-management-notice,
-.admin-dashboard-layout[dir="rtl"] .user-management-notice {
+.admin-dashboard-layout.is-rtl .user-management-toast,
+.admin-dashboard-layout[dir="rtl"] .user-management-toast {
   direction: rtl;
   text-align: right;
+}
+
+.admin-dashboard-layout.is-rtl .user-management-toast-wrap,
+.admin-dashboard-layout[dir="rtl"] .user-management-toast-wrap {
+  right: 24px;
+  left: auto;
+}
+
+.admin-dashboard-layout.is-rtl .user-management-row,
+.admin-dashboard-layout[dir="rtl"] .user-management-row {
+  grid-template-areas: "identity management";
+}
+
+.admin-dashboard-layout.is-rtl .user-management-identity-half,
+.admin-dashboard-layout[dir="rtl"] .user-management-identity-half {
+  justify-items: start;
+}
+
+.admin-dashboard-layout.is-rtl .user-management-row label,
+.admin-dashboard-layout[dir="rtl"] .user-management-row label {
+  text-align: right;
+}
+
+.admin-dashboard-layout.is-rtl .user-management-row select,
+.admin-dashboard-layout[dir="rtl"] .user-management-row select {
+  text-align: right;
+}
+
+.admin-dashboard-layout.is-rtl .user-management-actions,
+.admin-dashboard-layout[dir="rtl"] .user-management-actions {
+  justify-content: flex-end;
+  justify-self: end;
 }
 
 /* ============================================================
@@ -466,6 +759,64 @@ body.theme-dark .user-management-secondary,
   box-shadow: none !important;
 }
 
+[data-theme="dark"] .user-management-danger,
+body.theme-dark .user-management-danger,
+.theme-dark .user-management-danger {
+  background: rgba(255, 107, 107, 0.09) !important;
+  border-color: rgba(255, 107, 107, 0.24) !important;
+  color: #ffb4b4 !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .user-management-toast.success,
+body.theme-dark .user-management-toast.success,
+.theme-dark .user-management-toast.success {
+  background: #0b352f !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #8ff0d2 !important;
+}
+
+[data-theme="dark"] .user-management-toast.error,
+body.theme-dark .user-management-toast.error,
+.theme-dark .user-management-toast.error {
+  background: #3b1518 !important;
+  border-color: rgba(255, 107, 107, 0.36) !important;
+  color: #ffb4b4 !important;
+}
+
+[data-theme="dark"] .user-management-page .page-delete-modal,
+body.theme-dark .user-management-page .page-delete-modal,
+.theme-dark .user-management-page .page-delete-modal {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.07), transparent 30%),
+    linear-gradient(145deg, #101c2d 0%, #111c2c 100%) !important;
+  border-color: rgba(255, 107, 107, 0.24) !important;
+  color: #f8fbff !important;
+}
+
+[data-theme="dark"] .user-management-page .page-delete-modal-copy h2,
+[data-theme="dark"] .user-management-page .page-delete-modal-copy strong,
+body.theme-dark .user-management-page .page-delete-modal-copy h2,
+body.theme-dark .user-management-page .page-delete-modal-copy strong,
+.theme-dark .user-management-page .page-delete-modal-copy h2,
+.theme-dark .user-management-page .page-delete-modal-copy strong {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .user-management-page .page-delete-modal-copy p,
+body.theme-dark .user-management-page .page-delete-modal-copy p,
+.theme-dark .user-management-page .page-delete-modal-copy p {
+  color: #b9c7d8 !important;
+}
+
+[data-theme="dark"] .user-management-page .page-delete-modal-secondary,
+body.theme-dark .user-management-page .page-delete-modal-secondary,
+.theme-dark .user-management-page .page-delete-modal-secondary {
+  background: #162235 !important;
+  border-color: rgba(126, 158, 181, 0.22) !important;
+  color: #d8eef1 !important;
+}
+
 [data-theme="dark"] .user-management-pagination span,
 body.theme-dark .user-management-pagination span,
 .theme-dark .user-management-pagination span {
@@ -477,6 +828,14 @@ body.theme-dark .user-management-secondary:hover:not(:disabled),
 .theme-dark .user-management-secondary:hover:not(:disabled) {
   background: #1b2a40 !important;
   border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .user-management-danger:hover:not(:disabled),
+body.theme-dark .user-management-danger:hover:not(:disabled),
+.theme-dark .user-management-danger:hover:not(:disabled) {
+  background: #b42318 !important;
+  border-color: #ff8a8a !important;
   color: #ffffff !important;
 }
 
@@ -530,23 +889,51 @@ body.theme-dark .user-management-empty,
   color: #aab7c7 !important;
 }
 
+[data-theme="dark"] .user-management-skeleton-avatar,
+[data-theme="dark"] .user-management-skeleton-line,
+body.theme-dark .user-management-skeleton-avatar,
+body.theme-dark .user-management-skeleton-line,
+.theme-dark .user-management-skeleton-avatar,
+.theme-dark .user-management-skeleton-line {
+  background: linear-gradient(
+    90deg,
+    rgba(126, 158, 181, 0.10) 0%,
+    rgba(127, 214, 208, 0.18) 42%,
+    rgba(126, 158, 181, 0.10) 84%
+  ) !important;
+  background-size: 220% 100% !important;
+}
+
 @media (max-width: 1420px) {
+  .user-management-row {
+    column-gap: 14px;
+  }
+}
+
+@media (max-width: 1180px) {
   .user-management-row {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "profile"
-      "role"
-      "plan"
-      "action";
+      "identity"
+      "management";
     align-items: stretch;
   }
 
-  .user-management-controls {
-    grid-template-columns: minmax(180px, 1fr) minmax(132px, max-content);
+  .admin-dashboard-layout.is-rtl .user-management-row,
+  .admin-dashboard-layout[dir="rtl"] .user-management-row {
+    grid-template-areas:
+      "identity"
+      "management";
   }
 
+  .user-management-controls,
   .user-management-plan-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .user-management-actions {
+    justify-self: stretch;
+    width: fit-content;
   }
 }
 
@@ -556,7 +943,20 @@ body.theme-dark .user-management-empty,
   }
 
   .user-management-stats,
+  .user-management-controls,
   .user-management-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-management-actions {
+    width: 100%;
+  }
+
+  .user-management-actions > button {
+    flex: 1 1 0;
+  }
+
+  .user-management-page .page-delete-modal-actions {
     grid-template-columns: 1fr;
   }
 }

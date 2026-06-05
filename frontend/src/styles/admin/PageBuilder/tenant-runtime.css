@@ -38,3 +38,278 @@
   font-weight: 900;
   cursor: pointer;
 }
+
+/* ============================================================
+   TENANT RUNTIME DARK MODE
+   Published builder pages use saved template colors inline, so dark
+   mode has to normalize runtime canvas/sections explicitly.
+   ============================================================ */
+
+:root[data-theme="dark"] .tenant-site-runtime,
+html.theme-dark .tenant-site-runtime,
+body.theme-dark .tenant-site-runtime {
+  --tenant-dark-bg: #07111f;
+  --tenant-dark-surface: #101c2d;
+  --tenant-dark-surface-2: #162235;
+  --tenant-dark-text: #f8fafc;
+  --tenant-dark-muted: #b8c5d6;
+  --tenant-dark-accent: #7fd6d0;
+  --tenant-dark-accent-strong: #9fe7df;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+  color: var(--tenant-dark-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page,
+html.theme-dark .tenant-runtime-page,
+body.theme-dark .tenant-runtime-page,
+:root[data-theme="dark"] .tenant-login-runtime,
+html.theme-dark .tenant-login-runtime,
+body.theme-dark .tenant-login-runtime,
+:root[data-theme="dark"] .tenant-runtime-main,
+html.theme-dark .tenant-runtime-main,
+body.theme-dark .tenant-runtime-main {
+  background:
+    radial-gradient(circle at 16% 0%, rgba(47, 159, 154, 0.1), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+  color: var(--tenant-dark-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .builder-canvas,
+html.theme-dark .tenant-runtime-page .builder-canvas,
+body.theme-dark .tenant-runtime-page .builder-canvas {
+  background:
+    radial-gradient(circle at 92% 8%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(180deg, #081321 0%, #07111f 100%) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .site-section,
+html.theme-dark .tenant-runtime-page .site-section,
+body.theme-dark .tenant-runtime-page .site-section,
+:root[data-theme="dark"] .tenant-runtime-page .site-section[style*="#ffffff"],
+:root[data-theme="dark"] .tenant-runtime-page .site-section[style*="#fbfaf8"],
+:root[data-theme="dark"] .tenant-runtime-page .site-section[style*="255, 255, 255"],
+:root[data-theme="dark"] .tenant-runtime-page .site-section[style*="251, 250, 248"],
+html.theme-dark .tenant-runtime-page .site-section[style*="#ffffff"],
+html.theme-dark .tenant-runtime-page .site-section[style*="#fbfaf8"],
+html.theme-dark .tenant-runtime-page .site-section[style*="255, 255, 255"],
+html.theme-dark .tenant-runtime-page .site-section[style*="251, 250, 248"],
+body.theme-dark .tenant-runtime-page .site-section[style*="#ffffff"],
+body.theme-dark .tenant-runtime-page .site-section[style*="#fbfaf8"],
+body.theme-dark .tenant-runtime-page .site-section[style*="255, 255, 255"],
+body.theme-dark .tenant-runtime-page .site-section[style*="251, 250, 248"] {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(8, 19, 33, 0.96)) !important;
+  border-color: transparent !important;
+  color: var(--tenant-dark-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .site-section:nth-child(even),
+html.theme-dark .tenant-runtime-page .site-section:nth-child(even),
+body.theme-dark .tenant-runtime-page .site-section:nth-child(even) {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(47, 159, 154, 0.07), transparent 30%),
+    linear-gradient(145deg, #081321, #101c2d) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .site-column,
+html.theme-dark .tenant-runtime-page .site-column,
+body.theme-dark .tenant-runtime-page .site-column {
+  color: var(--tenant-dark-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .builder-element,
+html.theme-dark .tenant-runtime-page .builder-element,
+body.theme-dark .tenant-runtime-page .builder-element {
+  border-color: transparent !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-heading,
+html.theme-dark .tenant-runtime-page .builder-element-heading,
+body.theme-dark .tenant-runtime-page .builder-element-heading,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-card strong,
+html.theme-dark .tenant-runtime-page .builder-element-card strong,
+body.theme-dark .tenant-runtime-page .builder-element-card strong,
+:root[data-theme="dark"] .tenant-runtime-page .metric-value,
+html.theme-dark .tenant-runtime-page .metric-value,
+body.theme-dark .tenant-runtime-page .metric-value {
+  color: #ffffff !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-text,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-list,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-card,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-card span,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-embed,
+:root[data-theme="dark"] .tenant-runtime-page .runtime-form-header p,
+:root[data-theme="dark"] .tenant-runtime-page .runtime-form-section-header p,
+:root[data-theme="dark"] .tenant-runtime-page .runtime-question small,
+html.theme-dark .tenant-runtime-page .builder-element-text,
+html.theme-dark .tenant-runtime-page .builder-element-list,
+html.theme-dark .tenant-runtime-page .builder-element-card,
+html.theme-dark .tenant-runtime-page .builder-element-card span,
+html.theme-dark .tenant-runtime-page .builder-element-embed,
+html.theme-dark .tenant-runtime-page .runtime-form-header p,
+html.theme-dark .tenant-runtime-page .runtime-form-section-header p,
+html.theme-dark .tenant-runtime-page .runtime-question small,
+body.theme-dark .tenant-runtime-page .builder-element-text,
+body.theme-dark .tenant-runtime-page .builder-element-list,
+body.theme-dark .tenant-runtime-page .builder-element-card,
+body.theme-dark .tenant-runtime-page .builder-element-card span,
+body.theme-dark .tenant-runtime-page .builder-element-embed,
+body.theme-dark .tenant-runtime-page .runtime-form-header p,
+body.theme-dark .tenant-runtime-page .runtime-form-section-header p,
+body.theme-dark .tenant-runtime-page .runtime-question small {
+  color: var(--tenant-dark-muted) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-card,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-metric,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-formBlock,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-reservationBlock,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-responsesTable,
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-embed,
+:root[data-theme="dark"] .tenant-runtime-page .runtime-form,
+:root[data-theme="dark"] .tenant-runtime-page .responses-preview,
+html.theme-dark .tenant-runtime-page .builder-element-card,
+html.theme-dark .tenant-runtime-page .builder-element-metric,
+html.theme-dark .tenant-runtime-page .builder-element-formBlock,
+html.theme-dark .tenant-runtime-page .builder-element-reservationBlock,
+html.theme-dark .tenant-runtime-page .builder-element-responsesTable,
+html.theme-dark .tenant-runtime-page .builder-element-embed,
+html.theme-dark .tenant-runtime-page .runtime-form,
+html.theme-dark .tenant-runtime-page .responses-preview,
+body.theme-dark .tenant-runtime-page .builder-element-card,
+body.theme-dark .tenant-runtime-page .builder-element-metric,
+body.theme-dark .tenant-runtime-page .builder-element-formBlock,
+body.theme-dark .tenant-runtime-page .builder-element-reservationBlock,
+body.theme-dark .tenant-runtime-page .builder-element-responsesTable,
+body.theme-dark .tenant-runtime-page .builder-element-embed,
+body.theme-dark .tenant-runtime-page .runtime-form,
+body.theme-dark .tenant-runtime-page .responses-preview {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.96), rgba(7, 17, 31, 0.92)) !important;
+  border: 0 !important;
+  color: var(--tenant-dark-text) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .builder-element-button,
+:root[data-theme="dark"] .tenant-runtime-page .runtime-submit,
+:root[data-theme="dark"] .tenant-runtime-page .reservation-submit,
+html.theme-dark .tenant-runtime-page .builder-element-button,
+html.theme-dark .tenant-runtime-page .runtime-submit,
+html.theme-dark .tenant-runtime-page .reservation-submit,
+body.theme-dark .tenant-runtime-page .builder-element-button,
+body.theme-dark .tenant-runtime-page .runtime-submit,
+body.theme-dark .tenant-runtime-page .reservation-submit {
+  background: linear-gradient(135deg, #2f9f9a, #7fd6d0) !important;
+  border-color: transparent !important;
+  color: #03111c !important;
+  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.22) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page .runtime-form-section,
+:root[data-theme="dark"] .tenant-runtime-page .runtime-question,
+:root[data-theme="dark"] .tenant-runtime-page .mock-table-row,
+html.theme-dark .tenant-runtime-page .runtime-form-section,
+html.theme-dark .tenant-runtime-page .runtime-question,
+html.theme-dark .tenant-runtime-page .mock-table-row,
+body.theme-dark .tenant-runtime-page .runtime-form-section,
+body.theme-dark .tenant-runtime-page .runtime-question,
+body.theme-dark .tenant-runtime-page .mock-table-row {
+  background: rgba(7, 17, 31, 0.44) !important;
+  border-color: transparent !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page input,
+:root[data-theme="dark"] .tenant-runtime-page select,
+:root[data-theme="dark"] .tenant-runtime-page textarea,
+html.theme-dark .tenant-runtime-page input,
+html.theme-dark .tenant-runtime-page select,
+html.theme-dark .tenant-runtime-page textarea,
+body.theme-dark .tenant-runtime-page input,
+body.theme-dark .tenant-runtime-page select,
+body.theme-dark .tenant-runtime-page textarea {
+  background: rgba(7, 17, 31, 0.82) !important;
+  border-color: rgba(126, 158, 181, 0.2) !important;
+  color: var(--tenant-dark-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-runtime-page input::placeholder,
+:root[data-theme="dark"] .tenant-runtime-page textarea::placeholder,
+html.theme-dark .tenant-runtime-page input::placeholder,
+html.theme-dark .tenant-runtime-page textarea::placeholder,
+body.theme-dark .tenant-runtime-page input::placeholder,
+body.theme-dark .tenant-runtime-page textarea::placeholder {
+  color: rgba(184, 197, 214, 0.72) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-header,
+html.theme-dark .tenant-site-header,
+body.theme-dark .tenant-site-header,
+:root[data-theme="dark"] .tenant-site-footer,
+html.theme-dark .tenant-site-footer,
+body.theme-dark .tenant-site-footer {
+  background: rgba(8, 19, 33, 0.98) !important;
+  border-color: transparent !important;
+  color: var(--tenant-dark-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-brand,
+:root[data-theme="dark"] .tenant-site-nav button,
+:root[data-theme="dark"] .tenant-footer-logo-row h3,
+:root[data-theme="dark"] .tenant-footer-column h4,
+:root[data-theme="dark"] .tenant-footer-contact h4,
+html.theme-dark .tenant-site-brand,
+html.theme-dark .tenant-site-nav button,
+html.theme-dark .tenant-footer-logo-row h3,
+html.theme-dark .tenant-footer-column h4,
+html.theme-dark .tenant-footer-contact h4,
+body.theme-dark .tenant-site-brand,
+body.theme-dark .tenant-site-nav button,
+body.theme-dark .tenant-footer-logo-row h3,
+body.theme-dark .tenant-footer-column h4,
+body.theme-dark .tenant-footer-contact h4 {
+  color: var(--tenant-dark-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-footer-brand p,
+:root[data-theme="dark"] .tenant-footer-contact p,
+:root[data-theme="dark"] .tenant-footer-bottom p,
+:root[data-theme="dark"] .tenant-footer-column button,
+:root[data-theme="dark"] .tenant-footer-bottom button,
+html.theme-dark .tenant-footer-brand p,
+html.theme-dark .tenant-footer-contact p,
+html.theme-dark .tenant-footer-bottom p,
+html.theme-dark .tenant-footer-column button,
+html.theme-dark .tenant-footer-bottom button,
+body.theme-dark .tenant-footer-brand p,
+body.theme-dark .tenant-footer-contact p,
+body.theme-dark .tenant-footer-bottom p,
+body.theme-dark .tenant-footer-column button,
+body.theme-dark .tenant-footer-bottom button {
+  color: var(--tenant-dark-muted) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-nav button:hover,
+:root[data-theme="dark"] .tenant-site-nav button.active,
+:root[data-theme="dark"] .tenant-footer-column button:hover,
+:root[data-theme="dark"] .tenant-footer-bottom button:hover,
+html.theme-dark .tenant-site-nav button:hover,
+html.theme-dark .tenant-site-nav button.active,
+html.theme-dark .tenant-footer-column button:hover,
+html.theme-dark .tenant-footer-bottom button:hover,
+body.theme-dark .tenant-site-nav button:hover,
+body.theme-dark .tenant-site-nav button.active,
+body.theme-dark .tenant-footer-column button:hover,
+body.theme-dark .tenant-footer-bottom button:hover {
+  background: rgba(47, 159, 154, 0.14) !important;
+  color: var(--tenant-dark-accent-strong) !important;
+}

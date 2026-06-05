@@ -1,0 +1,33 @@
+{
+  "sidebar": {
+    "brand": "Madar",
+    "subtitle": "Admin Panel",
+    "aria": "Dashboard sidebar",
+    "navigation": "Dashboard navigation",
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "pageBuilder": "Page Builder",
+    "submissions": "Submissions",
+    "dataLogs": "Data Logs",
+    "myPlan": "My Plan",
+    "settings": "Settings",
+    "languageSwitch": "العربية",
+    "logout": "Log out",
+    "themeMode": "Theme",
+    "userManagement": "User Management",
+    "admin": "Admin"
+  },
+  "loading": {
+    "dashboard": "Loading dashboard",
+    "pageBuilder": "Loading page builder",
+    "submissions": "Loading submissions",
+    "dataLogs": "Loading data logs",
+    "myPlan": "Loading my plan",
+    "userManagement": "Loading user management",
+    "settings": "Loading settings",
+    "passwordSettings": "Loading password settings"
+  },
+  "user": {
+    "fallbackName": "Madar User"
+  }
+}

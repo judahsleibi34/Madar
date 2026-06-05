@@ -1,0 +1,33 @@
+{
+  "sidebar": {
+    "brand": "مدار",
+    "subtitle": "لوحة التحكم",
+    "aria": "الشريط الجانبي للوحة التحكم",
+    "navigation": "تنقل لوحة التحكم",
+    "home": "الرئيسية",
+    "dashboard": "لوحة التحكم",
+    "pageBuilder": "منشئ الصفحات",
+    "submissions": "النماذج",
+    "dataLogs": "سجلات البيانات",
+    "myPlan": "خطتي",
+    "settings": "الإعدادات",
+    "languageSwitch": "English",
+    "logout": "تسجيل الخروج",
+    "themeMode": "السمة",
+    "userManagement": "إدارة المستخدمين",
+    "admin": "مسؤول"
+  },
+  "loading": {
+    "dashboard": "جار تحميل لوحة التحكم",
+    "pageBuilder": "جار تحميل منشئ الصفحات",
+    "submissions": "جار تحميل النماذج",
+    "dataLogs": "جار تحميل سجلات البيانات",
+    "myPlan": "جار تحميل خطتي",
+    "userManagement": "جار تحميل إدارة المستخدمين",
+    "settings": "جار تحميل الإعدادات",
+    "passwordSettings": "جار تحميل إعدادات كلمة المرور"
+  },
+  "user": {
+    "fallbackName": "مستخدم مدار"
+  }
+}

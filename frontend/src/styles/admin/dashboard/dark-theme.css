@@ -20,6 +20,93 @@ body.theme-dark {
    DASHBOARD LAYOUT DARK
    ============================================================ */
 
+[data-theme="dark"] .dashboard-skeleton-layout,
+.theme-dark .dashboard-skeleton-layout {
+  background: #07111f !important;
+}
+
+[data-theme="dark"] .dashboard-skeleton-sidebar,
+.theme-dark .dashboard-skeleton-sidebar {
+  background: #081321 !important;
+  border-right-color: rgba(126, 158, 181, 0.16) !important;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .dashboard-skeleton-page,
+.theme-dark .dashboard-skeleton-page {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+}
+
+[data-theme="dark"] .skeleton-circle,
+[data-theme="dark"] .skeleton-line,
+[data-theme="dark"] .skeleton-card,
+[data-theme="dark"] .skeleton-panel,
+.theme-dark .skeleton-circle,
+.theme-dark .skeleton-line,
+.theme-dark .skeleton-card,
+.theme-dark .skeleton-panel {
+  background: linear-gradient(
+    90deg,
+    rgba(126, 158, 181, 0.1),
+    rgba(127, 214, 208, 0.16),
+    rgba(126, 158, 181, 0.1)
+  ) !important;
+  background-size: 220% 100% !important;
+}
+
+[data-theme="dark"] .skeleton-card,
+[data-theme="dark"] .skeleton-panel,
+.theme-dark .skeleton-card,
+.theme-dark .skeleton-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.26);
+}
+
+[data-theme="dark"] .auth-page,
+[data-theme="dark"] .login-page,
+[data-theme="dark"] .already-signed-page,
+.theme-dark .auth-page,
+.theme-dark .login-page,
+.theme-dark .already-signed-page {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .auth-skeleton-card,
+.theme-dark .auth-skeleton-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.26) !important;
+}
+
+[data-theme="dark"] .auth-skeleton-card::after,
+.theme-dark .auth-skeleton-card::after {
+  background: #7fd6d0 !important;
+  opacity: 0.08 !important;
+}
+
+[data-theme="dark"] .auth-skeleton-line,
+[data-theme="dark"] .auth-skeleton-button,
+.theme-dark .auth-skeleton-line,
+.theme-dark .auth-skeleton-button {
+  background: linear-gradient(
+    90deg,
+    rgba(126, 158, 181, 0.1),
+    rgba(127, 214, 208, 0.16),
+    rgba(126, 158, 181, 0.1)
+  ) !important;
+  background-size: 220% 100% !important;
+}
+
 [data-theme="dark"] .admin-dashboard-layout,
 .theme-dark .admin-dashboard-layout {
   background: #0f1726 !important;
@@ -29,9 +116,9 @@ body.theme-dark {
 .theme-dark .admin-dashboard-page {
   color: #f8fafc !important;
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.22), transparent 34%),
-    radial-gradient(circle at top right, rgba(26, 39, 68, 0.4), transparent 36%),
-    linear-gradient(135deg, #0f1726 0%, #111827 48%, #15101a 100%) !important;
+    radial-gradient(circle at top left, rgba(47, 159, 154, 0.12), transparent 34%),
+    radial-gradient(circle at top right, rgba(80, 117, 151, 0.18), transparent 36%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
 }
 
 [data-theme="dark"] .admin-dashboard-shell,
@@ -57,7 +144,7 @@ body.theme-dark {
 .theme-dark .dashboard-panel {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(139, 42, 26, 0.28)) border-box !important;
+    linear-gradient(135deg, rgba(126, 158, 181, 0.22), rgba(127, 214, 208, 0.18)) border-box !important;
   border: 1px solid transparent !important;
   color: #f8fafc !important;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28) !important;
@@ -94,9 +181,9 @@ body.theme-dark {
 [data-theme="dark"] .panel-icon,
 .theme-dark .overview-icon,
 .theme-dark .panel-icon {
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%) !important;
+  background: linear-gradient(135deg, rgba(80, 117, 151, 0.94) 0%, #7fd6d0 100%) !important;
   color: #ffffff !important;
-  box-shadow: 0 18px 40px rgba(139, 42, 26, 0.24) !important;
+  box-shadow: 0 14px 30px rgba(47, 159, 154, 0.18) !important;
 }
 
 [data-theme="dark"] .metric-track,
@@ -106,13 +193,13 @@ body.theme-dark {
 
 [data-theme="dark"] .metric-track > div,
 .theme-dark .metric-track > div {
-  background: linear-gradient(135deg, #8b2a1a 0%, #d48a75 100%) !important;
+  background: linear-gradient(135deg, #2f9f9a 0%, #7fd6d0 100%) !important;
 }
 
 [data-theme="dark"] .cash-bar,
 .theme-dark .cash-bar {
-  background: linear-gradient(180deg, #d48a75 0%, #8b2a1a 100%) !important;
-  box-shadow: 0 18px 34px rgba(139, 42, 26, 0.22) !important;
+  background: linear-gradient(180deg, #7fd6d0 0%, #2f9f9a 100%) !important;
+  box-shadow: 0 14px 30px rgba(47, 159, 154, 0.18) !important;
 }
 
 [data-theme="dark"] .cash-bar span,
@@ -141,9 +228,9 @@ body.theme-dark {
 [data-theme="dark"] .uptime-circle,
 .theme-dark .uptime-circle {
   background:
-    radial-gradient(circle, rgba(139, 42, 26, 0.2), transparent 58%),
+    radial-gradient(circle, rgba(47, 159, 154, 0.18), transparent 58%),
     rgba(255, 255, 255, 0.04) !important;
-  border-color: rgba(139, 42, 26, 0.32) !important;
+  border-color: rgba(127, 214, 208, 0.32) !important;
 }
 
 [data-theme="dark"] .uptime-circle strong,
@@ -225,13 +312,13 @@ body.theme-dark {
 .theme-dark .admin-sidebar-lang {
   background: transparent !important;
   color: #f8fafc !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
+  border-color: transparent !important;
 }
 
 [data-theme="dark"] .admin-sidebar-lang:hover,
 .theme-dark .admin-sidebar-lang:hover {
   background: rgba(255, 255, 255, 0.08) !important;
-  border-color: rgba(255, 255, 255, 0.26) !important;
+  border-color: transparent !important;
 }
 
 [data-theme="dark"] .admin-sidebar-logout,
@@ -246,7 +333,7 @@ body.theme-dark {
 
 [data-theme="dark"] .admin-sidebar-logout:hover,
 .theme-dark .admin-sidebar-logout:hover {
-  background: rgba(139, 42, 26, 0.2) !important;
+  background: rgba(47, 159, 154, 0.14) !important;
   color: #ffffff !important;
 }
 
@@ -257,15 +344,9 @@ body.theme-dark {
 
 [data-theme="dark"] .admin-sidebar-user,
 .theme-dark .admin-sidebar-user {
-  background:
-    linear-gradient(#101827, #101827) padding-box,
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.16),
-      rgba(139, 42, 26, 0.42)
-    ) border-box !important;
-  border: 1px solid transparent !important;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 /* ============================================================
@@ -279,7 +360,7 @@ body.theme-dark {
 
 [data-theme="dark"] .settings-header p,
 .theme-dark .settings-header p {
-  color: #d48a75 !important;
+  color: #9fe7df !important;
 }
 
 [data-theme="dark"] .settings-header h1,
@@ -300,7 +381,7 @@ body.theme-dark {
 .theme-dark .settings-card {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(139, 42, 26, 0.28)) border-box !important;
+    linear-gradient(135deg, rgba(126, 158, 181, 0.22), rgba(127, 214, 208, 0.18)) border-box !important;
   border: 1px solid transparent !important;
   color: #f8fafc !important;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28) !important;
@@ -311,7 +392,7 @@ body.theme-dark {
   background:
     radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.16), transparent 28%),
     radial-gradient(circle at 84% 26%, rgba(255, 255, 255, 0.1), transparent 26%),
-    linear-gradient(135deg, #1a2744 0%, #4b2b35 48%, #8b2a1a 100%) !important;
+    linear-gradient(135deg, #07111f 0%, #101c2d 48%, #162235 100%) !important;
 }
 
 [data-theme="dark"] .settings-profile-avatar,
@@ -348,12 +429,12 @@ body.theme-dark {
 .theme-dark .settings-card input:focus,
 .theme-dark .settings-card textarea:focus {
   border-color: rgba(212, 138, 117, 0.7) !important;
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.2) !important;
+  box-shadow: 0 0 0 4px rgba(47, 159, 154, 0.16) !important;
 }
 
 [data-theme="dark"] .settings-file-button,
 .theme-dark .settings-file-button {
-  background: rgba(139, 42, 26, 0.18) !important;
+  background: rgba(47, 159, 154, 0.14) !important;
   border-color: rgba(212, 138, 117, 0.42) !important;
   color: #f8fafc !important;
 }
@@ -367,7 +448,7 @@ body.theme-dark {
 
 [data-theme="dark"] .settings-reset-password-button:hover,
 .theme-dark .settings-reset-password-button:hover {
-  background: rgba(139, 42, 26, 0.2) !important;
+  background: rgba(47, 159, 154, 0.14) !important;
   border-color: rgba(212, 138, 117, 0.4) !important;
   color: #ffffff !important;
 }
@@ -401,7 +482,7 @@ body.theme-dark {
 
 [data-theme="dark"] .my-plan-kicker,
 .theme-dark .my-plan-kicker {
-  color: #d48a75 !important;
+  color: #9fe7df !important;
 }
 
 [data-theme="dark"] .my-plan-hero h1,
@@ -438,7 +519,7 @@ body.theme-dark {
 .theme-dark .my-plan-builder-card {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(139, 42, 26, 0.28)) border-box !important;
+    linear-gradient(135deg, rgba(126, 158, 181, 0.22), rgba(127, 214, 208, 0.18)) border-box !important;
   border: 1px solid transparent !important;
   color: #f8fafc !important;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28) !important;
@@ -459,7 +540,7 @@ body.theme-dark {
 
 [data-theme="dark"] .my-plan-secondary-btn:hover,
 .theme-dark .my-plan-secondary-btn:hover {
-  background: rgba(139, 42, 26, 0.2) !important;
+  background: rgba(47, 159, 154, 0.14) !important;
   border-color: rgba(212, 138, 117, 0.4) !important;
 }
 
@@ -472,7 +553,7 @@ body.theme-dark {
 [data-theme="dark"] .my-plan-builder-card-top strong,
 .theme-dark .my-plan-card-top strong,
 .theme-dark .my-plan-builder-card-top strong {
-  background: rgba(139, 42, 26, 0.22) !important;
+  background: rgba(47, 159, 154, 0.16) !important;
   color: #f8fafc !important;
 }
 
@@ -480,7 +561,7 @@ body.theme-dark {
 [data-theme="dark"] .my-plan-builder-footer em,
 .theme-dark .my-plan-price-row div strong,
 .theme-dark .my-plan-builder-footer em {
-  color: #d48a75 !important;
+  color: #9fe7df !important;
 }
 
 [data-theme="dark"] .my-plan-meta-grid div,
@@ -505,13 +586,13 @@ body.theme-dark {
 
 [data-theme="dark"] .my-plan-progress-track span,
 .theme-dark .my-plan-progress-track span {
-  background: linear-gradient(90deg, #d48a75 0%, #8b2a1a 100%) !important;
+  background: linear-gradient(90deg, #7fd6d0 0%, #2f9f9a 100%) !important;
 }
 
 [data-theme="dark"] .my-plan-builder-card.active,
 .theme-dark .my-plan-builder-card.active {
   border-color: rgba(212, 138, 117, 0.46) !important;
-  box-shadow: 0 24px 70px rgba(139, 42, 26, 0.18) !important;
+  box-shadow: 0 22px 56px rgba(47, 159, 154, 0.12) !important;
 }
 
 /* ============================================================
@@ -529,15 +610,15 @@ body.theme-dark {
   --madar-text: #f8fafc;
   --madar-muted: rgba(248, 250, 252, 0.68);
   --madar-navy: #1a2744;
-  --madar-red: #d48a75;
-  --madar-red-dark: #8b2a1a;
+  --madar-red: #7fd6d0;
+  --madar-red-dark: #4fb7b1;
   --madar-border: rgba(255, 255, 255, 0.12);
   --madar-border-strong: rgba(255, 255, 255, 0.2);
-  --madar-gradient: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  --madar-gradient: linear-gradient(135deg, #223154 0%, #7fd6d0 100%);
   --madar-gradient-hover: linear-gradient(135deg, #22345b 0%, #a33a26 100%);
   --madar-shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.22);
   --madar-shadow-md: 0 18px 45px rgba(0, 0, 0, 0.3);
-  --madar-red-shadow: 0 12px 28px rgba(139, 42, 26, 0.3);
+  --madar-red-shadow: 0 12px 28px rgba(47, 159, 154, 0.22);
 
   background: var(--madar-bg) !important;
   color: var(--madar-text) !important;
@@ -603,7 +684,7 @@ body.theme-dark {
 .theme-dark .page-builder .responses-results-page,
 .theme-dark .page-builder .analytics-dashboard-page {
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.16), transparent 32%),
+    radial-gradient(circle at top left, rgba(47, 159, 154, 0.12), transparent 32%),
     linear-gradient(180deg, #0f1726 0%, var(--madar-bg) 100%) !important;
 }
 
@@ -771,7 +852,7 @@ body.theme-dark {
 .theme-dark .page-builder .page-delete-modal {
   background: var(--madar-surface) !important;
   color: var(--madar-text) !important;
-  border-color: rgba(139, 42, 26, 0.28) !important;
+  border-color: rgba(127, 214, 208, 0.28) !important;
 }
 
 /* ============================================================
@@ -796,9 +877,9 @@ body.theme-dark {
 [data-theme="dark"] .my-plan-primary-btn,
 .theme-dark .settings-save-button,
 .theme-dark .my-plan-primary-btn {
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%) !important;
+  background: linear-gradient(135deg, #223154 0%, #7fd6d0 100%) !important;
   color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.26) !important;
+  box-shadow: 0 14px 30px rgba(47, 159, 154, 0.18) !important;
 }
 
 /* ============================================================
@@ -1187,9 +1268,9 @@ body.theme-dark {
 
 [data-theme="dark"] .admin-sidebar-user,
 .theme-dark .admin-sidebar-user {
-  background:
-    linear-gradient(#081321, #081321) padding-box,
-    linear-gradient(135deg, rgba(126, 158, 181, 0.2), rgba(127, 214, 208, 0.36)) border-box !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 [data-theme="dark"] .admin-sidebar-logout:hover,
@@ -1888,4 +1969,362 @@ body.theme-dark .page-builder [style*="194, 65, 12"] {
   background: rgba(47, 159, 154, 0.12) !important;
   border-color: rgba(127, 214, 208, 0.32) !important;
   box-shadow: none !important;
+}
+
+/* ============================================================
+   RESPONSIVE ADMIN DARK THEME
+   ============================================================ */
+
+[data-theme="dark"] .dashboard-mobile-menu-button,
+body.theme-dark .dashboard-mobile-menu-button,
+.theme-dark .dashboard-mobile-menu-button {
+  background:
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border: 1px solid rgba(126, 158, 181, 0.2) !important;
+  color: #d8eef1 !important;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+[data-theme="dark"] .dashboard-mobile-menu-button:hover,
+[data-theme="dark"] .dashboard-mobile-menu-button:focus-visible,
+body.theme-dark .dashboard-mobile-menu-button:hover,
+body.theme-dark .dashboard-mobile-menu-button:focus-visible,
+.theme-dark .dashboard-mobile-menu-button:hover,
+.theme-dark .dashboard-mobile-menu-button:focus-visible {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .dashboard-sidebar-backdrop,
+body.theme-dark .dashboard-sidebar-backdrop,
+.theme-dark .dashboard-sidebar-backdrop {
+  background: rgba(7, 17, 31, 0.68) !important;
+}
+
+[data-theme="dark"] .admin-sidebar,
+body.theme-dark .admin-sidebar,
+.theme-dark .admin-sidebar {
+  background: #081321 !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-admin-badge,
+body.theme-dark .admin-sidebar-admin-badge,
+.theme-dark .admin-sidebar-admin-badge {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border: 1px solid rgba(127, 214, 208, 0.26) !important;
+  color: #7fd6d0 !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-sidebar-admin-badge svg,
+body.theme-dark .admin-sidebar-admin-badge svg,
+.theme-dark .admin-sidebar-admin-badge svg {
+  color: #7fd6d0 !important;
+}
+
+@media (max-width: 700px) {
+  [data-theme="dark"] .admin-sidebar,
+  body.theme-dark .admin-sidebar,
+  .theme-dark .admin-sidebar {
+    background: #081321 !important;
+    border-right-color: rgba(126, 158, 181, 0.16) !important;
+    border-left-color: rgba(126, 158, 181, 0.16) !important;
+  }
+
+  [data-theme="dark"] .admin-dashboard-page,
+  body.theme-dark .admin-dashboard-page,
+  .theme-dark .admin-dashboard-page {
+    background:
+      radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+      linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+  }
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row,
+body.theme-dark .admin-sidebar-theme-row,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row,
+.theme-dark .admin-sidebar-theme-row,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row {
+  color: #d8eef1 !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row:hover,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row:hover,
+body.theme-dark .admin-sidebar-theme-row:hover,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row:hover,
+.theme-dark .admin-sidebar-theme-row:hover,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row:hover {
+  background: rgba(47, 159, 154, 0.12) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-label,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-label,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-label,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-label,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-label,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-label {
+  color: #d8eef1 !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-icon,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-icon,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-icon,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-icon,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-icon,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-icon {
+  color: #7fd6d0 !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-switch,
+[data-theme="dark"] .theme-toggle.is-dark .theme-toggle-switch,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-switch,
+body.theme-dark .theme-toggle.is-dark .theme-toggle-switch,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-switch,
+.theme-dark .theme-toggle.is-dark .theme-toggle-switch {
+  background: rgba(47, 159, 154, 0.18) !important;
+  border-color: rgba(127, 214, 208, 0.38) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-thumb,
+[data-theme="dark"] .theme-toggle.is-dark .theme-toggle-thumb,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-thumb,
+body.theme-dark .theme-toggle.is-dark .theme-toggle-thumb,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-thumb,
+.theme-dark .theme-toggle.is-dark .theme-toggle-thumb {
+  background: #7fd6d0 !important;
+  box-shadow: 0 4px 10px rgba(47, 159, 154, 0.28) !important;
+}
+
+/* ============================================================
+   FINAL ADMIN DARK RED PURGE
+   Keeps the dashboard fully on the dark navy / teal palette.
+   ============================================================ */
+
+:root[data-theme="dark"],
+body.theme-dark,
+.theme-dark {
+  --madar-red: #7fd6d0 !important;
+  --madar-red-dark: #4fb7b1 !important;
+  --madar-gradient: linear-gradient(135deg, #223154 0%, #7fd6d0 100%) !important;
+  --madar-gradient-hover: linear-gradient(135deg, #2f9f9a 0%, #9fe7df 100%) !important;
+  --madar-button-shadow: 0 12px 28px rgba(47, 159, 154, 0.2) !important;
+  --madar-button-shadow-hover: 0 16px 34px rgba(47, 159, 154, 0.26) !important;
+  --admin-red: #7fd6d0 !important;
+  --admin-red-bright: #9fe7df !important;
+  --admin-gradient: linear-gradient(135deg, #223154 0%, #7fd6d0 100%) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page,
+body.theme-dark .admin-dashboard-page,
+.theme-dark .admin-dashboard-page {
+  background:
+    radial-gradient(circle at top left, rgba(47, 159, 154, 0.12), transparent 34%),
+    radial-gradient(circle at top right, rgba(80, 117, 151, 0.18), transparent 36%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border: 0 !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.2) !important;
+}
+
+[data-theme="dark"] .overview-card::after,
+[data-theme="dark"] .overview-card.navy::after,
+[data-theme="dark"] .overview-card.red::after,
+[data-theme="dark"] .overview-card.olive::after,
+body.theme-dark .overview-card::after,
+body.theme-dark .overview-card.navy::after,
+body.theme-dark .overview-card.red::after,
+body.theme-dark .overview-card.olive::after,
+.theme-dark .overview-card::after,
+.theme-dark .overview-card.navy::after,
+.theme-dark .overview-card.red::after,
+.theme-dark .overview-card.olive::after {
+  background:
+    radial-gradient(circle, rgba(127, 214, 208, 0.9), rgba(47, 159, 154, 0.35) 58%, transparent 72%) !important;
+  opacity: 0.18 !important;
+}
+
+[data-theme="dark"] .overview-card p,
+body.theme-dark .overview-card p,
+.theme-dark .overview-card p {
+  color: #b8c5d6 !important;
+}
+
+[data-theme="dark"] .overview-sub,
+body.theme-dark .overview-sub,
+.theme-dark .overview-sub,
+[data-theme="dark"] .overview-sub svg,
+body.theme-dark .overview-sub svg,
+.theme-dark .overview-sub svg {
+  color: #7fd6d0 !important;
+}
+
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+[data-theme="dark"] .my-plan-plan-icon,
+[data-theme="dark"] .settings-profile-avatar,
+[data-theme="dark"] .settings-file-button,
+[data-theme="dark"] .settings-save-button,
+[data-theme="dark"] .admin-dashboard-page .settings-save-button,
+[data-theme="dark"] .admin-dashboard-page .settings-file-button,
+body.theme-dark .overview-icon,
+body.theme-dark .panel-icon,
+body.theme-dark .my-plan-plan-icon,
+body.theme-dark .settings-profile-avatar,
+body.theme-dark .settings-file-button,
+body.theme-dark .settings-save-button,
+body.theme-dark .admin-dashboard-page .settings-save-button,
+body.theme-dark .admin-dashboard-page .settings-file-button,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon,
+.theme-dark .my-plan-plan-icon,
+.theme-dark .settings-profile-avatar,
+.theme-dark .settings-file-button,
+.theme-dark .settings-save-button,
+.theme-dark .admin-dashboard-page .settings-save-button,
+.theme-dark .admin-dashboard-page .settings-file-button {
+  background: linear-gradient(135deg, rgba(80, 117, 151, 0.94) 0%, #7fd6d0 100%) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #03111c !important;
+  box-shadow: 0 14px 30px rgba(47, 159, 154, 0.18) !important;
+}
+
+[data-theme="dark"] .metric-track > div,
+[data-theme="dark"] .cash-bar,
+[data-theme="dark"] .uptime-circle,
+[data-theme="dark"] .my-plan-progress-fill,
+[data-theme="dark"] .my-plan-current-card::before,
+[data-theme="dark"] .my-plan-builder-button,
+[data-theme="dark"] .user-management-primary,
+body.theme-dark .metric-track > div,
+body.theme-dark .cash-bar,
+body.theme-dark .uptime-circle,
+body.theme-dark .my-plan-progress-fill,
+body.theme-dark .my-plan-current-card::before,
+body.theme-dark .my-plan-builder-button,
+body.theme-dark .user-management-primary,
+.theme-dark .metric-track > div,
+.theme-dark .cash-bar,
+.theme-dark .uptime-circle,
+.theme-dark .my-plan-progress-fill,
+.theme-dark .my-plan-current-card::before,
+.theme-dark .my-plan-builder-button,
+.theme-dark .user-management-primary {
+  background: linear-gradient(135deg, #2f9f9a 0%, #7fd6d0 100%) !important;
+  box-shadow: 0 14px 30px rgba(47, 159, 154, 0.18) !important;
+}
+
+[data-theme="dark"] .settings-header span,
+[data-theme="dark"] .settings-field-error,
+[data-theme="dark"] .my-plan-kicker,
+[data-theme="dark"] .my-plan-feature-pill,
+[data-theme="dark"] .my-plan-usage-card strong,
+[data-theme="dark"] .page-builder-dashboard-card span,
+body.theme-dark .settings-header span,
+body.theme-dark .settings-field-error,
+body.theme-dark .my-plan-kicker,
+body.theme-dark .my-plan-feature-pill,
+body.theme-dark .my-plan-usage-card strong,
+body.theme-dark .page-builder-dashboard-card span,
+.theme-dark .settings-header span,
+.theme-dark .settings-field-error,
+.theme-dark .my-plan-kicker,
+.theme-dark .my-plan-feature-pill,
+.theme-dark .my-plan-usage-card strong,
+.theme-dark .page-builder-dashboard-card span {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.28) !important;
+  color: #9fe7df !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page a,
+[data-theme="dark"] .admin-dashboard-page .gradient-text,
+body.theme-dark .admin-dashboard-page a,
+body.theme-dark .admin-dashboard-page .gradient-text,
+.theme-dark .admin-dashboard-page a,
+.theme-dark .admin-dashboard-page .gradient-text {
+  --gradient-text-colors: #7fd6d0, #9fe7df, #ffffff !important;
+}
+
+/* ============================================================
+   FINAL ADMIN DARK BORDER REMOVAL
+   ============================================================ */
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+[data-theme="dark"] .server-info-list div,
+[data-theme="dark"] .metric-track,
+[data-theme="dark"] .admin-sidebar,
+[data-theme="dark"] .admin-sidebar-user,
+[data-theme="dark"] .admin-sidebar-admin-badge,
+[data-theme="dark"] .admin-dashboard-page .settings-card,
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+[data-theme="dark"] .user-management-stats article,
+[data-theme="dark"] .user-management-row,
+[data-theme="dark"] .user-management-toolbar,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .server-info-list div,
+body.theme-dark .metric-track,
+body.theme-dark .admin-sidebar,
+body.theme-dark .admin-sidebar-user,
+body.theme-dark .admin-sidebar-admin-badge,
+body.theme-dark .admin-dashboard-page .settings-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-usage-card,
+body.theme-dark .my-plan-builder-card,
+body.theme-dark .user-management-stats article,
+body.theme-dark .user-management-row,
+body.theme-dark .user-management-toolbar,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+.theme-dark .server-info-list div,
+.theme-dark .metric-track,
+.theme-dark .admin-sidebar,
+.theme-dark .admin-sidebar-user,
+.theme-dark .admin-sidebar-admin-badge,
+.theme-dark .admin-dashboard-page .settings-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card,
+.theme-dark .user-management-stats article,
+.theme-dark .user-management-row,
+.theme-dark .user-management-toolbar {
+  border: 0 !important;
+  border-color: transparent !important;
+}
+
+[data-theme="dark"] .server-info-list div,
+body.theme-dark .server-info-list div,
+.theme-dark .server-info-list div,
+[data-theme="dark"] .metric-track,
+body.theme-dark .metric-track,
+.theme-dark .metric-track {
+  box-shadow: none !important;
+}
+
+@media (max-width: 700px) {
+  [data-theme="dark"] .admin-sidebar,
+  body.theme-dark .admin-sidebar,
+  .theme-dark .admin-sidebar {
+    border: 0 !important;
+  }
 }

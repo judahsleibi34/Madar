@@ -1,59 +1,18 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { Moon, Sun } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
+import LanguageSwitcher from "../LanguageSwitcher";
 import logo from "../../assets/MadarTemplates/madar_header.svg";
 
-const navItems = {
-  en: [
-    { id: "home", label: "Home", path: "/" },
-    { id: "features", label: "Product Tour", path: "/features" },
-    { id: "pricing", label: "Plans and Pricing", path: "/pricing" },
-    { id: "team", label: "Madar Team", path: "/team" },
-    { id: "about", label: "About Us", path: "/about" },
-    { id: "contact", label: "Contact Us", path: "/contact" },
-  ],
-  ar: [
-    { id: "home", label: "الرئيسية", path: "/" },
-    { id: "features", label: "جولة المنتج", path: "/features" },
-    { id: "pricing", label: "الخطط والأسعار", path: "/pricing" },
-    { id: "team", label: "فريق مدار", path: "/team" },
-    { id: "about", label: "من نحن", path: "/about" },
-    { id: "contact", label: "تواصل معنا", path: "/contact" },
-  ],
-};
-
-const authLabels = {
-  en: {
-    login: "Log In",
-    signup: "Sign Up",
-    logout: "Logout",
-    dashboard: "Dashboard",
-    openMenu: "Open menu",
-    closeMenu: "Close menu",
-    menu: "Menu",
-    language: "Language",
-    switchLight: "Switch to light mode",
-    switchDark: "Switch to dark mode",
-    appearance: "Appearance",
-  },
-  ar: {
-    login: "تسجيل الدخول",
-    signup: "إنشاء حساب",
-    logout: "تسجيل الخروج",
-    dashboard: "لوحة التحكم",
-    openMenu: "فتح القائمة",
-    closeMenu: "إغلاق القائمة",
-    menu: "القائمة",
-    language: "اللغة",
-    switchLight: "التبديل إلى الوضع الفاتح",
-    switchDark: "التبديل إلى الوضع الداكن",
-    appearance: "المظهر",
-  },
-};
-
-const langOptions = [
-  { code: "en", label: "EN" },
-  { code: "ar", label: "AR" },
+const navItems = [
+  { id: "home", labelKey: "nav.home", path: "/" },
+  { id: "features", labelKey: "nav.features", path: "/features" },
+  { id: "pricing", labelKey: "nav.pricing", path: "/pricing" },
+  { id: "team", labelKey: "nav.team", path: "/team" },
+  { id: "about", labelKey: "nav.about", path: "/about" },
+  { id: "contact", labelKey: "nav.contact", path: "/contact" },
 ];
 
 export default function Header({
@@ -64,20 +23,15 @@ export default function Header({
   themeMode = "light",
   onThemeModeChange,
 }) {
+  const { t } = useTranslation(["common", "public"]);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [langOpen, setLangOpen] = useState(false);
-  const langRef = useRef(null);
 
   const isRTL = lang === "ar";
   const isDark = themeMode === "dark";
-  const items = navItems[lang] || navItems.en;
-  const auth = authLabels[lang] || authLabels.en;
-  const currentLang =
-    langOptions.find((item) => item.code === lang) || langOptions[0];
 
   const finalNavItems = isLoggedIn
-    ? [...items, { id: "dashboard", label: auth.dashboard, path: "/dashboard" }]
-    : items;
+    ? [...navItems, { id: "dashboard", labelKey: "nav.dashboard", path: "/dashboard" }]
+    : navItems;
 
   const closeMenu = () => {
     setMenuOpen(false);
@@ -89,19 +43,21 @@ export default function Header({
     }
   };
 
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (langRef.current && !langRef.current.contains(event.target)) {
-        setLangOpen(false);
-      }
+  const handleLangSelect = (code) => {
+    setMenuOpen(false);
+
+    if (typeof onLanguageChange === "function") {
+      onLanguageChange(code);
     }
+  };
 
-    document.addEventListener("mousedown", handleClickOutside);
+  const handleLogout = () => {
+    setMenuOpen(false);
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    if (onLogout) {
+      onLogout();
+    }
+  };
 
   useEffect(() => {
     function handleResize() {
@@ -121,7 +77,6 @@ export default function Header({
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         setMenuOpen(false);
-        setLangOpen(false);
       }
     }
 
@@ -140,32 +95,15 @@ export default function Header({
     };
   }, [menuOpen]);
 
-  const handleLangSelect = (code) => {
-    setLangOpen(false);
-    setMenuOpen(false);
-
-    if (onLanguageChange) {
-      onLanguageChange(code);
-    }
-  };
-
-  const handleLogout = () => {
-    setMenuOpen(false);
-
-    if (onLogout) {
-      onLogout();
-    }
-  };
-
   return (
     <>
       <header className="site-header" dir={isRTL ? "rtl" : "ltr"}>
         <Link to="/" className="brand" onClick={closeMenu}>
-          <img className="logo" src={logo} alt="Madar logo" />
-          <h1 className="brand-name">{isRTL ? "مدار" : "Madar"}</h1>
+          <img className="logo" src={logo} alt={t("common:app.logoAlt")} />
+          <h1 className="brand-name">{t("common:app.brand")}</h1>
         </Link>
 
-        <nav className="nav-menu" aria-label="Main navigation">
+        <nav className="nav-menu" aria-label={t("common:navigation.main")}>
           {finalNavItems.map((item) => (
             <NavLink
               key={item.id}
@@ -173,7 +111,7 @@ export default function Header({
               end={item.path === "/"}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
-              {item.label}
+              {t(`public:${item.labelKey}`)}
             </NavLink>
           ))}
         </nav>
@@ -183,80 +121,52 @@ export default function Header({
             type="button"
             className={`header-theme-toggle ${isDark ? "is-dark" : "is-light"}`}
             onClick={handleThemeClick}
-            aria-label={isDark ? auth.switchLight : auth.switchDark}
-            title={isDark ? auth.switchLight : auth.switchDark}
+            aria-label={
+              isDark
+                ? t("common:theme.switchLight")
+                : t("common:theme.switchDark")
+            }
+            title={
+              isDark
+                ? t("common:theme.switchLight")
+                : t("common:theme.switchDark")
+            }
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
           {isLoggedIn ? (
             <button type="button" className="btn-signup" onClick={handleLogout}>
-              {auth.logout}
+              {t("public:nav.logout")}
             </button>
           ) : (
             <>
               <Link to="/login" className="btn-login">
-                {auth.login}
+                {t("public:nav.login")}
               </Link>
 
               <Link to="/signup" className="btn-signup">
-                {auth.signup}
+                {t("public:nav.signup")}
               </Link>
             </>
           )}
 
-          <div className="lang-switcher" ref={langRef}>
-            <button
-              type="button"
-              className="lang-toggle"
-              onClick={() => setLangOpen((open) => !open)}
-              aria-expanded={langOpen}
-              aria-haspopup="listbox"
-            >
-              {currentLang.label}
-
-              <svg
-                className={`lang-chevron${langOpen ? " open" : ""}`}
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M2 4L6 8L10 4"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-
-            {langOpen && (
-              <ul className="lang-dropdown" role="listbox">
-                {langOptions.map((option) => (
-                  <li key={option.code}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={option.code === lang}
-                      className={option.code === lang ? "active" : ""}
-                      onClick={() => handleLangSelect(option.code)}
-                    >
-                      {option.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <LanguageSwitcher
+            current={lang}
+            onChange={handleLangSelect}
+            compact
+            className="header-language-switcher"
+          />
 
           <button
             type="button"
             className={`hamburger${menuOpen ? " open" : ""}`}
             onClick={() => setMenuOpen((open) => !open)}
-            aria-label={menuOpen ? auth.closeMenu : auth.openMenu}
+            aria-label={
+              menuOpen
+                ? t("common:navigation.closeMenu")
+                : t("common:navigation.openMenu")
+            }
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
           >
@@ -272,27 +182,27 @@ export default function Header({
           <button
             type="button"
             className="mobile-menu-backdrop"
-            aria-label={auth.closeMenu}
+            aria-label={t("common:navigation.closeMenu")}
             onClick={closeMenu}
           />
 
           <aside
             id="mobile-menu"
             className="mobile-menu"
-            aria-label="Mobile navigation"
+            aria-label={t("common:navigation.mobile")}
             dir={isRTL ? "rtl" : "ltr"}
           >
             <div className="mobile-menu-head">
               <Link to="/" className="mobile-menu-brand" onClick={closeMenu}>
-                <img src={logo} alt="Madar logo" />
-                <span>{isRTL ? "مدار" : "Madar"}</span>
+                <img src={logo} alt={t("common:app.logoAlt")} />
+                <span>{t("common:app.brand")}</span>
               </Link>
 
               <button
                 type="button"
                 className="mobile-menu-close"
                 onClick={closeMenu}
-                aria-label={auth.closeMenu}
+                aria-label={t("common:navigation.closeMenu")}
               >
                 <svg
                   width="20"
@@ -312,7 +222,7 @@ export default function Header({
             </div>
 
             <div className="mobile-menu-body">
-              <div className="mobile-menu-title">{auth.menu}</div>
+              <div className="mobile-menu-title">{t("common:navigation.menu")}</div>
 
               <button
                 type="button"
@@ -321,12 +231,17 @@ export default function Header({
               >
                 <span>
                   {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                  {auth.appearance}
+                  {t("common:theme.appearance")}
                 </span>
-                <strong>{isDark ? "Dark" : "Light"}</strong>
+                <strong>
+                  {isDark ? t("common:theme.dark") : t("common:theme.light")}
+                </strong>
               </button>
 
-              <nav className="mobile-menu-links" aria-label="Mobile menu links">
+              <nav
+                className="mobile-menu-links"
+                aria-label={t("common:navigation.mobileLinks")}
+              >
                 {finalNavItems.map((item) => (
                   <NavLink
                     key={item.id}
@@ -335,7 +250,7 @@ export default function Header({
                     className={({ isActive }) => (isActive ? "active" : "")}
                     onClick={closeMenu}
                   >
-                    <span>{item.label}</span>
+                    <span>{t(`public:${item.labelKey}`)}</span>
 
                     <svg
                       width="18"
@@ -363,7 +278,7 @@ export default function Header({
                     className="btn-signup mobile-auth-full"
                     onClick={handleLogout}
                   >
-                    {auth.logout}
+                    {t("public:nav.logout")}
                   </button>
                 ) : (
                   <>
@@ -372,7 +287,7 @@ export default function Header({
                       className="btn-login"
                       onClick={closeMenu}
                     >
-                      {auth.login}
+                      {t("public:nav.login")}
                     </Link>
 
                     <Link
@@ -380,29 +295,20 @@ export default function Header({
                       className="btn-signup"
                       onClick={closeMenu}
                     >
-                      {auth.signup}
+                      {t("public:nav.signup")}
                     </Link>
                   </>
                 )}
               </div>
 
               <div className="mobile-menu-lang-wrap">
-                <span>{auth.language}</span>
+                <span>{t("common:language.label")}</span>
 
-                <div className="mobile-menu-lang">
-                  {langOptions.map((option) => (
-                    <button
-                      type="button"
-                      key={option.code}
-                      className={`lang-mobile-btn${
-                        option.code === lang ? " active" : ""
-                      }`}
-                      onClick={() => handleLangSelect(option.code)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+                <LanguageSwitcher
+                  current={lang}
+                  onChange={handleLangSelect}
+                  className="mobile-menu-lang"
+                />
               </div>
             </div>
           </aside>

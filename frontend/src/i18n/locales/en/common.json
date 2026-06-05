@@ -1,0 +1,48 @@
+{
+  "app": {
+    "brand": "Madar",
+    "logoAlt": "Madar logo"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "loading": "Loading...",
+    "logout": "Log out",
+    "continue": "Continue",
+    "back": "Back",
+    "close": "Close",
+    "open": "Open",
+    "submit": "Submit",
+    "retry": "Try again"
+  },
+  "language": {
+    "label": "Language",
+    "select": "Select language",
+    "english": "English",
+    "arabic": "Arabic"
+  },
+  "theme": {
+    "appearance": "Appearance",
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "switchLight": "Switch to light mode",
+    "switchDark": "Switch to dark mode"
+  },
+  "navigation": {
+    "main": "Main navigation",
+    "mobile": "Mobile navigation",
+    "mobileLinks": "Mobile menu links",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "menu": "Menu"
+  },
+  "status": {
+    "serverError": "Server error",
+    "required": "This field is required.",
+    "invalidEmail": "Please enter a valid email address."
+  }
+}

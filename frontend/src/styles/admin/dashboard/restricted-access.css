@@ -1,0 +1,107 @@
+.restricted-access-page {
+  min-height: calc(100vh - 80px);
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.restricted-access-card {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 24px;
+  justify-items: center;
+  text-align: center;
+  padding: 48px 38px;
+  border: 1px solid rgba(126, 32, 21, 0.12);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+}
+
+.restricted-access-content {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.restricted-access-eyebrow {
+  margin: 0;
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.restricted-access-card h1 {
+  margin: 0;
+  color: #0f2a52;
+  font-size: clamp(2.4rem, 5vw, 4.2rem);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+}
+
+.restricted-access-card p {
+  max-width: 420px;
+  margin: 0;
+  color: #667085;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.restricted-access-card button {
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 22px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f2a52, #7e2015);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 16px 35px rgba(126, 32, 21, 0.2);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.restricted-access-card button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(126, 32, 21, 0.24);
+}
+
+.restricted-access-card button:focus-visible {
+  outline: 3px solid rgba(126, 32, 21, 0.28);
+  outline-offset: 4px;
+}
+
+[data-theme="dark"] .restricted-access-card,
+.dark .restricted-access-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(18, 24, 38, 0.92);
+}
+
+[data-theme="dark"] .restricted-access-card h1,
+.dark .restricted-access-card h1 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .restricted-access-eyebrow,
+.dark .restricted-access-eyebrow,
+[data-theme="dark"] .restricted-access-card p,
+.dark .restricted-access-card p {
+  color: #cbd5e1;
+}
+
+@media (max-width: 680px) {
+  .restricted-access-page {
+    min-height: calc(100vh - 48px);
+    padding: 20px;
+  }
+
+  .restricted-access-card {
+    padding: 34px 24px;
+    border-radius: 24px;
+  }
+
+  .restricted-access-card h1 {
+    font-size: clamp(2rem, 14vw, 3rem);
+  }
+}

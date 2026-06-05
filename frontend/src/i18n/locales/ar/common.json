@@ -1,0 +1,48 @@
+{
+  "app": {
+    "brand": "مدار",
+    "logoAlt": "شعار مدار"
+  },
+  "actions": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "search": "بحث",
+    "loading": "جار التحميل...",
+    "logout": "تسجيل الخروج",
+    "continue": "متابعة",
+    "back": "رجوع",
+    "close": "إغلاق",
+    "open": "فتح",
+    "submit": "إرسال",
+    "retry": "حاول مرة أخرى"
+  },
+  "language": {
+    "label": "اللغة",
+    "select": "اختر اللغة",
+    "english": "الإنجليزية",
+    "arabic": "العربية"
+  },
+  "theme": {
+    "appearance": "المظهر",
+    "label": "السمة",
+    "light": "فاتح",
+    "dark": "داكن",
+    "switchLight": "التبديل إلى الوضع الفاتح",
+    "switchDark": "التبديل إلى الوضع الداكن"
+  },
+  "navigation": {
+    "main": "التنقل الرئيسي",
+    "mobile": "تنقل الهاتف",
+    "mobileLinks": "روابط قائمة الهاتف",
+    "openMenu": "فتح القائمة",
+    "closeMenu": "إغلاق القائمة",
+    "menu": "القائمة"
+  },
+  "status": {
+    "serverError": "خطأ في الخادم",
+    "required": "هذا الحقل مطلوب.",
+    "invalidEmail": "يرجى إدخال بريد إلكتروني صحيح."
+  }
+}
