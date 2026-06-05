@@ -293,3 +293,132 @@
     grid-column: 1;
   }
 }
+
+:root[data-theme="dark"] .reservation-block,
+html.theme-dark .reservation-block,
+body.theme-dark .reservation-block {
+  color: #f8fafc;
+}
+
+:root[data-theme="dark"] .reservation-block-header span,
+html.theme-dark .reservation-block-header span,
+body.theme-dark .reservation-block-header span,
+:root[data-theme="dark"] .reservation-summary strong,
+html.theme-dark .reservation-summary strong,
+body.theme-dark .reservation-summary strong,
+:root[data-theme="dark"] .reservation-block label strong,
+html.theme-dark .reservation-block label strong,
+body.theme-dark .reservation-block label strong {
+  color: #9fe7df;
+}
+
+:root[data-theme="dark"] .reservation-block-header span,
+html.theme-dark .reservation-block-header span,
+body.theme-dark .reservation-block-header span {
+  background: rgba(47, 159, 154, 0.18);
+  border: 1px solid rgba(127, 214, 208, 0.22);
+}
+
+:root[data-theme="dark"] .reservation-block-header h3,
+html.theme-dark .reservation-block-header h3,
+body.theme-dark .reservation-block-header h3,
+:root[data-theme="dark"] .reservation-block label,
+html.theme-dark .reservation-block label,
+body.theme-dark .reservation-block label {
+  color: #f8fafc;
+}
+
+:root[data-theme="dark"] .reservation-block-header p,
+html.theme-dark .reservation-block-header p,
+body.theme-dark .reservation-block-header p,
+:root[data-theme="dark"] .reservation-summary small,
+html.theme-dark .reservation-summary small,
+body.theme-dark .reservation-summary small,
+:root[data-theme="dark"] .reservation-helper,
+html.theme-dark .reservation-helper,
+body.theme-dark .reservation-helper {
+  color: #b8c5d6;
+}
+
+:root[data-theme="dark"] .reservation-summary,
+html.theme-dark .reservation-summary,
+body.theme-dark .reservation-summary {
+  border-color: rgba(126, 158, 181, 0.18);
+  background:
+    linear-gradient(180deg, rgba(16, 28, 45, 0.94), rgba(7, 17, 31, 0.9)),
+    rgba(47, 159, 154, 0.08);
+}
+
+:root[data-theme="dark"] .reservation-block input,
+:root[data-theme="dark"] .reservation-block select,
+:root[data-theme="dark"] .reservation-block textarea,
+html.theme-dark .reservation-block input,
+html.theme-dark .reservation-block select,
+html.theme-dark .reservation-block textarea,
+body.theme-dark .reservation-block input,
+body.theme-dark .reservation-block select,
+body.theme-dark .reservation-block textarea {
+  border-color: rgba(126, 158, 181, 0.2);
+  background: rgba(7, 17, 31, 0.82);
+  color: #f8fafc;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .reservation-block input::placeholder,
+:root[data-theme="dark"] .reservation-block textarea::placeholder,
+html.theme-dark .reservation-block input::placeholder,
+html.theme-dark .reservation-block textarea::placeholder,
+body.theme-dark .reservation-block input::placeholder,
+body.theme-dark .reservation-block textarea::placeholder {
+  color: rgba(184, 197, 214, 0.72);
+}
+
+:root[data-theme="dark"] .reservation-block input:focus,
+:root[data-theme="dark"] .reservation-block select:focus,
+:root[data-theme="dark"] .reservation-block textarea:focus,
+html.theme-dark .reservation-block input:focus,
+html.theme-dark .reservation-block select:focus,
+html.theme-dark .reservation-block textarea:focus,
+body.theme-dark .reservation-block input:focus,
+body.theme-dark .reservation-block select:focus,
+body.theme-dark .reservation-block textarea:focus {
+  border-color: rgba(127, 214, 208, 0.48);
+  box-shadow: 0 0 0 4px rgba(47, 159, 154, 0.14);
+}
+
+:root[data-theme="dark"] .reservation-block input:disabled,
+:root[data-theme="dark"] .reservation-block select:disabled,
+:root[data-theme="dark"] .reservation-block textarea:disabled,
+html.theme-dark .reservation-block input:disabled,
+html.theme-dark .reservation-block select:disabled,
+html.theme-dark .reservation-block textarea:disabled,
+body.theme-dark .reservation-block input:disabled,
+body.theme-dark .reservation-block select:disabled,
+body.theme-dark .reservation-block textarea:disabled {
+  background: rgba(16, 28, 45, 0.68);
+  color: rgba(184, 197, 214, 0.7);
+}
+
+:root[data-theme="dark"] .reservation-block .has-error input,
+:root[data-theme="dark"] .reservation-block .has-error select,
+html.theme-dark .reservation-block .has-error input,
+html.theme-dark .reservation-block .has-error select,
+body.theme-dark .reservation-block .has-error input,
+body.theme-dark .reservation-block .has-error select {
+  border-color: rgba(127, 214, 208, 0.54);
+  box-shadow: 0 0 0 3px rgba(47, 159, 154, 0.14);
+}
+
+:root[data-theme="dark"] .reservation-submit,
+html.theme-dark .reservation-submit,
+body.theme-dark .reservation-submit {
+  background: linear-gradient(135deg, #2f9f9a, #7fd6d0);
+  color: #03111c;
+  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.22);
+}
+
+:root[data-theme="dark"] .reservation-submit:not(:disabled):hover,
+html.theme-dark .reservation-submit:not(:disabled):hover,
+body.theme-dark .reservation-submit:not(:disabled):hover {
+  background: linear-gradient(135deg, #4fb7b1, #9fe7df);
+}

@@ -7,7 +7,11 @@ from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFil
 from classes import UserProfileUpdate
 from database import service_supabase
 from services.billing_service import get_billing_summary_for_tenant
-from services.auth_service import build_user_payload, get_authenticated_user_row
+from services.auth_service import (
+    build_user_payload,
+    get_authenticated_user_row,
+    require_regular_user,
+)
 
 router = APIRouter(prefix="/user", tags=["User"])
 
@@ -135,7 +139,7 @@ def update_user_profile(
     response: Response,
 ):
     try:
-        _, user_data = get_authenticated_user_row(request, response)
+        _, user_data = require_regular_user(request, response)
 
         update_payload = {}
 
@@ -234,7 +238,7 @@ async def upload_user_avatar(
     file: UploadFile = File(...),
 ):
     try:
-        _, user_data = get_authenticated_user_row(request, response)
+        _, user_data = require_regular_user(request, response)
 
         auth_id = str(user_data.get("auth_id") or "").strip()
 

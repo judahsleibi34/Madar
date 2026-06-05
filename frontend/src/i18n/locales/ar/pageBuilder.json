@@ -1,0 +1,11 @@
+{
+  "editor": {
+    "publish": "نشر",
+    "saveDraft": "حفظ المسودة",
+    "preview": "معاينة",
+    "pageBuilder": "منشئ الصفحات"
+  },
+  "runtime": {
+    "loading": "جار تحميل الموقع..."
+  }
+}

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect } from "react";
 
 import {
   Activity,
@@ -8,15 +8,11 @@ import {
   DollarSign,
   FolderKanban,
   HardDrive,
-  Menu,
   Server,
   TrendingUp,
   Users,
   Wifi,
-  X,
 } from "lucide-react";
-
-import DashboardSidebar from "./DashboardSidebar";
 
 const dashboardText = {
   en: {
@@ -53,9 +49,6 @@ const dashboardText = {
     cashSubtitle: "Monthly revenue performance",
 
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
-
-    openMenu: "Open dashboard menu",
-    closeMenu: "Close dashboard menu",
   },
 
   ar: {
@@ -92,9 +85,6 @@ const dashboardText = {
     cashSubtitle: "أداء الإيرادات الشهرية",
 
     months: ["ينا", "فبر", "مار", "أبر", "ماي", "يون", "يول", "أغس"],
-
-    openMenu: "فتح قائمة لوحة التحكم",
-    closeMenu: "إغلاق قائمة لوحة التحكم",
   },
 };
 
@@ -107,6 +97,7 @@ function forceScrollTop() {
 
   window.scrollTo({
     top: 0,
+    left: 0,
     behavior: "instant",
   });
 
@@ -168,14 +159,10 @@ function MetricRow({ label, value, percent }) {
 
 export default function Dashboard({
   lang = "en",
-  onLogout,
   user,
-  onLanguageChange,
   themeMode = "light",
   onThemeModeChange,
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   useLayoutEffect(() => {
     forceScrollTop();
 
@@ -203,208 +190,164 @@ export default function Dashboard({
     };
   }, []);
 
-  const t = dashboardText[lang] || dashboardText.en;
+  const safeLang = lang === "ar" ? "ar" : "en";
+  const t = dashboardText[safeLang] || dashboardText.en;
   const maxCash = Math.max(...cashData);
-  const isRtl = lang === "ar";
-
-  const closeSidebar = () => {
-    setSidebarOpen(false);
-  };
-
-  const handleLogout = () => {
-    closeSidebar();
-    onLogout?.();
-  };
+  const isRtl = safeLang === "ar";
 
   return (
-    <div
-      className={`admin-dashboard-layout ${isRtl ? "is-rtl" : "is-ltr"}${
-        sidebarOpen ? " sidebar-open" : ""
-      }`}
-      dir="ltr"
+    <section
+      className="dashboard-page admin-dashboard-shell"
+      dir={isRtl ? "rtl" : "ltr"}
+      data-language={safeLang}
+      data-theme={themeMode}
     >
-      <button
-        type="button"
-        className="dashboard-mobile-menu-button"
-        onClick={() => setSidebarOpen((open) => !open)}
-        aria-label={sidebarOpen ? t.closeMenu : t.openMenu}
-        aria-expanded={sidebarOpen}
-        aria-controls="dashboard-sidebar"
-      >
-        {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
-      </button>
-
-      <button
-        type="button"
-        className="dashboard-sidebar-backdrop"
-        onClick={closeSidebar}
-        aria-label={t.closeMenu}
-      />
-
-      <DashboardSidebar
-        id="dashboard-sidebar"
-        lang={lang}
-        user={user}
-        onLogout={handleLogout}
-        onLanguageChange={onLanguageChange}
-        onNavigate={closeSidebar}
-        themeMode={themeMode}
-        onThemeModeChange={onThemeModeChange}
-      />
-
-      <main className="admin-dashboard-page" dir={isRtl ? "rtl" : "ltr"}>
-        <div className="admin-dashboard-shell">
-          <header className="admin-dashboard-header">
-            <div>
-              <h1>{t.title}</h1>
-              <p>{t.subtitle}</p>
-            </div>
-          </header>
-
-          <section className="overview-grid">
-            <OverviewCard
-              title={t.runningProjects}
-              value="18"
-              sub={t.projectsSub}
-              icon={FolderKanban}
-              variant="navy"
-            />
-
-            <OverviewCard
-              title={t.users}
-              value="4,862"
-              sub={t.usersSub}
-              icon={Users}
-              variant="red"
-            />
-
-            <OverviewCard
-              title={t.totalRevenue}
-              value="$62.4K"
-              sub={t.revenueSub}
-              icon={DollarSign}
-              variant="olive"
-            />
-
-            <OverviewCard
-              title={t.uptime}
-              value="99.98%"
-              sub={t.uptimeSub}
-              icon={Clock3}
-              variant="navy"
-            />
-          </section>
-
-          <section className="admin-dashboard-grid">
-            <article className="dashboard-panel cash-panel">
-              <div className="dashboard-panel-header">
-                <div>
-                  <h2>{t.cashFlow}</h2>
-                  <p>{t.cashSubtitle}</p>
-                </div>
-
-                <div className="panel-icon">
-                  <BarChart3 size={22} />
-                </div>
-              </div>
-
-              <div className="cash-chart">
-                {cashData.map((value, index) => (
-                  <div
-                    className="cash-bar-item"
-                    key={`${t.months[index]}-${value}`}
-                  >
-                    <div
-                      className="cash-bar"
-                      style={{ height: `${(value / maxCash) * 100}%` }}
-                    >
-                      <span>${Math.round(value / 1000)}K</span>
-                    </div>
-
-                    <small>{t.months[index]}</small>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="dashboard-panel server-panel">
-              <div className="dashboard-panel-header">
-                <div>
-                  <h2>{t.serverInfo}</h2>
-                  <p>{t.serverSubtitle}</p>
-                </div>
-
-                <div className="panel-icon">
-                  <Server size={22} />
-                </div>
-              </div>
-
-              <div className="server-info-list">
-                <div>
-                  <span>
-                    <Wifi size={17} />
-                    {t.serverStatus}
-                  </span>
-
-                  <strong>{t.healthy}</strong>
-                </div>
-
-                <div>
-                  <span>
-                    <Database size={17} />
-                    {t.activeServices}
-                  </span>
-
-                  <strong>4</strong>
-                </div>
-
-                <div>
-                  <span>
-                    <Activity size={17} />
-                    {t.serverRegion}
-                  </span>
-
-                  <strong>{t.regionValue}</strong>
-                </div>
-              </div>
-            </article>
-          </section>
-
-          <section className="admin-dashboard-grid lower">
-            <article className="dashboard-panel usage-panel">
-              <div className="dashboard-panel-header">
-                <div>
-                  <h2>{t.usage}</h2>
-                  <p>{t.usageSubtitle}</p>
-                </div>
-
-                <div className="panel-icon">
-                  <HardDrive size={22} />
-                </div>
-              </div>
-
-              <div className="metrics-list">
-                <MetricRow label={t.cpu} value="42%" percent={42} />
-                <MetricRow label={t.memory} value="68%" percent={68} />
-                <MetricRow label={t.storage} value="74%" percent={74} />
-                <MetricRow label={t.network} value="36%" percent={36} />
-              </div>
-            </article>
-
-            <article className="dashboard-panel uptime-panel">
-              <div className="uptime-circle">
-                <div>
-                  <strong>99.98%</strong>
-                  <span>{t.uptime}</span>
-                </div>
-              </div>
-
-              <h2>{t.uptime}</h2>
-              <p>{t.uptimeSub}</p>
-            </article>
-          </section>
+      <header className="admin-dashboard-header">
+        <div>
+          <h1>{t.title}</h1>
+          <p>{t.subtitle}</p>
         </div>
-      </main>
-    </div>
+      </header>
+
+      <section className="overview-grid" aria-label={t.title}>
+        <OverviewCard
+          title={t.runningProjects}
+          value="18"
+          sub={t.projectsSub}
+          icon={FolderKanban}
+          variant="navy"
+        />
+
+        <OverviewCard
+          title={t.users}
+          value="4,862"
+          sub={t.usersSub}
+          icon={Users}
+          variant="red"
+        />
+
+        <OverviewCard
+          title={t.totalRevenue}
+          value="$62.4K"
+          sub={t.revenueSub}
+          icon={DollarSign}
+          variant="olive"
+        />
+
+        <OverviewCard
+          title={t.uptime}
+          value="99.98%"
+          sub={t.uptimeSub}
+          icon={Clock3}
+          variant="navy"
+        />
+      </section>
+
+      <section className="admin-dashboard-grid">
+        <article className="dashboard-panel cash-panel">
+          <div className="dashboard-panel-header">
+            <div>
+              <h2>{t.cashFlow}</h2>
+              <p>{t.cashSubtitle}</p>
+            </div>
+
+            <div className="panel-icon">
+              <BarChart3 size={22} />
+            </div>
+          </div>
+
+          <div className="cash-chart" dir="ltr" aria-label={t.cashFlow}>
+            {cashData.map((value, index) => (
+              <div className="cash-bar-item" key={`${t.months[index]}-${value}`}>
+                <div
+                  className="cash-bar"
+                  style={{ height: `${(value / maxCash) * 100}%` }}
+                >
+                  <span>${Math.round(value / 1000)}K</span>
+                </div>
+
+                <small dir={isRtl ? "rtl" : "ltr"}>{t.months[index]}</small>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="dashboard-panel server-panel">
+          <div className="dashboard-panel-header">
+            <div>
+              <h2>{t.serverInfo}</h2>
+              <p>{t.serverSubtitle}</p>
+            </div>
+
+            <div className="panel-icon">
+              <Server size={22} />
+            </div>
+          </div>
+
+          <div className="server-info-list">
+            <div>
+              <span>
+                <Wifi size={17} />
+                {t.serverStatus}
+              </span>
+
+              <strong>{t.healthy}</strong>
+            </div>
+
+            <div>
+              <span>
+                <Database size={17} />
+                {t.activeServices}
+              </span>
+
+              <strong>4</strong>
+            </div>
+
+            <div>
+              <span>
+                <Activity size={17} />
+                {t.serverRegion}
+              </span>
+
+              <strong>{t.regionValue}</strong>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="admin-dashboard-grid lower">
+        <article className="dashboard-panel usage-panel">
+          <div className="dashboard-panel-header">
+            <div>
+              <h2>{t.usage}</h2>
+              <p>{t.usageSubtitle}</p>
+            </div>
+
+            <div className="panel-icon">
+              <HardDrive size={22} />
+            </div>
+          </div>
+
+          <div className="metrics-list">
+            <MetricRow label={t.cpu} value="42%" percent={42} />
+            <MetricRow label={t.memory} value="68%" percent={68} />
+            <MetricRow label={t.storage} value="74%" percent={74} />
+            <MetricRow label={t.network} value="36%" percent={36} />
+          </div>
+        </article>
+
+        <article className="dashboard-panel uptime-panel">
+          <div className="uptime-circle">
+            <div>
+              <strong>99.98%</strong>
+              <span>{t.uptime}</span>
+            </div>
+          </div>
+
+          <h2>{t.uptime}</h2>
+          <p>{t.uptimeSub}</p>
+        </article>
+      </section>
+    </section>
   );
 }

@@ -4,6 +4,7 @@ export default function PageDeleteConfirmModal({
   message,
   cancelLabel,
   confirmLabel,
+  confirmDisabled = false,
   onCancel,
   onConfirm,
 }) {
@@ -49,6 +50,7 @@ export default function PageDeleteConfirmModal({
             type="button"
             className="page-delete-modal-danger"
             onClick={onConfirm}
+            disabled={confirmDisabled}
           >
             {dangerLabel}
           </button>

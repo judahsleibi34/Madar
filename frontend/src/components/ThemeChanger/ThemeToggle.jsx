@@ -1,4 +1,5 @@
 import { Moon, Sun } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import "./ThemeToggle.css";
 
 export default function ThemeToggle({
@@ -10,6 +11,7 @@ export default function ThemeToggle({
   showSwitch,
   className = "",
 }) {
+  const { t } = useTranslation("common");
   const isDark = mode === "dark";
   const shouldShowLabel = showLabel ?? !compact;
   const shouldShowSwitch = showSwitch ?? !compact;
@@ -34,8 +36,8 @@ export default function ThemeToggle({
         .filter(Boolean)
         .join(" ")}
       onClick={handleToggle}
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      aria-label={isDark ? t("theme.switchLight") : t("theme.switchDark")}
+      title={isDark ? t("theme.switchLight") : t("theme.switchDark")}
     >
       <span className="theme-toggle-left">
         <span className="theme-toggle-icon" aria-hidden="true">

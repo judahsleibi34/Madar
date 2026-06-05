@@ -1,50 +1,20 @@
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+
 import logo from "../../assets/MadarTemplates/madar_header.svg";
 
-const navItems = {
-  en: [
-    { id: "home", label: "Home", path: "/" },
-    { id: "features", label: "Product Tour", path: "/features" },
-    { id: "pricing", label: "Plans and Pricing", path: "/pricing" },
-    { id: "contact", label: "Contact Us", path: "/contact" },
-  ],
-  ar: [
-    { id: "home", label: "الرئيسية", path: "/" },
-    { id: "features", label: "جولة المنتج", path: "/features" },
-    { id: "pricing", label: "الخطط والأسعار", path: "/pricing" },
-    { id: "contact", label: "تواصل معنا", path: "/contact" },
-  ],
-};
-
-const footerText = {
-  en: {
-    brand: "Madar",
-    description:
-      "An adaptive business management platform for creating, managing, and scaling digital systems.",
-    linksTitle: "Company",
-    contactTitle: "Get in touch",
-    emailLabel: "Email",
-    phoneLabel: "Phone",
-    followLabel: "Follow us",
-    rights: "All rights reserved.",
-  },
-  ar: {
-    brand: "مدار",
-    description: "منصة إدارة أعمال مرنة لإنشاء وإدارة وتوسيع الأنظمة الرقمية.",
-    linksTitle: "الشركة",
-    contactTitle: "تواصل معنا",
-    emailLabel: "البريد الإلكتروني",
-    phoneLabel: "الهاتف",
-    followLabel: "تابعنا",
-    rights: "جميع الحقوق محفوظة.",
-  },
-};
+const navItems = [
+  { id: "home", labelKey: "nav.home", path: "/" },
+  { id: "features", labelKey: "nav.features", path: "/features" },
+  { id: "pricing", labelKey: "nav.pricing", path: "/pricing" },
+  { id: "contact", labelKey: "nav.contact", path: "/contact" },
+];
 
 export default function Footer({ lang = "en" }) {
+  const { t } = useTranslation(["common", "public"]);
   const currentLang = lang === "ar" ? "ar" : "en";
   const isAr = currentLang === "ar";
-  const t = footerText[currentLang];
-  const items = navItems[currentLang];
+  const brand = t("common:app.brand");
 
   return (
     <footer
@@ -54,20 +24,20 @@ export default function Footer({ lang = "en" }) {
     >
       <div className="footer-shell">
         <div className="footer-main">
-          <section className="footer-brand" aria-label={`${t.brand} footer brand`}>
-            <NavLink to="/" className="footer-logo-link" aria-label={`${t.brand} Home`}>
-              <img className="footer-logo" src={logo} alt={`${t.brand} logo`} />
-              <span>{t.brand}</span>
+          <section className="footer-brand" aria-label={t("public:footer.brandAria")}>
+            <NavLink to="/" className="footer-logo-link" aria-label={t("public:footer.homeAria")}>
+              <img className="footer-logo" src={logo} alt={t("common:app.logoAlt")} />
+              <span>{brand}</span>
             </NavLink>
 
-            <p>{t.description}</p>
+            <p>{t("public:footer.description")}</p>
           </section>
 
-          <nav className="footer-links" aria-label="Footer navigation">
-            <h4>{t.linksTitle}</h4>
+          <nav className="footer-links" aria-label={t("public:footer.navigation")}>
+            <h4>{t("public:footer.linksTitle")}</h4>
 
             <div className="footer-links-grid">
-              {items.map((item) => (
+              {navItems.map((item) => (
                 <NavLink
                   key={item.id}
                   to={item.path}
@@ -76,23 +46,23 @@ export default function Footer({ lang = "en" }) {
                     isActive ? "footer-link active" : "footer-link"
                   }
                 >
-                  {item.label}
+                  {t(`public:${item.labelKey}`)}
                 </NavLink>
               ))}
             </div>
           </nav>
 
-          <section className="footer-contact" aria-label="Footer contact">
-            <h4>{t.contactTitle}</h4>
+          <section className="footer-contact" aria-label={t("public:footer.contactAria")}>
+            <h4>{t("public:footer.contactTitle")}</h4>
 
             <div className="footer-contact-list">
               <a href="mailto:info@madar.com" className="footer-contact-item">
-                <span>{t.emailLabel}</span>
+                <span>{t("public:footer.emailLabel")}</span>
                 <strong dir="ltr">info@madar.com</strong>
               </a>
 
               <a href="tel:+972599203857" className="footer-contact-item">
-                <span>{t.phoneLabel}</span>
+                <span>{t("public:footer.phoneLabel")}</span>
                 <strong dir="ltr">+972 599 203 857</strong>
               </a>
             </div>
@@ -103,7 +73,7 @@ export default function Footer({ lang = "en" }) {
                 href="https://www.instagram.com/maadar_ps/"
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Madar Instagram"
+                aria-label={t("public:footer.instagramAria")}
                 title="Instagram"
               >
                 <svg
@@ -123,14 +93,17 @@ export default function Footer({ lang = "en" }) {
                 </svg>
               </a>
 
-              <span>{t.followLabel}</span>
+              <span>{t("public:footer.followLabel")}</span>
             </div>
           </section>
         </div>
 
         <div className="footer-bottom">
           <p>
-            © 2026 {t.brand}. {t.rights}
+            {t("public:footer.copyright", {
+              brand,
+              rights: t("public:footer.rights"),
+            })}
           </p>
         </div>
       </div>

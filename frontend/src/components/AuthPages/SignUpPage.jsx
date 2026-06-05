@@ -1,51 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-console.log("LOGIN API_URL:", API_URL);
 
-const pageText = {
-  en: {
-    title: "Register",
-    firstName: "First Name",
-    lastName: "Last Name",
-    email: "Email",
-    password: "Password",
-    confirmPassword: "Confirm Password",
-    button: "Create Account",
-    loading: "Creating Account...",
-    success: "Account created! Redirecting to login...",
-    serverError: "Server error",
-    required: "This field is required.",
-    invalidEmail: "Please enter a valid email address.",
-    alreadyRegistered: "This email is already registered. Please log in.", // ✅
-    passwordInvalid:
-      "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
-    passwordMismatch: "Passwords do not match.",
-  },
-  ar: {
-    title: "إنشاء حساب",
-    firstName: "الاسم الأول",
-    lastName: "اسم العائلة",
-    email: "البريد الإلكتروني",
-    password: "كلمة المرور",
-    confirmPassword: "تأكيد كلمة المرور",
-    button: "إنشاء الحساب",
-    loading: "جاري إنشاء الحساب...",
-    success: "تم إنشاء الحساب! جاري التحويل إلى تسجيل الدخول...",
-    serverError: "تعذر الاتصال بالخادم.",
-    required: "هذا الحقل مطلوب.",
-    invalidEmail: "يرجى إدخال بريد إلكتروني صحيح.",
-    alreadyRegistered: "هذا البريد مسجل مسبقاً. يرجى تسجيل الدخول.", // ✅
-    passwordInvalid:
-      "يجب أن تكون كلمة المرور 8 أحرف على الأقل وتحتوي على حرف كبير وحرف صغير ورقم ورمز خاص.",
-    passwordMismatch: "كلمتا المرور غير متطابقتين.",
-  },
-};
-
-export default function SignUpPage({ lang = "en", loginPath = "/login", onSignupSuccess }) {
-  const t = pageText[lang] || pageText.en;
-  const navigate = useNavigate(); // ✅ THIS WAS MISSING
+export default function SignUpPage({
+  lang = "en",
+  loginPath = "/login",
+  onSignupSuccess,
+}) {
+  const { t } = useTranslation("auth");
+  const navigate = useNavigate();
+  const pageDir = lang === "ar" ? "rtl" : "ltr";
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -71,19 +38,22 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.firstName.trim()) newErrors.firstName = t.required;
-    if (!formData.lastName.trim()) newErrors.lastName = t.required;
-    if (!formData.email.trim()) newErrors.email = t.required;
-    if (!formData.password.trim()) newErrors.password = t.required;
-    if (!formData.confirmPassword.trim()) newErrors.confirmPassword = t.required;
-
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = t.invalidEmail;
+    if (!formData.firstName.trim()) newErrors.firstName = t("validation.required");
+    if (!formData.lastName.trim()) newErrors.lastName = t("validation.required");
+    if (!formData.email.trim()) newErrors.email = t("validation.required");
+    if (!formData.password.trim()) newErrors.password = t("validation.required");
+    if (!formData.confirmPassword.trim()) {
+      newErrors.confirmPassword = t("validation.required");
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = t("validation.invalidEmail");
+    }
+
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
     if (formData.password && !passwordRegex.test(formData.password)) {
-      newErrors.password = t.passwordInvalid;
+      newErrors.password = t("signup.passwordInvalid");
     }
 
     if (
@@ -91,7 +61,7 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
       formData.confirmPassword &&
       formData.password !== formData.confirmPassword
     ) {
-      newErrors.confirmPassword = t.passwordMismatch;
+      newErrors.confirmPassword = t("signup.passwordMismatch");
     }
 
     setErrors(newErrors);
@@ -121,53 +91,53 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
       const data = await response.json();
 
       if (!response.ok) {
-  if (response.status === 422 && Array.isArray(data.detail)) {
-    const newErrors = {};
+        if (response.status === 422 && Array.isArray(data.detail)) {
+          const newErrors = {};
 
-    data.detail.forEach((error) => {
-      const field = error.loc?.[1];
+          data.detail.forEach((error) => {
+            const field = error.loc?.[1];
 
-      if (field === "email") {
-        newErrors.email = t.invalidEmail;
+            if (field === "email") {
+              newErrors.email = t("validation.invalidEmail");
+            }
+
+            if (field === "first_name") {
+              newErrors.firstName = t("validation.required");
+            }
+
+            if (field === "last_name") {
+              newErrors.lastName = t("validation.required");
+            }
+
+            if (field === "password") {
+              newErrors.password = error.msg || t("validation.required");
+            }
+          });
+
+          setErrors((prev) => ({
+            ...prev,
+            ...newErrors,
+          }));
+
+          setStatusMessage("");
+          return;
+        }
+
+        if (
+          typeof data.detail === "string" &&
+          data.detail.toLowerCase().includes("already registered")
+        ) {
+          setStatusMessage(t("signup.alreadyRegistered"));
+          return;
+        }
+
+        setStatusMessage(
+          typeof data.detail === "string" ? data.detail : t("signup.signupFailed")
+        );
+        return;
       }
 
-      if (field === "first_name") {
-        newErrors.firstName = t.required;
-      }
-
-      if (field === "last_name") {
-        newErrors.lastName = t.required;
-      }
-
-      if (field === "password") {
-        newErrors.password = error.msg || t.required;
-      }
-    });
-
-    setErrors((prev) => ({
-      ...prev,
-      ...newErrors,
-    }));
-
-    setStatusMessage("");
-    return;
-  }
-
-    if (
-      typeof data.detail === "string" &&
-      data.detail.toLowerCase().includes("already registered")
-    ) {
-      setStatusMessage(t.alreadyRegistered);
-      return;
-    }
-
-    setStatusMessage(
-      typeof data.detail === "string" ? data.detail : "Signup failed."
-    );
-    return;
-  }
-
-      setStatusMessage(t.success);
+      setStatusMessage(t("signup.success"));
       setTimeout(() => {
         if (onSignupSuccess) {
           onSignupSuccess();
@@ -178,16 +148,16 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
       }, 1500);
     } catch (error) {
       console.error(error);
-      setStatusMessage(t.serverError);
+      setStatusMessage(t("login.serverError"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="register-page">
-      <form className="register-card" onSubmit={handleSubmit}>
-        <h1>{t.title}</h1>
+    <main className="register-page" dir={pageDir}>
+      <form className="register-card" onSubmit={handleSubmit} dir={pageDir}>
+        <h1>{t("signup.title")}</h1>
 
         {statusMessage && (
           <p className="form-status-message">{statusMessage}</p>
@@ -195,11 +165,11 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
 
         <div className="register-row">
           <label>
-            {t.firstName}
+            {t("signup.firstName")}
             <input
               type="text"
               name="firstName"
-              placeholder={t.firstName}
+              placeholder={t("signup.firstName")}
               value={formData.firstName}
               onChange={handleChange}
             />
@@ -207,11 +177,11 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
           </label>
 
           <label>
-            {t.lastName}
+            {t("signup.lastName")}
             <input
               type="text"
               name="lastName"
-              placeholder={t.lastName}
+              placeholder={t("signup.lastName")}
               value={formData.lastName}
               onChange={handleChange}
             />
@@ -220,11 +190,11 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
         </div>
 
         <label>
-          {t.email}
+          {t("signup.email")}
           <input
             type="email"
             name="email"
-            placeholder={t.email}
+            placeholder={t("signup.email")}
             value={formData.email}
             onChange={handleChange}
             dir="ltr"
@@ -233,12 +203,12 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
         </label>
 
         <label>
-          {t.password}
+          {t("signup.password")}
           <div className="password-field">
             <input
               type={showPassword ? "text" : "password"}
               name="password"
-              placeholder={t.password}
+              placeholder={t("signup.password")}
               value={formData.password}
               onChange={handleChange}
               dir="ltr"
@@ -246,21 +216,21 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              aria-label="Toggle password visibility"
+              aria-label={t("signup.togglePassword")}
             >
-              👁
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
           {errors.password && <span>{errors.password}</span>}
         </label>
 
         <label>
-          {t.confirmPassword}
+          {t("signup.confirmPassword")}
           <div className="password-field">
             <input
               type={showConfirmPassword ? "text" : "password"}
               name="confirmPassword"
-              placeholder={t.confirmPassword}
+              placeholder={t("signup.confirmPassword")}
               value={formData.confirmPassword}
               onChange={handleChange}
               dir="ltr"
@@ -268,9 +238,9 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
             <button
               type="button"
               onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label="Toggle confirm password visibility"
+              aria-label={t("signup.toggleConfirmPassword")}
             >
-              👁
+              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
           {errors.confirmPassword && <span>{errors.confirmPassword}</span>}
@@ -281,7 +251,7 @@ export default function SignUpPage({ lang = "en", loginPath = "/login", onSignup
           type="submit"
           disabled={isSubmitting}
         >
-          {isSubmitting ? t.loading : t.button}
+          {isSubmitting ? t("signup.loading") : t("signup.submit")}
         </button>
       </form>
     </main>

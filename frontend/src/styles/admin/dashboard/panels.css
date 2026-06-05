@@ -196,9 +196,19 @@
   display: grid;
   place-items: center;
   background:
-    linear-gradient(#1a2744, #1a2744) padding-box,
-    conic-gradient(#ffffff 0 92%, rgba(255, 255, 255, 0.28) 92% 100%) border-box;
-  border: 12px solid transparent;
+    linear-gradient(145deg, #172744 0%, #13213c 100%) padding-box,
+    conic-gradient(
+      from -90deg,
+      #6f2017 0%,
+      #9f2f21 34%,
+      #d96542 68%,
+      #8b2a1a 92%,
+      rgba(139, 42, 26, 0.16) 92% 100%
+    ) border-box;
+  border: 10px solid transparent;
+  box-shadow:
+    0 18px 38px rgba(139, 42, 26, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .uptime-circle div {
