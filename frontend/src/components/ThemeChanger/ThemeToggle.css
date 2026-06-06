@@ -125,7 +125,14 @@
 .theme-dark .theme-toggle:hover,
 [data-theme="dark"] .theme-toggle:hover {
   background: transparent;
-  color: #ffffff;
+  color: #9fe7df;
+}
+
+.theme-dark .theme-toggle-icon,
+[data-theme="dark"] .theme-toggle-icon,
+.theme-dark .theme-toggle.is-dark .theme-toggle-icon,
+[data-theme="dark"] .theme-toggle.is-dark .theme-toggle-icon {
+  color: #7fd6d0;
 }
 
 .theme-dark .theme-toggle-switch,
@@ -136,8 +143,8 @@
 
 .theme-dark .theme-toggle-thumb,
 [data-theme="dark"] .theme-toggle-thumb {
-  background: #7f241a;
-  box-shadow: 0 4px 10px rgba(127, 36, 26, 0.24);
+  background: #7fd6d0;
+  box-shadow: 0 4px 10px rgba(47, 159, 154, 0.28);
 }
 
 .theme-dark .theme-toggle.is-dark .theme-toggle-switch,
@@ -154,5 +161,5 @@
 .theme-dark .theme-toggle.is-compact,
 [data-theme="dark"] .theme-toggle.is-compact {
   background: transparent;
-  color: #f3d7d0;
+  color: #dce7f3;
 }

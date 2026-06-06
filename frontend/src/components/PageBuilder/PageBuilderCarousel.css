@@ -491,3 +491,179 @@
     text-align: left;
   }
 }
+
+:root[data-theme="dark"] .page-builder-carousel,
+html.theme-dark .page-builder-carousel,
+body.theme-dark .page-builder-carousel {
+  color: #f8fafc;
+}
+
+:root[data-theme="dark"] .page-builder-carousel .carousel-stage,
+html.theme-dark .page-builder-carousel .carousel-stage,
+body.theme-dark .page-builder-carousel .carousel-stage {
+  border-color: rgba(126, 158, 181, 0.18);
+  background: #07111f;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="dark"] .page-builder-carousel .carousel-stage::after,
+html.theme-dark .page-builder-carousel .carousel-stage::after,
+body.theme-dark .page-builder-carousel .carousel-stage::after {
+  background:
+    linear-gradient(90deg, rgba(7, 17, 31, 0.9), rgba(7, 17, 31, 0.24)),
+    linear-gradient(180deg, transparent, rgba(7, 17, 31, 0.42));
+}
+
+:root[data-theme="dark"] .page-builder-carousel .carousel-copy span,
+html.theme-dark .page-builder-carousel .carousel-copy span,
+body.theme-dark .page-builder-carousel .carousel-copy span,
+:root[data-theme="dark"] .circular-gallery-header strong,
+html.theme-dark .circular-gallery-header strong,
+body.theme-dark .circular-gallery-header strong {
+  background: rgba(47, 159, 154, 0.18);
+  color: #9fe7df;
+  border: 1px solid rgba(127, 214, 208, 0.22);
+}
+
+:root[data-theme="dark"] .page-builder-carousel .carousel-controls > button,
+html.theme-dark .page-builder-carousel .carousel-controls > button,
+body.theme-dark .page-builder-carousel .carousel-controls > button {
+  border-color: rgba(126, 158, 181, 0.2);
+  background: #101c2d;
+  color: #dce7f3;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="dark"] .page-builder-carousel .carousel-controls > button:hover,
+html.theme-dark .page-builder-carousel .carousel-controls > button:hover,
+body.theme-dark .page-builder-carousel .carousel-controls > button:hover {
+  border-color: rgba(127, 214, 208, 0.42);
+  background: #162235;
+  color: #9fe7df;
+}
+
+:root[data-theme="dark"] .page-builder-carousel .carousel-dots button,
+html.theme-dark .page-builder-carousel .carousel-dots button,
+body.theme-dark .page-builder-carousel .carousel-dots button {
+  background: rgba(126, 158, 181, 0.28);
+}
+
+:root[data-theme="dark"] .page-builder-carousel .carousel-dots button.active,
+html.theme-dark .page-builder-carousel .carousel-dots button.active,
+body.theme-dark .page-builder-carousel .carousel-dots button.active {
+  background: #7fd6d0;
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-stage,
+html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage,
+body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage {
+  border-color: rgba(126, 158, 181, 0.2);
+  background:
+    radial-gradient(circle at 82% 18%, rgba(47, 159, 154, 0.18), transparent 28%),
+    linear-gradient(135deg, #07111f 0%, #101c2d 52%, #162235 100%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after,
+html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after,
+body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after {
+  background:
+    linear-gradient(90deg, rgba(7, 17, 31, 0.9), rgba(7, 17, 31, 0.22)),
+    linear-gradient(180deg, transparent, rgba(7, 17, 31, 0.42));
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-controls,
+html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls,
+body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls {
+  border-color: rgba(126, 158, 181, 0.18);
+  background: rgba(7, 17, 31, 0.86);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button,
+html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button,
+body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button {
+  background: #162235;
+  color: #f8fafc;
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards,
+html.theme-dark .page-builder-carousel.carousel-variant-cards,
+body.theme-dark .page-builder-carousel.carousel-variant-cards,
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-circular,
+html.theme-dark .page-builder-carousel.carousel-variant-circular,
+body.theme-dark .page-builder-carousel.carousel-variant-circular {
+  color: #f8fafc;
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards .carousel-stage,
+html.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage,
+body.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage {
+  border-color: rgba(126, 158, 181, 0.18);
+  background: #101c2d;
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
+html.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
+body.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage::after {
+  background: linear-gradient(
+    90deg,
+    rgba(7, 17, 31, 0.94) 0%,
+    rgba(7, 17, 31, 0.8) 48%,
+    rgba(7, 17, 31, 0.18) 100%
+  );
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards h3,
+html.theme-dark .page-builder-carousel.carousel-variant-cards h3,
+body.theme-dark .page-builder-carousel.carousel-variant-cards h3 {
+  color: #ffffff !important;
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards p,
+html.theme-dark .page-builder-carousel.carousel-variant-cards p,
+body.theme-dark .page-builder-carousel.carousel-variant-cards p,
+:root[data-theme="dark"] .circular-gallery-caption p,
+html.theme-dark .circular-gallery-caption p,
+body.theme-dark .circular-gallery-caption p {
+  color: #b8c5d6 !important;
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-split .carousel-stage,
+html.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage,
+body.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage,
+:root[data-theme="dark"] .circular-gallery-stage,
+html.theme-dark .circular-gallery-stage,
+body.theme-dark .circular-gallery-stage {
+  background:
+    radial-gradient(circle at center, rgba(47, 159, 154, 0.16), transparent 34%),
+    linear-gradient(180deg, #101c2d, #07111f);
+}
+
+:root[data-theme="dark"] .page-builder-carousel.carousel-variant-split .carousel-stage::after,
+html.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage::after,
+body.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage::after {
+  background: linear-gradient(
+    90deg,
+    rgba(7, 17, 31, 0.94) 0%,
+    rgba(7, 17, 31, 0.9) 46%,
+    rgba(7, 17, 31, 0.08) 46%,
+    rgba(7, 17, 31, 0.02) 100%
+  );
+}
+
+:root[data-theme="dark"] .circular-gallery-item,
+html.theme-dark .circular-gallery-item,
+body.theme-dark .circular-gallery-item {
+  border-color: rgba(126, 158, 181, 0.18);
+  background: #101c2d;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="dark"] .circular-gallery-item span,
+html.theme-dark .circular-gallery-item span,
+body.theme-dark .circular-gallery-item span {
+  background: rgba(7, 17, 31, 0.86);
+  color: #dce7f3;
+  border: 1px solid rgba(127, 214, 208, 0.22);
+}

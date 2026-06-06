@@ -1,42 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-
-const pageText = {
-  en: {
-    title: "Log In",
-    subtitle: "Welcome back. Log in to continue to your Madar account.",
-    email: "Email",
-    password: "Password",
-    forgotPassword: "Forgot password?",
-    button: "Log In",
-    loading: "Logging in...",
-    success: "User is logged in! Redirecting...",
-    serverError: "Server error",
-    loginFailed: "Login failed.",
-    noAccount: "Don't have an account?",
-    signup: "Sign Up",
-    required: "This field is required.",
-    invalidEmail: "Please enter a valid email address.",
-  },
-  ar: {
-    title: "تسجيل الدخول",
-    subtitle: "مرحبًا بعودتك. سجّل الدخول للمتابعة إلى حسابك في مدار.",
-    email: "البريد الإلكتروني",
-    password: "كلمة المرور",
-    forgotPassword: "نسيت كلمة المرور؟",
-    button: "تسجيل الدخول",
-    loading: "جاري تسجيل الدخول...",
-    success: "تم تسجيل الدخول! جاري التحويل...",
-    serverError: "تعذر الاتصال بالخادم.",
-    loginFailed: "فشل تسجيل الدخول.",
-    noAccount: "ليس لديك حساب؟",
-    signup: "إنشاء حساب",
-    required: "هذا الحقل مطلوب.",
-    invalidEmail: "يرجى إدخال بريد إلكتروني صحيح.",
-  },
-};
 
 export default function LoginPage({
   lang = "en",
@@ -44,7 +11,7 @@ export default function LoginPage({
   signupPath = "/signup",
   forgotPasswordPath = "/forgot-password",
 }) {
-  const t = pageText[lang] || pageText.en;
+  const { t } = useTranslation("auth");
   const pageDir = lang === "ar" ? "rtl" : "ltr";
 
   const [formData, setFormData] = useState({
@@ -77,13 +44,13 @@ export default function LoginPage({
     const newErrors = {};
 
     if (!formData.email.trim()) {
-      newErrors.email = t.required;
+      newErrors.email = t("validation.required");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = t.invalidEmail;
+      newErrors.email = t("validation.invalidEmail");
     }
 
     if (!formData.password.trim()) {
-      newErrors.password = t.required;
+      newErrors.password = t("validation.required");
     }
 
     setErrors(newErrors);
@@ -122,29 +89,29 @@ export default function LoginPage({
           if (emailError) {
             setErrors((prev) => ({
               ...prev,
-              email: t.invalidEmail,
+              email: t("validation.invalidEmail"),
             }));
             return;
           }
 
-          setStatusMessage(t.loginFailed);
+          setStatusMessage(t("login.loginFailed"));
           return;
         }
 
         setStatusMessage(
-          typeof data.detail === "string" ? data.detail : t.loginFailed
+          typeof data.detail === "string" ? data.detail : t("login.loginFailed")
         );
         return;
       }
 
-      setStatusMessage(t.success);
+      setStatusMessage(t("login.success"));
 
       if (onLoginSuccess) {
         onLoginSuccess(data.user);
       }
     } catch (error) {
       console.error(error);
-      setStatusMessage(t.serverError);
+      setStatusMessage(t("login.serverError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -154,8 +121,8 @@ export default function LoginPage({
     <main className="login-page" dir={pageDir}>
       <form className="login-card" onSubmit={handleSubmit} dir={pageDir}>
         <div className="login-heading">
-          <h1>{t.title}</h1>
-          <p>{t.subtitle}</p>
+          <h1>{t("login.title")}</h1>
+          <p>{t("login.subtitle")}</p>
         </div>
 
         {statusMessage && (
@@ -163,12 +130,12 @@ export default function LoginPage({
         )}
 
         <label>
-          {t.email}
+          {t("login.email")}
 
           <input
             type="email"
             name="email"
-            placeholder={t.email}
+            placeholder={t("login.email")}
             value={formData.email}
             onChange={handleChange}
             dir="ltr"
@@ -178,13 +145,13 @@ export default function LoginPage({
         </label>
 
         <label>
-          {t.password}
+          {t("login.password")}
 
           <div className="password-field">
             <input
               type={showPassword ? "text" : "password"}
               name="password"
-              placeholder={t.password}
+              placeholder={t("login.password")}
               value={formData.password}
               onChange={handleChange}
               dir="ltr"
@@ -193,9 +160,9 @@ export default function LoginPage({
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              aria-label="Toggle password visibility"
+              aria-label={t("login.togglePassword")}
             >
-              👁
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
 
@@ -203,15 +170,15 @@ export default function LoginPage({
         </label>
 
         <div className="login-options">
-          <Link to={forgotPasswordPath}>{t.forgotPassword}</Link>
+          <Link to={forgotPasswordPath}>{t("login.forgotPassword")}</Link>
         </div>
 
         <button className="login-submit" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? t.loading : t.button}
+          {isSubmitting ? t("login.loading") : t("login.submit")}
         </button>
 
         <p className="login-signup-text">
-          {t.noAccount} <Link to={signupPath}>{t.signup}</Link>
+          {t("login.noAccount")} <Link to={signupPath}>{t("login.signup")}</Link>
         </p>
       </form>
     </main>

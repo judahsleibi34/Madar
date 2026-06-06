@@ -1,104 +1,75 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const readRecoveryToken = () => {
+  const hash = window.location.hash;
+  const params = new URLSearchParams(hash.replace("#", ""));
+  const token = params.get("access_token");
+  const type = params.get("type");
 
-const pageText = {
-  en: {
-    title: "Reset Password",
-    subtitle: "Enter your new password below.",
-    password: "New Password",
-    confirm: "Confirm Password",
-    button: "Update Password",
-    loading: "Updating...",
-    success: "Password updated! Redirecting to login...",
-    mismatch: "Passwords do not match.",
-    short: "Password must be at least 6 characters.",
-    required: "This field is required.",
-    invalidLink: "Invalid or expired reset link.",
-  },
-  ar: {
-    title: "إعادة تعيين كلمة المرور",
-    subtitle: "أدخل كلمة المرور الجديدة أدناه.",
-    password: "كلمة المرور الجديدة",
-    confirm: "تأكيد كلمة المرور",
-    button: "تحديث كلمة المرور",
-    loading: "جاري التحديث...",
-    success: "تم تحديث كلمة المرور! جاري التحويل...",
-    mismatch: "كلمتا المرور غير متطابقتين.",
-    short: "يجب أن تكون كلمة المرور 6 أحرف على الأقل.",
-    required: "هذا الحقل مطلوب.",
-    invalidLink: "رابط إعادة التعيين غير صالح أو منتهي الصلاحية.",
-  },
+  return token && type === "recovery" ? token : null;
 };
 
 export default function ResetPasswordPage({ lang = "en" }) {
-  const t = pageText[lang] || pageText.en;
+  const { t } = useTranslation("auth");
   const navigate = useNavigate();
+  const pageDir = lang === "ar" ? "rtl" : "ltr";
 
-  const [accessToken, setAccessToken] = useState(null);
+  const [accessToken] = useState(readRecoveryToken);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() =>
+    accessToken ? "" : t("resetPassword.invalidToken")
+  );
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    // Extract access_token from the URL hash
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.replace("#", ""));
-    const token = params.get("access_token");
-    const type = params.get("type");
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
-    if (token && type === "recovery") {
-      setAccessToken(token);
-    } else {
-      setError(t.invalidLink);
-    }
-  }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!password) return setError(t.required);
-    if (password.length < 6) return setError(t.short);
-    if (password !== confirm) return setError(t.mismatch);
+    if (!password) return setError(t("validation.required"));
+    if (password.length < 6) return setError(t("resetPassword.passwordShort"));
+    if (password !== confirm) return setError(t("resetPassword.passwordMismatch"));
 
     setIsSubmitting(true);
     setError("");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/auth/password-reset`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: accessToken, password }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "/api"}/auth/password-reset`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token: accessToken, password }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.detail || "Something went wrong.");
+        setError(data.detail || t("resetPassword.unknownError"));
         return;
       }
 
-      setStatusMessage(t.success);
+      setStatusMessage(t("resetPassword.success"));
       setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
       console.error(err);
-      setError("Server unavailable. Try again later.");
+      setError(t("resetPassword.serverError"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
+    <main className="login-page" dir={pageDir}>
+      <form className="login-card" onSubmit={handleSubmit} dir={pageDir}>
         <div className="login-heading">
-          <h1>{t.title}</h1>
-          <p>{t.subtitle}</p>
+          <h1>{t("resetPassword.title")}</h1>
+          <p>{t("resetPassword.subtitle")}</p>
         </div>
 
         {statusMessage && <p className="form-status-message">{statusMessage}</p>}
@@ -107,30 +78,42 @@ export default function ResetPasswordPage({ lang = "en" }) {
         {accessToken && !statusMessage && (
           <>
             <label>
-              {t.password}
+              {t("resetPassword.password")}
               <div className="password-field">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setError("");
+                  }}
                   dir="ltr"
                 />
-                <button type="button" onClick={() => setShowPassword((p) => !p)}>👁</button>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={t("resetPassword.togglePassword")}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </label>
 
             <label>
-              {t.confirm}
+              {t("resetPassword.confirmPassword")}
               <input
                 type={showPassword ? "text" : "password"}
                 value={confirm}
-                onChange={(e) => { setConfirm(e.target.value); setError(""); }}
+                onChange={(event) => {
+                  setConfirm(event.target.value);
+                  setError("");
+                }}
                 dir="ltr"
               />
             </label>
 
             <button className="login-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? t.loading : t.button}
+              {isSubmitting ? t("resetPassword.loading") : t("resetPassword.submit")}
             </button>
           </>
         )}

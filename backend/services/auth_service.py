@@ -4,12 +4,38 @@ from fastapi import HTTPException, Request, Response
 
 from database import service_supabase, supabase
 
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
-COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")
+APP_ENV = (
+    os.getenv("APP_ENV")
+    or os.getenv("ENV")
+    or os.getenv("FASTAPI_ENV")
+    or "development"
+).strip().lower()
 
-# 15 minutes
+IS_PRODUCTION = APP_ENV in {"prod", "production"}
+
+COOKIE_SECURE = os.getenv(
+    "COOKIE_SECURE",
+    "true" if IS_PRODUCTION else "false",
+).lower() == "true"
+
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax").strip().lower()
+
+if COOKIE_SAMESITE not in {"strict", "lax", "none"}:
+    raise RuntimeError("COOKIE_SAMESITE must be strict, lax, or none")
+
+if IS_PRODUCTION and not COOKIE_SECURE:
+    raise RuntimeError("COOKIE_SECURE must be true in production")
+
+if COOKIE_SAMESITE == "none" and not COOKIE_SECURE:
+    raise RuntimeError("COOKIE_SECURE must be true when COOKIE_SAMESITE is none")
+
+
 ACCESS_COOKIE_MAX_AGE = 60 * 15
 REFRESH_COOKIE_MAX_AGE = 60 * 15
+
+
+def normalize_user_type(value) -> str:
+    return str(value or "user").strip().lower()
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
@@ -55,7 +81,7 @@ def delete_auth_cookies(response: Response):
 def build_user_payload(user_data):
     first_name = user_data.get("first_name") or ""
     last_name = user_data.get("last_name") or ""
-    full_name = f"{first_name} {last_name}".strip() or "Admin User"
+    full_name = f"{first_name} {last_name}".strip() or "User"
 
     return {
         "id": user_data.get("id"),
@@ -69,6 +95,7 @@ def build_user_payload(user_data):
         "avatar": user_data.get("avatar") or user_data.get("avatar_url") or "",
         "subscription_type": user_data.get("subscription_type") or "",
         "payment_status": user_data.get("payment_status") or "",
+        "user_type": normalize_user_type(user_data.get("user_type")),
         "created_at": user_data.get("created_at"),
         "updated_at": user_data.get("updated_at"),
     }
@@ -100,7 +127,7 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
                     next_refresh_token = auth_response.session.refresh_token
 
             except Exception as session_error:
-                print("AUTH SET SESSION ERROR:", repr(session_error))
+                print("AUTH SET SESSION ERROR:", type(session_error).__name__)
 
                 auth_response = supabase.auth.refresh_session(refresh_token)
                 auth_user = getattr(auth_response, "user", None)
@@ -122,7 +149,7 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
             auth_user = getattr(auth_response, "user", None)
 
     except Exception as e:
-        print("AUTH SESSION ERROR:", repr(e))
+        print("AUTH SESSION ERROR:", type(e).__name__)
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
     if not auth_user:
@@ -147,3 +174,23 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
         raise HTTPException(status_code=404, detail="User not found")
 
     return auth_user, user_response.data
+
+
+def require_system_admin(request: Request, response: Response | None = None):
+    auth_user, user_data = get_authenticated_user_row(request, response)
+    user_type = normalize_user_type(user_data.get("user_type"))
+
+    if user_type != "admin":
+        raise HTTPException(status_code=403, detail="Admin access is required")
+
+    return auth_user, user_data
+
+
+def require_regular_user(request: Request, response: Response | None = None):
+    auth_user, user_data = get_authenticated_user_row(request, response)
+    user_type = normalize_user_type(user_data.get("user_type"))
+
+    if user_type == "admin":
+        raise HTTPException(status_code=403, detail="User access is required")
+
+    return auth_user, user_data

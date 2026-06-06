@@ -61,3 +61,10 @@ seaborn
 matplotlib
 python-multipart
 redis==5.0.8
+google-genai
+openai
+numpy
+scipy
+scikit-learn
+statsmodels
+openpyxl

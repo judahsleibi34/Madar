@@ -1277,3 +1277,841 @@ body.theme-dark .gradient-text[style*="139, 42, 26"] {
   -webkit-background-clip: text !important;
   background-clip: text !important;
 }
+
+/* ============================================================
+   GLOBAL DARK BLUE CONSISTENCY FINAL PASS
+   One last website-wide guard so public, auth, tenant, dashboard,
+   and PageBuilder pages use the same blue/teal dark mode.
+   ============================================================ */
+
+:root[data-theme="dark"],
+body.theme-dark {
+  --madar-bg: #07111f;
+  --madar-surface: #101c2d;
+  --madar-surface-soft: #162235;
+  --madar-text: #f5f7fb;
+  --madar-muted: #aab7c7;
+  --madar-navy: #24385f;
+  --madar-red: #7fd6d0;
+  --madar-red-dark: #4fb7b1;
+  --madar-border: rgba(126, 158, 181, 0.16);
+  --madar-border-strong: rgba(126, 158, 181, 0.26);
+  --madar-gradient: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%);
+  --madar-gradient-hover: linear-gradient(135deg, #5f89a7 0%, #9fe7df 100%);
+  --madar-button-shadow: 0 14px 28px rgba(47, 159, 154, 0.18);
+  --madar-button-shadow-hover: 0 18px 34px rgba(47, 159, 154, 0.22);
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] .app-shell,
+body.theme-dark,
+body.theme-dark .app-shell,
+[data-theme="dark"] .tenant-site-runtime,
+body.theme-dark .tenant-site-runtime {
+  background: #07111f !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .app-main,
+body.theme-dark .app-main,
+[data-theme="dark"] .tenant-runtime-main,
+[data-theme="dark"] .tenant-login-runtime,
+body.theme-dark .tenant-runtime-main,
+body.theme-dark .tenant-login-runtime {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+}
+
+[data-theme="dark"] .site-header,
+[data-theme="dark"] header,
+[data-theme="dark"] .tenant-site-header,
+body.theme-dark .site-header,
+body.theme-dark header,
+body.theme-dark .tenant-site-header {
+  background: rgba(7, 17, 31, 0.96) !important;
+  border-color: rgba(126, 158, 181, 0.18) !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .footer,
+[data-theme="dark"] footer,
+[data-theme="dark"] .tenant-site-footer,
+body.theme-dark .footer,
+body.theme-dark footer,
+body.theme-dark .tenant-site-footer {
+  background:
+    radial-gradient(circle at 86% 12%, rgba(47, 159, 154, 0.1), transparent 24%),
+    linear-gradient(135deg, #050b14 0%, #07111f 56%, #0a0d18 100%) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  color: #f5f7fb !important;
+}
+
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .features-demo-panel,
+[data-theme="dark"] .pricing-card,
+[data-theme="dark"] .pricing-tabs,
+[data-theme="dark"] .contact-info-card,
+[data-theme="dark"] .contact-form,
+[data-theme="dark"] .team-profile-card,
+[data-theme="dark"] .register-card,
+[data-theme="dark"] .login-card,
+[data-theme="dark"] .forgot-card,
+[data-theme="dark"] .reset-card,
+[data-theme="dark"] .already-signed-card,
+[data-theme="dark"] .builder-gallery-shell,
+[data-theme="dark"] .tenant-runtime-card,
+[data-theme="dark"] .tenant-login-card,
+body.theme-dark .feature-card,
+body.theme-dark .features-demo-panel,
+body.theme-dark .pricing-card,
+body.theme-dark .pricing-tabs,
+body.theme-dark .contact-info-card,
+body.theme-dark .contact-form,
+body.theme-dark .team-profile-card,
+body.theme-dark .register-card,
+body.theme-dark .login-card,
+body.theme-dark .forgot-card,
+body.theme-dark .reset-card,
+body.theme-dark .already-signed-card,
+body.theme-dark .builder-gallery-shell,
+body.theme-dark .tenant-runtime-card,
+body.theme-dark .tenant-login-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border: 1px solid rgba(126, 158, 181, 0.16) !important;
+  color: #f5f7fb !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24) !important;
+}
+
+[data-theme="dark"] .gradient-text,
+body.theme-dark .gradient-text,
+[data-theme="dark"] .features-hero > span,
+[data-theme="dark"] .pricing-header span,
+[data-theme="dark"] .builder-gallery-info span,
+[data-theme="dark"] .profile-role,
+[data-theme="dark"] .contact-info-card strong,
+[data-theme="dark"] .arabic-name,
+[data-theme="dark"] .plan-name,
+[data-theme="dark"] .feature-icon,
+[data-theme="dark"] .tenant-eyebrow,
+body.theme-dark .features-hero > span,
+body.theme-dark .pricing-header span,
+body.theme-dark .builder-gallery-info span,
+body.theme-dark .profile-role,
+body.theme-dark .contact-info-card strong,
+body.theme-dark .arabic-name,
+body.theme-dark .plan-name,
+body.theme-dark .feature-icon,
+body.theme-dark .tenant-eyebrow {
+  color: #7fd6d0 !important;
+  --gradient-text-colors: #7fd6d0, #9fe7df, #ffffff !important;
+}
+
+[data-theme="dark"] .features-demo-cta,
+[data-theme="dark"] .btn-signup,
+[data-theme="dark"] .register-submit,
+[data-theme="dark"] .login-submit,
+[data-theme="dark"] .forgot-card button,
+[data-theme="dark"] .reset-card button,
+[data-theme="dark"] .contact-form button,
+[data-theme="dark"] .plan-btn.primary,
+[data-theme="dark"] .pricing-card:hover .plan-btn,
+[data-theme="dark"] .pricing-card.is-active-plan .plan-btn,
+[data-theme="dark"] .pricing-tabs button.active,
+[data-theme="dark"] .tenant-site-cta,
+[data-theme="dark"] .tenant-runtime-actions button,
+body.theme-dark .features-demo-cta,
+body.theme-dark .btn-signup,
+body.theme-dark .register-submit,
+body.theme-dark .login-submit,
+body.theme-dark .forgot-card button,
+body.theme-dark .reset-card button,
+body.theme-dark .contact-form button,
+body.theme-dark .plan-btn.primary,
+body.theme-dark .pricing-card:hover .plan-btn,
+body.theme-dark .pricing-card.is-active-plan .plan-btn,
+body.theme-dark .pricing-tabs button.active,
+body.theme-dark .tenant-site-cta,
+body.theme-dark .tenant-runtime-actions button {
+  background: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%) !important;
+  border-color: rgba(127, 214, 208, 0.42) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.18) !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus,
+body.theme-dark input:focus,
+body.theme-dark textarea:focus,
+body.theme-dark select:focus {
+  border-color: rgba(127, 214, 208, 0.58) !important;
+  box-shadow: 0 0 0 4px rgba(47, 159, 154, 0.16) !important;
+}
+
+[data-theme="dark"] [style*="#8b2a1a"],
+[data-theme="dark"] [style*="#6e2014"],
+[data-theme="dark"] [style*="#c2410c"],
+[data-theme="dark"] [style*="#9a3412"],
+[data-theme="dark"] [style*="#b6422d"],
+[data-theme="dark"] [style*="139, 42, 26"],
+[data-theme="dark"] [style*="194, 65, 12"],
+body.theme-dark [style*="#8b2a1a"],
+body.theme-dark [style*="#6e2014"],
+body.theme-dark [style*="#c2410c"],
+body.theme-dark [style*="#9a3412"],
+body.theme-dark [style*="#b6422d"],
+body.theme-dark [style*="139, 42, 26"],
+body.theme-dark [style*="194, 65, 12"] {
+  color: #7fd6d0 !important;
+  background: rgba(47, 159, 154, 0.12) !important;
+  border-color: rgba(127, 214, 208, 0.32) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .gradient-text,
+[data-theme="dark"] .gradient-text[style*="#8b2a1a"],
+[data-theme="dark"] .gradient-text[style*="#6e2014"],
+[data-theme="dark"] .gradient-text[style*="#c2410c"],
+[data-theme="dark"] .gradient-text[style*="#9a3412"],
+[data-theme="dark"] .gradient-text[style*="#b6422d"],
+[data-theme="dark"] .gradient-text[style*="139, 42, 26"],
+[data-theme="dark"] .gradient-text[style*="194, 65, 12"],
+body.theme-dark .gradient-text,
+body.theme-dark .gradient-text[style*="#8b2a1a"],
+body.theme-dark .gradient-text[style*="#6e2014"],
+body.theme-dark .gradient-text[style*="#c2410c"],
+body.theme-dark .gradient-text[style*="#9a3412"],
+body.theme-dark .gradient-text[style*="#b6422d"],
+body.theme-dark .gradient-text[style*="139, 42, 26"],
+body.theme-dark .gradient-text[style*="194, 65, 12"] {
+  color: transparent !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(
+    var(--gradient-text-angle, 90deg),
+    var(--gradient-text-colors, #7fd6d0, #9fe7df, #ffffff)
+  ) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+/* Final responsive public header guard. */
+:root[data-theme="dark"] .hamburger,
+:root[data-theme="dark"] .mobile-menu-close,
+html.theme-dark .hamburger,
+html.theme-dark .mobile-menu-close,
+body.theme-dark .hamburger,
+body.theme-dark .mobile-menu-close {
+  background:
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border: 1px solid rgba(126, 158, 181, 0.2) !important;
+  color: #d8eef1 !important;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+:root[data-theme="dark"] .hamburger:hover,
+:root[data-theme="dark"] .hamburger.open,
+:root[data-theme="dark"] .mobile-menu-close:hover,
+:root[data-theme="dark"] .mobile-menu-close:focus-visible,
+html.theme-dark .hamburger:hover,
+html.theme-dark .hamburger.open,
+html.theme-dark .mobile-menu-close:hover,
+html.theme-dark .mobile-menu-close:focus-visible,
+body.theme-dark .hamburger:hover,
+body.theme-dark .hamburger.open,
+body.theme-dark .mobile-menu-close:hover,
+body.theme-dark .mobile-menu-close:focus-visible {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.3),
+    0 0 0 4px rgba(127, 214, 208, 0.1) !important;
+}
+
+:root[data-theme="dark"] .hamburger span,
+html.theme-dark .hamburger span,
+body.theme-dark .hamburger span {
+  background: #d8eef1 !important;
+}
+
+:root[data-theme="dark"] .header-theme-toggle,
+html.theme-dark .header-theme-toggle,
+body.theme-dark .header-theme-toggle,
+:root[data-theme="dark"] .mobile-theme-toggle,
+html.theme-dark .mobile-theme-toggle,
+body.theme-dark .mobile-theme-toggle {
+  background: rgba(16, 28, 45, 0.82) !important;
+  border-color: rgba(126, 158, 181, 0.2) !important;
+  color: #d8eef1 !important;
+}
+
+:root[data-theme="dark"] .mobile-menu,
+html.theme-dark .mobile-menu,
+body.theme-dark .mobile-menu {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(47, 159, 154, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(8, 19, 33, 0.99), rgba(7, 17, 31, 0.99)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+}
+
+/* ============================================================
+   WEBSITE-WIDE DARK PALETTE NORMALIZATION
+   Keep all public, auth, pricing, tenant, and responsive surfaces
+   on the same dark blue / teal palette.
+   ============================================================ */
+
+:root[data-theme="dark"],
+html.theme-dark,
+body.theme-dark {
+  --madar-bg: #07111f !important;
+  --madar-surface: #101c2d !important;
+  --madar-surface-soft: #162235 !important;
+  --madar-text: #f5f7fb !important;
+  --madar-muted: #aab7c7 !important;
+  --madar-navy: #24385f !important;
+  --madar-red: #7fd6d0 !important;
+  --madar-red-dark: #4fb7b1 !important;
+  --madar-border: rgba(126, 158, 181, 0.16) !important;
+  --madar-border-strong: rgba(126, 158, 181, 0.26) !important;
+  --madar-gradient: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%) !important;
+  --madar-gradient-hover: linear-gradient(135deg, #5f89a7 0%, #9fe7df 100%) !important;
+  --madar-button-shadow: 0 14px 28px rgba(47, 159, 154, 0.18) !important;
+  --madar-button-shadow-hover: 0 18px 34px rgba(47, 159, 154, 0.22) !important;
+}
+
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] #root,
+:root[data-theme="dark"] .app-shell,
+:root[data-theme="dark"] .app-main,
+html.theme-dark body,
+html.theme-dark #root,
+html.theme-dark .app-shell,
+html.theme-dark .app-main,
+body.theme-dark,
+body.theme-dark #root,
+body.theme-dark .app-shell,
+body.theme-dark .app-main {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+  color: #f5f7fb !important;
+}
+
+:root[data-theme="dark"] .hero-section,
+:root[data-theme="dark"] .home-page,
+:root[data-theme="dark"] .features-page,
+:root[data-theme="dark"] .pricing-page,
+:root[data-theme="dark"] .team-page,
+:root[data-theme="dark"] .contact-page,
+:root[data-theme="dark"] .auth-page,
+:root[data-theme="dark"] .login-page,
+:root[data-theme="dark"] .register-page,
+:root[data-theme="dark"] .forgot-page,
+:root[data-theme="dark"] .reset-page,
+:root[data-theme="dark"] .already-signed-page,
+:root[data-theme="dark"] .tenant-site-runtime,
+:root[data-theme="dark"] .tenant-runtime-main,
+:root[data-theme="dark"] .tenant-login-runtime,
+html.theme-dark .hero-section,
+html.theme-dark .home-page,
+html.theme-dark .features-page,
+html.theme-dark .pricing-page,
+html.theme-dark .team-page,
+html.theme-dark .contact-page,
+html.theme-dark .auth-page,
+html.theme-dark .login-page,
+html.theme-dark .register-page,
+html.theme-dark .forgot-page,
+html.theme-dark .reset-page,
+html.theme-dark .already-signed-page,
+html.theme-dark .tenant-site-runtime,
+html.theme-dark .tenant-runtime-main,
+html.theme-dark .tenant-login-runtime,
+body.theme-dark .hero-section,
+body.theme-dark .home-page,
+body.theme-dark .features-page,
+body.theme-dark .pricing-page,
+body.theme-dark .team-page,
+body.theme-dark .contact-page,
+body.theme-dark .auth-page,
+body.theme-dark .login-page,
+body.theme-dark .register-page,
+body.theme-dark .forgot-page,
+body.theme-dark .reset-page,
+body.theme-dark .already-signed-page,
+body.theme-dark .tenant-site-runtime,
+body.theme-dark .tenant-runtime-main,
+body.theme-dark .tenant-login-runtime {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.12), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 58%, #0a0d18 100%) !important;
+  color: #f5f7fb !important;
+}
+
+:root[data-theme="dark"] .feature-card,
+:root[data-theme="dark"] .features-demo-panel,
+:root[data-theme="dark"] .pricing-card,
+:root[data-theme="dark"] .pricing-tabs,
+:root[data-theme="dark"] .team-profile-card,
+:root[data-theme="dark"] .profile-card,
+:root[data-theme="dark"] .contact-info-card,
+:root[data-theme="dark"] .contact-form,
+:root[data-theme="dark"] .auth-card,
+:root[data-theme="dark"] .login-card,
+:root[data-theme="dark"] .register-card,
+:root[data-theme="dark"] .forgot-card,
+:root[data-theme="dark"] .reset-card,
+:root[data-theme="dark"] .already-signed-card,
+:root[data-theme="dark"] .builder-gallery-shell,
+:root[data-theme="dark"] .tenant-runtime-card,
+:root[data-theme="dark"] .tenant-login-card,
+:root[data-theme="dark"] .subscription-modal,
+:root[data-theme="dark"] .subscription-modal-card,
+html.theme-dark .feature-card,
+html.theme-dark .features-demo-panel,
+html.theme-dark .pricing-card,
+html.theme-dark .pricing-tabs,
+html.theme-dark .team-profile-card,
+html.theme-dark .profile-card,
+html.theme-dark .contact-info-card,
+html.theme-dark .contact-form,
+html.theme-dark .auth-card,
+html.theme-dark .login-card,
+html.theme-dark .register-card,
+html.theme-dark .forgot-card,
+html.theme-dark .reset-card,
+html.theme-dark .already-signed-card,
+html.theme-dark .builder-gallery-shell,
+html.theme-dark .tenant-runtime-card,
+html.theme-dark .tenant-login-card,
+html.theme-dark .subscription-modal,
+html.theme-dark .subscription-modal-card,
+body.theme-dark .feature-card,
+body.theme-dark .features-demo-panel,
+body.theme-dark .pricing-card,
+body.theme-dark .pricing-tabs,
+body.theme-dark .team-profile-card,
+body.theme-dark .profile-card,
+body.theme-dark .contact-info-card,
+body.theme-dark .contact-form,
+body.theme-dark .auth-card,
+body.theme-dark .login-card,
+body.theme-dark .register-card,
+body.theme-dark .forgot-card,
+body.theme-dark .reset-card,
+body.theme-dark .already-signed-card,
+body.theme-dark .builder-gallery-shell,
+body.theme-dark .tenant-runtime-card,
+body.theme-dark .tenant-login-card,
+body.theme-dark .subscription-modal,
+body.theme-dark .subscription-modal-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 28%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  color: #f5f7fb !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24) !important;
+}
+
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] h2,
+:root[data-theme="dark"] h3,
+:root[data-theme="dark"] h4,
+:root[data-theme="dark"] .brand-name,
+:root[data-theme="dark"] .mobile-menu-brand span,
+:root[data-theme="dark"] .tenant-site-brand,
+:root[data-theme="dark"] .tenant-footer-logo-row h3,
+html.theme-dark h1,
+html.theme-dark h2,
+html.theme-dark h3,
+html.theme-dark h4,
+html.theme-dark .brand-name,
+html.theme-dark .mobile-menu-brand span,
+html.theme-dark .tenant-site-brand,
+html.theme-dark .tenant-footer-logo-row h3,
+body.theme-dark h1,
+body.theme-dark h2,
+body.theme-dark h3,
+body.theme-dark h4,
+body.theme-dark .brand-name,
+body.theme-dark .mobile-menu-brand span,
+body.theme-dark .tenant-site-brand,
+body.theme-dark .tenant-footer-logo-row h3 {
+  color: #ffffff !important;
+}
+
+:root[data-theme="dark"] p,
+:root[data-theme="dark"] li,
+:root[data-theme="dark"] small,
+:root[data-theme="dark"] label,
+:root[data-theme="dark"] .hero-description,
+:root[data-theme="dark"] .features-hero p,
+:root[data-theme="dark"] .feature-card p,
+:root[data-theme="dark"] .pricing-header p,
+:root[data-theme="dark"] .team-hero p,
+:root[data-theme="dark"] .contact-hero p,
+:root[data-theme="dark"] .mobile-menu-title,
+:root[data-theme="dark"] .mobile-menu-lang-wrap > span,
+html.theme-dark p,
+html.theme-dark li,
+html.theme-dark small,
+html.theme-dark label,
+html.theme-dark .hero-description,
+html.theme-dark .features-hero p,
+html.theme-dark .feature-card p,
+html.theme-dark .pricing-header p,
+html.theme-dark .team-hero p,
+html.theme-dark .contact-hero p,
+html.theme-dark .mobile-menu-title,
+html.theme-dark .mobile-menu-lang-wrap > span,
+body.theme-dark p,
+body.theme-dark li,
+body.theme-dark small,
+body.theme-dark label,
+body.theme-dark .hero-description,
+body.theme-dark .features-hero p,
+body.theme-dark .feature-card p,
+body.theme-dark .pricing-header p,
+body.theme-dark .team-hero p,
+body.theme-dark .contact-hero p,
+body.theme-dark .mobile-menu-title,
+body.theme-dark .mobile-menu-lang-wrap > span {
+  color: #aab7c7 !important;
+}
+
+:root[data-theme="dark"] .gradient-text,
+:root[data-theme="dark"] .features-hero > span,
+:root[data-theme="dark"] .pricing-header span,
+:root[data-theme="dark"] .builder-gallery-info span,
+:root[data-theme="dark"] .profile-role,
+:root[data-theme="dark"] .contact-info-card strong,
+:root[data-theme="dark"] .arabic-name,
+:root[data-theme="dark"] .plan-name,
+:root[data-theme="dark"] .feature-icon,
+:root[data-theme="dark"] .tenant-eyebrow,
+:root[data-theme="dark"] .plan-mini-badge,
+:root[data-theme="dark"] .mobile-theme-toggle strong,
+html.theme-dark .gradient-text,
+html.theme-dark .features-hero > span,
+html.theme-dark .pricing-header span,
+html.theme-dark .builder-gallery-info span,
+html.theme-dark .profile-role,
+html.theme-dark .contact-info-card strong,
+html.theme-dark .arabic-name,
+html.theme-dark .plan-name,
+html.theme-dark .feature-icon,
+html.theme-dark .tenant-eyebrow,
+html.theme-dark .plan-mini-badge,
+html.theme-dark .mobile-theme-toggle strong,
+body.theme-dark .gradient-text,
+body.theme-dark .features-hero > span,
+body.theme-dark .pricing-header span,
+body.theme-dark .builder-gallery-info span,
+body.theme-dark .profile-role,
+body.theme-dark .contact-info-card strong,
+body.theme-dark .arabic-name,
+body.theme-dark .plan-name,
+body.theme-dark .feature-icon,
+body.theme-dark .tenant-eyebrow,
+body.theme-dark .plan-mini-badge,
+body.theme-dark .mobile-theme-toggle strong {
+  color: #7fd6d0 !important;
+  --gradient-text-colors: #7fd6d0, #9fe7df, #ffffff !important;
+}
+
+:root[data-theme="dark"] .btn-signup,
+:root[data-theme="dark"] .features-demo-cta,
+:root[data-theme="dark"] .register-submit,
+:root[data-theme="dark"] .login-submit,
+:root[data-theme="dark"] .forgot-card button,
+:root[data-theme="dark"] .reset-card button,
+:root[data-theme="dark"] .contact-form button,
+:root[data-theme="dark"] .plan-btn.primary,
+:root[data-theme="dark"] .pricing-tabs button.active,
+:root[data-theme="dark"] .pricing-card:hover .plan-btn,
+:root[data-theme="dark"] .pricing-card.is-active-plan .plan-btn,
+:root[data-theme="dark"] .tenant-site-cta,
+:root[data-theme="dark"] .tenant-runtime-actions button,
+:root[data-theme="dark"] .mobile-auth-full,
+:root[data-theme="dark"] .mobile-menu-auth .btn-signup,
+:root[data-theme="dark"] .lang-mobile-btn.active,
+html.theme-dark .btn-signup,
+html.theme-dark .features-demo-cta,
+html.theme-dark .register-submit,
+html.theme-dark .login-submit,
+html.theme-dark .forgot-card button,
+html.theme-dark .reset-card button,
+html.theme-dark .contact-form button,
+html.theme-dark .plan-btn.primary,
+html.theme-dark .pricing-tabs button.active,
+html.theme-dark .pricing-card:hover .plan-btn,
+html.theme-dark .pricing-card.is-active-plan .plan-btn,
+html.theme-dark .tenant-site-cta,
+html.theme-dark .tenant-runtime-actions button,
+html.theme-dark .mobile-auth-full,
+html.theme-dark .mobile-menu-auth .btn-signup,
+html.theme-dark .lang-mobile-btn.active,
+body.theme-dark .btn-signup,
+body.theme-dark .features-demo-cta,
+body.theme-dark .register-submit,
+body.theme-dark .login-submit,
+body.theme-dark .forgot-card button,
+body.theme-dark .reset-card button,
+body.theme-dark .contact-form button,
+body.theme-dark .plan-btn.primary,
+body.theme-dark .pricing-tabs button.active,
+body.theme-dark .pricing-card:hover .plan-btn,
+body.theme-dark .pricing-card.is-active-plan .plan-btn,
+body.theme-dark .tenant-site-cta,
+body.theme-dark .tenant-runtime-actions button,
+body.theme-dark .mobile-auth-full,
+body.theme-dark .mobile-menu-auth .btn-signup,
+body.theme-dark .lang-mobile-btn.active {
+  background: linear-gradient(135deg, rgba(80, 117, 151, 0.92) 0%, #7fd6d0 100%) !important;
+  border-color: rgba(127, 214, 208, 0.42) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.18) !important;
+}
+
+:root[data-theme="dark"] .btn-login,
+:root[data-theme="dark"] .lang-toggle,
+:root[data-theme="dark"] .plan-btn,
+:root[data-theme="dark"] .mobile-menu-auth .btn-login,
+:root[data-theme="dark"] .mobile-menu-lang .lang-mobile-btn,
+:root[data-theme="dark"] .profile-icon-link,
+:root[data-theme="dark"] .tenant-social-row button,
+:root[data-theme="dark"] .footer-social-link,
+html.theme-dark .btn-login,
+html.theme-dark .lang-toggle,
+html.theme-dark .plan-btn,
+html.theme-dark .mobile-menu-auth .btn-login,
+html.theme-dark .mobile-menu-lang .lang-mobile-btn,
+html.theme-dark .profile-icon-link,
+html.theme-dark .tenant-social-row button,
+html.theme-dark .footer-social-link,
+body.theme-dark .btn-login,
+body.theme-dark .lang-toggle,
+body.theme-dark .plan-btn,
+body.theme-dark .mobile-menu-auth .btn-login,
+body.theme-dark .mobile-menu-lang .lang-mobile-btn,
+body.theme-dark .profile-icon-link,
+body.theme-dark .tenant-social-row button,
+body.theme-dark .footer-social-link {
+  background: rgba(16, 28, 45, 0.72) !important;
+  border-color: rgba(126, 158, 181, 0.2) !important;
+  color: #d8eef1 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .btn-login:hover,
+:root[data-theme="dark"] .lang-toggle:hover,
+:root[data-theme="dark"] .plan-btn:hover,
+:root[data-theme="dark"] .mobile-menu-auth .btn-login:hover,
+:root[data-theme="dark"] .mobile-menu-lang .lang-mobile-btn:hover,
+:root[data-theme="dark"] .lang-dropdown button:hover,
+:root[data-theme="dark"] .lang-dropdown button.active,
+:root[data-theme="dark"] .mobile-menu-links a:hover,
+:root[data-theme="dark"] .mobile-menu-links a.active,
+html.theme-dark .btn-login:hover,
+html.theme-dark .lang-toggle:hover,
+html.theme-dark .plan-btn:hover,
+html.theme-dark .mobile-menu-auth .btn-login:hover,
+html.theme-dark .mobile-menu-lang .lang-mobile-btn:hover,
+html.theme-dark .lang-dropdown button:hover,
+html.theme-dark .lang-dropdown button.active,
+html.theme-dark .mobile-menu-links a:hover,
+html.theme-dark .mobile-menu-links a.active,
+body.theme-dark .btn-login:hover,
+body.theme-dark .lang-toggle:hover,
+body.theme-dark .plan-btn:hover,
+body.theme-dark .mobile-menu-auth .btn-login:hover,
+body.theme-dark .mobile-menu-lang .lang-mobile-btn:hover,
+body.theme-dark .lang-dropdown button:hover,
+body.theme-dark .lang-dropdown button.active,
+body.theme-dark .mobile-menu-links a:hover,
+body.theme-dark .mobile-menu-links a.active {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .features-demo-icon,
+:root[data-theme="dark"] .feature-card-icon,
+:root[data-theme="dark"] .tenant-logo-fallback,
+:root[data-theme="dark"] .popular-badge,
+:root[data-theme="dark"] .center-core,
+:root[data-theme="dark"] .orbit-dot,
+html.theme-dark .features-demo-icon,
+html.theme-dark .feature-card-icon,
+html.theme-dark .tenant-logo-fallback,
+html.theme-dark .popular-badge,
+html.theme-dark .center-core,
+html.theme-dark .orbit-dot,
+body.theme-dark .features-demo-icon,
+body.theme-dark .feature-card-icon,
+body.theme-dark .tenant-logo-fallback,
+body.theme-dark .popular-badge,
+body.theme-dark .center-core,
+body.theme-dark .orbit-dot {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #7fd6d0 !important;
+  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.14) !important;
+}
+
+:root[data-theme="dark"] .orbit-wrapper,
+:root[data-theme="dark"] .hero-visual,
+html.theme-dark .orbit-wrapper,
+html.theme-dark .hero-visual,
+body.theme-dark .orbit-wrapper,
+body.theme-dark .hero-visual {
+  background:
+    radial-gradient(circle at center, rgba(47, 159, 154, 0.1), transparent 58%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.58), rgba(7, 17, 31, 0.74)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .nav-menu a::after,
+:root[data-theme="dark"] .footer-link::after,
+:root[data-theme="dark"] .pricing-card::before,
+:root[data-theme="dark"] .features-demo-panel::before,
+:root[data-theme="dark"] .team-profile-card::before,
+:root[data-theme="dark"] .contact-info-card::before,
+html.theme-dark .nav-menu a::after,
+html.theme-dark .footer-link::after,
+html.theme-dark .pricing-card::before,
+html.theme-dark .features-demo-panel::before,
+html.theme-dark .team-profile-card::before,
+html.theme-dark .contact-info-card::before,
+body.theme-dark .nav-menu a::after,
+body.theme-dark .footer-link::after,
+body.theme-dark .pricing-card::before,
+body.theme-dark .features-demo-panel::before,
+body.theme-dark .team-profile-card::before,
+body.theme-dark .contact-info-card::before {
+  background:
+    radial-gradient(circle at top right, rgba(47, 159, 154, 0.13), transparent 34%),
+    linear-gradient(135deg, rgba(80, 117, 151, 0.18), rgba(127, 214, 208, 0.12)) !important;
+  border-color: rgba(127, 214, 208, 0.22) !important;
+  box-shadow: none !important;
+}
+
+/* Final public footer dark-theme normalization. */
+:root[data-theme="dark"] .site-footer,
+html.theme-dark .site-footer,
+body.theme-dark .site-footer {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(47, 159, 154, 0.11), transparent 28%),
+    linear-gradient(135deg, #050b14 0%, #07111f 58%, #0a0d18 100%) !important;
+  border-top-color: rgba(126, 158, 181, 0.14) !important;
+  color: #f5f7fb !important;
+}
+
+:root[data-theme="dark"] .site-footer::before,
+html.theme-dark .site-footer::before,
+body.theme-dark .site-footer::before {
+  background:
+    linear-gradient(rgba(126, 158, 181, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(126, 158, 181, 0.035) 1px, transparent 1px) !important;
+}
+
+:root[data-theme="dark"] .footer-links,
+:root[data-theme="dark"] .footer-contact,
+html.theme-dark .footer-links,
+html.theme-dark .footer-contact,
+body.theme-dark .footer-links,
+body.theme-dark .footer-contact {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 159, 154, 0.08), transparent 30%),
+    linear-gradient(145deg, rgba(16, 28, 45, 0.96), rgba(10, 22, 38, 0.94)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .footer-logo-link span,
+:root[data-theme="dark"] .footer-links h4,
+:root[data-theme="dark"] .footer-contact h4,
+:root[data-theme="dark"] .footer-contact-item strong,
+html.theme-dark .footer-logo-link span,
+html.theme-dark .footer-links h4,
+html.theme-dark .footer-contact h4,
+html.theme-dark .footer-contact-item strong,
+body.theme-dark .footer-logo-link span,
+body.theme-dark .footer-links h4,
+body.theme-dark .footer-contact h4,
+body.theme-dark .footer-contact-item strong {
+  color: #ffffff !important;
+}
+
+:root[data-theme="dark"] .footer-brand p,
+:root[data-theme="dark"] .footer-bottom p,
+html.theme-dark .footer-brand p,
+html.theme-dark .footer-bottom p,
+body.theme-dark .footer-brand p,
+body.theme-dark .footer-bottom p {
+  color: #b8c5d6 !important;
+}
+
+:root[data-theme="dark"] .footer-link,
+html.theme-dark .footer-link,
+body.theme-dark .footer-link {
+  color: #dce7f3 !important;
+}
+
+:root[data-theme="dark"] .footer-link:hover,
+:root[data-theme="dark"] .footer-link.active,
+html.theme-dark .footer-link:hover,
+html.theme-dark .footer-link.active,
+body.theme-dark .footer-link:hover,
+body.theme-dark .footer-link.active {
+  color: #9fe7df !important;
+}
+
+:root[data-theme="dark"] .footer-link::after,
+html.theme-dark .footer-link::after,
+body.theme-dark .footer-link::after {
+  background: #7fd6d0 !important;
+  box-shadow: 0 0 14px rgba(127, 214, 208, 0.42) !important;
+}
+
+:root[data-theme="dark"] .footer-contact-item span,
+:root[data-theme="dark"] .footer-social-row span,
+html.theme-dark .footer-contact-item span,
+html.theme-dark .footer-social-row span,
+body.theme-dark .footer-contact-item span,
+body.theme-dark .footer-social-row span {
+  color: #9fb0c2 !important;
+}
+
+:root[data-theme="dark"] .footer-social-link,
+html.theme-dark .footer-social-link,
+body.theme-dark .footer-social-link {
+  background: rgba(16, 28, 45, 0.72) !important;
+  border-color: rgba(126, 158, 181, 0.2) !important;
+  color: #d8eef1 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .footer-social-link:hover,
+html.theme-dark .footer-social-link:hover,
+body.theme-dark .footer-social-link:hover {
+  background: rgba(47, 159, 154, 0.16) !important;
+  border-color: rgba(127, 214, 208, 0.38) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 4px rgba(127, 214, 208, 0.1) !important;
+}
+
+:root[data-theme="dark"] .footer-bottom,
+html.theme-dark .footer-bottom,
+body.theme-dark .footer-bottom {
+  border-top-color: rgba(126, 158, 181, 0.16) !important;
+}

@@ -50,7 +50,7 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     "--madar-border": safeTheme.border,
     "--madar-border-strong":
       safeTheme.mode === "dark"
-        ? "rgba(255, 255, 255, 0.2)"
+        ? "rgba(126, 158, 181, 0.26)"
         : "rgba(26, 39, 68, 0.22)",
     "--madar-gradient": `linear-gradient(135deg, ${safeTheme.primary} 0%, ${safeTheme.accent} 100%)`,
     "--madar-gradient-hover": `linear-gradient(135deg, ${safeTheme.primary} 0%, ${safeTheme.accentDark} 100%)`,

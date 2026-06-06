@@ -1150,3 +1150,141 @@ body.theme-dark .login-card label,
 body.theme-dark .signup-card label {
   color: #f8fafc !important;
 }
+
+/* ============================================================
+   PUBLIC HEADER RESPONSIVE DARK THEME
+   ============================================================ */
+
+:root[data-theme="dark"] .site-header,
+html.theme-dark .site-header,
+body.theme-dark .site-header {
+  background: rgba(8, 19, 33, 0.97) !important;
+  border-bottom-color: rgba(126, 158, 181, 0.16) !important;
+}
+
+:root[data-theme="dark"] .hamburger,
+:root[data-theme="dark"] .mobile-menu-close,
+html.theme-dark .hamburger,
+html.theme-dark .mobile-menu-close,
+body.theme-dark .hamburger,
+body.theme-dark .mobile-menu-close,
+html[data-darkreader-mode] .hamburger,
+html[data-darkreader-scheme] .hamburger,
+html[data-darkreader-mode] .mobile-menu-close,
+html[data-darkreader-scheme] .mobile-menu-close {
+  background:
+    linear-gradient(145deg, rgba(16, 28, 45, 0.98), rgba(18, 27, 42, 0.96)) !important;
+  border: 1px solid rgba(126, 158, 181, 0.2) !important;
+  color: #d8eef1 !important;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+:root[data-theme="dark"] .hamburger:hover,
+:root[data-theme="dark"] .hamburger.open,
+:root[data-theme="dark"] .mobile-menu-close:hover,
+:root[data-theme="dark"] .mobile-menu-close:focus-visible,
+html.theme-dark .hamburger:hover,
+html.theme-dark .hamburger.open,
+html.theme-dark .mobile-menu-close:hover,
+html.theme-dark .mobile-menu-close:focus-visible,
+body.theme-dark .hamburger:hover,
+body.theme-dark .hamburger.open,
+body.theme-dark .mobile-menu-close:hover,
+body.theme-dark .mobile-menu-close:focus-visible {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.3),
+    0 0 0 4px rgba(127, 214, 208, 0.1) !important;
+}
+
+:root[data-theme="dark"] .hamburger span,
+html.theme-dark .hamburger span,
+body.theme-dark .hamburger span,
+html[data-darkreader-mode] .hamburger span,
+html[data-darkreader-scheme] .hamburger span {
+  background: #d8eef1 !important;
+}
+
+:root[data-theme="dark"] .header-theme-toggle,
+:root[data-theme="dark"] .mobile-theme-toggle,
+html.theme-dark .header-theme-toggle,
+html.theme-dark .mobile-theme-toggle,
+body.theme-dark .header-theme-toggle,
+body.theme-dark .mobile-theme-toggle {
+  background: rgba(16, 28, 45, 0.82) !important;
+  border-color: rgba(126, 158, 181, 0.2) !important;
+  color: #d8eef1 !important;
+}
+
+:root[data-theme="dark"] .header-theme-toggle:hover,
+:root[data-theme="dark"] .mobile-theme-toggle:hover,
+html.theme-dark .header-theme-toggle:hover,
+html.theme-dark .mobile-theme-toggle:hover,
+body.theme-dark .header-theme-toggle:hover,
+body.theme-dark .mobile-theme-toggle:hover {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #ffffff !important;
+}
+
+:root[data-theme="dark"] .mobile-menu,
+html.theme-dark .mobile-menu,
+body.theme-dark .mobile-menu {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(47, 159, 154, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(8, 19, 33, 0.99), rgba(7, 17, 31, 0.99)) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+}
+
+:root[data-theme="dark"] .mobile-menu-head,
+html.theme-dark .mobile-menu-head,
+body.theme-dark .mobile-menu-head {
+  background: rgba(16, 28, 45, 0.72) !important;
+  border-bottom-color: rgba(126, 158, 181, 0.16) !important;
+}
+
+:root[data-theme="dark"] .mobile-menu-links a,
+html.theme-dark .mobile-menu-links a,
+body.theme-dark .mobile-menu-links a {
+  background: rgba(16, 28, 45, 0.72) !important;
+  border-color: rgba(126, 158, 181, 0.16) !important;
+  color: #f5f7fb !important;
+}
+
+:root[data-theme="dark"] .mobile-menu-links a:hover,
+:root[data-theme="dark"] .mobile-menu-links a.active,
+html.theme-dark .mobile-menu-links a:hover,
+html.theme-dark .mobile-menu-links a.active,
+body.theme-dark .mobile-menu-links a:hover,
+body.theme-dark .mobile-menu-links a.active {
+  background: rgba(47, 159, 154, 0.14) !important;
+  border-color: rgba(127, 214, 208, 0.34) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .mobile-theme-toggle strong,
+html.theme-dark .mobile-theme-toggle strong,
+body.theme-dark .mobile-theme-toggle strong,
+:root[data-theme="dark"] .nav-menu a:hover,
+:root[data-theme="dark"] .nav-menu a.active,
+html.theme-dark .nav-menu a:hover,
+html.theme-dark .nav-menu a.active,
+body.theme-dark .nav-menu a:hover,
+body.theme-dark .nav-menu a.active {
+  color: #7fd6d0 !important;
+}
+
+:root[data-theme="dark"] .lang-dropdown button:hover,
+:root[data-theme="dark"] .lang-dropdown button.active,
+html.theme-dark .lang-dropdown button:hover,
+html.theme-dark .lang-dropdown button.active,
+body.theme-dark .lang-dropdown button:hover,
+body.theme-dark .lang-dropdown button.active {
+  background: rgba(47, 159, 154, 0.14) !important;
+  color: #d8eef1 !important;
+}
