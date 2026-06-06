@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from database import service_supabase
 from classes import WebsiteSettingsUpdate
 from services.auth_service import get_authenticated_user_row
+from services.website_settings_service import ensure_settings_for_tenant, get_settings_for_tenant
 
 router = APIRouter(prefix="/website", tags=["Website"])
 
@@ -184,17 +185,14 @@ def update_website_settings(
             }
 
         user_id = user_data["id"]
-        tenant_id = user_data.get("tenant_id") or user_id
+        tenant_id = user_data.get("tenant_id")
 
-        existing_response = (
-            service_supabase.table("website_settings")
-            .select("*")
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
+        if tenant_id is None:
+            raise HTTPException(status_code=403, detail="User does not belong to a tenant")
 
-        existing_website = existing_response.data
+        update_payload["tenant_id"] = tenant_id
+
+        existing_website = get_settings_for_tenant(tenant_id, user_id)
 
         if existing_website:
             save_response = (
@@ -247,18 +245,18 @@ def get_website_settings(request: Request, response: Response):
     try:
         _, user_data = get_authenticated_user_row(request, response)
 
-        website_response = (
-            service_supabase.table("website_settings")
-            .select("*")
-            .eq("user_id", user_data["id"])
-            .maybe_single()
-            .execute()
-        )
+        user_id = user_data["id"]
+        tenant_id = user_data.get("tenant_id")
+
+        if tenant_id is None:
+            raise HTTPException(status_code=403, detail="User does not belong to a tenant")
+
+        website = ensure_settings_for_tenant(tenant_id, user_id)
 
         return {
             "success": True,
             "message": "Website settings fetched successfully",
-            "website": website_response.data,
+            "website": website,
         }
 
     except HTTPException:

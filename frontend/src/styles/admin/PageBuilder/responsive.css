@@ -432,3 +432,19 @@
     flex-direction: column;
   }
 }
+
+.page-builder.preview-mode .builder-desktop-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.page-builder.preview-mode .builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.page-builder.preview-mode .builder-canvas-shell {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+}

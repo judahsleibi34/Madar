@@ -1,10 +1,11 @@
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from supabase import create_client
 
 from classes import PasswordReset
 from database import service_supabase, supabase
+from services.rate_limit_service import enforce_password_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["Password"])
 
@@ -20,12 +21,14 @@ admin_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
 @router.post("/forgot-password")
-def forgot_password(payload: dict):
+def forgot_password(payload: dict, request: Request):
     try:
         email = payload.get("email", "").strip().lower()
 
         if not email:
             raise HTTPException(status_code=400, detail="Email is required")
+
+        enforce_password_rate_limit(request, "forgot_password", email)
 
         user = service_supabase.table("users").select("id").eq("email", email).single().execute()
 
@@ -47,8 +50,10 @@ def forgot_password(payload: dict):
 
 
 @router.post("/password-reset")
-def password_reset(payload: PasswordReset):
+def password_reset(payload: PasswordReset, request: Request):
     try:
+        enforce_password_rate_limit(request, "password_reset")
+
         user = supabase.auth.get_user(payload.access_token)
 
         if not user.user:

@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { fetchBuilderFormSubmissions } from "./PageBuilder.api";
+
 const responsesText = {
   en: {
     kicker: "Form information",
@@ -33,6 +36,15 @@ const responsesText = {
     emptyText: "When users submit this form, their answers will appear here as rows in this table.",
     noForm: "No form selected",
     noFormText: "Create a form first, then submitted answers will appear here.",
+    loadingTitle: "Loading submissions",
+    loadingText: "Fetching the latest saved submissions for this form.",
+    errorTitle: "Could not load submissions",
+    errorText: "Try again in a moment or confirm you still have access to this project.",
+    refresh: "Refresh",
+    refreshing: "Refreshing...",
+    previous: "Previous",
+    next: "Next",
+    page: "Page",
   },
   ar: {
     kicker: "\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0646\u0645\u0648\u0630\u062c",
@@ -68,12 +80,45 @@ const responsesText = {
     emptyText: "\u0639\u0646\u062f\u0645\u0627 \u064a\u0631\u0633\u0644 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u0648\u0646 \u0647\u0630\u0627 \u0627\u0644\u0646\u0645\u0648\u0630\u062c\u060c \u0633\u062a\u0638\u0647\u0631 \u0625\u062c\u0627\u0628\u0627\u062a\u0647\u0645 \u0647\u0646\u0627.",
     noForm: "\u0644\u0645 \u064a\u062a\u0645 \u0627\u062e\u062a\u064a\u0627\u0631 \u0646\u0645\u0648\u0630\u062c",
     noFormText: "\u0623\u0646\u0634\u0626 \u0646\u0645\u0648\u0630\u062c\u0627 \u0623\u0648\u0644\u0627\u060c \u062b\u0645 \u0633\u062a\u0638\u0647\u0631 \u0627\u0644\u0631\u062f\u0648\u062f \u0647\u0646\u0627.",
+    loadingTitle: "\u062c\u0627\u0631\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0631\u062f\u0648\u062f",
+    loadingText: "\u064a\u062a\u0645 \u062c\u0644\u0628 \u0623\u062d\u062f\u062b \u0627\u0644\u0631\u062f\u0648\u062f \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0646\u0645\u0648\u0630\u062c.",
+    errorTitle: "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0631\u062f\u0648\u062f",
+    errorText: "\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649 \u0628\u0639\u062f \u0642\u0644\u064a\u0644 \u0623\u0648 \u062a\u0623\u0643\u062f \u0645\u0646 \u0635\u0644\u0627\u062d\u064a\u0629 \u0627\u0644\u0648\u0635\u0648\u0644.",
+    refresh: "\u062a\u062d\u062f\u064a\u062b",
+    refreshing: "\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u062f\u064a\u062b...",
+    previous: "\u0627\u0644\u0633\u0627\u0628\u0642",
+    next: "\u0627\u0644\u062a\u0627\u0644\u064a",
+    page: "\u0635\u0641\u062d\u0629",
   },
+};
+
+const normalizeBackendResponse = (submission) => ({
+  id: submission?.id || `submission_${Date.now()}`,
+  createdAt: submission?.createdAt || submission?.submitted_at || submission?.created_at || "",
+  status: submission?.status || "New",
+  answers: submission?.answers && typeof submission.answers === "object" ? submission.answers : {},
+  quiz: submission?.quiz || submission?.quiz_result || null,
+  backendSubmission: true,
+});
+
+const RESPONSE_PAGE_SIZE = 50;
+
+const getResponseLoadMessage = (error, t) => {
+  if (error?.status === 403) {
+    return "You do not have access to these submissions.";
+  }
+
+  if (error?.status === 404) {
+    return "This project, form, or submissions list was not found.";
+  }
+
+  return t.errorText;
 };
 
 export default function BuilderResponsesPage({
   lang = "en",
   project,
+  builderProjectId = "",
   activeForm,
   selectForm,
   getFormFields,
@@ -84,24 +129,94 @@ export default function BuilderResponsesPage({
   const isArabic = activeLang === "ar";
   const t = responsesText[activeLang];
   const selectedForm = activeForm || project.forms?.[0];
-
+  const selectedFormId = selectedForm?.id || "";
   const allForms = project.forms || [];
+  const [backendResponsesByForm, setBackendResponsesByForm] = useState({});
+  const [responsePageByForm, setResponsePageByForm] = useState({});
+  const [responsesLoading, setResponsesLoading] = useState(false);
+  const [responsesError, setResponsesError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const selectedPage = responsePageByForm[selectedFormId] || 0;
+  const selectedOffset = selectedPage * RESPONSE_PAGE_SIZE;
+
+  useEffect(() => {
+    if (!builderProjectId || !selectedFormId) {
+      setResponsesLoading(false);
+      setResponsesError("");
+      return undefined;
+    }
+
+    let cancelled = false;
+    setResponsesLoading(true);
+    setResponsesError("");
+
+    fetchBuilderFormSubmissions(builderProjectId, {
+      form_id: selectedFormId,
+      limit: RESPONSE_PAGE_SIZE,
+      offset: selectedOffset,
+    })
+      .then((submissions) => {
+        if (cancelled) return;
+        setBackendResponsesByForm((current) => ({
+          ...current,
+          [selectedFormId]: submissions.map(normalizeBackendResponse),
+        }));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setResponsesError(getResponseLoadMessage(error, t));
+      })
+      .finally(() => {
+        if (!cancelled) setResponsesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [builderProjectId, selectedFormId, selectedOffset, refreshKey, t]);
+
+  const refreshResponses = () => {
+    if (!builderProjectId || !selectedFormId || responsesLoading) return;
+    setRefreshKey((current) => current + 1);
+  };
+
+  const setSelectedPage = (page) => {
+    if (!builderProjectId || !selectedFormId || responsesLoading) return;
+    setResponsePageByForm((current) => ({
+      ...current,
+      [selectedFormId]: Math.max(0, page),
+    }));
+  };
+
+  const getDisplayResponsesForForm = (form) => {
+    if (!form) return [];
+    if (builderProjectId && backendResponsesByForm[form.id]) {
+      return backendResponsesByForm[form.id];
+    }
+
+    if (builderProjectId) return [];
+
+    return form.responses || [];
+  };
 
   const totalResponses = allForms.reduce(
-    (total, form) => total + (form.responses || []).length,
+    (total, form) => total + getDisplayResponsesForForm(form).length,
     0
   );
 
   const formsWithResponses = allForms.filter(
-    (form) => (form.responses || []).length > 0
+    (form) => getDisplayResponsesForForm(form).length > 0
   ).length;
 
   const fields = selectedForm ? getFormFields(selectedForm) : [];
-  const responses = selectedForm?.responses || [];
+  const responses = getDisplayResponsesForForm(selectedForm);
   const isQuiz = selectedForm?.mode === "quiz";
   const requiredFields = fields.filter((field) => field.required);
   const optionalFields = Math.max(0, fields.length - requiredFields.length);
-  const latestResponse = responses[0];
+  const latestResponse = selectedPage === 0 ? responses[0] : null;
+  const hasBackendPagination = Boolean(builderProjectId && selectedFormId);
+  const hasNextPage = hasBackendPagination && responses.length === RESPONSE_PAGE_SIZE;
+  const hasPreviousPage = hasBackendPagination && selectedPage > 0;
   const answeredCells = responses.reduce(
     (total, response) =>
       total +
@@ -117,7 +232,7 @@ export default function BuilderResponsesPage({
       : 0;
 
   const connectedCollection = selectedForm?.connectedCollectionId
-    ? project.collections.find(
+    ? project.collections?.find(
         (collection) => collection.id === selectedForm.connectedCollectionId
       )
     : null;
@@ -200,7 +315,7 @@ export default function BuilderResponsesPage({
           <div className="results-form-list-scroll">
             {allForms.map((form) => {
               const isActive = selectedForm?.id === form.id;
-              const count = form.responses?.length || 0;
+              const count = getDisplayResponsesForForm(form).length;
               const formFields = getFormFields(form);
 
               return (
@@ -235,8 +350,43 @@ export default function BuilderResponsesPage({
                   </p>
                 </div>
 
-                <div className="results-count-pill">
-                  {responses.length} {responses.length === 1 ? t.response : t.responses}
+                <div className="responses-table-controls">
+                  {hasBackendPagination && (
+                    <div className="responses-pagination-controls">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPage(selectedPage - 1)}
+                        disabled={!hasPreviousPage || responsesLoading}
+                      >
+                        {t.previous}
+                      </button>
+                      <span>
+                        {t.page} {selectedPage + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPage(selectedPage + 1)}
+                        disabled={!hasNextPage || responsesLoading}
+                      >
+                        {t.next}
+                      </button>
+                    </div>
+                  )}
+
+                  {hasBackendPagination && (
+                    <button
+                      type="button"
+                      className="responses-refresh-button"
+                      onClick={refreshResponses}
+                      disabled={responsesLoading}
+                    >
+                      {responsesLoading ? t.refreshing : t.refresh}
+                    </button>
+                  )}
+
+                  <div className="results-count-pill">
+                    {responses.length} {responses.length === 1 ? t.response : t.responses}
+                  </div>
                 </div>
               </div>
 
@@ -277,7 +427,25 @@ export default function BuilderResponsesPage({
                   </thead>
 
                   <tbody>
-                    {responses.length > 0 ? (
+                    {responsesLoading ? (
+                      <tr>
+                        <td colSpan={fields.length + 2 + (isQuiz ? 1 : 0)}>
+                          <div className="results-empty-state">
+                            <strong>{t.loadingTitle}</strong>
+                            <p>{t.loadingText}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : responsesError ? (
+                      <tr>
+                        <td colSpan={fields.length + 2 + (isQuiz ? 1 : 0)}>
+                          <div className="results-empty-state">
+                            <strong>{t.errorTitle}</strong>
+                            <p>{responsesError}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : responses.length > 0 ? (
                       responses.map((response) => (
                         <tr key={response.id}>
                           <td>

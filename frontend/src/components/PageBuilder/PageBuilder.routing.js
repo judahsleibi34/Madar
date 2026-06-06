@@ -9,11 +9,15 @@ export const sanitizeSubdomain = (value = "") => {
     .slice(0, 63);
 };
 
+export const getConfiguredProjectSubdomain = (project) => {
+  return sanitizeSubdomain(project?.publish?.subdomain || "");
+};
+
 export const getProjectSubdomain = (project) => {
-  const saved = project?.publish?.subdomain;
+  const saved = getConfiguredProjectSubdomain(project);
   const fallback = project?.name || "my-site";
 
-  return sanitizeSubdomain(saved || fallback) || "my-site";
+  return saved || sanitizeSubdomain(fallback) || "my-site";
 };
 
 export const getLocalTenantPath = (project, path = "/") => {

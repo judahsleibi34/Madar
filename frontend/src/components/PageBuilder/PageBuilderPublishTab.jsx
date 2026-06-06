@@ -10,7 +10,7 @@ export default function PageBuilderPublishTab({
       <div className="workspace-header">
         <div>
           <h2>Publish</h2>
-          <p>Local-only save, load, export, and mock publishing for now.</p>
+          <p>Save and publish this project through the backend. A local cache is kept for recovery.</p>
         </div>
       </div>
 
@@ -38,11 +38,11 @@ export default function PageBuilderPublishTab({
 
           <div className="publish-actions">
             <button type="button" onClick={saveProject}>
-              Save locally
+              Save
             </button>
 
             <button type="button" onClick={loadProject}>
-              Load local save
+              Load project
             </button>
 
             <button type="button" onClick={exportProject}>

@@ -961,6 +961,32 @@ summary {
   pointer-events: none;
 }
 
+.page-builder .builder-live-site-link {
+  position: fixed;
+  top: 212px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 999px;
+
+  background: var(--madar-gradient);
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(26, 39, 68, 0.18);
+  font-size: 13px;
+  font-weight: 950;
+  text-decoration: none;
+}
+
+.page-builder .builder-live-site-link:hover {
+  filter: brightness(1.04);
+}
+
 .page-builder .builder-toast::before {
   content: "✓";
   width: 26px;

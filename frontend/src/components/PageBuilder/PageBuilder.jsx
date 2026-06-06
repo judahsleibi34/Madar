@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "../../styles/admin/PageBuilder/index.css";
 import {
   STORAGE_KEY,
@@ -48,7 +48,7 @@ import {
 } from "./PageBuilder.starters";
 import BuilderResponsesPage from "./BuilderResponsesPage";
 import DataAnalysisWorkspace from "./DataAnalysisWorkspace";
-import { getLocalTenantPath } from "./PageBuilder.routing";
+import { sanitizeSubdomain } from "./PageBuilder.routing";
 import PageBuilderCarousel from "./PageBuilderCarousel";
 import PageBuilderTopbar from "./PageBuilderTopbar";
 import PageBuilderSubbar from "./PageBuilderSubbar";
@@ -56,6 +56,14 @@ import PageBuilderThemeTab from "./PageBuilderThemeTab";
 import PageBuilderPublishTab from "./PageBuilderPublishTab";
 import PageBuilderUsersTab from "./PageBuilderUsersTab";
 import PageBuilderWorkflowsTab from "./PageBuilderWorkflowsTab";
+import {
+  createBuilderProject,
+  fetchBuilderProject,
+  fetchWebsiteSettings,
+  listBuilderProjects,
+  publishBuilderProject,
+  updateBuilderProject,
+} from "./PageBuilder.api";
 
 import {
   applyThemeModeToProject,
@@ -626,6 +634,45 @@ const loadInitialProject = () => {
   }
 };
 
+const normalizeProjectSlug = (value) => {
+  const cleanValue = String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return cleanValue || `builder-project-${Date.now()}`;
+};
+
+const getBuilderProjectName = (project) =>
+  String(project?.name || project?.siteChrome?.brandName || "Page Builder Project").trim() ||
+  "Page Builder Project";
+
+const getBuilderProjectSlug = (project, record) =>
+  normalizeProjectSlug(record?.slug || project?.slug || project?.siteChrome?.subdomain || project?.siteChrome?.brandName || project?.name);
+
+const getDraftProjectFromRecord = (record) => {
+  if (!record?.draft_schema || typeof record.draft_schema !== "object" || Array.isArray(record.draft_schema)) {
+    return null;
+  }
+
+  return cleanBuilderProject(record.draft_schema);
+};
+
+const getPreviewCanvasStyle = (viewport, isPreview) => {
+  if (isPreview && viewport === "desktop") {
+    return { width: "100%" };
+  }
+
+  const viewportWidth = viewports[viewport] || viewports.desktop;
+
+  return {
+    width: `${viewportWidth}px`,
+    maxWidth: "100%",
+  };
+};
+
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
@@ -639,6 +686,8 @@ export default function PageBuilder({
   const [project, setProject] = useState(() =>
     demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
   );
+  const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
+  const [builderProjectLoading, setBuilderProjectLoading] = useState(!demoMode);
   const [activeTab, setActiveTab] = useState(initialTab || "design");
   const [designPanel, setDesignPanel] = useState("Pages");
   const [viewport, setViewport] = useState("desktop");
@@ -651,6 +700,7 @@ export default function PageBuilder({
   const [runtimeErrors, setRuntimeErrors] = useState({});
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
+  const [liveSitePath, setLiveSitePath] = useState("");
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
 
@@ -658,6 +708,55 @@ export default function PageBuilder({
     if (demoMode) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
   }, [demoMode, project]);
+
+  useEffect(() => {
+    if (demoMode) return;
+
+    let cancelled = false;
+
+    const loadBackendProject = async () => {
+      setBuilderProjectLoading(true);
+
+      try {
+        const projects = await listBuilderProjects();
+        const selectedProject = projects[0] || null;
+
+        if (!selectedProject) {
+          if (!cancelled) {
+            setBuilderProjectRecord(null);
+          }
+          return;
+        }
+
+        const fullRecord = await fetchBuilderProject(selectedProject.id);
+        const loadedProject = getDraftProjectFromRecord(fullRecord);
+
+        if (!loadedProject) return;
+
+        if (!cancelled) {
+          setBuilderProjectRecord(fullRecord);
+          setProject(loadedProject);
+          setSelected({ type: "page", id: loadedProject.activePageId });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedProject));
+        }
+      } catch (error) {
+        console.warn("Could not load builder project from backend:", error);
+        if (!cancelled) {
+          showToast("Using local draft cache. Save again when the backend is reachable.");
+        }
+      } finally {
+        if (!cancelled) {
+          setBuilderProjectLoading(false);
+        }
+      }
+    };
+
+    loadBackendProject();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [demoMode]);
 
   const activePage = useMemo(
     () => project.pages.find((page) => page.id === project.activePageId) || project.pages[0],
@@ -2103,21 +2202,49 @@ export default function PageBuilder({
     return nextProject;
   };
 
-  const saveProject = () => {
+  const saveProject = async () => {
     setActiveTopbarAction("save");
-    persistProject(
-      {
-        ...project,
-        publish: {
-          ...project.publish,
-          lastSavedAt: new Date().toISOString(),
-        },
+
+    const nextProject = {
+      ...project,
+      publish: {
+        ...project.publish,
+        lastSavedAt: new Date().toISOString(),
       },
-      demoMode ? "Demo changes stay until refresh." : "Saved locally."
-    );
+    };
+
+    if (demoMode) {
+      persistProject(nextProject, "Demo changes stay until refresh.");
+      return;
+    }
+
+    if (builderProjectLoading) {
+      showToast("Builder project is still loading. Try saving again in a moment.");
+      return;
+    }
+
+    persistProject(nextProject, "Saving to backend...");
+
+    try {
+      const payload = {
+        name: getBuilderProjectName(nextProject),
+        slug: getBuilderProjectSlug(nextProject, builderProjectRecord),
+        draft_schema: nextProject,
+      };
+
+      const savedRecord = builderProjectRecord?.id
+        ? await updateBuilderProject(builderProjectRecord.id, payload)
+        : await createBuilderProject(payload);
+
+      setBuilderProjectRecord(savedRecord);
+      showToast("Saved to backend.");
+    } catch (error) {
+      console.error("Could not save builder project:", error);
+      showToast("Saved local draft cache. Backend save failed.");
+    }
   };
 
-  const loadProject = () => {
+  const loadProject = async () => {
     if (demoMode) {
       const freshProject = cleanBuilderProject(createInitialProject());
       setProject(freshProject);
@@ -2126,23 +2253,44 @@ export default function PageBuilder({
       return;
     }
 
+    try {
+      const projects = await listBuilderProjects();
+      const selectedProject = projects[0] || null;
+
+      if (selectedProject) {
+        const fullRecord = await fetchBuilderProject(selectedProject.id);
+        const loadedProject = getDraftProjectFromRecord(fullRecord);
+
+        if (loadedProject) {
+          setBuilderProjectRecord(fullRecord);
+          setProject(loadedProject);
+          setSelected({ type: "page", id: loadedProject.activePageId });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedProject));
+          showToast("Loaded backend project.");
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn("Could not load backend builder project:", error);
+    }
+
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      alert("No saved project found.");
+      alert("No backend project or local draft cache found.");
       return;
     }
 
     try {
-      const loaded = JSON.parse(raw);
+      const loaded = cleanBuilderProject(JSON.parse(raw));
       setProject(loaded);
       setSelected({ type: "page", id: loaded.activePageId });
-      showToast("Loaded saved project.");
+      showToast("Loaded local draft cache.");
     } catch {
       alert("Saved project is not valid JSON.");
     }
   };
 
-  const publishProject = () => {
+  const publishProject = async () => {
     setActiveTopbarAction("publish");
     const publishedProject = {
       ...project,
@@ -2154,13 +2302,62 @@ export default function PageBuilder({
       },
     };
 
-    persistProject(
-      publishedProject,
-      demoMode ? "Demo publish status updated until refresh." : "Site is live locally."
-    );
+    if (demoMode) {
+      persistProject(publishedProject, "Demo publish status updated until refresh.");
+      return;
+    }
 
-    if (!demoMode) {
-      window.open(getLocalTenantPath(publishedProject), "_blank", "noopener,noreferrer");
+    if (builderProjectLoading) {
+      showToast("Builder project is still loading. Try publishing again in a moment.");
+      return;
+    }
+
+    persistProject(publishedProject, "Publishing to backend...");
+    setLiveSitePath("");
+    const liveWindow = window.open("about:blank", "_blank");
+
+    try {
+      const websiteSettings = await fetchWebsiteSettings();
+      const publicSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
+
+      if (!publicSubdomain) {
+        if (liveWindow && !liveWindow.closed) {
+          liveWindow.close();
+        }
+        throw new Error("Configure a website subdomain before going live.");
+      }
+
+      const liveSitePath = `/site/${publicSubdomain}/`;
+      const payload = {
+        name: getBuilderProjectName(publishedProject),
+        slug: getBuilderProjectSlug(publishedProject, builderProjectRecord),
+        draft_schema: publishedProject,
+      };
+
+      const savedRecord = builderProjectRecord?.id
+        ? await updateBuilderProject(builderProjectRecord.id, payload)
+        : await createBuilderProject(payload);
+
+      const publishedRecord = await publishBuilderProject(savedRecord.id);
+
+      setBuilderProjectRecord(publishedRecord);
+      showToast("Site published to backend.");
+
+      if (liveWindow && !liveWindow.closed) {
+        liveWindow.location.href = liveSitePath;
+      } else {
+        const openedWindow = window.open(liveSitePath, "_blank", "noopener,noreferrer");
+        if (!openedWindow) {
+          setLiveSitePath(liveSitePath);
+          showToast("Site published. Use the open live site link.");
+        }
+      }
+    } catch (error) {
+      if (liveWindow && !liveWindow.closed) {
+        liveWindow.close();
+      }
+      console.error("Could not publish builder project:", error);
+      showToast(error?.message || "Publish failed. Local draft cache was updated.");
     }
   };
 
@@ -3104,7 +3301,7 @@ export default function PageBuilder({
       >
         <div
           className={`builder-canvas viewport-${viewport}`}
-          style={{ width: `${viewports[viewport]}px` }}
+          style={getPreviewCanvasStyle(viewport, preview)}
         >
           {renderSiteHeader()}
 
@@ -3917,6 +4114,7 @@ export default function PageBuilder({
   const renderResponsesTab = () => (
     <BuilderResponsesPage
       project={project}
+      builderProjectId={builderProjectRecord?.id || ""}
       lang={lang}
       activeForm={activeForm}
       selectForm={selectForm}
@@ -4100,6 +4298,16 @@ export default function PageBuilder({
       )}
 
       {toast && <div className="builder-toast">{toast}</div>}
+      {liveSitePath && (
+        <a
+          className="builder-live-site-link"
+          href={liveSitePath}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open live site
+        </a>
+      )}
     </div>
   );
 }

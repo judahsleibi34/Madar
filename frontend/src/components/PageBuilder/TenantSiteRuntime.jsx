@@ -4,6 +4,7 @@ import ForgotPasswordPage from "../AuthPages/ForgotPasswordPage";
 import LoginPage from "../AuthPages/LoginPage";
 import SignUpPage from "../AuthPages/SignUpPage";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "./PageBuilder.constants";
+import { fetchPublicSite, submitPublicFormSubmission } from "./PageBuilder.api";
 import { getFormSections } from "./PageBuilder.factories";
 import "../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "./PageBuilderCarousel";
@@ -61,6 +62,46 @@ const getModernFieldPlaceholder = (field = {}) => {
   if (label.includes("name")) return "e.g. Sarah Haddad";
 
   return "Type your answer";
+};
+
+const getRuntimeFormFields = (form) =>
+  getFormSections(form).flatMap((section) => section.fields || []);
+
+const isEmptyAnswer = (value) =>
+  value === undefined ||
+  value === null ||
+  value === "" ||
+  (Array.isArray(value) && value.length === 0);
+
+const inputTypeForField = (fieldType) => {
+  if (fieldType === "email") return "email";
+  if (fieldType === "phone") return "tel";
+  if (fieldType === "url") return "url";
+  if (fieldType === "number") return "number";
+  if (fieldType === "date") return "date";
+  if (fieldType === "time") return "time";
+  return "text";
+};
+
+const getSubmissionErrorMessage = (error) => {
+  const detail = error?.data?.detail;
+
+  if (typeof detail === "string") return detail;
+
+  if (detail?.message === "Required field is missing") {
+    return `${detail.field_label || "A required field"} is required.`;
+  }
+
+  if (detail?.message === "Submission contains unknown fields") {
+    return "This form changed after the page loaded. Refresh and try again.";
+  }
+
+  if (error?.status === 404) return "This form is no longer available.";
+  if (error?.status === 429) return "Too many submissions. Please wait and try again.";
+
+  if (!navigator.onLine) return "Network connection lost. Please try again.";
+
+  return "Could not submit the form. Please try again.";
 };
 
 const normalizeElementAlignSelf = (value) => {
@@ -156,8 +197,32 @@ export default function TenantSiteRuntime() {
 
   const cleanSubdomain = getCleanSubdomain(subdomain);
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
+  const [project, setProject] = useState(() => loadPublishedProject());
+  const [formAnswers, setFormAnswers] = useState({});
+  const [formStatus, setFormStatus] = useState({});
 
-  const project = useMemo(() => loadPublishedProject(), []);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBackendPublishedSite = async () => {
+      try {
+        const publicSite = await fetchPublicSite(cleanSubdomain);
+        const publishedProject = publicSite?.project?.published_schema;
+
+        if (!cancelled && publishedProject && typeof publishedProject === "object") {
+          setProject(publishedProject);
+        }
+      } catch (error) {
+        console.warn("Could not load published site from backend:", error);
+      }
+    };
+
+    loadBackendPublishedSite();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanSubdomain]);
   const site = {
     ...defaultSiteChrome,
     ...(project?.siteChrome || {}),
@@ -292,23 +357,219 @@ export default function TenantSiteRuntime() {
     };
   };
 
-  const renderConnectedForm = (formId) => {
+  const setFormAnswer = (instanceKey, fieldId, value) => {
+    setFormAnswers((prev) => ({
+      ...prev,
+      [instanceKey]: {
+        ...(prev[instanceKey] || {}),
+        [fieldId]: value,
+      },
+    }));
+    setFormStatus((prev) => ({
+      ...prev,
+      [instanceKey]: {
+        ...(prev[instanceKey] || {}),
+        error: "",
+        success: "",
+      },
+    }));
+  };
+
+  const buildSubmissionAnswers = (form, instanceKey) => {
+    const enteredAnswers = formAnswers[instanceKey] || {};
+
+    return getRuntimeFormFields(form).reduce((acc, field) => {
+      const value = enteredAnswers[field.id] !== undefined ? enteredAnswers[field.id] : field.defaultValue;
+
+      if (!isEmptyAnswer(value)) {
+        acc[field.id] = value;
+      }
+
+      return acc;
+    }, {});
+  };
+
+  const submitRuntimeForm = async (event, form, formElementId, instanceKey) => {
+    event.preventDefault();
+
+    const answers = buildSubmissionAnswers(form, instanceKey);
+    const missingField = getRuntimeFormFields(form).find(
+      (field) => field.required && isEmptyAnswer(answers[field.id])
+    );
+
+    if (missingField) {
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: {
+          submitting: false,
+          success: "",
+          error: `${missingField.label || "A required field"} is required.`,
+        },
+      }));
+      return;
+    }
+
+    setFormStatus((prev) => ({
+      ...prev,
+      [instanceKey]: { submitting: true, success: "", error: "" },
+    }));
+
+    try {
+      await submitPublicFormSubmission(cleanSubdomain, form.id, {
+        answers,
+        form_element_id: formElementId,
+      });
+
+      setFormAnswers((prev) => ({ ...prev, [instanceKey]: {} }));
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: {
+          submitting: false,
+          error: "",
+          success: form.successMessage || "Thank you. Your response has been submitted.",
+        },
+      }));
+    } catch (error) {
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: {
+          submitting: false,
+          success: "",
+          error: getSubmissionErrorMessage(error),
+        },
+      }));
+    }
+  };
+
+  const renderRuntimeField = (field, form, instanceKey, disabled) => {
+    const meta = getFieldType(field.type);
+    const placeholder = getModernFieldPlaceholder(field);
+    const currentValue = formAnswers[instanceKey]?.[field.id] ?? field.defaultValue ?? "";
+    const baseId = `${instanceKey}_${field.id}`;
+
+    if (field.type === "file") {
+      return <p className="runtime-form-note">File uploads are not supported yet.</p>;
+    }
+
+    if (field.type === "dropdown" || field.type === "status" || field.type === "yesNo") {
+      const options = field.type === "yesNo" ? ["Yes", "No"] : field.options || [];
+      return (
+        <select
+          value={currentValue}
+          onChange={(event) => setFormAnswer(instanceKey, field.id, event.target.value)}
+          disabled={disabled}
+        >
+          <option value="">{placeholder}</option>
+          {options.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      );
+    }
+
+    if (field.type === "radio") {
+      return (
+        <div className="runtime-choice-list">
+          {(field.options || []).map((option) => (
+            <label className="runtime-choice" key={option} htmlFor={`${baseId}_${option}`}>
+              <input
+                id={`${baseId}_${option}`}
+                type="radio"
+                name={baseId}
+                value={option}
+                checked={currentValue === option}
+                onChange={(event) => setFormAnswer(instanceKey, field.id, event.target.value)}
+                disabled={disabled}
+              />
+              <span>{option}</span>
+            </label>
+          ))}
+        </div>
+      );
+    }
+
+    if (field.type === "checkboxes") {
+      const selectedValues = Array.isArray(currentValue) ? currentValue : [];
+      return (
+        <div className="runtime-choice-list">
+          {(field.options || []).map((option) => (
+            <label className="runtime-choice" key={option} htmlFor={`${baseId}_${option}`}>
+              <input
+                id={`${baseId}_${option}`}
+                type="checkbox"
+                value={option}
+                checked={selectedValues.includes(option)}
+                onChange={(event) => {
+                  const nextValue = event.target.checked
+                    ? [...selectedValues, option]
+                    : selectedValues.filter((item) => item !== option);
+                  setFormAnswer(instanceKey, field.id, nextValue);
+                }}
+                disabled={disabled}
+              />
+              <span>{option}</span>
+            </label>
+          ))}
+        </div>
+      );
+    }
+
+    if (field.type === "linearScale" || field.type === "rating") {
+      const max = field.type === "rating" ? Number(field.maxRating || 5) : Number(field.scaleMax || 5);
+      const min = field.type === "rating" ? 1 : Number(field.scaleMin || 1);
+      const values = Array.from({ length: Math.max(1, max - min + 1) }, (_, index) => min + index);
+      return (
+        <div className="runtime-choice-list runtime-choice-inline">
+          {values.map((value) => (
+            <label className="runtime-choice" key={value} htmlFor={`${baseId}_${value}`}>
+              <input
+                id={`${baseId}_${value}`}
+                type="radio"
+                name={baseId}
+                value={value}
+                checked={String(currentValue) === String(value)}
+                onChange={(event) => setFormAnswer(instanceKey, field.id, Number(event.target.value))}
+                disabled={disabled}
+              />
+              <span>{value}</span>
+            </label>
+          ))}
+        </div>
+      );
+    }
+
+    if (meta.input === "textarea" || field.type === "paragraph") {
+      return (
+        <textarea
+          placeholder={placeholder}
+          value={currentValue}
+          onChange={(event) => setFormAnswer(instanceKey, field.id, event.target.value)}
+          disabled={disabled}
+        />
+      );
+    }
+
+    return (
+      <input
+        type={inputTypeForField(field.type)}
+        placeholder={placeholder}
+        value={currentValue}
+        onChange={(event) => setFormAnswer(instanceKey, field.id, event.target.value)}
+        disabled={disabled}
+      />
+    );
+  };
+
+  const renderConnectedForm = (formId, formElementId = "") => {
     const form = project?.forms?.find((item) => item.id === formId) || project?.forms?.[0];
     if (!form) return <div className="empty-connected">No form selected.</div>;
 
-    const renderReadOnlyField = (field) => {
-      const meta = getFieldType(field.type);
-      const placeholder = getModernFieldPlaceholder(field);
-
-      if (meta.input === "textarea") {
-        return <textarea placeholder={placeholder} readOnly />;
-      }
-
-      return <input type="text" placeholder={placeholder} readOnly />;
-    };
+    const instanceKey = `${formElementId || "form"}_${form.id}`;
+    const status = formStatus[instanceKey] || {};
+    const isSubmitting = Boolean(status.submitting);
 
     return (
-      <div className="runtime-form">
+      <form className="runtime-form" onSubmit={(event) => submitRuntimeForm(event, form, formElementId, instanceKey)}>
         <div className="runtime-form-header">
           <h3>{form.title}</h3>
           <p>{form.description}</p>
@@ -323,23 +584,26 @@ export default function TenantSiteRuntime() {
 
             {(section.fields || []).map((field) => (
               <div className="runtime-question" key={field.id}>
-                <label>
+                <div className="runtime-question-field">
                   <span>
                     {field.label}
                     {field.required ? " *" : ""}
                   </span>
                   {field.helpText && <small>{field.helpText}</small>}
-                  {renderReadOnlyField(field)}
-                </label>
+                  {renderRuntimeField(field, form, instanceKey, isSubmitting)}
+                </div>
               </div>
             ))}
           </div>
         ))}
 
-        <button type="button" className="runtime-submit">
-          Submit
+        {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
+        {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}
+
+        <button type="submit" className="runtime-submit" disabled={isSubmitting}>
+          {isSubmitting ? "Submitting..." : "Submit"}
         </button>
-      </div>
+      </form>
     );
   };
 
@@ -459,7 +723,7 @@ export default function TenantSiteRuntime() {
         </div>
       );
     }
-    if (element.type === "formBlock") return <div key={element.id} {...props}>{renderConnectedForm(element.connectedFormId)}</div>;
+    if (element.type === "formBlock") return <div key={element.id} {...props}>{renderConnectedForm(element.connectedFormId, element.id)}</div>;
     if (element.type === "responsesTable") return <div key={element.id} {...props}>{renderResponsesTable(element.connectedFormId)}</div>;
 
     return <div key={element.id} {...props}>{element.content}</div>;
