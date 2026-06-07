@@ -130,9 +130,9 @@
   }
 
   .mobile-menu-auth .btn-login:hover {
-    border-color: #8b2a1a;
-    color: #8b2a1a;
-    background: rgba(139, 42, 26, 0.04);
+    border-color: var(--theme-primary);
+    color: var(--theme-primary);
+    background: rgba(var(--theme-primary-rgb), 0.04);
   }
 
   .mobile-menu-auth .btn-signup {
@@ -152,9 +152,9 @@
 
   .mobile-menu-lang .lang-mobile-btn.active,
   .mobile-menu-lang .lang-mobile-btn:hover {
-    border-color: #8b2a1a;
-    color: #8b2a1a;
-    background: rgba(139, 42, 26, 0.05);
+    border-color: var(--theme-primary);
+    color: var(--theme-primary);
+    background: rgba(var(--theme-primary-rgb), 0.05);
   }
 
   /* Hide desktop auth buttons on mobile */

@@ -133,22 +133,40 @@
   }
 
   .page-builder .builder-mobile-blocker {
-    min-height: 100vh;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    min-height: 100dvh;
     display: grid;
     place-items: center;
-    padding: 24px;
-    background: var(--madar-bg);
+    padding: 24px 18px;
+    background: rgba(12, 13, 18, 0.72);
     color: var(--madar-text);
     text-align: center;
+    backdrop-filter: blur(10px);
   }
 
   .page-builder .builder-mobile-blocker div {
-    max-width: 520px;
+    width: min(100%, 520px);
     background: var(--madar-surface);
     border: 1px solid var(--madar-border);
-    border-radius: 24px;
+    border-radius: 18px;
     padding: 32px;
     box-shadow: var(--madar-shadow-md);
+  }
+
+  .page-builder .builder-mobile-blocker h2 {
+    margin: 0 0 10px;
+    color: var(--madar-text);
+    font-size: 24px;
+    line-height: 1.15;
+  }
+
+  .page-builder .builder-mobile-blocker p {
+    margin: 0;
+    color: var(--madar-muted);
+    font-size: 15px;
+    line-height: 1.55;
   }
 }
 

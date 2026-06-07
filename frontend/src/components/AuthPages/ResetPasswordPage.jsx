@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +22,7 @@ export default function ResetPasswordPage({ lang = "en" }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState(() =>
     accessToken ? "" : t("resetPassword.invalidToken")
   );
@@ -101,15 +103,24 @@ export default function ResetPasswordPage({ lang = "en" }) {
 
             <label>
               {t("resetPassword.confirmPassword")}
-              <input
-                type={showPassword ? "text" : "password"}
-                value={confirm}
-                onChange={(event) => {
-                  setConfirm(event.target.value);
-                  setError("");
-                }}
-                dir="ltr"
-              />
+              <div className="password-field">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirm}
+                  onChange={(event) => {
+                    setConfirm(event.target.value);
+                    setError("");
+                  }}
+                  dir="ltr"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={t("resetPassword.togglePassword")}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </label>
 
             <button className="login-submit" type="submit" disabled={isSubmitting}>
@@ -117,6 +128,10 @@ export default function ResetPasswordPage({ lang = "en" }) {
             </button>
           </>
         )}
+
+        <p className="login-signup-text">
+          <Link to="/login">{t("resetPassword.backToLogin")}</Link>
+        </p>
       </form>
     </main>
   );

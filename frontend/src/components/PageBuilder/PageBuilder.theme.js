@@ -30,13 +30,14 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     text: "#1a2744",
     muted: "#6d7484",
     primary: "#1a2744",
-    accent: "#8b2a1a",
-    accentDark: "#6e2014",
+    accent: "var(--theme-primary)",
+    accentDark: "var(--theme-primary-hover)",
     border: "rgba(26, 39, 68, 0.12)",
     radius: 18,
     fontFamily: "Inter",
     ...theme,
   };
+  const isDarkMode = safeTheme.mode === "dark";
 
   return {
     "--madar-bg": safeTheme.background,
@@ -49,11 +50,15 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     "--madar-red-dark": safeTheme.accentDark,
     "--madar-border": safeTheme.border,
     "--madar-border-strong":
-      safeTheme.mode === "dark"
-        ? "rgba(126, 158, 181, 0.26)"
+      isDarkMode
+        ? "rgba(244, 240, 232, 0.18)"
         : "rgba(26, 39, 68, 0.22)",
-    "--madar-gradient": `linear-gradient(135deg, ${safeTheme.primary} 0%, ${safeTheme.accent} 100%)`,
-    "--madar-gradient-hover": `linear-gradient(135deg, ${safeTheme.primary} 0%, ${safeTheme.accentDark} 100%)`,
+    "--madar-gradient": isDarkMode
+      ? "var(--theme-gradient)"
+      : `linear-gradient(135deg, ${safeTheme.primary} 0%, ${safeTheme.accent} 100%)`,
+    "--madar-gradient-hover": isDarkMode
+      ? "var(--theme-gradient-hover)"
+      : `linear-gradient(135deg, ${safeTheme.primary} 0%, ${safeTheme.accentDark} 100%)`,
     "--madar-radius": `${safeTheme.radius}px`,
     fontFamily: safeTheme.fontFamily,
   };

@@ -38,11 +38,11 @@
 }
 
 .subscription-modal-success .subscription-modal-icon {
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
 }
 
 .subscription-modal-error .subscription-modal-icon {
-  background: #8b2a1a;
+  background: var(--theme-primary);
 }
 
 .subscription-modal-copy h2 {
@@ -75,17 +75,17 @@
   border-radius: 16px;
   padding: 13px 18px;
   cursor: pointer;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
   font: inherit;
   font-weight: 950;
-  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.22);
+  box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .subscription-modal-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 16px 34px rgba(139, 42, 26, 0.28);
+  box-shadow: 0 16px 34px rgba(var(--theme-primary-rgb), 0.28);
 }
 
 .subscription-modal-backdrop[dir="rtl"],

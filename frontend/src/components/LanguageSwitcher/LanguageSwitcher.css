@@ -42,6 +42,7 @@
 .language-toggle-button:hover {
   transform: translateY(-1px);
   border-color: rgba(126, 32, 21, 0.18);
+
   background:
     linear-gradient(
       180deg,
@@ -127,7 +128,7 @@
 .language-toggle-current[dir="rtl"] {
   direction: rtl;
   unicode-bidi: isolate;
-  text-align: left;
+  text-align: start;
   font-size: 1rem;
   letter-spacing: 0;
 }
@@ -138,6 +139,7 @@
 
   width: 7px;
   height: 7px;
+
   border-radius: 999px;
 
   background: rgba(126, 32, 21, 0.42);
@@ -147,6 +149,48 @@
 .language-toggle-button::after {
   display: none !important;
 }
+
+/* ============================================================
+   SIDEBAR RTL VERSION
+   The LanguageSwitcher is grid, so RTL needs grid columns.
+   ============================================================ */
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher.language-toggle-button {
+  direction: rtl;
+  grid-template-columns: 8px minmax(0, 1fr) 38px;
+  text-align: start;
+}
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-animation {
+  grid-column: 3;
+}
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-current {
+  grid-column: 2;
+  justify-self: start;
+  text-align: start;
+}
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-dot {
+  grid-column: 1;
+  justify-self: start;
+}
+
+/* ============================================================
+   COMPACT
+   ============================================================ */
 
 .language-toggle-button.is-compact {
   width: auto;
@@ -169,9 +213,42 @@
   height: 36px;
 }
 
-/* Dark mode */
+/* Sidebar compact override */
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher.language-toggle-button {
+  width: 46px !important;
+  min-width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+
+  grid-template-columns: 36px !important;
+  justify-content: center !important;
+
+  padding: 5px !important;
+  margin-inline: auto !important;
+}
+
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher .language-toggle-animation {
+  grid-column: 1 !important;
+  width: 36px;
+  height: 36px;
+}
+
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher .language-toggle-dot {
+  display: none !important;
+}
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+
 [data-theme="dark"] .language-toggle-button,
-.dark .language-toggle-button {
+.dark .language-toggle-button,
+.theme-dark .language-toggle-button {
   border-color: rgba(255, 255, 255, 0.1);
   color: #f8fafc;
 
@@ -188,7 +265,8 @@
 }
 
 [data-theme="dark"] .language-toggle-button:hover,
-.dark .language-toggle-button:hover {
+.dark .language-toggle-button:hover,
+.theme-dark .language-toggle-button:hover {
   border-color: rgba(248, 113, 113, 0.22);
 
   background:
@@ -200,7 +278,8 @@
 }
 
 [data-theme="dark"] .language-toggle-animation,
-.dark .language-toggle-animation {
+.dark .language-toggle-animation,
+.theme-dark .language-toggle-animation {
   color: #f8fafc;
 
   background:
@@ -221,12 +300,21 @@
 }
 
 [data-theme="dark"] .language-toggle-current,
-.dark .language-toggle-current {
+.dark .language-toggle-current,
+.theme-dark .language-toggle-current {
   color: #f8fafc;
 }
 
 [data-theme="dark"] .language-toggle-dot,
-.dark .language-toggle-dot {
+.dark .language-toggle-dot,
+.theme-dark .language-toggle-dot {
   background: rgba(248, 113, 113, 0.7);
   box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.12);
+}
+
+/* Sidebar dark cleanup */
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button {
+  box-shadow: none;
 }

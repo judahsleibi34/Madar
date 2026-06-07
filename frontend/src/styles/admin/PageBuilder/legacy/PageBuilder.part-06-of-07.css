@@ -28,7 +28,7 @@
 .page-builder select:focus {
   outline: none !important;
   border-color: var(--madar-red) !important;
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.1) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1) !important;
 }
 
 /* Unified neutral buttons. */
@@ -74,7 +74,7 @@
 .page-builder .builder-modal .section-card button {
   background: var(--madar-gradient) !important;
   color: #ffffff !important;
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.2) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.2) !important;
 }
 
 /* Unified danger actions. */
@@ -178,7 +178,7 @@
 .page-builder .clean-question-card.active,
 .page-builder .form-section-card.active {
   border-color: var(--madar-red) !important;
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08) !important;
 }
 
 /* Built website header: keep user-owned, clean and centered. */
@@ -223,12 +223,12 @@
 .page-builder .ecommerce-footer-contact p,
 .page-builder .ecommerce-footer-bottom,
 .page-builder .powered-by-madar {
-  color: #111827 !important;
+  color: var(--theme-surface) !important;
 }
 
 .page-builder .ecommerce-footer-column button:hover,
 .page-builder .powered-by-madar:hover {
-  color: #8b2a1a !important;
+  color: var(--theme-primary) !important;
 }
 
 .page-builder .ecommerce-payment-row span,
@@ -290,18 +290,18 @@
   --madar-surface-soft: #fbfaf8;
   --madar-navy: #1a2744;
   --madar-navy-dark: #111b31;
-  --madar-red: #8b2a1a;
-  --madar-red-dark: #6e2014;
+  --madar-red: var(--theme-primary);
+  --madar-red-dark: var(--theme-primary-hover);
   --madar-border: rgba(26, 39, 68, 0.12);
   --madar-border-strong: rgba(26, 39, 68, 0.22);
   --madar-muted: #6d7484;
   --madar-text: #1a2744;
-  --madar-danger: #8b2a1a;
-  --madar-gradient: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
-  --madar-gradient-hover: linear-gradient(135deg, #111b31 0%, #6e2014 100%);
+  --madar-danger: var(--theme-primary);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
   --madar-shadow-sm: 0 10px 24px rgba(26, 39, 68, 0.06);
   --madar-shadow-md: 0 18px 45px rgba(26, 39, 68, 0.08);
-  --madar-red-shadow: 0 12px 28px rgba(139, 42, 26, 0.22);
+  --madar-red-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
 
   background: var(--madar-bg) !important;
   color: var(--madar-text) !important;
@@ -401,7 +401,7 @@
 .page-builder select:focus {
   outline: none !important;
   border-color: var(--madar-red) !important;
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.1) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1) !important;
 }
 
 .page-builder button {
@@ -424,7 +424,7 @@
 .page-builder .compact-actions button:hover,
 .page-builder .section-card-actions button:hover,
 .page-builder .reset-position-button:hover {
-  background: rgba(139, 42, 26, 0.09) !important;
+  background: rgba(var(--theme-primary-rgb), 0.09) !important;
   color: var(--madar-red) !important;
 }
 
@@ -457,7 +457,7 @@
   background: var(--madar-red) !important;
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.18) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18) !important;
 }
 
 .page-builder .danger-button:hover {
@@ -465,9 +465,9 @@
 }
 
 .page-builder .danger-lite {
-  background: rgba(139, 42, 26, 0.08) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
   color: var(--madar-red) !important;
-  border: 1px solid rgba(139, 42, 26, 0.18) !important;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18) !important;
 }
 
 .page-builder .panel-mode-select {
@@ -536,7 +536,7 @@
 .page-builder .automation-card.active,
 .page-builder .role-card.active {
   border-color: var(--madar-red) !important;
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08) !important;
 }
 
 .page-builder .site-column .builder-element-heading,
@@ -605,12 +605,12 @@
 .page-builder .ecommerce-footer-contact p,
 .page-builder .ecommerce-footer-bottom,
 .page-builder .powered-by-madar {
-  color: #111827 !important;
+  color: var(--theme-surface) !important;
 }
 
 .page-builder .ecommerce-footer-column button:hover,
 .page-builder .powered-by-madar:hover {
-  color: #8b2a1a !important;
+  color: var(--theme-primary) !important;
 }
 
 .page-builder .ecommerce-payment-row span,

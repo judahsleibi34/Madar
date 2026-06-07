@@ -24,9 +24,18 @@ export default function LanguageSwitcher({
 
   const selected = SUPPORTED_LANGUAGES[safeLanguage] || SUPPORTED_LANGUAGES.en;
   const next = SUPPORTED_LANGUAGES[nextLanguage] || SUPPORTED_LANGUAGES.en;
+  const selectedLabel = t(`language.${safeLanguage}`, {
+    defaultValue: selected.label,
+  });
+  const nextLabel = t(`language.${nextLanguage}`, {
+    defaultValue: next.label,
+  });
 
   const handleToggle = () => {
     const selectedLanguage = setAppLanguage(nextLanguage);
+
+    document.documentElement.dir = selectedLanguage === "ar" ? "rtl" : "ltr";
+    document.documentElement.lang = selectedLanguage === "ar" ? "ar" : "en";
 
     if (typeof onChange === "function") {
       onChange(selectedLanguage);
@@ -47,12 +56,12 @@ export default function LanguageSwitcher({
         .join(" ")}
       onClick={handleToggle}
       aria-label={t("language.switchTo", {
-        language: next.label,
-        defaultValue: `Switch language to ${next.label}`,
+        language: nextLabel,
+        defaultValue: `Switch language to ${nextLabel}`,
       })}
       title={t("language.switchTo", {
-        language: next.label,
-        defaultValue: `Switch language to ${next.label}`,
+        language: nextLabel,
+        defaultValue: `Switch language to ${nextLabel}`,
       })}
       data-language={safeLanguage}
       data-next-language={nextLanguage}
@@ -66,7 +75,7 @@ export default function LanguageSwitcher({
           className="language-toggle-current"
           dir={safeLanguage === "ar" ? "rtl" : "ltr"}
         >
-          {selected.label}
+          {selectedLabel}
         </span>
       )}
 

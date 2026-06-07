@@ -42,7 +42,7 @@
 }
 
 .overview-card.red::after {
-  background: #8b2a1a;
+  background: var(--theme-primary);
 }
 
 .overview-card.olive::after {
@@ -82,8 +82,8 @@
   display: grid;
   place-items: center;
   color: #ffffff;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
-  box-shadow: 0 10px 24px rgba(139, 42, 26, 0.22);
+  background: var(--theme-gradient);
+  box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.22);
   flex-shrink: 0;
 }
 
@@ -94,7 +94,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-size: 13px;
   font-weight: 900;
 }

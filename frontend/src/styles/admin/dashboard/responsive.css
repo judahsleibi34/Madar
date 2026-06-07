@@ -46,22 +46,31 @@
     max-width: 100vw;
     min-height: 100vh;
     overflow-x: hidden;
+  }
+
+  .admin-dashboard-layout.is-ltr,
+  .admin-dashboard-layout[dir="ltr"] {
     direction: ltr;
+  }
+
+  .admin-dashboard-layout.is-rtl,
+  .admin-dashboard-layout[dir="rtl"] {
+    direction: rtl;
   }
 
   .dashboard-mobile-menu-button {
     display: inline-flex !important;
     position: fixed;
     top: 14px;
-    left: 14px;
-    right: auto;
+    inset-inline-start: 14px;
+    inset-inline-end: auto;
     z-index: 130;
   }
 
   .admin-dashboard-layout.is-rtl .dashboard-mobile-menu-button,
   .admin-dashboard-layout[dir="rtl"] .dashboard-mobile-menu-button {
-    left: auto;
-    right: 14px;
+    inset-inline-start: auto;
+    inset-inline-end: 14px;
   }
 
   .dashboard-sidebar-backdrop {
@@ -86,8 +95,8 @@
     position: fixed !important;
     top: 0;
     bottom: 0;
-    left: 0;
-    right: auto;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
     z-index: 120;
 
     width: min(320px, calc(100vw - 44px));
@@ -100,8 +109,8 @@
 
     padding: 72px 16px 18px;
 
-    border-right: 1px solid rgba(26, 39, 68, 0.12);
-    border-left: none;
+    border-inline-end: 1px solid rgba(26, 39, 68, 0.12);
+    border-inline-start: none;
     border-bottom: none;
 
     transform: translateX(-100%);
@@ -117,13 +126,13 @@
 
   .admin-dashboard-layout.is-rtl .admin-sidebar,
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar {
-    left: auto;
-    right: 0;
+    inset-inline-start: auto;
+    inset-inline-end: 0;
     direction: rtl;
-    text-align: right;
+    text-align: start;
 
-    border-right: none;
-    border-left: 1px solid rgba(26, 39, 68, 0.12);
+    border-inline-end: none;
+    border-inline-start: 1px solid rgba(26, 39, 68, 0.12);
     border-bottom: none;
 
     transform: translateX(100%);
@@ -167,7 +176,7 @@
   .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang {
     direction: rtl;
     justify-content: flex-start;
-    text-align: right;
+    text-align: start;
   }
 
   .admin-sidebar-user {
@@ -190,7 +199,7 @@
   .admin-dashboard-layout.is-rtl .admin-dashboard-page,
   .admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
     direction: rtl;
-    text-align: right;
+    text-align: start;
   }
 
   .admin-dashboard-layout.is-ltr .admin-dashboard-page,

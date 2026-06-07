@@ -9,7 +9,7 @@
   width: 100%;
   min-height: calc(100vh - 96px - 180px);
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.08), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
     #f5f2ee;
   color: #1a2744;
@@ -53,7 +53,7 @@
   top: -82px;
   right: -72px;
   border-radius: 999px;
-  background: #8b2a1a;
+  background: var(--theme-primary);
   opacity: 0.12;
   pointer-events: none;
 }
@@ -131,9 +131,9 @@
 .login-actions a:first-child,
 .already-signed-actions a:first-child {
   border: 0;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
-  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.2);
+  box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.2);
 }
 
 .auth-actions button:not(:first-child),
@@ -142,9 +142,9 @@
 .auth-actions a:not(:first-child),
 .login-actions a:not(:first-child),
 .already-signed-actions a:not(:first-child) {
-  border: 1px solid rgba(139, 42, 26, 0.28);
-  background: rgba(139, 42, 26, 0.06);
-  color: #8b2a1a;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.28);
+  background: rgba(var(--theme-primary-rgb), 0.06);
+  color: var(--theme-primary);
   box-shadow: none;
 }
 
@@ -163,7 +163,7 @@
 .auth-actions a:first-child:hover,
 .login-actions a:first-child:hover,
 .already-signed-actions a:first-child:hover {
-  box-shadow: 0 16px 32px rgba(139, 42, 26, 0.24);
+  box-shadow: 0 16px 32px rgba(var(--theme-primary-rgb), 0.24);
 }
 
 .auth-actions button:not(:first-child):hover,
@@ -172,8 +172,8 @@
 .auth-actions a:not(:first-child):hover,
 .login-actions a:not(:first-child):hover,
 .already-signed-actions a:not(:first-child):hover {
-  background: rgba(139, 42, 26, 0.1);
-  border-color: rgba(139, 42, 26, 0.38);
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  border-color: rgba(var(--theme-primary-rgb), 0.38);
 }
 
 /* ============================================================
@@ -188,7 +188,7 @@
   background: linear-gradient(
     90deg,
     rgba(26, 39, 68, 0.08),
-    rgba(139, 42, 26, 0.14),
+    rgba(var(--theme-primary-rgb), 0.14),
     rgba(26, 39, 68, 0.08)
   );
   background-size: 220% 100%;

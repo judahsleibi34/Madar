@@ -79,7 +79,7 @@
   color: #ffffff !important;
   font-size: 14px !important;
   font-weight: 950 !important;
-  box-shadow: 0 8px 18px rgba(139, 42, 26, 0.2) !important;
+  box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.2) !important;
 }
 
 /* Pages panel wrapper */
@@ -122,7 +122,7 @@
 
 .page-builder .page-actions-grid > button:hover {
   transform: translateY(-1px) !important;
-  background: rgba(139, 42, 26, 0.1) !important;
+  background: rgba(var(--theme-primary-rgb), 0.1) !important;
   color: var(--madar-red) !important;
 }
 
@@ -153,14 +153,14 @@
   font-size: 14px !important;
   font-weight: 950 !important;
 
-  background: rgba(139, 42, 26, 0.1) !important;
+  background: rgba(var(--theme-primary-rgb), 0.1) !important;
   color: var(--madar-red) !important;
   box-shadow: none !important;
 }
 
 .page-builder .page-delete-row .page-delete-trigger:hover {
   transform: translateY(-1px) !important;
-  background: rgba(139, 42, 26, 0.15) !important;
+  background: rgba(var(--theme-primary-rgb), 0.15) !important;
   color: var(--madar-red-dark) !important;
 }
 
@@ -168,7 +168,7 @@
 .page-builder .go-live-action {
   background: var(--madar-gradient) !important;
   color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.24) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.24) !important;
 }
 
 .page-builder .go-live-action:hover {
@@ -452,7 +452,7 @@
 }
 
 .page-builder .layer-tree button:hover {
-  background: rgba(139, 42, 26, 0.08) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
   color: var(--madar-red) !important;
   transform: none !important;
 }
@@ -460,14 +460,14 @@
 .page-builder .layer-tree button.active {
   background: #ffffff !important;
   color: var(--madar-red-dark) !important;
-  border-color: rgba(139, 42, 26, 0.42) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
   box-shadow: inset 4px 0 0 var(--madar-red), 0 8px 18px rgba(26, 39, 68, 0.08) !important;
   transform: none !important;
 }
 
 .page-builder .layer-tree .layer-element-button.active {
   background: #fffaf8 !important;
-  border-color: rgba(139, 42, 26, 0.5) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.5) !important;
   box-shadow: inset 3px 0 0 var(--madar-red) !important;
 }
 
@@ -505,7 +505,7 @@
 }
 
 .page-builder .layer-add-actions button:hover {
-  background: rgba(139, 42, 26, 0.08) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
   color: var(--madar-red) !important;
   transform: none !important;
 }
@@ -706,7 +706,7 @@
 .page-builder .workspace-tabs button.active {
   background: transparent !important;
   color: var(--madar-red) !important;
-  box-shadow: inset 0 -3px 0 rgba(139, 42, 26, 0.28) !important;
+  box-shadow: inset 0 -3px 0 rgba(var(--theme-primary-rgb), 0.28) !important;
 }
 
 /* Topbar action hierarchy */
@@ -752,30 +752,30 @@
   background: #ffffff !important;
   border-color: transparent !important;
   color: var(--madar-red) !important;
-  box-shadow: inset 0 -3px 0 rgba(139, 42, 26, 0.28) !important;
+  box-shadow: inset 0 -3px 0 rgba(var(--theme-primary-rgb), 0.28) !important;
 }
 
 .page-builder .builder-topbar-actions > button:hover {
   transform: translateY(-1px) !important;
-  background: rgba(139, 42, 26, 0.1) !important;
-  border-color: rgba(139, 42, 26, 0.22) !important;
+  background: rgba(var(--theme-primary-rgb), 0.1) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.22) !important;
   color: var(--madar-red) !important;
 }
 
 .page-builder .builder-topbar-actions > button.primary-action:hover {
-  background: rgba(139, 42, 26, 0.1) !important;
-  border-color: rgba(139, 42, 26, 0.22) !important;
+  background: rgba(var(--theme-primary-rgb), 0.1) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.22) !important;
   color: var(--madar-red) !important;
   box-shadow: none !important;
 }
 
 .page-builder .builder-topbar-actions > button.action-active:hover {
-  background: rgba(139, 42, 26, 0.08) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
   color: var(--madar-red-dark) !important;
 }
 
 .page-builder .builder-topbar-actions > button:focus-visible {
-  outline: 3px solid rgba(139, 42, 26, 0.24) !important;
+  outline: 3px solid rgba(var(--theme-primary-rgb), 0.24) !important;
   outline-offset: 3px !important;
 }
 
@@ -805,7 +805,7 @@
 .page-builder .viewport-switcher button.active {
   background: transparent !important;
   color: var(--madar-red) !important;
-  box-shadow: inset 0 -3px 0 rgba(139, 42, 26, 0.28) !important;
+  box-shadow: inset 0 -3px 0 rgba(var(--theme-primary-rgb), 0.28) !important;
 }
 
 @media (max-width: 1240px) {

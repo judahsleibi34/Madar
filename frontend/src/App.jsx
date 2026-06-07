@@ -119,6 +119,9 @@ export default function App() {
       phone: userInfo?.phone || "",
       avatar: userInfo?.avatar || userInfo?.avatar_url || "",
       subscription_type: userInfo?.subscription_type || "",
+      plan: userInfo?.plan || "",
+      builder_type: userInfo?.builder_type || "",
+      features: Array.isArray(userInfo?.features) ? userInfo.features : [],
       payment_status: userInfo?.payment_status || "",
       user_type: normalizeUserType(userInfo?.user_type),
       created_at: userInfo?.created_at || "",
@@ -557,9 +560,33 @@ export default function App() {
         </div>
 
         <div className="skeleton-nav">
-          <div className="skeleton-line skeleton-nav-item" />
-          <div className="skeleton-line skeleton-nav-item" />
-          <div className="skeleton-line skeleton-nav-item" />
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div className="skeleton-sidebar-row" key={index}>
+              <div className="skeleton-circle skeleton-sidebar-icon" />
+              <div className="skeleton-line skeleton-sidebar-label" />
+            </div>
+          ))}
+        </div>
+
+        <div className="skeleton-sidebar-bottom">
+          <div className="skeleton-sidebar-row">
+            <div className="skeleton-circle skeleton-sidebar-icon" />
+            <div className="skeleton-line skeleton-sidebar-label" />
+          </div>
+
+          <div className="skeleton-sidebar-row">
+            <div className="skeleton-circle skeleton-sidebar-icon" />
+            <div className="skeleton-line skeleton-sidebar-label" />
+          </div>
+
+          <div className="skeleton-user-row">
+            <div className="skeleton-circle skeleton-user-avatar" />
+            <div className="skeleton-user-lines">
+              <div className="skeleton-line skeleton-user-badge" />
+              <div className="skeleton-line skeleton-user-name" />
+              <div className="skeleton-line skeleton-user-email" />
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -596,6 +623,7 @@ export default function App() {
   ) => {
     const shellLang = options.lang || lang;
     const isShellRtl = shellLang === "ar";
+    const useCompactBuilderSidebar = isPageBuilderShell || options.compactSidebar;
 
     const openMenuLabel = t("common:navigation.openMenu");
     const closeMenuLabel = t("common:navigation.closeMenu");
@@ -606,7 +634,7 @@ export default function App() {
       <div
         className={[
           "admin-dashboard-layout",
-          isPageBuilderShell ? "admin-dashboard-layout-builder" : "",
+          useCompactBuilderSidebar ? "admin-dashboard-layout-builder" : "",
           isShellRtl ? "is-rtl" : "is-ltr",
           dashboardSidebarOpen ? "sidebar-open" : "",
         ]
@@ -643,6 +671,7 @@ export default function App() {
           hideLanguage={options.hideLanguage}
           themeMode={themeMode}
           onThemeModeChange={handleThemeModeChange}
+          compact={useCompactBuilderSidebar}
           onNavigate={closeDashboardSidebar}
         />
 
@@ -764,7 +793,8 @@ export default function App() {
                     appThemeMode={themeMode}
                     onAppThemeModeChange={handleThemeModeChange}
                   />,
-                  false
+                  false,
+                  { compactSidebar: true }
                 )
               ) : (
                 renderRestrictedPage(
@@ -793,7 +823,8 @@ export default function App() {
                     appThemeMode={themeMode}
                     onAppThemeModeChange={handleThemeModeChange}
                   />,
-                  false
+                  false,
+                  { compactSidebar: true }
                 )
               ) : (
                 renderRestrictedPage(
@@ -889,7 +920,7 @@ export default function App() {
     <>
       <ScrollToTop />
 
-      <div className="app-shell">
+      <div className="app-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
         <Header
           lang={lang}
           onLanguageChange={handleLanguageChange}

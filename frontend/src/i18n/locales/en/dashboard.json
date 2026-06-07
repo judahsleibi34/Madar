@@ -15,7 +15,8 @@
     "logout": "Log out",
     "themeMode": "Theme",
     "userManagement": "User Management",
-    "admin": "Admin"
+    "admin": "Admin",
+    "userRole": "User"
   },
   "loading": {
     "dashboard": "Loading dashboard",
@@ -29,5 +30,117 @@
   },
   "user": {
     "fallbackName": "Madar User"
+  },
+  "userDashboard": {
+    "header": {
+      "kicker": "Workspace",
+      "title": "Welcome, {{name}}",
+      "subtitle": "Manage your website, submissions, data, plan, and account settings from one focused workspace."
+    },
+    "actions": {
+      "settings": "Settings",
+      "openBuilder": "Open builder",
+      "managePlan": "Manage plan",
+      "viewBilling": "View billing and usage",
+      "continueSetup": "Continue setup"
+    },
+    "summary": {
+      "aria": "Workspace summary",
+      "currentPlan": "Current plan",
+      "enabledBuilders": "Enabled builders",
+      "fullPlatformAccess": "Full platform access",
+      "activeTools": "Active tools",
+      "responses": "Responses",
+      "fromWebsiteForms": "From website forms",
+      "dataWorkspace": "Data workspace",
+      "ready": "Ready",
+      "addOn": "Add-on",
+      "reportsAndImports": "Reports and imports"
+    },
+    "builders": {
+      "kicker": "Builders",
+      "title": "Your active toolkit",
+      "subtitle": "Open the tools included in your workspace or review add-ons.",
+      "enabled": "Enabled",
+      "add": "Add",
+      "website": {
+        "title": "Website Builder",
+        "description": "Pages, sections, templates, branded sites, and publishing."
+      },
+      "forms": {
+        "title": "Form Builder",
+        "description": "Fields, submissions, exports, and response dashboards."
+      },
+      "quiz": {
+        "title": "Quiz Builder",
+        "description": "Scoring, answer keys, timers, pass or fail results, and review."
+      },
+      "reservation": {
+        "title": "Reservation Builder",
+        "description": "Bookings, services, date and time fields, guests, and requests."
+      },
+      "reports": {
+        "title": "Report Builder",
+        "description": "Operational reports, monitoring views, and custom dashboards."
+      },
+      "data": {
+        "title": "Data Workspace",
+        "description": "CSV/XLS uploads, imports, cleaning, inspection, and analysis."
+      }
+    },
+    "plan": {
+      "kicker": "Plan"
+    },
+    "plans": {
+      "workspace": "Workspace plan",
+      "fullPlatform": "Full platform",
+      "builder": "{{builder}} builder",
+      "starter": "Starter",
+      "basic": "Basic",
+      "premium": "Premium",
+      "pro": "Pro"
+    },
+    "builderTypes": {
+      "website": "Website",
+      "forms": "Forms",
+      "quiz": "Quiz",
+      "reservation": "Reservation",
+      "reports": "Reports",
+      "data": "Data"
+    },
+    "status": {
+      "pending": "Pending",
+      "active": "Active",
+      "paid": "Paid",
+      "inactive": "Inactive",
+      "cancelled": "Cancelled",
+      "failed": "Failed"
+    },
+    "usage": {
+      "kicker": "Usage",
+      "title": "Plan limits",
+      "subtitle": "Track the main limits used across your workspace.",
+      "items": {
+        "projects": "Projects",
+        "users": "Users",
+        "responses": "Responses",
+        "storage": "Storage"
+      }
+    },
+    "activity": {
+      "kicker": "Activity",
+      "title": "Workspace status",
+      "subtitle": "Recent operational checkpoints from the tools available today.",
+      "websiteReadyTitle": "Website builder ready",
+      "websiteReadyDetail": "Create or update public pages from the builder workspace.",
+      "submissionsActiveTitle": "Submission inbox active",
+      "submissionsActiveDetail": "Review collected form answers from the responses page.",
+      "dataLogsTitle": "Data logs available",
+      "dataLogsDetail": "Import responses or spreadsheets for reporting and analysis."
+    },
+    "next": {
+      "title": "Recommended next step",
+      "subtitle": "Update your public website, then use form responses and data logs to review what visitors submit."
+    }
   }
 }

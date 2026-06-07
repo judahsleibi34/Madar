@@ -21,8 +21,8 @@
   width: fit-content;
   border-radius: 999px;
   padding: 5px 10px;
-  background: rgba(139, 42, 26, 0.1);
-  color: var(--madar-red, #8b2a1a);
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--madar-red, var(--theme-primary));
   font-size: 11px;
   font-weight: 950;
   text-transform: uppercase;
@@ -76,8 +76,8 @@
 }
 
 .auth-block input:focus {
-  border-color: rgba(139, 42, 26, 0.45);
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.1);
+  border-color: rgba(var(--theme-primary-rgb), 0.45);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1);
   outline: 0;
 }
 
@@ -104,13 +104,13 @@
 }
 
 .auth-block label strong {
-  color: var(--madar-red, #8b2a1a);
+  color: var(--madar-red, var(--theme-primary));
   font-size: 12px;
 }
 
 .auth-block .has-error input {
-  border-color: var(--madar-red, #8b2a1a);
-  box-shadow: 0 0 0 3px rgba(139, 42, 26, 0.1);
+  border-color: var(--madar-red, var(--theme-primary));
+  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.1);
 }
 
 .auth-submit {
@@ -118,11 +118,11 @@
   min-height: 58px;
   border: 0;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--madar-navy, #1a2744), var(--madar-red, #8b2a1a));
+  background: linear-gradient(135deg, var(--madar-navy, #1a2744), var(--madar-red, var(--theme-primary)));
   color: #ffffff;
   font-size: 16px;
   font-weight: 950;
-  box-shadow: 0 18px 34px rgba(139, 42, 26, 0.22);
+  box-shadow: 0 18px 34px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 .auth-submit:disabled,
@@ -144,7 +144,7 @@
 .auth-switch button {
   padding: 0;
   background: transparent;
-  color: var(--madar-red, #8b2a1a);
+  color: var(--madar-red, var(--theme-primary));
   font: inherit;
   font-weight: 950;
 }

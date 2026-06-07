@@ -34,8 +34,8 @@
   width: fit-content;
   border-radius: 999px;
   padding: 5px 10px;
-  background: rgba(139, 42, 26, 0.1);
-  color: var(--madar-red, #8b2a1a);
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--madar-red, var(--theme-primary));
   font-size: 11px;
   font-weight: 950;
   text-transform: uppercase;
@@ -66,7 +66,7 @@
   padding: 12px 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72)),
-    rgba(139, 42, 26, 0.05);
+    rgba(var(--theme-primary-rgb), 0.05);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -79,7 +79,7 @@
 }
 
 .reservation-summary strong {
-  color: var(--madar-red, #8b2a1a);
+  color: var(--madar-red, var(--theme-primary));
   font-size: 24px;
   line-height: 1;
 }
@@ -145,8 +145,8 @@
 .reservation-block input:focus,
 .reservation-block select:focus,
 .reservation-block textarea:focus {
-  border-color: rgba(139, 42, 26, 0.42);
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.1);
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1);
   outline: 0;
 }
 
@@ -170,14 +170,14 @@
 }
 
 .reservation-block label strong {
-  color: var(--madar-red, #8b2a1a);
+  color: var(--madar-red, var(--theme-primary));
   font-size: 12px;
 }
 
 .reservation-block .has-error input,
 .reservation-block .has-error select {
-  border-color: var(--madar-red, #8b2a1a);
-  box-shadow: 0 0 0 3px rgba(139, 42, 26, 0.1);
+  border-color: var(--madar-red, var(--theme-primary));
+  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.1);
 }
 
 .reservation-footer {
@@ -194,15 +194,15 @@
   border: 0;
   border-radius: 14px;
   padding: 12px 18px;
-  background: var(--madar-red, #8b2a1a);
+  background: var(--madar-red, var(--theme-primary));
   color: #ffffff;
   font-size: 14px;
   font-weight: 950;
-  box-shadow: 0 14px 28px rgba(139, 42, 26, 0.22);
+  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 .reservation-submit:not(:disabled):hover {
-  background: var(--madar-red-dark, #6e2014);
+  background: var(--madar-red-dark, var(--theme-primary-hover));
 }
 
 .reservation-submit:disabled {
@@ -297,7 +297,7 @@
 :root[data-theme="dark"] .reservation-block,
 html.theme-dark .reservation-block,
 body.theme-dark .reservation-block {
-  color: #f8fafc;
+  color: var(--theme-text);
 }
 
 :root[data-theme="dark"] .reservation-block-header span,
@@ -309,14 +309,14 @@ body.theme-dark .reservation-summary strong,
 :root[data-theme="dark"] .reservation-block label strong,
 html.theme-dark .reservation-block label strong,
 body.theme-dark .reservation-block label strong {
-  color: #9fe7df;
+  color: var(--theme-primary-hover);
 }
 
 :root[data-theme="dark"] .reservation-block-header span,
 html.theme-dark .reservation-block-header span,
 body.theme-dark .reservation-block-header span {
-  background: rgba(47, 159, 154, 0.18);
-  border: 1px solid rgba(127, 214, 208, 0.22);
+  background: rgba(var(--theme-primary-rgb), 0.18);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
 }
 
 :root[data-theme="dark"] .reservation-block-header h3,
@@ -325,7 +325,7 @@ body.theme-dark .reservation-block-header h3,
 :root[data-theme="dark"] .reservation-block label,
 html.theme-dark .reservation-block label,
 body.theme-dark .reservation-block label {
-  color: #f8fafc;
+  color: var(--theme-text);
 }
 
 :root[data-theme="dark"] .reservation-block-header p,
@@ -337,16 +337,16 @@ body.theme-dark .reservation-summary small,
 :root[data-theme="dark"] .reservation-helper,
 html.theme-dark .reservation-helper,
 body.theme-dark .reservation-helper {
-  color: #b8c5d6;
+  color: var(--theme-text-muted);
 }
 
 :root[data-theme="dark"] .reservation-summary,
 html.theme-dark .reservation-summary,
 body.theme-dark .reservation-summary {
-  border-color: rgba(126, 158, 181, 0.18);
+  border-color: rgba(244, 240, 232, 0.18);
   background:
     linear-gradient(180deg, rgba(16, 28, 45, 0.94), rgba(7, 17, 31, 0.9)),
-    rgba(47, 159, 154, 0.08);
+    rgba(var(--theme-primary-rgb), 0.08);
 }
 
 :root[data-theme="dark"] .reservation-block input,
@@ -358,9 +358,9 @@ html.theme-dark .reservation-block textarea,
 body.theme-dark .reservation-block input,
 body.theme-dark .reservation-block select,
 body.theme-dark .reservation-block textarea {
-  border-color: rgba(126, 158, 181, 0.2);
+  border-color: rgba(244, 240, 232, 0.2);
   background: rgba(7, 17, 31, 0.82);
-  color: #f8fafc;
+  color: var(--theme-text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -382,8 +382,8 @@ html.theme-dark .reservation-block textarea:focus,
 body.theme-dark .reservation-block input:focus,
 body.theme-dark .reservation-block select:focus,
 body.theme-dark .reservation-block textarea:focus {
-  border-color: rgba(127, 214, 208, 0.48);
-  box-shadow: 0 0 0 4px rgba(47, 159, 154, 0.14);
+  border-color: rgba(var(--theme-primary-rgb), 0.48);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.14);
 }
 
 :root[data-theme="dark"] .reservation-block input:disabled,
@@ -405,20 +405,20 @@ html.theme-dark .reservation-block .has-error input,
 html.theme-dark .reservation-block .has-error select,
 body.theme-dark .reservation-block .has-error input,
 body.theme-dark .reservation-block .has-error select {
-  border-color: rgba(127, 214, 208, 0.54);
-  box-shadow: 0 0 0 3px rgba(47, 159, 154, 0.14);
+  border-color: rgba(var(--theme-primary-rgb), 0.54);
+  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.14);
 }
 
 :root[data-theme="dark"] .reservation-submit,
 html.theme-dark .reservation-submit,
 body.theme-dark .reservation-submit {
-  background: linear-gradient(135deg, #2f9f9a, #7fd6d0);
-  color: #03111c;
-  box-shadow: 0 14px 28px rgba(47, 159, 154, 0.22);
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-hover));
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 :root[data-theme="dark"] .reservation-submit:not(:disabled):hover,
 html.theme-dark .reservation-submit:not(:disabled):hover,
 body.theme-dark .reservation-submit:not(:disabled):hover {
-  background: linear-gradient(135deg, #4fb7b1, #9fe7df);
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-hover));
 }

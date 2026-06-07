@@ -27,8 +27,8 @@
   padding: 0;
   cursor: pointer;
   color: #ffffff;
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
-  box-shadow: 0 10px 22px rgba(139, 42, 26, 0.2);
+  background: var(--theme-gradient);
+  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.2);
   font-size: 20px;
   font-weight: 900;
 }
@@ -43,7 +43,7 @@
 }
 
 .simple-form-title {
-  border-top: 8px solid #8b2a1a;
+  border-top: 8px solid var(--theme-primary);
   padding: 24px;
 }
 
@@ -65,7 +65,7 @@
 .clean-title-input:focus,
 .helper-text-clean-input:focus {
   outline: none;
-  border-color: #8b2a1a;
+  border-color: var(--theme-primary);
 }
 
 .form-description-clean-input {
@@ -91,7 +91,7 @@
 }
 
 .clean-question-card.active {
-  border-left-color: #8b2a1a;
+  border-left-color: var(--theme-primary);
 }
 
 .clean-question-top {
@@ -184,9 +184,9 @@
 
 .drop-between-zone:hover,
 .forms-document-area:has(.floating-question-buttons button:active) .drop-between-zone {
-  color: rgba(139, 42, 26, 0.8);
-  border-color: rgba(139, 42, 26, 0.32);
-  background: rgba(139, 42, 26, 0.055);
+  color: rgba(var(--theme-primary-rgb), 0.8);
+  border-color: rgba(var(--theme-primary-rgb), 0.32);
+  background: rgba(var(--theme-primary-rgb), 0.055);
 }
 
 .top-zone {
@@ -197,12 +197,12 @@
 
 .empty-form-drop-zone {
   min-height: 240px;
-  border: 2px dashed rgba(139, 42, 26, 0.28);
+  border: 2px dashed rgba(var(--theme-primary-rgb), 0.28);
   border-radius: 22px;
   display: grid;
   place-content: center;
   text-align: center;
-  background: rgba(139, 42, 26, 0.04);
+  background: rgba(var(--theme-primary-rgb), 0.04);
   color: #1a2744;
 }
 
@@ -245,8 +245,8 @@
 
 .floating-question-buttons button:hover {
   color: #ffffff;
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.2);
+  background: var(--theme-gradient);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.2);
   transform: translateY(-1px);
 }
 
@@ -257,7 +257,7 @@
   display: grid;
   place-items: center;
   background: #ffffff;
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-weight: 950;
   flex: 0 0 auto;
 }
@@ -364,7 +364,7 @@
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
+  background: var(--theme-gradient);
   color: #ffffff;
   display: grid;
   place-items: center;
@@ -392,7 +392,7 @@
 .section-title-input:focus,
 .section-description-input:focus {
   outline: none;
-  border-bottom-color: #8b2a1a;
+  border-bottom-color: var(--theme-primary);
 }
 
 .section-description-input {
@@ -428,12 +428,12 @@
 .section-drop-zone {
   margin: 16px 0 12px 56px;
   min-height: 42px;
-  border: 1px dashed rgba(139, 42, 26, 0.28);
+  border: 1px dashed rgba(var(--theme-primary-rgb), 0.28);
   border-radius: 16px;
   display: grid;
   place-items: center;
-  color: rgba(139, 42, 26, 0.82);
-  background: rgba(139, 42, 26, 0.04);
+  color: rgba(var(--theme-primary-rgb), 0.82);
+  background: rgba(var(--theme-primary-rgb), 0.04);
   font-size: 12px;
   font-weight: 900;
 }
@@ -453,12 +453,12 @@
 .empty-section-drop {
   margin-left: 56px;
   min-height: 160px;
-  border: 2px dashed rgba(139, 42, 26, 0.24);
+  border: 2px dashed rgba(var(--theme-primary-rgb), 0.24);
   border-radius: 20px;
   display: grid;
   place-content: center;
   text-align: center;
-  background: rgba(139, 42, 26, 0.035);
+  background: rgba(var(--theme-primary-rgb), 0.035);
   color: #1a2744;
 }
 
@@ -473,9 +473,9 @@
 
 .add-section-inline,
 .add-section-tool {
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
+  background: var(--theme-gradient);
   color: #ffffff;
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.22);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 .add-section-inline {
@@ -542,8 +542,8 @@
 }
 
 .builder-element.is-selected {
-  border-color: #8b2a1a;
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08);
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
 .builder-element-heading,
@@ -588,8 +588,8 @@
 }
 
 .reset-position-button:hover {
-  background: rgba(139, 42, 26, 0.1);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--theme-primary);
 }
 
 /* v3.4.7 — smoother number editing in inspector */

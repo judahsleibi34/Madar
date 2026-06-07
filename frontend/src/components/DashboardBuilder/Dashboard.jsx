@@ -16,9 +16,20 @@ import {
 
 const dashboardText = {
   en: {
+    eyebrow: "Admin overview",
     title: "Dashboard",
     subtitle:
       "Monitor platform activity, active projects, revenue, system health, and resource usage.",
+    liveStatus: "Live",
+    lastUpdated: "Updated just now",
+    platformHealth: "Platform healthy",
+    chartScope: "Revenue, Jan-Aug",
+    heroTitle: "Admin monitoring center",
+    heroSubtitle:
+      "Track users, revenue, services, and infrastructure health from one operational view.",
+    viewReports: "View reports",
+    todayOrders: "12 new workspace events",
+    todayRevenue: "$4.2K revenue today",
 
     runningProjects: "Running Projects",
     users: "Users",
@@ -47,14 +58,37 @@ const dashboardText = {
 
     cashFlow: "Cash Through Time",
     cashSubtitle: "Monthly revenue performance",
+    userSignals: "User Signals",
+    userSignalsSubtitle: "Live account and traffic indicators",
+    activeUsers: "Active users",
+    sessions: "Sessions",
+    signups: "New signups",
+    conversion: "Conversion",
+    serviceHealth: "Service Health",
+    serviceHealthSubtitle: "Request quality and infrastructure pressure",
+    apiLatency: "API latency",
+    errorRate: "Error rate",
+    queueDepth: "Queue depth",
+    databaseLoad: "Database load",
 
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
   },
 
   ar: {
+    eyebrow: "نظرة عامة للمسؤول",
     title: "لوحة التحكم",
     subtitle:
       "راقب نشاط المنصة والمشاريع النشطة والإيرادات وصحة النظام واستخدام الموارد.",
+    liveStatus: "مباشر",
+    lastUpdated: "تم التحديث الآن",
+    platformHealth: "المنصة مستقرة",
+    chartScope: "الإيرادات، يناير-أغسطس",
+    heroTitle: "مركز مراقبة الإدارة",
+    heroSubtitle:
+      "تابع المستخدمين، والإيرادات، والخدمات، وصحة البنية التحتية من واجهة تشغيلية واحدة.",
+    viewReports: "عرض التقارير",
+    todayOrders: "12 حدثاً جديداً في مساحة العمل",
+    todayRevenue: "إيرادات اليوم $4.2K",
 
     runningProjects: "المشاريع النشطة",
     users: "المستخدمون",
@@ -83,12 +117,37 @@ const dashboardText = {
 
     cashFlow: "التدفق المالي عبر الزمن",
     cashSubtitle: "أداء الإيرادات الشهرية",
+    userSignals: "مؤشرات المستخدمين",
+    userSignalsSubtitle: "مؤشرات الحسابات والزيارات المباشرة",
+    activeUsers: "المستخدمون النشطون",
+    sessions: "الجلسات",
+    signups: "تسجيلات جديدة",
+    conversion: "التحويل",
+    serviceHealth: "صحة الخدمات",
+    serviceHealthSubtitle: "جودة الطلبات وضغط البنية التحتية",
+    apiLatency: "زمن استجابة API",
+    errorRate: "معدل الأخطاء",
+    queueDepth: "عمق قائمة الانتظار",
+    databaseLoad: "حمل قاعدة البيانات",
 
     months: ["ينا", "فبر", "مار", "أبر", "ماي", "يون", "يول", "أغس"],
   },
 };
 
 const cashData = [18000, 24500, 22000, 31000, 38500, 42000, 51000, 62000];
+const userSignalData = [
+  { key: "activeUsers", value: "1,284", trend: "+8.2%", percent: 82 },
+  { key: "sessions", value: "6,420", trend: "+12.4%", percent: 74 },
+  { key: "signups", value: "124", trend: "+5.1%", percent: 58 },
+  { key: "conversion", value: "6.45%", trend: "+0.8%", percent: 64 },
+];
+
+const serviceHealthData = [
+  { key: "apiLatency", value: "142ms", percent: 42 },
+  { key: "errorRate", value: "0.08%", percent: 8 },
+  { key: "queueDepth", value: "24", percent: 24 },
+  { key: "databaseLoad", value: "68%", percent: 68 },
+];
 
 function forceScrollTop() {
   if ("scrollRestoration" in window.history) {
@@ -122,7 +181,7 @@ function forceScrollTop() {
 
 function OverviewCard({ title, value, sub, icon: Icon, variant }) {
   return (
-    <article className={`overview-card ${variant}`}>
+    <article className={`overview-card ${variant}`} aria-label={`${title}: ${value}`}>
       <div className="overview-card-top">
         <div>
           <p>{title}</p>
@@ -154,6 +213,21 @@ function MetricRow({ label, value, percent }) {
         <div style={{ width: `${percent}%` }} />
       </div>
     </div>
+  );
+}
+
+function SignalCard({ label, value, trend, percent }) {
+  return (
+    <article className="admin-signal-card">
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+      <em>{trend}</em>
+      <div className="admin-signal-track" aria-hidden="true">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+    </article>
   );
 }
 
@@ -202,10 +276,35 @@ export default function Dashboard({
       data-language={safeLang}
       data-theme={themeMode}
     >
+      <section className="admin-dashboard-hero">
+        <div>
+          <span className="admin-dashboard-eyebrow">{t.eyebrow}</span>
+          <h1>{t.heroTitle}</h1>
+          <p>{t.heroSubtitle}</p>
+          <div className="admin-dashboard-hero-meta">
+            <span>{t.todayOrders}</span>
+            <span>{t.todayRevenue}</span>
+          </div>
+        </div>
+
+        <button type="button" className="admin-dashboard-hero-action">
+          {t.viewReports}
+          <TrendingUp size={17} aria-hidden="true" />
+        </button>
+      </section>
+
       <header className="admin-dashboard-header">
         <div>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
+          <div className="admin-dashboard-header-meta" aria-label={t.platformHealth}>
+            <span>
+              <Activity size={14} aria-hidden="true" />
+              {t.liveStatus}
+            </span>
+            <span>{t.lastUpdated}</span>
+            <span>{t.platformHealth}</span>
+          </div>
         </div>
       </header>
 
@@ -243,6 +342,57 @@ export default function Dashboard({
         />
       </section>
 
+      <section className="admin-monitor-grid">
+        <article className="dashboard-panel admin-user-signals-panel">
+          <div className="dashboard-panel-header">
+            <div>
+              <h2>{t.userSignals}</h2>
+              <p>{t.userSignalsSubtitle}</p>
+            </div>
+
+            <div className="panel-icon">
+              <Users size={22} />
+            </div>
+          </div>
+
+          <div className="admin-signal-grid">
+            {userSignalData.map((item) => (
+              <SignalCard
+                key={item.key}
+                label={t[item.key]}
+                value={item.value}
+                trend={item.trend}
+                percent={item.percent}
+              />
+            ))}
+          </div>
+        </article>
+
+        <article className="dashboard-panel admin-service-health-panel">
+          <div className="dashboard-panel-header">
+            <div>
+              <h2>{t.serviceHealth}</h2>
+              <p>{t.serviceHealthSubtitle}</p>
+            </div>
+
+            <div className="panel-icon">
+              <Server size={22} />
+            </div>
+          </div>
+
+          <div className="metrics-list">
+            {serviceHealthData.map((item) => (
+              <MetricRow
+                key={item.key}
+                label={t[item.key]}
+                value={item.value}
+                percent={item.percent}
+              />
+            ))}
+          </div>
+        </article>
+      </section>
+
       <section className="admin-dashboard-grid">
         <article className="dashboard-panel cash-panel">
           <div className="dashboard-panel-header">
@@ -254,6 +404,11 @@ export default function Dashboard({
             <div className="panel-icon">
               <BarChart3 size={22} />
             </div>
+          </div>
+
+          <div className="dashboard-panel-meta">
+            <span>{t.chartScope}</span>
+            <strong>+$44K</strong>
           </div>
 
           <div className="cash-chart" dir="ltr" aria-label={t.cashFlow}>
@@ -291,7 +446,7 @@ export default function Dashboard({
                 {t.serverStatus}
               </span>
 
-              <strong>{t.healthy}</strong>
+              <strong className="server-status-healthy">{t.healthy}</strong>
             </div>
 
             <div>

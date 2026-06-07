@@ -4,14 +4,14 @@
    ============================================================ */
 
 .page-builder .go-live-action {
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%) !important;
+  background: var(--theme-gradient) !important;
   color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.24) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.24) !important;
 }
 
 .page-builder .go-live-action:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, #111b31 0%, #6e2014 100%) !important;
+  background: linear-gradient(135deg, #111b31 0%, var(--theme-primary-hover) 100%) !important;
   color: #ffffff !important;
 }
 
@@ -42,7 +42,7 @@
   border-radius: 28px;
   padding: 26px;
   background: #ffffff;
-  border: 1px solid rgba(139, 42, 26, 0.18);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
   color: var(--madar-text);
   text-align: center;
   box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
@@ -54,7 +54,7 @@
   display: grid;
   place-items: center;
   border-radius: 20px;
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
   font-size: 28px;
   line-height: 1;
@@ -103,5 +103,5 @@
 .page-builder .page-delete-modal-danger {
   background: var(--madar-red) !important;
   color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.22) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.22) !important;
 }

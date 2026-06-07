@@ -135,6 +135,15 @@ export default function Header({
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
+          {isLoggedIn && (
+            <LanguageSwitcher
+              current={lang}
+              onChange={handleLangSelect}
+              compact
+              className="header-language-switcher"
+            />
+          )}
+
           {isLoggedIn ? (
             <button type="button" className="btn-signup" onClick={handleLogout}>
               {t("public:nav.logout")}
@@ -148,15 +157,15 @@ export default function Header({
               <Link to="/signup" className="btn-signup">
                 {t("public:nav.signup")}
               </Link>
+
+              <LanguageSwitcher
+                current={lang}
+                onChange={handleLangSelect}
+                compact
+                className="header-language-switcher"
+              />
             </>
           )}
-
-          <LanguageSwitcher
-            current={lang}
-            onChange={handleLangSelect}
-            compact
-            className="header-language-switcher"
-          />
 
           <button
             type="button"

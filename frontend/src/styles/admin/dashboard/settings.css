@@ -14,7 +14,7 @@
 
 .settings-header p {
   margin: 0 0 8px;
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-size: 13px;
   font-weight: 950;
   text-transform: uppercase;
@@ -83,7 +83,7 @@
 }
 
 .settings-toast-success .settings-toast-content::before {
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
 }
 
 .settings-toast-error .settings-toast-content::before {
@@ -108,7 +108,7 @@
 }
 
 .settings-toast-error span {
-  color: #8b2a1a;
+  color: var(--theme-primary);
 }
 
 .settings-toast button {
@@ -125,8 +125,8 @@
 }
 
 .settings-toast button:hover {
-  background: rgba(139, 42, 26, 0.1);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--theme-primary);
 }
 
 @keyframes settingsToastIn {
@@ -171,7 +171,7 @@
   background:
     radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.2), transparent 28%),
     radial-gradient(circle at 84% 26%, rgba(255, 255, 255, 0.14), transparent 26%),
-    linear-gradient(135deg, #1a2744 0%, #4b2b35 48%, #8b2a1a 100%);
+    var(--theme-gradient);
   color: #ffffff;
 }
 
@@ -228,7 +228,7 @@
   place-items: center;
   object-fit: cover;
   object-position: center;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
   font-size: 42px;
   font-weight: 950;
@@ -308,19 +308,19 @@
 
 .settings-card input:focus,
 .settings-card textarea:focus {
-  border-color: rgba(139, 42, 26, 0.56);
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.09);
+  border-color: rgba(var(--theme-primary-rgb), 0.56);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.09);
 }
 
 .settings-card input.field-has-error,
 .settings-card textarea.field-has-error {
-  border-color: rgba(139, 42, 26, 0.68);
-  background: rgba(139, 42, 26, 0.035);
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08);
+  border-color: rgba(var(--theme-primary-rgb), 0.68);
+  background: rgba(var(--theme-primary-rgb), 0.035);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
 .settings-field-error {
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-size: 12px;
   font-weight: 850;
   line-height: 1.35;
@@ -328,11 +328,11 @@
 
 .settings-file-button {
   cursor: pointer;
-  border: 1px dashed rgba(139, 42, 26, 0.42);
+  border: 1px dashed rgba(var(--theme-primary-rgb), 0.42);
   border-radius: 16px;
   padding: 16px;
-  background: rgba(139, 42, 26, 0.06);
-  color: #8b2a1a !important;
+  background: rgba(var(--theme-primary-rgb), 0.06);
+  color: var(--theme-primary) !important;
   text-align: center;
   min-height: 58px;
   align-content: center;
@@ -353,9 +353,9 @@
   justify-content: center;
   gap: 9px;
   cursor: pointer;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
-  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.2);
+  box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.2);
   font-weight: 950;
   transition:
     transform 0.2s ease,
@@ -365,7 +365,7 @@
 
 .settings-save-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 16px 32px rgba(139, 42, 26, 0.24);
+  box-shadow: 0 16px 32px rgba(var(--theme-primary-rgb), 0.24);
 }
 
 .settings-save-button:disabled {
@@ -388,7 +388,7 @@
   justify-self: start;
   width: 280px;
   max-width: 100%;
-  border: 1px solid rgba(139, 42, 26, 0.22);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
   border-radius: 16px;
   padding: 14px 18px;
   display: inline-flex;
@@ -396,8 +396,8 @@
   justify-content: center;
   gap: 9px;
   cursor: pointer;
-  background: rgba(139, 42, 26, 0.055);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.055);
+  color: var(--theme-primary);
   font-weight: 950;
   box-shadow: none;
   text-decoration: none;
@@ -410,9 +410,9 @@
 
 .settings-reset-password-button:hover {
   transform: translateY(-1px);
-  background: rgba(139, 42, 26, 0.09);
-  border-color: rgba(139, 42, 26, 0.38);
-  box-shadow: 0 12px 24px rgba(139, 42, 26, 0.12);
+  background: rgba(var(--theme-primary-rgb), 0.09);
+  border-color: rgba(var(--theme-primary-rgb), 0.38);
+  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.12);
 }
 
 .settings-profile-actions .settings-save-button {
@@ -452,7 +452,7 @@
 }
 
 .settings-website-card .settings-profile-avatar span {
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
 }
 
