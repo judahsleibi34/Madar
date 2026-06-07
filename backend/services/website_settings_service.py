@@ -82,6 +82,42 @@ def ensure_settings_for_tenant(tenant_id: int, user_id: int):
         raise
 
 
+def save_settings_for_tenant(tenant_id: int, user_id: int, update_payload: dict):
+    update_payload = {
+        **update_payload,
+        "tenant_id": tenant_id,
+    }
+    existing_website = get_settings_for_tenant(tenant_id, user_id)
+
+    if existing_website:
+        save_response = (
+            service_supabase.table("website_settings")
+            .update(update_payload)
+            .eq("id", existing_website["id"])
+            .execute()
+        )
+    else:
+        insert_payload = {
+            **update_payload,
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+        }
+
+        save_response = (
+            service_supabase.table("website_settings")
+            .insert(insert_payload)
+            .execute()
+        )
+
+    return (
+        first_row(save_response)
+        or {
+            **(existing_website or {}),
+            **update_payload,
+        }
+    )
+
+
 def require_public_subdomain(tenant_id: int, user_id: int):
     settings = ensure_settings_for_tenant(tenant_id, user_id)
     subdomain = (settings.get("subdomain") or "").strip().lower()

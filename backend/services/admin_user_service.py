@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import HTTPException
 
 from database import service_supabase
+
+logger = logging.getLogger(__name__)
 
 
 USER_SELECT_COLUMNS = (
@@ -17,12 +20,18 @@ def list_users_with_features(
     *,
     page: int = 1,
     page_size: int = 10,
+    limit: int | None = None,
+    offset: int | None = None,
     search: str = "",
 ) -> dict[str, Any]:
-    safe_page = max(int(page or 1), 1)
-    safe_page_size = min(max(int(page_size or 10), 1), 50)
-    start = (safe_page - 1) * safe_page_size
-    end = start + safe_page_size
+    safe_limit = min(max(int(limit or page_size or 20), 1), 100)
+    if offset is None:
+        safe_page = max(int(page or 1), 1)
+        safe_offset = (safe_page - 1) * safe_limit
+    else:
+        safe_offset = max(int(offset or 0), 0)
+        safe_page = (safe_offset // safe_limit) + 1
+    end = safe_offset + safe_limit
     normalized_search = str(search or "").strip()
 
     try:
@@ -41,12 +50,12 @@ def list_users_with_features(
         if normalized_search:
             count_query = count_query.ilike("email", f"%{normalized_search}%")
 
-        users_response = query.range(start, end).execute()
+        users_response = query.range(safe_offset, end).execute()
         count_response = count_query.range(0, 0).execute()
         fetched_users = users_response.data or []
         total_count = count_response.count or 0
-        has_next_page = len(fetched_users) > safe_page_size
-        users = fetched_users[:safe_page_size]
+        has_more = len(fetched_users) > safe_limit
+        users = fetched_users[:safe_limit]
         tenant_ids = sorted({
             user.get("tenant_id")
             for user in users
@@ -69,7 +78,7 @@ def list_users_with_features(
                 features_by_tenant.setdefault(tenant_key, []).append(feature)
 
     except Exception as error:
-        print("ADMIN USER LIST ERROR:", type(error).__name__)
+        logger.warning("admin.users.list_failed", extra={"error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not load users.")
 
     enriched_users = [
@@ -83,12 +92,17 @@ def list_users_with_features(
 
     return {
         "users": enriched_users,
+        "items": enriched_users,
         "pagination": {
+            "limit": safe_limit,
+            "offset": safe_offset,
+            "count": len(enriched_users),
+            "has_more": has_more,
             "page": safe_page,
-            "page_size": safe_page_size,
+            "page_size": safe_limit,
             "total_count": total_count,
-            "has_next_page": has_next_page,
-            "has_previous_page": safe_page > 1,
+            "has_next_page": has_more,
+            "has_previous_page": safe_offset > 0,
         },
     }
 
@@ -109,16 +123,21 @@ def update_user_type(*, user_id: int, user_type: str) -> dict[str, Any]:
         )
 
     except Exception as error:
-        print("ADMIN USER TYPE UPDATE ERROR:", type(error).__name__)
+        logger.warning("admin.user_type.update_failed", extra={"target_user_id": user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not update user type.")
 
     if not result.data:
         raise HTTPException(status_code=404, detail="User was not found.")
 
-    return {
+    updated_user = {
         **result.data[0],
         "user_type": result.data[0].get("user_type") or "user",
     }
+    logger.info(
+        "admin.user_type_changed",
+        extra={"target_user_id": user_id, "user_type": updated_user.get("user_type")},
+    )
+    return updated_user
 
 
 def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) -> dict[str, Any]:
@@ -136,7 +155,7 @@ def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) 
         )
 
     except Exception as error:
-        print("ADMIN USER DELETE FETCH ERROR:", type(error).__name__)
+        logger.warning("admin.user_delete.fetch_failed", extra={"target_user_id": user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not load user for deletion.")
 
     if not user_result.data:
@@ -161,7 +180,7 @@ def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) 
             tenant_should_be_deleted = not bool(remaining_members.data)
 
         except Exception as error:
-            print("ADMIN USER DELETE MEMBERSHIP CHECK ERROR:", type(error).__name__)
+            logger.warning("admin.user_delete.membership_check_failed", extra={"target_user_id": user_id, "tenant_id": tenant_id, "error_type": type(error).__name__})
             raise HTTPException(status_code=500, detail="Could not verify tenant membership.")
 
     try:
@@ -186,8 +205,18 @@ def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) 
             )
 
     except Exception as error:
-        print("ADMIN USER DELETE ERROR:", type(error).__name__)
+        logger.warning("admin.user_delete.failed", extra={"target_user_id": user_id, "tenant_id": tenant_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not delete user.")
+
+    logger.info(
+        "admin.user_deleted",
+        extra={
+            "target_user_id": target_user.get("id"),
+            "tenant_id": tenant_id,
+            "tenant_deleted": tenant_should_be_deleted,
+            "requesting_user_id": requesting_user_id,
+        },
+    )
 
     return {
         "id": target_user.get("id"),

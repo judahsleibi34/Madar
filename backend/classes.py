@@ -2,9 +2,9 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
 
 class ContactMessage(BaseModel):
-    name: str
-    phone: str
-    message: str
+    name: str = Field(..., max_length=120)
+    phone: Optional[str] = Field(default=None, max_length=40)
+    message: str = Field(..., max_length=5000)
 
 class SignUpRequest(BaseModel):
     first_name: str

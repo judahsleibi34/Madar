@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from fastapi import HTTPException, Request, Response
 
 from database import service_supabase
-from services.auth_service import get_authenticated_user_row
+from services.auth_service import require_regular_user
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ def get_current_tenant_context(
     request: Request,
     response: Response | None = None,
 ) -> TenantContext:
-    auth_user, user_data = get_authenticated_user_row(request, response)
+    auth_user, user_data = require_regular_user(request, response)
 
     tenant_id = user_data.get("tenant_id")
     user_id = user_data.get("id")

@@ -682,6 +682,7 @@ export default function PageBuilder({
   templateLang = lang,
   appThemeMode = "light",
   onAppThemeModeChange,
+  user = null,
 } = {}) {
   const [project, setProject] = useState(() =>
     demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
@@ -718,7 +719,7 @@ export default function PageBuilder({
       setBuilderProjectLoading(true);
 
       try {
-        const projects = await listBuilderProjects();
+        const projects = await listBuilderProjects(user?.id);
         const selectedProject = projects[0] || null;
 
         if (!selectedProject) {
@@ -728,7 +729,7 @@ export default function PageBuilder({
           return;
         }
 
-        const fullRecord = await fetchBuilderProject(selectedProject.id);
+        const fullRecord = await fetchBuilderProject(selectedProject.id, user?.id);
         const loadedProject = getDraftProjectFromRecord(fullRecord);
 
         if (!loadedProject) return;
@@ -2233,8 +2234,8 @@ export default function PageBuilder({
       };
 
       const savedRecord = builderProjectRecord?.id
-        ? await updateBuilderProject(builderProjectRecord.id, payload)
-        : await createBuilderProject(payload);
+        ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
+        : await createBuilderProject(payload, user?.id);
 
       setBuilderProjectRecord(savedRecord);
       showToast("Saved to backend.");
@@ -2254,11 +2255,11 @@ export default function PageBuilder({
     }
 
     try {
-      const projects = await listBuilderProjects();
+      const projects = await listBuilderProjects(user?.id);
       const selectedProject = projects[0] || null;
 
       if (selectedProject) {
-        const fullRecord = await fetchBuilderProject(selectedProject.id);
+        const fullRecord = await fetchBuilderProject(selectedProject.id, user?.id);
         const loadedProject = getDraftProjectFromRecord(fullRecord);
 
         if (loadedProject) {
@@ -2317,7 +2318,7 @@ export default function PageBuilder({
     const liveWindow = window.open("about:blank", "_blank");
 
     try {
-      const websiteSettings = await fetchWebsiteSettings();
+      const websiteSettings = await fetchWebsiteSettings(user?.id);
       const publicSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
 
       if (!publicSubdomain) {
@@ -2335,10 +2336,10 @@ export default function PageBuilder({
       };
 
       const savedRecord = builderProjectRecord?.id
-        ? await updateBuilderProject(builderProjectRecord.id, payload)
-        : await createBuilderProject(payload);
+        ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
+        : await createBuilderProject(payload, user?.id);
 
-      const publishedRecord = await publishBuilderProject(savedRecord.id);
+      const publishedRecord = await publishBuilderProject(savedRecord.id, user?.id);
 
       setBuilderProjectRecord(publishedRecord);
       showToast("Site published to backend.");
@@ -3745,6 +3746,7 @@ export default function PageBuilder({
   <DataAnalysisWorkspace
     project={project}
     lang={lang}
+    user={user}
     selectForm={selectForm}
     setActiveTab={setActiveTab}
     getFormFields={getFormFields}
@@ -4116,6 +4118,7 @@ export default function PageBuilder({
       project={project}
       builderProjectId={builderProjectRecord?.id || ""}
       lang={lang}
+      user={user}
       activeForm={activeForm}
       selectForm={selectForm}
       setActiveTab={setActiveTab}

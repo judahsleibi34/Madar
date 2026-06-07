@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchBuilderFormSubmissions } from "./PageBuilder.api";
+import { fetchBuilderFormSubmissionsPage } from "./PageBuilder.api";
 
 const responsesText = {
   en: {
@@ -117,6 +117,7 @@ const getResponseLoadMessage = (error, t) => {
 
 export default function BuilderResponsesPage({
   lang = "en",
+  user = null,
   project,
   builderProjectId = "",
   activeForm,
@@ -132,6 +133,7 @@ export default function BuilderResponsesPage({
   const selectedFormId = selectedForm?.id || "";
   const allForms = project.forms || [];
   const [backendResponsesByForm, setBackendResponsesByForm] = useState({});
+  const [backendPaginationByForm, setBackendPaginationByForm] = useState({});
   const [responsePageByForm, setResponsePageByForm] = useState({});
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responsesError, setResponsesError] = useState("");
@@ -150,16 +152,21 @@ export default function BuilderResponsesPage({
     setResponsesLoading(true);
     setResponsesError("");
 
-    fetchBuilderFormSubmissions(builderProjectId, {
+    fetchBuilderFormSubmissionsPage(builderProjectId, {
       form_id: selectedFormId,
       limit: RESPONSE_PAGE_SIZE,
       offset: selectedOffset,
+      user_id: user?.id,
     })
-      .then((submissions) => {
+      .then(({ submissions, pagination }) => {
         if (cancelled) return;
         setBackendResponsesByForm((current) => ({
           ...current,
           [selectedFormId]: submissions.map(normalizeBackendResponse),
+        }));
+        setBackendPaginationByForm((current) => ({
+          ...current,
+          [selectedFormId]: pagination,
         }));
       })
       .catch((error) => {
@@ -210,12 +217,13 @@ export default function BuilderResponsesPage({
 
   const fields = selectedForm ? getFormFields(selectedForm) : [];
   const responses = getDisplayResponsesForForm(selectedForm);
+  const selectedPagination = backendPaginationByForm[selectedFormId];
   const isQuiz = selectedForm?.mode === "quiz";
   const requiredFields = fields.filter((field) => field.required);
   const optionalFields = Math.max(0, fields.length - requiredFields.length);
   const latestResponse = selectedPage === 0 ? responses[0] : null;
   const hasBackendPagination = Boolean(builderProjectId && selectedFormId);
-  const hasNextPage = hasBackendPagination && responses.length === RESPONSE_PAGE_SIZE;
+  const hasNextPage = hasBackendPagination && Boolean(selectedPagination?.has_more);
   const hasPreviousPage = hasBackendPagination && selectedPage > 0;
   const answeredCells = responses.reduce(
     (total, response) =>

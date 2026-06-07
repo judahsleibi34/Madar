@@ -130,8 +130,8 @@ export default function App() {
   }, []);
 
   const fetchUserInfo = useCallback(async () => {
-    const response = await fetch(`${API_URL}/user/info`, {
-      method: "POST",
+    const response = await fetch(`${API_URL}/auth/user_status`, {
+      method: "GET",
       credentials: "include",
       cache: "no-store",
     });
@@ -759,6 +759,7 @@ export default function App() {
                 renderDashboardShell(
                   <PageBuilder
                     key="page-builder-main"
+                    user={user}
                     templateLang={lang}
                     appThemeMode={themeMode}
                     onAppThemeModeChange={handleThemeModeChange}
@@ -785,6 +786,7 @@ export default function App() {
                 renderDashboardShell(
                   <PageBuilder
                     key="builder-responses-page"
+                    user={user}
                     initialTab="responses"
                     visibleTabIds={["responses"]}
                     hideWorkspaceTabs={true}
@@ -815,6 +817,7 @@ export default function App() {
                 renderDashboardShell(
                   <PageBuilder
                     key="builder-data-page"
+                    user={user}
                     initialTab="data"
                     visibleTabIds={["data"]}
                     hideWorkspaceTabs={true}
@@ -947,6 +950,7 @@ export default function App() {
                 <PageBuilder
                   key="page-builder-demo"
                   demoMode
+                  user={user}
                   lang="en"
                   templateLang={lang}
                   appThemeMode={themeMode}

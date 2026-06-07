@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request
@@ -8,6 +9,8 @@ try:
     import redis
 except ImportError:  # pragma: no cover - dependency is installed in Docker
     redis = None
+
+logger = logging.getLogger(__name__)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -29,6 +32,8 @@ PUBLIC_RATE_LIMIT_LIMIT = int(os.getenv("PUBLIC_RATE_LIMIT_LIMIT", "120"))
 PUBLIC_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PUBLIC_RATE_LIMIT_WINDOW_SECONDS", "60"))
 PUBLIC_FORM_SUBMISSION_RATE_LIMIT_LIMIT = int(os.getenv("PUBLIC_FORM_SUBMISSION_RATE_LIMIT_LIMIT", "20"))
 PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS", "300"))
+PUBLIC_CONTACT_RATE_LIMIT_LIMIT = int(os.getenv("PUBLIC_CONTACT_RATE_LIMIT_LIMIT", "10"))
+PUBLIC_CONTACT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PUBLIC_CONTACT_RATE_LIMIT_WINDOW_SECONDS", "300"))
 
 
 @dataclass
@@ -88,7 +93,7 @@ def get_rate_limit_store():
     except Exception as exc:
         if not RATE_LIMIT_FAIL_OPEN:
             raise RuntimeError(f"Rate limiter Redis unavailable: {exc}") from exc
-        print("RATE LIMIT WARNING: using in-memory fallback:", repr(exc))
+        logger.warning("rate_limit.redis_unavailable", extra={"error_type": type(exc).__name__})
         _store = _memory_store
 
     return _store
@@ -139,7 +144,7 @@ def enforce_rate_limit(
         if not RATE_LIMIT_FAIL_OPEN:
             raise RuntimeError(f"Rate limiter Redis unavailable: {exc}") from exc
 
-        print("RATE LIMIT WARNING: using in-memory fallback:", repr(exc))
+        logger.warning("rate_limit.fallback_used", extra={"error_type": type(exc).__name__})
         fallback_store = _memory_store
         count = fallback_store.incr_with_ttl(key, window_seconds)
 
@@ -198,4 +203,14 @@ def enforce_public_form_submission_rate_limit(
         identifier=identifier,
         limit=PUBLIC_FORM_SUBMISSION_RATE_LIMIT_LIMIT,
         window_seconds=PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
+def enforce_public_contact_rate_limit(request: Request, identifier: str | None = None):
+    return enforce_rate_limit(
+        request,
+        "public_contact:submit",
+        identifier=identifier,
+        limit=PUBLIC_CONTACT_RATE_LIMIT_LIMIT,
+        window_seconds=PUBLIC_CONTACT_RATE_LIMIT_WINDOW_SECONDS,
     )

@@ -479,7 +479,9 @@ class DataCleaning(DataReadingNormal):
 
             if bool_ratio >= 0.9:
                 df[column] = booleans.astype("boolean")
-            elif numeric_ratio >= 0.85:
+            elif numeric_ratio >= 0.85 or (
+                numeric_ratio >= 0.5 and self._looks_numeric_column(column, cleaned_text)
+            ):
                 df[column] = numeric
             elif date_ratio >= 0.85 or (date_ratio >= 0.5 and self._looks_date_column(column)):
                 df[column] = dates
@@ -748,8 +750,8 @@ class DataCleaning(DataReadingNormal):
             series.astype("string")
             .map(self._normalize_text_value)
             .str.replace(",", "", regex=False)
-            .str.replace(r"[$â‚¬آ£â‚ھ%]", "", regex=True)
             .str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+            .str.replace(r"[^\d.\-]", "", regex=True)
             .str.strip()
         )
         return pd.to_numeric(cleaned, errors="coerce")
@@ -766,7 +768,8 @@ class DataCleaning(DataReadingNormal):
         return series.map(convert)
 
     def _is_object_like(self, series: pd.Series) -> bool:
-        return series.dtype == "object" or str(series.dtype).startswith("string")
+        dtype_name = str(series.dtype)
+        return series.dtype == "object" or dtype_name == "str" or dtype_name.startswith("string")
 
     def _is_multi_select_series(self, series: pd.Series) -> bool:
         if not self._is_object_like(series):

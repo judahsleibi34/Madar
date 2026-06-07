@@ -85,6 +85,7 @@ class FakeQuery:
         self.supabase = supabase
         self.table_name = table_name
         self.filters = []
+        self.neq_filters = []
         self.not_null_columns = set()
         self.insert_payload = None
         self.limit_count = None
@@ -98,6 +99,10 @@ class FakeQuery:
 
     def eq(self, column, value):
         self.filters.append((column, value))
+        return self
+
+    def neq(self, column, value):
+        self.neq_filters.append((column, value))
         return self
 
     @property
@@ -143,6 +148,9 @@ class FakeQuery:
         for column, value in self.filters:
             rows = [row for row in rows if row.get(column) == value]
 
+        for column, value in self.neq_filters:
+            rows = [row for row in rows if row.get(column) != value]
+
         for column in self.not_null_columns:
             rows = [row for row in rows if row.get(column) is not None]
 
@@ -178,6 +186,7 @@ class FakeSupabase:
                     "published_schema": PUBLISHED_SCHEMA,
                     "published_version": 4,
                     "last_published_at": "2026-06-03T13:00:00+00:00",
+                    "updated_at": "2026-06-03T13:00:00+00:00",
                 }
             ],
             "builder_form_submissions": [
@@ -321,13 +330,152 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
+            response = client.get(f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["project_id"], PROJECT_ID)
         self.assertEqual(len(body["submissions"]), 1)
+        self.assertEqual(body["items"], body["submissions"])
+        self.assertEqual(body["pagination"]["limit"], 20)
+        self.assertEqual(body["pagination"]["offset"], 0)
+        self.assertFalse(body["pagination"]["has_more"])
         self.assertEqual(body["submissions"][0]["answers"], {"field_name": "Existing"})
+
+    def test_builder_project_list_default_pagination(self):
+        fake_supabase = FakeSupabase()
+        for index in range(25):
+            fake_supabase.tables["builder_projects"].append(
+                {
+                    "id": f"project-{index}",
+                    "tenant_id": 1,
+                    "name": f"Project {index}",
+                    "slug": f"project-{index}",
+                    "status": "draft",
+                    "updated_at": f"2026-06-03T12:{index:02d}:00+00:00",
+                }
+            )
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.get("/users/2/builder/projects")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["projects"]), 20)
+        self.assertEqual(body["items"], body["projects"])
+        self.assertEqual(body["pagination"]["limit"], 20)
+        self.assertEqual(body["pagination"]["offset"], 0)
+        self.assertEqual(body["pagination"]["count"], 20)
+        self.assertTrue(body["pagination"]["has_more"])
+
+    def test_builder_project_list_custom_limit_offset_and_tenant_scope(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"].extend(
+            [
+                {
+                    "id": "tenant-1-project",
+                    "tenant_id": 1,
+                    "name": "Tenant 1 project",
+                    "slug": "tenant-1-project",
+                    "status": "draft",
+                    "updated_at": "2026-06-03T15:00:00+00:00",
+                },
+                {
+                    "id": "tenant-2-project",
+                    "tenant_id": 2,
+                    "name": "Tenant 2 project",
+                    "slug": "tenant-2-project",
+                    "status": "draft",
+                    "updated_at": "2026-06-03T16:00:00+00:00",
+                },
+                {
+                    "id": "tenant-1-project-2",
+                    "tenant_id": 1,
+                    "name": "Tenant 1 project 2",
+                    "slug": "tenant-1-project-2",
+                    "status": "draft",
+                    "updated_at": "2026-06-03T14:00:00+00:00",
+                },
+            ]
+        )
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.get("/users/2/builder/projects?limit=1&offset=1")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["projects"]), 1)
+        self.assertTrue(all(project["tenant_id"] == 1 for project in body["projects"]))
+        self.assertEqual(body["pagination"]["limit"], 1)
+        self.assertEqual(body["pagination"]["offset"], 1)
+        self.assertTrue(body["pagination"]["has_more"])
+
+    def test_builder_project_list_rejects_invalid_pagination(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            over_limit = client.get("/users/2/builder/projects?limit=101")
+            negative_offset = client.get("/users/2/builder/projects?offset=-1")
+
+        self.assertEqual(over_limit.status_code, 422)
+        self.assertEqual(negative_offset.status_code, 422)
+
+    def test_form_submissions_custom_pagination(self):
+        fake_supabase = FakeSupabase()
+        for index in range(3):
+            fake_supabase.tables["builder_form_submissions"].append(
+                {
+                    "id": f"submission-{index}",
+                    "tenant_id": 1,
+                    "project_id": PROJECT_ID,
+                    "form_id": FORM_ID,
+                    "form_title": "Contact form",
+                    "form_version": 4,
+                    "status": "new",
+                    "answers": {"field_name": f"Person {index}"},
+                    "quiz_result": None,
+                    "field_snapshot": [],
+                    "submitted_at": f"2026-06-03T15:0{index}:00+00:00",
+                    "created_at": f"2026-06-03T15:0{index}:00+00:00",
+                }
+            )
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.get(
+                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?limit=2&offset=1"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["submissions"]), 2)
+        self.assertEqual(body["items"], body["submissions"])
+        self.assertEqual(body["pagination"]["limit"], 2)
+        self.assertEqual(body["pagination"]["offset"], 1)
+        self.assertTrue(body["pagination"]["has_more"])
+
+    def test_form_submissions_rejects_invalid_pagination(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            over_limit = client.get(
+                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?limit=101"
+            )
+            negative_offset = client.get(
+                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?offset=-1"
+            )
+
+        self.assertEqual(over_limit.status_code, 422)
+        self.assertEqual(negative_offset.status_code, 422)
 
     def test_authenticated_submission_read_works(self):
         fake_supabase = FakeSupabase()
@@ -336,7 +484,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(
-                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -348,7 +496,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
-            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions")
+            response = client.get(f"/users/2/builder/projects/{PROJECT_ID}/form-submissions")
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Builder project not found")

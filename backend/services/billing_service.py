@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import HTTPException
 
 from database import service_supabase
+
+logger = logging.getLogger(__name__)
 
 
 FULL_PLATFORM_PLANS = {"starter", "pro", "business"}
@@ -93,7 +96,7 @@ def get_billing_summary_for_tenant(tenant_id: int | str | None) -> dict[str, Any
         )
 
     except Exception as error:
-        print("BILLING SUMMARY ERROR:", type(error).__name__)
+        logger.warning("billing.summary_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
         return {}
 
     features = result.data or []
@@ -171,7 +174,20 @@ def apply_verified_billing_update(
             result = service_supabase.table("features").insert(payload).execute()
 
     except Exception as error:
-        print("BILLING UPDATE ERROR:", type(error).__name__)
+        logger.warning("billing.features_update_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not apply billing update.")
 
-    return result.data[0] if result.data else payload
+    feature = result.data[0] if result.data else payload
+    logger.info(
+        "billing.features_updated",
+        extra={
+            "tenant_id": tenant_id,
+            "subscription_type": payload.get("subscription_type"),
+            "plan": payload.get("plan"),
+            "builder_type": payload.get("builder_type"),
+            "payment_status": payload.get("payment_status"),
+            "source": source,
+            "updated_by_user_id": updated_by_user_id,
+        },
+    )
+    return feature

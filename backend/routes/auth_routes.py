@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from database import service_supabase, supabase
@@ -12,6 +14,7 @@ from services.auth_service import (
 from services.billing_service import get_billing_summary_for_tenant
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+logger = logging.getLogger(__name__)
 
 
 def normalize_email(email: str) -> str:
@@ -134,7 +137,10 @@ def signup(user: SignUpRequest, request: Request):
             )
 
         except Exception as auth_create_error:
-            print("SIGNUP AUTH CREATE ERROR:", repr(auth_create_error))
+            logger.warning(
+                "auth.signup.auth_create_failed",
+                extra={"email": clean_email, "error_type": type(auth_create_error).__name__},
+            )
             friendly_message = get_auth_error_message(auth_create_error)
 
             if friendly_message:
@@ -181,7 +187,10 @@ def signup(user: SignUpRequest, request: Request):
             )
 
         except Exception as user_insert_error:
-            print("SIGNUP USER INSERT ERROR:", repr(user_insert_error))
+            logger.warning(
+                "auth.signup.user_insert_failed",
+                extra={"auth_id": auth_user_id, "tenant_id": tenant_id, "error_type": type(user_insert_error).__name__},
+            )
             friendly_message = get_auth_error_message(user_insert_error)
 
             if friendly_message:
@@ -222,7 +231,7 @@ def signup(user: SignUpRequest, request: Request):
         raise
 
     except Exception as e:
-        print("SIGNUP ERROR:", repr(e))
+        logger.warning("auth.signup.failed", extra={"error_type": type(e).__name__})
         raise HTTPException(status_code=400, detail="Could not create account")
 
     finally:
@@ -232,14 +241,14 @@ def signup(user: SignUpRequest, request: Request):
                     "auth_id", auth_user_id
                 ).execute()
             except Exception as cleanup_error:
-                print("SIGNUP MEMBERSHIP CLEANUP ERROR:", repr(cleanup_error))
+                logger.warning("auth.signup.membership_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
 
             try:
                 service_supabase.table("users").delete().eq(
                     "auth_id", auth_user_id
                 ).execute()
             except Exception as cleanup_error:
-                print("SIGNUP USER CLEANUP ERROR:", repr(cleanup_error))
+                logger.warning("auth.signup.user_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
 
         if not signup_complete and tenant_id is not None:
             try:
@@ -247,13 +256,13 @@ def signup(user: SignUpRequest, request: Request):
                     "tenant_id", tenant_id
                 ).execute()
             except Exception as cleanup_error:
-                print("SIGNUP TENANT CLEANUP ERROR:", repr(cleanup_error))
+                logger.warning("auth.signup.tenant_cleanup_failed", extra={"tenant_id": tenant_id, "error_type": type(cleanup_error).__name__})
 
         if not signup_complete and auth_user_id:
             try:
                 service_supabase.auth.admin.delete_user(auth_user_id)
             except Exception as cleanup_error:
-                print("SIGNUP AUTH CLEANUP ERROR:", repr(cleanup_error))
+                logger.warning("auth.signup.auth_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
 
 
 @router.post("/login")
@@ -308,7 +317,10 @@ def login(user: LogIn, response: Response, request: Request):
                 )
 
             except Exception as email_sync_error:
-                print("LOGIN EMAIL SYNC ERROR:", repr(email_sync_error))
+                logger.warning(
+                    "auth.login.email_sync_failed",
+                    extra={"auth_id": auth_user_id, "error_type": type(email_sync_error).__name__},
+                )
                 raise HTTPException(
                     status_code=409,
                     detail="Could not sync login email",
@@ -328,6 +340,11 @@ def login(user: LogIn, response: Response, request: Request):
             auth_response.session.refresh_token,
         )
 
+        logger.info(
+            "auth.login.success",
+            extra={"user_id": local_user.get("id"), "tenant_id": local_user.get("tenant_id")},
+        )
+
         return {
             "message": "User is logged in",
             "user": build_user_payload(local_user),
@@ -337,7 +354,7 @@ def login(user: LogIn, response: Response, request: Request):
         raise
 
     except Exception as e:
-        print("LOGIN ERROR:", repr(e))
+        logger.warning("auth.login.failed", extra={"error_type": type(e).__name__})
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
@@ -360,7 +377,7 @@ def user_status(request: Request, response: Response):
         }
 
     except Exception as e:
-        print("USER STATUS ERROR:", repr(e))
+        logger.warning("auth.user_status.failed", extra={"error_type": type(e).__name__})
         return {
             "logged_in": False,
             "user": None,
@@ -419,7 +436,7 @@ def change_password(
             raise
 
         except Exception as verify_error:
-            print("PASSWORD VERIFY ERROR:", repr(verify_error))
+            logger.warning("auth.password.verify_failed", extra={"user_id": user_data.get("id"), "error_type": type(verify_error).__name__})
             raise HTTPException(
                 status_code=401,
                 detail="Current password is incorrect",
@@ -434,7 +451,7 @@ def change_password(
             )
 
         except Exception as update_error:
-            print("PASSWORD UPDATE ERROR:", repr(update_error))
+            logger.warning("auth.password.update_failed", extra={"user_id": user_data.get("id"), "error_type": type(update_error).__name__})
             raise HTTPException(
                 status_code=500,
                 detail="Could not update password",
@@ -456,7 +473,7 @@ def change_password(
                 )
 
         except Exception as session_error:
-            print("PASSWORD SESSION REFRESH ERROR:", repr(session_error))
+            logger.warning("auth.password.session_refresh_failed", extra={"user_id": user_data.get("id"), "error_type": type(session_error).__name__})
 
         return {
             "message": "Password updated successfully",
@@ -466,7 +483,7 @@ def change_password(
         raise
 
     except Exception as e:
-        print("CHANGE PASSWORD ERROR:", repr(e))
+        logger.warning("auth.password.change_failed", extra={"error_type": type(e).__name__})
         raise HTTPException(
             status_code=500,
             detail="Could not update password",

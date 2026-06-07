@@ -1,5 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
-export const USER_INFO_PATH = import.meta.env.VITE_USER_INFO_PATH || "/user/info";
+export const USER_STATUS_PATH = import.meta.env.VITE_USER_STATUS_PATH || "/auth/user_status";
 
 export const getApiUrl = (path) => `${API_BASE_URL}${path}`;
 
@@ -18,8 +18,8 @@ const parseJsonResponse = async (response) => {
 };
 
 export const fetchCurrentBackendUser = async () => {
-  const response = await fetch(getApiUrl(USER_INFO_PATH), {
-    method: "POST",
+  const response = await fetch(getApiUrl(USER_STATUS_PATH), {
+    method: "GET",
     credentials: "include",
     cache: "no-store",
   });
@@ -28,6 +28,16 @@ export const fetchCurrentBackendUser = async () => {
 
   const data = await response.json();
   return data?.user || null;
+};
+
+const getUserScopedPath = async (userId, path) => {
+  const scopedUserId = userId || (await fetchCurrentBackendUser())?.id;
+
+  if (!scopedUserId) {
+    throw new Error("Could not resolve current user id");
+  }
+
+  return `/users/${encodeURIComponent(scopedUserId)}${path}`;
 };
 
 export const getBackendUserDisplayName = (user) => {
@@ -52,8 +62,8 @@ export const mapBackendUserToBuilderUser = (backendUser, roleId = "") => ({
   authId: backendUser?.auth_id || "",
 });
 
-export const listBuilderProjects = async () => {
-  const response = await fetch(getApiUrl("/builder/projects"), {
+export const listBuilderProjects = async (userId) => {
+  const response = await fetch(getApiUrl(await getUserScopedPath(userId, "/builder/projects")), {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -63,8 +73,8 @@ export const listBuilderProjects = async () => {
   return data?.projects || [];
 };
 
-export const fetchBuilderProject = async (projectId) => {
-  const response = await fetch(getApiUrl(`/builder/projects/${projectId}`), {
+export const fetchBuilderProject = async (projectId, userId) => {
+  const response = await fetch(getApiUrl(await getUserScopedPath(userId, `/builder/projects/${projectId}`)), {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -74,8 +84,8 @@ export const fetchBuilderProject = async (projectId) => {
   return data?.project || null;
 };
 
-export const createBuilderProject = async ({ name, slug, draft_schema }) => {
-  const response = await fetch(getApiUrl("/builder/projects"), {
+export const createBuilderProject = async ({ name, slug, draft_schema }, userId) => {
+  const response = await fetch(getApiUrl(await getUserScopedPath(userId, "/builder/projects")), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -86,8 +96,8 @@ export const createBuilderProject = async ({ name, slug, draft_schema }) => {
   return data?.project || null;
 };
 
-export const updateBuilderProject = async (projectId, payload) => {
-  const response = await fetch(getApiUrl(`/builder/projects/${projectId}`), {
+export const updateBuilderProject = async (projectId, payload, userId) => {
+  const response = await fetch(getApiUrl(await getUserScopedPath(userId, `/builder/projects/${projectId}`)), {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -98,8 +108,8 @@ export const updateBuilderProject = async (projectId, payload) => {
   return data?.project || null;
 };
 
-export const publishBuilderProject = async (projectId) => {
-  const response = await fetch(getApiUrl(`/builder/projects/${projectId}/publish`), {
+export const publishBuilderProject = async (projectId, userId) => {
+  const response = await fetch(getApiUrl(await getUserScopedPath(userId, `/builder/projects/${projectId}/publish`)), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -110,8 +120,8 @@ export const publishBuilderProject = async (projectId) => {
   return data?.project || null;
 };
 
-export const fetchWebsiteSettings = async () => {
-  const response = await fetch(getApiUrl("/website/settings"), {
+export const fetchWebsiteSettings = async (userId) => {
+  const response = await fetch(getApiUrl(await getUserScopedPath(userId, "/website/settings")), {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -123,7 +133,7 @@ export const fetchWebsiteSettings = async () => {
 
 export const fetchBuilderFormSubmissions = async (
   projectId,
-  { form_id, limit = 100, offset = 0 } = {}
+  { form_id, limit = 100, offset = 0, user_id } = {}
 ) => {
   const params = new URLSearchParams();
 
@@ -133,7 +143,10 @@ export const fetchBuilderFormSubmissions = async (
 
   const query = params.toString();
   const response = await fetch(
-    getApiUrl(`/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`),
+    getApiUrl(await getUserScopedPath(
+      user_id,
+      `/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`
+    )),
     {
       method: "GET",
       credentials: "include",
@@ -143,6 +156,43 @@ export const fetchBuilderFormSubmissions = async (
 
   const data = await parseJsonResponse(response);
   return data?.submissions || [];
+};
+
+export const fetchBuilderFormSubmissionsPage = async (
+  projectId,
+  { form_id, limit = 20, offset = 0, user_id } = {}
+) => {
+  const params = new URLSearchParams();
+
+  if (form_id) params.set("form_id", form_id);
+  if (limit !== undefined && limit !== null) params.set("limit", String(limit));
+  if (offset !== undefined && offset !== null) params.set("offset", String(offset));
+
+  const query = params.toString();
+  const response = await fetch(
+    getApiUrl(await getUserScopedPath(
+      user_id,
+      `/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`
+    )),
+    {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    }
+  );
+
+  const data = await parseJsonResponse(response);
+  const submissions = data?.items || data?.submissions || [];
+
+  return {
+    submissions,
+    pagination: data?.pagination || {
+      limit,
+      offset,
+      count: submissions.length,
+      has_more: submissions.length >= limit,
+    },
+  };
 };
 
 export const submitPublicFormSubmission = async (subdomain, formId, payload) => {
