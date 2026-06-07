@@ -1,4 +1,7 @@
+import json
+import os
 import re
+import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -14,10 +17,12 @@ from services.tenant_service import (
     require_builder_write_access,
 )
 
-router = APIRouter(prefix="/builder", tags=["Builder"])
+router = APIRouter(prefix="/users/{user_id}/builder", tags=["Builder"])
+logger = logging.getLogger(__name__)
 
 SLUG_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 PROJECT_STATUSES = {"draft", "published", "archived"}
+MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
 
 
 def normalize_slug(value: str) -> str:
@@ -56,6 +61,17 @@ def assert_json_object(value: Any, field_name: str = "draft_schema") -> dict:
 
     if not isinstance(value, dict):
         raise HTTPException(status_code=400, detail=f"{field_name} must be a JSON object")
+
+    try:
+        size_bytes = len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail=f"{field_name} must be JSON serializable")
+
+    if size_bytes > MAX_BUILDER_SCHEMA_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"{field_name} is too large",
+        )
 
     return value
 
@@ -121,10 +137,23 @@ def format_form_submission(row: dict):
     }
 
 
-def clamp_pagination(limit: int, offset: int):
-    safe_limit = max(1, min(int(limit or 50), 200))
-    safe_offset = max(0, int(offset or 0))
-    return safe_limit, safe_offset
+def pagination_response(rows: list[Any], limit: int, offset: int):
+    items = rows[:limit]
+    return items, {
+        "limit": limit,
+        "offset": offset,
+        "count": len(items),
+        "has_more": len(rows) > limit,
+    }
+
+
+def assert_context_user(context: TenantContext, user_id: int) -> None:
+    try:
+        if int(context.user_id) != int(user_id):
+            raise ValueError
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=403, detail="User id does not match session")
+
 
 def first_row(response):
     if not response.data:
@@ -134,8 +163,15 @@ def first_row(response):
 
 
 @router.get("/projects")
-def list_builder_projects(request: Request, response: Response):
+def list_builder_projects(
+    user_id: int,
+    request: Request,
+    response: Response,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
     context = require_active_tenant_member(request, response)
+    assert_context_user(context, user_id)
 
     projects_response = (
         service_supabase.table("builder_projects")
@@ -143,22 +179,28 @@ def list_builder_projects(request: Request, response: Response):
         .eq("tenant_id", context.tenant_id)
         .neq("status", "archived")
         .order("updated_at", desc=True)
+        .range(offset, offset + limit)
         .execute()
     )
+    projects, pagination = pagination_response(projects_response.data or [], limit, offset)
 
     return {
         "success": True,
-        "projects": projects_response.data or [],
+        "items": projects,
+        "projects": projects,
+        "pagination": pagination,
     }
 
 
 @router.post("/projects")
 def create_builder_project(
+    user_id: int,
     project: BuilderProjectCreate,
     request: Request,
     response: Response,
 ):
     context = require_builder_write_access(request, response)
+    assert_context_user(context, user_id)
 
     payload = {
         "tenant_id": context.tenant_id,
@@ -175,7 +217,7 @@ def create_builder_project(
         if "duplicate" in str(error).lower() or "unique" in str(error).lower():
             raise HTTPException(status_code=409, detail="Project slug already exists")
 
-        print("BUILDER PROJECT CREATE ERROR:", repr(error))
+        logger.warning("builder.project_create_failed", extra={"tenant_id": context.tenant_id, "user_id": context.user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not create builder project")
 
     return {
@@ -185,8 +227,9 @@ def create_builder_project(
 
 
 @router.get("/projects/{project_id}")
-def get_builder_project(project_id: str, request: Request, response: Response):
+def get_builder_project(user_id: int, project_id: str, request: Request, response: Response):
     context = require_active_tenant_member(request, response)
+    assert_context_user(context, user_id)
 
     return {
         "success": True,
@@ -196,12 +239,14 @@ def get_builder_project(project_id: str, request: Request, response: Response):
 
 @router.put("/projects/{project_id}")
 def update_builder_project(
+    user_id: int,
     project_id: str,
     project: BuilderProjectUpdate,
     request: Request,
     response: Response,
 ):
     context = require_builder_write_access(request, response)
+    assert_context_user(context, user_id)
     get_project_for_tenant(project_id, context.tenant_id)
 
     update_payload = {}
@@ -241,7 +286,7 @@ def update_builder_project(
         if "duplicate" in str(error).lower() or "unique" in str(error).lower():
             raise HTTPException(status_code=409, detail="Project slug already exists")
 
-        print("BUILDER PROJECT UPDATE ERROR:", repr(error))
+        logger.warning("builder.project_update_failed", extra={"tenant_id": context.tenant_id, "user_id": context.user_id, "project_id": project_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not update builder project")
 
     return {
@@ -251,8 +296,9 @@ def update_builder_project(
 
 
 @router.delete("/projects/{project_id}")
-def archive_builder_project(project_id: str, request: Request, response: Response):
+def archive_builder_project(user_id: int, project_id: str, request: Request, response: Response):
     context = require_builder_admin_access(request, response)
+    assert_context_user(context, user_id)
     get_project_for_tenant(project_id, context.tenant_id)
 
     archive_response = (
@@ -271,16 +317,17 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
 
 @router.get("/projects/{project_id}/form-submissions")
 def list_builder_form_submissions(
+    user_id: int,
     project_id: str,
     request: Request,
     response: Response,
     form_id: Optional[str] = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
     context = require_active_tenant_member(request, response)
+    assert_context_user(context, user_id)
     get_project_for_tenant(project_id, context.tenant_id)
-    safe_limit, safe_offset = clamp_pagination(limit, offset)
 
     query = (
         service_supabase.table("builder_form_submissions")
@@ -294,29 +341,39 @@ def list_builder_form_submissions(
 
     submissions_response = (
         query.order("submitted_at", desc=True)
-        .range(safe_offset, safe_offset + safe_limit - 1)
+        .range(offset, offset + limit)
         .execute()
+    )
+    submissions, pagination = pagination_response(
+        [
+            format_form_submission(row)
+            for row in (submissions_response.data or [])
+        ],
+        limit,
+        offset,
     )
 
     return {
         "success": True,
         "project_id": project_id,
-        "submissions": [
-            format_form_submission(row) for row in (submissions_response.data or [])
-        ],
-        "limit": safe_limit,
-        "offset": safe_offset,
+        "items": submissions,
+        "submissions": submissions,
+        "pagination": pagination,
+        "limit": limit,
+        "offset": offset,
     }
 
 
 @router.get("/projects/{project_id}/form-submissions/{submission_id}")
 def get_builder_form_submission(
+    user_id: int,
     project_id: str,
     submission_id: str,
     request: Request,
     response: Response,
 ):
     context = require_active_tenant_member(request, response)
+    assert_context_user(context, user_id)
     get_project_for_tenant(project_id, context.tenant_id)
 
     submission_response = (
@@ -343,12 +400,14 @@ def get_builder_form_submission(
 
 @router.post("/projects/{project_id}/publish")
 def publish_builder_project(
+    user_id: int,
     project_id: str,
     request: Request,
     response: Response,
     publish: Optional[BuilderProjectPublish] = Body(default=None),
 ):
     context = require_builder_write_access(request, response)
+    assert_context_user(context, user_id)
     project = get_project_for_tenant(project_id, context.tenant_id)
     website_settings = require_public_subdomain(context.tenant_id, context.user_id)
 
@@ -365,6 +424,11 @@ def publish_builder_project(
         .eq("id", project_id)
         .eq("tenant_id", context.tenant_id)
         .execute()
+    )
+
+    logger.info(
+        "builder.project_published",
+        extra={"tenant_id": context.tenant_id, "user_id": context.user_id, "project_id": project_id},
     )
 
     return {

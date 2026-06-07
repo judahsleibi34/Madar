@@ -18,6 +18,7 @@ import ReportCanvas from './components/ReportCanvas';
 export default function DataAnalysisWorkspace({
   lang = "en",
   project,
+  user = null,
   getFormFields = () => [],
   selectForm,
   setActiveTab,
@@ -25,6 +26,13 @@ export default function DataAnalysisWorkspace({
   const activeLang = lang === "ar" ? "ar" : "en";
   const isArabic = activeLang === "ar";
   const t = uiText[activeLang];
+  const userApiPath = (path) => {
+    if (!user?.id) {
+      throw new Error(t.sessionExpired || "Your session has expired.");
+    }
+
+    return `${API_URL}/users/${encodeURIComponent(user.id)}${path}`;
+  };
 
   const availableForms = project?.forms || [];
   const firstFormWithResponses =
@@ -232,7 +240,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await fetch(`${API_URL}/data/upload`, {
+      const response = await fetch(userApiPath("/data/upload"), {
         method: "POST",
         credentials: "include",
         body: payload,
@@ -264,7 +272,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await fetch(`${API_URL}/data/read`, {
+      const response = await fetch(userApiPath("/data/read"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -349,7 +357,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await fetch(`${API_URL}${paths[type]}`, {
+      const response = await fetch(userApiPath(paths[type]), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -394,7 +402,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await fetch(`${API_URL}/analysis/run`, {
+      const response = await fetch(userApiPath("/analysis/run"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -451,7 +459,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await fetch(`${API_URL}/analysis/assist`, {
+      const response = await fetch(userApiPath("/analysis/assist"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

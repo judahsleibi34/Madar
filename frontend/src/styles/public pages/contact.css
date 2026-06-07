@@ -89,6 +89,26 @@
   background: var(--theme-primary-hover);
 }
 
+.contact-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.contact-form-status {
+  margin: -4px 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.contact-form-status-success {
+  color: #157347;
+}
+
+.contact-form-status-error {
+  color: #b42318;
+}
+
 .contact-info-card {
   background: #ffffff;
   border: 1px solid rgba(26, 39, 68, 0.08);

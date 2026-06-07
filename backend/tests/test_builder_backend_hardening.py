@@ -75,7 +75,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  "require_public_subdomain",
                  return_value={"subdomain": "tenant-site", "tenant_id": 1},
              ):
-            response = client.post("/builder/projects/project-1/publish")
+            response = client.post("/users/2/builder/projects/project-1/publish")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["project"]["published_schema"], {"pages": []})
@@ -102,7 +102,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  "require_public_subdomain",
                  return_value={"subdomain": "tenant-site", "tenant_id": 1},
              ):
-            response = client.post("/builder/projects/project-1/publish", json={})
+            response = client.post("/users/2/builder/projects/project-1/publish", json={})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["project"]["published_schema"], {"version": 1})
@@ -130,13 +130,37 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                      detail="Configure a website subdomain before going live.",
                  ),
              ):
-            response = client.post("/builder/projects/project-1/publish")
+            response = client.post("/users/2/builder/projects/project-1/publish")
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json()["detail"],
             "Configure a website subdomain before going live.",
         )
+
+    def test_update_rejects_oversized_draft_schema(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "MAX_BUILDER_SCHEMA_BYTES", 100), \
+             patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "draft_schema": {"pages": []},
+                 },
+             ):
+            response = client.put(
+                "/users/2/builder/projects/project-1",
+                json={"draft_schema": {"pages": [{"content": "x" * 200}]}},
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.json()["detail"], "draft_schema is too large")
 
     def test_member_cannot_archive_project(self):
         with patch(
@@ -158,7 +182,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
             "require_builder_admin_access",
             side_effect=HTTPException(status_code=403, detail="Builder admin access required"),
         ):
-            response = client.delete("/builder/projects/project-1")
+            response = client.delete("/users/2/builder/projects/project-1")
 
         self.assertEqual(response.status_code, 403)
 
@@ -172,7 +196,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                 "SUPABASE_ANON_KEY": "anon-key",
             },
             clear=True,
-        ):
+        ), patch("dotenv.load_dotenv", return_value=False):
             spec = importlib.util.spec_from_file_location(
                 "database_missing_service_key_test",
                 database_path,

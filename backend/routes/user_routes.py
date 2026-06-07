@@ -1,4 +1,5 @@
 import os
+import logging
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -11,9 +12,11 @@ from services.auth_service import (
     build_user_payload,
     get_authenticated_user_row,
     require_regular_user,
+    require_regular_user_id,
 )
 
-router = APIRouter(prefix="/user", tags=["User"])
+router = APIRouter(prefix="/users/{user_id}", tags=["User"])
+logger = logging.getLogger(__name__)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 
@@ -74,7 +77,7 @@ def upload_avatar_to_storage(storage_path: str, content: bytes, content_type: st
         return result
 
     except Exception as storage_error:
-        print("AVATAR STORAGE UPLOAD ERROR:", type(storage_error).__name__)
+        logger.warning("user.avatar.storage_upload_failed", extra={"error_type": type(storage_error).__name__})
         raise HTTPException(
             status_code=500,
             detail="Could not upload profile photo.",
@@ -99,7 +102,7 @@ def delete_old_avatar_if_storage_url(old_avatar: str, auth_id: str):
         service_supabase.storage.from_(AVATAR_BUCKET).remove([storage_path])
 
     except Exception as cleanup_error:
-        print("OLD AVATAR CLEANUP ERROR:", type(cleanup_error).__name__)
+        logger.warning("user.avatar.old_cleanup_failed", extra={"auth_id": auth_id, "error_type": type(cleanup_error).__name__})
 
 
 def is_duplicate_error(error: Exception) -> bool:
@@ -113,9 +116,9 @@ def is_duplicate_error(error: Exception) -> bool:
 
 
 @router.post("/info")
-def user_info(request: Request, response: Response):
+def user_info(user_id: int, request: Request, response: Response):
     try:
-        _, user_data = get_authenticated_user_row(request, response)
+        _, user_data = require_regular_user_id(user_id, request, response)
         user_payload = build_user_payload(user_data)
         user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
 
@@ -128,18 +131,19 @@ def user_info(request: Request, response: Response):
         raise
 
     except Exception as e:
-        print("USER INFO ERROR:", type(e).__name__)
+        logger.warning("user.info.failed", extra={"user_id": user_id, "error_type": type(e).__name__})
         raise HTTPException(status_code=500, detail="Could not fetch user info")
 
 
 @router.put("/profile")
 def update_user_profile(
+    user_id: int,
     profile: UserProfileUpdate,
     request: Request,
     response: Response,
 ):
     try:
-        _, user_data = require_regular_user(request, response)
+        _, user_data = require_regular_user_id(user_id, request, response)
 
         update_payload = {}
 
@@ -195,7 +199,7 @@ def update_user_profile(
             )
 
         except Exception as update_error:
-            print("USER PROFILE UPDATE DB ERROR:", type(update_error).__name__)
+            logger.warning("user.profile.db_update_failed", extra={"user_id": user_id, "error_type": type(update_error).__name__})
 
             if is_duplicate_error(update_error):
                 raise HTTPException(
@@ -227,18 +231,19 @@ def update_user_profile(
         raise
 
     except Exception as e:
-        print("USER PROFILE UPDATE ERROR:", type(e).__name__)
+        logger.warning("user.profile.update_failed", extra={"user_id": user_id, "error_type": type(e).__name__})
         raise HTTPException(status_code=500, detail="Could not update user profile")
 
 
 @router.post("/avatar")
 async def upload_user_avatar(
+    user_id: int,
     request: Request,
     response: Response,
     file: UploadFile = File(...),
 ):
     try:
-        _, user_data = require_regular_user(request, response)
+        _, user_data = require_regular_user_id(user_id, request, response)
 
         auth_id = str(user_data.get("auth_id") or "").strip()
 
@@ -295,12 +300,12 @@ async def upload_user_avatar(
             )
 
         except Exception as db_error:
-            print("AVATAR DB UPDATE ERROR:", type(db_error).__name__)
+            logger.warning("user.avatar.db_update_failed", extra={"user_id": user_id, "error_type": type(db_error).__name__})
 
             try:
                 service_supabase.storage.from_(AVATAR_BUCKET).remove([storage_path])
             except Exception as cleanup_error:
-                print("AVATAR STORAGE ROLLBACK ERROR:", type(cleanup_error).__name__)
+                logger.warning("user.avatar.storage_rollback_failed", extra={"user_id": user_id, "error_type": type(cleanup_error).__name__})
 
             raise HTTPException(
                 status_code=500,
@@ -331,5 +336,5 @@ async def upload_user_avatar(
         raise
 
     except Exception as e:
-        print("USER AVATAR UPLOAD ERROR:", type(e).__name__)
+        logger.warning("user.avatar.upload_failed", extra={"user_id": user_id, "error_type": type(e).__name__})
         raise HTTPException(status_code=500, detail="Could not upload profile photo")

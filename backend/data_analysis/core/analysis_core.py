@@ -155,11 +155,13 @@ class AnalysisBase:
             return self._numeric_cache[column].copy(deep=True)
 
         raw = self.df[column]
-        if raw.dtype == "object" or str(raw.dtype).startswith("string"):
+        raw_dtype = str(raw.dtype)
+        if raw.dtype == "object" or raw_dtype == "str" or raw_dtype.startswith("string"):
             cleaned = (
                 raw.astype("string")
                 .str.replace(",", "", regex=False)
-                .str.replace(r"[$â‚¬آ£â‚ھ%]", "", regex=True)
+                .str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+                .str.replace(r"[^\d.\-]", "", regex=True)
                 .str.strip()
             )
             values = pd.to_numeric(cleaned, errors="coerce")
@@ -260,11 +262,13 @@ class AnalysisBase:
         profiles = {}
         for column in self.df.columns:
             series = self.df[column]
-            if series.dtype == "object" or str(series.dtype).startswith("string"):
+            series_dtype = str(series.dtype)
+            if series.dtype == "object" or series_dtype == "str" or series_dtype.startswith("string"):
                 numeric_source = (
                     series.astype("string")
                     .str.replace(",", "", regex=False)
-                    .str.replace(r"[$â‚¬آ£â‚ھ%]", "", regex=True)
+                    .str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+                    .str.replace(r"[^\d.\-]", "", regex=True)
                     .str.strip()
                 )
             else:
@@ -276,7 +280,7 @@ class AnalysisBase:
                 inferred = "number"
             elif dates.notna().sum() / non_null >= 0.8:
                 inferred = "date"
-            elif series.dropna().astype(str).str.contains(r",|;|\|").mean() > 0.25:
+            elif series.dropna().astype(str).str.contains(r",|;|\|").mean() >= 0.25:
                 inferred = "multi_choice"
             elif series.nunique(dropna=True) <= max(20, len(series) * 0.2):
                 inferred = "category"

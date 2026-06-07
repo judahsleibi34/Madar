@@ -1,8 +1,11 @@
 import os
+import logging
 
 from fastapi import HTTPException, Request, Response
 
 from database import service_supabase, supabase
+
+logger = logging.getLogger(__name__)
 
 APP_ENV = (
     os.getenv("APP_ENV")
@@ -127,7 +130,10 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
                     next_refresh_token = auth_response.session.refresh_token
 
             except Exception as session_error:
-                print("AUTH SET SESSION ERROR:", type(session_error).__name__)
+                logger.warning(
+                    "auth.session.refresh_failed",
+                    extra={"error_type": type(session_error).__name__},
+                )
 
                 auth_response = supabase.auth.refresh_session(refresh_token)
                 auth_user = getattr(auth_response, "user", None)
@@ -149,7 +155,10 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
             auth_user = getattr(auth_response, "user", None)
 
     except Exception as e:
-        print("AUTH SESSION ERROR:", type(e).__name__)
+        logger.warning(
+            "auth.session.invalid",
+            extra={"error_type": type(e).__name__},
+        )
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
     if not auth_user:
@@ -192,5 +201,24 @@ def require_regular_user(request: Request, response: Response | None = None):
 
     if user_type == "admin":
         raise HTTPException(status_code=403, detail="User access is required")
+
+    return auth_user, user_data
+
+
+def require_regular_user_id(
+    user_id: int,
+    request: Request,
+    response: Response | None = None,
+):
+    auth_user, user_data = require_regular_user(request, response)
+
+    try:
+        path_user_id = int(user_id)
+        authenticated_user_id = int(user_data.get("id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="User id is invalid")
+
+    if authenticated_user_id != path_user_id:
+        raise HTTPException(status_code=403, detail="User id does not match session")
 
     return auth_user, user_data

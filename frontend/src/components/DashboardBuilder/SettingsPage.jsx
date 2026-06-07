@@ -262,6 +262,13 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
   const isArabic = lang === "ar";
   const t = settingsCopy[isArabic ? "ar" : "en"];
+  const userApiPath = (path) => {
+    if (!user?.id) {
+      throw new Error(t.sessionExpired);
+    }
+
+    return `${API_URL}/users/${encodeURIComponent(user.id)}${path}`;
+  };
 
   const avatarUrl = resolveMediaUrl(accountForm.avatar);
   const shouldShowAvatarImage = Boolean(avatarUrl) && !avatarLoadFailed;
@@ -423,7 +430,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadAccount = async () => {
       try {
-        const response = await fetch(`${API_URL}/user/info`, {
+        const response = await fetch(userApiPath("/info"), {
           method: "POST",
           credentials: "include",
         });
@@ -467,7 +474,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadWebsiteSettings = async () => {
       try {
-        const response = await fetch(`${API_URL}/website/settings`, {
+        const response = await fetch(userApiPath("/website/settings"), {
           method: "GET",
           credentials: "include",
           cache: "no-store",
@@ -544,7 +551,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setAvatarLoadFailed(false);
 
     try {
-      const response = await fetch(`${API_URL}/user/avatar`, {
+      const response = await fetch(userApiPath("/avatar"), {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -590,7 +597,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setIsSavingAccount(true);
 
     try {
-      const response = await fetch(`${API_URL}/user/profile`, {
+      const response = await fetch(userApiPath("/profile"), {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -652,7 +659,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     };
 
     try {
-      const response = await fetch(`${API_URL}/website/settings`, {
+      const response = await fetch(userApiPath("/website/settings"), {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

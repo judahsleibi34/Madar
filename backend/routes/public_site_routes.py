@@ -1,4 +1,5 @@
 import re
+import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -12,6 +13,7 @@ from services.rate_limit_service import (
 )
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
+logger = logging.getLogger(__name__)
 
 SUBDOMAIN_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
@@ -332,12 +334,22 @@ def submit_public_builder_form(
     try:
         insert_response = service_supabase.table("builder_form_submissions").insert(payload).execute()
     except Exception as error:
-        print("PUBLIC BUILDER FORM SUBMISSION ERROR:", repr(error))
+        logger.warning("public.form_submission_failed", extra={"tenant_id": tenant_id, "project_id": project.get("id"), "form_id": clean_form_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not submit form")
 
     saved_submission = first_row(insert_response)
 
     if not saved_submission:
         raise HTTPException(status_code=500, detail="Could not submit form")
+
+    logger.info(
+        "public.form_submission_created",
+        extra={
+            "tenant_id": tenant_id,
+            "project_id": project.get("id"),
+            "form_id": clean_form_id,
+            "submission_id": saved_submission.get("id"),
+        },
+    )
 
     return format_submission(saved_submission)

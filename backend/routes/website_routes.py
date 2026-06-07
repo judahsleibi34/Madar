@@ -1,13 +1,14 @@
 import re
+import logging
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from database import service_supabase
 from classes import WebsiteSettingsUpdate
-from services.auth_service import get_authenticated_user_row
-from services.website_settings_service import ensure_settings_for_tenant, get_settings_for_tenant
+from services.auth_service import require_regular_user_id
+from services.website_settings_service import ensure_settings_for_tenant, save_settings_for_tenant
 
-router = APIRouter(prefix="/website", tags=["Website"])
+router = APIRouter(prefix="/users/{user_id}/website", tags=["Website"])
+logger = logging.getLogger(__name__)
 
 SUBDOMAIN_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
@@ -143,12 +144,13 @@ def validate_description(value: str):
 
 @router.put("/settings")
 def update_website_settings(
+    user_id: int,
     settings: WebsiteSettingsUpdate,
     request: Request,
     response: Response,
 ):
     try:
-        _, user_data = get_authenticated_user_row(request, response)
+        _, user_data = require_regular_user_id(user_id, request, response)
 
         update_payload = {}
 
@@ -190,37 +192,10 @@ def update_website_settings(
         if tenant_id is None:
             raise HTTPException(status_code=403, detail="User does not belong to a tenant")
 
-        update_payload["tenant_id"] = tenant_id
-
-        existing_website = get_settings_for_tenant(tenant_id, user_id)
-
-        if existing_website:
-            save_response = (
-                service_supabase.table("website_settings")
-                .update(update_payload)
-                .eq("id", existing_website["id"])
-                .execute()
-            )
-        else:
-            insert_payload = {
-                **update_payload,
-                "user_id": user_id,
-                "tenant_id": tenant_id,
-            }
-
-            save_response = (
-                service_supabase.table("website_settings")
-                .insert(insert_payload)
-                .execute()
-            )
-
-        updated_website = (
-            save_response.data[0]
-            if save_response.data
-            else {
-                **(existing_website or {}),
-                **update_payload,
-            }
+        updated_website = save_settings_for_tenant(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            update_payload=update_payload,
         )
 
         return {
@@ -233,7 +208,7 @@ def update_website_settings(
         raise
 
     except Exception as e:
-        print("WEBSITE SETTINGS UPDATE ERROR:", repr(e))
+        logger.warning("website.settings.update_failed", extra={"user_id": user_id, "error_type": type(e).__name__})
         raise HTTPException(
             status_code=500,
             detail="Could not update website settings",
@@ -241,9 +216,9 @@ def update_website_settings(
 
 
 @router.get("/settings")
-def get_website_settings(request: Request, response: Response):
+def get_website_settings(user_id: int, request: Request, response: Response):
     try:
-        _, user_data = get_authenticated_user_row(request, response)
+        _, user_data = require_regular_user_id(user_id, request, response)
 
         user_id = user_data["id"]
         tenant_id = user_data.get("tenant_id")
@@ -263,7 +238,7 @@ def get_website_settings(request: Request, response: Response):
         raise
 
     except Exception as e:
-        print("WEBSITE SETTINGS FETCH ERROR:", repr(e))
+        logger.warning("website.settings.fetch_failed", extra={"user_id": user_id, "error_type": type(e).__name__})
         raise HTTPException(
             status_code=500,
             detail="Could not fetch website settings",

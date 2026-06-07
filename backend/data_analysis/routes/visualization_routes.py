@@ -1,18 +1,18 @@
-﻿from typing import Any
+import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from data_analysis.cleaning.data_cleaning import DataCleaning
-from data_analysis.visualization.visualization import DataVisualization
-from data_analysis.core.response_utils import sanitize_for_json
+from data_analysis import services as data_services
 from data_analysis.routes.data_routes import get_storage_scope
 
 
 router = APIRouter(
-    prefix="/visualization",
-    tags=["Visualization"]
+    prefix="/users/{user_id}/visualization",
+    tags=["Visualization"],
 )
+logger = logging.getLogger(__name__)
 
 
 class VisualizationRequest(BaseModel):
@@ -22,29 +22,20 @@ class VisualizationRequest(BaseModel):
 
 
 @router.post("/create")
-def create_visualization(request: VisualizationRequest, fastapi_request: Request, response: Response):
+def create_visualization(user_id: int, request: VisualizationRequest, fastapi_request: Request, response: Response):
     try:
-        tenant_id, user_id = get_storage_scope(fastapi_request, response)
-        cleaner = DataCleaning(request.input_path, tenant_id=tenant_id, user_id=user_id)
-
-        if request.cleaning_actions:
-            df = cleaner.apply_pipeline(request.cleaning_actions)
-        else:
-            df = cleaner.read()
-
-        visualizer = DataVisualization(df)
-        chart_path = visualizer.plot(**request.chart_config)
-
-        return sanitize_for_json({
-            "chart_path": chart_path,
-            "rows_used": int(len(df)),
-            "columns_used": list(df.columns)
-        })
+        tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        return data_services.create_visualization(
+            input_path=request.input_path,
+            cleaning_actions=request.cleaning_actions,
+            chart_config=request.chart_config,
+            tenant_id=tenant_id,
+            user_id=scoped_user_id,
+        )
 
     except HTTPException:
         raise
 
     except Exception as error:
-        print("VISUALIZATION CREATE ERROR:", type(error).__name__)
+        logger.warning("data.visualization.create_failed", extra={"user_id": user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=400, detail="Could not create visualization.")
-

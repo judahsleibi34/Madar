@@ -17,7 +17,9 @@ def list_users(
     request: Request,
     response: Response,
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=10, ge=1, le=50),
+    page_size: int = Query(default=10, ge=1, le=100),
+    limit: int | None = Query(default=None, ge=1, le=100),
+    offset: int | None = Query(default=None, ge=0),
     search: str = Query(default=""),
 ):
     require_system_admin(request, response)
@@ -25,11 +27,14 @@ def list_users(
     result = list_users_with_features(
         page=page,
         page_size=page_size,
+        limit=limit,
+        offset=offset,
         search=search,
     )
 
     return {
         "success": True,
+        "items": result["items"],
         "users": result["users"],
         "pagination": result["pagination"],
     }

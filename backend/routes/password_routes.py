@@ -1,4 +1,5 @@
 import os
+import logging
 
 from fastapi import APIRouter, HTTPException, Request
 from supabase import create_client
@@ -8,6 +9,7 @@ from database import service_supabase, supabase
 from services.rate_limit_service import enforce_password_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["Password"])
+logger = logging.getLogger(__name__)
 
 FRONTEND_URL = (
     os.getenv("FRONTEND_URL")
@@ -45,7 +47,7 @@ def forgot_password(payload: dict, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print("FORGOT PASSWORD ERROR:", repr(e))
+        logger.warning("auth.forgot_password.failed", extra={"error_type": type(e).__name__})
         return {"message": RESET_MESSAGE}
 
 
@@ -71,5 +73,5 @@ def password_reset(payload: PasswordReset, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print("RESET PASSWORD ERROR:", repr(e))
+        logger.warning("auth.password_reset.failed", extra={"error_type": type(e).__name__})
         raise HTTPException(status_code=400, detail="Could not reset password")

@@ -21,6 +21,18 @@ if SUPABASE_SERVICE_KEY == SUPABASE_ANON_KEY:
         "SUPABASE_SERVICE_KEY must not be the anon key; privileged backend operations require a service role key"
     )
 
+
+def get_config_readiness() -> dict[str, bool]:
+    return {
+        "supabase_url": bool(SUPABASE_URL),
+        "supabase_anon_key": bool(SUPABASE_ANON_KEY),
+        "supabase_service_key": bool(SUPABASE_SERVICE_KEY),
+        "service_key_is_distinct": bool(
+            SUPABASE_SERVICE_KEY and SUPABASE_SERVICE_KEY != SUPABASE_ANON_KEY
+        ),
+    }
+
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 service_supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
