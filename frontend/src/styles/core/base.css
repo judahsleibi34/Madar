@@ -10,7 +10,7 @@
 
 body {
   margin: 0;
-  background: #f5f2ee;
+  background: var(--theme-bg);
   font-family: Inter, sans-serif;
 }
 
@@ -43,8 +43,8 @@ body,
 body {
   min-height: 100vh;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #ffffff;
-  color: #111827;
+  background: var(--theme-bg);
+  color: var(--theme-text);
 }
 
 button,

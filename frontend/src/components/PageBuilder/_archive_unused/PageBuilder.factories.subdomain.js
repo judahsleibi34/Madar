@@ -142,7 +142,7 @@ export const createElement = (type = "text", overrides = {}) => {
       styles: {
         ...base.styles,
         color: "#ffffff",
-        backgroundColor: "#8b2a1a",
+        backgroundColor: "var(--theme-primary)",
         fontWeight: "900",
       },
     },

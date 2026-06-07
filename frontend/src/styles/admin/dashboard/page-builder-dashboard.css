@@ -101,8 +101,8 @@
 
 /* Active compact icon */
 .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active {
-  background: rgba(139, 42, 26, 0.1);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--theme-primary);
 }
 
 /* ============================================================
@@ -285,7 +285,7 @@
 .theme-dark
   .admin-dashboard-layout:has(.page-builder)
   .admin-sidebar-lang::after {
-  color: #f8fafc;
+  color: var(--theme-text);
 }
 
 [data-theme="dark"]
@@ -312,6 +312,12 @@
    ============================================================ */
 
 @media (max-width: 768px) {
+  .admin-dashboard-layout:has(.page-builder) .dashboard-mobile-menu-button,
+  .admin-dashboard-layout:has(.page-builder) .dashboard-sidebar-backdrop,
+  .admin-dashboard-layout:has(.page-builder) .admin-sidebar {
+    display: none !important;
+  }
+
   .page-builder-dashboard-page {
     padding: 0;
   }

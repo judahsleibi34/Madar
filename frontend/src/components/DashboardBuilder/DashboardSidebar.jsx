@@ -23,9 +23,7 @@ import {
 } from "../../utils/themeMode";
 
 function normalizeRoleValue(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
+  return String(value || "").trim().toLowerCase();
 }
 
 function getUserRole(user) {
@@ -88,6 +86,9 @@ export default function DashboardSidebar({
   const { t } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const isRtl = lang === "ar";
+  const sidebarDir = isRtl ? "rtl" : "ltr";
 
   const [internalThemeMode, setInternalThemeMode] = useState(() => {
     if (themeMode === "dark" || themeMode === "light") {
@@ -169,6 +170,11 @@ export default function DashboardSidebar({
   }, [activeThemeMode]);
 
   useEffect(() => {
+    document.documentElement.dir = isRtl ? "rtl" : "ltr";
+    document.documentElement.lang = isRtl ? "ar" : "en";
+  }, [isRtl]);
+
+  useEffect(() => {
     const handleThemeStorage = (event) => {
       if (event.key !== "madar-theme-mode") return;
 
@@ -225,8 +231,11 @@ export default function DashboardSidebar({
 
   return (
     <aside
-      id={id}
-      className={`admin-sidebar ${compact ? "is-compact" : ""}`}
+      id={id || "dashboard-sidebar"}
+      className={`admin-sidebar dashboard-sidebar ${
+        compact ? "is-compact" : ""
+      } ${isRtl ? "is-rtl" : "is-ltr"}`}
+      dir={sidebarDir}
       aria-label={t("sidebar.aria")}
       data-user-role={userRole}
     >
@@ -265,7 +274,7 @@ export default function DashboardSidebar({
                 onClick={() => goTo(item.path)}
                 title={item.label}
               >
-                <Icon size={18} />
+                <Icon size={18} aria-hidden="true" />
                 <span>{item.label}</span>
               </button>
             );
@@ -275,7 +284,7 @@ export default function DashboardSidebar({
             mode={activeThemeMode}
             onChange={handleThemeChange}
             label={t("sidebar.themeMode")}
-            compact
+            compact={compact}
             showLabel
             showSwitch={false}
             className="admin-sidebar-theme-row"
@@ -288,7 +297,7 @@ export default function DashboardSidebar({
               onClick={() => goTo("/settings")}
               title={t("sidebar.settings")}
             >
-              <Settings size={18} />
+              <Settings size={18} aria-hidden="true" />
               <span>{t("sidebar.settings")}</span>
             </button>
           )}
@@ -311,7 +320,7 @@ export default function DashboardSidebar({
           onClick={onLogout}
           title={t("sidebar.logout")}
         >
-          <LogOut size={18} />
+          <LogOut size={18} aria-hidden="true" />
           <span>{t("sidebar.logout")}</span>
         </button>
 
@@ -333,7 +342,7 @@ export default function DashboardSidebar({
                   className="admin-sidebar-admin-badge"
                   title={t("sidebar.admin")}
                 >
-                  <ShieldCheck size={12} />
+                  <ShieldCheck size={12} aria-hidden="true" />
                   {t("sidebar.admin")}
                 </span>
               ) : (

@@ -112,14 +112,14 @@
 
 .page-builder-carousel .carousel-dots button.active {
   width: 28px;
-  background: #8b2a1a;
+  background: var(--theme-primary);
 }
 
 .page-builder-carousel.carousel-variant-lightswind .carousel-stage {
   border: 1px solid rgba(26, 39, 68, 0.12);
   background:
-    radial-gradient(circle at 82% 18%, rgba(139, 42, 26, 0.22), transparent 28%),
-    linear-gradient(135deg, #111a30 0%, #1a2744 52%, #8b2a1a 100%);
+    radial-gradient(circle at 82% 18%, rgba(var(--theme-primary-rgb), 0.22), transparent 28%),
+    var(--theme-gradient);
   box-shadow: 0 24px 70px rgba(26, 39, 68, 0.18);
 }
 
@@ -201,8 +201,8 @@
 }
 
 .page-builder-carousel.carousel-variant-cards .carousel-copy span {
-  background: rgba(139, 42, 26, 0.1);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--theme-primary);
 }
 
 .page-builder-carousel.carousel-variant-cards h3 {
@@ -261,8 +261,8 @@
 .circular-gallery-header strong {
   border-radius: 999px;
   padding: 8px 12px;
-  background: rgba(139, 42, 26, 0.1);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--theme-primary);
   font-size: 12px;
   font-weight: 950;
 }
@@ -274,7 +274,7 @@
   overflow: hidden;
   border-radius: inherit;
   background:
-    radial-gradient(circle at center, rgba(139, 42, 26, 0.12), transparent 34%),
+    radial-gradient(circle at center, rgba(var(--theme-primary-rgb), 0.12), transparent 34%),
     linear-gradient(180deg, #f9f7f4, #ffffff);
   perspective: 1100px;
   cursor: grab;
@@ -495,14 +495,14 @@
 :root[data-theme="dark"] .page-builder-carousel,
 html.theme-dark .page-builder-carousel,
 body.theme-dark .page-builder-carousel {
-  color: #f8fafc;
+  color: var(--theme-text);
 }
 
 :root[data-theme="dark"] .page-builder-carousel .carousel-stage,
 html.theme-dark .page-builder-carousel .carousel-stage,
 body.theme-dark .page-builder-carousel .carousel-stage {
-  border-color: rgba(126, 158, 181, 0.18);
-  background: #07111f;
+  border-color: rgba(244, 240, 232, 0.18);
+  background: var(--theme-bg);
   box-shadow: 0 22px 56px rgba(0, 0, 0, 0.28);
 }
 
@@ -510,8 +510,8 @@ body.theme-dark .page-builder-carousel .carousel-stage {
 html.theme-dark .page-builder-carousel .carousel-stage::after,
 body.theme-dark .page-builder-carousel .carousel-stage::after {
   background:
-    linear-gradient(90deg, rgba(7, 17, 31, 0.9), rgba(7, 17, 31, 0.24)),
-    linear-gradient(180deg, transparent, rgba(7, 17, 31, 0.42));
+    linear-gradient(90deg, rgba(15, 13, 18, 0.9), rgba(15, 13, 18, 0.24)),
+    linear-gradient(180deg, transparent, rgba(15, 13, 18, 0.42));
 }
 
 :root[data-theme="dark"] .page-builder-carousel .carousel-copy span,
@@ -520,47 +520,47 @@ body.theme-dark .page-builder-carousel .carousel-copy span,
 :root[data-theme="dark"] .circular-gallery-header strong,
 html.theme-dark .circular-gallery-header strong,
 body.theme-dark .circular-gallery-header strong {
-  background: rgba(47, 159, 154, 0.18);
-  color: #9fe7df;
-  border: 1px solid rgba(127, 214, 208, 0.22);
+  background: rgba(var(--theme-primary-rgb), 0.18);
+  color: var(--theme-primary-hover);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
 }
 
 :root[data-theme="dark"] .page-builder-carousel .carousel-controls > button,
 html.theme-dark .page-builder-carousel .carousel-controls > button,
 body.theme-dark .page-builder-carousel .carousel-controls > button {
-  border-color: rgba(126, 158, 181, 0.2);
-  background: #101c2d;
-  color: #dce7f3;
+  border-color: rgba(244, 240, 232, 0.2);
+  background: var(--theme-surface);
+  color: var(--theme-text-muted);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
 }
 
 :root[data-theme="dark"] .page-builder-carousel .carousel-controls > button:hover,
 html.theme-dark .page-builder-carousel .carousel-controls > button:hover,
 body.theme-dark .page-builder-carousel .carousel-controls > button:hover {
-  border-color: rgba(127, 214, 208, 0.42);
-  background: #162235;
-  color: #9fe7df;
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  background: var(--theme-surface-2);
+  color: var(--theme-primary-hover);
 }
 
 :root[data-theme="dark"] .page-builder-carousel .carousel-dots button,
 html.theme-dark .page-builder-carousel .carousel-dots button,
 body.theme-dark .page-builder-carousel .carousel-dots button {
-  background: rgba(126, 158, 181, 0.28);
+  background: rgba(244, 240, 232, 0.28);
 }
 
 :root[data-theme="dark"] .page-builder-carousel .carousel-dots button.active,
 html.theme-dark .page-builder-carousel .carousel-dots button.active,
 body.theme-dark .page-builder-carousel .carousel-dots button.active {
-  background: #7fd6d0;
+  background: var(--theme-primary-hover);
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-stage,
 html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage,
 body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage {
-  border-color: rgba(126, 158, 181, 0.2);
+  border-color: rgba(244, 240, 232, 0.2);
   background:
-    radial-gradient(circle at 82% 18%, rgba(47, 159, 154, 0.18), transparent 28%),
-    linear-gradient(135deg, #07111f 0%, #101c2d 52%, #162235 100%);
+    radial-gradient(circle at 82% 18%, rgba(var(--theme-primary-rgb), 0.18), transparent 28%),
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-surface) 52%, var(--theme-surface-2) 100%);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
 }
 
@@ -568,23 +568,23 @@ body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-sta
 html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after,
 body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after {
   background:
-    linear-gradient(90deg, rgba(7, 17, 31, 0.9), rgba(7, 17, 31, 0.22)),
-    linear-gradient(180deg, transparent, rgba(7, 17, 31, 0.42));
+    linear-gradient(90deg, rgba(15, 13, 18, 0.9), rgba(15, 13, 18, 0.22)),
+    linear-gradient(180deg, transparent, rgba(15, 13, 18, 0.42));
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-controls,
 html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls,
 body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls {
-  border-color: rgba(126, 158, 181, 0.18);
-  background: rgba(7, 17, 31, 0.86);
+  border-color: rgba(244, 240, 232, 0.18);
+  background: rgba(15, 13, 18, 0.86);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button,
 html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button,
 body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button {
-  background: #162235;
-  color: #f8fafc;
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards,
@@ -593,14 +593,14 @@ body.theme-dark .page-builder-carousel.carousel-variant-cards,
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-circular,
 html.theme-dark .page-builder-carousel.carousel-variant-circular,
 body.theme-dark .page-builder-carousel.carousel-variant-circular {
-  color: #f8fafc;
+  color: var(--theme-text);
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards .carousel-stage,
 html.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage,
 body.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage {
-  border-color: rgba(126, 158, 181, 0.18);
-  background: #101c2d;
+  border-color: rgba(244, 240, 232, 0.18);
+  background: var(--theme-surface);
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
@@ -608,9 +608,9 @@ html.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage::a
 body.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage::after {
   background: linear-gradient(
     90deg,
-    rgba(7, 17, 31, 0.94) 0%,
-    rgba(7, 17, 31, 0.8) 48%,
-    rgba(7, 17, 31, 0.18) 100%
+    rgba(15, 13, 18, 0.94) 0%,
+    rgba(15, 13, 18, 0.8) 48%,
+    rgba(15, 13, 18, 0.18) 100%
   );
 }
 
@@ -626,7 +626,7 @@ body.theme-dark .page-builder-carousel.carousel-variant-cards p,
 :root[data-theme="dark"] .circular-gallery-caption p,
 html.theme-dark .circular-gallery-caption p,
 body.theme-dark .circular-gallery-caption p {
-  color: #b8c5d6 !important;
+  color: var(--theme-text-muted) !important;
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-split .carousel-stage,
@@ -636,8 +636,8 @@ body.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage,
 html.theme-dark .circular-gallery-stage,
 body.theme-dark .circular-gallery-stage {
   background:
-    radial-gradient(circle at center, rgba(47, 159, 154, 0.16), transparent 34%),
-    linear-gradient(180deg, #101c2d, #07111f);
+    radial-gradient(circle at center, rgba(var(--theme-primary-rgb), 0.16), transparent 34%),
+    linear-gradient(180deg, var(--theme-surface), var(--theme-bg));
 }
 
 :root[data-theme="dark"] .page-builder-carousel.carousel-variant-split .carousel-stage::after,
@@ -645,25 +645,25 @@ html.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage::a
 body.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage::after {
   background: linear-gradient(
     90deg,
-    rgba(7, 17, 31, 0.94) 0%,
-    rgba(7, 17, 31, 0.9) 46%,
-    rgba(7, 17, 31, 0.08) 46%,
-    rgba(7, 17, 31, 0.02) 100%
+    rgba(15, 13, 18, 0.94) 0%,
+    rgba(15, 13, 18, 0.9) 46%,
+    rgba(15, 13, 18, 0.08) 46%,
+    rgba(15, 13, 18, 0.02) 100%
   );
 }
 
 :root[data-theme="dark"] .circular-gallery-item,
 html.theme-dark .circular-gallery-item,
 body.theme-dark .circular-gallery-item {
-  border-color: rgba(126, 158, 181, 0.18);
-  background: #101c2d;
+  border-color: rgba(244, 240, 232, 0.18);
+  background: var(--theme-surface);
   box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
 }
 
 :root[data-theme="dark"] .circular-gallery-item span,
 html.theme-dark .circular-gallery-item span,
 body.theme-dark .circular-gallery-item span {
-  background: rgba(7, 17, 31, 0.86);
-  color: #dce7f3;
-  border: 1px solid rgba(127, 214, 208, 0.22);
+  background: rgba(15, 13, 18, 0.86);
+  color: var(--theme-text-muted);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
 }

@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-export default function ForgotPasswordPage({ lang = "en" }) {
+export default function ForgotPasswordPage({ lang = "en", loginPath = "/login" }) {
   const { t } = useTranslation("auth");
   const pageDir = lang === "ar" ? "rtl" : "ltr";
 
@@ -102,6 +103,10 @@ export default function ForgotPasswordPage({ lang = "en" }) {
             </button>
           </>
         )}
+
+        <p className="login-signup-text">
+          <Link to={loginPath}>{t("forgotPassword.backToLogin")}</Link>
+        </p>
       </form>
     </main>
   );

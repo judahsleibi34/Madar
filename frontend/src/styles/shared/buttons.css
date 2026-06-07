@@ -101,7 +101,7 @@
 /* Avoid weird gradient on tiny dropdown language choices */
 .lang-dropdown button:hover,
 .lang-dropdown button.active {
-  background: rgba(139, 42, 26, 0.07);
+  background: rgba(var(--theme-primary-rgb), 0.07);
   color: var(--madar-red);
   transform: none;
   box-shadow: none;

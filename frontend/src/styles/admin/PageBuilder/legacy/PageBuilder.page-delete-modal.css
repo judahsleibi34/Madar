@@ -21,7 +21,7 @@
   border-radius: 28px;
   padding: 26px;
   background: #ffffff;
-  border: 1px solid rgba(139, 42, 26, 0.18);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
   color: var(--madar-text);
   text-align: center;
   box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
@@ -33,7 +33,7 @@
   display: grid;
   place-items: center;
   border-radius: 20px;
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
   font-size: 28px;
   line-height: 1;
@@ -82,7 +82,7 @@
 .page-builder .page-delete-modal-danger {
   background: var(--madar-red) !important;
   color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.22) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.22) !important;
 }
 
 @media (max-width: 520px) {

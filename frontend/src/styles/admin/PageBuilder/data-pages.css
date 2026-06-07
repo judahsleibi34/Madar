@@ -7,6 +7,7 @@
   align-items: center;
   width: fit-content;
   margin-bottom: 6px;
+  background: transparent;
   color: var(--madar-red);
   font-size: 15px;
   font-weight: 950;
@@ -208,8 +209,10 @@
 .page-builder .results-form-list-scroll button.active,
 .page-builder .results-form-list-scroll button:hover,
 .page-builder .analytics-list button:hover {
-  background: var(--madar-gradient);
-  color: #ffffff;
+  background: var(--madar-surface);
+  border-color: var(--madar-border-strong);
+  color: var(--madar-text);
+  box-shadow: inset 3px 0 0 var(--madar-red);
 }
 
 .page-builder .results-form-list-scroll strong,
@@ -244,7 +247,8 @@
 .page-builder .results-count-pill {
   border-radius: 999px;
   padding: 8px 12px;
-  background: rgba(139, 42, 26, 0.1);
+  background: transparent;
+  border: 1px solid var(--madar-border);
   color: var(--madar-red);
   font-weight: 950;
   white-space: nowrap;
@@ -356,7 +360,8 @@
   display: inline-flex;
   border-radius: 999px;
   padding: 5px 9px;
-  background: rgba(26, 39, 68, 0.08);
+  background: transparent;
+  border: 1px solid var(--madar-border);
   color: var(--madar-text);
   font-size: 12px;
   font-weight: 900;
@@ -515,7 +520,7 @@
 
 .page-builder .analysis-step-card button:hover,
 .page-builder .analysis-action-row button:hover {
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
 }
 
@@ -549,7 +554,7 @@
 }
 
 .page-builder .analysis-column-list span.numeric {
-  background: rgba(139, 42, 26, 0.1);
+  background: transparent;
   color: var(--madar-red);
 }
 
@@ -559,7 +564,7 @@
   border: 1px solid var(--madar-border);
   border-radius: 8px;
   padding: 12px;
-  background: #0f172a;
+  background: var(--theme-bg-soft);
   color: #e5e7eb;
   font-size: 12px;
   line-height: 1.45;
@@ -568,10 +573,10 @@
 
 .page-builder .analysis-error {
   margin-bottom: 14px;
-  border: 1px solid rgba(139, 42, 26, 0.28);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.28);
   border-radius: 10px;
   padding: 12px 14px;
-  background: rgba(139, 42, 26, 0.08);
+  background: rgba(var(--theme-primary-rgb), 0.08);
   color: var(--madar-red-dark);
   font-weight: 900;
 }
@@ -602,8 +607,8 @@
 
 .page-builder .analysis-source-tabs button.active,
 .page-builder .analysis-method-tabs button.active {
-  border-color: rgba(139, 42, 26, 0.28);
-  background: rgba(139, 42, 26, 0.11);
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
+  background: var(--madar-surface);
   color: var(--madar-red-dark);
 }
 
@@ -647,8 +652,8 @@
 }
 
 .page-builder .analysis-file-dropzone:hover {
-  border-color: rgba(139, 42, 26, 0.42);
-  background: rgba(139, 42, 26, 0.055);
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  background: rgba(var(--theme-primary-rgb), 0.055);
 }
 
 .page-builder .analysis-file-dropzone input {

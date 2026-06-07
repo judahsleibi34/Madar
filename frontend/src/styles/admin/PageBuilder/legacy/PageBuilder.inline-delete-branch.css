@@ -34,7 +34,7 @@
 }
 
 .page-builder .page-kind-pill.branch {
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
 }
 
@@ -71,8 +71,8 @@
 
 .page-builder .page-create-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(139, 42, 26, 0.28) !important;
-  box-shadow: 0 14px 30px rgba(139, 42, 26, 0.12) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.12) !important;
 }
 
 .page-builder .page-create-card.main:hover {
@@ -80,7 +80,7 @@
 }
 
 .page-builder .page-create-card.branch:hover {
-  background: rgba(139, 42, 26, 0.055) !important;
+  background: rgba(var(--theme-primary-rgb), 0.055) !important;
 }
 
 .page-builder .page-secondary-actions {
@@ -96,8 +96,8 @@
   gap: 10px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid rgba(139, 42, 26, 0.22);
-  background: rgba(139, 42, 26, 0.065);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
+  background: rgba(var(--theme-primary-rgb), 0.065);
 }
 
 .page-builder .page-delete-card strong {
@@ -130,5 +130,5 @@
 .page-builder .danger-confirm-button {
   background: var(--madar-red) !important;
   color: #ffffff !important;
-  box-shadow: 0 12px 24px rgba(139, 42, 26, 0.18) !important;
+  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.18) !important;
 }

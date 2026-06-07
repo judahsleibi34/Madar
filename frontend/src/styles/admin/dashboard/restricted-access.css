@@ -80,7 +80,7 @@
 
 [data-theme="dark"] .restricted-access-card h1,
 .dark .restricted-access-card h1 {
-  color: #f8fafc;
+  color: var(--theme-text);
 }
 
 [data-theme="dark"] .restricted-access-eyebrow,

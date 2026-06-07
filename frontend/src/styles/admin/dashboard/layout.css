@@ -29,7 +29,7 @@
 
 .admin-dashboard-layout.is-rtl,
 .admin-dashboard-layout[dir="rtl"] {
-  direction: ltr;
+  direction: rtl;
 }
 
 /* ============================================================
@@ -43,11 +43,11 @@
   width: auto;
   min-height: 100vh;
 
-  margin-left: 260px;
-  margin-right: 0;
+  margin-inline-start: 260px;
+  margin-inline-end: 0;
 
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.08), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
     #f5f2ee;
 
@@ -58,8 +58,8 @@
 
 .admin-dashboard-layout.is-rtl .admin-dashboard-page,
 .admin-dashboard-layout[dir="rtl"] .admin-dashboard-page {
-  margin-left: 0;
-  margin-right: 260px;
+  margin-inline-start: 0;
+  margin-inline-end: 260px;
   direction: rtl;
   text-align: right;
 }
@@ -110,24 +110,39 @@
    ============================================================ */
 
 .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
-  margin-left: 76px !important;
+  margin-left: 72px !important;
   margin-right: 0 !important;
-  width: calc(100vw - 76px) !important;
-  max-width: calc(100vw - 76px) !important;
+  width: calc(100vw - 72px) !important;
+  max-width: calc(100vw - 72px) !important;
   padding: 0 !important;
   overflow-x: hidden !important;
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.08), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
     #f5f2ee !important;
+}
+
+.admin-dashboard-layout-builder .admin-dashboard-page {
+  margin-left: 72px !important;
+  margin-right: 0 !important;
+  width: calc(100vw - 72px) !important;
+  max-width: calc(100vw - 72px) !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+}
+
+.admin-dashboard-layout-builder.is-rtl .admin-dashboard-page,
+.admin-dashboard-layout-builder[dir="rtl"] .admin-dashboard-page {
+  margin-left: 0 !important;
+  margin-right: 72px !important;
 }
 
 .admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
 .admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
   margin-left: 0 !important;
-  margin-right: 76px !important;
-  width: calc(100vw - 76px) !important;
-  max-width: calc(100vw - 76px) !important;
+  margin-right: 72px !important;
+  width: calc(100vw - 72px) !important;
+  max-width: calc(100vw - 72px) !important;
   direction: rtl;
   text-align: right;
 }
@@ -200,13 +215,13 @@
   height: 46px;
   border: 0;
   border-radius: 16px;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   box-shadow:
-    0 14px 30px rgba(139, 42, 26, 0.28),
+    0 14px 30px rgba(var(--theme-primary-rgb), 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
@@ -217,7 +232,7 @@
 }
 
 .dashboard-mobile-menu-button:hover {
-  background: linear-gradient(135deg, #111b31 0%, #6e2014 100%);
+  background: linear-gradient(135deg, #111b31 0%, var(--theme-primary-hover) 100%);
 }
 
 .dashboard-sidebar-backdrop {
@@ -244,16 +259,16 @@
 .admin-dashboard-layout-builder .dashboard-sidebar {
   position: fixed !important;
   inset: 0 auto 0 0 !important;
-  width: 76px !important;
-  min-width: 76px !important;
-  max-width: 76px !important;
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
   height: 100vh !important;
   min-height: 100vh !important;
   flex: none !important;
   z-index: 120 !important;
   overflow: hidden !important;
-  padding-left: 10px !important;
-  padding-right: 10px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
 }
 
 /* RTL safety */
@@ -268,10 +283,10 @@
 .admin-dashboard-layout-builder .admin-dashboard-page.page-builder-dashboard-page,
 .admin-dashboard-layout-builder.is-ltr .admin-dashboard-page.page-builder-dashboard-page,
 .admin-dashboard-layout-builder[dir="ltr"] .admin-dashboard-page.page-builder-dashboard-page {
-  margin-left: 76px !important;
+  margin-left: 72px !important;
   margin-right: 0 !important;
-  width: calc(100vw - 76px) !important;
-  max-width: calc(100vw - 76px) !important;
+  width: calc(100vw - 72px) !important;
+  max-width: calc(100vw - 72px) !important;
   height: 100vh !important;
   min-height: 100vh !important;
   padding: 0 !important;
@@ -284,9 +299,9 @@
 .admin-dashboard-layout-builder.is-rtl .admin-dashboard-page.page-builder-dashboard-page,
 .admin-dashboard-layout-builder[dir="rtl"] .admin-dashboard-page.page-builder-dashboard-page {
   margin-left: 0 !important;
-  margin-right: 76px !important;
-  width: calc(100vw - 76px) !important;
-  max-width: calc(100vw - 76px) !important;
+  margin-right: 72px !important;
+  width: calc(100vw - 72px) !important;
+  max-width: calc(100vw - 72px) !important;
 }
 
 /* Hide text inside outer dashboard sidebar only in builder mode */
@@ -448,24 +463,24 @@
 
 .theme-dark .admin-dashboard-page,
 [data-theme="dark"] .admin-dashboard-page {
-  color: #f8fafc !important;
+  color: var(--theme-text) !important;
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.24), transparent 34%),
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.24), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.44), transparent 36%),
-    linear-gradient(135deg, #0f1726 0%, #111827 48%, #15101a 100%) !important;
+    linear-gradient(135deg, #0f1726 0%, var(--theme-surface) 48%, #15101a 100%) !important;
 }
 
 .theme-dark .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
 [data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.24), transparent 34%),
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.24), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.44), transparent 36%),
-    linear-gradient(135deg, #0f1726 0%, #111827 48%, #15101a 100%) !important;
+    linear-gradient(135deg, #0f1726 0%, var(--theme-surface) 48%, #15101a 100%) !important;
 }
 
 .theme-dark .admin-dashboard-header h1,
 [data-theme="dark"] .admin-dashboard-header h1 {
-  color: #f8fafc !important;
+  color: var(--theme-text) !important;
 }
 
 .theme-dark .admin-dashboard-header p,
@@ -479,9 +494,9 @@
 [data-theme="dark"] .dashboard-panel {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(139, 42, 26, 0.28)) border-box !important;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(var(--theme-primary-rgb), 0.28)) border-box !important;
   border: 1px solid transparent !important;
-  color: #f8fafc !important;
+  color: var(--theme-text) !important;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28) !important;
 }
 
@@ -516,9 +531,9 @@
 .theme-dark .panel-icon,
 [data-theme="dark"] .overview-icon,
 [data-theme="dark"] .panel-icon {
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%) !important;
+  background: var(--theme-gradient) !important;
   color: #ffffff !important;
-  box-shadow: 0 18px 40px rgba(139, 42, 26, 0.24) !important;
+  box-shadow: 0 18px 40px rgba(var(--theme-primary-rgb), 0.24) !important;
 }
 
 .theme-dark .metric-track,
@@ -528,13 +543,13 @@
 
 .theme-dark .metric-track > div,
 [data-theme="dark"] .metric-track > div {
-  background: linear-gradient(135deg, #8b2a1a 0%, #d48a75 100%) !important;
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-primary-hover) 100%) !important;
 }
 
 .theme-dark .cash-bar,
 [data-theme="dark"] .cash-bar {
-  background: linear-gradient(180deg, #d48a75 0%, #8b2a1a 100%) !important;
-  box-shadow: 0 18px 34px rgba(139, 42, 26, 0.22) !important;
+  background: linear-gradient(180deg, var(--theme-primary-hover) 0%, var(--theme-primary) 100%) !important;
+  box-shadow: 0 18px 34px rgba(var(--theme-primary-rgb), 0.22) !important;
 }
 
 .theme-dark .cash-bar span,
@@ -563,9 +578,9 @@
 .theme-dark .uptime-circle,
 [data-theme="dark"] .uptime-circle {
   background:
-    radial-gradient(circle, rgba(139, 42, 26, 0.2), transparent 58%),
+    radial-gradient(circle, rgba(var(--theme-primary-rgb), 0.2), transparent 58%),
     rgba(255, 255, 255, 0.04) !important;
-  border-color: rgba(139, 42, 26, 0.32) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.32) !important;
 }
 
 .theme-dark .uptime-circle strong,

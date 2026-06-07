@@ -48,7 +48,7 @@
 }
 
 .arabic-name {
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-weight: 800;
   font-size: 22px;
   font-family: inherit;
@@ -66,7 +66,7 @@
   flex-shrink: 0;
   background:
     radial-gradient(circle at center, rgba(255, 247, 239, 0.92) 0 24%, transparent 25%),
-    radial-gradient(circle at center, transparent 0 48%, rgba(139, 42, 26, 0.11) 49%, transparent 62%),
+    radial-gradient(circle at center, transparent 0 48%, rgba(var(--theme-primary-rgb), 0.11) 49%, transparent 62%),
     radial-gradient(circle at center, transparent 0 72%, rgba(26, 39, 68, 0.08) 73%, transparent 76%);
 }
 
@@ -79,12 +79,12 @@
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 25%, rgba(139, 42, 26, 0.16), transparent 42%),
+    radial-gradient(circle at 35% 25%, rgba(var(--theme-primary-rgb), 0.16), transparent 42%),
     linear-gradient(145deg, #ffffff, #fff7ef);
   border: 3px solid #1a2744;
   box-shadow:
     0 24px 60px rgba(26, 39, 68, 0.16),
-    inset 0 0 0 7px rgba(139, 42, 26, 0.055);
+    inset 0 0 0 7px rgba(var(--theme-primary-rgb), 0.055);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,7 +116,7 @@
   width: 180px;
   height: 180px;
   animation-duration: 8s;
-  border-color: rgba(139, 42, 26, 0.38);
+  border-color: rgba(var(--theme-primary-rgb), 0.38);
 }
 
 .orbit-two {
@@ -131,7 +131,7 @@
   width: 360px;
   height: 360px;
   animation-duration: 18s;
-  border-color: rgba(139, 42, 26, 0.24);
+  border-color: rgba(var(--theme-primary-rgb), 0.24);
 }
 
 .orbit-dot {
@@ -154,12 +154,12 @@
   transform: translateY(-50%) rotate(80deg);
   background:
     linear-gradient(145deg, #ffffff 0%, #fff7ef 48%, #f2dfd3 100%);
-  color: #8b2a1a;
-  border: 1px solid rgba(139, 42, 26, 0.34);
+  color: var(--theme-primary);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.34);
   box-shadow:
-    0 14px 30px rgba(139, 42, 26, 0.14),
+    0 14px 30px rgba(var(--theme-primary-rgb), 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -8px 16px rgba(139, 42, 26, 0.06);
+    inset 0 -8px 16px rgba(var(--theme-primary-rgb), 0.06);
 }
 
 .orbit-two .orbit-dot {
@@ -167,7 +167,7 @@
   left: 20px;
   transform: rotate(45deg);
   background:
-    linear-gradient(145deg, #24385f 0%, #10213f 48%, #07152b 100%);
+    linear-gradient(145deg, var(--theme-surface-3) 0%, var(--theme-surface) 48%, var(--theme-bg) 100%);
   color: #fff7ef;
   border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow:
@@ -185,9 +185,79 @@
   color: #fff7ef;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow:
-    0 16px 34px rgba(139, 42, 26, 0.28),
+    0 16px 34px rgba(var(--theme-primary-rgb), 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -8px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+
+[data-theme="dark"] .hero-section,
+body.theme-dark .hero-section {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(var(--theme-primary-rgb), 0.08), transparent 30%),
+    linear-gradient(180deg, var(--theme-bg) 0%, #0b0a0e 100%);
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .hero-title,
+[data-theme="dark"] .hero-subtitle,
+body.theme-dark .hero-title,
+body.theme-dark .hero-subtitle {
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .hero-description,
+body.theme-dark .hero-description {
+  color: var(--theme-text-muted);
+}
+
+[data-theme="dark"] .arabic-name,
+body.theme-dark .arabic-name {
+  color: var(--theme-primary-hover);
+}
+
+[data-theme="dark"] .orbit-wrapper,
+body.theme-dark .orbit-wrapper {
+  background:
+    radial-gradient(circle at center, rgba(244, 240, 232, 0.08) 0 24%, transparent 25%),
+    radial-gradient(circle at center, transparent 0 48%, rgba(var(--theme-primary-rgb), 0.18) 49%, transparent 62%),
+    radial-gradient(circle at center, transparent 0 72%, rgba(244, 240, 232, 0.1) 73%, transparent 76%);
+}
+
+[data-theme="dark"] .center-core,
+body.theme-dark .center-core {
+  background:
+    radial-gradient(circle at 35% 25%, rgba(var(--theme-primary-rgb), 0.12), transparent 42%),
+    linear-gradient(145deg, #fff8f0, #f4f0e8);
+  border-color: rgba(244, 240, 232, 0.72);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 7px rgba(var(--theme-primary-rgb), 0.08);
+}
+
+[data-theme="dark"] .center-core span,
+body.theme-dark .center-core span {
+  color: #1a2744;
+}
+
+[data-theme="dark"] .orbit,
+body.theme-dark .orbit {
+  border-color: rgba(244, 240, 232, 0.18);
+}
+
+[data-theme="dark"] .orbit-one,
+body.theme-dark .orbit-one,
+[data-theme="dark"] .orbit-three,
+body.theme-dark .orbit-three {
+  border-color: rgba(var(--theme-primary-rgb), 0.32);
+}
+
+[data-theme="dark"] .orbit-dot,
+body.theme-dark .orbit-dot {
+  border-color: rgba(244, 240, 232, 0.18);
 }
 
 @keyframes rotateOrbit {

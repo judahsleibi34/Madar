@@ -20,6 +20,8 @@
   top: 0;
   align-self: flex-start;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-skeleton-page {
@@ -27,7 +29,7 @@
   min-width: 0;
   padding: 44px 5% 70px;
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.08), transparent 34%),
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.08), transparent 34%),
     radial-gradient(circle at top right, rgba(26, 39, 68, 0.08), transparent 32%),
     #f5f2ee;
 }
@@ -46,7 +48,7 @@
   background: linear-gradient(
     90deg,
     rgba(26, 39, 68, 0.08),
-    rgba(139, 42, 26, 0.14),
+    rgba(var(--theme-primary-rgb), 0.14),
     rgba(26, 39, 68, 0.08)
   );
   background-size: 220% 100%;
@@ -76,13 +78,91 @@
 .skeleton-nav {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .skeleton-nav-item {
   width: 100%;
   height: 44px;
   border-radius: 14px;
+}
+
+.skeleton-sidebar-row {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 12px;
+  border-radius: 14px;
+}
+
+.dashboard-skeleton-layout[dir="rtl"] .skeleton-sidebar-row,
+.dashboard-skeleton-layout[dir="rtl"] .skeleton-user-row {
+  direction: rtl;
+}
+
+.skeleton-sidebar-icon {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 7px;
+}
+
+.skeleton-sidebar-label {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: 132px;
+}
+
+.skeleton-nav .skeleton-sidebar-row:nth-child(2) .skeleton-sidebar-label,
+.skeleton-nav .skeleton-sidebar-row:nth-child(4) .skeleton-sidebar-label,
+.skeleton-nav .skeleton-sidebar-row:nth-child(7) .skeleton-sidebar-label {
+  max-width: 104px;
+}
+
+.skeleton-sidebar-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+}
+
+.skeleton-user-avatar {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 999px;
+}
+
+.skeleton-user-lines {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-user-badge {
+  width: 48px;
+  height: 14px;
+}
+
+.skeleton-user-name {
+  width: 112px;
+  height: 13px;
+}
+
+.skeleton-user-email {
+  width: 150px;
+  height: 11px;
 }
 
 .skeleton-heading {

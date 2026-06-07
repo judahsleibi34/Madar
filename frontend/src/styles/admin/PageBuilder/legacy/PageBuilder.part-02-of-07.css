@@ -16,7 +16,7 @@
 .builder-element-button {
   padding: 13px 20px;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(139, 42, 26, 0.2);
+  box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.2);
 }
 
 .builder-element-image {
@@ -259,7 +259,7 @@
 }
 
 .form-title-card {
-  border-left: 6px solid #8b2a1a;
+  border-left: 6px solid var(--theme-primary);
   border-radius: 18px;
   padding: 18px;
   background: rgba(26, 39, 68, 0.03);
@@ -284,8 +284,8 @@
 }
 
 .question-card.active {
-  border-color: #8b2a1a;
-  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.1);
+  border-color: var(--theme-primary);
+  box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.1);
 }
 
 .question-number {
@@ -395,7 +395,7 @@
 
 .automation-card.active,
 .role-card.active {
-  border-color: #8b2a1a;
+  border-color: var(--theme-primary);
 }
 
 .automation-card-header {
@@ -442,7 +442,7 @@
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: #8b2a1a;
+  background: var(--theme-primary);
   color: #ffffff;
 }
 
@@ -483,7 +483,7 @@
 }
 
 .publish-card pre {
-  background: #111827;
+  background: var(--theme-surface);
   color: #e5e7eb;
   border-radius: 14px;
   padding: 16px;
@@ -558,7 +558,7 @@
 }
 
 .section-card span {
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-size: 12px;
   font-weight: 950;
   text-transform: uppercase;

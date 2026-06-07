@@ -7,7 +7,7 @@
   padding: 18px;
   overflow: auto;
   background:
-    radial-gradient(circle at top left, rgba(139, 42, 26, 0.07), transparent 34%),
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.07), transparent 34%),
     linear-gradient(180deg, #ffffff 0%, var(--madar-bg) 100%);
 }
 
@@ -81,7 +81,7 @@
 .built-site-footer.is-selected {
   outline: 2px solid var(--madar-red);
   outline-offset: -2px;
-  box-shadow: inset 0 0 0 4px rgba(139, 42, 26, 0.08);
+  box-shadow: inset 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
 .built-site-header-inner {
@@ -174,7 +174,7 @@
   cursor: pointer;
   color: #ffffff;
   background: var(--madar-gradient);
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.18);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18);
   font-weight: 950;
 }
 
@@ -185,7 +185,7 @@
 
 .site-section.is-selected {
   border-color: var(--madar-red);
-  box-shadow: inset 0 0 0 2px rgba(139, 42, 26, 0.08);
+  box-shadow: inset 0 0 0 2px rgba(var(--theme-primary-rgb), 0.08);
 }
 
 .site-section.width-small {
@@ -284,8 +284,8 @@
 }
 
 .site-column.is-selected {
-  border-color: rgba(139, 42, 26, 0.42);
-  background: rgba(139, 42, 26, 0.035);
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  background: rgba(var(--theme-primary-rgb), 0.035);
 }
 
 .column-align-left {
@@ -327,7 +327,7 @@
   min-height: 34px;
   border-radius: 10px;
   padding: 0 12px;
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
   font-size: 12px;
   font-weight: 950;
@@ -335,7 +335,7 @@
 }
 
 .empty-column-delete:hover {
-  background: rgba(139, 42, 26, 0.16);
+  background: rgba(var(--theme-primary-rgb), 0.16);
   color: var(--madar-red-dark);
 }
 
@@ -358,7 +358,7 @@
 
 .builder-element.is-selected {
   border-color: var(--madar-red) !important;
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.08) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08) !important;
 }
 
 .builder-element-heading,
@@ -369,7 +369,7 @@
 .builder-element-button {
   padding: 13px 20px;
   border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(139, 42, 26, 0.2);
+  box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.2);
 }
 
 .builder-element-image {

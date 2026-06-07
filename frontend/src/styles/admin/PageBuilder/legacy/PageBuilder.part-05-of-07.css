@@ -14,8 +14,8 @@
   padding: 12px 14px;
   cursor: pointer;
   color: #ffffff !important;
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.22);
+  background: var(--theme-gradient);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
   font-weight: 900 !important;
   text-align: center;
 }
@@ -177,13 +177,13 @@
   padding: 11px 16px;
   cursor: pointer;
   color: #ffffff;
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.18);
+  background: var(--theme-gradient);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18);
   font-weight: 950;
 }
 
 .built-site-footer {
-  background: #111827;
+  background: var(--theme-surface);
   color: #ffffff;
 }
 
@@ -361,8 +361,8 @@
   padding: 11px 16px;
   cursor: pointer;
   color: #ffffff;
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.18);
+  background: var(--theme-gradient);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18);
   font-weight: 950;
 }
 
@@ -386,12 +386,12 @@
 .ecommerce-footer-contact p,
 .ecommerce-footer-bottom,
 .powered-by-madar {
-  color: #111827 !important;
+  color: var(--theme-surface) !important;
 }
 
 .ecommerce-footer-column button:hover,
 .powered-by-madar:hover {
-  color: #8b2a1a !important;
+  color: var(--theme-primary) !important;
 }
 
 .ecommerce-payment-row span,
@@ -429,7 +429,7 @@
   width: 86px;
   height: 86px;
   object-fit: contain;
-  background: #f8fafc;
+  background: var(--theme-text);
   border-radius: 2px;
   padding: 8px;
 }
@@ -586,7 +586,7 @@
 .page-builder {
   --madar-navy: #17233f;
   --madar-navy-soft: #233254;
-  --madar-red: #8b2a1a;
+  --madar-red: var(--theme-primary);
   --madar-red-soft: #a33a26;
   --madar-bg: #f6f3ef;
   --madar-surface: #ffffff;
@@ -596,7 +596,7 @@
   --madar-text: #17233f;
   --madar-muted: #667085;
   --madar-danger: #9f1d1d;
-  --madar-gradient: linear-gradient(135deg, #17233f, #8b2a1a);
+  --madar-gradient: var(--theme-gradient);
   --madar-shadow: 0 16px 38px rgba(23, 35, 63, 0.08);
 
   background: var(--madar-bg) !important;

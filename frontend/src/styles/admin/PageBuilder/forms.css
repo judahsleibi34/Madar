@@ -100,7 +100,7 @@
 }
 
 .quiz-question-stage {
-  border-color: rgba(139, 42, 26, 0.18);
+  border-color: rgba(var(--theme-primary-rgb), 0.18);
 }
 
 .quiz-navigation {
@@ -169,8 +169,8 @@
 .runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
 .runtime-question textarea:focus,
 .runtime-question select:focus {
-  border-color: rgba(139, 42, 26, 0.42);
-  box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.1);
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1);
   outline: none;
 }
 
@@ -182,10 +182,10 @@
 .runtime-question input[type="file"] {
   width: 100%;
   min-height: 54px;
-  border: 1px dashed rgba(139, 42, 26, 0.28);
+  border: 1px dashed rgba(var(--theme-primary-rgb), 0.28);
   border-radius: 16px;
   padding: 13px 14px;
-  background: rgba(139, 42, 26, 0.04);
+  background: rgba(var(--theme-primary-rgb), 0.04);
   color: var(--madar-text);
   font-weight: 800;
 }
@@ -483,7 +483,7 @@
 
 .google-add-strip .add-section-control {
   margin-left: auto;
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
 }
 
@@ -593,11 +593,11 @@
   grid-template-columns: minmax(0, 1.1fr) minmax(180px, 0.6fr) auto;
   gap: 14px;
   align-items: end;
-  border: 1px solid rgba(139, 42, 26, 0.22);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
   border-radius: 18px;
   padding: 14px;
   margin-bottom: 16px;
-  background: rgba(139, 42, 26, 0.045);
+  background: rgba(var(--theme-primary-rgb), 0.045);
 }
 
 .form-connect-card strong {
@@ -630,7 +630,7 @@
   gap: 8px;
   align-items: center;
   padding-top: 10px;
-  border-top: 1px solid rgba(139, 42, 26, 0.14);
+  border-top: 1px solid rgba(var(--theme-primary-rgb), 0.14);
 }
 
 .forms-settings-top {
@@ -721,7 +721,7 @@
 
 .question-card.active {
   border-color: var(--madar-red);
-  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.1);
+  box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.1);
 }
 
 .question-number {
@@ -900,7 +900,7 @@
 }
 
 .forms-google-workspace .question-footer-actions button:hover {
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
 }
 
@@ -909,7 +909,7 @@
   min-height: 40px;
   border-radius: 10px;
   padding: 0 13px;
-  background: rgba(139, 42, 26, 0.1) !important;
+  background: rgba(var(--theme-primary-rgb), 0.1) !important;
   color: var(--madar-red) !important;
   font-weight: 900;
 }
@@ -1085,10 +1085,10 @@
 .quiz-answer-key {
   display: grid;
   gap: 8px;
-  border: 1px solid rgba(139, 42, 26, 0.14);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.14);
   border-radius: 14px;
   padding: 12px;
-  background: rgba(139, 42, 26, 0.045);
+  background: rgba(var(--theme-primary-rgb), 0.045);
 }
 
 .quiz-answer-key strong,
@@ -1173,7 +1173,7 @@
 }
 
 .forms-google-workspace .google-form-actions button:hover {
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
 }
 

@@ -125,9 +125,9 @@ button {
 .builder-modal .starter-card button,
 .builder-modal .section-card button,
 .runtime-submit {
-  background: linear-gradient(135deg, #1a2744, #8b2a1a);
+  background: var(--theme-gradient);
   color: #ffffff;
-  box-shadow: 0 12px 26px rgba(139, 42, 26, 0.22);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 .viewport-switcher {
@@ -337,8 +337,8 @@ summary {
 .add-group button:hover,
 .layer-tree button:hover,
 .object-list button:hover {
-  background: rgba(139, 42, 26, 0.08);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.08);
+  color: var(--theme-primary);
 }
 
 .layer-tree {
@@ -422,7 +422,7 @@ summary {
 }
 
 .site-section.is-selected {
-  border-color: #8b2a1a;
+  border-color: var(--theme-primary);
 }
 
 .site-section.width-small {
@@ -562,8 +562,8 @@ summary {
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(139, 42, 26, 0.08);
-  color: #8b2a1a;
+  background: rgba(var(--theme-primary-rgb), 0.08);
+  color: var(--theme-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -573,7 +573,7 @@ summary {
   border-radius: 999px;
   padding: 8px 12px;
   background: #ffffff;
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-weight: 900;
   cursor: pointer;
 }
@@ -598,5 +598,5 @@ summary {
 }
 
 .builder-element.is-selected {
-  border-color: #8b2a1a;
+  border-color: var(--theme-primary);
 }

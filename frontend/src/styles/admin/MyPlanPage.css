@@ -34,7 +34,7 @@
 .my-plan-kicker {
   display: inline-block;
   margin-bottom: 8px;
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-size: 13px;
   font-weight: 950;
   text-transform: uppercase;
@@ -94,9 +94,9 @@
 
 .my-plan-primary-btn {
   border: 0;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
-  box-shadow: 0 12px 28px rgba(139, 42, 26, 0.2);
+  box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.2);
 }
 
 .my-plan-secondary-btn {
@@ -111,11 +111,11 @@
 }
 
 .my-plan-primary-btn:hover {
-  box-shadow: 0 16px 34px rgba(139, 42, 26, 0.24);
+  box-shadow: 0 16px 34px rgba(var(--theme-primary-rgb), 0.24);
 }
 
 .my-plan-secondary-btn:hover {
-  border-color: rgba(139, 42, 26, 0.28);
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
 }
 
 /* ============================================================
@@ -157,7 +157,7 @@
   right: -90px;
   top: -110px;
   border-radius: 999px;
-  background: #8b2a1a;
+  background: var(--theme-primary);
   opacity: 0.12;
   pointer-events: none;
 }
@@ -193,9 +193,9 @@
 }
 
 .my-plan-card-top strong {
-  color: #8b2a1a;
+  color: var(--theme-primary);
   border-radius: 999px;
-  background: rgba(139, 42, 26, 0.08);
+  background: rgba(var(--theme-primary-rgb), 0.08);
   padding: 8px 12px;
 }
 
@@ -225,7 +225,7 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  color: #8b2a1a;
+  color: var(--theme-primary);
 }
 
 .my-plan-price-row div strong {
@@ -287,14 +287,14 @@
   padding: 28px;
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 38%),
-    linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+    var(--theme-gradient);
   color: #ffffff;
 }
 
 .my-plan-page[dir="rtl"] .my-plan-feature-card {
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 38%),
-    linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+    var(--theme-gradient);
 }
 
 .my-plan-builder-icon {
@@ -411,7 +411,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
 }
 
 /* ============================================================
@@ -436,8 +436,8 @@
 }
 
 .my-plan-builder-card.active {
-  border-color: rgba(139, 42, 26, 0.42);
-  box-shadow: 0 22px 52px rgba(139, 42, 26, 0.12);
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  box-shadow: 0 22px 52px rgba(var(--theme-primary-rgb), 0.12);
   transform: translateY(-2px);
 }
 
@@ -455,18 +455,18 @@
   display: grid;
   place-items: center;
   border-radius: 15px;
-  background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+  background: var(--theme-gradient);
   color: #ffffff;
   font-size: 19px;
   font-weight: 950;
 }
 
 .my-plan-builder-card-top strong {
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-size: 12px;
   font-weight: 950;
   border-radius: 999px;
-  background: rgba(139, 42, 26, 0.08);
+  background: rgba(var(--theme-primary-rgb), 0.08);
   padding: 7px 10px;
 }
 
@@ -500,10 +500,146 @@
 }
 
 .my-plan-builder-footer em {
-  color: #8b2a1a;
+  color: var(--theme-primary);
   font-style: normal;
   font-size: 13px;
   font-weight: 950;
+}
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+
+[data-theme="dark"] .my-plan-page,
+body.theme-dark .my-plan-page {
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .my-plan-hero h1,
+[data-theme="dark"] .my-plan-section-header h2,
+[data-theme="dark"] .my-plan-price-row h2,
+[data-theme="dark"] .my-plan-builder-card h3,
+body.theme-dark .my-plan-hero h1,
+body.theme-dark .my-plan-section-header h2,
+body.theme-dark .my-plan-price-row h2,
+body.theme-dark .my-plan-builder-card h3 {
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .my-plan-hero p,
+[data-theme="dark"] .my-plan-current-card > p,
+[data-theme="dark"] .my-plan-builder-card p,
+body.theme-dark .my-plan-hero p,
+body.theme-dark .my-plan-current-card > p,
+body.theme-dark .my-plan-builder-card p {
+  color: var(--theme-text-muted);
+}
+
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-feature-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-feature-card,
+body.theme-dark .my-plan-usage-card,
+body.theme-dark .my-plan-builder-card {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  color: var(--theme-text);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24);
+}
+
+[data-theme="dark"] .my-plan-feature-card,
+[data-theme="dark"] .my-plan-page[dir="rtl"] .my-plan-feature-card,
+body.theme-dark .my-plan-feature-card,
+body.theme-dark .my-plan-page[dir="rtl"] .my-plan-feature-card {
+  background:
+    radial-gradient(circle at top right, rgba(var(--theme-primary-rgb), 0.12), transparent 34%),
+    var(--theme-surface);
+}
+
+[data-theme="dark"] .my-plan-feature-card span,
+[data-theme="dark"] .my-plan-feature-card p,
+body.theme-dark .my-plan-feature-card span,
+body.theme-dark .my-plan-feature-card p {
+  color: var(--theme-text-muted);
+}
+
+[data-theme="dark"] .my-plan-feature-card h2,
+[data-theme="dark"] .my-plan-feature-card > strong,
+body.theme-dark .my-plan-feature-card h2,
+body.theme-dark .my-plan-feature-card > strong {
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .my-plan-primary-btn,
+body.theme-dark .my-plan-primary-btn {
+  background: var(--theme-gradient);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.22);
+}
+
+[data-theme="dark"] .my-plan-primary-btn:hover,
+body.theme-dark .my-plan-primary-btn:hover {
+  background: var(--theme-gradient-hover);
+}
+
+[data-theme="dark"] .my-plan-secondary-btn,
+body.theme-dark .my-plan-secondary-btn {
+  background: var(--theme-surface-2);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .my-plan-meta-grid div,
+body.theme-dark .my-plan-meta-grid div {
+  background: var(--theme-surface-2);
+  border-color: var(--theme-border);
+}
+
+[data-theme="dark"] .my-plan-card-top span,
+[data-theme="dark"] .my-plan-price-row div span,
+[data-theme="dark"] .my-plan-meta-grid span,
+[data-theme="dark"] .my-plan-usage-card span,
+body.theme-dark .my-plan-card-top span,
+body.theme-dark .my-plan-price-row div span,
+body.theme-dark .my-plan-meta-grid span,
+body.theme-dark .my-plan-usage-card span {
+  color: var(--theme-text-muted);
+}
+
+[data-theme="dark"] .my-plan-meta-grid strong,
+[data-theme="dark"] .my-plan-usage-card strong,
+[data-theme="dark"] .my-plan-builder-footer span,
+body.theme-dark .my-plan-meta-grid strong,
+body.theme-dark .my-plan-usage-card strong,
+body.theme-dark .my-plan-builder-footer span {
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .my-plan-builder-icon,
+[data-theme="dark"] .my-plan-builder-mini-icon,
+body.theme-dark .my-plan-builder-icon,
+body.theme-dark .my-plan-builder-mini-icon {
+  background: var(--theme-gradient);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.2);
+}
+
+[data-theme="dark"] .my-plan-progress-track,
+body.theme-dark .my-plan-progress-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .my-plan-progress-track span,
+body.theme-dark .my-plan-progress-track span {
+  background: var(--theme-gradient);
+}
+
+[data-theme="dark"] .my-plan-current-card::after,
+body.theme-dark .my-plan-current-card::after {
+  background: var(--theme-primary);
+  opacity: 0.12;
 }
 
 /* ============================================================

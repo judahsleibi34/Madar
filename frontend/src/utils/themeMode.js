@@ -1,8 +1,21 @@
 export const MADAR_THEME_STORAGE_KEY = "madar-theme-mode";
 const MADAR_LIGHT_THEME_RESTORE_KEY = "madar-light-theme-restored-v1";
 
+export const SUPPORTED_THEME_MODES = {
+  light: {
+    label: "Light",
+    colorScheme: "light",
+    className: "theme-light",
+  },
+  dark: {
+    label: "Dark",
+    colorScheme: "dark",
+    className: "theme-dark",
+  },
+};
+
 export function normalizeThemeMode(mode) {
-  return mode === "dark" ? "dark" : "light";
+  return SUPPORTED_THEME_MODES[mode] ? mode : "light";
 }
 
 export function readStoredThemeMode() {
@@ -22,12 +35,22 @@ export function readStoredThemeMode() {
 
 export function applyThemeMode(mode) {
   const safeMode = normalizeThemeMode(mode);
+  const activeTheme = SUPPORTED_THEME_MODES[safeMode];
 
   document.documentElement.dataset.theme = safeMode;
-  document.documentElement.classList.toggle("theme-dark", safeMode === "dark");
+
+  Object.values(SUPPORTED_THEME_MODES).forEach(({ className }) => {
+    document.documentElement.classList.remove(className);
+  });
+
+  document.documentElement.classList.add(activeTheme.className);
 
   if (document.body) {
-    document.body.classList.toggle("theme-dark", safeMode === "dark");
+    Object.values(SUPPORTED_THEME_MODES).forEach(({ className }) => {
+      document.body.classList.remove(className);
+    });
+
+    document.body.classList.add(activeTheme.className);
   }
 
   try {

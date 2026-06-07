@@ -28,7 +28,7 @@
   margin-bottom: 8px;
   padding: 5px 9px;
   border-radius: 999px;
-  background: rgba(139, 42, 26, 0.1);
+  background: rgba(var(--theme-primary-rgb), 0.1);
   color: var(--madar-red);
   font-size: 12px;
   font-weight: 950;

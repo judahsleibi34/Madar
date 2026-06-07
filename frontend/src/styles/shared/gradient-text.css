@@ -1,9 +1,12 @@
 .gradient-text {
   display: inline;
   color: transparent;
-  background-image: linear-gradient(
-    var(--gradient-text-angle, 90deg),
-    var(--gradient-text-colors, #1a2744, #8b2a1a, #b85c45)
+  background-image: var(
+    --gradient-text-image,
+    linear-gradient(
+      var(--gradient-text-angle, 90deg),
+      var(--gradient-text-colors, #1a2744, var(--theme-primary), var(--theme-primary-hover))
+    )
   );
   background-size: 220% 100%;
   background-position: 0% 50%;
@@ -21,9 +24,15 @@
 }
 
 .gradient-text-bordered {
-  border: 1px solid rgba(139, 42, 26, 0.24);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.24);
   border-radius: 999px;
   padding: 0.02em 0.24em;
+}
+
+[data-theme="dark"] .gradient-text,
+body.theme-dark .gradient-text {
+  --gradient-text-colors: var(--theme-text), var(--theme-primary-hover), var(--theme-text);
+  --gradient-text-image: var(--theme-text-gradient);
 }
 
 @keyframes gradientTextMove {

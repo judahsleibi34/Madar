@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -156,8 +156,11 @@ export default function SignUpPage({
 
   return (
     <main className="register-page" dir={pageDir}>
-      <form className="register-card" onSubmit={handleSubmit} dir={pageDir}>
-        <h1>{t("signup.title")}</h1>
+      <form className="login-card register-card" onSubmit={handleSubmit} dir={pageDir}>
+        <div className="login-heading">
+          <h1>{t("signup.title")}</h1>
+          <p>{t("signup.subtitle")}</p>
+        </div>
 
         {statusMessage && (
           <p className="form-status-message">{statusMessage}</p>
@@ -247,12 +250,16 @@ export default function SignUpPage({
         </label>
 
         <button
-          className="register-submit"
+          className="login-submit register-submit"
           type="submit"
           disabled={isSubmitting}
         >
           {isSubmitting ? t("signup.loading") : t("signup.submit")}
         </button>
+
+        <p className="login-signup-text">
+          {t("signup.hasAccount")} <Link to={loginPath}>{t("signup.login")}</Link>
+        </p>
       </form>
     </main>
   );

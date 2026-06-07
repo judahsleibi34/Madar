@@ -115,11 +115,11 @@ export default function PageBuilderSubdomainModal({
             border-radius: 18px;
             display: grid;
             place-items: center;
-            background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+            background: var(--theme-gradient);
             color: #ffffff;
             font-size: 22px;
             font-weight: 950;
-            box-shadow: 0 12px 28px rgba(139, 42, 26, 0.22);
+            box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
           }
 
           .madar-website-name-kicker {
@@ -127,8 +127,8 @@ export default function PageBuilderSubdomainModal({
             margin-bottom: 8px;
             padding: 6px 10px;
             border-radius: 999px;
-            background: rgba(139, 42, 26, 0.1);
-            color: #8b2a1a;
+            background: rgba(var(--theme-primary-rgb), 0.1);
+            color: var(--theme-primary);
             font-size: 12px;
             font-weight: 950;
             letter-spacing: 0.04em;
@@ -177,8 +177,8 @@ export default function PageBuilderSubdomainModal({
           }
 
           .madar-website-name-input-row:focus-within {
-            border-color: #8b2a1a;
-            box-shadow: 0 0 0 4px rgba(139, 42, 26, 0.1);
+            border-color: var(--theme-primary);
+            box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1);
           }
 
           .madar-website-name-input-row input {
@@ -206,8 +206,8 @@ export default function PageBuilderSubdomainModal({
             margin: 0;
             padding: 10px 12px;
             border-radius: 14px;
-            background: rgba(139, 42, 26, 0.09);
-            color: #8b2a1a;
+            background: rgba(var(--theme-primary-rgb), 0.09);
+            color: var(--theme-primary);
             font-size: 13px;
             font-weight: 900;
           }
@@ -267,9 +267,9 @@ export default function PageBuilderSubdomainModal({
           }
 
           .madar-website-name-primary {
-            background: linear-gradient(135deg, #1a2744 0%, #8b2a1a 100%);
+            background: var(--theme-gradient);
             color: #ffffff;
-            box-shadow: 0 12px 28px rgba(139, 42, 26, 0.22);
+            box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
           }
 
           @media (max-width: 640px) {

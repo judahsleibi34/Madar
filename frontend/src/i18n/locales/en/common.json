@@ -22,7 +22,10 @@
     "label": "Language",
     "select": "Select language",
     "english": "English",
-    "arabic": "Arabic"
+    "arabic": "Arabic",
+    "en": "English",
+    "ar": "Arabic",
+    "switchTo": "Switch language to {{language}}"
   },
   "theme": {
     "appearance": "Appearance",

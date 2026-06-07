@@ -14,17 +14,20 @@
   --pricing-muted: #4d5568;
   --pricing-soft: #8790a2;
   --pricing-accent: #9a3d2d;
-  --pricing-accent-soft: rgba(154, 61, 45, 0.1);
-  --pricing-purple: #34264f;
+  --pricing-accent-soft: rgba(139, 30, 24, 0.1);
+  --pricing-purple: var(--theme-secondary);
 }
 
-body.dark .pricing-page,
+body.theme-dark .pricing-page,
 html[data-theme="dark"] .pricing-page {
-  --pricing-card-bg: #171b1d;
-  --pricing-card-border: rgba(255, 255, 255, 0.09);
-  --pricing-text: #f2eee8;
-  --pricing-muted: #c8bfb4;
-  --pricing-soft: #8f97a3;
+  --pricing-card-bg: var(--theme-surface);
+  --pricing-card-border: var(--theme-border);
+  --pricing-text: var(--theme-text);
+  --pricing-muted: var(--theme-text-muted);
+  --pricing-soft: var(--theme-text-muted);
+  --pricing-accent: var(--theme-primary);
+  --pricing-accent-soft: var(--theme-primary-soft);
+  --pricing-purple: var(--theme-primary-hover);
 }
 
 .pricing-header {
@@ -85,8 +88,8 @@ html[data-theme="dark"] .pricing-page {
 
 .pricing-tabs button.active {
   color: #ffffff;
-  background: linear-gradient(135deg, var(--pricing-purple), var(--pricing-accent));
-  box-shadow: 0 12px 26px rgba(154, 61, 45, 0.22);
+  background: var(--theme-gradient, linear-gradient(135deg, var(--pricing-purple), var(--pricing-accent)));
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.22);
 }
 
 /* ============================================================
@@ -100,11 +103,11 @@ html[data-theme="dark"] .pricing-page {
   grid-template-columns: 340px minmax(0, 1fr);
   gap: 30px;
   align-items: center;
-  border: 1px solid rgba(154, 61, 45, 0.16);
+  border: 1px solid color-mix(in srgb, var(--pricing-accent) 28%, transparent);
   border-radius: 28px;
   background:
-    radial-gradient(circle at 20% 20%, rgba(154, 61, 45, 0.1), transparent 30%),
-    radial-gradient(circle at 80% 70%, rgba(52, 38, 79, 0.08), transparent 34%),
+    radial-gradient(circle at 20% 20%, var(--pricing-accent-soft), transparent 30%),
+    radial-gradient(circle at 80% 70%, var(--theme-secondary-soft, rgba(52, 38, 79, 0.08)), transparent 34%),
     var(--pricing-card-bg);
   overflow: hidden;
   position: relative;
@@ -119,9 +122,9 @@ html[data-theme="dark"] .pricing-page {
     conic-gradient(
       from 180deg,
       transparent,
-      rgba(154, 61, 45, 0.1),
+      var(--pricing-accent-soft),
       transparent,
-      rgba(52, 38, 79, 0.1),
+      var(--theme-secondary-soft, rgba(52, 38, 79, 0.1)),
       transparent
     );
   animation: builder-shell-spin 14s linear infinite;
@@ -153,11 +156,11 @@ html[data-theme="dark"] .pricing-page {
     radial-gradient(circle, var(--pricing-card-bg) 0 31%, transparent 32%),
     repeating-conic-gradient(
       from 0deg,
-      rgba(154, 61, 45, 0.12) 0 8deg,
+      color-mix(in srgb, var(--pricing-accent) 24%, transparent) 0 8deg,
       transparent 8deg 24deg
     );
   box-shadow:
-    inset 0 0 0 1px rgba(154, 61, 45, 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--pricing-accent) 24%, transparent),
     0 24px 60px rgba(31, 42, 68, 0.12);
   animation: orbit-float 5s ease-in-out infinite;
 }
@@ -173,7 +176,7 @@ html[data-theme="dark"] .pricing-page {
   background: linear-gradient(135deg, var(--pricing-purple), var(--pricing-accent));
   color: #ffffff;
   box-shadow:
-    0 20px 44px rgba(154, 61, 45, 0.28),
+    0 20px 44px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
@@ -200,7 +203,7 @@ html[data-theme="dark"] .pricing-page {
   top: 50%;
   width: 82px;
   height: 82px;
-  border: 1px solid rgba(154, 61, 45, 0.16);
+  border: 1px solid color-mix(in srgb, var(--pricing-accent) 26%, transparent);
   border-radius: 22px;
   transform:
     translate(-50%, -50%)
@@ -240,7 +243,7 @@ html[data-theme="dark"] .pricing-page {
   background: var(--pricing-accent);
   color: #ffffff;
   border-color: var(--pricing-accent);
-  box-shadow: 0 18px 36px rgba(154, 61, 45, 0.24);
+  box-shadow: 0 18px 36px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.24);
 }
 
 .builder-orbit-item:hover span,
@@ -304,7 +307,7 @@ html[data-theme="dark"] .pricing-page {
   z-index: 0;
   border-radius: 34px;
   background:
-    radial-gradient(circle at 50% 50%, rgba(154, 61, 45, 0.08), transparent 54%);
+    radial-gradient(circle at 50% 50%, var(--pricing-accent-soft), transparent 54%);
   pointer-events: none;
 }
 
@@ -375,16 +378,16 @@ html[data-theme="dark"] .pricing-page {
   pointer-events: none;
   border-radius: inherit;
   background:
-    radial-gradient(circle at top right, rgba(154, 61, 45, 0.1), transparent 34%),
-    radial-gradient(circle at bottom left, rgba(52, 38, 79, 0.08), transparent 30%);
+    radial-gradient(circle at top right, var(--pricing-accent-soft), transparent 34%),
+    radial-gradient(circle at bottom left, var(--theme-secondary-soft, rgba(52, 38, 79, 0.08)), transparent 30%);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
 
 .pricing-card:hover,
 .pricing-card.is-active-plan {
-  border-color: rgba(154, 61, 45, 0.7);
-  box-shadow: 0 26px 58px rgba(154, 61, 45, 0.16);
+  border-color: color-mix(in srgb, var(--pricing-accent) 70%, transparent);
+  box-shadow: 0 26px 58px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.16);
 }
 
 .pricing-card:hover::before,
@@ -397,7 +400,7 @@ html[data-theme="dark"] .pricing-page {
 }
 
 .pricing-card.popular.is-active-plan {
-  box-shadow: 0 30px 70px rgba(154, 61, 45, 0.22);
+  box-shadow: 0 30px 70px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.22);
 }
 
 .popular-badge {
@@ -414,7 +417,7 @@ html[data-theme="dark"] .pricing-page {
   border-radius: 999px;
   white-space: nowrap;
   font-family: inherit;
-  box-shadow: 0 10px 24px rgba(154, 61, 45, 0.24);
+  box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.24);
 }
 
 .plan-top {
@@ -560,7 +563,7 @@ html[data-theme="dark"] .pricing-page {
   background: var(--pricing-card-bg);
   border-color: var(--pricing-accent);
   color: var(--pricing-accent);
-  box-shadow: 0 8px 20px rgba(154, 61, 45, 0.12);
+  box-shadow: 0 8px 20px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.12);
 }
 
 .plan-btn:hover {
@@ -571,14 +574,14 @@ html[data-theme="dark"] .pricing-page {
 }
 
 .plan-btn.primary {
-  background: linear-gradient(135deg, var(--pricing-purple), var(--pricing-accent));
+  background: var(--theme-gradient, linear-gradient(135deg, var(--pricing-purple), var(--pricing-accent)));
   border-color: transparent;
   color: #ffffff;
-  box-shadow: 0 14px 30px rgba(154, 61, 45, 0.18);
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.18);
 }
 
 .plan-btn.primary:hover {
-  background: linear-gradient(135deg, #2b2141, #843326);
+  background: var(--theme-gradient-hover, linear-gradient(135deg, #2b2141, #843326));
   color: #ffffff;
 }
 
@@ -586,15 +589,15 @@ html[data-theme="dark"] .pricing-page {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: 1px solid rgba(154, 61, 45, 0.28);
-  background: linear-gradient(135deg, var(--pricing-purple), var(--pricing-accent));
+  border: 1px solid color-mix(in srgb, var(--pricing-accent) 38%, transparent);
+  background: var(--theme-gradient, linear-gradient(135deg, var(--pricing-purple), var(--pricing-accent)));
   color: #ffffff;
   font-size: 34px;
   line-height: 1;
   display: grid;
   place-items: center;
   cursor: pointer;
-  box-shadow: 0 14px 34px rgba(154, 61, 45, 0.2);
+  box-shadow: 0 14px 34px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.2);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;
@@ -603,7 +606,7 @@ html[data-theme="dark"] .pricing-page {
 
 .pricing-carousel-arrow:hover {
   transform: translateY(-2px) scale(1.04);
-  box-shadow: 0 18px 42px rgba(154, 61, 45, 0.26);
+  box-shadow: 0 18px 42px rgba(var(--theme-primary-rgb, 139, 30, 24), 0.26);
 }
 
 .pricing-carousel-arrow:active {

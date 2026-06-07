@@ -1,7 +1,7 @@
 export default function GradientText({
   children,
   className = "",
-  colors = ["#1a2744", "#8b2a1a", "#b85c45"],
+  colors = ["var(--theme-secondary)", "var(--theme-primary)", "var(--theme-primary-hover)"],
   animationSpeed = 8,
   direction = "horizontal",
   pauseOnHover = false,
