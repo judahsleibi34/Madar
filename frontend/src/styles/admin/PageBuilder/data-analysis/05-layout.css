@@ -1,0 +1,98 @@
+﻿/* ============================================================
+   Layout
+   ============================================================ */
+
+.page-builder .daw-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.page-builder .daw-scroll-nav,
+.page-builder .daw-page-jumpbar,
+.page-builder .daw-page-sidebar,
+.page-builder .daw-fixed-sidebar,
+.page-builder .daw-scroll-rail,
+.page-builder .daw-vertical-slider {
+  display: none !important;
+}
+
+.page-builder .daw-flow {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  scroll-margin-top: 110px;
+}
+
+.page-builder .daw-step-content {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+.page-builder .daw-step-report .daw-step-content {
+  grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.page-builder .daw-canvas-column {
+  min-width: 0;
+  position: sticky;
+  top: 104px;
+  scroll-margin-top: 110px;
+}
+
+.page-builder #daw-top,
+.page-builder #daw-workspace-main,
+.page-builder #daw-assistant,
+.page-builder #daw-flow-actions,
+.page-builder #daw-report-preview {
+  scroll-margin-top: 110px;
+}
+
+/* ============================================================
+   Normal vertical slider bar
+   ============================================================ */
+
+.daw-normal-slider {
+  display: none !important;
+}
+
+.daw-normal-slider-track {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  cursor: pointer !important;
+  touch-action: none !important;
+  outline: none !important;
+}
+
+.daw-normal-slider-track:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28) !important;
+}
+
+.daw-normal-slider-thumb {
+  position: absolute !important;
+  left: 50% !important;
+  display: block !important;
+  width: 10px !important;
+  min-height: 28px !important;
+  border-radius: 999px !important;
+  background: #9a9a9a !important;
+  transform: translateX(-50%) !important;
+  pointer-events: none !important;
+}
+
+.daw-normal-slider-track:hover .daw-normal-slider-thumb,
+.daw-normal-slider-track:focus-visible .daw-normal-slider-thumb {
+  background: #b0b0b0 !important;
+}
+
+.daw-page[dir="rtl"] .daw-normal-slider {
+  right: auto !important;
+  left: 0 !important;
+  border-left: 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+}

@@ -1,0 +1,123 @@
+﻿/* ============================================================
+   Cleaning
+   ============================================================ */
+
+.page-builder .daw-cleaning-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.page-builder .daw-cleaning-stack details {
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  padding: 16px;
+  background: var(--daw-soft-bg);
+}
+
+.page-builder .daw-cleaning-stack summary {
+  color: var(--daw-text);
+  font-size: 14px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.page-builder .daw-cleaning-grid,
+.page-builder .daw-form-grid,
+.page-builder .daw-report-options-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.page-builder .daw-report-customize {
+  margin-top: 16px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(26, 39, 68, 0.035);
+}
+
+.page-builder .daw-section-heading.compact {
+  margin-bottom: 12px;
+}
+
+.page-builder .daw-section-heading.compact h4 {
+  margin: 0;
+  color: var(--daw-text);
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.page-builder .daw-section-heading.compact p {
+  margin: 6px 0 0;
+  color: var(--daw-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.page-builder .daw-report-options-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.page-builder .daw-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 48px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-toggle {
+  flex-direction: row;
+  text-align: right;
+}
+
+.page-builder .daw-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--daw-red);
+  flex: 0 0 auto;
+}
+
+.page-builder .daw-column-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 16px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.page-builder .daw-column-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(26, 39, 68, 0.07);
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .daw-column-picker input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--daw-red);
+}
+
+.page-builder .daw-column-picker em {
+  padding: 5px;
+  color: var(--daw-muted);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+}

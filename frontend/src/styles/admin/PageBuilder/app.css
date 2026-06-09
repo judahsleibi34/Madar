@@ -230,6 +230,7 @@
   border-color: var(--madar-border);
   padding: 14px;
   overflow-y: auto;
+  max-height: calc(100vh - 126px);
 }
 
 .builder-sidebar {

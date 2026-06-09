@@ -578,22 +578,90 @@ const removeDuplicateFormHeadings = (section) => ({
   })),
 });
 
-const cleanBuilderProject = (project) => {
-  if (!project?.pages?.length) return project;
+const normalizeBuilderProjectShape = (project) => {
+  const fallback = createInitialProject();
+  const source =
+    project && typeof project === "object" && !Array.isArray(project)
+      ? project
+      : {};
 
-  const formSectionsToKeep = project.pages
+  const pages =
+    Array.isArray(source.pages) && source.pages.length > 0
+      ? source.pages
+      : fallback.pages;
+
+  const forms =
+    Array.isArray(source.forms) && source.forms.length > 0
+      ? source.forms
+      : fallback.forms;
+
+  const workflows = Array.isArray(source.workflows)
+    ? source.workflows
+    : fallback.workflows || [];
+
+  const roles = Array.isArray(source.roles) ? source.roles : fallback.roles || [];
+  const users = Array.isArray(source.users) ? source.users : fallback.users || [];
+  const collections = Array.isArray(source.collections)
+    ? source.collections
+    : fallback.collections || [];
+
+  return {
+    ...fallback,
+    ...source,
+    pages,
+    forms,
+    workflows,
+    roles,
+    users,
+    collections,
+    activePageId: pages.some((page) => page.id === source.activePageId)
+      ? source.activePageId
+      : pages[0]?.id || "",
+    activeFormId: forms.some((form) => form.id === source.activeFormId)
+      ? source.activeFormId
+      : forms[0]?.id || "",
+    activeWorkflowId: workflows.some(
+      (workflow) => workflow.id === source.activeWorkflowId
+    )
+      ? source.activeWorkflowId
+      : workflows[0]?.id || "",
+    activeRoleId: roles.some((role) => role.id === source.activeRoleId)
+      ? source.activeRoleId
+      : roles[0]?.id || "",
+    siteChrome: {
+      ...(fallback.siteChrome || defaultSiteChrome),
+      ...(source.siteChrome || {}),
+    },
+    theme: {
+      ...(fallback.theme || {}),
+      ...(source.theme || {}),
+    },
+  };
+};
+
+const cleanBuilderProject = (project) => {
+  const normalizedProject = normalizeBuilderProjectShape(project);
+
+  if (!normalizedProject.pages.length) return normalizedProject;
+
+  const formSectionsToKeep = normalizedProject.pages
     .slice(1)
     .flatMap((page) => page.sections || [])
     .filter((section) =>
       getSectionElements(section).some((element) => element.type === "formBlock")
     );
 
-  const cleanedPages = project.pages
-    .filter((page, index) => index === 0 || !internalPageNames.has(String(page.name || "").toLowerCase()))
+  const cleanedPages = normalizedProject.pages
+    .filter(
+      (page, index) =>
+        index === 0 ||
+        !internalPageNames.has(String(page.name || "").toLowerCase())
+    )
     .map((page, index) => {
       const baseSections = (page.sections || []).filter(
         (section) => !isMetricsSection(section) && !isResponsesSection(section)
       );
+
       const sections =
         index === 0 && !hasFormSection({ ...page, sections: baseSections })
           ? [...baseSections, ...formSectionsToKeep]
@@ -607,16 +675,16 @@ const cleanBuilderProject = (project) => {
     })
     .filter((page, index) => index === 0 || (page.sections || []).length > 0);
 
-  const pages = cleanedPages.length ? cleanedPages : project.pages;
+  const pages = cleanedPages.length ? cleanedPages : normalizedProject.pages;
 
   return {
-    ...project,
-    activePageId: pages.some((page) => page.id === project.activePageId)
-      ? project.activePageId
+    ...normalizedProject,
+    activePageId: pages.some((page) => page.id === normalizedProject.activePageId)
+      ? normalizedProject.activePageId
       : pages[0]?.id || "",
     siteChrome: {
-      ...project.siteChrome,
-      footerShopLinks: String(project.siteChrome?.footerShopLinks || "")
+      ...normalizedProject.siteChrome,
+      footerShopLinks: String(normalizedProject.siteChrome?.footerShopLinks || "")
         .split("\n")
         .filter((item) => !["Responses", "Reports", "Orders"].includes(item.trim()))
         .join("\n"),
@@ -759,32 +827,63 @@ export default function PageBuilder({
     };
   }, [demoMode]);
 
+  const safeProjectPages = Array.isArray(project?.pages) ? project.pages : [];
+  const safeProjectForms = Array.isArray(project?.forms) ? project.forms : [];
+  const safeProjectWorkflows = Array.isArray(project?.workflows)
+    ? project.workflows
+    : [];
+  const safeProjectRoles = Array.isArray(project?.roles) ? project.roles : [];
+
   const activePage = useMemo(
-    () => project.pages.find((page) => page.id === project.activePageId) || project.pages[0],
-    [project.pages, project.activePageId]
+    () =>
+      safeProjectPages.find((page) => page.id === project?.activePageId) ||
+      safeProjectPages[0] ||
+      null,
+    [safeProjectPages, project?.activePageId]
   );
 
   const activeForm = useMemo(
-    () => project.forms.find((form) => form.id === project.activeFormId) || project.forms[0],
-    [project.forms, project.activeFormId]
+    () =>
+      safeProjectForms.find((form) => form.id === project?.activeFormId) ||
+      safeProjectForms[0] ||
+      null,
+    [safeProjectForms, project?.activeFormId]
   );
 
   const activeWorkflow = useMemo(
-    () => project.workflows.find((workflow) => workflow.id === project.activeWorkflowId) || project.workflows[0],
-    [project.workflows, project.activeWorkflowId]
+    () =>
+      safeProjectWorkflows.find(
+        (workflow) => workflow.id === project?.activeWorkflowId
+      ) ||
+      safeProjectWorkflows[0] ||
+      null,
+    [safeProjectWorkflows, project?.activeWorkflowId]
   );
 
   const selectedSection = useMemo(() => {
     if (selected.type !== "section") return null;
-    return activePage?.sections.find((section) => section.id === selected.id) || null;
+
+    const sections = Array.isArray(activePage?.sections)
+      ? activePage.sections
+      : [];
+
+    return sections.find((section) => section.id === selected.id) || null;
   }, [activePage, selected]);
 
   const selectedColumn = useMemo(() => {
     if (selected.type !== "column") return null;
 
-    for (const section of activePage?.sections || []) {
-      for (const row of section.rows || []) {
-        const column = row.columns.find((item) => item.id === selected.id);
+    const sections = Array.isArray(activePage?.sections)
+      ? activePage.sections
+      : [];
+
+    for (const section of sections) {
+      const rows = Array.isArray(section?.rows) ? section.rows : [];
+
+      for (const row of rows) {
+        const columns = Array.isArray(row?.columns) ? row.columns : [];
+        const column = columns.find((item) => item.id === selected.id);
+
         if (column) return column;
       }
     }
@@ -795,15 +894,31 @@ export default function PageBuilder({
   const selectedElement = useMemo(() => {
     if (selected.type !== "element") return null;
 
-    for (const section of activePage?.sections || []) {
+    const sections = Array.isArray(activePage?.sections)
+      ? activePage.sections
+      : [];
+
+    for (const section of sections) {
       if (section.mode === "free") {
-        const found = section.freeElements.find((item) => item.id === selected.id);
+        const freeElements = Array.isArray(section?.freeElements)
+          ? section.freeElements
+          : [];
+
+        const found = freeElements.find((item) => item.id === selected.id);
         if (found) return found;
       }
 
-      for (const row of section.rows || []) {
-        for (const column of row.columns || []) {
-          const found = column.elements.find((item) => item.id === selected.id);
+      const rows = Array.isArray(section?.rows) ? section.rows : [];
+
+      for (const row of rows) {
+        const columns = Array.isArray(row?.columns) ? row.columns : [];
+
+        for (const column of columns) {
+          const elements = Array.isArray(column?.elements)
+            ? column.elements
+            : [];
+
+          const found = elements.find((item) => item.id === selected.id);
           if (found) return found;
         }
       }
@@ -814,8 +929,8 @@ export default function PageBuilder({
 
   const selectedRole = useMemo(() => {
     if (selected.type !== "role") return null;
-    return project.roles.find((role) => role.id === selected.id) || null;
-  }, [project.roles, selected]);
+    return safeProjectRoles.find((role) => role.id === selected.id) || null;
+  }, [safeProjectRoles, selected]);
 
   const showToast = (message) => {
     setToast(message);

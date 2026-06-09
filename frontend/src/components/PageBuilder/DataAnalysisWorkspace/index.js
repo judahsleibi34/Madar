@@ -1,1 +1,1 @@
-export { default } from "./DataAnalysisWorkspace";
+export { default } from "./components/DataAnalysisWorkspace";

@@ -1,0 +1,88 @@
+﻿/* ============================================================
+   Button system
+   ============================================================ */
+
+.page-builder .daw-primary,
+.page-builder .daw-page button.daw-primary,
+.page-builder .daw-button-row .daw-primary,
+.page-builder .daw-section-actions .daw-primary,
+.page-builder .daw-report-submit-row .daw-primary,
+.page-builder .daw-flow-actions .daw-primary,
+.page-builder .daw-header .daw-primary,
+.page-builder .daw-assistant-card .daw-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--daw-btn-height);
+  height: var(--daw-btn-height);
+  padding: var(--daw-btn-padding);
+  border: 1px solid transparent;
+  border-radius: var(--daw-btn-radius);
+  background: var(--daw-primary-bg);
+  color: var(--daw-primary-text);
+  font-size: var(--daw-btn-font-size);
+  font-weight: var(--daw-btn-font-weight);
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: var(--daw-primary-shadow);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.page-builder .daw-primary:hover,
+.page-builder .daw-page button.daw-primary:hover,
+.page-builder .daw-header .daw-primary:hover,
+.page-builder .daw-assistant-card .daw-primary:hover {
+  background: var(--daw-primary-bg-hover);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(var(--theme-primary-rgb), 0.24);
+}
+
+.page-builder .daw-button-row button:not(.daw-primary),
+.page-builder .daw-section-actions button:not(.daw-primary),
+.page-builder .daw-report-submit-row button:not(.daw-primary),
+.page-builder .daw-flow-actions button:not(.daw-primary),
+.page-builder .daw-pagination button,
+.page-builder .daw-column-menu summary,
+.page-builder .daw-column-menu-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--daw-btn-height);
+  height: var(--daw-btn-height);
+  padding: var(--daw-btn-padding);
+  border: 1px solid var(--daw-secondary-border);
+  border-radius: var(--daw-btn-radius);
+  background: var(--daw-secondary-bg);
+  color: var(--daw-secondary-text);
+  font-size: var(--daw-btn-font-size);
+  font-weight: var(--daw-btn-font-weight);
+  line-height: 1;
+  box-shadow: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.page-builder .daw-button-row button:not(.daw-primary):hover,
+.page-builder .daw-section-actions button:not(.daw-primary):hover,
+.page-builder .daw-report-submit-row button:not(.daw-primary):hover,
+.page-builder .daw-flow-actions button:not(.daw-primary):hover,
+.page-builder .daw-pagination button:hover,
+.page-builder .daw-column-menu summary:hover,
+.page-builder .daw-column-menu-panel button:hover {
+  background: var(--daw-secondary-bg-hover);
+  border-color: rgba(var(--theme-primary-rgb), 0.18);
+  color: var(--daw-red);
+  transform: translateY(-1px);
+}

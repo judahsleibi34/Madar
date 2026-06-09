@@ -1,0 +1,81 @@
+﻿/* ============================================================
+   Actions
+   ============================================================ */
+
+.page-builder .daw-button-row,
+.page-builder .daw-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.page-builder .daw-flow-actions {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.page-builder .daw-flow-actions button {
+  min-width: 96px;
+  gap: 8px;
+}
+
+.page-builder .daw-flow-actions.only-next {
+  justify-content: flex-end;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-flow-actions.only-next {
+  justify-content: flex-start;
+}
+
+.page-builder .daw-report-submit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
+  border-radius: 18px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(var(--theme-primary-rgb), 0.08), rgba(26, 39, 68, 0.04)),
+    #ffffff;
+}
+
+.page-builder .daw-report-submit-row div {
+  min-width: 0;
+}
+
+.page-builder .daw-report-submit-row strong {
+  display: block;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .daw-report-submit-row span {
+  display: block;
+  margin-top: 5px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.page-builder .daw-report-submit-row .daw-primary {
+  flex: 0 0 auto;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-report-submit-row {
+  flex-direction: row;
+  text-align: right;
+}

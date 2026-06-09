@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, ArrowRight, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ArrowLeft, ArrowRight, X } from "lucide-react";
 
-import { uiText } from './constants/uiText';
-import { analysisGroups } from './constants/analysisConfig';
-import { API_URL, getFriendlyExternalError, readApiResponse } from './utils/api';
-import { cleanObject, escapeCsvValue } from './utils/formatters';
-import { getMissingRequiredParams } from './utils/validation';
+import { uiText } from "../constants/uiText";
+import { analysisGroups } from "../constants/analysisConfig";
+import { API_URL, getFriendlyExternalError, readApiResponse } from "../utils/api";
+import { cleanObject, escapeCsvValue } from "../utils/formatters";
+import { getMissingRequiredParams } from "../utils/validation";
 
-import Stepper from './components/Stepper';
-import DataSourceStep from './components/DataSourceStep';
-import DatasetReviewStep from './components/DatasetReviewStep';
-import PrepareDataStep from './components/PrepareDataStep';
-import ReportBuilderStep from './components/ReportBuilderStep';
-import AssistantPanel from './components/AssistantPanel';
-import ReportCanvas from './components/ReportCanvas';
+import Stepper from "./Stepper";
+import DataSourceStep from "./DataSourceStep";
+import DatasetReviewStep from "./DatasetReviewStep";
+import PrepareDataStep from "./PrepareDataStep";
+import ReportBuilderStep from "./ReportBuilderStep";
+import AssistantPanel from "./AssistantPanel";
+import ReportCanvas from "./ReportCanvas";
+import PageVerticalSlider from "./PageVerticalSlider";
 
 export default function DataAnalysisWorkspace({
   lang = "en",
@@ -26,6 +27,7 @@ export default function DataAnalysisWorkspace({
   const activeLang = lang === "ar" ? "ar" : "en";
   const isArabic = activeLang === "ar";
   const t = uiText[activeLang];
+
   const userApiPath = (path) => {
     if (!user?.id) {
       throw new Error(t.sessionExpired || "Your session has expired.");
@@ -40,18 +42,22 @@ export default function DataAnalysisWorkspace({
 
   const [currentStep, setCurrentStep] = useState("source");
   const [sourceMode, setSourceMode] = useState("forms");
-  const [selectedFormId, setSelectedFormId] = useState(firstFormWithResponses?.id || "");
+  const [selectedFormId, setSelectedFormId] = useState(
+    firstFormWithResponses?.id || ""
+  );
   const [dataset, setDataset] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [externalUrl, setExternalUrl] = useState("");
   const [inspection, setInspection] = useState(null);
   const [inspectionCache, setInspectionCache] = useState({});
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [visualizationResult, setVisualizationResult] = useState(null);
   const [assistQuestion, setAssistQuestion] = useState("");
   const [assistResult, setAssistResult] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
   const [flowToast, setFlowToast] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
   const [reportOptions, setReportOptions] = useState({
     title: "",
     includeSummary: true,
@@ -84,10 +90,13 @@ export default function DataAnalysisWorkspace({
   const [analysisMethod, setAnalysisMethod] = useState(
     analysisGroups.finance.methods[0].id
   );
-  const [params, setParams] = useState({ ...analysisGroups.finance.methods[0].template });
+  const [params, setParams] = useState({
+    ...analysisGroups.finance.methods[0].template,
+  });
 
   const selectedForm =
-    availableForms.find((form) => form.id === selectedFormId) || firstFormWithResponses;
+    availableForms.find((form) => form.id === selectedFormId) ||
+    firstFormWithResponses;
 
   const formFields = selectedForm ? getFormFields(selectedForm) : [];
   const methods = analysisGroups[analysisDomain].methods;
@@ -98,6 +107,7 @@ export default function DataAnalysisWorkspace({
 
   const numericColumns = useMemo(() => {
     const preview = dataset?.preview || [];
+
     return columns.filter((column) =>
       preview.some((row) => Number.isFinite(Number(row[column])))
     );
@@ -117,6 +127,13 @@ export default function DataAnalysisWorkspace({
 
     return () => window.clearTimeout(timeoutId);
   }, [flowToast]);
+
+  useEffect(() => {
+    const container = document.querySelector(".daw-page");
+    if (container) {
+      container.scrollTop = 0;
+    }
+  }, [currentStep]);
 
   const showFlowError = (message) => {
     setAnalysisError(message);
@@ -177,14 +194,18 @@ export default function DataAnalysisWorkspace({
     if (cleaning.convertColumn) {
       actions.push({
         type: "convert_column_types",
-        params: { type_map: { [cleaning.convertColumn]: cleaning.convertType } },
+        params: {
+          type_map: { [cleaning.convertColumn]: cleaning.convertType },
+        },
       });
     }
 
     if (cleaning.renameColumn && cleaning.renameTo.trim()) {
       actions.push({
         type: "rename_column",
-        params: { rename_map: { [cleaning.renameColumn]: cleaning.renameTo.trim() } },
+        params: {
+          rename_map: { [cleaning.renameColumn]: cleaning.renameTo.trim() },
+        },
       });
     }
 
@@ -212,7 +233,8 @@ export default function DataAnalysisWorkspace({
   };
 
   const setMethod = (methodId) => {
-    const nextMethod = methods.find((method) => method.id === methodId) || methods[0];
+    const nextMethod =
+      methods.find((method) => method.id === methodId) || methods[0];
 
     setAnalysisMethod(nextMethod.id);
     setParams({ ...nextMethod.template });
@@ -223,6 +245,7 @@ export default function DataAnalysisWorkspace({
     setInspection(null);
     setInspectionCache({});
     setAnalysisResult(null);
+    setVisualizationResult(null);
     setAssistResult(null);
     setCurrentStep("review");
   };
@@ -340,6 +363,7 @@ export default function DataAnalysisWorkspace({
     }
 
     const cacheKey = `${dataset.file_path}:${type}`;
+
     if (inspectionCache[cacheKey]) {
       setInspection(inspectionCache[cacheKey]);
       setAnalysisError("");
@@ -372,7 +396,10 @@ export default function DataAnalysisWorkspace({
 
       const nextInspection = { type, data };
       setInspection(nextInspection);
-      setInspectionCache((current) => ({ ...current, [cacheKey]: nextInspection }));
+      setInspectionCache((current) => ({
+        ...current,
+        [cacheKey]: nextInspection,
+      }));
     } catch (error) {
       showFlowError(error.message);
     } finally {
@@ -442,6 +469,55 @@ export default function DataAnalysisWorkspace({
     }
   };
 
+  const runVisualization = async () => {
+    if (!dataset?.file_path) {
+      showFlowError(t.loadDataBeforeAnalysis);
+      return;
+    }
+
+    const xColumn = columns[0] || "";
+    const yColumn = numericColumns[0] || columns[1] || "";
+
+    if (!xColumn || !yColumn) {
+      showFlowError("Not enough columns available to generate a visualization.");
+      return;
+    }
+
+    setIsLoading(true);
+    setAnalysisError("");
+
+    try {
+      const response = await fetch(userApiPath("/visualization/create"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input_path: dataset.file_path,
+          cleaning_actions: cleaningActions,
+          chart_config: {
+            chart_type: "bar",
+            x_column: xColumn,
+            y_column: yColumn,
+            title: reportOptions.title?.trim() || `${yColumn} by ${xColumn}`,
+          },
+        }),
+      });
+
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.detail || "The visualization could not be created.");
+      }
+
+      setVisualizationResult(data);
+      setCurrentStep("report");
+    } catch (error) {
+      showFlowError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const runAssistedQuestion = async () => {
     const question = assistQuestion.trim();
 
@@ -480,7 +556,9 @@ export default function DataAnalysisWorkspace({
       const data = await readApiResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.detail || "The assisted analysis could not be completed.");
+        throw new Error(
+          data.detail || "The assisted analysis could not be completed."
+        );
       }
 
       setAssistResult(data.result || data);
@@ -503,13 +581,13 @@ export default function DataAnalysisWorkspace({
   }, [analysisResult, activeMethod.label]);
 
   const goToPreviousStep = () => {
-    const order = ["source", "review", "prepare", "report"];
+    const order = ["source", "review", "prepare", "visualization", "report"];
     const currentIndex = order.indexOf(currentStep);
     setCurrentStep(order[Math.max(0, currentIndex - 1)]);
   };
 
   const goToNextStep = () => {
-    const order = ["source", "review", "prepare", "report"];
+    const order = ["source", "review", "prepare", "visualization", "report"];
     const currentIndex = order.indexOf(currentStep);
     setCurrentStep(order[Math.min(order.length - 1, currentIndex + 1)]);
   };
@@ -563,6 +641,30 @@ export default function DataAnalysisWorkspace({
       );
     }
 
+    if (currentStep === "visualization") {
+      return (
+        <div className="daw-section-card">
+          <div>
+            <span className="daw-kicker">VISUALIZATION</span>
+            <h3>Create a visualization</h3>
+            <p>Generate a chart from your data before creating the full report.</p>
+          </div>
+          <button
+            className="daw-primary"
+            onClick={runVisualization}
+            disabled={isLoading || !dataset}
+          >
+            {isLoading ? t.working : "Generate Visualization"}
+          </button>
+          {visualizationResult && (
+            <div style={{ marginTop: "20px" }}>
+              <p>Visualization created successfully!</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <ReportBuilderStep
         dataset={dataset}
@@ -578,6 +680,7 @@ export default function DataAnalysisWorkspace({
         columns={columns}
         numericColumns={numericColumns}
         runAnalysis={runAnalysis}
+        runVisualization={runVisualization}
         isLoading={isLoading}
         reportOptions={reportOptions}
         updateReportOptions={updateReportOptions}
@@ -588,7 +691,7 @@ export default function DataAnalysisWorkspace({
 
   return (
     <div className="daw-page" dir={isArabic ? "rtl" : "ltr"}>
-      <header className="daw-header">
+      <header className="daw-header" id="daw-top">
         <div>
           <span className="daw-kicker">{t.kicker}</span>
           <h2>{t.title}</h2>
@@ -612,7 +715,11 @@ export default function DataAnalysisWorkspace({
             <strong>{t.flowIssueTitle}</strong>
             <p>{flowToast}</p>
           </div>
-          <button type="button" aria-label="Dismiss message" onClick={() => setFlowToast("")}>
+          <button
+            type="button"
+            aria-label="Dismiss message"
+            onClick={() => setFlowToast("")}
+          >
             <X size={16} />
           </button>
         </div>
@@ -621,15 +728,16 @@ export default function DataAnalysisWorkspace({
       {analysisError ? <div className="daw-error">{analysisError}</div> : null}
 
       <section className={`daw-layout daw-step-${currentStep}`}>
-        <main className="daw-flow">
+        <main className="daw-flow" id="daw-workspace-main">
           <div className="daw-step-content">
             {renderCurrentStep()}
 
             {currentStep === "report" ? (
-              <aside className="daw-canvas-column">
+              <aside className="daw-canvas-column" id="daw-report-preview">
                 <ReportCanvas
                   dataset={dataset}
                   analysisResult={analysisResult}
+                  visualizationResult={visualizationResult}
                   analysisPayload={analysisPayload}
                   activeMethod={activeMethod}
                   activeLang={activeLang}
@@ -640,35 +748,60 @@ export default function DataAnalysisWorkspace({
             ) : null}
           </div>
 
-          <AssistantPanel
-            dataset={dataset}
-            assistQuestion={assistQuestion}
-            setAssistQuestion={setAssistQuestion}
-            runAssistedQuestion={runAssistedQuestion}
-            assistResult={assistResult}
-            isLoading={isLoading}
-            t={t}
-          />
+          <div id="daw-assistant">
+            <AssistantPanel
+              dataset={dataset}
+              assistQuestion={assistQuestion}
+              setAssistQuestion={setAssistQuestion}
+              runAssistedQuestion={runAssistedQuestion}
+              assistResult={assistResult}
+              isLoading={isLoading}
+              t={t}
+            />
+          </div>
 
           {dataset ? (
-            <div className={`daw-flow-actions ${currentStep === "source" ? "only-next" : ""}`}>
+            <div
+              id="daw-flow-actions"
+              className={`daw-flow-actions ${
+                currentStep === "source" ? "only-next" : ""
+              }`}
+            >
               {currentStep !== "source" ? (
-                <button type="button" className="daw-step-back" onClick={goToPreviousStep}>
-                  {isArabic ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
+                <button
+                  type="button"
+                  className="daw-step-back"
+                  onClick={goToPreviousStep}
+                >
+                  {isArabic ? (
+                    <ArrowRight size={16} />
+                  ) : (
+                    <ArrowLeft size={16} />
+                  )}
                   {t.back}
                 </button>
               ) : null}
 
               {currentStep !== "report" ? (
-                <button type="button" className="daw-primary daw-step-next" onClick={goToNextStep}>
+                <button
+                  type="button"
+                  className="daw-primary daw-step-next"
+                  onClick={goToNextStep}
+                >
                   {t.continue}
-                  {isArabic ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
+                  {isArabic ? (
+                    <ArrowLeft size={16} />
+                  ) : (
+                    <ArrowRight size={16} />
+                  )}
                 </button>
               ) : null}
             </div>
           ) : null}
         </main>
       </section>
+
+      <PageVerticalSlider />
     </div>
   );
 }

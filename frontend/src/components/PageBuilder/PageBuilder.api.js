@@ -1,11 +1,24 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
-export const USER_STATUS_PATH = import.meta.env.VITE_USER_STATUS_PATH || "/auth/user_status";
+export const USER_STATUS_PATH =
+  import.meta.env.VITE_USER_STATUS_PATH || "/auth/user_status";
 
-export const getApiUrl = (path) => `${API_BASE_URL}${path}`;
+const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
+const ensureLeadingSlash = (value) =>
+  String(value || "").startsWith("/") ? String(value || "") : `/${value || ""}`;
+
+export const getApiUrl = (path) =>
+  `${trimTrailingSlash(API_BASE_URL)}${ensureLeadingSlash(path)}`;
 
 const parseJsonResponse = async (response) => {
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+
+  let data = null;
+
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text ? { message: text } : null;
+  }
 
   if (!response.ok) {
     const error = new Error(data?.detail || data?.message || "Request failed");
@@ -15,6 +28,34 @@ const parseJsonResponse = async (response) => {
   }
 
   return data;
+};
+
+const normalizeBackendUserFromStatus = (data) => {
+  if (!data) return null;
+
+  const user = data?.user || data;
+
+  const loggedIn =
+    data?.logged_in === true ||
+    data?.authenticated === true ||
+    Boolean(data?.user);
+
+  if (!loggedIn) return null;
+
+  const id = user?.id || user?.user_id;
+
+  if (!id) return null;
+
+  return {
+    ...user,
+    id,
+    auth_id: user?.auth_id || user?.authId || "",
+    tenant_id: user?.tenant_id || user?.tenantId || "",
+    user_type:
+      user?.user_type ||
+      user?.role ||
+      (user?.admin === true || user?.is_admin === true ? "admin" : "user"),
+  };
 };
 
 export const fetchCurrentBackendUser = async () => {
@@ -27,17 +68,18 @@ export const fetchCurrentBackendUser = async () => {
   if (!response.ok) return null;
 
   const data = await response.json();
-  return data?.user || null;
+  return normalizeBackendUserFromStatus(data);
 };
 
 const getUserScopedPath = async (userId, path) => {
-  const scopedUserId = userId || (await fetchCurrentBackendUser())?.id;
+  const backendUser = userId ? null : await fetchCurrentBackendUser();
+  const scopedUserId = userId || backendUser?.id || backendUser?.user_id;
 
   if (!scopedUserId) {
     throw new Error("Could not resolve current user id");
   }
 
-  return `/users/${encodeURIComponent(scopedUserId)}${path}`;
+  return `/users/${encodeURIComponent(scopedUserId)}${ensureLeadingSlash(path)}`;
 };
 
 export const getBackendUserDisplayName = (user) => {
@@ -51,15 +93,15 @@ export const getBackendUserDisplayName = (user) => {
 export const mapBackendUserToBuilderUser = (backendUser, roleId = "") => ({
   id: backendUser?.auth_id
     ? `auth_${backendUser.auth_id}`
-    : `backend_${backendUser?.id || "current"}`,
+    : `backend_${backendUser?.id || backendUser?.user_id || "current"}`,
   name: getBackendUserDisplayName(backendUser),
   email: backendUser?.email || "",
   roleId,
   status: "Active",
   lastSeen: "Now",
   isCurrentUser: true,
-  backendUserId: backendUser?.id || "",
-  authId: backendUser?.auth_id || "",
+  backendUserId: backendUser?.id || backendUser?.user_id || "",
+  authId: backendUser?.auth_id || backendUser?.authId || "",
 });
 
 export const listBuilderProjects = async () => {
@@ -121,11 +163,14 @@ export const publishBuilderProject = async (projectId) => {
 };
 
 export const fetchWebsiteSettings = async (userId) => {
-  const response = await fetch(getApiUrl(await getUserScopedPath(userId, "/website/settings")), {
-    method: "GET",
-    credentials: "include",
-    cache: "no-store",
-  });
+  const response = await fetch(
+    getApiUrl(await getUserScopedPath(userId, "/website/settings")),
+    {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    }
+  );
 
   const data = await parseJsonResponse(response);
   return data?.website || null;
@@ -139,9 +184,11 @@ export const fetchBuilderFormSubmissions = async (
 
   if (form_id) params.set("form_id", form_id);
   if (limit !== undefined && limit !== null) params.set("limit", String(limit));
-  if (offset !== undefined && offset !== null) params.set("offset", String(offset));
+  if (offset !== undefined && offset !== null)
+    params.set("offset", String(offset));
 
   const query = params.toString();
+
   const response = await fetch(
     getApiUrl(`/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`),
     {
@@ -163,9 +210,11 @@ export const fetchBuilderFormSubmissionsPage = async (
 
   if (form_id) params.set("form_id", form_id);
   if (limit !== undefined && limit !== null) params.set("limit", String(limit));
-  if (offset !== undefined && offset !== null) params.set("offset", String(offset));
+  if (offset !== undefined && offset !== null)
+    params.set("offset", String(offset));
 
   const query = params.toString();
+
   const response = await fetch(
     getApiUrl(`/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`),
     {
