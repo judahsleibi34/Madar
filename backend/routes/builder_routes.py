@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
+from postgrest.exceptions import APIError
 
 from database import service_supabase
 from services.website_settings_service import require_public_subdomain
@@ -22,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 SLUG_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 PROJECT_STATUSES = {"draft", "published", "archived"}
+SUBMISSION_STATUS_LABELS = {
+    "new": "New",
+    "contacted": "Contacted",
+    "closed": "Closed",
+    "spam": "Spam",
+    "archived": "Archived",
+}
+SUBMISSION_STATUS_VALUES = {label.lower(): value for value, label in SUBMISSION_STATUS_LABELS.items()}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
 
 
@@ -103,6 +112,25 @@ class BuilderProjectPublish(BaseModel):
     message: Optional[str] = None
 
 
+class BuilderFormSubmissionStatusUpdate(BaseModel):
+    status: str = Field(..., min_length=1)
+
+
+def normalize_submission_status(value: str) -> str:
+    status = (value or "").strip().lower()
+    db_status = SUBMISSION_STATUS_VALUES.get(status) or (status if status in SUBMISSION_STATUS_LABELS else None)
+
+    if db_status:
+        return db_status
+
+    raise HTTPException(status_code=400, detail="Invalid submission status")
+
+
+def format_submission_status(value: str | None) -> str:
+    status = (value or "new").strip().lower()
+    return SUBMISSION_STATUS_LABELS.get(status, "New")
+
+
 def get_project_for_tenant(project_id: str, tenant_id: int):
     project_response = (
         service_supabase.table("builder_projects")
@@ -130,7 +158,7 @@ def format_form_submission(row: dict):
         "form_version": row.get("form_version"),
         "createdAt": row.get("submitted_at") or row.get("created_at"),
         "submitted_at": row.get("submitted_at"),
-        "status": "New" if row.get("status") == "new" else row.get("status"),
+        "status": format_submission_status(row.get("status")),
         "answers": row.get("answers") or {},
         "quiz": row.get("quiz_result"),
         "field_snapshot": row.get("field_snapshot") or [],
@@ -387,6 +415,55 @@ def get_builder_form_submission(
     )
 
     submission_rows = getattr(submission_response, "data", None) or []
+    submission = submission_rows[0] if submission_rows else None
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Form submission not found")
+
+    return {
+        "success": True,
+        "submission": format_form_submission(submission),
+    }
+
+
+@router.put("/projects/{project_id}/form-submissions/{submission_id}")
+def update_builder_form_submission_status(
+    user_id: int,
+    project_id: str,
+    submission_id: str,
+    submission_update: BuilderFormSubmissionStatusUpdate,
+    request: Request,
+    response: Response,
+):
+    context = require_active_tenant_member(request, response)
+    assert_context_user(context, user_id)
+    get_project_for_tenant(project_id, context.tenant_id)
+
+    status = normalize_submission_status(submission_update.status)
+
+    try:
+        update_response = (
+            service_supabase.table("builder_form_submissions")
+            .update({"status": status})
+            .eq("tenant_id", context.tenant_id)
+            .eq("project_id", project_id)
+            .eq("id", submission_id)
+            .execute()
+        )
+    except APIError as error:
+        logger.warning(
+            "builder.form_submission_status_update_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "user_id": context.user_id,
+                "project_id": project_id,
+                "submission_id": submission_id,
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(status_code=500, detail="Could not update form submission status")
+
+    submission_rows = getattr(update_response, "data", None) or []
     submission = submission_rows[0] if submission_rows else None
 
     if not submission:

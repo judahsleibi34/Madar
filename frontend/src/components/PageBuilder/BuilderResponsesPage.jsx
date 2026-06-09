@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { fetchBuilderFormSubmissionsPage } from "./PageBuilder.api";
+import {
+  fetchBuilderFormSubmissionsPage,
+  updateBuilderFormSubmissionStatus,
+} from "./PageBuilder.api";
 
 const responsesText = {
   en: {
@@ -45,6 +48,7 @@ const responsesText = {
     previous: "Previous",
     next: "Next",
     page: "Page",
+    updateStatusFailed: "Could not update submission status.",
   },
   ar: {
     kicker: "\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0646\u0645\u0648\u0630\u062c",
@@ -89,6 +93,7 @@ const responsesText = {
     previous: "\u0627\u0644\u0633\u0627\u0628\u0642",
     next: "\u0627\u0644\u062a\u0627\u0644\u064a",
     page: "\u0635\u0641\u062d\u0629",
+    updateStatusFailed: "\u062a\u0639\u0630\u0631 \u062a\u062d\u062f\u064a\u062b \u062d\u0627\u0644\u0629 \u0627\u0644\u0631\u062f.",
   },
 };
 
@@ -102,6 +107,7 @@ const normalizeBackendResponse = (submission) => ({
 });
 
 const RESPONSE_PAGE_SIZE = 50;
+const SUBMISSION_STATUSES = ["New", "Contacted", "Closed", "Spam", "Archived"];
 
 const getResponseLoadMessage = (error, t) => {
   if (error?.status === 403) {
@@ -137,6 +143,7 @@ export default function BuilderResponsesPage({
   const [responsePageByForm, setResponsePageByForm] = useState({});
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responsesError, setResponsesError] = useState("");
+  const [statusUpdatingById, setStatusUpdatingById] = useState({});
   const [refreshKey, setRefreshKey] = useState(0);
   const selectedPage = responsePageByForm[selectedFormId] || 0;
   const selectedOffset = selectedPage * RESPONSE_PAGE_SIZE;
@@ -180,7 +187,7 @@ export default function BuilderResponsesPage({
     return () => {
       cancelled = true;
     };
-  }, [builderProjectId, selectedFormId, selectedOffset, refreshKey, t]);
+  }, [builderProjectId, selectedFormId, selectedOffset, refreshKey, t, user?.id]);
 
   const refreshResponses = () => {
     if (!builderProjectId || !selectedFormId || responsesLoading) return;
@@ -244,6 +251,33 @@ export default function BuilderResponsesPage({
         (collection) => collection.id === selectedForm.connectedCollectionId
       )
     : null;
+
+  const updateSubmissionStatus = async (submissionId, status) => {
+    if (!builderProjectId || !selectedFormId || !submissionId) return;
+
+    setStatusUpdatingById((current) => ({ ...current, [submissionId]: true }));
+
+    try {
+      const updatedSubmission = await updateBuilderFormSubmissionStatus(
+        builderProjectId,
+        submissionId,
+        status,
+        user?.id
+      );
+      const normalizedSubmission = normalizeBackendResponse(updatedSubmission);
+
+      setBackendResponsesByForm((current) => ({
+        ...current,
+        [selectedFormId]: (current[selectedFormId] || []).map((submission) =>
+          submission.id === submissionId ? normalizedSubmission : submission
+        ),
+      }));
+    } catch (error) {
+      showToast?.(error?.message || t.updateStatusFailed);
+    } finally {
+      setStatusUpdatingById((current) => ({ ...current, [submissionId]: false }));
+    }
+  };
 
   const copyResults = () => {
     if (!selectedForm) return;
@@ -457,9 +491,24 @@ export default function BuilderResponsesPage({
                       responses.map((response) => (
                         <tr key={response.id}>
                           <td>
-                            <span className="status-pill">
-                              {response.status || t.newStatus}
-                            </span>
+                            {response.backendSubmission ? (
+                              <select
+                                className="response-status-select"
+                                value={response.status || t.newStatus}
+                                disabled={Boolean(statusUpdatingById[response.id])}
+                                onChange={(event) => updateSubmissionStatus(response.id, event.target.value)}
+                              >
+                                {SUBMISSION_STATUSES.map((status) => (
+                                  <option key={status} value={status}>
+                                    {status}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="status-pill">
+                                {response.status || t.newStatus}
+                              </span>
+                            )}
                           </td>
 
                           <td>

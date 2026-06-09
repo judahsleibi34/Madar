@@ -356,6 +356,23 @@
   border-bottom: none;
 }
 
+
+.page-builder .response-status-select {
+  min-width: 118px;
+  border: 1px solid rgba(139, 42, 26, 0.22);
+  border-radius: 999px;
+  background: rgba(139, 42, 26, 0.08);
+  color: var(--madar-red);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .response-status-select:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .page-builder .status-pill {
   display: inline-flex;
   border-radius: 999px;

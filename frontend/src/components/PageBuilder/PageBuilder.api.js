@@ -195,6 +195,29 @@ export const fetchBuilderFormSubmissionsPage = async (
   };
 };
 
+export const updateBuilderFormSubmissionStatus = async (
+  projectId,
+  submissionId,
+  status,
+  userId
+) => {
+  const response = await fetch(
+    getApiUrl(await getUserScopedPath(
+      userId,
+      `/builder/projects/${projectId}/form-submissions/${submissionId}`
+    )),
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    }
+  );
+
+  const data = await parseJsonResponse(response);
+  return data?.submission || null;
+};
+
 export const submitPublicFormSubmission = async (subdomain, formId, payload) => {
   const response = await fetch(
     getApiUrl(`/public/sites/${subdomain}/forms/${formId}/submissions`),
