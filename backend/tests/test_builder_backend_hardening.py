@@ -75,7 +75,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  "require_public_subdomain",
                  return_value={"subdomain": "tenant-site", "tenant_id": 1},
              ):
-            response = client.post("/users/2/builder/projects/project-1/publish")
+            response = client.post("/builder/projects/project-1/publish")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["project"]["published_schema"], {"pages": []})
@@ -102,7 +102,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  "require_public_subdomain",
                  return_value={"subdomain": "tenant-site", "tenant_id": 1},
              ):
-            response = client.post("/users/2/builder/projects/project-1/publish", json={})
+            response = client.post("/builder/projects/project-1/publish", json={})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["project"]["published_schema"], {"version": 1})
@@ -130,7 +130,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                      detail="Configure a website subdomain before going live.",
                  ),
              ):
-            response = client.post("/users/2/builder/projects/project-1/publish")
+            response = client.post("/builder/projects/project-1/publish")
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
@@ -155,7 +155,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  },
              ):
             response = client.put(
-                "/users/2/builder/projects/project-1",
+                "/builder/projects/project-1",
                 json={"draft_schema": {"pages": [{"content": "x" * 200}]}},
             )
 
@@ -182,9 +182,46 @@ class BuilderBackendHardeningTests(unittest.TestCase):
             "require_builder_admin_access",
             side_effect=HTTPException(status_code=403, detail="Builder admin access required"),
         ):
-            response = client.delete("/users/2/builder/projects/project-1")
+            response = client.delete("/builder/projects/project-1")
 
         self.assertEqual(response.status_code, 403)
+
+
+    def test_builder_compatibility_route_accepts_matching_user_id(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "draft_schema": {"pages": []},
+                     "published_version": 0,
+                 },
+             ), \
+             patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
+             ):
+            response = client.post("/users/2/builder/projects/project-1/publish")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_builder_compatibility_route_rejects_wrong_user_id(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.get("/users/3/builder/projects")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "User id does not match session")
 
     def test_database_requires_service_key(self):
         database_path = Path(__file__).resolve().parents[1] / "database.py"

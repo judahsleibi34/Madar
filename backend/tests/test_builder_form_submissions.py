@@ -344,7 +344,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            response = client.get(f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
+            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -373,7 +373,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            response = client.get("/users/2/builder/projects")
+            response = client.get("/builder/projects")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -418,7 +418,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            response = client.get("/users/2/builder/projects?limit=1&offset=1")
+            response = client.get("/builder/projects?limit=1&offset=1")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -434,8 +434,8 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            over_limit = client.get("/users/2/builder/projects?limit=101")
-            negative_offset = client.get("/users/2/builder/projects?offset=-1")
+            over_limit = client.get("/builder/projects?limit=101")
+            negative_offset = client.get("/builder/projects?offset=-1")
 
         self.assertEqual(over_limit.status_code, 422)
         self.assertEqual(negative_offset.status_code, 422)
@@ -464,7 +464,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?limit=2&offset=1"
+                f"/builder/projects/{PROJECT_ID}/form-submissions?limit=2&offset=1"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -482,10 +482,10 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             over_limit = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?limit=101"
+                f"/builder/projects/{PROJECT_ID}/form-submissions?limit=101"
             )
             negative_offset = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?offset=-1"
+                f"/builder/projects/{PROJECT_ID}/form-submissions?offset=-1"
             )
 
         self.assertEqual(over_limit.status_code, 422)
@@ -498,7 +498,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -512,7 +512,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -526,7 +526,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}"
+                f"/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -540,7 +540,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.put(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Contacted"},
             )
 
@@ -557,7 +557,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.put(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Closed"},
             )
 
@@ -574,7 +574,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.put(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Maybe"},
             )
 
@@ -588,7 +588,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.put(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/missing-submission",
+                f"/builder/projects/{PROJECT_ID}/form-submissions/missing-submission",
                 json={"status": "Closed"},
             )
 
@@ -601,7 +601,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase):
             response = client.put(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Contacted"},
             )
 
@@ -614,7 +614,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
             response = client.put(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Contacted"},
             )
 
@@ -627,7 +627,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
-            response = client.get(f"/users/2/builder/projects/{PROJECT_ID}/form-submissions")
+            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions")
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Builder project not found")

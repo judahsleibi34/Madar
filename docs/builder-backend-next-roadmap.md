@@ -18,17 +18,19 @@ This document reflects the current codebase state after the Builder submissions 
 
 ### Authenticated Builder project routes
 
-Current `origin/main` uses user-scoped Builder routes:
+Current Builder API uses canonical authenticated routes:
 
-- `GET /users/{user_id}/builder/projects`
-- `POST /users/{user_id}/builder/projects`
-- `GET /users/{user_id}/builder/projects/{project_id}`
-- `PUT /users/{user_id}/builder/projects/{project_id}`
-- `DELETE /users/{user_id}/builder/projects/{project_id}`
-- `POST /users/{user_id}/builder/projects/{project_id}/publish`
-- `GET /users/{user_id}/builder/projects/{project_id}/form-submissions`
-- `GET /users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}`
-- `PUT /users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}`
+- `GET /builder/projects`
+- `POST /builder/projects`
+- `GET /builder/projects/{project_id}`
+- `PUT /builder/projects/{project_id}`
+- `DELETE /builder/projects/{project_id}`
+- `POST /builder/projects/{project_id}/publish`
+- `GET /builder/projects/{project_id}/form-submissions`
+- `GET /builder/projects/{project_id}/form-submissions/{submission_id}`
+- `PUT /builder/projects/{project_id}/form-submissions/{submission_id}`
+
+Temporary compatibility aliases still exist under `/users/{user_id}/builder/...`. Those aliases validate the path `user_id` against the authenticated session and should be removed after frontend and external clients have migrated.
 
 `assert_context_user()` verifies that the path `user_id` matches the authenticated session user id.
 
@@ -69,7 +71,7 @@ Current `origin/main` uses user-scoped Builder routes:
 
 ### Submission status updates
 
-- Authenticated status update route exists: `PUT /users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}`.
+- Authenticated status update route exists: `PUT /builder/projects/{project_id}/form-submissions/{submission_id}`. Temporary compatibility alias: `PUT /users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}`.
 - Accepted user-facing statuses are `New`, `Contacted`, `Closed`, `Spam`, and `Archived`, case-insensitive.
 - Database stores normalized lowercase values: `new`, `contacted`, `closed`, `spam`, `archived`.
 - Backend list/read/update responses map database values back to frontend labels.
@@ -116,19 +118,21 @@ Current `origin/main` uses user-scoped Builder routes:
 
 ### Authenticated Builder route map
 
-All authenticated Builder routes are currently user-scoped:
+Canonical authenticated Builder routes:
 
 | Method | Route | Purpose | Access |
 | --- | --- | --- | --- |
-| GET | `/users/{user_id}/builder/projects` | List non-archived tenant projects | active tenant member |
-| POST | `/users/{user_id}/builder/projects` | Create tenant project | owner/admin/member |
-| GET | `/users/{user_id}/builder/projects/{project_id}` | Load tenant project | active tenant member |
-| PUT | `/users/{user_id}/builder/projects/{project_id}` | Update name/slug/status/draft_schema | owner/admin/member |
-| DELETE | `/users/{user_id}/builder/projects/{project_id}` | Soft archive project | owner/admin |
-| POST | `/users/{user_id}/builder/projects/{project_id}/publish` | Copy draft_schema to published_schema | owner/admin/member plus configured subdomain |
-| GET | `/users/{user_id}/builder/projects/{project_id}/form-submissions` | List project submissions | active tenant member |
-| GET | `/users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}` | Read one submission | active tenant member |
-| PUT | `/users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}` | Update submission status only | active tenant member |
+| GET | `/builder/projects` | List non-archived tenant projects | active tenant member |
+| POST | `/builder/projects` | Create tenant project | owner/admin/member |
+| GET | `/builder/projects/{project_id}` | Load tenant project | active tenant member |
+| PUT | `/builder/projects/{project_id}` | Update name/slug/status/draft_schema | owner/admin/member |
+| DELETE | `/builder/projects/{project_id}` | Soft archive project | owner/admin |
+| POST | `/builder/projects/{project_id}/publish` | Copy draft_schema to published_schema | owner/admin/member plus configured subdomain |
+| GET | `/builder/projects/{project_id}/form-submissions` | List project submissions | active tenant member |
+| GET | `/builder/projects/{project_id}/form-submissions/{submission_id}` | Read one submission | active tenant member |
+| PUT | `/builder/projects/{project_id}/form-submissions/{submission_id}` | Update submission status only | active tenant member |
+
+Temporary compatibility aliases mirror the same routes at `/users/{user_id}/builder/...`; they should stay undocumented for new clients and be removed in a later cleanup after usage is verified.
 
 ### Public route map
 
@@ -195,7 +199,7 @@ Current website routes are also user-scoped:
 ## 3. Known Technical Debt / Risks
 
 - User-scoped route design adds route consistency risk. The path `user_id` is redundant with the session and must always be checked with `assert_context_user()`.
-- Route consistency is mixed across the app: Builder and website settings are user-scoped, public routes are not, and older expectations may still reference `/builder/...` in docs or clients.
+- Route consistency is still mixed across the app: Builder is canonical at `/builder/...` with temporary user-scoped aliases, website settings remains user-scoped, and public routes are not user-scoped.
 - Supabase SDK/PostgREST coupling is strong. Moving to self-hosted Postgres requires replacing table-builder calls, Supabase Auth token validation, `auth.uid()` RLS assumptions, and storage assumptions.
 - Backend service role bypasses RLS. RLS must be treated as secondary protection only.
 - `users.tenant_id` and `tenant_memberships` can diverge. Current tenant context depends on both `users.tenant_id` and an active membership row for that same tenant.
@@ -450,8 +454,9 @@ Defer Bloom filters. Use rate limits, DB indexes, normalized fingerprints, and a
    - Ensure migration `026` is applied in Supabase.
    - Manually smoke test status updates for `Contacted` and `Closed`.
    - Confirm no 500/CORS-like symptom remains on status updates.
-2. Audit route architecture/user-scoped routing decision.
-   - Decide whether `/users/{user_id}/builder/...` is permanent.
+2. Finish the Builder route migration.
+   - Treat `/builder/...` as canonical.
+   - Monitor usage of `/users/{user_id}/builder/...` aliases, then remove them in a later cleanup.
    - If permanent, document it as the API contract.
    - If not permanent, plan a separate migration/compatibility period.
 3. Add response filters/status UX polish.
@@ -548,7 +553,7 @@ Defer Bloom filters. Use rate limits, DB indexes, normalized fingerprints, and a
 
 ## Open Decisions Before More Backend Work
 
-- Is `/users/{user_id}/builder/...` the permanent Builder API contract?
+- When should temporary `/users/{user_id}/builder/...` Builder compatibility aliases be removed?
 - When can the `website_settings.user_id` fallback be removed?
 - Should direct Supabase authenticated users ever update submissions, or should all writes remain FastAPI-only?
 - Should `tenant_memberships` direct select expose all same-tenant members or only the current user's own membership?

@@ -62,8 +62,8 @@ export const mapBackendUserToBuilderUser = (backendUser, roleId = "") => ({
   authId: backendUser?.auth_id || "",
 });
 
-export const listBuilderProjects = async (userId) => {
-  const response = await fetch(getApiUrl(await getUserScopedPath(userId, "/builder/projects")), {
+export const listBuilderProjects = async () => {
+  const response = await fetch(getApiUrl("/builder/projects"), {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -73,8 +73,8 @@ export const listBuilderProjects = async (userId) => {
   return data?.projects || [];
 };
 
-export const fetchBuilderProject = async (projectId, userId) => {
-  const response = await fetch(getApiUrl(await getUserScopedPath(userId, `/builder/projects/${projectId}`)), {
+export const fetchBuilderProject = async (projectId) => {
+  const response = await fetch(getApiUrl(`/builder/projects/${projectId}`), {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -84,8 +84,8 @@ export const fetchBuilderProject = async (projectId, userId) => {
   return data?.project || null;
 };
 
-export const createBuilderProject = async ({ name, slug, draft_schema }, userId) => {
-  const response = await fetch(getApiUrl(await getUserScopedPath(userId, "/builder/projects")), {
+export const createBuilderProject = async ({ name, slug, draft_schema }) => {
+  const response = await fetch(getApiUrl("/builder/projects"), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -96,8 +96,8 @@ export const createBuilderProject = async ({ name, slug, draft_schema }, userId)
   return data?.project || null;
 };
 
-export const updateBuilderProject = async (projectId, payload, userId) => {
-  const response = await fetch(getApiUrl(await getUserScopedPath(userId, `/builder/projects/${projectId}`)), {
+export const updateBuilderProject = async (projectId, payload) => {
+  const response = await fetch(getApiUrl(`/builder/projects/${projectId}`), {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -108,8 +108,8 @@ export const updateBuilderProject = async (projectId, payload, userId) => {
   return data?.project || null;
 };
 
-export const publishBuilderProject = async (projectId, userId) => {
-  const response = await fetch(getApiUrl(await getUserScopedPath(userId, `/builder/projects/${projectId}/publish`)), {
+export const publishBuilderProject = async (projectId) => {
+  const response = await fetch(getApiUrl(`/builder/projects/${projectId}/publish`), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -133,7 +133,7 @@ export const fetchWebsiteSettings = async (userId) => {
 
 export const fetchBuilderFormSubmissions = async (
   projectId,
-  { form_id, limit = 100, offset = 0, user_id } = {}
+  { form_id, limit = 100, offset = 0 } = {}
 ) => {
   const params = new URLSearchParams();
 
@@ -143,10 +143,7 @@ export const fetchBuilderFormSubmissions = async (
 
   const query = params.toString();
   const response = await fetch(
-    getApiUrl(await getUserScopedPath(
-      user_id,
-      `/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`
-    )),
+    getApiUrl(`/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`),
     {
       method: "GET",
       credentials: "include",
@@ -160,7 +157,7 @@ export const fetchBuilderFormSubmissions = async (
 
 export const fetchBuilderFormSubmissionsPage = async (
   projectId,
-  { form_id, limit = 20, offset = 0, user_id } = {}
+  { form_id, limit = 20, offset = 0 } = {}
 ) => {
   const params = new URLSearchParams();
 
@@ -170,10 +167,7 @@ export const fetchBuilderFormSubmissionsPage = async (
 
   const query = params.toString();
   const response = await fetch(
-    getApiUrl(await getUserScopedPath(
-      user_id,
-      `/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`
-    )),
+    getApiUrl(`/builder/projects/${projectId}/form-submissions${query ? `?${query}` : ""}`),
     {
       method: "GET",
       credentials: "include",
@@ -198,14 +192,10 @@ export const fetchBuilderFormSubmissionsPage = async (
 export const updateBuilderFormSubmissionStatus = async (
   projectId,
   submissionId,
-  status,
-  userId
+  status
 ) => {
   const response = await fetch(
-    getApiUrl(await getUserScopedPath(
-      userId,
-      `/builder/projects/${projectId}/form-submissions/${submissionId}`
-    )),
+    getApiUrl(`/builder/projects/${projectId}/form-submissions/${submissionId}`),
     {
       method: "PUT",
       credentials: "include",

@@ -18,7 +18,7 @@ from services.tenant_service import (
     require_builder_write_access,
 )
 
-router = APIRouter(prefix="/users/{user_id}/builder", tags=["Builder"])
+router = APIRouter(tags=["Builder"])
 logger = logging.getLogger(__name__)
 
 SLUG_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
@@ -175,12 +175,21 @@ def pagination_response(rows: list[Any], limit: int, offset: int):
     }
 
 
-def assert_context_user(context: TenantContext, user_id: int) -> None:
+def assert_context_user(context: TenantContext, user_id: int | str | None) -> None:
+    if user_id is None:
+        return
+
     try:
         if int(context.user_id) != int(user_id):
             raise ValueError
     except (TypeError, ValueError):
         raise HTTPException(status_code=403, detail="User id does not match session")
+
+
+def require_builder_context(request: Request, response: Response, access_checker) -> TenantContext:
+    context = access_checker(request, response)
+    assert_context_user(context, request.path_params.get("user_id"))
+    return context
 
 
 def first_row(response):
@@ -190,16 +199,15 @@ def first_row(response):
     return response.data[0]
 
 
-@router.get("/projects")
+@router.get("/users/{user_id}/builder/projects", include_in_schema=False)
+@router.get("/builder/projects")
 def list_builder_projects(
-    user_id: int,
     request: Request,
     response: Response,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
-    context = require_active_tenant_member(request, response)
-    assert_context_user(context, user_id)
+    context = require_builder_context(request, response, require_active_tenant_member)
 
     projects_response = (
         service_supabase.table("builder_projects")
@@ -220,15 +228,14 @@ def list_builder_projects(
     }
 
 
-@router.post("/projects")
+@router.post("/users/{user_id}/builder/projects", include_in_schema=False)
+@router.post("/builder/projects")
 def create_builder_project(
-    user_id: int,
     project: BuilderProjectCreate,
     request: Request,
     response: Response,
 ):
-    context = require_builder_write_access(request, response)
-    assert_context_user(context, user_id)
+    context = require_builder_context(request, response, require_builder_write_access)
 
     payload = {
         "tenant_id": context.tenant_id,
@@ -254,10 +261,10 @@ def create_builder_project(
     }
 
 
-@router.get("/projects/{project_id}")
-def get_builder_project(user_id: int, project_id: str, request: Request, response: Response):
-    context = require_active_tenant_member(request, response)
-    assert_context_user(context, user_id)
+@router.get("/users/{user_id}/builder/projects/{project_id}", include_in_schema=False)
+@router.get("/builder/projects/{project_id}")
+def get_builder_project(project_id: str, request: Request, response: Response):
+    context = require_builder_context(request, response, require_active_tenant_member)
 
     return {
         "success": True,
@@ -265,16 +272,15 @@ def get_builder_project(user_id: int, project_id: str, request: Request, respons
     }
 
 
-@router.put("/projects/{project_id}")
+@router.put("/users/{user_id}/builder/projects/{project_id}", include_in_schema=False)
+@router.put("/builder/projects/{project_id}")
 def update_builder_project(
-    user_id: int,
     project_id: str,
     project: BuilderProjectUpdate,
     request: Request,
     response: Response,
 ):
-    context = require_builder_write_access(request, response)
-    assert_context_user(context, user_id)
+    context = require_builder_context(request, response, require_builder_write_access)
     get_project_for_tenant(project_id, context.tenant_id)
 
     update_payload = {}
@@ -323,10 +329,10 @@ def update_builder_project(
     }
 
 
-@router.delete("/projects/{project_id}")
-def archive_builder_project(user_id: int, project_id: str, request: Request, response: Response):
-    context = require_builder_admin_access(request, response)
-    assert_context_user(context, user_id)
+@router.delete("/users/{user_id}/builder/projects/{project_id}", include_in_schema=False)
+@router.delete("/builder/projects/{project_id}")
+def archive_builder_project(project_id: str, request: Request, response: Response):
+    context = require_builder_context(request, response, require_builder_admin_access)
     get_project_for_tenant(project_id, context.tenant_id)
 
     archive_response = (
@@ -343,9 +349,9 @@ def archive_builder_project(user_id: int, project_id: str, request: Request, res
     }
 
 
-@router.get("/projects/{project_id}/form-submissions")
+@router.get("/users/{user_id}/builder/projects/{project_id}/form-submissions", include_in_schema=False)
+@router.get("/builder/projects/{project_id}/form-submissions")
 def list_builder_form_submissions(
-    user_id: int,
     project_id: str,
     request: Request,
     response: Response,
@@ -353,8 +359,7 @@ def list_builder_form_submissions(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
-    context = require_active_tenant_member(request, response)
-    assert_context_user(context, user_id)
+    context = require_builder_context(request, response, require_active_tenant_member)
     get_project_for_tenant(project_id, context.tenant_id)
 
     query = (
@@ -392,16 +397,15 @@ def list_builder_form_submissions(
     }
 
 
-@router.get("/projects/{project_id}/form-submissions/{submission_id}")
+@router.get("/users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}", include_in_schema=False)
+@router.get("/builder/projects/{project_id}/form-submissions/{submission_id}")
 def get_builder_form_submission(
-    user_id: int,
     project_id: str,
     submission_id: str,
     request: Request,
     response: Response,
 ):
-    context = require_active_tenant_member(request, response)
-    assert_context_user(context, user_id)
+    context = require_builder_context(request, response, require_active_tenant_member)
     get_project_for_tenant(project_id, context.tenant_id)
 
     submission_response = (
@@ -426,17 +430,16 @@ def get_builder_form_submission(
     }
 
 
-@router.put("/projects/{project_id}/form-submissions/{submission_id}")
+@router.put("/users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}", include_in_schema=False)
+@router.put("/builder/projects/{project_id}/form-submissions/{submission_id}")
 def update_builder_form_submission_status(
-    user_id: int,
     project_id: str,
     submission_id: str,
     submission_update: BuilderFormSubmissionStatusUpdate,
     request: Request,
     response: Response,
 ):
-    context = require_active_tenant_member(request, response)
-    assert_context_user(context, user_id)
+    context = require_builder_context(request, response, require_active_tenant_member)
     get_project_for_tenant(project_id, context.tenant_id)
 
     status = normalize_submission_status(submission_update.status)
@@ -475,16 +478,15 @@ def update_builder_form_submission_status(
     }
 
 
-@router.post("/projects/{project_id}/publish")
+@router.post("/users/{user_id}/builder/projects/{project_id}/publish", include_in_schema=False)
+@router.post("/builder/projects/{project_id}/publish")
 def publish_builder_project(
-    user_id: int,
     project_id: str,
     request: Request,
     response: Response,
     publish: Optional[BuilderProjectPublish] = Body(default=None),
 ):
-    context = require_builder_write_access(request, response)
-    assert_context_user(context, user_id)
+    context = require_builder_context(request, response, require_builder_write_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
     website_settings = require_public_subdomain(context.tenant_id, context.user_id)
 
