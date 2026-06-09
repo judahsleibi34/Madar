@@ -1,0 +1,131 @@
+﻿/* ============================================================
+   Data grid
+   ============================================================ */
+
+.page-builder .daw-data-grid {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.page-builder .daw-data-grid-toolbar,
+.page-builder .daw-data-grid-meta,
+.page-builder .daw-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: var(--daw-soft-bg);
+}
+
+.page-builder .daw-data-grid-toolbar input {
+  width: min(360px, 100%);
+  min-height: 40px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--daw-text);
+  font-size: 13px;
+  font-weight: 850;
+  outline: none;
+}
+
+.page-builder .daw-data-grid-meta {
+  border-top: 1px solid var(--daw-card-border);
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-table-scroll {
+  width: 100%;
+  overflow: auto;
+}
+
+.page-builder .daw-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.page-builder .daw-table th,
+.page-builder .daw-table td {
+  max-width: 320px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--daw-card-border);
+  color: var(--daw-text);
+  font-size: 13px;
+  text-align: start;
+  vertical-align: top;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-builder .daw-table th {
+  background: rgba(26, 39, 68, 0.055);
+  color: var(--daw-muted);
+  font-weight: 950;
+}
+
+.page-builder .daw-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.page-builder .daw-table-indexed th,
+.page-builder .daw-table-indexed td {
+  vertical-align: middle;
+}
+
+.page-builder .daw-table-indexed th {
+  white-space: nowrap;
+}
+
+.page-builder .daw-row-index-head,
+.page-builder .daw-row-index-cell {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 74px;
+  min-width: 74px;
+  max-width: 74px;
+  text-align: center;
+  background: #f8f8f9;
+  color: #6b7280;
+  border-right: 2px solid rgba(122, 29, 31, 0.18);
+  box-shadow: 8px 0 16px rgba(15, 23, 42, 0.06);
+}
+
+.page-builder .daw-row-index-head {
+  z-index: 5;
+  font-weight: 950;
+}
+
+.page-builder .daw-row-index-cell {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-row-index-head,
+.page-builder .daw-page[dir="rtl"] .daw-row-index-cell {
+  left: auto;
+  right: 0;
+  border-right: 0;
+  border-left: 2px solid rgba(122, 29, 31, 0.18);
+  box-shadow: -8px 0 16px rgba(15, 23, 42, 0.06);
+}
+
+.page-builder .daw-pagination {
+  justify-content: flex-end;
+  border-top: 1px solid var(--daw-card-border);
+}
+
+.page-builder .daw-pagination span {
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 950;
+}
