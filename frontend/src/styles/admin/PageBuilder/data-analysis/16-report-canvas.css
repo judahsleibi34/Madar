@@ -1,0 +1,286 @@
+﻿/* ============================================================
+   Report canvas
+   ============================================================ */
+
+.page-builder .daw-report-canvas {
+  display: grid;
+  gap: 18px;
+  min-height: 680px;
+}
+
+.page-builder .daw-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.page-builder .daw-dataset-stats,
+.page-builder .daw-kpi-grid,
+.page-builder .daw-object-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.page-builder .daw-dataset-stats article,
+.page-builder .daw-kpi-grid article,
+.page-builder .daw-object-grid article {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  padding: 16px;
+  background: var(--daw-soft-bg);
+}
+
+.page-builder .daw-dataset-stats span,
+.page-builder .daw-kpi-grid span,
+.page-builder .daw-object-grid span {
+  display: block;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .daw-dataset-stats strong,
+.page-builder .daw-kpi-grid strong,
+.page-builder .daw-object-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--daw-text);
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-kpi-grid small {
+  display: block;
+  margin-top: 4px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-report-result {
+  display: grid;
+  gap: 16px;
+}
+
+.page-builder .daw-review-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.page-builder .daw-review-summary-grid article,
+.page-builder .daw-friendly-panel {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.page-builder .daw-review-summary-grid article.tone-good {
+  border-color: rgba(29, 128, 82, 0.24);
+  background: rgba(29, 128, 82, 0.07);
+}
+
+.page-builder .daw-review-summary-grid article.tone-warn {
+  border-color: rgba(var(--theme-primary-rgb), 0.24);
+  background: rgba(var(--theme-primary-rgb), 0.07);
+}
+
+.page-builder .daw-review-summary-grid span {
+  display: block;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .daw-review-summary-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--daw-text);
+  font-size: 26px;
+  font-weight: 950;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-review-summary-grid small {
+  display: block;
+  margin-top: 7px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.page-builder .daw-report-summary,
+.page-builder .daw-report-block,
+.page-builder .daw-warning-list {
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.page-builder .daw-report-summary span,
+.page-builder .daw-report-block h4,
+.page-builder .daw-warning-list h4,
+.page-builder .daw-friendly-panel h4 {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .daw-report-summary p,
+.page-builder .daw-warning-list p {
+  margin: 0;
+  color: var(--daw-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.page-builder .daw-friendly-panel ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--daw-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.page-builder .daw-report-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.page-builder .daw-report-block-header h4 {
+  margin: 0;
+}
+
+.page-builder .daw-report-block-header span {
+  flex: 0 0 auto;
+  color: var(--daw-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.page-builder .daw-compact-table-scroll {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 12px;
+}
+
+.page-builder .daw-compact-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.page-builder .daw-compact-table th,
+.page-builder .daw-compact-table td {
+  max-width: 220px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--daw-card-border);
+  color: var(--daw-text);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-compact-table th {
+  background: rgba(26, 39, 68, 0.045);
+  color: var(--daw-muted);
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.page-builder .daw-compact-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.page-builder .daw-compact-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-compact-pagination div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-builder .daw-compact-pagination button {
+  min-height: 34px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.page-builder .daw-compact-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.page-builder .daw-warning-list {
+  border-color: rgba(var(--theme-primary-rgb), 0.24);
+  background: rgba(var(--theme-primary-rgb), 0.07);
+}
+
+.page-builder .daw-insight-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--daw-text);
+}
+
+.page-builder .daw-insight-list li {
+  line-height: 1.55;
+}
+
+.page-builder .daw-chart-list {
+  display: grid;
+  gap: 10px;
+}
+
+.page-builder .daw-chart-list article {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(26, 39, 68, 0.055);
+}
+
+.page-builder .daw-chart-list strong {
+  color: var(--daw-text);
+  font-weight: 950;
+}
+
+.page-builder .daw-chart-list p {
+  margin: 5px 0 0;
+  color: var(--daw-muted);
+}

@@ -3,6 +3,7 @@ export default function Stepper({ currentStep, setCurrentStep, dataset, t }) {
     { id: "source", label: t.source, enabled: true },
     { id: "review", label: t.review, enabled: Boolean(dataset) },
     { id: "prepare", label: t.prepare, enabled: Boolean(dataset) },
+    { id: "visualization", label: t.visualization, enabled: Boolean(dataset) },
     { id: "report", label: t.report, enabled: Boolean(dataset) },
   ];
 

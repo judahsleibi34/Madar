@@ -1,0 +1,16 @@
+﻿/* ============================================================
+   JSON output
+   ============================================================ */
+
+.page-builder .daw-json-output {
+  max-height: 460px;
+  overflow: auto;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  padding: 16px;
+  background: var(--theme-surface);
+  color: #e5e7eb;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}

@@ -1,0 +1,91 @@
+/* ============================================================
+   Data Analysis Visualization Output
+   Used on the final report step
+   ============================================================ */
+
+.page-builder .daw-visualization-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.page-builder .daw-visualization-card h4 {
+  margin: 0;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .daw-visualization-card p {
+  margin: 0;
+  color: var(--daw-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.page-builder .daw-visualization-frame {
+  width: 100%;
+  min-width: 0;
+  min-height: 420px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  background: rgba(26, 39, 68, 0.035);
+  overflow: hidden;
+}
+
+.page-builder .daw-visualization-frame iframe {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  border: 0;
+}
+
+.page-builder .daw-visualization-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.page-builder .daw-visualization-json {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--theme-surface);
+  color: #e5e7eb;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Dark mode */
+.theme-dark .page-builder .daw-visualization-card,
+[data-theme="dark"] .page-builder .daw-visualization-card,
+.theme-dark .page-builder .daw-visualization-frame,
+[data-theme="dark"] .page-builder .daw-visualization-frame {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.theme-dark .page-builder .daw-visualization-image,
+[data-theme="dark"] .page-builder .daw-visualization-image {
+  background: rgba(15, 23, 38, 0.74);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Responsive */
+@media (max-width: 820px) {
+  .page-builder .daw-visualization-frame,
+  .page-builder .daw-visualization-frame iframe {
+    min-height: 320px;
+  }
+}

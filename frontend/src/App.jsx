@@ -99,6 +99,11 @@ export default function App() {
     location.pathname.startsWith("/admin/users") ||
     location.pathname.startsWith("/settings");
 
+  const getCurrentReturnTo = () =>
+    encodeURIComponent(
+      `${location.pathname}${location.search}${location.hash}`
+    );
+
   const normalizeUser = useCallback((userInfo) => {
     const firstName = userInfo?.first_name || "";
     const lastName = userInfo?.last_name || "";
@@ -429,7 +434,10 @@ export default function App() {
     const nextUserType = normalizeUserType(userInfo?.user_type);
     const nextUserIsAdmin = nextUserType === "admin";
 
-    let nextPath = returnTo || "/dashboard";
+    let nextPath =
+      returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+        ? returnTo
+        : "/dashboard";
 
     const adminOnlyPaths = ["/admin/users"];
 
@@ -623,7 +631,8 @@ export default function App() {
   ) => {
     const shellLang = options.lang || lang;
     const isShellRtl = shellLang === "ar";
-    const useCompactBuilderSidebar = isPageBuilderShell || options.compactSidebar;
+    const useCompactBuilderSidebar =
+      isPageBuilderShell || options.compactSidebar;
 
     const openMenuLabel = t("common:navigation.openMenu");
     const closeMenuLabel = t("common:navigation.closeMenu");
@@ -700,6 +709,19 @@ export default function App() {
       />
     );
 
+  console.log("[APP ROUTE DEBUG]", {
+    path: location.pathname,
+    isTenantSiteRoute,
+    isDashboardRoute,
+    authChecked,
+    isLoggedIn,
+    user,
+    userId: user?.id,
+    userType: user?.user_type,
+    isAdminUser,
+    isRegularUser,
+  });
+
   if (isTenantSiteRoute) {
     return (
       <>
@@ -720,12 +742,15 @@ export default function App() {
 
         <Routes>
           <Route
-            path="/dashboard"
+            path="/dashboard/*"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.dashboard"))
               ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
               ) : isAdminUser ? (
                 renderDashboardShell(
                   <Dashboard
@@ -749,12 +774,15 @@ export default function App() {
           />
 
           <Route
-            path="/page-builder"
+            path="/page-builder/*"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.pageBuilder"))
               ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
               ) : isRegularUser ? (
                 renderDashboardShell(
                   <PageBuilder
@@ -776,12 +804,15 @@ export default function App() {
           />
 
           <Route
-            path="/builder-responses"
+            path="/builder-responses/*"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.submissions"))
               ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
               ) : isRegularUser ? (
                 renderDashboardShell(
                   <PageBuilder
@@ -807,12 +838,15 @@ export default function App() {
           />
 
           <Route
-            path="/builder-data"
+            path="/builder-data/*"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.dataLogs"))
               ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
               ) : isRegularUser ? (
                 renderDashboardShell(
                   <PageBuilder
@@ -838,12 +872,15 @@ export default function App() {
           />
 
           <Route
-            path="/my-plan"
+            path="/my-plan/*"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.myPlan"))
               ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
               ) : isRegularUser ? (
                 renderDashboardShell(<MyPlanPage lang={lang} />)
               ) : (
@@ -855,12 +892,15 @@ export default function App() {
           />
 
           <Route
-            path="/admin/users"
+            path="/admin/users/*"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.userManagement"))
               ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
               ) : isAdminUser ? (
                 renderDashboardShell(
                   <UserManagementPage lang={lang} currentUser={user} />
@@ -874,12 +914,35 @@ export default function App() {
           />
 
           <Route
-            path="/settings"
+            path="/settings/change-password/*"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton(t("dashboard:loading.passwordSettings"))
+              ) : !isLoggedIn ? (
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
+              ) : isRegularUser ? (
+                renderDashboardShell(<ChangePasswordPage lang={lang} />)
+              ) : (
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
+              )
+            }
+          />
+
+          <Route
+            path="/settings/*"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.settings"))
               ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
               ) : isRegularUser ? (
                 renderDashboardShell(
                   <SettingsPage
@@ -896,24 +959,7 @@ export default function App() {
             }
           />
 
-          <Route
-            path="/settings/change-password"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.passwordSettings"))
-              ) : !isLoggedIn ? (
-                <Navigate to="/login" replace />
-              ) : isRegularUser ? (
-                renderDashboardShell(<ChangePasswordPage lang={lang} />)
-              ) : (
-                renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
-                )
-              )
-            }
-          />
-
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </>
     );

@@ -1,0 +1,80 @@
+﻿/* ============================================================
+   Column menu
+   ============================================================ */
+
+.page-builder .daw-column-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.page-builder .daw-column-menu summary {
+  list-style: none;
+}
+
+.page-builder .daw-column-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-builder .daw-column-menu-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  inset-inline-end: 0;
+  z-index: 50;
+  width: 320px;
+  max-width: min(320px, calc(100vw - 48px));
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  padding: 12px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(26, 39, 68, 0.16);
+}
+
+.page-builder .daw-column-menu-panel > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.page-builder .daw-column-menu-panel label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(26, 39, 68, 0.04);
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.page-builder .daw-column-menu-panel label:hover {
+  background: rgba(var(--theme-primary-rgb), 0.08);
+}
+
+.page-builder .daw-column-menu-panel input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--daw-red);
+  cursor: pointer;
+}
+
+.page-builder .daw-column-menu-panel label span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
