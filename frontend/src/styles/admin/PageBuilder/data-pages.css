@@ -276,6 +276,30 @@
   white-space: nowrap;
 }
 
+.page-builder .responses-status-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-builder .responses-status-filter span {
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.page-builder .responses-status-filter select {
+  min-width: 126px;
+  border: 1px solid var(--madar-border);
+  border-radius: 8px;
+  background: var(--madar-surface);
+  color: var(--madar-text);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .page-builder .responses-refresh-button,
 .page-builder .responses-pagination-controls button {
   border: 1px solid var(--madar-border);
