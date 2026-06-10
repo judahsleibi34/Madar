@@ -88,6 +88,7 @@ class FakeQuery:
         self.neq_filters = []
         self.not_null_columns = set()
         self.insert_payload = None
+        self.update_payload = None
         self.limit_count = None
         self.order_column = None
         self.order_desc = False
@@ -132,6 +133,10 @@ class FakeQuery:
         self.insert_payload = payload
         return self
 
+    def update(self, payload):
+        self.update_payload = payload
+        return self
+
     def execute(self):
         if self.insert_payload is not None:
             row = {
@@ -153,6 +158,15 @@ class FakeQuery:
 
         for column in self.not_null_columns:
             rows = [row for row in rows if row.get(column) is not None]
+
+        if self.update_payload is not None:
+            table_rows = self.supabase.tables.get(self.table_name, [])
+            updated_rows = []
+            for row in table_rows:
+                if row in rows:
+                    row.update(self.update_payload)
+                    updated_rows.append(row)
+            return FakeResponse(updated_rows)
 
         if self.order_column:
             rows = sorted(
@@ -330,7 +344,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            response = client.get(f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
+            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -359,7 +373,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            response = client.get("/users/2/builder/projects")
+            response = client.get("/builder/projects")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -404,7 +418,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            response = client.get("/users/2/builder/projects?limit=1&offset=1")
+            response = client.get("/builder/projects?limit=1&offset=1")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -420,8 +434,8 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
-            over_limit = client.get("/users/2/builder/projects?limit=101")
-            negative_offset = client.get("/users/2/builder/projects?offset=-1")
+            over_limit = client.get("/builder/projects?limit=101")
+            negative_offset = client.get("/builder/projects?offset=-1")
 
         self.assertEqual(over_limit.status_code, 422)
         self.assertEqual(negative_offset.status_code, 422)
@@ -450,7 +464,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?limit=2&offset=1"
+                f"/builder/projects/{PROJECT_ID}/form-submissions?limit=2&offset=1"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -468,10 +482,10 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             over_limit = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?limit=101"
+                f"/builder/projects/{PROJECT_ID}/form-submissions?limit=101"
             )
             negative_offset = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions?offset=-1"
+                f"/builder/projects/{PROJECT_ID}/form-submissions?offset=-1"
             )
 
         self.assertEqual(over_limit.status_code, 422)
@@ -484,11 +498,128 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(
-                f"/users/2/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
             )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["submission"]["id"], SUBMISSION_ID)
+
+    def test_authenticated_submission_read_returns_status_label(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_form_submissions"][0]["status"] = "contacted"
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.get(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["submission"]["status"], "Contacted")
+
+    def test_authenticated_submission_list_returns_status_labels(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_form_submissions"][0]["status"] = "closed"
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.get(
+                f"/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["submissions"][0]["status"], "Closed")
+
+
+    def test_authenticated_submission_status_update_works(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"status": "Contacted"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["submission"]["id"], SUBMISSION_ID)
+        self.assertEqual(body["submission"]["status"], "Contacted")
+        self.assertEqual(fake_supabase.tables["builder_form_submissions"][0]["status"], "contacted")
+
+    def test_authenticated_submission_status_update_closed_works(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"status": "Closed"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["submission"]["id"], SUBMISSION_ID)
+        self.assertEqual(body["submission"]["status"], "Closed")
+        self.assertEqual(fake_supabase.tables["builder_form_submissions"][0]["status"], "closed")
+
+    def test_authenticated_submission_status_update_rejects_invalid_status(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"status": "Maybe"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Invalid submission status")
+
+    def test_authenticated_submission_status_update_unknown_submission_fails(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/missing-submission",
+                json={"status": "Closed"},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Form submission not found")
+
+    def test_authenticated_submission_status_update_requires_auth(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase):
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"status": "Contacted"},
+            )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_cross_tenant_submission_status_update_is_blocked(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"status": "Contacted"},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Builder project not found")
 
     def test_cross_tenant_project_access_is_blocked(self):
         fake_supabase = FakeSupabase()
@@ -496,10 +627,112 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
              patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
-            response = client.get(f"/users/2/builder/projects/{PROJECT_ID}/form-submissions")
+            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions")
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Builder project not found")
+
+    def test_canonical_builder_project_list_requires_auth(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase):
+            response = client.get("/builder/projects")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_cross_tenant_project_read_is_blocked(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
+            response = client.get(f"/builder/projects/{PROJECT_ID}")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Builder project not found")
+
+    def test_cross_tenant_project_update_is_blocked(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context(tenant_id=2)):
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}",
+                json={"name": "Other tenant update"},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Builder project not found")
+
+    def test_cross_tenant_project_archive_is_blocked(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_admin_access", return_value=fake_context(tenant_id=2, role="owner")):
+            response = client.delete(f"/builder/projects/{PROJECT_ID}")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Builder project not found")
+
+    def test_cross_tenant_submission_read_is_blocked(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
+            response = client.get(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Builder project not found")
+
+    def test_compatibility_submission_status_update_rejects_wrong_user_id(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            response = client.put(
+                f"/users/3/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"status": "Contacted"},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "User id does not match session")
+
+    def test_public_site_response_does_not_expose_draft_schema(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"][0]["draft_schema"] = {"secret": True}
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("published_schema", body["project"])
+        self.assertNotIn("draft_schema", body["project"])
+        self.assertNotIn("draft_schema", str(body))
+
+    def test_public_submission_rejects_unpublished_project(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"][0]["status"] = "draft"
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")
 
 
 if __name__ == "__main__":

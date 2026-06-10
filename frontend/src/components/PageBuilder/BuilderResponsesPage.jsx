@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { fetchBuilderFormSubmissionsPage } from "./PageBuilder.api";
+import {
+  fetchBuilderFormSubmissionsPage,
+  updateBuilderFormSubmissionStatus,
+} from "./PageBuilder.api";
 
 const responsesText = {
   en: {
@@ -30,6 +33,7 @@ const responsesText = {
     latest: "Latest submission",
     none: "None",
     status: "Status",
+    reviewStatus: "Review Status",
     created: "Created",
     newStatus: "New",
     emptyTitle: "No submissions yet",
@@ -45,6 +49,11 @@ const responsesText = {
     previous: "Previous",
     next: "Next",
     page: "Page",
+    statusFilter: "Status filter",
+    allStatuses: "All",
+    filteredEmptyTitle: "No matching submissions",
+    filteredEmptyText: "No submissions on this loaded page match the selected status.",
+    updateStatusFailed: "Could not update submission status.",
   },
   ar: {
     kicker: "\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0646\u0645\u0648\u0630\u062c",
@@ -74,6 +83,7 @@ const responsesText = {
     latest: "\u0622\u062e\u0631 \u0631\u062f",
     none: "\u0644\u0627 \u064a\u0648\u062c\u062f",
     status: "\u0627\u0644\u062d\u0627\u0644\u0629",
+    reviewStatus: "\u062d\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629",
     created: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0625\u0646\u0634\u0627\u0621",
     newStatus: "\u062c\u062f\u064a\u062f",
     emptyTitle: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0631\u062f\u0648\u062f \u0628\u0639\u062f",
@@ -89,6 +99,11 @@ const responsesText = {
     previous: "\u0627\u0644\u0633\u0627\u0628\u0642",
     next: "\u0627\u0644\u062a\u0627\u0644\u064a",
     page: "\u0635\u0641\u062d\u0629",
+    statusFilter: "\u062a\u0635\u0641\u064a\u0629 \u0627\u0644\u062d\u0627\u0644\u0629",
+    allStatuses: "\u0627\u0644\u0643\u0644",
+    filteredEmptyTitle: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0631\u062f\u0648\u062f \u0645\u0637\u0627\u0628\u0642\u0629",
+    filteredEmptyText: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0631\u062f\u0648\u062f \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062d\u0629 \u062a\u0637\u0627\u0628\u0642 \u0627\u0644\u062d\u0627\u0644\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629.",
+    updateStatusFailed: "\u062a\u0639\u0630\u0631 \u062a\u062d\u062f\u064a\u062b \u062d\u0627\u0644\u0629 \u0627\u0644\u0631\u062f.",
   },
 };
 
@@ -102,6 +117,10 @@ const normalizeBackendResponse = (submission) => ({
 });
 
 const RESPONSE_PAGE_SIZE = 50;
+const SUBMISSION_STATUSES = ["New", "Contacted", "Closed", "Spam", "Archived"];
+const STATUS_FILTER_OPTIONS = ["All", ...SUBMISSION_STATUSES];
+
+const normalizeStatus = (status) => String(status || "New").trim().toLowerCase();
 
 const getResponseLoadMessage = (error, t) => {
   if (error?.status === 403) {
@@ -137,6 +156,8 @@ export default function BuilderResponsesPage({
   const [responsePageByForm, setResponsePageByForm] = useState({});
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responsesError, setResponsesError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusUpdatingById, setStatusUpdatingById] = useState({});
   const [refreshKey, setRefreshKey] = useState(0);
   const selectedPage = responsePageByForm[selectedFormId] || 0;
   const selectedOffset = selectedPage * RESPONSE_PAGE_SIZE;
@@ -180,7 +201,7 @@ export default function BuilderResponsesPage({
     return () => {
       cancelled = true;
     };
-  }, [builderProjectId, selectedFormId, selectedOffset, refreshKey, t]);
+  }, [builderProjectId, selectedFormId, selectedOffset, refreshKey, t, user?.id]);
 
   const refreshResponses = () => {
     if (!builderProjectId || !selectedFormId || responsesLoading) return;
@@ -217,6 +238,10 @@ export default function BuilderResponsesPage({
 
   const fields = selectedForm ? getFormFields(selectedForm) : [];
   const responses = getDisplayResponsesForForm(selectedForm);
+  const displayedResponses =
+    statusFilter === "All"
+      ? responses
+      : responses.filter((response) => normalizeStatus(response.status) === normalizeStatus(statusFilter));
   const selectedPagination = backendPaginationByForm[selectedFormId];
   const isQuiz = selectedForm?.mode === "quiz";
   const requiredFields = fields.filter((field) => field.required);
@@ -225,7 +250,7 @@ export default function BuilderResponsesPage({
   const hasBackendPagination = Boolean(builderProjectId && selectedFormId);
   const hasNextPage = hasBackendPagination && Boolean(selectedPagination?.has_more);
   const hasPreviousPage = hasBackendPagination && selectedPage > 0;
-  const answeredCells = responses.reduce(
+  const answeredCells = displayedResponses.reduce(
     (total, response) =>
       total +
       fields.filter((field) => {
@@ -235,8 +260,8 @@ export default function BuilderResponsesPage({
     0
   );
   const completionRate =
-    responses.length && fields.length
-      ? Math.round((answeredCells / (responses.length * fields.length)) * 100)
+    displayedResponses.length && fields.length
+      ? Math.round((answeredCells / (displayedResponses.length * fields.length)) * 100)
       : 0;
 
   const connectedCollection = selectedForm?.connectedCollectionId
@@ -245,14 +270,42 @@ export default function BuilderResponsesPage({
       )
     : null;
 
+  const updateSubmissionStatus = async (submissionId, status) => {
+    if (!builderProjectId || !selectedFormId || !submissionId) return;
+
+    setStatusUpdatingById((current) => ({ ...current, [submissionId]: true }));
+
+    try {
+      const updatedSubmission = await updateBuilderFormSubmissionStatus(
+        builderProjectId,
+        submissionId,
+        status,
+        user?.id
+      );
+      const normalizedSubmission = normalizeBackendResponse(updatedSubmission);
+
+      setBackendResponsesByForm((current) => ({
+        ...current,
+        [selectedFormId]: (current[selectedFormId] || []).map((submission) =>
+          submission.id === submissionId ? normalizedSubmission : submission
+        ),
+      }));
+    } catch (error) {
+      showToast?.(error?.message || t.updateStatusFailed);
+    } finally {
+      setStatusUpdatingById((current) => ({ ...current, [submissionId]: false }));
+    }
+  };
+
   const copyResults = () => {
     if (!selectedForm) return;
 
     const payload = {
       form: selectedForm.title,
-      totalResponses: responses.length,
+      totalResponses: displayedResponses.length,
+      statusFilter,
       exportedAt: new Date().toISOString(),
-      responses,
+      responses: displayedResponses,
     };
 
     try {
@@ -359,6 +412,20 @@ export default function BuilderResponsesPage({
                 </div>
 
                 <div className="responses-table-controls">
+                  <label className="responses-status-filter">
+                    <span>{t.statusFilter}</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => setStatusFilter(event.target.value)}
+                    >
+                      {STATUS_FILTER_OPTIONS.map((status) => (
+                        <option key={status} value={status}>
+                          {status === "All" ? t.allStatuses : status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
                   {hasBackendPagination && (
                     <div className="responses-pagination-controls">
                       <button
@@ -393,7 +460,7 @@ export default function BuilderResponsesPage({
                   )}
 
                   <div className="results-count-pill">
-                    {responses.length} {responses.length === 1 ? t.response : t.responses}
+                    {displayedResponses.length} {displayedResponses.length === 1 ? t.response : t.responses}
                   </div>
                 </div>
               </div>
@@ -425,7 +492,7 @@ export default function BuilderResponsesPage({
                 <table className="results-data-table">
                   <thead>
                     <tr>
-                      <th>{t.status}</th>
+                      <th>{t.reviewStatus}</th>
                       <th>{t.created}</th>
                       {isQuiz && <th>Score</th>}
                       {fields.map((field) => (
@@ -453,13 +520,28 @@ export default function BuilderResponsesPage({
                           </div>
                         </td>
                       </tr>
-                    ) : responses.length > 0 ? (
-                      responses.map((response) => (
+                    ) : displayedResponses.length > 0 ? (
+                      displayedResponses.map((response) => (
                         <tr key={response.id}>
                           <td>
-                            <span className="status-pill">
-                              {response.status || t.newStatus}
-                            </span>
+                            {response.backendSubmission ? (
+                              <select
+                                className="response-status-select"
+                                value={response.status || t.newStatus}
+                                disabled={Boolean(statusUpdatingById[response.id])}
+                                onChange={(event) => updateSubmissionStatus(response.id, event.target.value)}
+                              >
+                                {SUBMISSION_STATUSES.map((status) => (
+                                  <option key={status} value={status}>
+                                    {status}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="status-pill">
+                                {response.status || t.newStatus}
+                              </span>
+                            )}
                           </td>
 
                           <td>
@@ -487,8 +569,8 @@ export default function BuilderResponsesPage({
                       <tr>
                         <td colSpan={fields.length + 2 + (isQuiz ? 1 : 0)}>
                           <div className="results-empty-state">
-                            <strong>{t.emptyTitle}</strong>
-                            <p>{t.emptyText}</p>
+                            <strong>{responses.length > 0 ? t.filteredEmptyTitle : t.emptyTitle}</strong>
+                            <p>{responses.length > 0 ? t.filteredEmptyText : t.emptyText}</p>
                           </div>
                         </td>
                       </tr>
