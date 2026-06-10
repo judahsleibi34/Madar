@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import FastAPI, Request
@@ -83,6 +84,43 @@ class SecurityFoundationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response.json()["detail"], "Too many requests. Please try again later.")
+
+    def get_migrations_dir(self):
+        candidates = [
+            Path(__file__).resolve().parents[2] / "database" / "migrations",
+            Path(__file__).resolve().parents[1] / "database" / "migrations",
+        ]
+
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+
+        self.skipTest("database migrations are not available in this test environment")
+
+    def test_builder_rls_migrations_are_tenant_scoped(self):
+        migrations_dir = self.get_migrations_dir()
+        builder_projects_sql = (migrations_dir / "023_create_builder_projects.sql").read_text().lower()
+        submissions_sql = (migrations_dir / "025_create_builder_form_submissions.sql").read_text().lower()
+
+        self.assertIn("alter table public.builder_projects enable row level security", builder_projects_sql)
+        self.assertIn("alter table public.builder_form_submissions enable row level security", submissions_sql)
+        self.assertIn("tenant_memberships", builder_projects_sql)
+        self.assertIn("tenant_memberships", submissions_sql)
+        self.assertIn("auth.uid()", builder_projects_sql)
+        self.assertIn("auth.uid()", submissions_sql)
+        self.assertIn("role in ('owner', 'admin')", builder_projects_sql)
+        self.assertNotIn("for insert", submissions_sql.split("create policy", 1)[-1])
+        self.assertNotIn("for update", submissions_sql.split("create policy", 1)[-1])
+
+    def test_website_settings_rls_keeps_documented_user_id_compatibility(self):
+        migrations_dir = self.get_migrations_dir()
+        website_settings_sql = (migrations_dir / "024_harden_website_settings_rls.sql").read_text().lower()
+
+        self.assertIn("alter table public.website_settings enable row level security", website_settings_sql)
+        self.assertIn("tenant_memberships", website_settings_sql)
+        self.assertIn("auth.uid()", website_settings_sql)
+        self.assertIn("where u.id = website_settings.user_id", website_settings_sql)
+
 
 
 if __name__ == "__main__":

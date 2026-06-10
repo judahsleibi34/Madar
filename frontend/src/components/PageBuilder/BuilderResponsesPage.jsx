@@ -33,6 +33,7 @@ const responsesText = {
     latest: "Latest submission",
     none: "None",
     status: "Status",
+    reviewStatus: "Review Status",
     created: "Created",
     newStatus: "New",
     emptyTitle: "No submissions yet",
@@ -82,6 +83,7 @@ const responsesText = {
     latest: "\u0622\u062e\u0631 \u0631\u062f",
     none: "\u0644\u0627 \u064a\u0648\u062c\u062f",
     status: "\u0627\u0644\u062d\u0627\u0644\u0629",
+    reviewStatus: "\u062d\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629",
     created: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0625\u0646\u0634\u0627\u0621",
     newStatus: "\u062c\u062f\u064a\u062f",
     emptyTitle: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0631\u062f\u0648\u062f \u0628\u0639\u062f",
@@ -490,7 +492,7 @@ export default function BuilderResponsesPage({
                 <table className="results-data-table">
                   <thead>
                     <tr>
-                      <th>{t.status}</th>
+                      <th>{t.reviewStatus}</th>
                       <th>{t.created}</th>
                       {isQuiz && <th>Score</th>}
                       {fields.map((field) => (

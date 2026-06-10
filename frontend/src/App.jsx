@@ -709,18 +709,6 @@ export default function App() {
       />
     );
 
-  console.log("[APP ROUTE DEBUG]", {
-    path: location.pathname,
-    isTenantSiteRoute,
-    isDashboardRoute,
-    authChecked,
-    isLoggedIn,
-    user,
-    userId: user?.id,
-    userType: user?.user_type,
-    isAdminUser,
-    isRegularUser,
-  });
 
   if (isTenantSiteRoute) {
     return (
