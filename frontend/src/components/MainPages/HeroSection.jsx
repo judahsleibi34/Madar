@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Trans, useTranslation } from "react-i18next";
 
 import GradientText from "../Animations/GradientText";
-import OrbitVisual from "../Animations/OrbitVisual";
+import OrbitVisual from "./OrbitVisual";
 import SplitText from "../Animations/SplitText";
 
 export default function HeroSection({ lang }) {
