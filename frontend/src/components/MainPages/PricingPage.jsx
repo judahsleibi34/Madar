@@ -20,8 +20,9 @@ const pageText = {
     previous: "Previous",
     next: "Next",
     saving: "Saving...",
-    success: "Subscription saved successfully.",
-    failed: "Could not save subscription.",
+    success: "Checkout request created. Payment setup is not connected yet.",
+    loginRequired: "Please log in before choosing a plan.",
+    failed: "Could not start checkout.",
     serverError: "Could not connect to server.",
     plans: [
       {
@@ -195,8 +196,9 @@ const pageText = {
     previous: "السابق",
     next: "التالي",
     saving: "جارٍ الحفظ...",
-    success: "تم حفظ الاشتراك بنجاح.",
-    failed: "تعذر حفظ الاشتراك.",
+    success: "تم إنشاء طلب الدفع. إعداد الدفع غير متصل بعد.",
+    loginRequired: "يرجى تسجيل الدخول قبل اختيار خطة.",
+    failed: "تعذر بدء الدفع.",
     serverError: "تعذر الاتصال بالخادم.",
     plans: [
       {
@@ -602,7 +604,7 @@ export default function PricingPage({ lang = "en" }) {
     setSubmittingPlanId(plan.id);
 
     try {
-      const response = await fetch(`${API_URL}/feature-type`, {
+      const response = await fetch(`${API_URL}/billing/checkout`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -616,8 +618,11 @@ export default function PricingPage({ lang = "en" }) {
       if (!response.ok) {
         setModalState({
           open: true,
-          type: "error",
-          message: getFriendlySubscriptionError(data?.detail, lang),
+          type: response.status === 401 ? "login" : "error",
+          message:
+            response.status === 401
+              ? t.loginRequired
+              : getFriendlySubscriptionError(data?.detail, lang),
         });
         return;
       }
@@ -651,6 +656,8 @@ export default function PricingPage({ lang = "en" }) {
 
     if (wasSuccess) {
       navigate("/my-plan");
+    } else if (modalState.type === "login") {
+      navigate("/login");
     }
   };
 

@@ -4,21 +4,17 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from classes import BillingCheckoutRequest, BillingWebhookUpdateRequest
-from services.auth_service import require_regular_user_id
+from services.auth_service import require_regular_user, require_regular_user_id
 from services.billing_service import apply_verified_billing_update, validate_billing_plan
 
 
 router = APIRouter(tags=["Billing"])
 
 
-@router.post("/users/{user_id}/billing/checkout")
-def create_checkout(
-    user_id: int,
+def build_checkout_response(
     checkout: BillingCheckoutRequest,
-    request: Request,
-    response: Response,
+    user_data: dict,
 ):
-    _, user_data = require_regular_user_id(user_id, request, response)
     tenant_id = user_data.get("tenant_id")
 
     if tenant_id is None:
@@ -39,6 +35,27 @@ def create_checkout(
             **normalized,
         },
     }
+
+
+@router.post("/billing/checkout")
+def create_canonical_checkout(
+    checkout: BillingCheckoutRequest,
+    request: Request,
+    response: Response,
+):
+    _, user_data = require_regular_user(request, response)
+    return build_checkout_response(checkout, user_data)
+
+
+@router.post("/users/{user_id}/billing/checkout")
+def create_checkout(
+    user_id: int,
+    checkout: BillingCheckoutRequest,
+    request: Request,
+    response: Response,
+):
+    _, user_data = require_regular_user_id(user_id, request, response)
+    return build_checkout_response(checkout, user_data)
 
 
 @router.post("/billing/webhook")
