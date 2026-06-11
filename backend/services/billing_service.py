@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
@@ -121,14 +122,14 @@ def get_billing_summary_for_tenant(tenant_id: int | str | None) -> dict[str, Any
     }
 
 
-def apply_verified_billing_update(
+def persist_feature_selection(
     *,
     tenant_id: int | str,
     subscription_type: str,
     plan: str,
     builder_type: str | None = None,
-    payment_status: str = "active",
-    source: str = "billing",
+    payment_status: str,
+    source: str,
     updated_by_user_id: int | str | None = None,
     provider_event_id: str | None = None,
 ) -> dict[str, Any]:
@@ -151,8 +152,9 @@ def apply_verified_billing_update(
         "plan": normalized["plan"],
         "builder_type": normalized["builder_type"],
         "payment_status": normalized_payment_status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    _ = source, updated_by_user_id, provider_event_id
+    _ = provider_event_id
 
     existing = get_existing_feature_for_tenant(
         tenant_id=tenant_id,
@@ -191,3 +193,45 @@ def apply_verified_billing_update(
         },
     )
     return feature
+
+
+def apply_pending_checkout_selection(
+    *,
+    tenant_id: int | str,
+    subscription_type: str,
+    plan: str,
+    builder_type: str | None = None,
+    updated_by_user_id: int | str | None = None,
+) -> dict[str, Any]:
+    return persist_feature_selection(
+        tenant_id=tenant_id,
+        subscription_type=subscription_type,
+        plan=plan,
+        builder_type=builder_type,
+        payment_status="pending",
+        source="checkout",
+        updated_by_user_id=updated_by_user_id,
+    )
+
+
+def apply_verified_billing_update(
+    *,
+    tenant_id: int | str,
+    subscription_type: str,
+    plan: str,
+    builder_type: str | None = None,
+    payment_status: str = "active",
+    source: str = "billing",
+    updated_by_user_id: int | str | None = None,
+    provider_event_id: str | None = None,
+) -> dict[str, Any]:
+    return persist_feature_selection(
+        tenant_id=tenant_id,
+        subscription_type=subscription_type,
+        plan=plan,
+        builder_type=builder_type,
+        payment_status=payment_status,
+        source=source,
+        updated_by_user_id=updated_by_user_id,
+        provider_event_id=provider_event_id,
+    )
