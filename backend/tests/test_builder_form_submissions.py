@@ -293,6 +293,79 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"]["message"], "Required field is missing")
 
+    def test_public_submission_rejects_too_many_answer_fields(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        answers = {
+            f"field_{index}": "x"
+            for index in range(public_site_routes.MAX_PUBLIC_FORM_ANSWER_FIELDS + 1)
+        }
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": answers},
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(
+            response.json()["detail"]["message"],
+            "Submission contains too many answer fields",
+        )
+        self.assertEqual(
+            response.json()["detail"]["max_fields"],
+            public_site_routes.MAX_PUBLIC_FORM_ANSWER_FIELDS,
+        )
+
+    def test_public_submission_rejects_too_large_individual_answer(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        oversized_answer = "a" * (public_site_routes.MAX_PUBLIC_FORM_ANSWER_STRING_LENGTH + 1)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": oversized_answer}},
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.json()["detail"]["message"], "Submission answer is too large")
+        self.assertEqual(response.json()["detail"]["field_id"], "field_name")
+        self.assertEqual(
+            response.json()["detail"]["max_length"],
+            public_site_routes.MAX_PUBLIC_FORM_ANSWER_STRING_LENGTH,
+        )
+
+    def test_public_submission_rejects_too_large_answers_object(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        answers = {
+            "field_name": "Ada",
+            "field_email": [
+                "a" * public_site_routes.MAX_PUBLIC_FORM_ANSWER_STRING_LENGTH
+                for _ in range(14)
+            ],
+        }
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": answers},
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(
+            response.json()["detail"]["message"],
+            "Submission answers payload is too large",
+        )
+        self.assertEqual(
+            response.json()["detail"]["max_bytes"],
+            public_site_routes.MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES,
+        )
+
     def test_unknown_form_id_fails(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
