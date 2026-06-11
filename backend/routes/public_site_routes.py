@@ -1,3 +1,4 @@
+import json
 import re
 import logging
 from typing import Any, Optional
@@ -16,6 +17,9 @@ router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
 
 SUBDOMAIN_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+MAX_PUBLIC_FORM_ANSWER_FIELDS = 100
+MAX_PUBLIC_FORM_ANSWER_STRING_LENGTH = 5000
+MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES = 64 * 1024
 
 
 class PublicFormSubmissionCreate(BaseModel):
@@ -134,6 +138,54 @@ def normalize_answer_value(value):
     if isinstance(value, list):
         return [item for item in value if item is None or isinstance(item, (str, int, float, bool))]
     return value
+
+
+def iter_answer_strings(value):
+    if isinstance(value, str):
+        yield value
+        return
+
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str):
+                yield item
+
+
+def validate_public_answer_payload_limits(answers: dict[str, Any]):
+    if len(answers) > MAX_PUBLIC_FORM_ANSWER_FIELDS:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "message": "Submission contains too many answer fields",
+                "max_fields": MAX_PUBLIC_FORM_ANSWER_FIELDS,
+            },
+        )
+
+    for field_id, value in answers.items():
+        for answer_text in iter_answer_strings(value):
+            if len(answer_text) > MAX_PUBLIC_FORM_ANSWER_STRING_LENGTH:
+                raise HTTPException(
+                    status_code=413,
+                    detail={
+                        "message": "Submission answer is too large",
+                        "field_id": str(field_id),
+                        "max_length": MAX_PUBLIC_FORM_ANSWER_STRING_LENGTH,
+                    },
+                )
+
+    try:
+        serialized = json.dumps(answers, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="answers must be JSON serializable")
+
+    if len(serialized.encode("utf-8")) > MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "message": "Submission answers payload is too large",
+                "max_bytes": MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES,
+            },
+        )
 
 
 def validate_form_answers(form: dict, answers: dict[str, Any]) -> dict[str, Any]:
@@ -312,7 +364,9 @@ def submit_public_builder_form(
     if not published_page_contains_form_block(published_schema, clean_form_id):
         raise HTTPException(status_code=404, detail="Form not found")
 
-    cleaned_answers = validate_form_answers(form, submission.answers or {})
+    answers = submission.answers or {}
+    validate_public_answer_payload_limits(answers)
+    cleaned_answers = validate_form_answers(form, answers)
     fields = get_form_fields(form)
     submitter_ip = get_client_ip(request)
     user_agent = request.headers.get("user-agent", "")[:1000]
