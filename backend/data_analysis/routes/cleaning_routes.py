@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from data_analysis import services as data_services
 from data_analysis.routes.data_routes import get_storage_scope
+from services.rate_limit_service import enforce_data_workspace_rate_limit
 
 
 router = APIRouter(
@@ -28,6 +29,12 @@ class CleaningApplyRequest(BaseModel):
 def inspect_data(user_id: int, request: InputPathRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_inspect",
+            tenant_id=tenant_id,
+        )
         return data_services.inspect_dataset(request.input_path, tenant_id=tenant_id, user_id=scoped_user_id)
 
     except HTTPException:
@@ -42,6 +49,12 @@ def inspect_data(user_id: int, request: InputPathRequest, fastapi_request: Reque
 def preparation_report(user_id: int, request: InputPathRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_prepare_report",
+            tenant_id=tenant_id,
+        )
         return data_services.preparation_report(request.input_path, tenant_id=tenant_id, user_id=scoped_user_id)
 
     except HTTPException:
@@ -56,6 +69,12 @@ def preparation_report(user_id: int, request: InputPathRequest, fastapi_request:
 def statistical_inspection(user_id: int, request: InputPathRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_statistics",
+            tenant_id=tenant_id,
+        )
         return data_services.statistical_inspection(request.input_path, tenant_id=tenant_id, user_id=scoped_user_id)
 
     except HTTPException:
@@ -70,6 +89,12 @@ def statistical_inspection(user_id: int, request: InputPathRequest, fastapi_requ
 def missing_values_report(user_id: int, request: InputPathRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_missing_report",
+            tenant_id=tenant_id,
+        )
         return data_services.missing_values_report(request.input_path, tenant_id=tenant_id, user_id=scoped_user_id)
 
     except HTTPException:
@@ -84,6 +109,12 @@ def missing_values_report(user_id: int, request: InputPathRequest, fastapi_reque
 def quality_report(user_id: int, request: InputPathRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_quality_report",
+            tenant_id=tenant_id,
+        )
         return data_services.quality_report(request.input_path, tenant_id=tenant_id, user_id=scoped_user_id)
 
     except HTTPException:
@@ -98,6 +129,12 @@ def quality_report(user_id: int, request: InputPathRequest, fastapi_request: Req
 def column_types(user_id: int, request: InputPathRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_column_types",
+            tenant_id=tenant_id,
+        )
         return data_services.column_types(request.input_path, tenant_id=tenant_id, user_id=scoped_user_id)
 
     except HTTPException:
@@ -112,6 +149,12 @@ def column_types(user_id: int, request: InputPathRequest, fastapi_request: Reque
 def apply_cleaning(user_id: int, request: CleaningApplyRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_apply",
+            tenant_id=tenant_id,
+        )
         return data_services.apply_cleaning(
             request.input_path,
             request.actions,

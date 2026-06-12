@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from data_analysis import services as data_services
 from data_analysis.routes.data_routes import get_storage_scope
+from services.rate_limit_service import enforce_data_workspace_rate_limit
 
 
 router = APIRouter(
@@ -42,6 +43,12 @@ def analysis_catalog(user_id: int, fastapi_request: Request, response: Response,
 def run_analysis(user_id: int, request: AnalysisRunRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "analysis_run",
+            tenant_id=tenant_id,
+        )
         return data_services.run_analysis(
             input_path=request.input_path,
             cleaning_actions=request.cleaning_actions,
@@ -64,6 +71,12 @@ def run_analysis(user_id: int, request: AnalysisRunRequest, fastapi_request: Req
 def assisted_analysis(user_id: int, request: AssistedAnalysisRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "analysis_assist",
+            tenant_id=tenant_id,
+        )
         return data_services.run_assisted_analysis(
             input_path=request.input_path,
             cleaning_actions=request.cleaning_actions,

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from data_analysis import services as data_services
 from services.auth_service import require_regular_user_id
+from services.rate_limit_service import enforce_data_workspace_rate_limit
 
 
 router = APIRouter(
@@ -41,6 +42,12 @@ def read_data(
 ):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "read",
+            tenant_id=tenant_id,
+        )
         return data_services.process_read(
             request.input_path,
             tenant_id=tenant_id,
@@ -67,6 +74,12 @@ async def upload_data(
 ):
     try:
         tenant_id, scoped_user_id = get_storage_scope(request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            request,
+            scoped_user_id,
+            "upload",
+            tenant_id=tenant_id,
+        )
         return await data_services.process_upload(
             file,
             tenant_id=tenant_id,

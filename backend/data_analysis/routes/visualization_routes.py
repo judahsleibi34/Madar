@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from data_analysis import services as data_services
 from data_analysis.routes.data_routes import get_storage_scope
+from services.rate_limit_service import enforce_data_workspace_rate_limit
 
 
 router = APIRouter(
@@ -31,6 +32,12 @@ class VisualizationColumnProfileRequest(BaseModel):
 def profile_visualization_columns(user_id: int, request: VisualizationColumnProfileRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "visualization_profile",
+            tenant_id=tenant_id,
+        )
         return data_services.profile_visualization_columns(
             input_path=request.input_path,
             cleaning_actions=request.cleaning_actions,
@@ -51,6 +58,12 @@ def profile_visualization_columns(user_id: int, request: VisualizationColumnProf
 def create_visualization(user_id: int, request: VisualizationRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "visualization_create",
+            tenant_id=tenant_id,
+        )
         return data_services.create_visualization(
             input_path=request.input_path,
             cleaning_actions=request.cleaning_actions,

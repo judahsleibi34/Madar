@@ -37,6 +37,14 @@ PUBLIC_FORM_SUBMISSION_RATE_LIMIT_LIMIT = int(os.getenv("PUBLIC_FORM_SUBMISSION_
 PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PUBLIC_FORM_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS", "300"))
 PUBLIC_CONTACT_RATE_LIMIT_LIMIT = int(os.getenv("PUBLIC_CONTACT_RATE_LIMIT_LIMIT", "10"))
 PUBLIC_CONTACT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PUBLIC_CONTACT_RATE_LIMIT_WINDOW_SECONDS", "300"))
+DATA_WORKSPACE_RATE_LIMIT_LIMIT = int(os.getenv("DATA_WORKSPACE_RATE_LIMIT_LIMIT", "60"))
+DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS", "300"))
+DATA_UPLOAD_RATE_LIMIT_LIMIT = int(os.getenv("DATA_UPLOAD_RATE_LIMIT_LIMIT", "20"))
+DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS", "300"))
+DATA_ANALYSIS_RATE_LIMIT_LIMIT = int(os.getenv("DATA_ANALYSIS_RATE_LIMIT_LIMIT", "20"))
+DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS", "300"))
+DATA_VISUALIZATION_RATE_LIMIT_LIMIT = int(os.getenv("DATA_VISUALIZATION_RATE_LIMIT_LIMIT", "20"))
+DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS", "300"))
 
 
 @dataclass
@@ -200,6 +208,41 @@ def get_client_ip(request: Request) -> str:
 def normalize_identifier(value: str | None) -> str:
     cleaned = (value or "").strip().lower()
     return cleaned or "anonymous"
+
+
+def get_data_workspace_rate_limit(action: str) -> tuple[int, int]:
+    normalized_action = normalize_identifier(action)
+
+    if normalized_action in {"upload", "read"}:
+        return DATA_UPLOAD_RATE_LIMIT_LIMIT, DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS
+
+    if normalized_action in {"analysis_run", "analysis_assist"}:
+        return DATA_ANALYSIS_RATE_LIMIT_LIMIT, DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS
+
+    if normalized_action in {"visualization_create", "visualization_profile"}:
+        return DATA_VISUALIZATION_RATE_LIMIT_LIMIT, DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS
+
+    return DATA_WORKSPACE_RATE_LIMIT_LIMIT, DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS
+
+
+def enforce_data_workspace_rate_limit(
+    request: Request,
+    user_id: int | str,
+    action: str,
+    tenant_id: int | str | None = None,
+):
+    limit, window_seconds = get_data_workspace_rate_limit(action)
+    tenant_part = normalize_identifier(str(tenant_id)) if tenant_id is not None else "none"
+    user_part = normalize_identifier(str(user_id))
+    identifier = f"tenant:{tenant_part}:user:{user_part}"
+
+    return enforce_rate_limit(
+        request,
+        f"data_workspace:{normalize_identifier(action)}",
+        identifier=identifier,
+        limit=limit,
+        window_seconds=window_seconds,
+    )
 
 
 def enforce_rate_limit(
