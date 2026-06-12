@@ -781,7 +781,7 @@ export default function App() {
                     onAppThemeModeChange={handleThemeModeChange}
                   />,
                   true,
-                  { lang: "en", hideLanguage: true }
+                  { lang: "en" }
                 )
               ) : (
                 renderRestrictedPage(

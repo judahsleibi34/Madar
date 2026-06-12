@@ -48,6 +48,7 @@
 .page-builder .daw-section-actions button:not(.daw-primary),
 .page-builder .daw-report-submit-row button:not(.daw-primary),
 .page-builder .daw-flow-actions button:not(.daw-primary),
+.page-builder .daw-secondary,
 .page-builder .daw-pagination button,
 .page-builder .daw-column-menu summary,
 .page-builder .daw-column-menu-panel button {
@@ -78,6 +79,7 @@
 .page-builder .daw-section-actions button:not(.daw-primary):hover,
 .page-builder .daw-report-submit-row button:not(.daw-primary):hover,
 .page-builder .daw-flow-actions button:not(.daw-primary):hover,
+.page-builder .daw-secondary:hover,
 .page-builder .daw-pagination button:hover,
 .page-builder .daw-column-menu summary:hover,
 .page-builder .daw-column-menu-panel button:hover {

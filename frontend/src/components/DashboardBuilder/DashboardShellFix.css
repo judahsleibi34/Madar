@@ -1488,6 +1488,25 @@
   justify-content: center !important;
 }
 
+.admin-sidebar.is-compact .admin-sidebar-brand {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.admin-sidebar.is-compact .admin-sidebar-icon {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.admin-sidebar.is-compact .language-toggle-animation {
+  display: grid !important;
+  place-items: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  grid-column: 1 !important;
+}
+
 .admin-sidebar.is-compact .admin-sidebar-brand-text,
 .admin-sidebar.is-compact .admin-sidebar-nav button span,
 .admin-sidebar.is-compact .admin-sidebar-logout span,

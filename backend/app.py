@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from data_analysis.routes.analysis_routes import router as analysis_router
 from data_analysis.routes.cleaning_routes import router as cleaning_router
@@ -27,6 +29,10 @@ from services.request_security import get_allowed_origins, validate_cookie_write
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+CHART_OUTPUT_DIR = Path(os.getenv("CHART_OUTPUT_DIR", "generated_charts")).resolve()
+CHART_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/generated_charts", StaticFiles(directory=str(CHART_OUTPUT_DIR)), name="generated_charts")
 
 FRONTEND_URLS = os.getenv(
     "FRONTEND_URLS",

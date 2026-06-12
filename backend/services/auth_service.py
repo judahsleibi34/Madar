@@ -33,8 +33,8 @@ if COOKIE_SAMESITE == "none" and not COOKIE_SECURE:
     raise RuntimeError("COOKIE_SECURE must be true when COOKIE_SAMESITE is none")
 
 
-ACCESS_COOKIE_MAX_AGE = 60 * 15
-REFRESH_COOKIE_MAX_AGE = 60 * 15
+ACCESS_COOKIE_MAX_AGE = int(os.getenv("ACCESS_COOKIE_MAX_AGE", str(60 * 15)))
+REFRESH_COOKIE_MAX_AGE = int(os.getenv("REFRESH_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 
 
 def normalize_user_type(value) -> str:

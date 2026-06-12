@@ -168,26 +168,28 @@
 
 /* The data analysis page itself */
 .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .daw-page {
-  width: min(1560px, calc(100vw - 130px)) !important;
+  --daw-page-gutter: clamp(18px, 2vw, 34px);
+
+  width: calc(100% - (var(--daw-page-gutter) * 2)) !important;
   max-width: none !important;
-  margin-left: clamp(28px, 3vw, 54px) !important;
-  margin-right: auto !important;
+  margin-left: var(--daw-page-gutter) !important;
+  margin-right: var(--daw-page-gutter) !important;
   padding-top: 26px;
   padding-bottom: 56px;
 }
 
 .admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .daw-page,
 .admin-dashboard-layout[dir="rtl"]:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .daw-page {
-  margin-left: clamp(28px, 3vw, 54px) !important;
-  margin-right: clamp(28px, 3vw, 54px) !important;
+  margin-left: var(--daw-page-gutter) !important;
+  margin-right: var(--daw-page-gutter) !important;
 }
 
 /* Better alignment for builder demo header above the data page */
 .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-topbar,
 .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-header,
 .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-demo-header {
-  padding-left: clamp(28px, 3vw, 54px) !important;
-  padding-right: clamp(28px, 3vw, 54px) !important;
+  padding-left: clamp(18px, 2vw, 34px) !important;
+  padding-right: clamp(18px, 2vw, 34px) !important;
 }
 
 .admin-dashboard-layout.is-rtl:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) .builder-topbar,
@@ -304,21 +306,21 @@
   max-width: calc(100vw - 72px) !important;
 }
 
-/* Hide text inside outer dashboard sidebar only in builder mode */
-.admin-dashboard-layout-builder .admin-sidebar span,
-.admin-dashboard-layout-builder .admin-sidebar strong,
-.admin-dashboard-layout-builder .admin-sidebar p,
-.admin-dashboard-layout-builder .admin-sidebar h1,
-.admin-dashboard-layout-builder .admin-sidebar h2,
-.admin-dashboard-layout-builder .admin-sidebar h3,
-.admin-dashboard-layout-builder .admin-sidebar small,
-.admin-dashboard-layout-builder .dashboard-sidebar span,
-.admin-dashboard-layout-builder .dashboard-sidebar strong,
-.admin-dashboard-layout-builder .dashboard-sidebar p,
-.admin-dashboard-layout-builder .dashboard-sidebar h1,
-.admin-dashboard-layout-builder .dashboard-sidebar h2,
-.admin-dashboard-layout-builder .dashboard-sidebar h3,
-.admin-dashboard-layout-builder .dashboard-sidebar small {
+/* Hide labels inside the compact builder sidebar while keeping icon spans visible. */
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-brand-text,
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav button > span,
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-logout > span,
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-user-info,
+.admin-dashboard-layout-builder .admin-sidebar .theme-toggle-label,
+.admin-dashboard-layout-builder .admin-sidebar .language-toggle-current,
+.admin-dashboard-layout-builder .admin-sidebar .language-toggle-dot,
+.admin-dashboard-layout-builder .dashboard-sidebar .admin-sidebar-brand-text,
+.admin-dashboard-layout-builder .dashboard-sidebar .admin-sidebar-nav button > span,
+.admin-dashboard-layout-builder .dashboard-sidebar .admin-sidebar-logout > span,
+.admin-dashboard-layout-builder .dashboard-sidebar .admin-sidebar-user-info,
+.admin-dashboard-layout-builder .dashboard-sidebar .theme-toggle-label,
+.admin-dashboard-layout-builder .dashboard-sidebar .language-toggle-current,
+.admin-dashboard-layout-builder .dashboard-sidebar .language-toggle-dot {
   display: none !important;
 }
 

@@ -5,7 +5,7 @@
 .page-builder .daw-card {
   min-width: 0;
   border: 1px solid var(--daw-card-border);
-  border-radius: 24px;
+  border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88)),
     var(--daw-card-bg);
@@ -15,7 +15,7 @@
 .page-builder .daw-section-card,
 .page-builder .daw-assistant-card,
 .page-builder .daw-report-canvas {
-  padding: 22px;
+  padding: 20px;
 }
 
 .page-builder .daw-section-heading {
