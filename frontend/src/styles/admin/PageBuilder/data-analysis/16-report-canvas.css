@@ -284,3 +284,31 @@
   margin: 5px 0 0;
   color: var(--daw-muted);
 }
+
+.page-builder .daw-chart-list .daw-chart-fallback-note {
+  margin-top: 8px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-chart-list img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin-top: 10px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.page-builder .daw-pygwalker-frame {
+  display: block;
+  width: 100%;
+  min-height: 680px;
+  margin-top: 12px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 12px;
+  background: #ffffff;
+}

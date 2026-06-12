@@ -3,9 +3,9 @@
    ============================================================ */
 
 .page-builder .daw-source-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 18px;
 }
 
@@ -14,13 +14,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 16px;
+  min-height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--daw-tab-border);
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--daw-tab-bg);
   color: var(--daw-text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   line-height: 1.1;
   text-align: center;
@@ -30,6 +30,11 @@
     border-color 0.2s ease,
     color 0.2s ease,
     transform 0.2s ease;
+}
+
+.page-builder .daw-source-tabs button {
+  min-width: 168px;
+  width: auto;
 }
 
 .page-builder .daw-source-tabs button:hover,

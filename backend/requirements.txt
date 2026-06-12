@@ -59,6 +59,9 @@ pydantic[email]
 pandas
 seaborn
 matplotlib
+arabic-reshaper
+python-bidi
+pygwalker
 python-multipart
 redis==5.0.8
 google-genai

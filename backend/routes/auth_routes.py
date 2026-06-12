@@ -384,6 +384,34 @@ def user_status(request: Request, response: Response):
         }
 
 
+@router.post("/refresh")
+def refresh_session(request: Request, response: Response):
+    try:
+        _, user_data = get_authenticated_user_row(request, response)
+        user_payload = build_user_payload(user_data)
+        user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
+
+        return {
+            "logged_in": True,
+            "user": user_payload,
+        }
+
+    except HTTPException as error:
+        delete_auth_cookies(response)
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired. Please log in again.",
+        ) from error
+
+    except Exception as error:
+        logger.warning("auth.refresh.failed", extra={"error_type": type(error).__name__})
+        delete_auth_cookies(response)
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired. Please log in again.",
+        )
+
+
 @router.put("/password/change")
 def change_password(
     payload: UpdatePassword,

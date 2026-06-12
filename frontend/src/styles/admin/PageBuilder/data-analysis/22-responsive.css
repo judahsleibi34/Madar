@@ -33,7 +33,6 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .page-builder .daw-source-tabs,
   .page-builder .daw-review-shell,
   .page-builder .daw-review-summary-grid,
   .page-builder .daw-dataset-stats,
@@ -62,6 +61,15 @@
   .page-builder .daw-column-menu summary,
   .page-builder .daw-pagination button {
     width: 100%;
+  }
+
+  .page-builder .daw-source-tabs {
+    flex-direction: column;
+  }
+
+  .page-builder .daw-source-tabs button {
+    width: 100%;
+    min-width: 0;
   }
 
   .page-builder .daw-column-menu-panel {
@@ -93,11 +101,11 @@
 }
 
 @media (max-width: 560px) {
-  .page-builder .daw-section-card,
+.page-builder .daw-section-card,
   .page-builder .daw-assistant-card,
   .page-builder .daw-report-canvas {
     padding: 16px;
-    border-radius: 20px;
+    border-radius: 16px;
   }
 
   .page-builder .daw-stepper {
@@ -105,7 +113,7 @@
   }
 
   .page-builder .daw-stepper button {
-    min-height: 52px;
+    min-height: 44px;
   }
 
   .page-builder .daw-normal-slider {

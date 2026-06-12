@@ -14,6 +14,46 @@ export const readApiResponse = async (response) => {
   };
 };
 
+let refreshSessionPromise = null;
+
+export const refreshSession = async () => {
+  if (!refreshSessionPromise) {
+    refreshSessionPromise = fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    }).finally(() => {
+      refreshSessionPromise = null;
+    });
+  }
+
+  return refreshSessionPromise;
+};
+
+export const authFetch = async (input, init = {}) => {
+  const requestInit = {
+    ...init,
+    credentials: init.credentials || "include",
+  };
+
+  const response = await fetch(input, requestInit);
+
+  if (response.status !== 401) {
+    return response;
+  }
+
+  const refreshResponse = await refreshSession();
+
+  if (!refreshResponse.ok) {
+    return response;
+  }
+
+  return fetch(input, {
+    ...requestInit,
+    credentials: "include",
+  });
+};
+
 export const getFriendlyExternalError = (detail) => {
   const message = String(detail || "");
   const lowerMessage = message.toLowerCase();

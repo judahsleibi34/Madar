@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from uuid import uuid4
 
+import pandas as pd
 from fastapi import HTTPException, UploadFile
 
 from data_analysis.assisted.assisted_analysis import AssistedAnalysis
@@ -333,12 +334,123 @@ def create_visualization(
     cleaner = DataCleaning(input_path, tenant_id=tenant_id, user_id=user_id)
     df = cleaner.apply_pipeline(cleaning_actions) if cleaning_actions else cleaner.read()
     visualizer = DataVisualization(df)
-    chart_path = visualizer.plot(**chart_config)
+
+    if not isinstance(chart_config, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Choose plot settings before creating the visualization.",
+        )
+
+    save_path = chart_config.get("save_path") or f"madar-visualization-{uuid4().hex}.png"
+    explorer_save_path = (
+        f"{Path(save_path).stem}-explorer.html"
+        if save_path
+        else None
+    )
+
+    plot_kwargs = {
+        key: value
+        for key, value in chart_config.items()
+        if key
+        in {
+            "chart_type",
+            "x",
+            "y",
+            "hue",
+            "title",
+            "x_label",
+            "y_label",
+            "palette",
+            "color",
+            "font_family",
+            "title_font_size",
+            "label_font_size",
+            "tick_font_size",
+            "legend_font_size",
+            "series_count",
+            "language",
+            "orientation",
+            "style",
+            "figsize",
+            "marker",
+            "rotation",
+            "gradient",
+        }
+    }
+
+    if isinstance(plot_kwargs.get("figsize"), list):
+        plot_kwargs["figsize"] = tuple(plot_kwargs["figsize"])
+
+    try:
+        chart_path = visualizer.plot(**plot_kwargs, save_path=save_path)
+    except Exception as error:
+        logger.warning(
+            "data.visualization.chart_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Could not create the visualization. Please check the selected fields and chart type.",
+        ) from error
+
+    explorer_path = None
+    explorer_url = None
+    try:
+        explorer_path = visualizer.explorer(save_path=explorer_save_path)
+        explorer_url = f"/generated_charts/{Path(explorer_path).name}" if explorer_path else None
+    except Exception as error:
+        logger.info(
+            "data.visualization.explorer_skipped",
+            extra={"error_type": type(error).__name__},
+        )
+
+    chart_url = f"/generated_charts/{Path(chart_path).name}" if chart_path else None
 
     return sanitize_for_json(
         {
             "chart_path": chart_path,
+            "chart_url": chart_url,
+            "explorer_path": explorer_path,
+            "explorer_url": explorer_url,
+            "visualization_engine": "seaborn",
+            "inspection_engine": "pygwalker" if explorer_url else None,
+            "fallback_reason": None if explorer_url else "Interactive inspection was not available.",
             "rows_used": int(len(df)),
             "columns_used": list(df.columns),
+        }
+    )
+
+
+def profile_visualization_columns(
+    *,
+    input_path: str,
+    cleaning_actions: list[dict],
+    columns: list[str],
+    tenant_id: str,
+    user_id: str,
+):
+    cleaner = DataCleaning(input_path, tenant_id=tenant_id, user_id=user_id)
+    df = cleaner.apply_pipeline(cleaning_actions) if cleaning_actions else cleaner.read()
+    selected_columns = [column for column in columns if column in df.columns]
+
+    profiles = {}
+    for column in selected_columns:
+        series = df[column]
+        non_null = series.dropna()
+        unique_values = non_null.unique().tolist()
+        profiles[column] = {
+            "unique_count": int(non_null.nunique(dropna=True)),
+            "missing_count": int(series.isna().sum()),
+            "sample_values": [str(value) for value in unique_values[:50]],
+            "is_numeric": bool(pd.api.types.is_numeric_dtype(series)),
+        }
+
+    missing_columns = [column for column in columns if column not in df.columns]
+
+    return sanitize_for_json(
+        {
+            "rows_used": int(len(df)),
+            "profiles": profiles,
+            "missing_columns": missing_columns,
         }
     )

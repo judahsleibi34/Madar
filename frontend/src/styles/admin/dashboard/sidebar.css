@@ -682,6 +682,28 @@ img.admin-sidebar-avatar {
   grid-template-columns: 36px !important;
 }
 
+.admin-sidebar.is-compact .admin-sidebar-brand,
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-brand {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.admin-sidebar.is-compact .admin-sidebar-icon,
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-icon {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.admin-sidebar.is-compact .language-toggle-animation,
+.admin-dashboard-layout-builder .admin-sidebar .language-toggle-animation {
+  display: grid !important;
+  place-items: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  grid-column: 1 !important;
+}
+
 .admin-sidebar.is-compact .admin-sidebar-user {
   width: 46px;
   height: 46px;
