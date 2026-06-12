@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import FastAPI, Request, Response
@@ -212,6 +213,78 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertTrue(
             any(header.startswith(f"{CSRF_COOKIE_NAME}=") for header in set_cookie_headers)
         )
+
+    def build_rate_limit_request(self, host="198.51.100.10", headers=None):
+        return SimpleNamespace(
+            headers=headers or {},
+            client=SimpleNamespace(host=host),
+        )
+
+    def test_client_ip_without_forwarded_header_uses_request_client_host(self):
+        request = self.build_rate_limit_request(host="198.51.100.10")
+
+        self.assertEqual(rate_limit_service.get_client_ip(request), "198.51.100.10")
+
+    def test_untrusted_client_spoofed_forwarded_header_is_ignored(self):
+        request = self.build_rate_limit_request(
+            host="198.51.100.10",
+            headers={
+                "x-forwarded-for": "203.0.113.77",
+                "x-real-ip": "203.0.113.88",
+            },
+        )
+
+        with patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "127.0.0.1,::1"):
+            self.assertEqual(rate_limit_service.get_client_ip(request), "198.51.100.10")
+
+    def test_trusted_proxy_uses_original_forwarded_client_ip(self):
+        request = self.build_rate_limit_request(
+            host="10.0.0.2",
+            headers={"x-forwarded-for": "198.51.100.25, 10.0.0.1"},
+        )
+
+        with patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "10.0.0.1,10.0.0.2"):
+            self.assertEqual(rate_limit_service.get_client_ip(request), "198.51.100.25")
+
+    def test_malformed_forwarded_header_falls_back_to_proxy_peer(self):
+        request = self.build_rate_limit_request(
+            host="10.0.0.2",
+            headers={"x-forwarded-for": "not-an-ip"},
+        )
+
+        with patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "10.0.0.2"):
+            self.assertEqual(rate_limit_service.get_client_ip(request), "10.0.0.2")
+
+    def test_cidr_trusted_proxy_config_is_supported(self):
+        request = self.build_rate_limit_request(
+            host="10.0.0.42",
+            headers={"x-forwarded-for": "198.51.100.30"},
+        )
+
+        with patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "10.0.0.0/24"):
+            self.assertEqual(rate_limit_service.get_client_ip(request), "198.51.100.30")
+
+    def test_untrusted_spoofed_forwarded_headers_do_not_bypass_rate_limit(self):
+        app = FastAPI()
+        store = InMemoryRateLimitStore()
+
+        @app.post("/limited")
+        def limited(request: Request):
+            enforce_rate_limit(request, "test", limit=2, window_seconds=60)
+            return {"ok": True}
+
+        client = TestClient(app)
+
+        with patch.object(rate_limit_service, "_store", store), \
+             patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
+             patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "127.0.0.1,::1"):
+            first = client.post("/limited", headers={"x-forwarded-for": "203.0.113.1"})
+            second = client.post("/limited", headers={"x-forwarded-for": "203.0.113.2"})
+            response = client.post("/limited", headers={"x-forwarded-for": "203.0.113.3"})
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(response.status_code, 429)
 
     def test_rate_limit_rejects_after_limit(self):
         app = FastAPI()

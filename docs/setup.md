@@ -21,7 +21,13 @@ COOKIE_SAMESITE=none
 SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_KEY=...
+TRUSTED_PROXY_IPS=127.0.0.1,::1
 ```
+
+`TRUSTED_PROXY_IPS` is a comma-separated list of reverse proxy or tunnel IPs/CIDR
+ranges whose `X-Forwarded-For` and `X-Real-IP` headers may be trusted for rate
+limits. In production, configure only the real proxy/tunnel peers and block
+direct backend access with firewall or proxy rules.
 
 ## Full Stack
 
