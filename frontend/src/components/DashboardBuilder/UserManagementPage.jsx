@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import PageDeleteConfirmModal from "../PageBuilder/PageDeleteConfirmModal";
+import { apiFetch } from "../../utils/apiClient";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const USER_PAGE_CACHE_MS = 30_000;
@@ -510,8 +511,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
         params.set("search", searchTerm);
       }
 
-      const response = await fetch(`${API_URL}/admin/users?${params.toString()}`, {
-        credentials: "include",
+      const response = await apiFetch(`${API_URL}/admin/users?${params.toString()}`, {
         cache: "no-store",
       });
 
@@ -580,9 +580,8 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     setBusyKey(`role-${userId}`);
 
     try {
-      const response = await fetch(`${API_URL}/admin/users/${userId}/user-type`, {
+      const response = await apiFetch(`${API_URL}/admin/users/${userId}/user-type`, {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_type: userType }),
       });
@@ -605,9 +604,8 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     setBusyKey(`plan-${user.id}`);
 
     try {
-      const response = await fetch(`${API_URL}/admin/billing/features`, {
+      const response = await apiFetch(`${API_URL}/admin/billing/features`, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenant_id: user.tenant_id,
@@ -644,9 +642,8 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     setBusyKey(`delete-${user.id}`);
 
     try {
-      const response = await fetch(`${API_URL}/admin/users/${user.id}`, {
+      const response = await apiFetch(`${API_URL}/admin/users/${user.id}`, {
         method: "DELETE",
-        credentials: "include",
       });
 
       if (!response.ok) {

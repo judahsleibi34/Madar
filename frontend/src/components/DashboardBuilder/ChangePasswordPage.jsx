@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
 
+import { apiFetch } from "../../utils/apiClient";
+
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const copy = {
@@ -161,9 +163,8 @@ export default function ChangePasswordPage({ lang = "en" }) {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/password/change`, {
+      const response = await apiFetch(`${API_URL}/auth/password/change`, {
         method: "PUT",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },

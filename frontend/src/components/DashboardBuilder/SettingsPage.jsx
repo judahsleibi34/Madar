@@ -11,6 +11,7 @@ import {
   getConfiguredProjectSubdomain,
   sanitizeSubdomain,
 } from "../PageBuilder/PageBuilder.routing";
+import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
@@ -430,9 +431,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadAccount = async () => {
       try {
-        const response = await fetch(userApiPath("/info"), {
+        const response = await apiFetch(userApiPath("/info"), {
           method: "POST",
-          credentials: "include",
         });
 
         const data = await readApiResponse(response);
@@ -474,9 +474,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadWebsiteSettings = async () => {
       try {
-        const response = await fetch(userApiPath("/website/settings"), {
+        const response = await apiFetch(userApiPath("/website/settings"), {
           method: "GET",
-          credentials: "include",
           cache: "no-store",
         });
 
@@ -551,9 +550,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setAvatarLoadFailed(false);
 
     try {
-      const response = await fetch(userApiPath("/avatar"), {
+      const response = await apiFetch(userApiPath("/avatar"), {
         method: "POST",
-        credentials: "include",
         body: formData,
       });
 
@@ -597,9 +595,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setIsSavingAccount(true);
 
     try {
-      const response = await fetch(userApiPath("/profile"), {
+      const response = await apiFetch(userApiPath("/profile"), {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildProfilePayload(accountForm)),
       });
@@ -659,9 +656,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     };
 
     try {
-      const response = await fetch(userApiPath("/website/settings"), {
+      const response = await apiFetch(userApiPath("/website/settings"), {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subdomain: sanitizeSubdomain(siteForm.subdomain),

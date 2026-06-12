@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { syncCsrfTokenFromResponseData } from "../../utils/apiClient";
+
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 export default function LoginPage({
@@ -79,6 +81,7 @@ export default function LoginPage({
       });
 
       const data = await response.json();
+      syncCsrfTokenFromResponseData(data);
 
       if (!response.ok) {
         if (response.status === 422 && Array.isArray(data.detail)) {

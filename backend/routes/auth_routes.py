@@ -12,9 +12,24 @@ from services.auth_service import (
     get_authenticated_user_row,
 )
 from services.billing_service import get_billing_summary_for_tenant
+from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
+
+
+def ensure_csrf_token(request: Request, response: Response) -> str:
+    csrf_token = response.headers.get(CSRF_HEADER_NAME)
+
+    if csrf_token:
+        return csrf_token
+
+    csrf_token = create_csrf_token(
+        access_token=request.cookies.get("madar_access_token"),
+        refresh_token=request.cookies.get("madar_refresh_token"),
+    )
+    set_csrf_cookie(response, csrf_token)
+    return csrf_token
 
 
 def normalize_email(email: str) -> str:
@@ -334,7 +349,7 @@ def login(user: LogIn, response: Response, request: Request):
 
             local_user = update_response.data[0]
 
-        set_auth_cookies(
+        csrf_token = set_auth_cookies(
             response,
             auth_response.session.access_token,
             auth_response.session.refresh_token,
@@ -348,6 +363,7 @@ def login(user: LogIn, response: Response, request: Request):
         return {
             "message": "User is logged in",
             "user": build_user_payload(local_user),
+            "csrf_token": csrf_token,
         }
 
     except HTTPException:
@@ -364,10 +380,12 @@ def user_status(request: Request, response: Response):
         _, user_data = get_authenticated_user_row(request, response)
         user_payload = build_user_payload(user_data)
         user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
+        csrf_token = ensure_csrf_token(request, response)
 
         return {
             "logged_in": True,
             "user": user_payload,
+            "csrf_token": csrf_token,
         }
 
     except HTTPException:
@@ -505,6 +523,7 @@ def change_password(
 
         return {
             "message": "Password updated successfully",
+            "csrf_token": ensure_csrf_token(request, response),
         }
 
     except HTTPException:

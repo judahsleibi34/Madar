@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import GradientText from "../Animations/GradientText";
 import SubscriptionStatusModal from "./SubscriptionStatusModal";
+import { apiFetch } from "../../utils/apiClient";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -604,9 +605,8 @@ export default function PricingPage({ lang = "en" }) {
     setSubmittingPlanId(plan.id);
 
     try {
-      const response = await fetch(`${API_URL}/billing/checkout`, {
+      const response = await apiFetch(`${API_URL}/billing/checkout`, {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
