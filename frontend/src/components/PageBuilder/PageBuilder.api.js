@@ -72,17 +72,6 @@ export const fetchCurrentBackendUser = async () => {
   return normalizeBackendUserFromStatus(data);
 };
 
-const getUserScopedPath = async (userId, path) => {
-  const backendUser = userId ? null : await fetchCurrentBackendUser();
-  const scopedUserId = userId || backendUser?.id || backendUser?.user_id;
-
-  if (!scopedUserId) {
-    throw new Error("Could not resolve current user id");
-  }
-
-  return `/users/${encodeURIComponent(scopedUserId)}${ensureLeadingSlash(path)}`;
-};
-
 export const getBackendUserDisplayName = (user) => {
   const firstName = user?.first_name || "";
   const lastName = user?.last_name || "";
@@ -158,14 +147,11 @@ export const publishBuilderProject = async (projectId) => {
   return data?.project || null;
 };
 
-export const fetchWebsiteSettings = async (userId) => {
-  const response = await apiFetch(
-    getApiUrl(await getUserScopedPath(userId, "/website/settings")),
-    {
-      method: "GET",
-      cache: "no-store",
-    }
-  );
+export const fetchWebsiteSettings = async () => {
+  const response = await apiFetch(getApiUrl("/website/settings"), {
+    method: "GET",
+    cache: "no-store",
+  });
 
   const data = await parseJsonResponse(response);
   return data?.website || null;

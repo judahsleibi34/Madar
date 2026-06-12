@@ -474,7 +474,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadWebsiteSettings = async () => {
       try {
-        const response = await apiFetch(userApiPath("/website/settings"), {
+        const response = await apiFetch(`${API_URL}/website/settings`, {
           method: "GET",
           cache: "no-store",
         });
@@ -656,7 +656,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     };
 
     try {
-      const response = await apiFetch(userApiPath("/website/settings"), {
+      const response = await apiFetch(`${API_URL}/website/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
