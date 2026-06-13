@@ -25,6 +25,7 @@ from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
 
 from services.auth_service import get_authenticated_user_row, require_regular_user
+from services.request_body_limits import RequestBodyLimitMiddleware
 from services.request_security import (
     CSRF_HEADER_NAME,
     get_allowed_origins,
@@ -34,6 +35,7 @@ from services.request_security import (
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(RequestBodyLimitMiddleware)
 
 CHART_OUTPUT_DIR = Path(os.getenv("CHART_OUTPUT_DIR", "generated_charts")).resolve()
 CHART_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

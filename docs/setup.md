@@ -22,6 +22,10 @@ SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_KEY=...
 TRUSTED_PROXY_IPS=127.0.0.1,::1
+MAX_REQUEST_BODY_BYTES=12582912
+MAX_JSON_BODY_BYTES=3145728
+MAX_SMALL_JSON_BODY_BYTES=262144
+MAX_DATA_JSON_BODY_BYTES=1048576
 DATA_WORKSPACE_RATE_LIMIT_LIMIT=60
 DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS=300
 DATA_UPLOAD_RATE_LIMIT_LIMIT=20
@@ -36,6 +40,12 @@ DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS=300
 ranges whose `X-Forwarded-For` and `X-Real-IP` headers may be trusted for rate
 limits. In production, configure only the real proxy/tunnel peers and block
 direct backend access with firewall or proxy rules.
+
+Request body size limits reject oversized JSON and multipart requests before route
+processing. Keep `MAX_REQUEST_BODY_BYTES` large enough for the expected largest
+upload plus multipart overhead, and keep `MAX_JSON_BODY_BYTES` above the Builder
+schema limit. Tune the smaller JSON limits for public/auth/data routes based on
+production usage.
 
 Authenticated data workspace routes are rate limited per action and authenticated
 user, with the tenant included when available. Tune `DATA_*_RATE_LIMIT_*` values
