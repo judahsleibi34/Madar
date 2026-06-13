@@ -83,7 +83,8 @@ const urlLikeSiteChromeKeys = new Set(["href", "image", "imageUrl", "logoUrl", "
 const controlCharacterPattern = /[\u0000-\u001f\u007f]/;
 const urlSchemePattern = /^([a-z][a-z0-9+.-]*):/i;
 const assetUploadUnavailableMessage =
-  "Asset uploads are not available yet. Use an HTTPS image URL or managed internal path.";
+  "Image uploads are not available yet. Use a secure HTTPS image URL for now.";
+const assetUploadComingSoonLabel = "Asset uploads coming soon";
 
 const normalizeElementAlignSelf = (value) => {
   if (!value || value === "auto") return undefined;
@@ -3668,7 +3669,7 @@ export default function PageBuilder({
             <label>Contact email<input value={project.siteChrome?.contactEmail || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), contactEmail: event.target.value } }))} /></label>
             <label>Phone<input value={project.siteChrome?.phone || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), phone: event.target.value } }))} /></label>
             <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-            <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable}>Upload logo</button>
+            <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable} aria-disabled="true">{assetUploadComingSoonLabel}</button>
             <label>Footer brand name<input value={project.siteChrome?.footerStoreName || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerStoreName: event.target.value } }))} /></label>
             <label>Footer description<textarea value={project.siteChrome?.description || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), description: event.target.value } }))} /></label>
             <label>Footer rights<input value={project.siteChrome?.rights || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), rights: event.target.value } }))} /></label>
@@ -3684,7 +3685,7 @@ export default function PageBuilder({
           <h3>Header</h3>
           <label>Brand name<input value={project.siteChrome?.brand || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), brand: event.target.value } }))} /></label>
           <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-          <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable}>Upload logo</button>
+          <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable} aria-disabled="true">{assetUploadComingSoonLabel}</button>
           <label>Header button<input value={project.siteChrome?.headerButtonLabel || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerButtonLabel: event.target.value } }))} /></label>
           <label>Header alignment<select value={project.siteChrome?.headerAlign || "center"} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerAlign: event.target.value } }))}>
             <option value="left">Left</option>
@@ -3888,7 +3889,7 @@ export default function PageBuilder({
           )}
 
           {selectedElement.type === "image" && (
-            <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable}>Upload image</button>
+            <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable} aria-disabled="true">{assetUploadComingSoonLabel}</button>
           )}
 
           {selectedElement.mode === "free" && (
@@ -4545,7 +4546,6 @@ export default function PageBuilder({
     </div>
   );
 }
-
 
 
 

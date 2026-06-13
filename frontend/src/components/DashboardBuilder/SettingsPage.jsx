@@ -187,9 +187,9 @@ const settingsCopy = {
     websiteDescription:
       "Set the name, contact details, and logo visitors see on your website.",
     websiteLogoAlt: "Website logo",
-    uploadLogo: "Upload logo",
+    uploadLogo: "Asset uploads coming soon",
     logoUploadUnavailable:
-      "Logo file uploads are not available yet. Paste an HTTPS image URL or managed internal path.",
+      "Image uploads are not available yet. Use a secure HTTPS image URL for now.",
     subdomainName: "Subdomain name",
     logoUrl: "Logo URL",
     brandName: "Brand name",
@@ -245,9 +245,9 @@ const settingsCopy = {
     websiteDescription:
       "حدد الاسم وبيانات التواصل والشعار الذي يراه زوار موقعك.",
     websiteLogoAlt: "شعار الموقع",
-    uploadLogo: "رفع الشعار",
+    uploadLogo: "رفع الملفات قريباً",
     logoUploadUnavailable:
-      "رفع ملفات الشعار غير متاح حالياً. الصق رابط صورة HTTPS أو مساراً داخلياً مُداراً.",
+      "رفع الصور غير متاح حالياً. استخدم رابط صورة HTTPS آمناً في الوقت الحالي.",
     subdomainName: "اسم النطاق الفرعي",
     logoUrl: "رابط الشعار",
     brandName: "اسم العلامة",
@@ -922,6 +922,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
               type="button"
               className="settings-file-button settings-profile-upload"
               onClick={showLogoUploadUnavailable}
+              aria-disabled="true"
             >
               {t.uploadLogo}
             </button>
