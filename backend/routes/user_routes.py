@@ -14,6 +14,7 @@ from services.auth_service import (
     require_regular_user,
     require_regular_user_id,
 )
+from services.url_validation import validate_public_url
 
 router = APIRouter(prefix="/users/{user_id}", tags=["User"])
 logger = logging.getLogger(__name__)
@@ -182,7 +183,11 @@ def update_user_profile(
             update_payload["phone"] = profile.phone.strip()
 
         if profile.avatar is not None:
-            update_payload["avatar"] = profile.avatar.strip()
+            update_payload["avatar"] = validate_public_url(
+                profile.avatar,
+                field_name="Avatar URL",
+                allow_relative=True,
+            )
 
         if not update_payload:
             return {

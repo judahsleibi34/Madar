@@ -165,6 +165,56 @@ class WebsiteRoutesTests(unittest.TestCase):
         )
         self.assertEqual(response.json()["website"], website)
 
+    def test_canonical_put_accepts_https_logo_url(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+        website = {"id": 1, "tenant_id": 7, "user_id": 3, "logo_url": "https://cdn.example.com/logo.png"}
+
+        with patch.object(
+            website_routes,
+            "require_regular_user",
+            return_value=fake_auth_result(user_data),
+        ), patch.object(
+            website_routes,
+            "save_settings_for_tenant",
+            return_value=website,
+        ) as save_settings:
+            response = client.put(
+                "/website/settings",
+                json={"logo_url": " https://cdn.example.com/logo.png "},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        save_settings.assert_called_once_with(
+            tenant_id=7,
+            user_id=3,
+            update_payload={"logo_url": "https://cdn.example.com/logo.png"},
+        )
+
+    def test_canonical_put_rejects_unsafe_logo_urls(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+        unsafe_urls = [
+            "javascript:alert(1)",
+            "data:image/svg+xml;base64,PHN2Zy8+",
+            "//evil.example/logo.png",
+            "http://cdn.example.com/logo.png",
+        ]
+
+        for unsafe_url in unsafe_urls:
+            with self.subTest(unsafe_url=unsafe_url), patch.object(
+                website_routes,
+                "require_regular_user",
+                return_value=fake_auth_result(user_data),
+            ), patch.object(website_routes, "save_settings_for_tenant") as save_settings:
+                response = client.put(
+                    "/website/settings",
+                    json={"logo_url": unsafe_url},
+                )
+
+            self.assertEqual(response.status_code, 400)
+            save_settings.assert_not_called()
+
     def test_user_scoped_get_still_works_for_matching_user_id(self):
         client = build_website_client()
         user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}

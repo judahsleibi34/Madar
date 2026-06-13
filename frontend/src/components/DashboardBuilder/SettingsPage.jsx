@@ -17,6 +17,9 @@ import { resolveMediaUrl } from "../../utils/media";
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const BLOCKED_STORED_URL_SCHEMES = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 
 const readBuilderProject = () => {
   try {
@@ -96,17 +99,46 @@ const isValidEmail = (value) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 };
 
+const isSvgUrlPath = (value) => {
+  const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();
+  return path.endsWith(".svg") || path.endsWith(".svgz");
+};
+
+const getStoredImageUrlError = (url) => {
+  const cleanUrl = String(url || "").trim();
+
+  if (!cleanUrl) return "";
+  if (CONTROL_CHARACTER_PATTERN.test(cleanUrl)) return "invalid";
+  if (cleanUrl.startsWith("//")) return "invalid";
+
+  if (cleanUrl.startsWith("/")) {
+    if (cleanUrl.includes("\\")) return "invalid";
+    if (isSvgUrlPath(cleanUrl)) return "invalid";
+    return "";
+  }
+
+  const schemeMatch = cleanUrl.match(URL_SCHEME_PATTERN);
+  if (!schemeMatch) return "invalid";
+
+  const scheme = schemeMatch[1].toLowerCase();
+
+  if (BLOCKED_STORED_URL_SCHEMES.has(scheme)) return "invalid";
+  if (scheme !== "https") return "invalid";
+
+  try {
+    const parsedUrl = new URL(cleanUrl);
+    if (!parsedUrl.hostname) return "invalid";
+    if (isSvgUrlPath(parsedUrl.pathname)) return "invalid";
+  } catch {
+    return "invalid";
+  }
+
+  return "";
+};
+
 const isDirectImageUrl = (url) => {
-  if (!url || typeof url !== "string") return false;
-
-  const cleanUrl = url.trim();
-
-  if (cleanUrl.startsWith("data:image/")) return true;
-  if (cleanUrl.startsWith("/")) return true;
-  if (cleanUrl.startsWith("http://")) return true;
-  if (cleanUrl.startsWith("https://")) return true;
-
-  return /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(cleanUrl);
+  const cleanUrl = String(url || "").trim();
+  return Boolean(cleanUrl) && !getStoredImageUrlError(cleanUrl);
 };
 
 function SettingsNotification({ notification, isArabic, label, onClose }) {
@@ -156,6 +188,8 @@ const settingsCopy = {
       "Set the name, contact details, and logo visitors see on your website.",
     websiteLogoAlt: "Website logo",
     uploadLogo: "Upload logo",
+    logoUploadUnavailable:
+      "Logo file uploads are not available yet. Paste an HTTPS image URL or managed internal path.",
     subdomainName: "Subdomain name",
     logoUrl: "Logo URL",
     brandName: "Brand name",
@@ -173,7 +207,7 @@ const settingsCopy = {
     invalidAvatarType: "Please upload a PNG, JPG, or WebP image.",
     avatarTooLarge: "Profile photo must be 5MB or smaller.",
     invalidLogoUrl:
-      "Please use a direct image URL ending in .png, .jpg, .webp, .gif, or .svg.",
+      "Use an HTTPS image URL or managed internal path. Data, SVG, JavaScript, and HTTP URLs are not allowed.",
     sessionExpired: "Your session expired. Please log in again.",
 
     userAlt: "User",
@@ -212,6 +246,8 @@ const settingsCopy = {
       "حدد الاسم وبيانات التواصل والشعار الذي يراه زوار موقعك.",
     websiteLogoAlt: "شعار الموقع",
     uploadLogo: "رفع الشعار",
+    logoUploadUnavailable:
+      "رفع ملفات الشعار غير متاح حالياً. الصق رابط صورة HTTPS أو مساراً داخلياً مُداراً.",
     subdomainName: "اسم النطاق الفرعي",
     logoUrl: "رابط الشعار",
     brandName: "اسم العلامة",
@@ -229,7 +265,7 @@ const settingsCopy = {
     invalidAvatarType: "يرجى رفع صورة بصيغة PNG أو JPG أو WebP.",
     avatarTooLarge: "يجب ألا يتجاوز حجم صورة الملف الشخصي 5MB.",
     invalidLogoUrl:
-      "يرجى استخدام رابط صورة مباشر ينتهي بـ .png أو .jpg أو .webp أو .gif أو .svg.",
+      "استخدم رابط صورة HTTPS أو مساراً داخلياً مُداراً. روابط data و SVG و JavaScript و HTTP غير مسموحة.",
     sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
 
     userAlt: "المستخدم",
@@ -519,12 +555,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     };
   }, []);
 
-  const readImageFile = (file, callback) => {
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => callback(String(reader.result || ""));
-    reader.readAsDataURL(file);
+  const showLogoUploadUnavailable = () => {
+    showNotification("error", t.logoUploadUnavailable);
   };
 
   const uploadAvatar = async (event) => {
@@ -886,18 +918,13 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
               <p>{t.websiteDescription}</p>
             </div>
 
-            <label className="settings-file-button settings-profile-upload">
+            <button
+              type="button"
+              className="settings-file-button settings-profile-upload"
+              onClick={showLogoUploadUnavailable}
+            >
               {t.uploadLogo}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) =>
-                  readImageFile(event.target.files?.[0], (value) =>
-                    updateSiteField("logoUrl", value)
-                  )
-                }
-              />
-            </label>
+            </button>
           </div>
 
           <div className="settings-profile-body">

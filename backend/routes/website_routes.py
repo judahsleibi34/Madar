@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from classes import WebsiteSettingsUpdate
 from services.auth_service import require_regular_user, require_regular_user_id
+from services.url_validation import validate_public_url
 from services.website_settings_service import ensure_settings_for_tenant, save_settings_for_tenant
 
 router = APIRouter(tags=["Website"])
@@ -66,34 +67,10 @@ def validate_footer_name(value: str):
 
 
 def validate_logo_url(value: str):
-    clean_value = clean_string(value)
-
-    if not clean_value:
-        return ""
-
-    allowed_prefixes = (
-        "http://",
-        "https://",
-        "data:image/png",
-        "data:image/jpeg",
-        "data:image/jpg",
-        "data:image/webp",
-        "data:image/gif",
-        "data:image/svg+xml",
-    )
-
-    if clean_value.startswith(allowed_prefixes):
-        return clean_value
-
-    if clean_value.startswith("data:application/octet-stream"):
-        raise HTTPException(
-            status_code=400,
-            detail="Logo must be an image file, not a generic file",
-        )
-
-    raise HTTPException(
-        status_code=400,
-        detail="Logo URL must be a valid image URL",
+    return validate_public_url(
+        value,
+        field_name="Logo URL",
+        allow_relative=True,
     )
 
 

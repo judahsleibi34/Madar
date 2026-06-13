@@ -11,6 +11,7 @@ from postgrest.exceptions import APIError
 
 from database import service_supabase
 from services.website_settings_service import require_public_subdomain
+from services.url_validation import validate_builder_schema_urls
 from services.tenant_service import (
     TenantContext,
     require_active_tenant_member,
@@ -82,7 +83,7 @@ def assert_json_object(value: Any, field_name: str = "draft_schema") -> dict:
             detail=f"{field_name} is too large",
         )
 
-    return value
+    return validate_builder_schema_urls(value, field_name=field_name)
 
 
 class BuilderProjectCreate(BaseModel):
