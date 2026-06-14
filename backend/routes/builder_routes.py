@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from postgrest.exceptions import APIError
 
 from database import service_supabase
+from services.audit_service import record_audit_event
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
 from services.website_settings_service import require_public_subdomain
 from services.url_validation import validate_builder_schema_urls
@@ -429,7 +430,7 @@ def update_builder_project(
 @router.delete("/builder/projects/{project_id}")
 def archive_builder_project(project_id: str, request: Request, response: Response):
     context = require_builder_context(request, response, require_builder_admin_access)
-    get_project_for_tenant(project_id, context.tenant_id)
+    project = get_project_for_tenant(project_id, context.tenant_id)
 
     archive_response = (
         service_supabase.table("builder_projects")
@@ -438,10 +439,25 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
         .eq("tenant_id", context.tenant_id)
         .execute()
     )
+    archived_project = first_row(archive_response)
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.project_archived",
+        target_type="builder_project",
+        target_id=project_id,
+        metadata={
+            "project_slug": project.get("slug"),
+            "project_name": project.get("name"),
+            "status": archived_project.get("status"),
+        },
+    )
 
     return {
         "success": True,
-        "project": first_row(archive_response),
+        "project": archived_project,
     }
 
 
@@ -600,15 +616,29 @@ def publish_builder_project(
         .eq("tenant_id", context.tenant_id)
         .execute()
     )
+    published_project = first_row(publish_response)
 
     logger.info(
         "builder.project_published",
         extra={"tenant_id": context.tenant_id, "user_id": context.user_id, "project_id": project_id},
     )
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.project_published",
+        target_type="builder_project",
+        target_id=project_id,
+        metadata={
+            "project_slug": project.get("slug"),
+            "project_name": project.get("name"),
+            "published_version": published_project.get("published_version"),
+        },
+    )
 
     return {
         "success": True,
-        "project": first_row(publish_response),
+        "project": published_project,
         "site": {
             "subdomain": website_settings.get("subdomain"),
             "tenant_id": website_settings.get("tenant_id"),
