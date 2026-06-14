@@ -4,6 +4,11 @@ import logging
 from fastapi import HTTPException, Request, Response
 
 from database import service_supabase, supabase
+from services.request_security import (
+    create_csrf_token,
+    delete_csrf_cookie,
+    set_csrf_cookie,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +67,13 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         path="/",
     )
 
+    csrf_token = create_csrf_token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
+    set_csrf_cookie(response, csrf_token)
+    return csrf_token
+
 
 def delete_auth_cookies(response: Response):
     response.delete_cookie(
@@ -79,6 +91,7 @@ def delete_auth_cookies(response: Response):
         samesite=COOKIE_SAMESITE,
         path="/",
     )
+    delete_csrf_cookie(response)
 
 
 def build_user_payload(user_data):

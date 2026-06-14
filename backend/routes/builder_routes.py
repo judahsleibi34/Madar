@@ -3,14 +3,18 @@ import os
 import re
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Body, File, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field, field_validator
 from postgrest.exceptions import APIError
 
 from database import service_supabase
+from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
 from services.website_settings_service import require_public_subdomain
+from services.url_validation import validate_builder_schema_urls
 from services.tenant_service import (
     TenantContext,
     require_active_tenant_member,
@@ -32,6 +36,13 @@ SUBMISSION_STATUS_LABELS = {
 }
 SUBMISSION_STATUS_VALUES = {label.lower(): value for value, label in SUBMISSION_STATUS_LABELS.items()}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
+BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
+BUILDER_ASSET_UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "uploads")).resolve()
+BUILDER_ASSET_EXTENSIONS = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+}
 
 
 def normalize_slug(value: str) -> str:
@@ -64,6 +75,44 @@ def normalize_name(value: str) -> str:
     return name
 
 
+def detect_builder_asset_content_type(content: bytes) -> str | None:
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+
+    if content.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+
+    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "image/webp"
+
+    return None
+
+
+def normalize_tenant_asset_directory(tenant_id: int | str) -> str:
+    try:
+        tenant_value = int(tenant_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=403, detail="A valid tenant context is required")
+
+    if tenant_value <= 0:
+        raise HTTPException(status_code=403, detail="A valid tenant context is required")
+
+    return f"tenant_{tenant_value}"
+
+
+def get_builder_asset_target(tenant_id: int | str, filename: str) -> tuple[Path, Path, str]:
+    tenant_dir = normalize_tenant_asset_directory(tenant_id)
+    target_dir = BUILDER_ASSET_UPLOAD_DIR / tenant_dir / "builder_assets"
+    target_path = target_dir / filename
+    uploads_root = BUILDER_ASSET_UPLOAD_DIR.resolve()
+    resolved_target = target_path.resolve()
+
+    if uploads_root != resolved_target and uploads_root not in resolved_target.parents:
+        raise HTTPException(status_code=400, detail="Invalid asset path")
+
+    return target_dir, resolved_target, tenant_dir
+
+
 def assert_json_object(value: Any, field_name: str = "draft_schema") -> dict:
     if value is None:
         return {}
@@ -82,7 +131,7 @@ def assert_json_object(value: Any, field_name: str = "draft_schema") -> dict:
             detail=f"{field_name} is too large",
         )
 
-    return value
+    return validate_builder_schema_urls(value, field_name=field_name)
 
 
 class BuilderProjectCreate(BaseModel):
@@ -197,6 +246,53 @@ def first_row(response):
         raise HTTPException(status_code=500, detail="Builder project was not saved")
 
     return response.data[0]
+
+
+@router.post("/builder/assets/upload")
+async def upload_builder_asset(
+    request: Request,
+    response: Response,
+    file: UploadFile = File(...),
+):
+    context = require_builder_context(request, response, require_builder_write_access)
+    enforce_builder_asset_upload_rate_limit(request, context.user_id, context.tenant_id)
+
+    declared_content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
+
+    if declared_content_type and declared_content_type not in BUILDER_ASSET_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Please upload a PNG, JPG, or WebP image")
+
+    content = await file.read(BUILDER_ASSET_MAX_BYTES + 1)
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Image file is required")
+
+    if len(content) > BUILDER_ASSET_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Image file must be 5MB or smaller")
+
+    detected_content_type = detect_builder_asset_content_type(content)
+
+    if not detected_content_type:
+        raise HTTPException(status_code=400, detail="Please upload a PNG, JPG, or WebP image")
+
+    if declared_content_type and declared_content_type != detected_content_type:
+        raise HTTPException(status_code=400, detail="Image content does not match the declared file type")
+
+    extension = BUILDER_ASSET_EXTENSIONS[detected_content_type]
+    filename = f"{uuid4().hex}{extension}"
+    target_dir, target_path, tenant_dir = get_builder_asset_target(context.tenant_id, filename)
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path.write_bytes(content)
+
+    asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
+
+    return {
+        "success": True,
+        "asset_url": asset_url,
+        "url": asset_url,
+        "content_type": detected_content_type,
+    }
 
 
 @router.get("/users/{user_id}/builder/projects", include_in_schema=False)

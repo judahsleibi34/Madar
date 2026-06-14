@@ -63,7 +63,9 @@ import {
   listBuilderProjects,
   publishBuilderProject,
   updateBuilderProject,
+  uploadBuilderAsset,
 } from "./PageBuilder.api";
+import { resolveMediaUrl } from "../../utils/media";
 
 import {
   applyThemeModeToProject,
@@ -78,6 +80,14 @@ const splitLines = (value) =>
     .filter(Boolean);
 
 const carouselElementTypes = new Set(["carousel", "carouselCards", "carouselSplit", "circularGallery"]);
+const blockedStoredUrlSchemes = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
+const urlLikeSiteChromeKeys = new Set(["href", "image", "imageUrl", "logoUrl", "madarLink", "src", "url"]);
+const controlCharacterPattern = /[\u0000-\u001f\u007f]/;
+const urlSchemePattern = /^([a-z][a-z0-9+.-]*):/i;
+const managedUploadAssetPattern =
+  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
+const builderAssetMaxBytes = 5 * 1024 * 1024;
+const builderAssetMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const normalizeElementAlignSelf = (value) => {
   if (!value || value === "auto") return undefined;
@@ -544,6 +554,141 @@ const getSectionElements = (section) => {
   return [...autoElements, ...(section.freeElements || [])];
 };
 
+const isSvgUrlPath = (value) => {
+  const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();
+  return path.endsWith(".svg") || path.endsWith(".svgz");
+};
+
+const getStoredUrlError = (
+  value,
+  { fieldName = "URL", allowRelative = false, allowEmpty = true } = {}
+) => {
+  const cleanValue = String(value ?? "").trim();
+
+  if (!cleanValue) {
+    return allowEmpty ? "" : `${fieldName} is required.`;
+  }
+
+  if (controlCharacterPattern.test(cleanValue)) {
+    return `${fieldName} contains invalid characters.`;
+  }
+
+  if (cleanValue.startsWith("//")) {
+    return `${fieldName} cannot be protocol-relative.`;
+  }
+
+  if (cleanValue.startsWith("/")) {
+    if (!allowRelative) return `${fieldName} must use an HTTPS URL.`;
+    if (cleanValue.includes("\\")) return `${fieldName} contains invalid characters.`;
+    if (isSvgUrlPath(cleanValue)) return `${fieldName} cannot be an SVG URL.`;
+    if (cleanValue.startsWith("/uploads/") && !managedUploadAssetPattern.test(cleanValue)) {
+      return `${fieldName} must use a managed upload asset path.`;
+    }
+    return "";
+  }
+
+  const schemeMatch = cleanValue.match(urlSchemePattern);
+  if (!schemeMatch) {
+    return allowRelative
+      ? `${fieldName} must be an HTTPS URL or managed internal path.`
+      : `${fieldName} must be an HTTPS URL.`;
+  }
+
+  const scheme = schemeMatch[1].toLowerCase();
+
+  if (blockedStoredUrlSchemes.has(scheme)) {
+    return `${fieldName} cannot use ${scheme}: URLs.`;
+  }
+
+  if (scheme === "http") {
+    return `${fieldName} must use HTTPS instead of HTTP.`;
+  }
+
+  if (scheme !== "https") {
+    return `${fieldName} cannot use ${scheme}: URLs.`;
+  }
+
+  try {
+    const parsedUrl = new URL(cleanValue);
+    if (!parsedUrl.hostname) return `${fieldName} must include a host.`;
+    if (isSvgUrlPath(parsedUrl.pathname)) return `${fieldName} cannot be an SVG URL.`;
+  } catch {
+    return `${fieldName} must be a valid HTTPS URL.`;
+  }
+
+  return "";
+};
+
+const collectBuilderElements = (project) =>
+  (project?.pages || []).flatMap((page) =>
+    (page.sections || []).flatMap((section) => getSectionElements(section))
+  );
+
+const collectSiteChromeUrlErrors = (siteChrome = {}) =>
+  Object.entries(siteChrome).flatMap(([key, value]) => {
+    if (!urlLikeSiteChromeKeys.has(key) || typeof value !== "string") return [];
+
+    const error = getStoredUrlError(value, {
+      fieldName: `Site ${key}`,
+      allowRelative: true,
+    });
+
+    return error ? [error] : [];
+  });
+
+const collectCarouselImageUrlErrors = (content, fieldName) =>
+  String(content || "")
+    .split("\n\n")
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .flatMap((block, index) => {
+      const lines = block.split("\n").map((line) => line.trim());
+      const imageUrl = lines[2] || "";
+      const error = getStoredUrlError(imageUrl, {
+        fieldName: `${fieldName} slide ${index + 1} image URL`,
+        allowRelative: true,
+      });
+
+      return error ? [error] : [];
+    });
+
+const collectBuilderUrlErrors = (project) => {
+  const errors = collectSiteChromeUrlErrors(project?.siteChrome || {});
+
+  collectBuilderElements(project).forEach((element) => {
+    const elementName = element?.name || element?.type || "Element";
+
+    if (element?.type === "image") {
+      const error = getStoredUrlError(element.content, {
+        fieldName: `${elementName} image URL`,
+        allowRelative: true,
+      });
+      if (error) errors.push(error);
+    }
+
+    if (element?.type === "embed") {
+      const error = getStoredUrlError(element.content, {
+        fieldName: `${elementName} embed URL`,
+      });
+      if (error) errors.push(error);
+    }
+
+    if (carouselElementTypes.has(element?.type)) {
+      errors.push(...collectCarouselImageUrlErrors(element.content, elementName));
+    }
+
+    if (element?.action?.url) {
+      const error = getStoredUrlError(element.action.url, {
+        fieldName: `${elementName} action URL`,
+        allowRelative: true,
+      });
+      if (error) errors.push(error);
+    }
+  });
+
+  return errors;
+};
+
 const isMetricsSection = (section) =>
   section?.name?.toLowerCase().includes("metric") ||
   getSectionElements(section).some((element) => element.type === "metric");
@@ -772,6 +917,7 @@ export default function PageBuilder({
   const [liveSitePath, setLiveSitePath] = useState("");
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
+  const [assetUploadBusy, setAssetUploadBusy] = useState(false);
 
   useEffect(() => {
     if (demoMode) return;
@@ -1748,52 +1894,85 @@ export default function PageBuilder({
     );
   };
 
-  const uploadImageForSelectedElement = (file) => {
-    if (!file || !selectedElement || selectedElement.type !== "image") return;
+  const validateBuilderAssetFile = (file) => {
+    if (!file) return "Choose an image file first.";
 
-    if (!file.type.startsWith("image/")) {
-      alert("Please choose an image file.");
-      return;
+    if (!builderAssetMimeTypes.has(file.type)) {
+      return "Please upload a PNG, JPG, or WebP image.";
     }
 
-    const reader = new FileReader();
+    if (file.size > builderAssetMaxBytes) {
+      return "Image must be 5MB or smaller.";
+    }
 
-    reader.onload = () => {
-      updateSelectedElement({
-        content: reader.result,
-        name: selectedElement.name || file.name,
-      });
-    };
-
-    reader.onerror = () => {
-      alert("Could not read this image. Please try another file.");
-    };
-
-    reader.readAsDataURL(file);
+    return "";
   };
 
-  const uploadSiteLogo = (file) => {
-    if (!file) return;
+  const uploadBuilderImageFile = async (file) => {
+    const validationError = validateBuilderAssetFile(file);
 
-    if (!file.type.startsWith("image/")) {
-      alert("Please choose an image file.");
-      return;
+    if (validationError) {
+      showToast(validationError);
+      return "";
     }
 
-    const reader = new FileReader();
+    setAssetUploadBusy(true);
 
-    reader.onload = () => {
-      updateProject((prev) => ({
-        ...prev,
-        siteChrome: {
-          ...(prev.siteChrome || defaultSiteChrome),
-          logoUrl: reader.result,
-        },
-      }));
-    };
+    try {
+      const assetUrl = await uploadBuilderAsset(file);
 
-    reader.onerror = () => alert("Could not read this logo. Please try another file.");
-    reader.readAsDataURL(file);
+      if (!assetUrl) {
+        throw new Error("Upload did not return an asset URL.");
+      }
+
+      return assetUrl;
+    } catch (error) {
+      showToast(error?.message || "Could not upload image.");
+      return "";
+    } finally {
+      setAssetUploadBusy(false);
+    }
+  };
+
+  const uploadSelectedElementImage = async (file) => {
+    if (!selectedElement || selectedElement.type !== "image") return;
+
+    const assetUrl = await uploadBuilderImageFile(file);
+
+    if (!assetUrl) return;
+
+    updateSelectedElement({
+      content: assetUrl,
+      name: selectedElement.name || file.name || "Image",
+    });
+    showToast("Image uploaded.");
+  };
+
+  const uploadSiteLogo = async (file) => {
+    const assetUrl = await uploadBuilderImageFile(file);
+
+    if (!assetUrl) return;
+
+    updateProject((prev) => ({
+      ...prev,
+      siteChrome: {
+        ...(prev.siteChrome || defaultSiteChrome),
+        logoUrl: assetUrl,
+      },
+    }));
+    showToast("Logo uploaded.");
+  };
+
+  const handleSelectedElementImageUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    uploadSelectedElementImage(file);
+  };
+
+  const handleSiteLogoUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    uploadSiteLogo(file);
   };
 
   const updateActiveFormQuiz = (updates) => {
@@ -2300,6 +2479,16 @@ export default function PageBuilder({
     }
 
     if (action.type === "openUrl" && action.url) {
+      const urlError = getStoredUrlError(action.url, {
+        fieldName: "Button action URL",
+        allowRelative: true,
+      });
+
+      if (urlError) {
+        showToast(urlError);
+        return;
+      }
+
       window.open(action.url, "_blank", "noopener,noreferrer");
       return;
     }
@@ -2328,6 +2517,12 @@ export default function PageBuilder({
         lastSavedAt: new Date().toISOString(),
       },
     };
+    const urlErrors = collectBuilderUrlErrors(nextProject);
+
+    if (urlErrors.length > 0) {
+      showToast(urlErrors[0]);
+      return;
+    }
 
     if (demoMode) {
       persistProject(nextProject, "Demo changes stay until refresh.");
@@ -2417,6 +2612,12 @@ export default function PageBuilder({
         lastPublishedAt: new Date().toISOString(),
       },
     };
+    const urlErrors = collectBuilderUrlErrors(publishedProject);
+
+    if (urlErrors.length > 0) {
+      showToast(urlErrors[0]);
+      return;
+    }
 
     if (demoMode) {
       persistProject(publishedProject, "Demo publish status updated until refresh.");
@@ -3059,7 +3260,12 @@ export default function PageBuilder({
     }
 
     if (element.type === "image") {
-      return <img key={element.id} {...commonProps} src={element.content} alt={element.name} />;
+      const imageSrc = resolveMediaUrl(element.content);
+      return imageSrc ? (
+        <img key={element.id} {...commonProps} src={imageSrc} alt={element.name} />
+      ) : (
+        <div key={element.id} {...commonProps}>Image URL unavailable</div>
+      );
     }
 
     if (element.type === "card") {
@@ -3154,7 +3360,7 @@ export default function PageBuilder({
     const site = project.siteChrome || defaultSiteChrome;
     if (!site.showHeader) return null;
 
-    const logoSrc = site.logoUrl;
+    const logoSrc = resolveMediaUrl(site.logoUrl);
 
     return (
       <header
@@ -3237,8 +3443,8 @@ export default function PageBuilder({
         <div className="ecommerce-footer-grid">
           <div className="ecommerce-footer-brand">
             <div className="ecommerce-footer-logo-row">
-              {site.logoUrl ? (
-                <img className="ecommerce-footer-logo" src={site.logoUrl} alt={`${footerBrand} logo`} />
+              {resolveMediaUrl(site.logoUrl) ? (
+                <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={`${footerBrand} logo`} />
               ) : (
                 <div className="ecommerce-footer-logo footer-logo-fallback">{footerInitial}</div>
               )}
@@ -3552,7 +3758,10 @@ export default function PageBuilder({
             <label>Contact email<input value={project.siteChrome?.contactEmail || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), contactEmail: event.target.value } }))} /></label>
             <label>Phone<input value={project.siteChrome?.phone || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), phone: event.target.value } }))} /></label>
             <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-            <label className="upload-image-button">Upload logo<input type="file" accept="image/*" onChange={(event) => uploadSiteLogo(event.target.files?.[0])} /></label>
+            <label className="upload-image-button">
+              {assetUploadBusy ? "Uploading..." : "Upload logo"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
+            </label>
             <label>Footer brand name<input value={project.siteChrome?.footerStoreName || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerStoreName: event.target.value } }))} /></label>
             <label>Footer description<textarea value={project.siteChrome?.description || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), description: event.target.value } }))} /></label>
             <label>Footer rights<input value={project.siteChrome?.rights || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), rights: event.target.value } }))} /></label>
@@ -3568,7 +3777,10 @@ export default function PageBuilder({
           <h3>Header</h3>
           <label>Brand name<input value={project.siteChrome?.brand || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), brand: event.target.value } }))} /></label>
           <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-          <label className="upload-image-button">Upload logo<input type="file" accept="image/*" onChange={(event) => uploadSiteLogo(event.target.files?.[0])} /></label>
+          <label className="upload-image-button">
+            {assetUploadBusy ? "Uploading..." : "Upload logo"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
+          </label>
           <label>Header button<input value={project.siteChrome?.headerButtonLabel || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerButtonLabel: event.target.value } }))} /></label>
           <label>Header alignment<select value={project.siteChrome?.headerAlign || "center"} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerAlign: event.target.value } }))}>
             <option value="left">Left</option>
@@ -3772,7 +3984,10 @@ export default function PageBuilder({
           )}
 
           {selectedElement.type === "image" && (
-            <label className="upload-image-button">Upload image<input type="file" accept="image/*" onChange={(event) => uploadImageForSelectedElement(event.target.files?.[0])} /></label>
+            <label className="upload-image-button">
+              {assetUploadBusy ? "Uploading..." : "Upload image"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSelectedElementImageUpload} />
+            </label>
           )}
 
           {selectedElement.mode === "free" && (
@@ -4429,9 +4644,3 @@ export default function PageBuilder({
     </div>
   );
 }
-
-
-
-
-
-

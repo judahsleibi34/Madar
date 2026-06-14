@@ -21,7 +21,50 @@ COOKIE_SAMESITE=none
 SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_KEY=...
+TRUSTED_PROXY_IPS=127.0.0.1,::1
+MAX_REQUEST_BODY_BYTES=12582912
+MAX_JSON_BODY_BYTES=3145728
+MAX_SMALL_JSON_BODY_BYTES=262144
+MAX_DATA_JSON_BODY_BYTES=1048576
+ALLOW_INSECURE_HTTP_URLS=false
+DATA_WORKSPACE_RATE_LIMIT_LIMIT=60
+DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS=300
+DATA_UPLOAD_RATE_LIMIT_LIMIT=20
+DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS=300
+DATA_ANALYSIS_RATE_LIMIT_LIMIT=20
+DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS=300
+DATA_VISUALIZATION_RATE_LIMIT_LIMIT=20
+DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS=300
+UPLOADS_DIR=uploads
+BUILDER_ASSET_MAX_BYTES=5242880
+BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT=30
+BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS=300
 ```
+
+`TRUSTED_PROXY_IPS` is a comma-separated list of reverse proxy or tunnel IPs/CIDR
+ranges whose `X-Forwarded-For` and `X-Real-IP` headers may be trusted for rate
+limits. In production, configure only the real proxy/tunnel peers and block
+direct backend access with firewall or proxy rules.
+
+Request body size limits reject oversized JSON and multipart requests before route
+processing. Keep `MAX_REQUEST_BODY_BYTES` large enough for the expected largest
+upload plus multipart overhead, and keep `MAX_JSON_BODY_BYTES` above the Builder
+schema limit. Tune the smaller JSON limits for public/auth/data routes based on
+production usage.
+
+Persisted tenant/user URLs are validated before storage. External URLs should use
+`https://`; leave `ALLOW_INSECURE_HTTP_URLS=false` in production. Only set it to
+`true` for local development fixtures that must reference `http://` resources.
+
+Authenticated data workspace routes are rate limited per action and authenticated
+user, with the tenant included when available. Tune `DATA_*_RATE_LIMIT_*` values
+for production based on server capacity, dataset size, and expected chart or
+analysis usage.
+
+Builder and website image assets are uploaded through the backend and served from
+managed `/uploads/...` paths. `BUILDER_ASSET_MAX_BYTES` defaults to 5 MiB and
+only PNG, JPEG, and WebP files are accepted. Tune
+`BUILDER_ASSET_UPLOAD_RATE_LIMIT_*` based on expected editor usage.
 
 ## Full Stack
 

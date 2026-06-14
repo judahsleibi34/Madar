@@ -11,11 +11,20 @@ import {
   getConfiguredProjectSubdomain,
   sanitizeSubdomain,
 } from "../PageBuilder/PageBuilder.routing";
+import { uploadBuilderAsset } from "../PageBuilder/PageBuilder.api";
+import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const BUILDER_ASSET_MAX_BYTES = 5 * 1024 * 1024;
+const BUILDER_ASSET_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const BLOCKED_STORED_URL_SCHEMES = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
+const MANAGED_UPLOAD_ASSET_PATTERN =
+  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
 
 const readBuilderProject = () => {
   try {
@@ -95,17 +104,49 @@ const isValidEmail = (value) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 };
 
+const isSvgUrlPath = (value) => {
+  const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();
+  return path.endsWith(".svg") || path.endsWith(".svgz");
+};
+
+const getStoredImageUrlError = (url) => {
+  const cleanUrl = String(url || "").trim();
+
+  if (!cleanUrl) return "";
+  if (CONTROL_CHARACTER_PATTERN.test(cleanUrl)) return "invalid";
+  if (cleanUrl.startsWith("//")) return "invalid";
+
+  if (cleanUrl.startsWith("/")) {
+    if (cleanUrl.includes("\\")) return "invalid";
+    if (isSvgUrlPath(cleanUrl)) return "invalid";
+    if (cleanUrl.startsWith("/uploads/") && !MANAGED_UPLOAD_ASSET_PATTERN.test(cleanUrl)) {
+      return "invalid";
+    }
+    return "";
+  }
+
+  const schemeMatch = cleanUrl.match(URL_SCHEME_PATTERN);
+  if (!schemeMatch) return "invalid";
+
+  const scheme = schemeMatch[1].toLowerCase();
+
+  if (BLOCKED_STORED_URL_SCHEMES.has(scheme)) return "invalid";
+  if (scheme !== "https") return "invalid";
+
+  try {
+    const parsedUrl = new URL(cleanUrl);
+    if (!parsedUrl.hostname) return "invalid";
+    if (isSvgUrlPath(parsedUrl.pathname)) return "invalid";
+  } catch {
+    return "invalid";
+  }
+
+  return "";
+};
+
 const isDirectImageUrl = (url) => {
-  if (!url || typeof url !== "string") return false;
-
-  const cleanUrl = url.trim();
-
-  if (cleanUrl.startsWith("data:image/")) return true;
-  if (cleanUrl.startsWith("/")) return true;
-  if (cleanUrl.startsWith("http://")) return true;
-  if (cleanUrl.startsWith("https://")) return true;
-
-  return /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(cleanUrl);
+  const cleanUrl = String(url || "").trim();
+  return Boolean(cleanUrl) && !getStoredImageUrlError(cleanUrl);
 };
 
 function SettingsNotification({ notification, isArabic, label, onClose }) {
@@ -155,6 +196,9 @@ const settingsCopy = {
       "Set the name, contact details, and logo visitors see on your website.",
     websiteLogoAlt: "Website logo",
     uploadLogo: "Upload logo",
+    uploadingLogo: "Uploading...",
+    logoUploadUnavailable:
+      "Image uploads are not available yet. Use a secure HTTPS image URL for now.",
     subdomainName: "Subdomain name",
     logoUrl: "Logo URL",
     brandName: "Brand name",
@@ -166,13 +210,17 @@ const settingsCopy = {
 
     accountSaved: "Account settings saved.",
     avatarUploaded: "Profile photo updated.",
+    logoUploaded: "Logo uploaded.",
     websiteSaved: "Website settings saved.",
     accountError: "Could not update account settings.",
     avatarUploadError: "Could not upload profile photo.",
+    logoUploadError: "Could not upload logo.",
     invalidAvatarType: "Please upload a PNG, JPG, or WebP image.",
+    invalidLogoType: "Please upload a PNG, JPG, or WebP image.",
     avatarTooLarge: "Profile photo must be 5MB or smaller.",
+    logoTooLarge: "Logo image must be 5MB or smaller.",
     invalidLogoUrl:
-      "Please use a direct image URL ending in .png, .jpg, .webp, .gif, or .svg.",
+      "Use an HTTPS image URL or managed internal path. Data, SVG, JavaScript, and HTTP URLs are not allowed.",
     sessionExpired: "Your session expired. Please log in again.",
 
     userAlt: "User",
@@ -210,7 +258,9 @@ const settingsCopy = {
     websiteDescription:
       "حدد الاسم وبيانات التواصل والشعار الذي يراه زوار موقعك.",
     websiteLogoAlt: "شعار الموقع",
-    uploadLogo: "رفع الشعار",
+    uploadLogo: "رفع الملفات قريباً",
+    logoUploadUnavailable:
+      "رفع الصور غير متاح حالياً. استخدم رابط صورة HTTPS آمناً في الوقت الحالي.",
     subdomainName: "اسم النطاق الفرعي",
     logoUrl: "رابط الشعار",
     brandName: "اسم العلامة",
@@ -228,7 +278,7 @@ const settingsCopy = {
     invalidAvatarType: "يرجى رفع صورة بصيغة PNG أو JPG أو WebP.",
     avatarTooLarge: "يجب ألا يتجاوز حجم صورة الملف الشخصي 5MB.",
     invalidLogoUrl:
-      "يرجى استخدام رابط صورة مباشر ينتهي بـ .png أو .jpg أو .webp أو .gif أو .svg.",
+      "استخدم رابط صورة HTTPS أو مساراً داخلياً مُداراً. روابط data و SVG و JavaScript و HTTP غير مسموحة.",
     sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
 
     userAlt: "المستخدم",
@@ -257,6 +307,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
@@ -430,9 +481,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadAccount = async () => {
       try {
-        const response = await fetch(userApiPath("/info"), {
+        const response = await apiFetch(userApiPath("/info"), {
           method: "POST",
-          credentials: "include",
         });
 
         const data = await readApiResponse(response);
@@ -474,9 +524,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
     const loadWebsiteSettings = async () => {
       try {
-        const response = await fetch(userApiPath("/website/settings"), {
+        const response = await apiFetch(`${API_URL}/website/settings`, {
           method: "GET",
-          credentials: "include",
           cache: "no-store",
         });
 
@@ -520,12 +569,41 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     };
   }, []);
 
-  const readImageFile = (file, callback) => {
+  const uploadWebsiteLogo = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => callback(String(reader.result || ""));
-    reader.readAsDataURL(file);
+    if (!BUILDER_ASSET_MIME_TYPES.has(file.type)) {
+      showNotification("error", t.invalidLogoType || t.invalidAvatarType);
+      return;
+    }
+
+    if (file.size > BUILDER_ASSET_MAX_BYTES) {
+      showNotification("error", t.logoTooLarge || t.avatarTooLarge);
+      return;
+    }
+
+    setIsUploadingLogo(true);
+
+    try {
+      const assetUrl = await uploadBuilderAsset(file);
+
+      if (!assetUrl) {
+        throw new Error(t.logoUploadError || "Could not upload logo.");
+      }
+
+      updateSiteField("logoUrl", assetUrl);
+      showNotification("success", t.logoUploaded || "Logo uploaded.");
+    } catch (error) {
+      showNotification(
+        "error",
+        error.message || t.logoUploadError || "Could not upload logo."
+      );
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
   const uploadAvatar = async (event) => {
@@ -551,9 +629,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setAvatarLoadFailed(false);
 
     try {
-      const response = await fetch(userApiPath("/avatar"), {
+      const response = await apiFetch(userApiPath("/avatar"), {
         method: "POST",
-        credentials: "include",
         body: formData,
       });
 
@@ -597,9 +674,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     setIsSavingAccount(true);
 
     try {
-      const response = await fetch(userApiPath("/profile"), {
+      const response = await apiFetch(userApiPath("/profile"), {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildProfilePayload(accountForm)),
       });
@@ -659,9 +735,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     };
 
     try {
-      const response = await fetch(userApiPath("/website/settings"), {
+      const response = await apiFetch(`${API_URL}/website/settings`, {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subdomain: sanitizeSubdomain(siteForm.subdomain),
@@ -890,16 +965,17 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
               <p>{t.websiteDescription}</p>
             </div>
 
-            <label className="settings-file-button settings-profile-upload">
-              {t.uploadLogo}
+            <label
+              className="settings-file-button settings-profile-upload"
+              aria-disabled={isUploadingLogo}
+            >
+              {isUploadingLogo ? t.uploadingLogo || "Uploading..." : "Upload logo"}
               <input
                 type="file"
-                accept="image/*"
-                onChange={(event) =>
-                  readImageFile(event.target.files?.[0], (value) =>
-                    updateSiteField("logoUrl", value)
-                  )
-                }
+                accept="image/png,image/jpeg,image/webp"
+                hidden
+                disabled={isUploadingLogo}
+                onChange={uploadWebsiteLogo}
               />
             </label>
           </div>

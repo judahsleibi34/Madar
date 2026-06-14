@@ -777,7 +777,11 @@ class DataCleaning(DataReadingNormal):
         values = series.dropna().astype(str)
         if values.empty:
             return False
-        return bool(values.str.contains(r"[,;|\u060C]").mean() >= 0.25)
+        separators = (",", ";", "|", "\u060C")
+        contains_separator = values.map(
+            lambda value: any(separator in value for separator in separators)
+        )
+        return bool(contains_separator.mean() >= 0.25)
 
     def _looks_numeric_column(self, column: str, series: pd.Series) -> bool:
         lowered = str(column).lower()

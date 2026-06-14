@@ -8,6 +8,7 @@ import { fetchPublicSite, submitPublicFormSubmission } from "./PageBuilder.api";
 import { getFormSections } from "./PageBuilder.factories";
 import "../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "./PageBuilderCarousel";
+import { resolveMediaUrl } from "../../utils/media";
 
 const splitLines = (value) =>
   String(value || "")
@@ -653,7 +654,12 @@ export default function TenantSiteRuntime() {
     if (element.type === "heading") return <h1 key={element.id} {...props}>{element.content}</h1>;
     if (element.type === "text") return <p key={element.id} {...props}>{element.content}</p>;
     if (element.type === "button") return <button key={element.id} type="button" {...props}>{element.content}</button>;
-    if (element.type === "image") return <img key={element.id} {...props} src={element.content} alt={element.name || ""} />;
+    if (element.type === "image") {
+      const imageSrc = resolveMediaUrl(element.content);
+      return imageSrc ? (
+        <img key={element.id} {...props} src={imageSrc} alt={element.name || ""} />
+      ) : null;
+    }
     if (element.type === "card") {
       return (
         <div key={element.id} {...props}>
@@ -806,8 +812,8 @@ export default function TenantSiteRuntime() {
           className="tenant-site-brand"
           onClick={() => navigate(siteHomePath)}
         >
-          {site.logoUrl ? (
-            <img src={site.logoUrl} alt={`${brandName} logo`} />
+          {resolveMediaUrl(site.logoUrl) ? (
+            <img src={resolveMediaUrl(site.logoUrl)} alt={`${brandName} logo`} />
           ) : (
             <span className="tenant-logo-fallback">
               {brandName.slice(0, 1).toUpperCase() || "M"}
@@ -853,10 +859,10 @@ export default function TenantSiteRuntime() {
       <div className="tenant-footer-grid">
         <div className="tenant-footer-brand">
           <div className="tenant-footer-logo-row">
-            {site.logoUrl ? (
+            {resolveMediaUrl(site.logoUrl) ? (
               <img
                 className="tenant-footer-logo"
-                src={site.logoUrl}
+                src={resolveMediaUrl(site.logoUrl)}
                 alt={`${footerBrand} logo`}
               />
             ) : (

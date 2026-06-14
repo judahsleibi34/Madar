@@ -36,6 +36,11 @@ import PageBuilder from "./components/PageBuilder";
 import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
 
 import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
+import {
+  apiFetch,
+  clearCsrfToken,
+  syncCsrfTokenFromResponseData,
+} from "./utils/apiClient";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
@@ -135,9 +140,8 @@ export default function App() {
   }, []);
 
   const fetchUserInfo = useCallback(async () => {
-    const response = await fetch(`${API_URL}/auth/user_status`, {
+    const response = await apiFetch(`${API_URL}/auth/user_status`, {
       method: "GET",
-      credentials: "include",
       cache: "no-store",
     });
 
@@ -152,14 +156,14 @@ export default function App() {
     }
 
     const data = await response.json();
+    syncCsrfTokenFromResponseData(data);
     return normalizeUser(data.user || data);
   }, [normalizeUser]);
 
   const bootstrapAuth = useCallback(async () => {
     try {
-      const statusResponse = await fetch(`${API_URL}/auth/user_status`, {
+      const statusResponse = await apiFetch(`${API_URL}/auth/user_status`, {
         method: "GET",
-        credentials: "include",
         cache: "no-store",
       });
 
@@ -178,6 +182,7 @@ export default function App() {
       }
 
       const statusData = await statusResponse.json();
+      syncCsrfTokenFromResponseData(statusData);
 
       const loggedIn =
         statusData.logged_in === true || statusData.authenticated === true;
@@ -349,9 +354,8 @@ export default function App() {
       lastKeepAliveAt = now;
 
       try {
-        const response = await fetch(`${API_URL}/auth/user_status`, {
+        const response = await apiFetch(`${API_URL}/auth/user_status`, {
           method: "GET",
-          credentials: "include",
           cache: "no-store",
         });
 
@@ -371,6 +375,7 @@ export default function App() {
         }
 
         const data = await response.json();
+        syncCsrfTokenFromResponseData(data);
 
         const loggedIn =
           data.logged_in === true || data.authenticated === true;
@@ -509,9 +514,8 @@ export default function App() {
     setDashboardSidebarOpen(false);
 
     try {
-      await fetch(`${API_URL}/auth/log_out`, {
+      await apiFetch(`${API_URL}/auth/log_out`, {
         method: "POST",
-        credentials: "include",
       });
     } catch (error) {
       console.error("Logout failed:", error);
@@ -524,6 +528,7 @@ export default function App() {
       setIsLoggedIn(false);
       setAuthChecked(true);
       setUser(null);
+      clearCsrfToken();
 
       applyThemeMode(themeMode);
 

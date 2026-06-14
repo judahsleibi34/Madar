@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { resolveMediaUrl } from "../../utils/media";
 import "./PageBuilderCarousel.css";
 
 const fallbackSlides = [
@@ -119,7 +120,9 @@ export default function PageBuilderCarousel({
                   onClick={() => setActiveIndex(index)}
                   aria-label={`Open ${slide.title || `image ${index + 1}`}`}
                 >
-                  {slide.image && <img src={slide.image} alt={slide.title || name} />}
+                  {resolveMediaUrl(slide.image) && (
+                    <img src={resolveMediaUrl(slide.image)} alt={slide.title || name} />
+                  )}
                   <span>{String(index + 1).padStart(3, "0")}</span>
                 </button>
               );
@@ -138,8 +141,8 @@ export default function PageBuilderCarousel({
   return (
     <div className={`page-builder-carousel ${variantClass}`} aria-label={name}>
       <div className="carousel-stage">
-        {activeSlide.image && (
-          <img src={activeSlide.image} alt={activeSlide.title || name} />
+        {resolveMediaUrl(activeSlide.image) && (
+          <img src={resolveMediaUrl(activeSlide.image)} alt={activeSlide.title || name} />
         )}
 
         <div className="carousel-copy">

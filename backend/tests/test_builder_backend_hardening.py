@@ -53,6 +53,36 @@ def fake_context(role="owner"):
     )
 
 
+def builder_schema_with_element(element):
+    return {
+        "siteChrome": {
+            "logoUrl": "https://cdn.example.com/logo.png",
+            "madarLink": "/",
+        },
+        "pages": [
+            {
+                "id": "page-1",
+                "sections": [
+                    {
+                        "id": "section-1",
+                        "rows": [
+                            {
+                                "id": "row-1",
+                                "columns": [
+                                    {
+                                        "id": "column-1",
+                                        "elements": [element],
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+
 class BuilderBackendHardeningTests(unittest.TestCase):
     def test_publish_accepts_no_body(self):
         fake_supabase = FakeSupabase()
@@ -161,6 +191,166 @@ class BuilderBackendHardeningTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 413)
         self.assertEqual(response.json()["detail"], "draft_schema is too large")
+
+    def test_update_rejects_unsafe_image_url(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={"id": "project-1", "tenant_id": 1, "draft_schema": {"pages": []}},
+             ):
+            response = client.put(
+                "/builder/projects/project-1",
+                json={
+                    "draft_schema": builder_schema_with_element(
+                        {"id": "element-1", "type": "image", "content": "javascript:alert(1)"}
+                    )
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("draft_schema", response.json()["detail"])
+
+    def test_update_rejects_unsafe_embed_url(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={"id": "project-1", "tenant_id": 1, "draft_schema": {"pages": []}},
+             ):
+            response = client.put(
+                "/builder/projects/project-1",
+                json={
+                    "draft_schema": builder_schema_with_element(
+                        {"id": "element-1", "type": "embed", "content": "data:text/html,<script>alert(1)</script>"}
+                    )
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("draft_schema", response.json()["detail"])
+
+    def test_update_rejects_unsafe_action_url(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={"id": "project-1", "tenant_id": 1, "draft_schema": {"pages": []}},
+             ):
+            response = client.put(
+                "/builder/projects/project-1",
+                json={
+                    "draft_schema": builder_schema_with_element(
+                        {
+                            "id": "element-1",
+                            "type": "button",
+                            "content": "Open",
+                            "action": {"type": "openUrl", "url": "javascript:alert(1)"},
+                        }
+                    )
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("action.url", response.json()["detail"])
+
+    def test_update_rejects_unsafe_carousel_image_url(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+        carousel_content = "Title\nDescription\njavascript:alert(1)"
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={"id": "project-1", "tenant_id": 1, "draft_schema": {"pages": []}},
+             ):
+            response = client.put(
+                "/builder/projects/project-1",
+                json={
+                    "draft_schema": builder_schema_with_element(
+                        {"id": "element-1", "type": "carousel", "content": carousel_content}
+                    )
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("slide[0].image", response.json()["detail"])
+
+    def test_update_allows_safe_https_and_relative_navigation_urls(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+        schema = builder_schema_with_element(
+            {
+                "id": "element-1",
+                "type": "button",
+                "content": "Contact",
+                "action": {"type": "openUrl", "url": "/contact"},
+            }
+        )
+        schema["pages"][0]["sections"][0]["rows"][0]["columns"][0]["elements"].append(
+            {
+                "id": "element-2",
+                "type": "image",
+                "content": "https://images.example.com/photo.jpg",
+            }
+        )
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={"id": "project-1", "tenant_id": 1, "draft_schema": {"pages": []}},
+             ):
+            response = client.put(
+                "/builder/projects/project-1",
+                json={"draft_schema": schema},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(fake_supabase.query.payload["draft_schema"], schema)
+
+    def test_publish_revalidates_saved_draft_schema(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "draft_schema": builder_schema_with_element(
+                         {"id": "element-1", "type": "image", "content": "data:image/png;base64,AAAA"}
+                     ),
+                     "published_version": 0,
+                 },
+             ), \
+             patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
+             ):
+            response = client.post("/builder/projects/project-1/publish")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("draft_schema", response.json()["detail"])
 
     def test_member_cannot_archive_project(self):
         with patch(

@@ -4,10 +4,11 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from classes import WebsiteSettingsUpdate
-from services.auth_service import require_regular_user_id
+from services.auth_service import require_regular_user, require_regular_user_id
+from services.url_validation import validate_public_url
 from services.website_settings_service import ensure_settings_for_tenant, save_settings_for_tenant
 
-router = APIRouter(prefix="/users/{user_id}/website", tags=["Website"])
+router = APIRouter(tags=["Website"])
 logger = logging.getLogger(__name__)
 
 SUBDOMAIN_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
@@ -66,34 +67,10 @@ def validate_footer_name(value: str):
 
 
 def validate_logo_url(value: str):
-    clean_value = clean_string(value)
-
-    if not clean_value:
-        return ""
-
-    allowed_prefixes = (
-        "http://",
-        "https://",
-        "data:image/png",
-        "data:image/jpeg",
-        "data:image/jpg",
-        "data:image/webp",
-        "data:image/gif",
-        "data:image/svg+xml",
-    )
-
-    if clean_value.startswith(allowed_prefixes):
-        return clean_value
-
-    if clean_value.startswith("data:application/octet-stream"):
-        raise HTTPException(
-            status_code=400,
-            detail="Logo must be an image file, not a generic file",
-        )
-
-    raise HTTPException(
-        status_code=400,
-        detail="Logo URL must be a valid image URL",
+    return validate_public_url(
+        value,
+        field_name="Logo URL",
+        allow_relative=True,
     )
 
 
@@ -142,42 +119,67 @@ def validate_description(value: str):
     return clean_value
 
 
-@router.put("/settings")
+def get_website_user_context(request: Request, response: Response):
+    path_user_id = request.path_params.get("user_id")
+
+    if path_user_id is None:
+        return require_regular_user(request, response)
+
+    return require_regular_user_id(path_user_id, request, response)
+
+
+def get_tenant_context(user_data):
+    user_id = user_data["id"]
+    tenant_id = user_data.get("tenant_id")
+
+    if tenant_id is None:
+        raise HTTPException(status_code=403, detail="User does not belong to a tenant")
+
+    return tenant_id, user_id
+
+
+def build_settings_update_payload(settings: WebsiteSettingsUpdate):
+    update_payload = {}
+
+    if settings.subdomain is not None:
+        update_payload["subdomain"] = validate_subdomain(settings.subdomain)
+
+    if settings.brand is not None:
+        update_payload["brand"] = validate_brand(settings.brand)
+
+    if settings.footer_store_name is not None:
+        update_payload["footer_store_name"] = validate_footer_name(
+            settings.footer_store_name
+        )
+
+    if settings.logo_url is not None:
+        update_payload["logo_url"] = validate_logo_url(settings.logo_url)
+
+    if settings.contact_email is not None:
+        update_payload["contact_email"] = validate_contact_email(
+            settings.contact_email
+        )
+
+    if settings.phone is not None:
+        update_payload["phone"] = validate_phone(settings.phone)
+
+    if settings.description is not None:
+        update_payload["description"] = validate_description(settings.description)
+
+    return update_payload
+
+
+@router.put("/users/{user_id}/website/settings")
+@router.put("/website/settings")
 def update_website_settings(
-    user_id: int,
     settings: WebsiteSettingsUpdate,
     request: Request,
     response: Response,
+    user_id: int | None = None,
 ):
     try:
-        _, user_data = require_regular_user_id(user_id, request, response)
-
-        update_payload = {}
-
-        if settings.subdomain is not None:
-            update_payload["subdomain"] = validate_subdomain(settings.subdomain)
-
-        if settings.brand is not None:
-            update_payload["brand"] = validate_brand(settings.brand)
-
-        if settings.footer_store_name is not None:
-            update_payload["footer_store_name"] = validate_footer_name(
-                settings.footer_store_name
-            )
-
-        if settings.logo_url is not None:
-            update_payload["logo_url"] = validate_logo_url(settings.logo_url)
-
-        if settings.contact_email is not None:
-            update_payload["contact_email"] = validate_contact_email(
-                settings.contact_email
-            )
-
-        if settings.phone is not None:
-            update_payload["phone"] = validate_phone(settings.phone)
-
-        if settings.description is not None:
-            update_payload["description"] = validate_description(settings.description)
+        _, user_data = get_website_user_context(request, response)
+        update_payload = build_settings_update_payload(settings)
 
         if not update_payload:
             return {
@@ -186,15 +188,11 @@ def update_website_settings(
                 "website": None,
             }
 
-        user_id = user_data["id"]
-        tenant_id = user_data.get("tenant_id")
-
-        if tenant_id is None:
-            raise HTTPException(status_code=403, detail="User does not belong to a tenant")
+        tenant_id, authenticated_user_id = get_tenant_context(user_data)
 
         updated_website = save_settings_for_tenant(
             tenant_id=tenant_id,
-            user_id=user_id,
+            user_id=authenticated_user_id,
             update_payload=update_payload,
         )
 
@@ -215,18 +213,18 @@ def update_website_settings(
         )
 
 
-@router.get("/settings")
-def get_website_settings(user_id: int, request: Request, response: Response):
+@router.get("/users/{user_id}/website/settings")
+@router.get("/website/settings")
+def get_website_settings(
+    request: Request,
+    response: Response,
+    user_id: int | None = None,
+):
     try:
-        _, user_data = require_regular_user_id(user_id, request, response)
+        _, user_data = get_website_user_context(request, response)
+        tenant_id, authenticated_user_id = get_tenant_context(user_data)
 
-        user_id = user_data["id"]
-        tenant_id = user_data.get("tenant_id")
-
-        if tenant_id is None:
-            raise HTTPException(status_code=403, detail="User does not belong to a tenant")
-
-        website = ensure_settings_for_tenant(tenant_id, user_id)
+        website = ensure_settings_for_tenant(tenant_id, authenticated_user_id)
 
         return {
             "success": True,

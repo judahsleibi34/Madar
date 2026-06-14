@@ -3,9 +3,10 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye
 
 import { uiText } from "../constants/uiText";
 import { analysisGroups } from "../constants/analysisConfig";
-import { API_URL, authFetch, getFriendlyExternalError, readApiResponse } from "../utils/api";
+import { API_URL, getFriendlyExternalError, readApiResponse } from "../utils/api";
 import { cleanObject, escapeCsvValue } from "../utils/formatters";
 import { getMissingRequiredParams } from "../utils/validation";
+import { apiFetch } from "../../../../utils/apiClient";
 
 import Stepper from "./Stepper";
 import DataSourceStep from "./DataSourceStep";
@@ -1011,7 +1012,7 @@ export default function DataAnalysisWorkspace({
 
     if (!columnsToProfile.length) return null;
 
-    const response = await authFetch(userApiPath("/visualization/columns/profile"), {
+    const response = await apiFetch(userApiPath("/visualization/columns/profile"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1233,7 +1234,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await authFetch(userApiPath("/data/upload"), {
+      const response = await apiFetch(userApiPath("/data/upload"), {
         method: "POST",
         credentials: "include",
         body: payload,
@@ -1265,7 +1266,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await authFetch(userApiPath("/data/read"), {
+      const response = await apiFetch(userApiPath("/data/read"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1351,7 +1352,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await authFetch(userApiPath(paths[type]), {
+      const response = await apiFetch(userApiPath(paths[type]), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1399,7 +1400,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await authFetch(userApiPath("/analysis/run"), {
+      const response = await apiFetch(userApiPath("/analysis/run"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1491,7 +1492,7 @@ export default function DataAnalysisWorkspace({
       const results = [];
 
       for (const chartConfig of chartConfigs) {
-        const response = await authFetch(userApiPath("/visualization/create"), {
+        const response = await apiFetch(userApiPath("/visualization/create"), {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -1552,7 +1553,7 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await authFetch(userApiPath("/analysis/assist"), {
+      const response = await apiFetch(userApiPath("/analysis/assist"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
