@@ -288,6 +288,21 @@ async def upload_builder_asset(
 
     asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
 
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.asset_uploaded",
+        target_type="builder_asset",
+        target_id=filename,
+        metadata={
+            "asset_url": asset_url,
+            "content_type": detected_content_type,
+            "size_bytes": len(content),
+            "extension": extension,
+        },
+    )
+
     return {
         "success": True,
         "asset_url": asset_url,
@@ -556,6 +571,23 @@ def update_builder_form_submission_status(
 
     status = normalize_submission_status(submission_update.status)
 
+    existing_submission_response = (
+        service_supabase.table("builder_form_submissions")
+        .select("id, tenant_id, project_id, form_id, status")
+        .eq("tenant_id", context.tenant_id)
+        .eq("project_id", project_id)
+        .eq("id", submission_id)
+        .limit(1)
+        .execute()
+    )
+    existing_submission_rows = getattr(existing_submission_response, "data", None) or []
+    existing_submission = existing_submission_rows[0] if existing_submission_rows else None
+
+    if not existing_submission:
+        raise HTTPException(status_code=404, detail="Form submission not found")
+
+    old_status = str(existing_submission.get("status") or "new").strip().lower()
+
     try:
         update_response = (
             service_supabase.table("builder_form_submissions")
@@ -583,6 +615,21 @@ def update_builder_form_submission_status(
 
     if not submission:
         raise HTTPException(status_code=404, detail="Form submission not found")
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.form_submission_status_updated",
+        target_type="builder_form_submission",
+        target_id=submission_id,
+        metadata={
+            "project_id": project_id,
+            "form_id": submission.get("form_id") or existing_submission.get("form_id"),
+            "old_status": format_submission_status(old_status),
+            "new_status": format_submission_status(submission.get("status")),
+        },
+    )
 
     return {
         "success": True,

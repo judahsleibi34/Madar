@@ -149,9 +149,16 @@ class WebsiteRoutesTests(unittest.TestCase):
             return_value=fake_auth_result(user_data),
         ), patch.object(
             website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
+        ), patch.object(
+            website_routes,
             "save_settings_for_tenant",
             return_value=website,
-        ) as save_settings:
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
             response = client.put(
                 "/website/settings",
                 json={"subdomain": "Fresh-Site", "brand": "Fresh Brand"},
@@ -176,9 +183,16 @@ class WebsiteRoutesTests(unittest.TestCase):
             return_value=fake_auth_result(user_data),
         ), patch.object(
             website_routes,
+            "get_settings_for_tenant",
+            return_value=website,
+        ), patch.object(
+            website_routes,
             "save_settings_for_tenant",
             return_value=website,
-        ) as save_settings:
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
             response = client.put(
                 "/website/settings",
                 json={"logo_url": " https://cdn.example.com/logo.png "},
@@ -190,6 +204,76 @@ class WebsiteRoutesTests(unittest.TestCase):
             user_id=3,
             update_payload={"logo_url": "https://cdn.example.com/logo.png"},
         )
+
+
+    def test_canonical_put_records_audit_changed_fields_only(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+        website = {
+            "id": 1,
+            "tenant_id": 7,
+            "user_id": 3,
+            "subdomain": "fresh-site",
+            "brand": "Fresh Brand",
+            "description": "Public description",
+        }
+
+        with patch.object(
+            website_routes,
+            "require_regular_user",
+            return_value=fake_auth_result(user_data),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
+        ), patch.object(
+            website_routes,
+            "save_settings_for_tenant",
+            return_value=website,
+        ), patch.object(website_routes, "record_audit_event") as record_audit:
+            response = client.put(
+                "/website/settings",
+                json={
+                    "subdomain": "Fresh-Site",
+                    "brand": "Fresh Brand",
+                    "description": "Public description",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        record_audit.assert_called_once()
+        audit_kwargs = record_audit.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 7)
+        self.assertEqual(audit_kwargs["actor_user_id"], 3)
+        self.assertEqual(audit_kwargs["action"], "website.settings_updated")
+        self.assertEqual(audit_kwargs["target_type"], "website_settings")
+        self.assertEqual(audit_kwargs["target_id"], 1)
+        self.assertEqual(
+            audit_kwargs["metadata"],
+            {
+                "changed_fields": ["brand", "description", "subdomain"],
+                "old_subdomain": "old-site",
+                "new_subdomain": "fresh-site",
+            },
+        )
+        self.assertNotIn("Public description", str(audit_kwargs["metadata"]))
+
+    def test_failed_website_settings_validation_does_not_record_audit(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+
+        with patch.object(
+            website_routes,
+            "require_regular_user",
+            return_value=fake_auth_result(user_data),
+        ), patch.object(website_routes, "record_audit_event") as record_audit:
+            response = client.put(
+                "/website/settings",
+                json={"logo_url": "javascript:alert(1)"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        record_audit.assert_not_called()
 
     def test_canonical_put_rejects_unsafe_logo_urls(self):
         client = build_website_client()
@@ -246,9 +330,16 @@ class WebsiteRoutesTests(unittest.TestCase):
             return_value=fake_auth_result(user_data),
         ) as require_user, patch.object(
             website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
+        ), patch.object(
+            website_routes,
             "save_settings_for_tenant",
             return_value=website,
-        ) as save_settings:
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
             response = client.put(
                 "/users/3/website/settings",
                 json={"subdomain": "fresh-site", "brand": "Fresh Brand"},

@@ -4,9 +4,10 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from classes import WebsiteSettingsUpdate
+from services.audit_service import record_audit_event
 from services.auth_service import require_regular_user, require_regular_user_id
 from services.url_validation import validate_public_url
-from services.website_settings_service import ensure_settings_for_tenant, save_settings_for_tenant
+from services.website_settings_service import get_settings_for_tenant, ensure_settings_for_tenant, save_settings_for_tenant
 
 router = APIRouter(tags=["Website"])
 logger = logging.getLogger(__name__)
@@ -189,11 +190,36 @@ def update_website_settings(
             }
 
         tenant_id, authenticated_user_id = get_tenant_context(user_data)
+        existing_website = get_settings_for_tenant(tenant_id, authenticated_user_id)
 
         updated_website = save_settings_for_tenant(
             tenant_id=tenant_id,
             user_id=authenticated_user_id,
             update_payload=update_payload,
+        )
+
+        audit_metadata = {
+            "changed_fields": sorted(update_payload.keys()),
+        }
+        old_subdomain = (existing_website or {}).get("subdomain")
+        new_subdomain = updated_website.get("subdomain") if isinstance(updated_website, dict) else None
+
+        if "subdomain" in update_payload and old_subdomain != new_subdomain:
+            audit_metadata["old_subdomain"] = old_subdomain
+            audit_metadata["new_subdomain"] = new_subdomain
+
+        record_audit_event(
+            request=request,
+            tenant_id=tenant_id,
+            actor_user_id=authenticated_user_id,
+            action="website.settings_updated",
+            target_type="website_settings",
+            target_id=(
+                updated_website.get("id")
+                if isinstance(updated_website, dict) and updated_website.get("id") is not None
+                else tenant_id
+            ),
+            metadata=audit_metadata,
         )
 
         return {

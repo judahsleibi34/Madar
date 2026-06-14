@@ -81,7 +81,12 @@ class BuilderAssetUploadTests(unittest.TestCase):
         for item in self.patches:
             item.start()
 
+        self.audit_patch = patch.object(builder_routes, "record_audit_event")
+        self.record_audit_event = self.audit_patch.start()
+
     def tearDown(self):
+        self.audit_patch.stop()
+
         for item in reversed(self.patches):
             item.stop()
 
@@ -131,6 +136,36 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
             )
             self.assertTrue((self.upload_dir / asset_url.removeprefix("/uploads/")).exists())
+
+
+    def test_successful_upload_records_audit_event(self):
+        response = self.post_asset(PNG_BYTES, "asset.png", "image/png")
+
+        self.assertEqual(response.status_code, 200)
+        asset_url = response.json()["asset_url"]
+        self.record_audit_event.assert_called_once()
+        audit_kwargs = self.record_audit_event.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 1)
+        self.assertEqual(audit_kwargs["actor_user_id"], 2)
+        self.assertEqual(audit_kwargs["action"], "builder.asset_uploaded")
+        self.assertEqual(audit_kwargs["target_type"], "builder_asset")
+        self.assertRegex(audit_kwargs["target_id"], r"^[a-f0-9]{32}\.png$")
+        self.assertEqual(
+            audit_kwargs["metadata"],
+            {
+                "asset_url": asset_url,
+                "content_type": "image/png",
+                "size_bytes": len(PNG_BYTES),
+                "extension": ".png",
+            },
+        )
+        self.assertNotIn(str(self.upload_dir), str(audit_kwargs["metadata"]))
+
+    def test_rejected_upload_does_not_record_audit_event(self):
+        response = self.post_asset(SVG_BYTES, "logo.svg", "image/svg+xml")
+
+        self.assertEqual(response.status_code, 400)
+        self.record_audit_event.assert_not_called()
 
     def test_rejects_svg_upload(self):
         response = self.post_asset(SVG_BYTES, "logo.svg", "image/svg+xml")

@@ -611,7 +611,8 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "record_audit_event"):
             response = client.put(
                 f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Contacted"},
@@ -623,12 +624,46 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(body["submission"]["status"], "Contacted")
         self.assertEqual(fake_supabase.tables["builder_form_submissions"][0]["status"], "contacted")
 
+
+    def test_authenticated_submission_status_update_records_audit(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
+            response = client.put(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"status": "Contacted"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        record_audit.assert_called_once()
+        audit_kwargs = record_audit.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 1)
+        self.assertEqual(audit_kwargs["actor_user_id"], 2)
+        self.assertEqual(audit_kwargs["action"], "builder.form_submission_status_updated")
+        self.assertEqual(audit_kwargs["target_type"], "builder_form_submission")
+        self.assertEqual(audit_kwargs["target_id"], SUBMISSION_ID)
+        self.assertEqual(
+            audit_kwargs["metadata"],
+            {
+                "project_id": PROJECT_ID,
+                "form_id": FORM_ID,
+                "old_status": "New",
+                "new_status": "Contacted",
+            },
+        )
+        self.assertNotIn("answers", audit_kwargs["metadata"])
+        self.assertNotIn("field_snapshot", audit_kwargs["metadata"])
+
     def test_authenticated_submission_status_update_closed_works(self):
         fake_supabase = FakeSupabase()
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "record_audit_event"):
             response = client.put(
                 f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Closed"},
@@ -645,7 +680,8 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
             response = client.put(
                 f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Maybe"},
@@ -653,6 +689,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "Invalid submission status")
+        record_audit.assert_not_called()
 
     def test_authenticated_submission_status_update_unknown_submission_fails(self):
         fake_supabase = FakeSupabase()
@@ -685,7 +722,8 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)):
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context(tenant_id=2)), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
             response = client.put(
                 f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
                 json={"status": "Contacted"},
@@ -693,6 +731,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Builder project not found")
+        record_audit.assert_not_called()
 
     def test_cross_tenant_project_access_is_blocked(self):
         fake_supabase = FakeSupabase()
