@@ -147,6 +147,19 @@ export const publishBuilderProject = async (projectId) => {
   return data?.project || null;
 };
 
+export const uploadBuilderAsset = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiFetch(getApiUrl("/builder/assets/upload"), {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await parseJsonResponse(response);
+  return data?.asset_url || data?.url || "";
+};
+
 export const fetchWebsiteSettings = async () => {
   const response = await apiFetch(getApiUrl("/website/settings"), {
     method: "GET",

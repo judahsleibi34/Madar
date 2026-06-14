@@ -11,15 +11,20 @@ import {
   getConfiguredProjectSubdomain,
   sanitizeSubdomain,
 } from "../PageBuilder/PageBuilder.routing";
+import { uploadBuilderAsset } from "../PageBuilder/PageBuilder.api";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const BUILDER_ASSET_MAX_BYTES = 5 * 1024 * 1024;
+const BUILDER_ASSET_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const BLOCKED_STORED_URL_SCHEMES = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
+const MANAGED_UPLOAD_ASSET_PATTERN =
+  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
 
 const readBuilderProject = () => {
   try {
@@ -114,6 +119,9 @@ const getStoredImageUrlError = (url) => {
   if (cleanUrl.startsWith("/")) {
     if (cleanUrl.includes("\\")) return "invalid";
     if (isSvgUrlPath(cleanUrl)) return "invalid";
+    if (cleanUrl.startsWith("/uploads/") && !MANAGED_UPLOAD_ASSET_PATTERN.test(cleanUrl)) {
+      return "invalid";
+    }
     return "";
   }
 
@@ -187,7 +195,8 @@ const settingsCopy = {
     websiteDescription:
       "Set the name, contact details, and logo visitors see on your website.",
     websiteLogoAlt: "Website logo",
-    uploadLogo: "Asset uploads coming soon",
+    uploadLogo: "Upload logo",
+    uploadingLogo: "Uploading...",
     logoUploadUnavailable:
       "Image uploads are not available yet. Use a secure HTTPS image URL for now.",
     subdomainName: "Subdomain name",
@@ -201,11 +210,15 @@ const settingsCopy = {
 
     accountSaved: "Account settings saved.",
     avatarUploaded: "Profile photo updated.",
+    logoUploaded: "Logo uploaded.",
     websiteSaved: "Website settings saved.",
     accountError: "Could not update account settings.",
     avatarUploadError: "Could not upload profile photo.",
+    logoUploadError: "Could not upload logo.",
     invalidAvatarType: "Please upload a PNG, JPG, or WebP image.",
+    invalidLogoType: "Please upload a PNG, JPG, or WebP image.",
     avatarTooLarge: "Profile photo must be 5MB or smaller.",
+    logoTooLarge: "Logo image must be 5MB or smaller.",
     invalidLogoUrl:
       "Use an HTTPS image URL or managed internal path. Data, SVG, JavaScript, and HTTP URLs are not allowed.",
     sessionExpired: "Your session expired. Please log in again.",
@@ -294,6 +307,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
@@ -555,8 +569,41 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     };
   }, []);
 
-  const showLogoUploadUnavailable = () => {
-    showNotification("error", t.logoUploadUnavailable);
+  const uploadWebsiteLogo = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!BUILDER_ASSET_MIME_TYPES.has(file.type)) {
+      showNotification("error", t.invalidLogoType || t.invalidAvatarType);
+      return;
+    }
+
+    if (file.size > BUILDER_ASSET_MAX_BYTES) {
+      showNotification("error", t.logoTooLarge || t.avatarTooLarge);
+      return;
+    }
+
+    setIsUploadingLogo(true);
+
+    try {
+      const assetUrl = await uploadBuilderAsset(file);
+
+      if (!assetUrl) {
+        throw new Error(t.logoUploadError || "Could not upload logo.");
+      }
+
+      updateSiteField("logoUrl", assetUrl);
+      showNotification("success", t.logoUploaded || "Logo uploaded.");
+    } catch (error) {
+      showNotification(
+        "error",
+        error.message || t.logoUploadError || "Could not upload logo."
+      );
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
   const uploadAvatar = async (event) => {
@@ -918,14 +965,19 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
               <p>{t.websiteDescription}</p>
             </div>
 
-            <button
-              type="button"
+            <label
               className="settings-file-button settings-profile-upload"
-              onClick={showLogoUploadUnavailable}
-              aria-disabled="true"
+              aria-disabled={isUploadingLogo}
             >
-              {t.uploadLogo}
-            </button>
+              {isUploadingLogo ? t.uploadingLogo || "Uploading..." : "Upload logo"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                hidden
+                disabled={isUploadingLogo}
+                onChange={uploadWebsiteLogo}
+              />
+            </label>
           </div>
 
           <div className="settings-profile-body">

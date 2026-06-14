@@ -9,6 +9,9 @@ BLOCKED_SCHEMES = {"javascript", "data", "vbscript", "file", "ftp"}
 CONTROL_CHARACTER_PATTERN = re.compile(r"[\x00-\x1f\x7f]")
 CAROUSEL_ELEMENT_TYPES = {"carousel", "carouselCards", "carouselSplit", "circularGallery"}
 URL_LIKE_KEYS = {"href", "image", "imageUrl", "logoUrl", "madarLink", "src", "url"}
+MANAGED_UPLOAD_ASSET_PATTERN = re.compile(
+    r"^/uploads/tenant_[1-9][0-9]*/builder_assets/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$"
+)
 
 
 def env_flag_enabled(name: str) -> bool:
@@ -26,6 +29,10 @@ def reject_url(field_name: str, detail: str) -> None:
 def is_svg_url(parsed_url) -> bool:
     path = (parsed_url.path or "").strip().lower()
     return path.endswith(".svg") or path.endswith(".svgz")
+
+
+def is_managed_upload_asset_path(value: str) -> bool:
+    return bool(MANAGED_UPLOAD_ASSET_PATTERN.fullmatch(value))
 
 
 def validate_public_url(
@@ -69,6 +76,9 @@ def validate_public_url(
 
         if is_svg_url(parsed_relative):
             reject_url(field_name, "must not be an SVG URL")
+
+        if clean_value.startswith("/uploads/") and not is_managed_upload_asset_path(clean_value):
+            reject_url(field_name, "must use a managed upload asset path")
 
         return clean_value
 

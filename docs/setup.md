@@ -35,6 +35,10 @@ DATA_ANALYSIS_RATE_LIMIT_LIMIT=20
 DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS=300
 DATA_VISUALIZATION_RATE_LIMIT_LIMIT=20
 DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS=300
+UPLOADS_DIR=uploads
+BUILDER_ASSET_MAX_BYTES=5242880
+BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT=30
+BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS=300
 ```
 
 `TRUSTED_PROXY_IPS` is a comma-separated list of reverse proxy or tunnel IPs/CIDR
@@ -56,6 +60,11 @@ Authenticated data workspace routes are rate limited per action and authenticate
 user, with the tenant included when available. Tune `DATA_*_RATE_LIMIT_*` values
 for production based on server capacity, dataset size, and expected chart or
 analysis usage.
+
+Builder and website image assets are uploaded through the backend and served from
+managed `/uploads/...` paths. `BUILDER_ASSET_MAX_BYTES` defaults to 5 MiB and
+only PNG, JPEG, and WebP files are accepted. Tune
+`BUILDER_ASSET_UPLOAD_RATE_LIMIT_*` based on expected editor usage.
 
 ## Full Stack
 

@@ -45,6 +45,10 @@ DATA_ANALYSIS_RATE_LIMIT_LIMIT = int(os.getenv("DATA_ANALYSIS_RATE_LIMIT_LIMIT",
 DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS", "300"))
 DATA_VISUALIZATION_RATE_LIMIT_LIMIT = int(os.getenv("DATA_VISUALIZATION_RATE_LIMIT_LIMIT", "20"))
 DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS", "300"))
+BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT = int(os.getenv("BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT", "30"))
+BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS = int(
+    os.getenv("BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS", "300")
+)
 
 
 @dataclass
@@ -242,6 +246,24 @@ def enforce_data_workspace_rate_limit(
         identifier=identifier,
         limit=limit,
         window_seconds=window_seconds,
+    )
+
+
+def enforce_builder_asset_upload_rate_limit(
+    request: Request,
+    user_id: int | str,
+    tenant_id: int | str | None = None,
+):
+    tenant_part = normalize_identifier(str(tenant_id)) if tenant_id is not None else "none"
+    user_part = normalize_identifier(str(user_id))
+    identifier = f"tenant:{tenant_part}:user:{user_part}"
+
+    return enforce_rate_limit(
+        request,
+        "builder_asset_upload",
+        identifier=identifier,
+        limit=BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT,
+        window_seconds=BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS,
     )
 
 

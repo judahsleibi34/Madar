@@ -63,7 +63,9 @@ import {
   listBuilderProjects,
   publishBuilderProject,
   updateBuilderProject,
+  uploadBuilderAsset,
 } from "./PageBuilder.api";
+import { resolveMediaUrl } from "../../utils/media";
 
 import {
   applyThemeModeToProject,
@@ -82,9 +84,10 @@ const blockedStoredUrlSchemes = new Set(["javascript", "data", "vbscript", "file
 const urlLikeSiteChromeKeys = new Set(["href", "image", "imageUrl", "logoUrl", "madarLink", "src", "url"]);
 const controlCharacterPattern = /[\u0000-\u001f\u007f]/;
 const urlSchemePattern = /^([a-z][a-z0-9+.-]*):/i;
-const assetUploadUnavailableMessage =
-  "Image uploads are not available yet. Use a secure HTTPS image URL for now.";
-const assetUploadComingSoonLabel = "Asset uploads coming soon";
+const managedUploadAssetPattern =
+  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
+const builderAssetMaxBytes = 5 * 1024 * 1024;
+const builderAssetMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const normalizeElementAlignSelf = (value) => {
   if (!value || value === "auto") return undefined;
@@ -578,6 +581,9 @@ const getStoredUrlError = (
     if (!allowRelative) return `${fieldName} must use an HTTPS URL.`;
     if (cleanValue.includes("\\")) return `${fieldName} contains invalid characters.`;
     if (isSvgUrlPath(cleanValue)) return `${fieldName} cannot be an SVG URL.`;
+    if (cleanValue.startsWith("/uploads/") && !managedUploadAssetPattern.test(cleanValue)) {
+      return `${fieldName} must use a managed upload asset path.`;
+    }
     return "";
   }
 
@@ -911,6 +917,7 @@ export default function PageBuilder({
   const [liveSitePath, setLiveSitePath] = useState("");
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
+  const [assetUploadBusy, setAssetUploadBusy] = useState(false);
 
   useEffect(() => {
     if (demoMode) return;
@@ -1887,8 +1894,85 @@ export default function PageBuilder({
     );
   };
 
-  const showAssetUploadUnavailable = () => {
-    showToast(assetUploadUnavailableMessage);
+  const validateBuilderAssetFile = (file) => {
+    if (!file) return "Choose an image file first.";
+
+    if (!builderAssetMimeTypes.has(file.type)) {
+      return "Please upload a PNG, JPG, or WebP image.";
+    }
+
+    if (file.size > builderAssetMaxBytes) {
+      return "Image must be 5MB or smaller.";
+    }
+
+    return "";
+  };
+
+  const uploadBuilderImageFile = async (file) => {
+    const validationError = validateBuilderAssetFile(file);
+
+    if (validationError) {
+      showToast(validationError);
+      return "";
+    }
+
+    setAssetUploadBusy(true);
+
+    try {
+      const assetUrl = await uploadBuilderAsset(file);
+
+      if (!assetUrl) {
+        throw new Error("Upload did not return an asset URL.");
+      }
+
+      return assetUrl;
+    } catch (error) {
+      showToast(error?.message || "Could not upload image.");
+      return "";
+    } finally {
+      setAssetUploadBusy(false);
+    }
+  };
+
+  const uploadSelectedElementImage = async (file) => {
+    if (!selectedElement || selectedElement.type !== "image") return;
+
+    const assetUrl = await uploadBuilderImageFile(file);
+
+    if (!assetUrl) return;
+
+    updateSelectedElement({
+      content: assetUrl,
+      name: selectedElement.name || file.name || "Image",
+    });
+    showToast("Image uploaded.");
+  };
+
+  const uploadSiteLogo = async (file) => {
+    const assetUrl = await uploadBuilderImageFile(file);
+
+    if (!assetUrl) return;
+
+    updateProject((prev) => ({
+      ...prev,
+      siteChrome: {
+        ...(prev.siteChrome || defaultSiteChrome),
+        logoUrl: assetUrl,
+      },
+    }));
+    showToast("Logo uploaded.");
+  };
+
+  const handleSelectedElementImageUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    uploadSelectedElementImage(file);
+  };
+
+  const handleSiteLogoUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    uploadSiteLogo(file);
   };
 
   const updateActiveFormQuiz = (updates) => {
@@ -3176,7 +3260,12 @@ export default function PageBuilder({
     }
 
     if (element.type === "image") {
-      return <img key={element.id} {...commonProps} src={element.content} alt={element.name} />;
+      const imageSrc = resolveMediaUrl(element.content);
+      return imageSrc ? (
+        <img key={element.id} {...commonProps} src={imageSrc} alt={element.name} />
+      ) : (
+        <div key={element.id} {...commonProps}>Image URL unavailable</div>
+      );
     }
 
     if (element.type === "card") {
@@ -3271,7 +3360,7 @@ export default function PageBuilder({
     const site = project.siteChrome || defaultSiteChrome;
     if (!site.showHeader) return null;
 
-    const logoSrc = site.logoUrl;
+    const logoSrc = resolveMediaUrl(site.logoUrl);
 
     return (
       <header
@@ -3354,8 +3443,8 @@ export default function PageBuilder({
         <div className="ecommerce-footer-grid">
           <div className="ecommerce-footer-brand">
             <div className="ecommerce-footer-logo-row">
-              {site.logoUrl ? (
-                <img className="ecommerce-footer-logo" src={site.logoUrl} alt={`${footerBrand} logo`} />
+              {resolveMediaUrl(site.logoUrl) ? (
+                <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={`${footerBrand} logo`} />
               ) : (
                 <div className="ecommerce-footer-logo footer-logo-fallback">{footerInitial}</div>
               )}
@@ -3669,7 +3758,10 @@ export default function PageBuilder({
             <label>Contact email<input value={project.siteChrome?.contactEmail || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), contactEmail: event.target.value } }))} /></label>
             <label>Phone<input value={project.siteChrome?.phone || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), phone: event.target.value } }))} /></label>
             <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-            <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable} aria-disabled="true">{assetUploadComingSoonLabel}</button>
+            <label className="upload-image-button">
+              {assetUploadBusy ? "Uploading..." : "Upload logo"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
+            </label>
             <label>Footer brand name<input value={project.siteChrome?.footerStoreName || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerStoreName: event.target.value } }))} /></label>
             <label>Footer description<textarea value={project.siteChrome?.description || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), description: event.target.value } }))} /></label>
             <label>Footer rights<input value={project.siteChrome?.rights || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), rights: event.target.value } }))} /></label>
@@ -3685,7 +3777,10 @@ export default function PageBuilder({
           <h3>Header</h3>
           <label>Brand name<input value={project.siteChrome?.brand || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), brand: event.target.value } }))} /></label>
           <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-          <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable} aria-disabled="true">{assetUploadComingSoonLabel}</button>
+          <label className="upload-image-button">
+            {assetUploadBusy ? "Uploading..." : "Upload logo"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
+          </label>
           <label>Header button<input value={project.siteChrome?.headerButtonLabel || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerButtonLabel: event.target.value } }))} /></label>
           <label>Header alignment<select value={project.siteChrome?.headerAlign || "center"} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerAlign: event.target.value } }))}>
             <option value="left">Left</option>
@@ -3889,7 +3984,10 @@ export default function PageBuilder({
           )}
 
           {selectedElement.type === "image" && (
-            <button type="button" className="upload-image-button" onClick={showAssetUploadUnavailable} aria-disabled="true">{assetUploadComingSoonLabel}</button>
+            <label className="upload-image-button">
+              {assetUploadBusy ? "Uploading..." : "Upload image"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSelectedElementImageUpload} />
+            </label>
           )}
 
           {selectedElement.mode === "free" && (
@@ -4546,6 +4644,3 @@ export default function PageBuilder({
     </div>
   );
 }
-
-
-

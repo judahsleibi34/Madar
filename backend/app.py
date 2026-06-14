@@ -41,6 +41,10 @@ CHART_OUTPUT_DIR = Path(os.getenv("CHART_OUTPUT_DIR", "generated_charts")).resol
 CHART_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/generated_charts", StaticFiles(directory=str(CHART_OUTPUT_DIR)), name="generated_charts")
 
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", "uploads")).resolve()
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+
 FRONTEND_URLS = os.getenv(
     "FRONTEND_URLS",
     "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173",

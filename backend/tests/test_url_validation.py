@@ -53,6 +53,30 @@ class UrlValidationTests(unittest.TestCase):
             "/contact",
         )
 
+    def test_accepts_managed_upload_asset_path(self):
+        self.assertEqual(
+            validate_public_url(
+                "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.webp",
+                field_name="Image URL",
+                allow_relative=True,
+            ),
+            "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.webp",
+        )
+
+    def test_rejects_unmanaged_upload_paths(self):
+        unmanaged_paths = [
+            "/uploads/logo.png",
+            "/uploads/tenant_1/avatar.png",
+            "/uploads/tenant_1/builder_assets/not-random.png",
+            "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png?x=1",
+        ]
+
+        for path in unmanaged_paths:
+            with self.subTest(path=path), self.assertRaises(HTTPException) as error:
+                validate_public_url(path, field_name="Image URL", allow_relative=True)
+
+            self.assertEqual(error.exception.status_code, 400)
+
     def test_rejects_svg_urls(self):
         for svg_url in ["https://example.com/logo.svg", "/uploads/logo.svgz"]:
             with self.subTest(svg_url=svg_url), self.assertRaises(HTTPException) as error:
