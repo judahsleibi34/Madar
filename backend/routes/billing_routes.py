@@ -4,6 +4,7 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from classes import BillingCheckoutRequest, BillingWebhookUpdateRequest
+from services.audit_service import record_audit_event
 from services.auth_service import require_regular_user, require_regular_user_id
 from services.billing_service import apply_pending_checkout_selection, apply_verified_billing_update
 
@@ -14,6 +15,7 @@ router = APIRouter(tags=["Billing"])
 def build_checkout_response(
     checkout: BillingCheckoutRequest,
     user_data: dict,
+    request: Request | None = None,
 ):
     tenant_id = user_data.get("tenant_id")
 
@@ -26,6 +28,24 @@ def build_checkout_response(
         plan=checkout.plan,
         builder_type=checkout.builder_type,
         updated_by_user_id=user_data.get("id"),
+    )
+
+    record_audit_event(
+        request=request,
+        tenant_id=feature.get("tenant_id", tenant_id),
+        actor_user_id=user_data.get("id"),
+        action="billing.checkout_selected",
+        target_type="billing_selection",
+        target_id=feature.get("id") or tenant_id,
+        metadata={
+            "plan_type": feature.get("subscription_type"),
+            "subscription_type": feature.get("subscription_type"),
+            "plan": feature.get("plan"),
+            "builder_type": feature.get("builder_type"),
+            "selected_features": [feature.get("builder_type")] if feature.get("builder_type") else [feature.get("subscription_type")],
+            "payment_status": feature.get("payment_status"),
+            "source": "checkout",
+        },
     )
 
     return {
@@ -50,7 +70,7 @@ def create_canonical_checkout(
     response: Response,
 ):
     _, user_data = require_regular_user(request, response)
-    return build_checkout_response(checkout, user_data)
+    return build_checkout_response(checkout, user_data, request=request)
 
 
 @router.post("/users/{user_id}/billing/checkout")
@@ -61,7 +81,7 @@ def create_checkout(
     response: Response,
 ):
     _, user_data = require_regular_user_id(user_id, request, response)
-    return build_checkout_response(checkout, user_data)
+    return build_checkout_response(checkout, user_data, request=request)
 
 
 @router.post("/billing/webhook")
