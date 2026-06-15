@@ -88,6 +88,7 @@ const managedUploadAssetPattern =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
 const builderAssetMaxBytes = 5 * 1024 * 1024;
 const builderAssetMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+const builderInitialProjectLoadPromises = new Map();
 
 const normalizeElementAlignSelf = (value) => {
   if (!value || value === "auto") return undefined;
@@ -928,22 +929,42 @@ export default function PageBuilder({
     if (demoMode) return;
 
     let cancelled = false;
+    const cacheKey = user?.id || "current";
 
     const loadBackendProject = async () => {
       setBuilderProjectLoading(true);
 
       try {
-        const projects = await listBuilderProjects(user?.id);
-        const selectedProject = projects[0] || null;
+        if (!builderInitialProjectLoadPromises.has(cacheKey)) {
+          builderInitialProjectLoadPromises.set(
+            cacheKey,
+            (async () => {
+              const projects = await listBuilderProjects();
+              const selectedProject = projects[0] || null;
 
-        if (!selectedProject) {
+              if (!selectedProject) return null;
+
+              return fetchBuilderProject(selectedProject.id);
+            })()
+          );
+        }
+
+        let fullRecord = null;
+
+        try {
+          fullRecord = await builderInitialProjectLoadPromises.get(cacheKey);
+        } catch (error) {
+          builderInitialProjectLoadPromises.delete(cacheKey);
+          throw error;
+        }
+
+        if (!fullRecord) {
           if (!cancelled) {
             setBuilderProjectRecord(null);
           }
           return;
         }
 
-        const fullRecord = await fetchBuilderProject(selectedProject.id, user?.id);
         const loadedProject = getDraftProjectFromRecord(fullRecord);
 
         if (!loadedProject) return;
@@ -971,7 +992,7 @@ export default function PageBuilder({
     return () => {
       cancelled = true;
     };
-  }, [demoMode]);
+  }, [demoMode, user?.id]);
 
   const safeProjectPages = Array.isArray(project?.pages) ? project.pages : [];
   const safeProjectForms = Array.isArray(project?.forms) ? project.forms : [];

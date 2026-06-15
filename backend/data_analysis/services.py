@@ -368,6 +368,7 @@ def create_visualization(
             "tick_font_size",
             "legend_font_size",
             "series_count",
+            "features",
             "language",
             "orientation",
             "style",
@@ -383,6 +384,15 @@ def create_visualization(
 
     try:
         chart_path = visualizer.plot(**plot_kwargs, save_path=save_path)
+    except ValueError as error:
+        logger.warning(
+            "data.visualization.chart_validation_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
     except Exception as error:
         logger.warning(
             "data.visualization.chart_failed",
