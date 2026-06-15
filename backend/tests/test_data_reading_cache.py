@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -201,6 +202,145 @@ class DataReadingRemoteUrlSecurityTests(unittest.TestCase):
             reader = DataReadingNormal("http://example.com/file.csv")
             with self.assertRaisesRegex(ValueError, "Private or local network"):
                 reader._fetch_public_url("http://example.com/file.csv")
+
+
+class DataReadingExcelSafetyTests(unittest.TestCase):
+    def setUp(self):
+        DataReadingNormal.clear_shared_cache()
+
+    def _scoped_path(self, filename: str):
+        temp_dir = tempfile.TemporaryDirectory()
+        upload_root = Path(temp_dir.name).resolve()
+        data_dir = upload_root / "tenant_1" / "user_2"
+        data_dir.mkdir(parents=True)
+        return temp_dir, upload_root, data_dir / filename
+
+    def _write_workbook(self, path: Path, rows=None, sheet_count: int = 1):
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        active = workbook.active
+        active.title = "Sheet1"
+
+        for row in rows or [["name", "value"], ["A", 1]]:
+            active.append(row)
+
+        for index in range(2, sheet_count + 1):
+            sheet = workbook.create_sheet(f"Sheet{index}")
+            sheet.append(["name", "value"])
+            sheet.append(["B", index])
+
+        workbook.save(path)
+        workbook.close()
+
+    def test_normal_small_xlsx_is_accepted(self):
+        temp_dir, upload_root, xlsx_path = self._scoped_path("small.xlsx")
+        with temp_dir:
+            self._write_workbook(xlsx_path)
+
+            with patch.dict("os.environ", {"DATA_UPLOAD_DIR": str(upload_root)}, clear=False):
+                reader = DataReadingNormal(str(xlsx_path), tenant_id=1, user_id=2)
+                df = reader.read()
+
+        self.assertEqual(df.to_dict("records"), [{"name": "A", "value": 1}])
+
+    def test_corrupt_xlsx_is_rejected_cleanly(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("corrupt.xlsx")
+        with temp_dir:
+            xlsx_path.write_bytes(b"not-a-valid-zip")
+            reader = DataReadingNormal("uploads/fake.csv")
+
+            with self.assertRaisesRegex(ValueError, "Invalid or corrupt Excel workbook"):
+                reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_with_too_many_zip_entries_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("entries.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w") as archive:
+                archive.writestr("a.xml", "a")
+                archive.writestr("b.xml", "b")
+                archive.writestr("c.xml", "c")
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with patch.object(DataReadingNormal, "MAX_EXCEL_ZIP_ENTRIES", 2):
+                with self.assertRaisesRegex(ValueError, "too many ZIP entries"):
+                    reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_with_excessive_uncompressed_size_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("large-uncompressed.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("xl/worksheets/sheet1.xml", "x" * 128)
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with patch.object(DataReadingNormal, "MAX_EXCEL_UNCOMPRESSED_BYTES", 64):
+                with self.assertRaisesRegex(ValueError, "too large after decompression"):
+                    reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_with_path_traversal_entry_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("traversal.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w") as archive:
+                archive.writestr("xl/../evil.xml", "bad")
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with self.assertRaisesRegex(ValueError, "unsafe ZIP entry path"):
+                reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_with_backslash_entry_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("backslash.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w") as archive:
+                archive.writestr("xl\\evil.xml", "bad")
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with self.assertRaisesRegex(ValueError, "unsafe ZIP entry path"):
+                reader._validate_xlsx_file(xlsx_path)
+
+    def test_workbook_with_too_many_sheets_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("sheets.xlsx")
+        with temp_dir:
+            self._write_workbook(xlsx_path, sheet_count=2)
+            reader = DataReadingNormal("uploads/fake.csv")
+
+            with patch.object(DataReadingNormal, "MAX_EXCEL_SHEETS", 1):
+                with self.assertRaisesRegex(ValueError, "too many sheets"):
+                    reader._validate_xlsx_workbook(xlsx_path)
+
+    def test_workbook_with_too_many_rows_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("rows.xlsx")
+        with temp_dir:
+            self._write_workbook(xlsx_path, rows=[["name"], ["A"]])
+            reader = DataReadingNormal("uploads/fake.csv")
+
+            with patch.object(DataReadingNormal, "MAX_EXCEL_ROWS", 1):
+                with self.assertRaisesRegex(ValueError, "too many rows"):
+                    reader._validate_xlsx_workbook(xlsx_path)
+
+    def test_workbook_with_too_many_columns_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("columns.xlsx")
+        with temp_dir:
+            self._write_workbook(xlsx_path, rows=[["a", "b"], [1, 2]])
+            reader = DataReadingNormal("uploads/fake.csv")
+
+            with patch.object(DataReadingNormal, "MAX_EXCEL_COLUMNS", 1):
+                with self.assertRaisesRegex(ValueError, "too many columns"):
+                    reader._validate_xlsx_workbook(xlsx_path)
+
+    def test_workbook_cell_text_limit_is_enforced_after_parse(self):
+        temp_dir, upload_root, xlsx_path = self._scoped_path("cell-text.xlsx")
+        with temp_dir:
+            self._write_workbook(xlsx_path, rows=[["note"], ["x" * 16]])
+
+            with patch.dict("os.environ", {"DATA_UPLOAD_DIR": str(upload_root)}, clear=False), patch.object(
+                DataReadingNormal, "MAX_EXCEL_CELL_CHARS", 8
+            ):
+                reader = DataReadingNormal(str(xlsx_path), tenant_id=1, user_id=2)
+                with self.assertRaisesRegex(RuntimeError, "Failed to read data") as context:
+                    reader.read()
+
+        self.assertIsInstance(context.exception.__cause__, ValueError)
+        self.assertIn("Excel cell text is too large", str(context.exception.__cause__))
 
 
 if __name__ == "__main__":

@@ -4,11 +4,13 @@ import os
 import re
 import socket
 import time
+import zipfile
 from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urljoin, urlparse
 
+import openpyxl
 import pandas as pd
 import requests
 
@@ -32,6 +34,13 @@ class DataReadingNormal:
     MAX_REMOTE_BYTES = int(os.getenv("MAX_REMOTE_DATA_BYTES", str(10 * 1024 * 1024)))
     MAX_ROWS = int(os.getenv("DATAFRAME_MAX_ROWS", "100000"))
     MAX_COLUMNS = int(os.getenv("DATAFRAME_MAX_COLUMNS", "500"))
+    MAX_EXCEL_FILE_BYTES = int(os.getenv("MAX_EXCEL_FILE_BYTES", str(10 * 1024 * 1024)))
+    MAX_EXCEL_UNCOMPRESSED_BYTES = int(os.getenv("MAX_EXCEL_UNCOMPRESSED_BYTES", str(50 * 1024 * 1024)))
+    MAX_EXCEL_ZIP_ENTRIES = int(os.getenv("MAX_EXCEL_ZIP_ENTRIES", "200"))
+    MAX_EXCEL_SHEETS = int(os.getenv("MAX_EXCEL_SHEETS", "20"))
+    MAX_EXCEL_ROWS = int(os.getenv("MAX_EXCEL_ROWS", "100000"))
+    MAX_EXCEL_COLUMNS = int(os.getenv("MAX_EXCEL_COLUMNS", "1000"))
+    MAX_EXCEL_CELL_CHARS = int(os.getenv("MAX_EXCEL_CELL_CHARS", "10000"))
     REMOTE_DATASET_URLS_DISABLED_MESSAGE = (
         "Remote dataset URLs are disabled. Upload a CSV/XLS/XLSX file instead."
     )
@@ -123,8 +132,17 @@ class DataReadingNormal:
             with open(safe_path, "rb") as file:
                 return self._read_csv_bytes(file.read())
 
-        if extension in [".xls", ".xlsx"]:
+        if extension == ".xlsx":
+            self._validate_xlsx_file(safe_path)
+            self._validate_xlsx_workbook(safe_path)
+            df = pd.read_excel(safe_path, engine="openpyxl")
+            self._validate_excel_dataframe(df)
+            return self._normalize_dataframe(df)
+
+        if extension == ".xls":
+            self._validate_excel_file_size(safe_path.stat().st_size)
             df = pd.read_excel(safe_path)
+            self._validate_excel_dataframe(df)
             return self._normalize_dataframe(df)
 
         raise ValueError(
@@ -144,8 +162,7 @@ class DataReadingNormal:
             return self._read_csv_bytes(response.content)
 
         if extension in [".xls", ".xlsx"] or self._is_excel_content_type(content_type):
-            df = pd.read_excel(BytesIO(response.content))
-            return self._normalize_dataframe(df)
+            return self._read_excel_bytes(response.content, extension=extension)
 
         if "application/json" in content_type or url.lower().endswith(".json"):
             data = response.json()
@@ -178,6 +195,100 @@ class DataReadingNormal:
             )
 
         return self._read_csv_bytes(response.content)
+
+    def _read_excel_bytes(self, content: bytes, *, extension: str = "") -> pd.DataFrame:
+        self._validate_excel_file_size(len(content))
+
+        if extension == ".xlsx" or zipfile.is_zipfile(BytesIO(content)):
+            self._validate_xlsx_file(content)
+            self._validate_xlsx_workbook(content)
+            df = pd.read_excel(BytesIO(content), engine="openpyxl")
+        else:
+            df = pd.read_excel(BytesIO(content))
+
+        self._validate_excel_dataframe(df)
+        return self._normalize_dataframe(df)
+
+    def _validate_excel_file_size(self, size_bytes: int) -> None:
+        if size_bytes > self.MAX_EXCEL_FILE_BYTES:
+            raise ValueError("Excel file is too large")
+
+    def _zip_source(self, source):
+        if isinstance(source, (bytes, bytearray)):
+            return BytesIO(source)
+        return source
+
+    def _validate_xlsx_file(self, source) -> None:
+        try:
+            with zipfile.ZipFile(self._zip_source(source)) as workbook_zip:
+                entries = workbook_zip.infolist()
+
+                if len(entries) > self.MAX_EXCEL_ZIP_ENTRIES:
+                    raise ValueError("Excel workbook has too many ZIP entries")
+
+                total_uncompressed = 0
+
+                for entry in entries:
+                    self._validate_xlsx_zip_entry(entry)
+                    total_uncompressed += int(entry.file_size or 0)
+
+                    if total_uncompressed > self.MAX_EXCEL_UNCOMPRESSED_BYTES:
+                        raise ValueError("Excel workbook is too large after decompression")
+
+        except zipfile.BadZipFile as error:
+            raise ValueError("Invalid or corrupt Excel workbook") from error
+
+    def _validate_xlsx_zip_entry(self, entry: zipfile.ZipInfo) -> None:
+        filename = entry.filename or ""
+
+        if entry.flag_bits & 0x1:
+            raise ValueError("Encrypted Excel workbooks are not supported")
+
+        if (
+            not filename
+            or filename.startswith(("/", "\\"))
+            or "\\" in filename
+            or "//" in filename
+            or any(part in {".", ".."} for part in filename.split("/"))
+        ):
+            raise ValueError("Excel workbook contains an unsafe ZIP entry path")
+
+    def _validate_xlsx_workbook(self, source) -> None:
+        try:
+            workbook = openpyxl.load_workbook(
+                self._zip_source(source),
+                read_only=True,
+                data_only=True,
+                keep_links=False,
+            )
+        except zipfile.BadZipFile as error:
+            raise ValueError("Invalid or corrupt Excel workbook") from error
+        except Exception as error:
+            raise ValueError("Invalid or corrupt Excel workbook") from error
+
+        try:
+            if len(workbook.sheetnames) > self.MAX_EXCEL_SHEETS:
+                raise ValueError("Excel workbook has too many sheets")
+
+            for worksheet in workbook.worksheets:
+                if worksheet.max_row and worksheet.max_row > self.MAX_EXCEL_ROWS:
+                    raise ValueError("Excel worksheet has too many rows")
+
+                if worksheet.max_column and worksheet.max_column > self.MAX_EXCEL_COLUMNS:
+                    raise ValueError("Excel worksheet has too many columns")
+        finally:
+            workbook.close()
+
+    def _validate_excel_dataframe(self, df: pd.DataFrame) -> None:
+        if len(df) > self.MAX_EXCEL_ROWS:
+            raise ValueError("Excel worksheet has too many rows")
+
+        if len(df.columns) > self.MAX_EXCEL_COLUMNS:
+            raise ValueError("Excel worksheet has too many columns")
+
+        for value in df.to_numpy(dtype=object).flat:
+            if isinstance(value, str) and len(value) > self.MAX_EXCEL_CELL_CHARS:
+                raise ValueError("Excel cell text is too large")
 
     def _read_csv_bytes(self, content: bytes) -> pd.DataFrame:
         if not content:
