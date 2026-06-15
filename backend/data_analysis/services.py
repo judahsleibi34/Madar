@@ -17,7 +17,7 @@ from data_analysis.core.analysis_i18n import (
     normalize_symbols,
 )
 from data_analysis.core.response_utils import dataframe_preview, sanitize_for_json
-from data_analysis.io.data_reading import DataReadingNormal
+from data_analysis.io.data_reading import DataReadingNormal, RemoteDatasetUrlsDisabledError
 from data_analysis.router import AnalysisRouter
 from data_analysis.visualization.visualization import DataVisualization
 
@@ -161,7 +161,11 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
 
 def process_read(input_path: str, *, tenant_id: str, user_id: str):
     reader = DataReadingNormal(input_path, tenant_id=tenant_id, user_id=user_id)
-    df = reader.read()
+
+    try:
+        df = reader.read()
+    except RemoteDatasetUrlsDisabledError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
     return build_dataset_response(
         df,

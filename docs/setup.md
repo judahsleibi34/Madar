@@ -27,6 +27,8 @@ MAX_JSON_BODY_BYTES=3145728
 MAX_SMALL_JSON_BODY_BYTES=262144
 MAX_DATA_JSON_BODY_BYTES=1048576
 ALLOW_INSECURE_HTTP_URLS=false
+ALLOW_REMOTE_DATASET_URLS=false
+ALLOW_INSECURE_REMOTE_DATASET_HTTP=false
 DATA_WORKSPACE_RATE_LIMIT_LIMIT=60
 DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS=300
 DATA_UPLOAD_RATE_LIMIT_LIMIT=20
@@ -60,6 +62,13 @@ Authenticated data workspace routes are rate limited per action and authenticate
 user, with the tenant included when available. Tune `DATA_*_RATE_LIMIT_*` values
 for production based on server capacity, dataset size, and expected chart or
 analysis usage.
+
+Remote dataset URL imports are disabled by default for SSRF safety. Keep
+`ALLOW_REMOTE_DATASET_URLS=false` for the MVP and have users upload CSV/XLS/XLSX
+files instead. Only enable remote URL imports in controlled environments after
+reviewing the SSRF protections, and keep
+`ALLOW_INSECURE_REMOTE_DATASET_HTTP=false` unless a local fixture explicitly
+requires `http://`.
 
 Builder and website image assets are uploaded through the backend and served from
 managed `/uploads/...` paths. `BUILDER_ASSET_MAX_BYTES` defaults to 5 MiB and

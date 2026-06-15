@@ -13,6 +13,10 @@ import pandas as pd
 import requests
 
 
+class RemoteDatasetUrlsDisabledError(ValueError):
+    pass
+
+
 class DataReadingNormal:
     SUPPORTED_EXTENSIONS = {".csv", ".xls", ".xlsx"}
 
@@ -28,6 +32,9 @@ class DataReadingNormal:
     MAX_REMOTE_BYTES = int(os.getenv("MAX_REMOTE_DATA_BYTES", str(10 * 1024 * 1024)))
     MAX_ROWS = int(os.getenv("DATAFRAME_MAX_ROWS", "100000"))
     MAX_COLUMNS = int(os.getenv("DATAFRAME_MAX_COLUMNS", "500"))
+    REMOTE_DATASET_URLS_DISABLED_MESSAGE = (
+        "Remote dataset URLs are disabled. Upload a CSV/XLS/XLSX file instead."
+    )
     _shared_df_cache: OrderedDict[str, pd.DataFrame] = OrderedDict()
 
     def __init__(
@@ -45,6 +52,9 @@ class DataReadingNormal:
         self._cached_df: pd.DataFrame | None = None
 
     def read(self, refresh: bool = False) -> pd.DataFrame:
+        if self._is_url(self.input_path):
+            self._assert_remote_dataset_urls_enabled()
+
         if self._cached_df is not None and not refresh:
             return self._cached_df.copy(deep=True)
 
@@ -335,6 +345,7 @@ class DataReadingNormal:
         return f"{prefix}_{text}"
 
     def _fetch_public_url(self, url: str) -> requests.Response:
+        self._assert_remote_dataset_urls_enabled()
         headers = {"User-Agent": "Mozilla/5.0"}
         current_url = url
 
@@ -391,10 +402,33 @@ class DataReadingNormal:
         response._content = b"".join(chunks)
         response._content_consumed = True
 
+    def _remote_dataset_urls_enabled(self) -> bool:
+        return (os.getenv("ALLOW_REMOTE_DATASET_URLS") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+    def _insecure_remote_dataset_http_enabled(self) -> bool:
+        return (os.getenv("ALLOW_INSECURE_REMOTE_DATASET_HTTP") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+    def _assert_remote_dataset_urls_enabled(self) -> None:
+        if not self._remote_dataset_urls_enabled():
+            raise RemoteDatasetUrlsDisabledError(self.REMOTE_DATASET_URLS_DISABLED_MESSAGE)
+
     def _validate_public_url(self, url: str) -> None:
         parsed = urlparse(url)
         if parsed.scheme not in ["http", "https"] or not parsed.hostname:
             raise ValueError("Only public HTTP or HTTPS URLs are supported")
+
+        if parsed.scheme == "http" and not self._insecure_remote_dataset_http_enabled():
+            raise ValueError("Remote dataset URLs must use HTTPS")
 
         try:
             addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
