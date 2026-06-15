@@ -282,22 +282,28 @@
 
 .page-builder .daw-visualization-preview-modal {
   width: min(1180px, 100%);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 18px 20px;
 }
 
 .page-builder .daw-visualization-preview-stage {
   display: grid;
   place-items: center;
   min-width: 0;
+  min-height: 0;
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
-  padding: 14px;
+  padding: 10px;
   background: #ffffff;
+  overflow: hidden;
 }
 
 .page-builder .daw-visualization-preview-stage img {
   display: block;
   max-width: 100%;
-  max-height: min(68vh, 720px);
+  max-height: min(70vh, 690px);
   object-fit: contain;
 }
 
@@ -340,15 +346,16 @@
   z-index: 10000;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 14px;
   background: rgba(8, 12, 22, 0.72);
   backdrop-filter: blur(10px);
 }
 
 .page-builder .daw-modal {
   width: min(1180px, 100%);
-  max-height: min(820px, calc(100vh - 48px));
+  max-height: calc(100vh - 28px);
   overflow: auto;
+  overflow-x: hidden;
   border: 1px solid var(--daw-card-border);
   border-radius: 18px;
   padding: 20px;
@@ -362,7 +369,7 @@
 }
 
 .page-builder .daw-modal-header {
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .page-builder .daw-icon-button {
@@ -443,6 +450,14 @@
 
 .page-builder .daw-axis-select-row select {
   width: 100%;
+}
+
+.page-builder .daw-field-note {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  color: var(--daw-muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .page-builder .daw-multi-select {
@@ -709,7 +724,7 @@
 
 .page-builder .daw-modal-actions {
   justify-content: flex-end;
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 /* Dark mode */

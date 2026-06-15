@@ -194,9 +194,9 @@ export default function App() {
         };
       }
 
-      const userInfo = await fetchUserInfo();
+      const userInfo = normalizeUser(statusData.user || statusData);
 
-      if (!userInfo) {
+      if (!userInfo?.id) {
         return {
           loggedIn: false,
           user: null,
@@ -215,7 +215,7 @@ export default function App() {
         user: null,
       };
     }
-  }, [fetchUserInfo]);
+  }, [normalizeUser]);
 
   useEffect(() => {
     const safeLanguage = lang === "ar" ? "ar" : "en";

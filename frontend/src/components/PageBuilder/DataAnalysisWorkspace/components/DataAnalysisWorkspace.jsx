@@ -25,7 +25,7 @@ const chartTypes = [
   { id: "histogram", label: "Histogram" },
   { id: "box", label: "Box" },
   { id: "violin", label: "Violin" },
-  { id: "count", label: "Count" },
+  { id: "count", label: "Frequency" },
   { id: "pie", label: "Pie" },
   { id: "heatmap", label: "Heatmap" },
 ];
@@ -91,14 +91,51 @@ const userSafeErrorMessage = (
 const needsXColumn = (chartType) => !["heatmap"].includes(chartType);
 const needsYColumn = (chartType) =>
   ["bar", "line", "scatter", "box", "violin", "pie"].includes(chartType);
+const axisLabelsDisabled = (chartType) => ["pie", "heatmap"].includes(chartType);
 const toArray = (value) => (Array.isArray(value) ? value : value ? [value] : []);
 const hasColumnValue = (value) => toArray(value).filter(Boolean).length > 0;
+const arabicDigitMap = {
+  "٠": "0",
+  "١": "1",
+  "٢": "2",
+  "٣": "3",
+  "٤": "4",
+  "٥": "5",
+  "٦": "6",
+  "٧": "7",
+  "٨": "8",
+  "٩": "9",
+  "۰": "0",
+  "۱": "1",
+  "۲": "2",
+  "۳": "3",
+  "۴": "4",
+  "۵": "5",
+  "۶": "6",
+  "۷": "7",
+  "۸": "8",
+  "۹": "9",
+};
+const normalizeNumericText = (value) =>
+  String(value ?? "")
+    .trim()
+    .replace(/[٠-٩۰-۹]/g, (digit) => arabicDigitMap[digit] || digit)
+    .replace(/[%$€£₪،,\s]/g, "");
+const isNumericLikeValue = (value) => {
+  if (value === null || value === undefined || value === "") return false;
+  if (typeof value === "number") return Number.isFinite(value);
+
+  const normalized = normalizeNumericText(value);
+  if (!normalized) return false;
+
+  return Number.isFinite(Number(normalized));
+};
 const singleVariableCharts = ["histogram", "count"];
-const singlePairCharts = ["pie", "box", "violin"];
-const multiSeriesCharts = ["bar", "line", "scatter"];
+const singlePairCharts = ["pie", "violin"];
+const multiSeriesCharts = ["bar", "line", "scatter", "box"];
 const categoryColorCharts = ["bar", "box", "violin", "count", "pie"];
 const supportsUngroupedCategoryColors = (chartType) =>
-  ["bar", "count", "pie"].includes(chartType);
+  ["bar", "box", "violin", "count", "pie"].includes(chartType);
 const supportsHueGrouping = (chartType) =>
   ["bar", "line", "scatter", "histogram", "box", "violin", "count"].includes(
     chartType
@@ -167,12 +204,27 @@ const isTrendColumn = (column) =>
 
 const shouldUseTrendGradient = (plot, xValue) => {
   if (!plot) return false;
+  if (["heatmap", "box", "violin", "pie", "count", "histogram"].includes(plot.chartType)) {
+    return true;
+  }
   if (plot.chartType === "line") return true;
   if (!["bar", "scatter"].includes(plot.chartType)) return false;
   return toArray(xValue || plot.xColumns || plot.xColumn).some(isTrendColumn);
 };
 
 const getComparisonHint = (plot) => {
+  if (plot.chartType === "line" && plot.comparisonMode === "1:1") {
+    return "Single trend uses one shared X axis, usually time, and one numeric Y value.";
+  }
+
+  if (plot.chartType === "line" && plot.comparisonMode === "1:M") {
+    return "Compare trends uses one shared X axis, usually time, with multiple numeric Y values.";
+  }
+
+  if (plot.chartType === "box" && plot.comparisonMode === "1:M") {
+    return "Compare distributions uses one group axis with multiple numeric Y variables shown side-by-side.";
+  }
+
   if (plot.chartType === "heatmap") {
     return "Heatmap uses the numeric columns in the dataset, so no axis selection is needed.";
   }
@@ -196,14 +248,34 @@ const getComparisonHint = (plot) => {
   return "Use one X variable and one Y variable for a direct comparison.";
 };
 
-const validateVisualizationPlot = (plot) => {
+const validateVisualizationPlot = (plot, numericColumns = []) => {
   const chartType = plot?.chartType;
-  const xCount = toArray(plot?.xColumns).filter(Boolean).length;
-  const yCount = toArray(plot?.yColumns).filter(Boolean).length;
+  const xColumns = toArray(plot?.xColumns).filter(Boolean);
+  const xCount = xColumns.length;
+  const yColumns = toArray(plot?.yColumns).filter(Boolean);
+  const yCount = yColumns.length;
   const plotName = plot?.name || "this plot";
+  const numericColumnSet = new Set(numericColumns);
 
   if (!plot) return "Choose a plot before generating.";
-  if (chartType === "heatmap") return "";
+  if (chartType === "heatmap") {
+    const heatmapColumns = toArray(plot?.heatmapColumns).filter(Boolean);
+    const nonNumericHeatmapColumns = heatmapColumns.filter(
+      (column) => !numericColumnSet.has(column)
+    );
+
+    if (nonNumericHeatmapColumns.length) {
+      return `${plotName} heatmap needs numeric features. Remove: ${nonNumericHeatmapColumns.join(", ")}.`;
+    }
+
+    return heatmapColumns.length >= 2
+      ? ""
+      : `${plotName} heatmap needs at least two numeric features.`;
+  }
+
+  if (["line", "box"].includes(chartType) && plot.comparisonMode === "M:M") {
+    return `${plotName} ${chartType} chart supports 1:1 or 1:M. Choose one X axis and one or more numeric Y variables.`;
+  }
 
   if (plot.comparisonMode !== "M:M" && xCount > 1) {
     return `${plotName} has ${xCount} X variables selected. Use one X variable per plot, or create ${xCount} separate plots.`;
@@ -221,6 +293,20 @@ const validateVisualizationPlot = (plot) => {
 
   if (!multiSeriesCharts.includes(chartType)) {
     return "";
+  }
+
+  if (["line", "box"].includes(chartType)) {
+    const nonNumericYColumns = yColumns.filter(
+      (column) => !numericColumnSet.has(column)
+    );
+
+    if (nonNumericYColumns.length) {
+      return `${plotName} ${chartType} chart needs numeric Y variables. Remove: ${nonNumericYColumns.join(", ")}.`;
+    }
+  }
+
+  if (chartType === "box" && xColumns.some((column) => yColumns.includes(column))) {
+    return `${plotName} box chart needs different X and Y columns. Remove the X axis column from Y variables.`;
   }
 
   if (plot.comparisonMode === "1:M") {
@@ -244,6 +330,30 @@ const validateVisualizationPlot = (plot) => {
     : `${plotName} 1:1 needs exactly one X variable and one Y variable.`;
 };
 
+const getFriendlyVisualizationError = (message) => {
+  const text = String(message || "").trim();
+
+  if (!text) return "Could not create the visualization. Please check the selected fields and chart type.";
+
+  const lowerText = text.toLowerCase();
+  const backendErrorPatterns = [
+    "id_vars",
+    "traceback",
+    "keyerror",
+    "valueerror",
+    "indexerror",
+    "cannot contain duplicate columns",
+    "pandas",
+    "seaborn",
+  ];
+
+  if (backendErrorPatterns.some((pattern) => lowerText.includes(pattern))) {
+    return "Could not create the visualization. Please check that the X axis is not also selected as a Y variable, and that the selected Y variables are numeric.";
+  }
+
+  return text;
+};
+
 const createVisualizationPlot = (index, columns = [], numericColumns = []) => ({
   id: `plot-${index}`,
   name: `Plot ${index}`,
@@ -254,6 +364,7 @@ const createVisualizationPlot = (index, columns = [], numericColumns = []) => ({
   yColumn: numericColumns[0] || columns[1] || "",
   xColumns: columns[0] ? [columns[0]] : [],
   yColumns: numericColumns[0] ? [numericColumns[0]] : columns[1] ? [columns[1]] : [],
+  heatmapColumns: numericColumns.slice(0, 6),
   seriesColors: {},
   categoryColors: {},
   categoryColorColumn: "",
@@ -342,6 +453,7 @@ export default function DataAnalysisWorkspace({
   const [openAxisDropdown, setOpenAxisDropdown] = useState("");
   const activeColorInputRef = useRef(null);
   const visualizationNoticeRequestRef = useRef(0);
+  const visualizationProfileCacheRef = useRef({});
 
   const [cleaning, setCleaning] = useState({
     trimText: true,
@@ -384,7 +496,7 @@ export default function DataAnalysisWorkspace({
     const preview = dataset?.preview || [];
 
     return columns.filter((column) =>
-      preview.some((row) => Number.isFinite(Number(row[column])))
+      preview.some((row) => isNumericLikeValue(row[column]))
     );
   }, [columns, dataset]);
 
@@ -421,19 +533,46 @@ export default function DataAnalysisWorkspace({
     if (!columns.length) return;
 
     setVisualizationPlots((currentPlots) =>
-      currentPlots.map((plot) => ({
-        ...plot,
-        xColumn: plot.xColumn || columns[0] || "",
-        yColumn: plot.yColumn || numericColumns[0] || columns[1] || "",
-        xColumns: plot.xColumns?.length ? plot.xColumns : columns[0] ? [columns[0]] : [],
-        yColumns: plot.yColumns?.length
-          ? plot.yColumns
-          : numericColumns[0]
+      currentPlots.map((plot) => {
+        const fallbackYColumns = numericColumns[0]
           ? [numericColumns[0]]
           : columns[1]
           ? [columns[1]]
-          : [],
-      }))
+          : [];
+        const lineYColumns = toArray(plot.yColumns).filter((column) =>
+          numericColumns.includes(column)
+        );
+        const heatmapColumns = toArray(plot.heatmapColumns).filter((column) =>
+          numericColumns.includes(column)
+        );
+
+        return {
+          ...plot,
+          comparisonMode:
+            plot.chartType === "line" && plot.comparisonMode === "M:M"
+              ? "1:M"
+              : plot.comparisonMode,
+          xColumn: plot.xColumn || columns[0] || "",
+          yColumn:
+            plot.chartType === "line"
+              ? (lineYColumns[0] || numericColumns[0] || "")
+              : plot.yColumn || numericColumns[0] || columns[1] || "",
+          xColumns: plot.xColumns?.length ? plot.xColumns : columns[0] ? [columns[0]] : [],
+          yColumns:
+            plot.chartType === "line"
+              ? lineYColumns.length
+                ? lineYColumns
+                : numericColumns[0]
+                ? [numericColumns[0]]
+                : []
+              : plot.yColumns?.length
+              ? plot.yColumns
+              : fallbackYColumns,
+          heatmapColumns: heatmapColumns.length
+            ? heatmapColumns
+            : numericColumns.slice(0, 6),
+        };
+      })
     );
   }, [columns, numericColumns]);
 
@@ -554,7 +693,6 @@ export default function DataAnalysisWorkspace({
             <div>
               <span className="daw-kicker">PREVIEW</span>
               <h3>{visualizationPreview.title || "Generated visualization"}</h3>
-              <p>{visualizationPreview.label}</p>
             </div>
             <button
               type="button"
@@ -574,17 +712,6 @@ export default function DataAnalysisWorkspace({
           </div>
 
           <div className="daw-modal-actions">
-            {visualizationPreview.inspectUrl &&
-            visualizationPreview.inspectUrl !== visualizationPreview.url ? (
-              <a
-                className="daw-secondary"
-                href={visualizationPreview.inspectUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open inspector
-              </a>
-            ) : null}
             <button
               type="button"
               className="daw-primary"
@@ -692,15 +819,42 @@ export default function DataAnalysisWorkspace({
   const updateVisualizationPlotChartType = (plotId, chartType) => {
     setVisualizationPlots((currentPlots) =>
       currentPlots.map((plot) =>
-        plot.id === plotId
-          ? {
+        {
+          if (plot.id !== plotId) return plot;
+
+          if (chartType === "line") {
+            const nextYColumns = toArray(plot.yColumns).filter((column) =>
+              numericColumns.includes(column)
+            );
+            const fallbackYColumns = nextYColumns.length
+              ? nextYColumns
+              : numericColumns[0]
+              ? [numericColumns[0]]
+              : [];
+
+            return {
               ...plot,
               chartType,
-              comparisonMode: multiSeriesCharts.includes(chartType)
-                ? plot.comparisonMode
-                : "1:1",
-            }
-          : plot
+              comparisonMode: plot.comparisonMode === "1:M" ? "1:M" : "1:1",
+              yColumn: fallbackYColumns[0] || "",
+              yColumns: fallbackYColumns,
+            };
+          }
+
+          return {
+            ...plot,
+            chartType,
+            comparisonMode: multiSeriesCharts.includes(chartType)
+              ? plot.comparisonMode
+              : "1:1",
+            xLabel: axisLabelsDisabled(chartType) ? "" : plot.xLabel,
+            yLabel: axisLabelsDisabled(chartType) ? "" : plot.yLabel,
+            heatmapColumns:
+              chartType === "heatmap" && !toArray(plot.heatmapColumns).length
+                ? numericColumns.slice(0, 6)
+                : plot.heatmapColumns,
+          };
+        }
       )
     );
   };
@@ -779,6 +933,10 @@ export default function DataAnalysisWorkspace({
     onChange,
   }) => {
     const selected = toArray(selectedValues).filter(Boolean);
+    const menuOptions = [
+      ...selected.filter((value) => !options.includes(value)),
+      ...options,
+    ];
     const isOpen = openAxisDropdown === id;
     const summary = selected.length
       ? multiple
@@ -790,7 +948,7 @@ export default function DataAnalysisWorkspace({
 
     const toggleValue = (value) => {
       if (!multiple) {
-        onChange(value ? [value] : []);
+        onChange(selected.includes(value) ? [] : value ? [value] : []);
         setOpenAxisDropdown("");
         return;
       }
@@ -818,8 +976,9 @@ export default function DataAnalysisWorkspace({
 
         {isOpen ? (
           <div className="daw-multi-select-menu" role="listbox">
-            {options.map((option) => {
+            {menuOptions.map((option) => {
               const isSelected = selected.includes(option);
+              const isStaleSelection = isSelected && !options.includes(option);
               const selectedColor = colorMap[option];
 
               return (
@@ -834,12 +993,18 @@ export default function DataAnalysisWorkspace({
                   }
                   role="option"
                   aria-selected={isSelected}
+                  title={
+                    isStaleSelection
+                      ? "Selected earlier. Click to remove it."
+                      : option
+                  }
                   onClick={() => toggleValue(option)}
                 >
                   <span className="daw-multi-select-check">
                     {isSelected ? <Check size={13} /> : null}
                   </span>
                   <span>{option}</span>
+                  {isStaleSelection ? <small>Remove</small> : null}
                 </button>
               );
             })}
@@ -874,6 +1039,7 @@ export default function DataAnalysisWorkspace({
       labelFontSize,
       tickFontSize,
       legendFontSize,
+      heatmapColumns,
       width,
       height,
     } = plot || {};
@@ -924,13 +1090,16 @@ export default function DataAnalysisWorkspace({
 
     return cleanObject({
       chart_type: chartType,
-      orientation: chartType === "bar" ? barOrientation || "vertical" : "",
+      orientation: ["bar", "box", "violin"].includes(chartType)
+        ? barOrientation || "vertical"
+        : "",
       x: needsXColumn(chartType) ? nextX : "",
       y: needsYColumn(chartType) ? nextY : "",
       hue: supportsHueGrouping(chartType) ? hueColumn : "",
+      features: chartType === "heatmap" ? toArray(heatmapColumns).filter(Boolean) : [],
       title: `${fallbackTitle}${titleSuffix}`,
-      x_label: String(xLabel || "").trim(),
-      y_label: String(yLabel || "").trim(),
+      x_label: axisLabelsDisabled(chartType) ? "" : String(xLabel || "").trim(),
+      y_label: axisLabelsDisabled(chartType) ? "" : String(yLabel || "").trim(),
       palette: shouldUseSeriesPalette
         ? nextSeriesPalette
         : shouldUseSingleColor
@@ -948,9 +1117,7 @@ export default function DataAnalysisWorkspace({
       legend_font_size: Number(legendFontSize) || 10,
       figsize: [Number(width) || 10, Number(height) || 6],
       gradient:
-        categoryPalette.length > 1
-          ? false
-          : typeof useGradient === "boolean"
+        typeof useGradient === "boolean"
           ? useGradient
           : shouldUseTrendGradient(plot, nextX),
       save_path: `${String(header || name || "madar-visualization")
@@ -1003,6 +1170,23 @@ export default function DataAnalysisWorkspace({
     ];
   };
 
+  const getVisualizationProfileCacheKey = (plot) => {
+    const columnsToProfile = [
+      ...toArray(plot?.xColumns),
+      ...toArray(plot?.yColumns),
+      plot?.hueColumn,
+    ]
+      .filter(Boolean)
+      .map(String)
+      .sort();
+
+    return JSON.stringify({
+      inputPath: dataset?.file_path || "",
+      cleaningActions,
+      columns: Array.from(new Set(columnsToProfile)),
+    });
+  };
+
   const profileVisualizationColumns = async (plot) => {
     const columnsToProfile = [
       ...toArray(plot?.xColumns),
@@ -1011,6 +1195,12 @@ export default function DataAnalysisWorkspace({
     ].filter(Boolean);
 
     if (!columnsToProfile.length) return null;
+
+    const cacheKey = getVisualizationProfileCacheKey(plot);
+
+    if (visualizationProfileCacheRef.current[cacheKey]) {
+      return visualizationProfileCacheRef.current[cacheKey];
+    }
 
     const response = await apiFetch(userApiPath("/visualization/columns/profile"), {
       method: "POST",
@@ -1029,6 +1219,7 @@ export default function DataAnalysisWorkspace({
       throw new Error(data.detail || "Could not inspect selected columns.");
     }
 
+    visualizationProfileCacheRef.current[cacheKey] = data;
     return data;
   };
 
@@ -1450,7 +1641,7 @@ export default function DataAnalysisWorkspace({
       return;
     }
 
-    const validationMessage = validateVisualizationPlot(plot);
+    const validationMessage = validateVisualizationPlot(plot, numericColumns);
     if (validationMessage) {
       showVisualizationError(validationMessage);
       return;
@@ -1530,7 +1721,7 @@ export default function DataAnalysisWorkspace({
       setActiveVisualizationPlotId(plot.id);
       setCurrentStep("visualization");
     } catch (error) {
-      showVisualizationError(error.message);
+      showVisualizationError(getFriendlyVisualizationError(error.message));
     } finally {
       setIsLoading(false);
     }
@@ -1645,10 +1836,14 @@ export default function DataAnalysisWorkspace({
           <div className="daw-plot-editor-list">
             {visualizationPlots.map((plot, index) => {
               const chartType = plot.chartType;
+              const activeComparisonMode =
+                ["line", "box"].includes(chartType) && plot.comparisonMode === "M:M"
+                  ? "1:M"
+                  : plot.comparisonMode;
               const seriesCount = getSeriesCount(plot);
               const usesSeriesPalette =
                 multiSeriesCharts.includes(chartType) &&
-                ["1:M", "M:M"].includes(plot.comparisonMode);
+                ["1:M", "M:M"].includes(activeComparisonMode);
               const selectedChartLabel =
                 chartTypes.find((type) => type.id === chartType)?.label ||
                 "Chart";
@@ -1677,9 +1872,9 @@ export default function DataAnalysisWorkspace({
                       />
                     </Field>
 
-                    <Field label="Comparison">
+                    <Field label={chartType === "line" ? "Trend mode" : "Comparison"}>
                       <select
-                        value={plot.comparisonMode}
+                        value={activeComparisonMode}
                         disabled={!multiSeriesCharts.includes(chartType)}
                         onChange={(event) =>
                           updateVisualizationPlot(
@@ -1689,15 +1884,35 @@ export default function DataAnalysisWorkspace({
                           )
                         }
                       >
-                        <option value="1:1">1:1 comparison</option>
-                        <option value="1:M">1:M comparison</option>
-                        <option value="M:M">M:M comparison</option>
+                        {chartType === "line" ? (
+                          <>
+                            <option value="1:1">Single trend</option>
+                            <option value="1:M">Compare trends</option>
+                          </>
+                        ) : chartType === "box" ? (
+                          <>
+                            <option value="1:1">1:1 comparison</option>
+                            <option value="1:M">1:M comparison</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="1:1">1:1 comparison</option>
+                            <option value="1:M">1:M comparison</option>
+                            <option value="M:M">M:M comparison</option>
+                          </>
+                        )}
                       </select>
                     </Field>
 
                     <div className="daw-comparison-hint">
-                      <span>{plot.comparisonMode}</span>
-                      <p>{getComparisonHint(plot)}</p>
+                      <span>
+                        {chartType === "line" && activeComparisonMode === "1:1"
+                          ? "Single trend"
+                          : chartType === "line" && activeComparisonMode === "1:M"
+                          ? "Compare trends"
+                          : activeComparisonMode}
+                      </span>
+                      <p>{getComparisonHint({ ...plot, comparisonMode: activeComparisonMode })}</p>
                     </div>
 
                     <Field label="Plot type">
@@ -1718,8 +1933,8 @@ export default function DataAnalysisWorkspace({
                       </select>
                     </Field>
 
-                    {chartType === "bar" ? (
-                      <Field label="Bar direction">
+                    {["bar", "box", "violin"].includes(chartType) ? (
+                      <Field label="Chart direction">
                         <select
                           value={plot.barOrientation || "vertical"}
                           onChange={(event) =>
@@ -1730,8 +1945,8 @@ export default function DataAnalysisWorkspace({
                             )
                           }
                         >
-                          <option value="vertical">Vertical bars</option>
-                          <option value="horizontal">Horizontal bars</option>
+                          <option value="vertical">Vertical</option>
+                          <option value="horizontal">Horizontal</option>
                         </select>
                       </Field>
                     ) : null}
@@ -1777,12 +1992,30 @@ export default function DataAnalysisWorkspace({
                       </Field>
                     ) : null}
 
+                    {chartType === "heatmap" ? (
+                      <Field label="Features" wide>
+                        {renderColumnDropdown({
+                          id: `${plot.id}-heatmap-features`,
+                          options: numericColumns,
+                          selectedValues: toArray(plot.heatmapColumns),
+                          multiple: true,
+                          placeholder: "Select numeric features",
+                          onChange: (values) =>
+                            updateVisualizationColumns(
+                              plot.id,
+                              "heatmapColumns",
+                              values
+                            ),
+                        })}
+                      </Field>
+                    ) : null}
+
                     {needsXColumn(chartType) || needsYColumn(chartType) ? (
                       <div className="daw-axis-select-row">
                         {needsXColumn(chartType) ? (
                           <Field
                             label={
-                              plot.comparisonMode === "M:M" &&
+                              activeComparisonMode === "M:M" &&
                               multiSeriesCharts.includes(chartType)
                                 ? "X variables"
                                 : chartType === "pie"
@@ -1792,7 +2025,8 @@ export default function DataAnalysisWorkspace({
                           >
                             {(() => {
                               const multiple =
-                                plot.comparisonMode === "M:M" &&
+                                chartType !== "line" &&
+                                activeComparisonMode === "M:M" &&
                                 multiSeriesCharts.includes(chartType);
                               const selectedValues = toArray(plot.xColumns);
 
@@ -1818,20 +2052,23 @@ export default function DataAnalysisWorkspace({
                         {needsYColumn(chartType) ? (
                           <Field
                             label={
-                              (plot.comparisonMode === "1:M" ||
-                                plot.comparisonMode === "M:M") &&
+                              (activeComparisonMode === "1:M" ||
+                                activeComparisonMode === "M:M") &&
                               multiSeriesCharts.includes(chartType)
-                                ? "Y variables"
+                                ? chartType === "line"
+                                  ? "Trend values"
+                                  : "Y variables"
                                 : chartType === "pie"
                                 ? "Value column"
                                 : "Y axis"
                             }
                           >
                             {(() => {
-                              const yOptions = columns;
+                              const yOptions =
+                                ["line", "box"].includes(chartType) ? numericColumns : columns;
                               const multiple =
-                                (plot.comparisonMode === "1:M" ||
-                                  plot.comparisonMode === "M:M") &&
+                                (activeComparisonMode === "1:M" ||
+                                  activeComparisonMode === "M:M") &&
                                 multiSeriesCharts.includes(chartType);
                               const selectedValues = toArray(plot.yColumns);
                               const selectedColors = getPalettePreview(
@@ -1879,7 +2116,8 @@ export default function DataAnalysisWorkspace({
 
                     <Field label="X label">
                       <input
-                        value={plot.xLabel}
+                        value={axisLabelsDisabled(chartType) ? "" : plot.xLabel}
+                        disabled={axisLabelsDisabled(chartType)}
                         onChange={(event) =>
                           updateVisualizationPlot(plot.id, "xLabel", event.target.value)
                         }
@@ -1888,12 +2126,19 @@ export default function DataAnalysisWorkspace({
 
                     <Field label="Y label">
                       <input
-                        value={plot.yLabel}
+                        value={axisLabelsDisabled(chartType) ? "" : plot.yLabel}
+                        disabled={axisLabelsDisabled(chartType)}
                         onChange={(event) =>
                           updateVisualizationPlot(plot.id, "yLabel", event.target.value)
                         }
                       />
                     </Field>
+
+                    {axisLabelsDisabled(chartType) ? (
+                      <p className="daw-field-note">
+                        Axis labels are disabled for pie charts and heatmaps.
+                      </p>
+                    ) : null}
 
                     <Field label="Palette">
                       <select
@@ -1911,8 +2156,7 @@ export default function DataAnalysisWorkspace({
                       </select>
                     </Field>
 
-                    {["bar", "line", "scatter", "histogram"].includes(chartType) ? (
-                    <Field label="Trend gradient">
+                    <Field label="Gradient">
                       <label className="daw-color-mode-toggle daw-gradient-toggle">
                         <input
                           type="checkbox"
@@ -1932,10 +2176,9 @@ export default function DataAnalysisWorkspace({
                         <span>Use gradient</span>
                       </label>
                       <small>
-                        Adds gradient emphasis for time-based trends, lines, and ranking bars.
+                        Uses the selected palette or category colors as a gradient for this plot.
                       </small>
                     </Field>
-                    ) : null}
 
                     {usesSeriesPalette ? (
                       <Field label="Variable colors" wide>
@@ -1996,20 +2239,17 @@ export default function DataAnalysisWorkspace({
                                   !plot.hueColumn &&
                                   !plot.useGradient)
                               }
-                              disabled={
-                                chartType === "histogram" &&
-                                !plot.hueColumn &&
-                                Boolean(plot.useGradient)
-                              }
                               onChange={(event) => {
                                 const nextPlot = {
                                   ...plot,
                                   useSingleColor: event.target.checked,
                                 };
-                                updateVisualizationPlot(
-                                  plot.id,
-                                  "useSingleColor",
-                                  event.target.checked
+                                setVisualizationPlots((currentPlots) =>
+                                  currentPlots.map((currentPlot) =>
+                                    currentPlot.id === plot.id
+                                      ? nextPlot
+                                      : currentPlot
+                                  )
                                 );
                                 refreshVisualizationSelectionNotice(
                                   nextPlot,
@@ -2026,7 +2266,16 @@ export default function DataAnalysisWorkspace({
                               activeColorInputRef.current = event.currentTarget;
                               setOpenAxisDropdown("");
                               if (!plot.useSingleColor) {
-                                updateVisualizationPlot(plot.id, "useSingleColor", true);
+                                setVisualizationPlots((currentPlots) =>
+                                  currentPlots.map((currentPlot) =>
+                                    currentPlot.id === plot.id
+                                      ? {
+                                          ...currentPlot,
+                                          useSingleColor: true,
+                                        }
+                                      : currentPlot
+                                  )
+                                );
                               }
                             }}
                             onBlur={() => {
@@ -2034,11 +2283,6 @@ export default function DataAnalysisWorkspace({
                             }}
                             onChange={(event) => {
                               const nextColor = event.target.value;
-                              const nextPlot = {
-                                ...plot,
-                                color: nextColor,
-                                useSingleColor: true,
-                              };
                               setVisualizationPlots((currentPlots) =>
                                 currentPlots.map((currentPlot) =>
                                   currentPlot.id === plot.id
@@ -2049,10 +2293,6 @@ export default function DataAnalysisWorkspace({
                                       }
                                     : currentPlot
                                 )
-                              );
-                              refreshVisualizationSelectionNotice(
-                                nextPlot,
-                                "useSingleColor"
                               );
                             }}
                           />
