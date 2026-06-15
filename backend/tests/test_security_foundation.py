@@ -72,6 +72,11 @@ class SecurityFoundationTests(unittest.TestCase):
             delete_auth_cookies(response)
             return {"ok": True}
 
+        @app.post("/auth/log_out")
+        def log_out(response: Response):
+            delete_auth_cookies(response)
+            return {"message": "Logged out successfully"}
+
         return TestClient(app)
 
     def build_csrf_request_parts(self):
@@ -213,6 +218,51 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertTrue(
             any(header.startswith(f"{CSRF_COOKIE_NAME}=") for header in set_cookie_headers)
         )
+
+    def test_logout_route_is_csrf_exempt_with_auth_cookies_and_missing_header(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/auth/log_out",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+                CSRF_COOKIE_NAME: "stale-token",
+            },
+        )
+        set_cookie_headers = response.headers.get_list("set-cookie")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Logged out successfully"})
+        self.assertTrue(
+            any(header.startswith("madar_access_token=") for header in set_cookie_headers)
+        )
+        self.assertTrue(
+            any(header.startswith("madar_refresh_token=") for header in set_cookie_headers)
+        )
+        self.assertTrue(
+            any(header.startswith(f"{CSRF_COOKIE_NAME}=") for header in set_cookie_headers)
+        )
+
+    def test_logout_route_is_csrf_exempt_with_auth_cookies_and_invalid_header(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/auth/log_out",
+            headers={
+                "Origin": "https://app.example.com",
+                CSRF_HEADER_NAME: "bad-token",
+            },
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+                CSRF_COOKIE_NAME: "stale-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Logged out successfully"})
 
     def build_rate_limit_request(self, host="198.51.100.10", headers=None):
         return SimpleNamespace(
