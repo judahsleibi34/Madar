@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from classes import WebsiteSettingsUpdate
 from services.audit_service import record_audit_event
-from services.auth_service import require_regular_user, require_regular_user_id
+from services.tenant_service import require_active_tenant_member
 from services.url_validation import validate_public_url
 from services.website_settings_service import get_settings_for_tenant, ensure_settings_for_tenant, save_settings_for_tenant
 
@@ -120,23 +120,18 @@ def validate_description(value: str):
     return clean_value
 
 
-def get_website_user_context(request: Request, response: Response):
+def get_website_tenant_context(request: Request, response: Response):
+    context = require_active_tenant_member(request, response)
     path_user_id = request.path_params.get("user_id")
 
-    if path_user_id is None:
-        return require_regular_user(request, response)
+    if path_user_id is not None:
+        try:
+            if int(context.user_id) != int(path_user_id):
+                raise ValueError
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=403, detail="User id does not match session")
 
-    return require_regular_user_id(path_user_id, request, response)
-
-
-def get_tenant_context(user_data):
-    user_id = user_data["id"]
-    tenant_id = user_data.get("tenant_id")
-
-    if tenant_id is None:
-        raise HTTPException(status_code=403, detail="User does not belong to a tenant")
-
-    return tenant_id, user_id
+    return context
 
 
 def build_settings_update_payload(settings: WebsiteSettingsUpdate):
@@ -179,7 +174,7 @@ def update_website_settings(
     user_id: int | None = None,
 ):
     try:
-        _, user_data = get_website_user_context(request, response)
+        context = get_website_tenant_context(request, response)
         update_payload = build_settings_update_payload(settings)
 
         if not update_payload:
@@ -189,7 +184,8 @@ def update_website_settings(
                 "website": None,
             }
 
-        tenant_id, authenticated_user_id = get_tenant_context(user_data)
+        tenant_id = context.tenant_id
+        authenticated_user_id = context.user_id
         existing_website = get_settings_for_tenant(tenant_id, authenticated_user_id)
 
         updated_website = save_settings_for_tenant(
@@ -247,8 +243,9 @@ def get_website_settings(
     user_id: int | None = None,
 ):
     try:
-        _, user_data = get_website_user_context(request, response)
-        tenant_id, authenticated_user_id = get_tenant_context(user_data)
+        context = get_website_tenant_context(request, response)
+        tenant_id = context.tenant_id
+        authenticated_user_id = context.user_id
 
         website = ensure_settings_for_tenant(tenant_id, authenticated_user_id)
 
