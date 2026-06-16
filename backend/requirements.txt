@@ -71,3 +71,4 @@ scipy
 scikit-learn
 statsmodels
 openpyxl
+psycopg[binary]==3.2.3
