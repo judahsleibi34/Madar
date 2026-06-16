@@ -4,28 +4,57 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from classes import BillingCheckoutRequest, BillingWebhookUpdateRequest
-from services.auth_service import require_regular_user, require_regular_user_id
+from services.audit_service import record_audit_event
+from services.tenant_service import TenantContext, require_active_tenant_member
 from services.billing_service import apply_pending_checkout_selection, apply_verified_billing_update
 
 
 router = APIRouter(tags=["Billing"])
 
 
+def assert_context_user(context: TenantContext, user_id: int | str | None) -> None:
+    if user_id is None:
+        return
+
+    try:
+        if int(context.user_id) != int(user_id):
+            raise ValueError
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=403, detail="User id does not match session")
+
+
 def build_checkout_response(
     checkout: BillingCheckoutRequest,
-    user_data: dict,
+    context: TenantContext,
+    request: Request | None = None,
 ):
-    tenant_id = user_data.get("tenant_id")
-
-    if tenant_id is None:
-        raise HTTPException(status_code=400, detail="User does not have a tenant_id.")
+    tenant_id = context.tenant_id
+    user_id = context.user_id
 
     feature = apply_pending_checkout_selection(
         tenant_id=tenant_id,
         subscription_type=checkout.subscription_type,
         plan=checkout.plan,
         builder_type=checkout.builder_type,
-        updated_by_user_id=user_data.get("id"),
+        updated_by_user_id=user_id,
+    )
+
+    record_audit_event(
+        request=request,
+        tenant_id=feature.get("tenant_id", tenant_id),
+        actor_user_id=user_id,
+        action="billing.checkout_selected",
+        target_type="billing_selection",
+        target_id=feature.get("id") or tenant_id,
+        metadata={
+            "plan_type": feature.get("subscription_type"),
+            "subscription_type": feature.get("subscription_type"),
+            "plan": feature.get("plan"),
+            "builder_type": feature.get("builder_type"),
+            "selected_features": [feature.get("builder_type")] if feature.get("builder_type") else [feature.get("subscription_type")],
+            "payment_status": feature.get("payment_status"),
+            "source": "checkout",
+        },
     )
 
     return {
@@ -49,8 +78,8 @@ def create_canonical_checkout(
     request: Request,
     response: Response,
 ):
-    _, user_data = require_regular_user(request, response)
-    return build_checkout_response(checkout, user_data)
+    context = require_active_tenant_member(request, response)
+    return build_checkout_response(checkout, context, request=request)
 
 
 @router.post("/users/{user_id}/billing/checkout")
@@ -60,8 +89,9 @@ def create_checkout(
     request: Request,
     response: Response,
 ):
-    _, user_data = require_regular_user_id(user_id, request, response)
-    return build_checkout_response(checkout, user_data)
+    context = require_active_tenant_member(request, response)
+    assert_context_user(context, user_id)
+    return build_checkout_response(checkout, context, request=request)
 
 
 @router.post("/billing/webhook")

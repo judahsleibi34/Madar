@@ -104,7 +104,8 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  builder_routes,
                  "require_public_subdomain",
                  return_value={"subdomain": "tenant-site", "tenant_id": 1},
-             ):
+             ), \
+             patch.object(builder_routes, "record_audit_event"):
             response = client.post("/builder/projects/project-1/publish")
 
         self.assertEqual(response.status_code, 200)
@@ -131,7 +132,8 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  builder_routes,
                  "require_public_subdomain",
                  return_value={"subdomain": "tenant-site", "tenant_id": 1},
-             ):
+             ), \
+             patch.object(builder_routes, "record_audit_event"):
             response = client.post("/builder/projects/project-1/publish", json={})
 
         self.assertEqual(response.status_code, 200)
@@ -352,6 +354,122 @@ class BuilderBackendHardeningTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("draft_schema", response.json()["detail"])
 
+    def test_successful_publish_records_audit_event(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "name": "Landing Page",
+                     "slug": "landing-page",
+                     "draft_schema": {"pages": []},
+                     "published_version": 0,
+                 },
+             ), \
+             patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
+             ), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
+            response = client.post("/builder/projects/project-1/publish")
+
+        self.assertEqual(response.status_code, 200)
+        record_audit.assert_called_once()
+        audit_kwargs = record_audit.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 1)
+        self.assertEqual(audit_kwargs["actor_user_id"], 2)
+        self.assertEqual(audit_kwargs["action"], "builder.project_published")
+        self.assertEqual(audit_kwargs["target_type"], "builder_project")
+        self.assertEqual(audit_kwargs["target_id"], "project-1")
+        self.assertEqual(audit_kwargs["metadata"]["project_slug"], "landing-page")
+        self.assertEqual(audit_kwargs["metadata"]["project_name"], "Landing Page")
+        self.assertEqual(audit_kwargs["metadata"]["published_version"], 1)
+
+    def test_failed_publish_does_not_record_success_audit_event(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "draft_schema": builder_schema_with_element(
+                         {"id": "element-1", "type": "image", "content": "javascript:alert(1)"}
+                     ),
+                     "published_version": 0,
+                 },
+             ), \
+             patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
+             ), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
+            response = client.post("/builder/projects/project-1/publish")
+
+        self.assertEqual(response.status_code, 400)
+        record_audit.assert_not_called()
+
+    def test_successful_archive_records_audit_event(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_admin_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "name": "Landing Page",
+                     "slug": "landing-page",
+                     "status": "published",
+                 },
+             ), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
+            response = client.delete("/builder/projects/project-1")
+
+        self.assertEqual(response.status_code, 200)
+        record_audit.assert_called_once()
+        audit_kwargs = record_audit.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 1)
+        self.assertEqual(audit_kwargs["actor_user_id"], 2)
+        self.assertEqual(audit_kwargs["action"], "builder.project_archived")
+        self.assertEqual(audit_kwargs["target_type"], "builder_project")
+        self.assertEqual(audit_kwargs["target_id"], "project-1")
+        self.assertEqual(audit_kwargs["metadata"]["project_slug"], "landing-page")
+        self.assertEqual(audit_kwargs["metadata"]["project_name"], "Landing Page")
+        self.assertEqual(audit_kwargs["metadata"]["status"], "archived")
+
+    def test_failed_archive_does_not_record_success_audit_event(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_admin_access", return_value=fake_context()), \
+             patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 side_effect=HTTPException(status_code=404, detail="Builder project not found"),
+             ), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
+            response = client.delete("/builder/projects/project-1")
+
+        self.assertEqual(response.status_code, 404)
+        record_audit.assert_not_called()
+
     def test_member_cannot_archive_project(self):
         with patch(
             "services.tenant_service.get_current_tenant_context",
@@ -397,7 +515,8 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                  builder_routes,
                  "require_public_subdomain",
                  return_value={"subdomain": "tenant-site", "tenant_id": 1},
-             ):
+             ), \
+             patch.object(builder_routes, "record_audit_event"):
             response = client.post("/users/2/builder/projects/project-1/publish")
 
         self.assertEqual(response.status_code, 200)

@@ -72,6 +72,11 @@ class SecurityFoundationTests(unittest.TestCase):
             delete_auth_cookies(response)
             return {"ok": True}
 
+        @app.post("/auth/log_out")
+        def log_out(response: Response):
+            delete_auth_cookies(response)
+            return {"message": "Logged out successfully"}
+
         return TestClient(app)
 
     def build_csrf_request_parts(self):
@@ -214,6 +219,51 @@ class SecurityFoundationTests(unittest.TestCase):
             any(header.startswith(f"{CSRF_COOKIE_NAME}=") for header in set_cookie_headers)
         )
 
+    def test_logout_route_is_csrf_exempt_with_auth_cookies_and_missing_header(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/auth/log_out",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+                CSRF_COOKIE_NAME: "stale-token",
+            },
+        )
+        set_cookie_headers = response.headers.get_list("set-cookie")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Logged out successfully"})
+        self.assertTrue(
+            any(header.startswith("madar_access_token=") for header in set_cookie_headers)
+        )
+        self.assertTrue(
+            any(header.startswith("madar_refresh_token=") for header in set_cookie_headers)
+        )
+        self.assertTrue(
+            any(header.startswith(f"{CSRF_COOKIE_NAME}=") for header in set_cookie_headers)
+        )
+
+    def test_logout_route_is_csrf_exempt_with_auth_cookies_and_invalid_header(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/auth/log_out",
+            headers={
+                "Origin": "https://app.example.com",
+                CSRF_HEADER_NAME: "bad-token",
+            },
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+                CSRF_COOKIE_NAME: "stale-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Logged out successfully"})
+
     def build_rate_limit_request(self, host="198.51.100.10", headers=None):
         return SimpleNamespace(
             headers=headers or {},
@@ -347,6 +397,26 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertIn("auth.uid()", website_settings_sql)
         self.assertIn("where u.id = website_settings.user_id", website_settings_sql)
 
+
+
+    def test_audit_logs_migration_is_backend_only(self):
+        migrations_dir = self.get_migrations_dir()
+        audit_sql = (migrations_dir / "028_create_audit_logs.sql").read_text().lower()
+
+        self.assertIn("create table if not exists public.audit_logs", audit_sql)
+        self.assertIn("tenant_id integer references public.tenants", audit_sql)
+        self.assertIn("actor_user_id integer references public.users", audit_sql)
+        self.assertIn("metadata jsonb not null default '{}'::jsonb", audit_sql)
+        self.assertIn("alter table public.audit_logs enable row level security", audit_sql)
+        self.assertIn("revoke all on table public.audit_logs from anon", audit_sql)
+        self.assertIn("revoke all on table public.audit_logs from authenticated", audit_sql)
+        self.assertIn("to service_role", audit_sql)
+        self.assertNotIn("to anon", audit_sql.split("revoke", 1)[0])
+        self.assertNotIn("create policy", audit_sql)
+        self.assertIn("audit_logs_tenant_created_idx", audit_sql)
+        self.assertIn("audit_logs_actor_created_idx", audit_sql)
+        self.assertIn("audit_logs_action_created_idx", audit_sql)
+        self.assertIn("audit_logs_target_idx", audit_sql)
 
     def test_features_rls_migration_is_tenant_scoped_and_read_only(self):
         migrations_dir = self.get_migrations_dir()

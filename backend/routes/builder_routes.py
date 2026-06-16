@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from postgrest.exceptions import APIError
 
 from database import service_supabase
+from services.audit_service import record_audit_event
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
 from services.website_settings_service import require_public_subdomain
 from services.url_validation import validate_builder_schema_urls
@@ -287,6 +288,21 @@ async def upload_builder_asset(
 
     asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
 
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.asset_uploaded",
+        target_type="builder_asset",
+        target_id=filename,
+        metadata={
+            "asset_url": asset_url,
+            "content_type": detected_content_type,
+            "size_bytes": len(content),
+            "extension": extension,
+        },
+    )
+
     return {
         "success": True,
         "asset_url": asset_url,
@@ -429,7 +445,7 @@ def update_builder_project(
 @router.delete("/builder/projects/{project_id}")
 def archive_builder_project(project_id: str, request: Request, response: Response):
     context = require_builder_context(request, response, require_builder_admin_access)
-    get_project_for_tenant(project_id, context.tenant_id)
+    project = get_project_for_tenant(project_id, context.tenant_id)
 
     archive_response = (
         service_supabase.table("builder_projects")
@@ -438,10 +454,25 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
         .eq("tenant_id", context.tenant_id)
         .execute()
     )
+    archived_project = first_row(archive_response)
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.project_archived",
+        target_type="builder_project",
+        target_id=project_id,
+        metadata={
+            "project_slug": project.get("slug"),
+            "project_name": project.get("name"),
+            "status": archived_project.get("status"),
+        },
+    )
 
     return {
         "success": True,
-        "project": first_row(archive_response),
+        "project": archived_project,
     }
 
 
@@ -540,6 +571,23 @@ def update_builder_form_submission_status(
 
     status = normalize_submission_status(submission_update.status)
 
+    existing_submission_response = (
+        service_supabase.table("builder_form_submissions")
+        .select("id, tenant_id, project_id, form_id, status")
+        .eq("tenant_id", context.tenant_id)
+        .eq("project_id", project_id)
+        .eq("id", submission_id)
+        .limit(1)
+        .execute()
+    )
+    existing_submission_rows = getattr(existing_submission_response, "data", None) or []
+    existing_submission = existing_submission_rows[0] if existing_submission_rows else None
+
+    if not existing_submission:
+        raise HTTPException(status_code=404, detail="Form submission not found")
+
+    old_status = str(existing_submission.get("status") or "new").strip().lower()
+
     try:
         update_response = (
             service_supabase.table("builder_form_submissions")
@@ -567,6 +615,21 @@ def update_builder_form_submission_status(
 
     if not submission:
         raise HTTPException(status_code=404, detail="Form submission not found")
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.form_submission_status_updated",
+        target_type="builder_form_submission",
+        target_id=submission_id,
+        metadata={
+            "project_id": project_id,
+            "form_id": submission.get("form_id") or existing_submission.get("form_id"),
+            "old_status": format_submission_status(old_status),
+            "new_status": format_submission_status(submission.get("status")),
+        },
+    )
 
     return {
         "success": True,
@@ -600,15 +663,29 @@ def publish_builder_project(
         .eq("tenant_id", context.tenant_id)
         .execute()
     )
+    published_project = first_row(publish_response)
 
     logger.info(
         "builder.project_published",
         extra={"tenant_id": context.tenant_id, "user_id": context.user_id, "project_id": project_id},
     )
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.project_published",
+        target_type="builder_project",
+        target_id=project_id,
+        metadata={
+            "project_slug": project.get("slug"),
+            "project_name": project.get("name"),
+            "published_version": published_project.get("published_version"),
+        },
+    )
 
     return {
         "success": True,
-        "project": first_row(publish_response),
+        "project": published_project,
         "site": {
             "subdomain": website_settings.get("subdomain"),
             "tenant_id": website_settings.get("tenant_id"),

@@ -1,10 +1,11 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from routes import billing_routes
+from routes import admin_billing_routes, billing_routes
 from services import billing_service
 
 
@@ -12,6 +13,10 @@ def build_client():
     app = FastAPI()
     app.include_router(billing_routes.router)
     return TestClient(app)
+
+
+def fake_tenant_context(tenant_id=7, user_id=3):
+    return SimpleNamespace(tenant_id=tenant_id, user_id=user_id)
 
 
 class BillingRoutesTests(unittest.TestCase):
@@ -44,13 +49,19 @@ class BillingRoutesTests(unittest.TestCase):
 
         with patch.object(
             billing_routes,
-            "require_regular_user",
-            return_value=(object(), user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
         ), patch.object(
             billing_routes,
             "apply_pending_checkout_selection",
             return_value=feature,
-        ) as apply_update:
+        ) as apply_update, patch.object(
+            billing_routes,
+            "record_audit_event",
+        ):
             response = client.post(
                 "/billing/checkout",
                 json={
@@ -98,13 +109,19 @@ class BillingRoutesTests(unittest.TestCase):
 
         with patch.object(
             billing_routes,
-            "require_regular_user",
-            return_value=(object(), user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
         ), patch.object(
             billing_routes,
             "apply_pending_checkout_selection",
             return_value=feature,
-        ) as apply_update:
+        ) as apply_update, patch.object(
+            billing_routes,
+            "record_audit_event",
+        ):
             response = client.post(
                 "/billing/checkout",
                 json={
@@ -125,6 +142,118 @@ class BillingRoutesTests(unittest.TestCase):
         self.assertIsNone(response.json()["checkout"]["builder_type"])
         self.assertEqual(response.json()["checkout"]["payment_status"], "pending")
 
+    def test_canonical_checkout_rejects_membership_mismatch_before_persisting(self):
+        client = build_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+
+        with patch.object(
+            billing_routes,
+            "require_active_tenant_member",
+            side_effect=billing_routes.HTTPException(
+                status_code=403,
+                detail="Active tenant membership required",
+            ),
+        ), patch.object(
+            billing_routes,
+            "apply_pending_checkout_selection",
+        ) as apply_update, patch.object(
+            billing_routes,
+            "record_audit_event",
+        ) as record_audit:
+            response = client.post(
+                "/billing/checkout",
+                json={
+                    "subscription_type": "individual_builder",
+                    "plan": "basic",
+                    "builder_type": "website",
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        apply_update.assert_not_called()
+        record_audit.assert_not_called()
+
+    def test_canonical_checkout_rejects_inactive_membership_before_persisting(self):
+        client = build_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+
+        with patch.object(
+            billing_routes,
+            "require_active_tenant_member",
+            side_effect=billing_routes.HTTPException(
+                status_code=403,
+                detail="Active tenant membership required",
+            ),
+        ), patch.object(
+            billing_routes,
+            "apply_pending_checkout_selection",
+        ) as apply_update, patch.object(
+            billing_routes,
+            "record_audit_event",
+        ) as record_audit:
+            response = client.post(
+                "/billing/checkout",
+                json={
+                    "subscription_type": "full_platform",
+                    "plan": "pro",
+                    "builder_type": None,
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        apply_update.assert_not_called()
+        record_audit.assert_not_called()
+
+    def test_canonical_checkout_ignores_client_supplied_protected_fields(self):
+        client = build_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+        feature = {
+            "id": 12,
+            "tenant_id": 7,
+            "subscription_type": "full_platform",
+            "plan": "pro",
+            "builder_type": None,
+            "payment_status": "pending",
+        }
+
+        with patch.object(
+            billing_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
+        ), patch.object(
+            billing_routes,
+            "apply_pending_checkout_selection",
+            return_value=feature,
+        ) as apply_update, patch.object(
+            billing_routes,
+            "record_audit_event",
+        ):
+            response = client.post(
+                "/billing/checkout",
+                json={
+                    "tenant_id": 99,
+                    "payment_status": "active",
+                    "billing_status": "active",
+                    "user_type": "admin",
+                    "subscription_type": "full_platform",
+                    "plan": "pro",
+                    "builder_type": None,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        apply_update.assert_called_once_with(
+            tenant_id=7,
+            subscription_type="full_platform",
+            plan="pro",
+            builder_type=None,
+            updated_by_user_id=3,
+        )
+        self.assertEqual(response.json()["checkout"]["payment_status"], "pending")
+
     def test_user_scoped_checkout_still_persists_pending_feature(self):
         client = build_client()
         user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
@@ -139,13 +268,19 @@ class BillingRoutesTests(unittest.TestCase):
 
         with patch.object(
             billing_routes,
-            "require_regular_user_id",
-            return_value=(object(), user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
         ) as require_user_id, patch.object(
             billing_routes,
             "apply_pending_checkout_selection",
             return_value=feature,
-        ) as apply_update:
+        ) as apply_update, patch.object(
+            billing_routes,
+            "record_audit_event",
+        ):
             response = client.post(
                 "/users/3/billing/checkout",
                 json={
@@ -157,7 +292,6 @@ class BillingRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         require_user_id.assert_called_once()
-        self.assertEqual(require_user_id.call_args.args[0], 3)
         apply_update.assert_called_once_with(
             tenant_id=7,
             subscription_type="full_platform",
@@ -172,11 +306,8 @@ class BillingRoutesTests(unittest.TestCase):
 
         with patch.object(
             billing_routes,
-            "require_regular_user_id",
-            side_effect=billing_routes.HTTPException(
-                status_code=403,
-                detail="User id does not match session",
-            ),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(tenant_id=7, user_id=3),
         ), patch.object(
             billing_routes,
             "apply_pending_checkout_selection",
@@ -194,6 +325,86 @@ class BillingRoutesTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "User id does not match session")
         apply_update.assert_not_called()
 
+
+    def test_successful_checkout_records_pending_audit(self):
+        client = build_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+        feature = {
+            "id": 11,
+            "tenant_id": 7,
+            "subscription_type": "individual_builder",
+            "plan": "basic",
+            "builder_type": "website",
+            "payment_status": "pending",
+        }
+
+        with patch.object(
+            billing_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
+        ), patch.object(
+            billing_routes,
+            "apply_pending_checkout_selection",
+            return_value=feature,
+        ), patch.object(billing_routes, "record_audit_event") as record_audit:
+            response = client.post(
+                "/billing/checkout",
+                json={
+                    "subscription_type": "individual_builder",
+                    "plan": "basic",
+                    "builder_type": "website",
+                    "token": "not-accepted-by-schema",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        record_audit.assert_called_once()
+        audit_kwargs = record_audit.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 7)
+        self.assertEqual(audit_kwargs["actor_user_id"], 3)
+        self.assertEqual(audit_kwargs["action"], "billing.checkout_selected")
+        self.assertEqual(audit_kwargs["target_type"], "billing_selection")
+        self.assertEqual(audit_kwargs["target_id"], 11)
+        self.assertEqual(
+            audit_kwargs["metadata"],
+            {
+                "plan_type": "individual_builder",
+                "subscription_type": "individual_builder",
+                "plan": "basic",
+                "builder_type": "website",
+                "selected_features": ["website"],
+                "payment_status": "pending",
+                "source": "checkout",
+            },
+        )
+        self.assertNotIn("active", audit_kwargs["metadata"].values())
+        self.assertNotIn("token", str(audit_kwargs["metadata"]).lower())
+        self.assertNotIn("cookie", str(audit_kwargs["metadata"]).lower())
+        self.assertNotIn("raw_body", str(audit_kwargs["metadata"]).lower())
+
+    def test_failed_checkout_does_not_record_audit(self):
+        client = build_client()
+
+        with patch.object(
+            billing_routes,
+            "require_active_tenant_member",
+            side_effect=billing_routes.HTTPException(status_code=401, detail="Not logged in"),
+        ), patch.object(billing_routes, "record_audit_event") as record_audit:
+            response = client.post(
+                "/billing/checkout",
+                json={
+                    "subscription_type": "full_platform",
+                    "plan": "pro",
+                    "builder_type": None,
+                },
+            )
+
+        self.assertEqual(response.status_code, 401)
+        record_audit.assert_not_called()
+
     def test_feature_type_route_is_not_restored(self):
         client = build_client()
 
@@ -207,6 +418,101 @@ class BillingRoutesTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+def build_admin_billing_client():
+    app = FastAPI()
+    app.include_router(admin_billing_routes.router)
+    return TestClient(app)
+
+
+class AdminBillingRoutesTests(unittest.TestCase):
+    def test_successful_admin_billing_update_records_audit(self):
+        client = build_admin_billing_client()
+        admin_user = {"id": 1, "tenant_id": 99, "user_type": "admin"}
+        feature = {
+            "id": 45,
+            "tenant_id": 7,
+            "subscription_type": "full_platform",
+            "plan": "business",
+            "builder_type": None,
+            "payment_status": "active",
+        }
+
+        with patch.object(
+            admin_billing_routes,
+            "require_system_admin",
+            return_value=(object(), admin_user),
+        ), patch.object(
+            admin_billing_routes,
+            "apply_verified_billing_update",
+            return_value=feature,
+        ) as apply_update, patch.object(admin_billing_routes, "record_audit_event") as record_audit:
+            response = client.post(
+                "/admin/billing/features",
+                json={
+                    "tenant_id": 7,
+                    "subscription_type": "full_platform",
+                    "plan": "business",
+                    "builder_type": None,
+                    "payment_status": "active",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        apply_update.assert_called_once_with(
+            tenant_id=7,
+            subscription_type="full_platform",
+            plan="business",
+            builder_type=None,
+            payment_status="active",
+            source="admin",
+            updated_by_user_id=1,
+        )
+        record_audit.assert_called_once()
+        audit_kwargs = record_audit.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 7)
+        self.assertEqual(audit_kwargs["actor_user_id"], 1)
+        self.assertEqual(audit_kwargs["action"], "admin.billing_feature_updated")
+        self.assertEqual(audit_kwargs["target_type"], "billing_feature")
+        self.assertEqual(audit_kwargs["target_id"], 45)
+        self.assertEqual(
+            audit_kwargs["metadata"],
+            {
+                "plan_type": "full_platform",
+                "subscription_type": "full_platform",
+                "plan": "business",
+                "builder_type": None,
+                "payment_status": "active",
+                "source": "admin",
+            },
+        )
+        self.assertNotIn("token", str(audit_kwargs["metadata"]).lower())
+        self.assertNotIn("cookie", str(audit_kwargs["metadata"]).lower())
+        self.assertNotIn("raw_body", str(audit_kwargs["metadata"]).lower())
+        self.assertNotIn("secret", str(audit_kwargs["metadata"]).lower())
+
+    def test_unauthorized_admin_billing_update_does_not_record_audit(self):
+        client = build_admin_billing_client()
+
+        with patch.object(
+            admin_billing_routes,
+            "require_system_admin",
+            side_effect=HTTPException(status_code=403, detail="Admin access required"),
+        ), patch.object(admin_billing_routes, "record_audit_event") as record_audit:
+            response = client.post(
+                "/admin/billing/features",
+                json={
+                    "tenant_id": 7,
+                    "subscription_type": "full_platform",
+                    "plan": "business",
+                    "builder_type": None,
+                    "payment_status": "active",
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        record_audit.assert_not_called()
 
 
 class FakeBillingExecuteResult:

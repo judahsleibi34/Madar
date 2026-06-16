@@ -1,11 +1,11 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import public_site_routes, website_routes
-from services import auth_service
 
 
 def build_website_client():
@@ -22,6 +22,10 @@ def build_public_client(fake_supabase):
 
 def fake_auth_result(user_data):
     return object(), user_data
+
+
+def fake_tenant_context(tenant_id=7, user_id=3):
+    return SimpleNamespace(tenant_id=tenant_id, user_id=user_id)
 
 
 class FakeResponse:
@@ -125,8 +129,11 @@ class WebsiteRoutesTests(unittest.TestCase):
 
         with patch.object(
             website_routes,
-            "require_regular_user",
-            return_value=fake_auth_result(user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
         ), patch.object(
             website_routes,
             "ensure_settings_for_tenant",
@@ -145,13 +152,23 @@ class WebsiteRoutesTests(unittest.TestCase):
 
         with patch.object(
             website_routes,
-            "require_regular_user",
-            return_value=fake_auth_result(user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
         ), patch.object(
             website_routes,
             "save_settings_for_tenant",
             return_value=website,
-        ) as save_settings:
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
             response = client.put(
                 "/website/settings",
                 json={"subdomain": "Fresh-Site", "brand": "Fresh Brand"},
@@ -165,6 +182,99 @@ class WebsiteRoutesTests(unittest.TestCase):
         )
         self.assertEqual(response.json()["website"], website)
 
+    def test_canonical_get_rejects_stale_user_tenant_without_active_membership(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+
+        with patch.object(
+            website_routes,
+            "require_active_tenant_member",
+            side_effect=website_routes.HTTPException(
+                status_code=403,
+                detail="Active tenant membership required",
+            ),
+        ), patch.object(
+            website_routes,
+            "ensure_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "stale-site"},
+        ) as ensure_settings:
+            response = client.get("/website/settings")
+
+        self.assertEqual(response.status_code, 403)
+        ensure_settings.assert_not_called()
+
+    def test_canonical_put_rejects_membership_mismatch_before_saving_settings(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+
+        with patch.object(
+            website_routes,
+            "require_active_tenant_member",
+            side_effect=website_routes.HTTPException(
+                status_code=403,
+                detail="Active tenant membership required",
+            ),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
+        ) as get_settings, patch.object(
+            website_routes,
+            "save_settings_for_tenant",
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ) as record_audit:
+            response = client.put(
+                "/website/settings",
+                json={"subdomain": "fresh-site", "brand": "Fresh Brand"},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        get_settings.assert_not_called()
+        save_settings.assert_not_called()
+        record_audit.assert_not_called()
+
+    def test_canonical_put_ignores_client_supplied_tenant_id(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+        website = {"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "fresh-site"}
+
+        with patch.object(
+            website_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
+        ), patch.object(
+            website_routes,
+            "save_settings_for_tenant",
+            return_value=website,
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
+            response = client.put(
+                "/website/settings",
+                json={
+                    "tenant_id": 99,
+                    "subdomain": "fresh-site",
+                    "brand": "Fresh Brand",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        save_settings.assert_called_once_with(
+            tenant_id=7,
+            user_id=3,
+            update_payload={"subdomain": "fresh-site", "brand": "Fresh Brand"},
+        )
+
     def test_canonical_put_accepts_https_logo_url(self):
         client = build_website_client()
         user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
@@ -172,13 +282,23 @@ class WebsiteRoutesTests(unittest.TestCase):
 
         with patch.object(
             website_routes,
-            "require_regular_user",
-            return_value=fake_auth_result(user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value=website,
         ), patch.object(
             website_routes,
             "save_settings_for_tenant",
             return_value=website,
-        ) as save_settings:
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
             response = client.put(
                 "/website/settings",
                 json={"logo_url": " https://cdn.example.com/logo.png "},
@@ -190,6 +310,82 @@ class WebsiteRoutesTests(unittest.TestCase):
             user_id=3,
             update_payload={"logo_url": "https://cdn.example.com/logo.png"},
         )
+
+
+    def test_canonical_put_records_audit_changed_fields_only(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+        website = {
+            "id": 1,
+            "tenant_id": 7,
+            "user_id": 3,
+            "subdomain": "fresh-site",
+            "brand": "Fresh Brand",
+            "description": "Public description",
+        }
+
+        with patch.object(
+            website_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
+        ), patch.object(
+            website_routes,
+            "save_settings_for_tenant",
+            return_value=website,
+        ), patch.object(website_routes, "record_audit_event") as record_audit:
+            response = client.put(
+                "/website/settings",
+                json={
+                    "subdomain": "Fresh-Site",
+                    "brand": "Fresh Brand",
+                    "description": "Public description",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        record_audit.assert_called_once()
+        audit_kwargs = record_audit.call_args.kwargs
+        self.assertEqual(audit_kwargs["tenant_id"], 7)
+        self.assertEqual(audit_kwargs["actor_user_id"], 3)
+        self.assertEqual(audit_kwargs["action"], "website.settings_updated")
+        self.assertEqual(audit_kwargs["target_type"], "website_settings")
+        self.assertEqual(audit_kwargs["target_id"], 1)
+        self.assertEqual(
+            audit_kwargs["metadata"],
+            {
+                "changed_fields": ["brand", "description", "subdomain"],
+                "old_subdomain": "old-site",
+                "new_subdomain": "fresh-site",
+            },
+        )
+        self.assertNotIn("Public description", str(audit_kwargs["metadata"]))
+
+    def test_failed_website_settings_validation_does_not_record_audit(self):
+        client = build_website_client()
+        user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
+
+        with patch.object(
+            website_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
+        ), patch.object(website_routes, "record_audit_event") as record_audit:
+            response = client.put(
+                "/website/settings",
+                json={"logo_url": "javascript:alert(1)"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        record_audit.assert_not_called()
 
     def test_canonical_put_rejects_unsafe_logo_urls(self):
         client = build_website_client()
@@ -204,8 +400,11 @@ class WebsiteRoutesTests(unittest.TestCase):
         for unsafe_url in unsafe_urls:
             with self.subTest(unsafe_url=unsafe_url), patch.object(
                 website_routes,
-                "require_regular_user",
-                return_value=fake_auth_result(user_data),
+                "require_active_tenant_member",
+                return_value=fake_tenant_context(
+                    tenant_id=user_data.get("tenant_id"),
+                    user_id=user_data.get("id"),
+                ),
             ), patch.object(website_routes, "save_settings_for_tenant") as save_settings:
                 response = client.put(
                     "/website/settings",
@@ -222,8 +421,11 @@ class WebsiteRoutesTests(unittest.TestCase):
 
         with patch.object(
             website_routes,
-            "require_regular_user_id",
-            return_value=fake_auth_result(user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
         ) as require_user, patch.object(
             website_routes,
             "ensure_settings_for_tenant",
@@ -232,7 +434,6 @@ class WebsiteRoutesTests(unittest.TestCase):
             response = client.get("/users/3/website/settings")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(require_user.call_args.args[0]), "3")
         self.assertEqual(response.json()["website"], website)
 
     def test_user_scoped_put_still_works_for_matching_user_id(self):
@@ -242,20 +443,29 @@ class WebsiteRoutesTests(unittest.TestCase):
 
         with patch.object(
             website_routes,
-            "require_regular_user_id",
-            return_value=fake_auth_result(user_data),
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(
+                tenant_id=user_data.get("tenant_id"),
+                user_id=user_data.get("id"),
+            ),
         ) as require_user, patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3, "subdomain": "old-site"},
+        ), patch.object(
             website_routes,
             "save_settings_for_tenant",
             return_value=website,
-        ) as save_settings:
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
             response = client.put(
                 "/users/3/website/settings",
                 json={"subdomain": "fresh-site", "brand": "Fresh Brand"},
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(require_user.call_args.args[0]), "3")
         save_settings.assert_called_once_with(
             tenant_id=7,
             user_id=3,
@@ -266,9 +476,9 @@ class WebsiteRoutesTests(unittest.TestCase):
         client = build_website_client()
 
         with patch.object(
-            auth_service,
-            "get_authenticated_user_row",
-            return_value=fake_auth_result({"id": 4, "tenant_id": 7, "user_type": "user"}),
+            website_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(tenant_id=7, user_id=4),
         ):
             response = client.get("/users/3/website/settings")
 
@@ -279,9 +489,12 @@ class WebsiteRoutesTests(unittest.TestCase):
         client = build_website_client()
 
         with patch.object(
-            auth_service,
-            "get_authenticated_user_row",
-            return_value=fake_auth_result({"id": 1, "tenant_id": 7, "user_type": "admin"}),
+            website_routes,
+            "require_active_tenant_member",
+            side_effect=website_routes.HTTPException(
+                status_code=403,
+                detail="User access is required",
+            ),
         ):
             response = client.get("/website/settings")
 
@@ -292,9 +505,12 @@ class WebsiteRoutesTests(unittest.TestCase):
         client = build_website_client()
 
         with patch.object(
-            auth_service,
-            "get_authenticated_user_row",
-            return_value=fake_auth_result({"id": 3, "tenant_id": None, "user_type": "user"}),
+            website_routes,
+            "require_active_tenant_member",
+            side_effect=website_routes.HTTPException(
+                status_code=403,
+                detail="User does not belong to a tenant",
+            ),
         ):
             response = client.get("/website/settings")
 
