@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, Trash2, X } from "lucide-react";
 
 import { uiText } from "../constants/uiText";
 import { analysisGroups } from "../constants/analysisConfig";
@@ -134,6 +134,116 @@ const singleVariableCharts = ["histogram", "count"];
 const singlePairCharts = ["pie", "violin"];
 const multiSeriesCharts = ["bar", "line", "scatter", "box"];
 const categoryColorCharts = ["bar", "box", "violin", "count", "pie"];
+const chartRelationshipOptions = {
+  bar: [
+    {
+      value: "1:1",
+      label: "One category + one value",
+      hint: "Use one group column and one value column, like Region and Sales.",
+    },
+    {
+      value: "1:M",
+      label: "One category + many values",
+      hint: "Use one group column with several value columns, like Month with Sales, Cost, and Profit.",
+    },
+    {
+      value: "M:M",
+      label: "Matched category/value pairs",
+      hint: "Choose pairs in the same order, like Month A with Sales A, then Month B with Sales B.",
+    },
+  ],
+  line: [
+    {
+      value: "1:1",
+      label: "One timeline + one value",
+      hint: "Use one time or order column and one numeric value column.",
+    },
+    {
+      value: "1:M",
+      label: "One timeline + many values",
+      hint: "Use one shared time or order column with several numeric value columns.",
+    },
+  ],
+  scatter: [
+    {
+      value: "1:1",
+      label: "One X + one Y",
+      hint: "Use one column for horizontal position and one column for vertical position.",
+    },
+    {
+      value: "1:M",
+      label: "One X + many Y values",
+      hint: "Use one shared X column with several Y columns.",
+    },
+    {
+      value: "M:M",
+      label: "Matched X/Y pairs",
+      hint: "Choose X and Y columns in pairs, in the same order.",
+    },
+  ],
+  histogram: [
+    {
+      value: "1:1",
+      label: "One column",
+      hint: "Pick one column to show how its values are distributed.",
+    },
+  ],
+  box: [
+    {
+      value: "1:1",
+      label: "One group + one value",
+      hint: "Use one group column and one numeric value column.",
+    },
+    {
+      value: "1:M",
+      label: "One group + many values",
+      hint: "Use one group column with several numeric value columns.",
+    },
+  ],
+  violin: [
+    {
+      value: "1:1",
+      label: "One group + one value",
+      hint: "Use one group column and one numeric value column.",
+    },
+  ],
+  count: [
+    {
+      value: "1:1",
+      label: "One column",
+      hint: "Pick one column to count how often each answer appears.",
+    },
+  ],
+  pie: [
+    {
+      value: "1:1",
+      label: "One label + one value",
+      hint: "Use one label column and one numeric value column.",
+    },
+  ],
+  heatmap: [
+    {
+      value: "M:M",
+      label: "Many numeric columns",
+      hint: "Pick two or more numeric columns to compare how they move together.",
+    },
+  ],
+};
+const getRelationshipOptions = (chartType) =>
+  chartRelationshipOptions[chartType] || chartRelationshipOptions.bar;
+const getDefaultComparisonMode = (chartType) =>
+  getRelationshipOptions(chartType)[0]?.value || "1:1";
+const normalizeComparisonMode = (chartType, comparisonMode) => {
+  const options = getRelationshipOptions(chartType);
+  return options.some((option) => option.value === comparisonMode)
+    ? comparisonMode
+    : getDefaultComparisonMode(chartType);
+};
+const getRelationshipOption = (chartType, comparisonMode) => {
+  const options = getRelationshipOptions(chartType);
+  const normalizedMode = normalizeComparisonMode(chartType, comparisonMode);
+  return options.find((option) => option.value === normalizedMode) || options[0];
+};
 const supportsUngroupedCategoryColors = (chartType) =>
   ["bar", "box", "violin", "count", "pie"].includes(chartType);
 const supportsHueGrouping = (chartType) =>
@@ -142,10 +252,14 @@ const supportsHueGrouping = (chartType) =>
   );
 const getSeriesCount = (plot) => {
   if (!plot || !multiSeriesCharts.includes(plot.chartType)) return 1;
-  if (plot.comparisonMode === "1:M") {
+  const activeComparisonMode = normalizeComparisonMode(
+    plot.chartType,
+    plot.comparisonMode
+  );
+  if (activeComparisonMode === "1:M") {
     return Math.max(1, toArray(plot.yColumns).filter(Boolean).length);
   }
-  if (plot.comparisonMode === "M:M") {
+  if (activeComparisonMode === "M:M") {
     return Math.max(1, toArray(plot.yColumns).filter(Boolean).length);
   }
   return 1;
@@ -213,39 +327,7 @@ const shouldUseTrendGradient = (plot, xValue) => {
 };
 
 const getComparisonHint = (plot) => {
-  if (plot.chartType === "line" && plot.comparisonMode === "1:1") {
-    return "Single trend uses one shared X axis, usually time, and one numeric Y value.";
-  }
-
-  if (plot.chartType === "line" && plot.comparisonMode === "1:M") {
-    return "Compare trends uses one shared X axis, usually time, with multiple numeric Y values.";
-  }
-
-  if (plot.chartType === "box" && plot.comparisonMode === "1:M") {
-    return "Compare distributions uses one group axis with multiple numeric Y variables shown side-by-side.";
-  }
-
-  if (plot.chartType === "heatmap") {
-    return "Heatmap uses the numeric columns in the dataset, so no axis selection is needed.";
-  }
-
-  if (singleVariableCharts.includes(plot.chartType)) {
-    return "This chart uses one X variable. Pick the column you want to distribute or count.";
-  }
-
-  if (singlePairCharts.includes(plot.chartType)) {
-    return "This plot type compares one label/group column with one numeric value column.";
-  }
-
-  if (plot.comparisonMode === "1:M") {
-    return "Use one shared X axis, like time, with many Y series, like revenue for several projects.";
-  }
-
-  if (plot.comparisonMode === "M:M") {
-    return "Pair each X variable with the Y variable in the same position. The lists must have the same length.";
-  }
-
-  return "Use one X variable and one Y variable for a direct comparison.";
+  return getRelationshipOption(plot.chartType, plot.comparisonMode)?.hint || "";
 };
 
 const validateVisualizationPlot = (plot, numericColumns = []) => {
@@ -258,6 +340,8 @@ const validateVisualizationPlot = (plot, numericColumns = []) => {
   const numericColumnSet = new Set(numericColumns);
 
   if (!plot) return "Choose a plot before generating.";
+  const activeComparisonMode = normalizeComparisonMode(chartType, plot.comparisonMode);
+
   if (chartType === "heatmap") {
     const heatmapColumns = toArray(plot?.heatmapColumns).filter(Boolean);
     const nonNumericHeatmapColumns = heatmapColumns.filter(
@@ -265,30 +349,26 @@ const validateVisualizationPlot = (plot, numericColumns = []) => {
     );
 
     if (nonNumericHeatmapColumns.length) {
-      return `${plotName} heatmap needs numeric features. Remove: ${nonNumericHeatmapColumns.join(", ")}.`;
+      return `${plotName} heatmap can only use numeric columns. Remove: ${nonNumericHeatmapColumns.join(", ")}.`;
     }
 
     return heatmapColumns.length >= 2
       ? ""
-      : `${plotName} heatmap needs at least two numeric features.`;
+      : `${plotName} heatmap needs at least two numeric columns.`;
   }
 
-  if (["line", "box"].includes(chartType) && plot.comparisonMode === "M:M") {
-    return `${plotName} ${chartType} chart supports 1:1 or 1:M. Choose one X axis and one or more numeric Y variables.`;
-  }
-
-  if (plot.comparisonMode !== "M:M" && xCount > 1) {
-    return `${plotName} has ${xCount} X variables selected. Use one X variable per plot, or create ${xCount} separate plots.`;
+  if (activeComparisonMode !== "M:M" && xCount > 1) {
+    return `${plotName} has ${xCount} X columns selected. This relationship uses one X column.`;
   }
 
   if (singleVariableCharts.includes(chartType)) {
-    return xCount >= 1 ? "" : `Choose one X variable for ${plotName}.`;
+    return xCount >= 1 ? "" : `Choose one column for ${plotName}.`;
   }
 
   if (singlePairCharts.includes(chartType)) {
     return xCount === 1 && yCount === 1
       ? ""
-      : `${plotName} needs exactly one X variable and one Y variable for ${chartType}.`;
+      : `${plotName} needs one label/group column and one value column.`;
   }
 
   if (!multiSeriesCharts.includes(chartType)) {
@@ -301,33 +381,33 @@ const validateVisualizationPlot = (plot, numericColumns = []) => {
     );
 
     if (nonNumericYColumns.length) {
-      return `${plotName} ${chartType} chart needs numeric Y variables. Remove: ${nonNumericYColumns.join(", ")}.`;
+      return `${plotName} needs numeric value columns. Remove: ${nonNumericYColumns.join(", ")}.`;
     }
   }
 
   if (chartType === "box" && xColumns.some((column) => yColumns.includes(column))) {
-    return `${plotName} box chart needs different X and Y columns. Remove the X axis column from Y variables.`;
+    return `${plotName} uses the same column for group and value. Choose a different value column, or clear the group column to show one distribution.`;
   }
 
-  if (plot.comparisonMode === "1:M") {
+  if (activeComparisonMode === "1:M") {
     return xCount === 1 && yCount >= 1
       ? ""
-      : `${plotName} 1:M needs one X variable and one or more Y variables.`;
+      : `${plotName} needs one X/group column and one or more value columns.`;
   }
 
-  if (plot.comparisonMode === "M:M") {
+  if (activeComparisonMode === "M:M") {
     if (xCount < 1 || yCount < 1) {
-      return `${plotName} M:M needs at least one X variable and one Y variable.`;
+      return `${plotName} needs at least one X column and one Y column.`;
     }
 
     return xCount === yCount
       ? ""
-      : `${plotName} M:M needs matching X and Y counts. You selected ${xCount} X and ${yCount} Y.`;
+      : `${plotName} needs the same number of X and Y columns. You selected ${xCount} X and ${yCount} Y.`;
   }
 
   return xCount === 1 && yCount === 1
     ? ""
-    : `${plotName} 1:1 needs exactly one X variable and one Y variable.`;
+    : `${plotName} needs one X column and one Y column.`;
 };
 
 const getFriendlyVisualizationError = (message) => {
@@ -348,7 +428,7 @@ const getFriendlyVisualizationError = (message) => {
   ];
 
   if (backendErrorPatterns.some((pattern) => lowerText.includes(pattern))) {
-    return "Could not create the visualization. Please check that the X axis is not also selected as a Y variable, and that the selected Y variables are numeric.";
+    return "Could not create the visualization. Check that the group/X column is not also selected as a value column, and that the selected value columns are numeric.";
   }
 
   return text;
@@ -387,6 +467,80 @@ const createVisualizationPlot = (index, columns = [], numericColumns = []) => ({
   height: 6,
 });
 
+const DATA_WORKSPACE_CACHE_VERSION = 1;
+const DATA_WORKSPACE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const getDataWorkspaceCacheKey = (user, project) => {
+  const userId = user?.id || user?.email || "anonymous";
+  const projectId = project?.id || project?.slug || project?.name || "default";
+  return `madar:data-workspace:${userId}:${projectId}:v${DATA_WORKSPACE_CACHE_VERSION}`;
+};
+
+const safeReadDataWorkspaceCache = (storageKey) => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawValue = window.localStorage.getItem(storageKey);
+    if (!rawValue) return null;
+
+    const cachedValue = JSON.parse(rawValue);
+    const savedAt = Number(cachedValue?.savedAt || 0);
+    const isExpired = Date.now() - savedAt > DATA_WORKSPACE_CACHE_TTL_MS;
+
+    if (isExpired || !cachedValue?.dataset?.file_path) {
+      window.localStorage.removeItem(storageKey);
+      return null;
+    }
+
+    return cachedValue;
+  } catch {
+    window.localStorage.removeItem(storageKey);
+    return null;
+  }
+};
+
+const safeWriteDataWorkspaceCache = (storageKey, payload) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        ...payload,
+        savedAt: Date.now(),
+        version: DATA_WORKSPACE_CACHE_VERSION,
+      })
+    );
+  } catch {
+    // localStorage can be full or blocked; the app should keep working without cache.
+  }
+};
+
+const safeRemoveDataWorkspaceCache = (storageKey) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch {
+    // Ignore storage failures.
+  }
+};
+
+const getCacheableDataset = (dataset) => {
+  if (!dataset?.file_path) return null;
+
+  return {
+    file_path: dataset.file_path,
+    original_filename: dataset.original_filename || dataset.file_path,
+    rows: dataset.rows,
+    columns: Array.isArray(dataset.columns) ? dataset.columns : [],
+    preview: Array.isArray(dataset.preview) ? dataset.preview.slice(0, 100) : [],
+  };
+};
+
+const getRestorableDataWorkspaceStep = (step) =>
+  ["review", "prepare", "visualization"].includes(step) ? step : "review";
+
 export default function DataAnalysisWorkspace({
   lang = "en",
   project,
@@ -398,6 +552,11 @@ export default function DataAnalysisWorkspace({
   const activeLang = lang === "ar" ? "ar" : "en";
   const isArabic = activeLang === "ar";
   const t = uiText[activeLang];
+  const dataWorkspaceCacheKey = getDataWorkspaceCacheKey(user, project);
+  const cachedWorkspace = useMemo(
+    () => safeReadDataWorkspaceCache(dataWorkspaceCacheKey),
+    [dataWorkspaceCacheKey]
+  );
 
   const userApiPath = (path) => {
     if (!user?.id) {
@@ -411,14 +570,22 @@ export default function DataAnalysisWorkspace({
   const firstFormWithResponses =
     availableForms.find((form) => form.responses?.length) || availableForms[0];
 
-  const [currentStep, setCurrentStep] = useState("source");
-  const [sourceMode, setSourceMode] = useState("forms");
-  const [selectedFormId, setSelectedFormId] = useState(
-    firstFormWithResponses?.id || ""
+  const [currentStep, setCurrentStep] = useState(() =>
+    cachedWorkspace?.dataset
+      ? getRestorableDataWorkspaceStep(cachedWorkspace.currentStep)
+      : "source"
   );
-  const [dataset, setDataset] = useState(null);
+  const [sourceMode, setSourceMode] = useState(
+    () => cachedWorkspace?.sourceMode || "forms"
+  );
+  const [selectedFormId, setSelectedFormId] = useState(
+    () => cachedWorkspace?.selectedFormId || firstFormWithResponses?.id || ""
+  );
+  const [dataset, setDataset] = useState(() => cachedWorkspace?.dataset || null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [externalUrl, setExternalUrl] = useState("");
+  const [externalUrl, setExternalUrl] = useState(
+    () => cachedWorkspace?.externalUrl || ""
+  );
   const [inspection, setInspection] = useState(null);
   const [inspectionCache, setInspectionCache] = useState({});
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -432,7 +599,7 @@ export default function DataAnalysisWorkspace({
   const [isVisualizationChecking, setIsVisualizationChecking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [reportOptions, setReportOptions] = useState({
+  const [reportOptions, setReportOptions] = useState(() => ({
     title: "",
     includeSummary: true,
     includeKpis: true,
@@ -440,22 +607,27 @@ export default function DataAnalysisWorkspace({
     includeTables: true,
     includeCharts: true,
     includeWarnings: true,
-  });
+    ...(cachedWorkspace?.reportOptions || {}),
+  }));
   const [isVisualizationSettingsOpen, setIsVisualizationSettingsOpen] =
     useState(false);
-  const [visualizationPlots, setVisualizationPlots] = useState(() => [
-    createVisualizationPlot(1),
-  ]);
+  const [visualizationPlots, setVisualizationPlots] = useState(() =>
+    Array.isArray(cachedWorkspace?.visualizationPlots) &&
+    cachedWorkspace.visualizationPlots.length
+      ? cachedWorkspace.visualizationPlots
+      : [createVisualizationPlot(1)]
+  );
   const [visualizationResultsByPlot, setVisualizationResultsByPlot] = useState({});
   const [visualizationPreview, setVisualizationPreview] = useState(null);
-  const [activeVisualizationPlotId, setActiveVisualizationPlotId] =
-    useState("plot-1");
+  const [activeVisualizationPlotId, setActiveVisualizationPlotId] = useState(
+    () => cachedWorkspace?.activeVisualizationPlotId || "plot-1"
+  );
   const [openAxisDropdown, setOpenAxisDropdown] = useState("");
   const activeColorInputRef = useRef(null);
   const visualizationNoticeRequestRef = useRef(0);
   const visualizationProfileCacheRef = useRef({});
 
-  const [cleaning, setCleaning] = useState({
+  const [cleaning, setCleaning] = useState(() => ({
     trimText: true,
     lowercaseText: false,
     removeDuplicates: false,
@@ -464,21 +636,39 @@ export default function DataAnalysisWorkspace({
     fillColumn: "",
     fillMethod: "mode",
     fillValue: "",
-    removeOutliers: false,
-    outlierColumns: [],
     dropColumns: [],
+    dropColumnsConfirmed: false,
+    encodeColumns: [],
+    encodeMethod: "one_hot",
+    keepEncodedOriginals: false,
     convertColumn: "",
     convertType: "numeric",
     renameColumn: "",
     renameTo: "",
-  });
+    ...(cachedWorkspace?.cleaning || {}),
+  }));
 
-  const [analysisDomain, setAnalysisDomain] = useState("finance");
-  const [analysisMethod, setAnalysisMethod] = useState(
-    analysisGroups.finance.methods[0].id
+  const [analysisDomain, setAnalysisDomain] = useState(
+    () => cachedWorkspace?.analysisDomain || "finance"
   );
-  const [params, setParams] = useState({
-    ...analysisGroups.finance.methods[0].template,
+  const [analysisMethod, setAnalysisMethod] = useState(() => {
+    const cachedDomain = cachedWorkspace?.analysisDomain || "finance";
+    const domainMethods =
+      analysisGroups[cachedDomain]?.methods || analysisGroups.finance.methods;
+    return cachedWorkspace?.analysisMethod || domainMethods[0].id;
+  });
+  const [params, setParams] = useState(() => {
+    const cachedDomain = cachedWorkspace?.analysisDomain || "finance";
+    const domainMethods =
+      analysisGroups[cachedDomain]?.methods || analysisGroups.finance.methods;
+    const cachedMethod =
+      domainMethods.find((method) => method.id === cachedWorkspace?.analysisMethod) ||
+      domainMethods[0];
+
+    return {
+      ...cachedMethod.template,
+      ...(cachedWorkspace?.params || {}),
+    };
   });
 
   const selectedForm =
@@ -486,7 +676,8 @@ export default function DataAnalysisWorkspace({
     firstFormWithResponses;
 
   const formFields = selectedForm ? getFormFields(selectedForm) : [];
-  const methods = analysisGroups[analysisDomain].methods;
+  const methods =
+    analysisGroups[analysisDomain]?.methods || analysisGroups.finance.methods;
   const activeMethod =
     methods.find((method) => method.id === analysisMethod) || methods[0];
 
@@ -530,6 +721,76 @@ export default function DataAnalysisWorkspace({
   }, [currentStep]);
 
   useEffect(() => {
+    if (dataset?.file_path || !cachedWorkspace?.dataset?.file_path) return;
+
+    setDataset(cachedWorkspace.dataset);
+    setCurrentStep(getRestorableDataWorkspaceStep(cachedWorkspace.currentStep));
+    setSourceMode(cachedWorkspace.sourceMode || "forms");
+    setSelectedFormId(cachedWorkspace.selectedFormId || firstFormWithResponses?.id || "");
+    setExternalUrl(cachedWorkspace.externalUrl || "");
+    setCleaning((current) => ({ ...current, ...(cachedWorkspace.cleaning || {}) }));
+    setReportOptions((current) => ({
+      ...current,
+      ...(cachedWorkspace.reportOptions || {}),
+    }));
+    setAnalysisDomain(cachedWorkspace.analysisDomain || "finance");
+    setAnalysisMethod((current) => cachedWorkspace.analysisMethod || current);
+    setParams((current) => ({ ...current, ...(cachedWorkspace.params || {}) }));
+    if (
+      Array.isArray(cachedWorkspace.visualizationPlots) &&
+      cachedWorkspace.visualizationPlots.length
+    ) {
+      setVisualizationPlots(cachedWorkspace.visualizationPlots);
+    }
+    setActiveVisualizationPlotId(
+      cachedWorkspace.activeVisualizationPlotId || "plot-1"
+    );
+  }, [
+    cachedWorkspace,
+    dataset?.file_path,
+    firstFormWithResponses?.id,
+  ]);
+
+  useEffect(() => {
+    if (!dataset?.file_path) {
+      if (!cachedWorkspace?.dataset?.file_path) {
+        safeRemoveDataWorkspaceCache(dataWorkspaceCacheKey);
+      }
+      return;
+    }
+
+    safeWriteDataWorkspaceCache(dataWorkspaceCacheKey, {
+      dataset: getCacheableDataset(dataset),
+      currentStep: getRestorableDataWorkspaceStep(currentStep),
+      sourceMode,
+      selectedFormId,
+      externalUrl,
+      cleaning,
+      reportOptions,
+      analysisDomain,
+      analysisMethod,
+      params,
+      visualizationPlots,
+      activeVisualizationPlotId,
+    });
+  }, [
+    activeVisualizationPlotId,
+    analysisDomain,
+    analysisMethod,
+    cachedWorkspace,
+    cleaning,
+    currentStep,
+    dataWorkspaceCacheKey,
+    dataset,
+    externalUrl,
+    params,
+    reportOptions,
+    selectedFormId,
+    sourceMode,
+    visualizationPlots,
+  ]);
+
+  useEffect(() => {
     if (!columns.length) return;
 
     setVisualizationPlots((currentPlots) =>
@@ -548,10 +809,7 @@ export default function DataAnalysisWorkspace({
 
         return {
           ...plot,
-          comparisonMode:
-            plot.chartType === "line" && plot.comparisonMode === "M:M"
-              ? "1:M"
-              : plot.comparisonMode,
+          comparisonMode: normalizeComparisonMode(plot.chartType, plot.comparisonMode),
           xColumn: plot.xColumn || columns[0] || "",
           yColumn:
             plot.chartType === "line"
@@ -761,14 +1019,18 @@ export default function DataAnalysisWorkspace({
       });
     }
 
-    if (cleaning.removeOutliers && cleaning.outlierColumns.length) {
+    if (cleaning.encodeColumns?.length) {
       actions.push({
-        type: "remove_outliers_iqr",
-        params: { columns: cleaning.outlierColumns, multiplier: 1.5 },
+        type: "encode_columns",
+        params: {
+          columns: cleaning.encodeColumns,
+          method: cleaning.encodeMethod,
+          keep_original: cleaning.keepEncodedOriginals,
+        },
       });
     }
 
-    if (cleaning.dropColumns.length) {
+    if (cleaning.dropColumns.length && cleaning.dropColumnsConfirmed) {
       actions.push({
         type: "drop_columns",
         params: { columns: cleaning.dropColumns },
@@ -835,7 +1097,7 @@ export default function DataAnalysisWorkspace({
             return {
               ...plot,
               chartType,
-              comparisonMode: plot.comparisonMode === "1:M" ? "1:M" : "1:1",
+              comparisonMode: normalizeComparisonMode(chartType, plot.comparisonMode),
               yColumn: fallbackYColumns[0] || "",
               yColumns: fallbackYColumns,
             };
@@ -844,9 +1106,7 @@ export default function DataAnalysisWorkspace({
           return {
             ...plot,
             chartType,
-            comparisonMode: multiSeriesCharts.includes(chartType)
-              ? plot.comparisonMode
-              : "1:1",
+            comparisonMode: normalizeComparisonMode(chartType, plot.comparisonMode),
             xLabel: axisLabelsDisabled(chartType) ? "" : plot.xLabel,
             yLabel: axisLabelsDisabled(chartType) ? "" : plot.yLabel,
             heatmapColumns:
@@ -864,25 +1124,55 @@ export default function DataAnalysisWorkspace({
     const currentPlot =
       visualizationPlots.find((plot) => plot.id === plotId) ||
       activeVisualizationPlot;
+    const normalizePlotColumns = (plot) => {
+      if (!plot || plot.chartType !== "box") return plot;
+
+      const xColumns = toArray(plot.xColumns).filter(Boolean);
+      const yColumns = toArray(plot.yColumns).filter(Boolean);
+      if (!xColumns.length || !yColumns.length) return plot;
+
+      const xSet = new Set(xColumns);
+      const ySet = new Set(yColumns);
+      const hasOverlap = xColumns.some((column) => ySet.has(column));
+      if (!hasOverlap) return plot;
+
+      if (key === "xColumns") {
+        const filteredYColumns = yColumns.filter((column) => !xSet.has(column));
+        return {
+          ...plot,
+          yColumns: filteredYColumns,
+          yColumn: filteredYColumns[0] || "",
+        };
+      }
+
+      if (key === "yColumns") {
+        const filteredXColumns = xColumns.filter((column) => !ySet.has(column));
+        return {
+          ...plot,
+          xColumns: filteredXColumns,
+          xColumn: filteredXColumns[0] || "",
+        };
+      }
+
+      return plot;
+    };
     const nextPlot = currentPlot
-      ? {
+      ? normalizePlotColumns({
           ...currentPlot,
           [key]: nextValues,
           ...(key === "xColumns" ? { xColumn: nextValues[0] || "" } : {}),
           ...(key === "yColumns" ? { yColumn: nextValues[0] || "" } : {}),
-        }
+        })
       : null;
 
     setVisualizationPlots((currentPlots) =>
       currentPlots.map((plot) =>
-        plot.id === plotId
-          ? {
-              ...plot,
-              [key]: nextValues,
-              ...(key === "xColumns" ? { xColumn: nextValues[0] || "" } : {}),
-              ...(key === "yColumns" ? { yColumn: nextValues[0] || "" } : {}),
-            }
-          : plot
+        plot.id === plotId ? normalizePlotColumns({
+          ...plot,
+          [key]: nextValues,
+          ...(key === "xColumns" ? { xColumn: nextValues[0] || "" } : {}),
+          ...(key === "yColumns" ? { yColumn: nextValues[0] || "" } : {}),
+        }) : plot
       )
     );
 
@@ -920,6 +1210,36 @@ export default function DataAnalysisWorkspace({
             }
           : plot
       )
+    );
+  };
+
+  const updateVisualizationPalette = (plotId, palette) => {
+    setVisualizationPlots((currentPlots) =>
+      currentPlots.map((plot) => {
+        if (plot.id !== plotId) return plot;
+
+        const categoryValues = Array.isArray(plot.categoryColorValues)
+          ? plot.categoryColorValues
+          : [];
+        const categoryPalette = getPalettePreview(
+          palette,
+          Math.max(1, categoryValues.length)
+        );
+        const nextCategoryColors = Object.fromEntries(
+          categoryValues.map((value, index) => [
+            value,
+            categoryPalette[index] || plot.color,
+          ])
+        );
+
+        return {
+          ...plot,
+          palette,
+          useSingleColor: false,
+          seriesColors: {},
+          categoryColors: nextCategoryColors,
+        };
+      })
     );
   };
 
@@ -1048,11 +1368,12 @@ export default function DataAnalysisWorkspace({
     const nextXLabel = Array.isArray(nextX) ? nextX.join(" / ") : nextX;
     const nextYLabel = Array.isArray(nextY) ? nextY.join(" / ") : nextY;
     const titleSuffix = overrides.titleSuffix ? ` ${overrides.titleSuffix}` : "";
+    const activeComparisonMode = normalizeComparisonMode(chartType, comparisonMode);
     const seriesCount = Math.max(1, toArray(nextY).filter(Boolean).length);
     const seriesNames = toArray(nextY).filter(Boolean);
     const shouldUseSeriesPalette =
       multiSeriesCharts.includes(chartType) &&
-      ["1:M", "M:M"].includes(comparisonMode);
+      ["1:M", "M:M"].includes(activeComparisonMode);
     const histogramUsesGradient =
       chartType === "histogram" && !hueColumn && Boolean(useGradient);
     const shouldForceSingleColor =
@@ -1132,6 +1453,7 @@ export default function DataAnalysisWorkspace({
     if (!plot) return [];
 
     const chartType = plot.chartType;
+    const activeComparisonMode = normalizeComparisonMode(chartType, plot.comparisonMode);
 
     if (!needsYColumn(chartType)) {
       return [
@@ -1141,7 +1463,7 @@ export default function DataAnalysisWorkspace({
       ];
     }
 
-    if (plot.comparisonMode === "1:M") {
+    if (activeComparisonMode === "1:M") {
       return [
         buildSingleVisualizationConfig(plot, {
           xColumn: toArray(plot.xColumns)[0] || plot.xColumn,
@@ -1150,7 +1472,7 @@ export default function DataAnalysisWorkspace({
       ];
     }
 
-    if (plot.comparisonMode === "M:M") {
+    if (activeComparisonMode === "M:M") {
       const xColumns = toArray(plot.xColumns);
       const yColumns = toArray(plot.yColumns);
 
@@ -1225,6 +1547,10 @@ export default function DataAnalysisWorkspace({
 
   const getVisualizationColorNotice = (plot, profileData, changedKey = "") => {
     const profiles = profileData?.profiles || {};
+    const activeComparisonMode = normalizeComparisonMode(
+      plot?.chartType,
+      plot?.comparisonMode
+    );
     const xColumn = toArray(plot?.xColumns).filter(Boolean)[0];
     const yColumn = toArray(plot?.yColumns).filter(Boolean)[0];
     const hueColumn = plot?.hueColumn;
@@ -1253,8 +1579,8 @@ export default function DataAnalysisWorkspace({
       return `${xColumn} has ${xUniqueCount} values on the chart. ${yColumn} is categorical, so the chart counts records by ${xColumn} and colors by ${yColumn}.`;
     }
 
-    if (plot?.comparisonMode !== "1:1" && toArray(plot?.yColumns).filter(Boolean).length > 1) {
-      return "More than one Y variable is selected, so colors identify each series.";
+    if (activeComparisonMode !== "1:1" && toArray(plot?.yColumns).filter(Boolean).length > 1) {
+      return "More than one value column is selected, so colors identify each series.";
     }
 
     if (!plot?.useSingleColor && xColumn && xUniqueCount > 1) {
@@ -1401,8 +1727,18 @@ export default function DataAnalysisWorkspace({
     setParams({ ...nextMethod.template });
   };
 
-  const setLoadedDataset = (data) => {
+  const setLoadedDataset = (data, sourceContext = {}) => {
     setDataset(data);
+    if (sourceContext.sourceMode) {
+      setSourceMode(sourceContext.sourceMode);
+    }
+    if (sourceContext.selectedFormId) {
+      setSelectedFormId(sourceContext.selectedFormId);
+    }
+    if (sourceContext.externalUrl) {
+      setExternalUrl(sourceContext.externalUrl);
+    }
+    setSelectedFile(null);
     setInspection(null);
     setInspectionCache({});
     setAnalysisResult(null);
@@ -1412,7 +1748,7 @@ export default function DataAnalysisWorkspace({
     setCurrentStep("review");
   };
 
-  const uploadFile = async (file) => {
+  const uploadFile = async (file, sourceContext = {}) => {
     if (!file) {
       showFlowError(t.chooseFileFirst);
       return;
@@ -1437,7 +1773,10 @@ export default function DataAnalysisWorkspace({
         throw new Error(data.detail || "The data could not be loaded.");
       }
 
-      setLoadedDataset(data);
+      setLoadedDataset(data, {
+        sourceMode: sourceContext.sourceMode || "upload",
+        selectedFormId: sourceContext.selectedFormId,
+      });
     } catch (error) {
       showFlowError(error.message);
     } finally {
@@ -1470,11 +1809,17 @@ export default function DataAnalysisWorkspace({
         throw new Error(getFriendlyExternalError(data.detail));
       }
 
-      setLoadedDataset({
-        ...data,
-        file_path: data.file_path || inputPath,
-        original_filename: data.original_filename || inputPath,
-      });
+      setLoadedDataset(
+        {
+          ...data,
+          file_path: data.file_path || inputPath,
+          original_filename: data.original_filename || inputPath,
+        },
+        {
+          sourceMode: "external",
+          externalUrl: inputPath,
+        }
+      );
     } catch (error) {
       showFlowError(error.message);
     } finally {
@@ -1515,7 +1860,10 @@ export default function DataAnalysisWorkspace({
       { type: "text/csv;charset=utf-8" }
     );
 
-    await uploadFile(file);
+    await uploadFile(file, {
+      sourceMode: "forms",
+      selectedFormId: selectedForm.id,
+    });
   };
 
   const runInspection = async (type) => {
@@ -1703,13 +2051,15 @@ export default function DataAnalysisWorkspace({
         results.push(data);
       }
 
-      const nextVisualizationResult =
-        results.length === 1 ? results[0] : { plots: results };
+      setVisualizationResultsByPlot((current) => {
+        const existingPlots = getVisualizationPlots(current[plot.id]);
+        const nextPlots = [...existingPlots, ...results];
 
-      setVisualizationResultsByPlot((current) => ({
-        ...current,
-        [plot.id]: nextVisualizationResult,
-      }));
+        return {
+          ...current,
+          [plot.id]: nextPlots.length === 1 ? nextPlots[0] : { plots: nextPlots },
+        };
+      });
       setVisualizationError("");
       setVisualizationSuccess(
         results.length === 1
@@ -1725,6 +2075,24 @@ export default function DataAnalysisWorkspace({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const deleteVisualizationOutput = (plotId, outputIndex) => {
+    setVisualizationResultsByPlot((current) => {
+      const existingPlots = getVisualizationPlots(current[plotId]);
+      const nextPlots = existingPlots.filter((_, index) => index !== outputIndex);
+
+      if (!nextPlots.length) {
+        const remainingPlots = { ...current };
+        delete remainingPlots[plotId];
+        return remainingPlots;
+      }
+
+      return {
+        ...current,
+        [plotId]: nextPlots.length === 1 ? nextPlots[0] : { plots: nextPlots },
+      };
+    });
   };
 
   const runAssistedQuestion = async () => {
@@ -1836,10 +2204,15 @@ export default function DataAnalysisWorkspace({
           <div className="daw-plot-editor-list">
             {visualizationPlots.map((plot, index) => {
               const chartType = plot.chartType;
-              const activeComparisonMode =
-                ["line", "box"].includes(chartType) && plot.comparisonMode === "M:M"
-                  ? "1:M"
-                  : plot.comparisonMode;
+              const relationshipOptions = getRelationshipOptions(chartType);
+              const activeComparisonMode = normalizeComparisonMode(
+                chartType,
+                plot.comparisonMode
+              );
+              const activeRelationship = getRelationshipOption(
+                chartType,
+                activeComparisonMode
+              );
               const seriesCount = getSeriesCount(plot);
               const usesSeriesPalette =
                 multiSeriesCharts.includes(chartType) &&
@@ -1872,10 +2245,10 @@ export default function DataAnalysisWorkspace({
                       />
                     </Field>
 
-                    <Field label={chartType === "line" ? "Trend mode" : "Comparison"}>
+                    <Field label="Relationship">
                       <select
                         value={activeComparisonMode}
-                        disabled={!multiSeriesCharts.includes(chartType)}
+                        disabled={relationshipOptions.length <= 1}
                         onChange={(event) =>
                           updateVisualizationPlot(
                             plot.id,
@@ -1884,34 +2257,16 @@ export default function DataAnalysisWorkspace({
                           )
                         }
                       >
-                        {chartType === "line" ? (
-                          <>
-                            <option value="1:1">Single trend</option>
-                            <option value="1:M">Compare trends</option>
-                          </>
-                        ) : chartType === "box" ? (
-                          <>
-                            <option value="1:1">1:1 comparison</option>
-                            <option value="1:M">1:M comparison</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="1:1">1:1 comparison</option>
-                            <option value="1:M">1:M comparison</option>
-                            <option value="M:M">M:M comparison</option>
-                          </>
-                        )}
+                        {relationshipOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                     </Field>
 
                     <div className="daw-comparison-hint">
-                      <span>
-                        {chartType === "line" && activeComparisonMode === "1:1"
-                          ? "Single trend"
-                          : chartType === "line" && activeComparisonMode === "1:M"
-                          ? "Compare trends"
-                          : activeComparisonMode}
-                      </span>
+                      <span>{activeRelationship?.label}</span>
                       <p>{getComparisonHint({ ...plot, comparisonMode: activeComparisonMode })}</p>
                     </div>
 
@@ -1993,13 +2348,13 @@ export default function DataAnalysisWorkspace({
                     ) : null}
 
                     {chartType === "heatmap" ? (
-                      <Field label="Features" wide>
+                      <Field label="Numeric columns" wide>
                         {renderColumnDropdown({
                           id: `${plot.id}-heatmap-features`,
                           options: numericColumns,
                           selectedValues: toArray(plot.heatmapColumns),
                           multiple: true,
-                          placeholder: "Select numeric features",
+                          placeholder: "Select numeric columns",
                           onChange: (values) =>
                             updateVisualizationColumns(
                               plot.id,
@@ -2017,26 +2372,32 @@ export default function DataAnalysisWorkspace({
                             label={
                               activeComparisonMode === "M:M" &&
                               multiSeriesCharts.includes(chartType)
-                                ? "X variables"
+                                ? "X columns"
                                 : chartType === "pie"
                                 ? "Label column"
+                                : ["box", "violin"].includes(chartType)
+                                ? "Group column"
                                 : "X axis"
                             }
                           >
                             {(() => {
                               const multiple =
-                                chartType !== "line" &&
                                 activeComparisonMode === "M:M" &&
                                 multiSeriesCharts.includes(chartType);
                               const selectedValues = toArray(plot.xColumns);
 
                               return renderColumnDropdown({
                                 id: `${plot.id}-x`,
-                                options: columns,
+                                options:
+                                  chartType === "box"
+                                    ? columns.filter(
+                                        (column) => !toArray(plot.yColumns).includes(column)
+                                      )
+                                    : columns,
                                 selectedValues,
                                 multiple,
                                 placeholder: multiple
-                                  ? "Select X variables"
+                                  ? "Select X columns"
                                   : "Select X axis",
                                 onChange: (values) =>
                                   updateVisualizationColumns(
@@ -2056,9 +2417,11 @@ export default function DataAnalysisWorkspace({
                                 activeComparisonMode === "M:M") &&
                               multiSeriesCharts.includes(chartType)
                                 ? chartType === "line"
-                                  ? "Trend values"
-                                  : "Y variables"
+                                  ? "Value columns"
+                                  : "Value columns"
                                 : chartType === "pie"
+                                ? "Value column"
+                                : ["box", "violin"].includes(chartType)
                                 ? "Value column"
                                 : "Y axis"
                             }
@@ -2066,6 +2429,12 @@ export default function DataAnalysisWorkspace({
                             {(() => {
                               const yOptions =
                                 ["line", "box"].includes(chartType) ? numericColumns : columns;
+                              const availableYOptions =
+                                chartType === "box"
+                                  ? yOptions.filter(
+                                      (column) => !toArray(plot.xColumns).includes(column)
+                                    )
+                                  : yOptions;
                               const multiple =
                                 (activeComparisonMode === "1:M" ||
                                   activeComparisonMode === "M:M") &&
@@ -2084,12 +2453,12 @@ export default function DataAnalysisWorkspace({
 
                               return renderColumnDropdown({
                                 id: `${plot.id}-y`,
-                                options: yOptions,
+                                options: availableYOptions,
                                 selectedValues,
                                 multiple,
                                 colorMap,
                                 placeholder: multiple
-                                  ? "Select Y variables"
+                                  ? "Select value columns"
                                   : "Select Y axis",
                                 onChange: (values) =>
                                   updateVisualizationColumns(
@@ -2145,7 +2514,7 @@ export default function DataAnalysisWorkspace({
                         value={plot.palette}
                         disabled={plot.useSingleColor && !usesSeriesPalette}
                         onChange={(event) =>
-                          updateVisualizationPlot(plot.id, "palette", event.target.value)
+                          updateVisualizationPalette(plot.id, event.target.value)
                         }
                       >
                         {paletteOptions.map((palette) => (
@@ -2523,7 +2892,7 @@ export default function DataAnalysisWorkspace({
         <PrepareDataStep
           dataset={dataset}
           columns={columns}
-          numericColumns={numericColumns}
+          textColumns={textColumns}
           cleaning={cleaning}
           updateCleaning={updateCleaning}
           t={t}
@@ -2543,14 +2912,6 @@ export default function DataAnalysisWorkspace({
                 the full report.
               </p>
             </div>
-            <button
-              type="button"
-              className="daw-primary daw-open-settings-button"
-              onClick={() => setIsVisualizationSettingsOpen(true)}
-              disabled={!dataset}
-            >
-              Open plot settings
-            </button>
           </div>
 
           <div className="daw-plot-summary-grid">
@@ -2558,6 +2919,10 @@ export default function DataAnalysisWorkspace({
               const chartTypeLabel =
                 chartTypes.find((type) => type.id === plot.chartType)?.label ||
                 "Chart";
+              const relationshipLabel = getRelationshipOption(
+                plot.chartType,
+                plot.comparisonMode
+              )?.label;
               const plotResult = visualizationResultsByPlot[plot.id];
               const outputPlots = getVisualizationPlots(plotResult);
 
@@ -2570,7 +2935,7 @@ export default function DataAnalysisWorkspace({
                   <strong>{plot.header || plot.name}</strong>
                   <p>
                     {chartTypeLabel}
-                    {plot.comparisonMode ? ` / ${plot.comparisonMode}` : ""}
+                    {relationshipLabel ? ` / ${relationshipLabel}` : ""}
                     {needsXColumn(plot.chartType)
                       ? ` / X: ${
                           toArray(plot.xColumns).join(", ") || "Not selected"
@@ -2600,7 +2965,11 @@ export default function DataAnalysisWorkspace({
                         return (
                           <div
                             className="daw-plot-output-row"
-                            key={`${plot.id}_output_${outputIndex}`}
+                            key={
+                              output?.chart_path ||
+                              output?.explorer_path ||
+                              `${plot.id}_output_${outputIndex}`
+                            }
                           >
                             <div className="daw-plot-output-copy">
                               <span>Generated plot</span>
@@ -2639,6 +3008,17 @@ export default function DataAnalysisWorkspace({
                                   <Eye size={17} />
                                 </button>
                               ) : null}
+                              <button
+                                type="button"
+                                className="daw-icon-button daw-danger-icon-button"
+                                title="Delete generated plot"
+                                aria-label={`Delete ${outputLabel}`}
+                                onClick={() =>
+                                  deleteVisualizationOutput(plot.id, outputIndex)
+                                }
+                              >
+                                <Trash2 size={17} />
+                              </button>
                             </div>
                           </div>
                         );

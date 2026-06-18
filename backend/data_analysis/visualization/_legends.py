@@ -5,6 +5,17 @@ class LegendsMixin:
     def _legend_font_size(self, legend_font_size: int | None = None) -> int:
         return max(8, min(int(legend_font_size or 10), 11))
 
+    def _legend_column_count(
+        self,
+        labels: list[str],
+        rows_per_column: int = 12,
+        max_columns: int = 4,
+    ) -> int:
+        if not labels:
+            return 1
+
+        return max(1, min(max_columns, math.ceil(len(labels) / rows_per_column)))
+
     def _apply_legend_design(
         self,
         legend,
@@ -85,7 +96,7 @@ class LegendsMixin:
         legend_font_size: int | None = None,
         language: str = "en",
         loc: str = "upper left",
-        bbox_to_anchor: tuple[float, float] = (0.76, 0.82),
+        bbox_to_anchor: tuple[float, float] = (0.82, 0.82),
         **kwargs,
     ):
         if not handles or not labels:
@@ -317,7 +328,7 @@ class LegendsMixin:
             ]
             labels = ["Metric: category count", "Height: records"]
 
-        column_count = max(1, math.ceil(len(labels) / 12))
+        column_count = self._legend_column_count(labels)
 
         axis._madar_fixed_legend_lane = "bar"
 
@@ -399,7 +410,7 @@ class LegendsMixin:
             return
 
         axis._madar_fixed_legend_lane = "bar"
-        column_count = max(1, math.ceil(len(shown_labels) / 12))
+        column_count = self._legend_column_count(shown_labels)
 
         self._set_fixed_figure_legend(
             axis,
@@ -503,7 +514,7 @@ class LegendsMixin:
             return
 
         axis._madar_fixed_legend_lane = "scatter"
-        column_count = max(1, min(3, math.ceil(len(labels) / 12)))
+        column_count = self._legend_column_count(labels)
 
         self._set_fixed_figure_legend(
             axis,

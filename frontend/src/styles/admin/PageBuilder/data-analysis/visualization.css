@@ -100,10 +100,6 @@
   line-height: 1.55;
 }
 
-.page-builder .daw-open-settings-button {
-  min-width: 190px;
-}
-
 .page-builder .daw-modal-alert {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -383,6 +379,15 @@
   background: var(--daw-tab-bg);
   color: var(--daw-text);
   cursor: pointer;
+}
+
+.page-builder .daw-danger-icon-button {
+  border-color: rgba(239, 68, 68, 0.34);
+  color: #ef4444;
+}
+
+.page-builder .daw-danger-icon-button:hover {
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .page-builder .daw-modal-grid {

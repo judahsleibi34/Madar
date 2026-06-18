@@ -38,11 +38,15 @@
   direction: rtl;
 }
 
-.page-builder .daw-page[dir="rtl"] .daw-compact-table th,
-.page-builder .daw-page[dir="rtl"] .daw-compact-table td,
 .page-builder .daw-page[dir="rtl"] .daw-table th,
 .page-builder .daw-page[dir="rtl"] .daw-table td {
   text-align: right;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-compact-table th,
+.page-builder .daw-page[dir="rtl"] .daw-compact-table td,
+.page-builder .daw-page[dir="rtl"] .daw-compact-table td > span {
+  text-align: center;
 }
 
 .page-builder .daw-page[dir="rtl"] .daw-data-grid-toolbar,

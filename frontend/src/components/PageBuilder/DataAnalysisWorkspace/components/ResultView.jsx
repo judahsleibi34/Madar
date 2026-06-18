@@ -21,21 +21,19 @@ const percentage = (value) => {
 
 const friendlyType = (type, t) => t.typeLabels?.[type] || toLabel(type || "text");
 
-const translatedAction = (action, t) => {
-  const actionMap = {
-    "Review or fill empty answers before reporting.": t.actionReviewMissing,
-    "Remove duplicate rows before reporting.": t.actionRemoveDuplicates,
-    "Check columns that may have mixed formats.": t.actionCheckMixedFormats,
-    "No major cleanup needed before reporting.": t.actionNoCleanupNeeded,
-  };
+const friendlyReviewLabels = (t) => ({
+  field: t.field || "Field",
+  bestUse: t.recommendedUse || "Recommended use",
+  filled: t.filledAnswers || "Answered",
+  empty: t.missing || "Missing",
+  emptyPercent: t.missingPercent || "Missing %",
+  unique: t.uniqueValues || "Unique values",
+  examples: t.sampleAnswers || "Sample answers",
+});
 
-  return actionMap[action] || action;
-};
-
-const translatedReadiness = (value, fallbackReady, t) => {
-  if (value === "Ready to use") return t.readyToUse || value;
-  if (value === "Needs review") return t.needsReview || value;
-  return value || fallbackReady;
+const isQualitativeType = (type) => {
+  const normalizedType = String(type || "").toLowerCase();
+  return !["numeric", "number", "integer", "float", "money"].includes(normalizedType);
 };
 
 const SummaryCards = ({ cards }) => (
@@ -76,22 +74,83 @@ const WarningList = ({ warnings, t }) => {
   );
 };
 
-const profileRows = (profiles = {}, t) =>
-  objectToRows(profiles, (column, profile) => ({
-    [t.field || "Field"]: column,
-    [t.bestUse || "Best use"]: friendlyType(profile.type, t),
-    [t.filledAnswers || "Filled answers"]: profile.count,
-    [t.emptyAnswers || "Empty answers"]: profile.missing_values,
-    [t.emptyPercent || "Empty %"]: percentage(profile.missing_percentage),
-    [t.differentAnswers || "Different answers"]: profile.unique_count,
-    [t.examples || "Examples"]: compactList(profile.sample, t),
-  }));
+const qualitativeProfileRows = (profiles = {}, t) =>
+  objectToRows(profiles, (column, profile) => ({ column, profile }))
+    .filter(({ profile }) => isQualitativeType(profile?.type))
+    .map(({ column, profile }) => {
+      const valuesLabel = t.examples || "Example values";
+
+      return {
+        [t.field || "Field"]: column,
+        [t.type || "Type"]: friendlyType(profile.type, t),
+        [t.filledAnswers || "Filled answers"]: profile.count,
+        [t.emptyAnswers || "Empty answers"]: profile.missing_values,
+        [t.uniqueValues || "Unique values"]: profile.unique_count,
+        [valuesLabel]: compactList(profile.sample, t),
+      };
+    });
+
+const QualitativeValueSections = ({ profiles = {}, t }) => {
+  const qualitativeProfiles = objectToRows(profiles, (column, profile) => ({
+    column,
+    profile,
+  })).filter(({ profile }) => isQualitativeType(profile?.type));
+
+  if (!qualitativeProfiles.length) return null;
+
+  return (
+    <section className="daw-qualitative-values">
+      {qualitativeProfiles.map(({ column, profile }) => {
+        const values = Array.isArray(profile.sample) ? profile.sample : [];
+
+        return (
+          <article className="daw-qualitative-card" key={column}>
+            <header>
+              <div>
+                <span>{friendlyType(profile.type, t)}</span>
+                <h4 title={column}>{column}</h4>
+              </div>
+
+              <strong>
+                {profile.unique_count ?? values.length} {t.uniqueValues || "unique values"}
+              </strong>
+            </header>
+
+            <dl>
+              <div>
+                <dt>{t.filledAnswers || "Filled answers"}</dt>
+                <dd>{profile.count ?? "-"}</dd>
+              </div>
+              <div>
+                <dt>{t.emptyAnswers || "Empty answers"}</dt>
+                <dd>{profile.missing_values ?? 0}</dd>
+              </div>
+            </dl>
+
+            <div className="daw-unique-value-list" aria-label={t.uniqueValues || "Unique values"}>
+              {values.length ? (
+                values.map((item, index) => (
+                  <span key={`${column}_${index}`} title={displayValue(item, t)} dir={valueDir(item)}>
+                    {displayValue(item, t)}
+                  </span>
+                ))
+              ) : (
+                <em>{t.noValues || "No values"}</em>
+              )}
+            </div>
+          </article>
+        );
+      })}
+    </section>
+  );
+};
 
 const renderMissing = (value, t) => {
+  const emptyPercentLabel = t.emptyPercent || "Empty %";
   const rows = objectToRows(value, (column, report) => ({
     [t.field || "Field"]: column,
     [t.emptyAnswers || "Empty answers"]: report.missing_count,
-    [t.emptyPercent || "Empty %"]: percentage(report.missing_percentage),
+    [emptyPercentLabel]: percentage(report.missing_percentage),
     [t.status || "Status"]: Number(report.missing_count || 0) ? t.needsAttention || "Needs attention" : t.complete || "Complete",
   }));
   const emptyFields = rows.filter((row) => Number(row[t.emptyAnswers || "Empty answers"] || 0) > 0);
@@ -121,36 +180,40 @@ const renderMissing = (value, t) => {
             : t.allFieldsComplete || "All checked fields are complete.",
         ]}
       />
-      <ReportTable table={{ title: t.missing, rows }} t={t} variant="compact" />
+      <ReportTable table={{ title: t.missing, rows, metricColumns: [emptyPercentLabel] }} t={t} variant="compact" />
     </div>
   );
 };
 
 const renderStatistics = (value, t) => {
+  const averageLabel = t.average || "Average";
+  const middleLabel = t.middle || "Middle";
+  const lowestLabel = t.lowest || "Lowest";
+  const highestLabel = t.highest || "Highest";
+  const totalLabel = t.total || "Total";
+  const emptyPercentLabel = t.emptyPercent || "Empty %";
+  const numericMetricColumns = [
+    averageLabel,
+    middleLabel,
+    lowestLabel,
+    highestLabel,
+    totalLabel,
+    emptyPercentLabel,
+  ];
   const numericRows = objectToRows(value.numeric_columns, (column, stats) => ({
     [t.field || "Field"]: column,
     [t.type || "Type"]: t.numberType || "Number",
     [t.filledAnswers || "Filled answers"]: stats.filled_values ?? stats.count,
-    [t.average || "Average"]: stats.mean,
-    [t.middle || "Middle"]: stats.median,
-    [t.lowest || "Lowest"]: stats.min,
-    [t.highest || "Highest"]: stats.max,
-    [t.total || "Total"]: stats.sum,
+    [averageLabel]: stats.mean,
+    [middleLabel]: stats.median,
+    [lowestLabel]: stats.min,
+    [highestLabel]: stats.max,
+    [totalLabel]: stats.sum,
     [t.emptyAnswers || "Empty answers"]: stats.missing_values,
-    [t.emptyPercent || "Empty %"]: percentage(stats.missing_percentage),
+    [emptyPercentLabel]: percentage(stats.missing_percentage),
   }));
-  const categoryRows = objectToRows(value.categorical_columns, (column, stats) => ({
-    [t.field || "Field"]: column,
-    [t.type || "Type"]: t.textChoiceType || "Text or choice",
-    [t.filledAnswers || "Filled answers"]: stats.filled_values ?? stats.count,
-    [t.differentAnswers || "Different answers"]: stats.unique_count,
-    [t.mostCommon || "Most common"]: compactList(stats.most_common, t),
-    [t.examples || "Examples"]: compactList(stats.examples || stats.unique_values_sample, t),
-    [t.emptyAnswers || "Empty answers"]: stats.missing_values,
-    [t.emptyPercent || "Empty %"]: percentage(stats.missing_percentage),
-  }));
+  const categoryCount = Object.keys(value.categorical_columns || {}).length;
   const hasNumeric = numericRows.length > 0;
-  const hasCategories = categoryRows.length > 0;
 
   return (
     <div className="daw-report-result">
@@ -158,7 +221,7 @@ const renderStatistics = (value, t) => {
         cards={[
           { label: t.rowsAnalyzed || "Rows analyzed", value: value.rows ?? "-", help: t.responsesIncluded || "Responses included in this check." },
           { label: t.numberFields || "Number fields", value: numericRows.length, help: t.numberFieldsHint || "Fields where averages and totals apply." },
-          { label: t.textFields || "Text fields", value: categoryRows.length, help: t.textFieldsHint || "Fields summarized by common answers." },
+          { label: t.textFields || "Text fields", value: categoryCount, help: t.textFieldsHint || "Fields summarized by common answers." },
         ]}
       />
       <InsightList
@@ -167,24 +230,21 @@ const renderStatistics = (value, t) => {
           hasNumeric
             ? t.numericStatsHint || "Numeric fields include averages, totals, lowest, and highest values."
             : t.noNumericStatsHint || "No number fields were detected, so this dataset is summarized by common answers instead of averages.",
-          hasCategories
-            ? t.categoryStatsHint || "Text and choice fields show the most common answer and example values."
-            : t.noCategoryStatsHint || "No text or choice fields were detected.",
         ]}
       />
       <WarningList warnings={value.warnings} t={t} />
-      {hasNumeric ? <ReportTable table={{ title: t.numberSummaries || "Number summaries", rows: numericRows }} t={t} variant="compact" /> : null}
-      {hasCategories ? <ReportTable table={{ title: t.answerSummaries || "Answer summaries", rows: categoryRows }} t={t} variant="compact" /> : null}
+      {hasNumeric ? <ReportTable table={{ title: t.quantitativeSummaries || "Quantitative summaries", rows: numericRows, metricColumns: numericMetricColumns }} t={t} variant="compact" /> : null}
     </div>
   );
 };
 
 const renderOverview = (value, t) => {
+  const labels = friendlyReviewLabels(t);
   const rows = objectToRows(value.unique_values, (column, details) => ({
-    [t.field || "Field"]: column,
-    [t.differentAnswers || "Different answers"]: details.count,
-    [t.emptyAnswers || "Empty answers"]: details.missing_values,
-    [t.examples || "Examples"]: compactList(details.sample, t),
+    [labels.field]: column,
+    [labels.unique]: details.count,
+    [labels.empty]: details.missing_values,
+    [labels.examples]: compactList(details.sample, t),
   }));
 
   return (
@@ -207,47 +267,29 @@ const renderOverview = (value, t) => {
         ]}
       />
       <WarningList warnings={value.warnings} t={t} />
-      <ReportTable table={{ title: t.overview, rows }} t={t} variant="compact" />
-      <ReportTable table={{ title: t.fieldGuide || "Field guide", rows: profileRows(value.profiles, t) }} t={t} variant="compact" />
+      <ReportTable table={{ title: t.fieldsAtAGlance || "Fields at a glance", rows }} t={t} variant="compact" />
     </div>
   );
 };
 
 const renderQuality = (value, t) => {
-  const actions = Array.isArray(value.recommended_actions)
-    ? value.recommended_actions.map((action) => translatedAction(action, t))
-    : [];
-  const score = Number(value.quality_score ?? 0);
-  const summaryRows = [
-    { [t.check || "Check"]: t.readyForReporting || "Ready for reporting", [t.result || "Result"]: translatedReadiness(value.readiness, score >= 90 ? t.readyToUse || "Ready to use" : t.needsReview || "Needs review", t) },
-    { [t.check || "Check"]: t.completeAnswers || "Complete answers", [t.result || "Result"]: percentage(value.completion_percentage) },
-    { [t.check || "Check"]: t.emptyCells || "Empty cells", [t.result || "Result"]: value.missing_cells },
-    { [t.check || "Check"]: t.duplicateRows || "Duplicate rows", [t.result || "Result"]: value.duplicate_rows },
-    { [t.check || "Check"]: t.rowsChecked || "Rows checked", [t.result || "Result"]: value.rows },
-    { [t.check || "Check"]: t.fieldsCheckedShort || "Fields checked", [t.result || "Result"]: value.columns },
-  ];
-  const typeRows = objectToRows(value.profiles, (column, profile) => ({
-    [t.field || "Field"]: column,
-    [t.bestUse || "Best use"]: friendlyType(profile.type, t),
-    [t.emptyAnswers || "Empty answers"]: profile.missing_values,
-    [t.emptyPercent || "Empty %"]: percentage(profile.missing_percentage),
-    [t.differentAnswers || "Different answers"]: profile.unique_count,
-  }));
+  const qualitativeRows = qualitativeProfileRows(value.profiles, t);
+  const qualitativeFields = qualitativeRows.length;
+  const totalFields = Number(value.columns ?? Object.keys(value.profiles || {}).length);
 
   return (
     <div className="daw-report-result">
       <SummaryCards
         cards={[
           {
-            label: t.qualityScore || "Quality score",
-            value: `${score}%`,
-            tone: score >= 90 ? "good" : "warn",
-            help: t.qualityScoreHint || "Based on missing answers and duplicates.",
+            label: t.qualitativeFields || "Qualitative fields",
+            value: qualitativeFields,
+            help: t.qualitativeFieldsHint || "Text, category, date, status, and choice columns available for interpretation.",
           },
           {
-            label: t.completeAnswers || "Complete answers",
-            value: percentage(value.completion_percentage),
-            help: t.completeAnswersHint || "How much of the dataset is filled.",
+            label: t.fields || "Fields",
+            value: Number.isFinite(totalFields) ? totalFields : "-",
+            help: t.fieldsAvailableHint || "Columns available for reporting.",
           },
           {
             label: t.duplicateRows || "Duplicate rows",
@@ -257,10 +299,17 @@ const renderQuality = (value, t) => {
           },
         ]}
       />
-      <InsightList title={t.recommendedNextSteps || "Recommended next steps"} items={actions} />
+      <InsightList
+        title={t.whatThisMeans || "What this means"}
+        items={[
+          t.qualitativeAuditHint || "Use this view to see which qualitative columns can explain patterns in MEAL, finance, forms, and operational reports.",
+          qualitativeFields
+            ? t.qualitativeValuesHint || "Each row lists the column type, coverage, number of unique values, and example values."
+            : t.noQualitativeValuesHint || "No qualitative columns were detected in this dataset.",
+        ]}
+      />
       <WarningList warnings={value.warnings} t={t} />
-      <ReportTable table={{ title: t.quality, rows: summaryRows }} t={t} variant="compact" />
-      <ReportTable table={{ title: t.fieldQuality || "Field quality", rows: typeRows }} t={t} variant="compact" />
+      <QualitativeValueSections profiles={value.profiles} t={t} />
     </div>
   );
 };

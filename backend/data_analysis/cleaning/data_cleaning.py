@@ -121,7 +121,7 @@ class DataCleaning(DataReadingNormal):
 
         return report
 
-    def quality_report(self) -> dict:
+    def quality_report(self, max_unique_values: int = 100) -> dict:
         df, warnings = self.prepare_dataframe(self.read())
 
         duplicate_count = int(df.duplicated().sum())
@@ -159,7 +159,7 @@ class DataCleaning(DataReadingNormal):
             "recommended_actions": recommended_actions,
             "column_types": {column: str(df[column].dtype) for column in df.columns},
             "warnings": warnings,
-            "profiles": self.profile_dataframe(df),
+            "profiles": self.profile_dataframe(df, max_unique_values=max_unique_values),
         }
 
     def column_types(self) -> dict:
@@ -253,6 +253,22 @@ class DataCleaning(DataReadingNormal):
         df = self.read()
         self._validate_columns_exist(df, columns)
         return df.drop(columns=columns)
+
+    def encode_columns(
+        self,
+        columns: list[str],
+        method: str = "one_hot",
+        keep_original: bool = False,
+        max_unique_values: int = 50,
+    ) -> pd.DataFrame:
+        df = self.read()
+        return self._encode_columns_on_dataframe(
+            df,
+            columns,
+            method=method,
+            keep_original=keep_original,
+            max_unique_values=max_unique_values,
+        )
 
     def outlier_report_iqr(
         self,
@@ -424,6 +440,19 @@ class DataCleaning(DataReadingNormal):
                 columns = params["columns"]
                 self._validate_columns_exist(df, columns)
                 df = df.drop(columns=columns)
+
+            elif action_type == "encode_columns":
+                columns = params["columns"]
+                method = params.get("method", "one_hot")
+                keep_original = bool(params.get("keep_original", False))
+                max_unique_values = int(params.get("max_unique_values", 50))
+                df = self._encode_columns_on_dataframe(
+                    df,
+                    columns,
+                    method=method,
+                    keep_original=keep_original,
+                    max_unique_values=max_unique_values,
+                )
 
             elif action_type == "remove_outliers_iqr":
                 columns = params["columns"]
@@ -711,6 +740,45 @@ class DataCleaning(DataReadingNormal):
         df = df.copy()
         for column in columns:
             df[column] = df[column].map(lambda value: self._normalize_multi_select_value(value, separator=separator))
+        return df
+
+    def _encode_columns_on_dataframe(
+        self,
+        df: pd.DataFrame,
+        columns: list[str],
+        method: str = "one_hot",
+        keep_original: bool = False,
+        max_unique_values: int = 50,
+    ) -> pd.DataFrame:
+        df = df.copy()
+        self._validate_columns_exist(df, columns)
+
+        if method not in {"one_hot", "label"}:
+            raise ValueError(f"Unsupported encoding method: {method}")
+
+        for column in columns:
+            values = df[column].map(self._normalize_text_value).replace("", pd.NA)
+            unique_count = int(values.nunique(dropna=True))
+
+            if unique_count > max_unique_values:
+                raise ValueError(
+                    f"Column '{column}' has {unique_count} unique values. "
+                    f"Choose a column with {max_unique_values} or fewer values for encoding."
+                )
+
+            if method == "one_hot":
+                dummies = pd.get_dummies(values, prefix=column, prefix_sep="_", dummy_na=False)
+                dummies = dummies.astype("Int64")
+                df = pd.concat([df, dummies], axis=1)
+
+            else:
+                codes, _uniques = pd.factorize(values, sort=True)
+                code_series = pd.Series(codes, index=df.index).replace(-1, pd.NA).astype("Int64")
+                df[f"{column}_code"] = code_series
+
+        if not keep_original:
+            df = df.drop(columns=columns)
+
         return df
 
     def _normalize_header(self, value: Any) -> str:
