@@ -175,31 +175,169 @@
   font-weight: 900;
 }
 
+.page-builder .daw-qualitative-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.page-builder .daw-qualitative-card {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.page-builder .daw-qualitative-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--daw-card-border);
+}
+
+.page-builder .daw-qualitative-card header > div {
+  min-width: 0;
+}
+
+.page-builder .daw-qualitative-card header span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--daw-muted);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.page-builder .daw-qualitative-card h4 {
+  margin: 0;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-qualitative-card header strong {
+  flex: 0 0 auto;
+  max-width: 120px;
+  color: var(--daw-red);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.35;
+  text-align: end;
+}
+
+.page-builder .daw-qualitative-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.page-builder .daw-qualitative-card dl div {
+  min-width: 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: rgba(26, 39, 68, 0.045);
+}
+
+.page-builder .daw-qualitative-card dt {
+  margin: 0;
+  color: var(--daw-muted);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.page-builder .daw-qualitative-card dd {
+  margin: 4px 0 0;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .daw-unique-value-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  max-height: 190px;
+  overflow: auto;
+  padding-inline-end: 2px;
+}
+
+.page-builder .daw-unique-value-list span {
+  max-width: 100%;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: rgba(var(--theme-primary-rgb), 0.06);
+  color: var(--daw-text);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-unique-value-list em {
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .page-builder .daw-compact-table-scroll {
   width: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--daw-card-border);
   border-radius: 12px;
+  overscroll-behavior-x: contain;
 }
 
 .page-builder .daw-compact-table {
   width: 100%;
-  min-width: 0;
+  min-width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
+}
+
+.page-builder .daw-compact-table-wide {
+  min-width: 1580px;
+}
+
+.page-builder .daw-compact-col-label {
+  width: 190px;
+}
+
+.page-builder .daw-compact-col-number {
+  width: 170px;
+}
+
+.page-builder .daw-compact-col-sample {
+  width: 420px;
 }
 
 .page-builder .daw-compact-table th,
 .page-builder .daw-compact-table td {
-  max-width: 220px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--daw-card-border);
   color: var(--daw-text);
   font-size: 12px;
   line-height: 1.35;
-  text-align: start;
+  text-align: center;
   vertical-align: top;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+}
+
+.page-builder .daw-compact-table td > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .page-builder .daw-compact-table th {
@@ -207,6 +345,37 @@
   color: var(--daw-muted);
   font-weight: 950;
   white-space: nowrap;
+}
+
+.page-builder .daw-compact-cell-label {
+  font-weight: 900;
+  text-align: center;
+}
+
+.page-builder .daw-compact-cell-number {
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.page-builder .daw-compact-cell-text,
+.page-builder .daw-compact-cell-label {
+  white-space: nowrap;
+}
+
+.page-builder .daw-compact-cell-sample {
+  min-width: 240px;
+}
+
+.page-builder .daw-compact-table td.daw-compact-cell-sample > span {
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(26, 39, 68, 0.045);
+  line-height: 1.45;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .page-builder .daw-compact-table tr:last-child td {

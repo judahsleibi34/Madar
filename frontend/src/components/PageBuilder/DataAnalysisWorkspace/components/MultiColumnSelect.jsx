@@ -1,6 +1,6 @@
 import { columnLabel, valueDir } from '../utils/formatters';
 
-export default function MultiColumnSelect({ label, value, columns, onChange, activeLang, t }) {
+export default function MultiColumnSelect({ label, value, columns, onChange, activeLang, t, hideLabel = false }) {
   const selected = Array.isArray(value) ? value : [];
 
   const toggleColumn = (column) => {
@@ -13,7 +13,7 @@ export default function MultiColumnSelect({ label, value, columns, onChange, act
 
   return (
     <div className="daw-field wide">
-      <span>{label}</span>
+      {hideLabel ? null : <span>{label}</span>}
 
       <div className="daw-column-picker">
         {columns.length ? (

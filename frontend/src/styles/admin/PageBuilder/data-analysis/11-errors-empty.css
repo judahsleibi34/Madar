@@ -93,11 +93,18 @@
 }
 
 .page-builder .daw-empty {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-height: 160px;
   padding: 24px;
   text-align: center;
+}
+
+.page-builder .daw-empty-fill {
+  min-height: min(360px, calc(100vh - 360px));
+  height: 100%;
 }
 
 .page-builder .daw-empty strong {

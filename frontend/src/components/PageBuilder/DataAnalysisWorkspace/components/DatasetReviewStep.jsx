@@ -1,7 +1,9 @@
+import { useEffect, useRef } from 'react';
 import EmptyState from './EmptyState';
 import ResultView from './ResultView';
 
 export default function DatasetReviewStep({ dataset, inspection, runInspection, isLoading, t }) {
+  const inspectionBoxRef = useRef(null);
   const reviewActions = [
     {
       id: "overview",
@@ -14,16 +16,25 @@ export default function DatasetReviewStep({ dataset, inspection, runInspection, 
       hint: t.reviewStatisticsHint || "See totals, common answers, and numeric summaries.",
     },
     {
+      id: "quality",
+      label: t.quality,
+      hint: t.reviewQualityHint || "Inspect qualitative columns, unique values, and field coverage.",
+    },
+    {
       id: "missing",
       label: t.missing,
       hint: t.reviewMissingHint || "Find empty answers that may affect reporting.",
     },
-    {
-      id: "quality",
-      label: t.quality,
-      hint: t.reviewQualityHint || "Check readiness, duplicates, and cleanup advice.",
-    },
   ];
+
+  const resetInspectionScroll = () => {
+    if (!inspectionBoxRef.current) return;
+    inspectionBoxRef.current.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
+
+  useEffect(() => {
+    resetInspectionScroll();
+  }, [inspection?.type]);
 
   return (
     <section className="daw-card daw-section-card">
@@ -44,7 +55,10 @@ export default function DatasetReviewStep({ dataset, inspection, runInspection, 
                 type="button"
                 className={inspection?.type === action.id ? "active" : ""}
                 disabled={isLoading}
-                onClick={() => runInspection(action.id)}
+                onClick={() => {
+                  resetInspectionScroll();
+                  runInspection(action.id);
+                }}
               >
                 <strong>{action.label}</strong>
                 <span>{action.hint}</span>
@@ -52,11 +66,13 @@ export default function DatasetReviewStep({ dataset, inspection, runInspection, 
             ))}
           </aside>
 
-          <div className="daw-inspection-box">
+          <div className="daw-inspection-box" ref={inspectionBoxRef}>
             {inspection ? (
               <ResultView value={inspection.data} type={inspection.type} t={t} />
             ) : (
-              <EmptyState title={t.review}>{t.inspectionWaiting}</EmptyState>
+              <EmptyState title={t.review} className="daw-empty-fill">
+                {t.inspectionWaiting}
+              </EmptyState>
             )}
           </div>
         </div>

@@ -409,10 +409,11 @@ class PlotHelpersMixin:
             legend_font_size=legend_font_size,
             language=language,
             bbox_to_anchor=(0.82, 0.84),
-            ncol=1,
+            ncol=self._legend_column_count(labels),
+            columnspacing=1.1,
         )
 
-        figure.tight_layout(rect=[0, 0, 0.76, 1])
+        figure.tight_layout(rect=[0, 0, 0.70, 1])
         
     def _plot_pie(
         self,
@@ -456,10 +457,9 @@ class PlotHelpersMixin:
             colors = list(sns.color_palette(palette or "viridis", n_colors=len(values)).as_hex())
 
         axis = plt.gca()
-        wedges, _texts, autotexts = axis.pie(
+        wedges, _texts = axis.pie(
             values,
             labels=None,
-            autopct="%1.1f%%",
             startangle=90,
             colors=colors,
             wedgeprops={
@@ -471,10 +471,6 @@ class PlotHelpersMixin:
                 "color": "#111827",
             },
         )
-
-        for autotext in autotexts:
-            autotext.set_fontweight("bold")
-            autotext.set_color("#111827")
 
         axis.axis("equal")
 
@@ -491,10 +487,11 @@ class PlotHelpersMixin:
             legend_font_size=10,
             language=language,
             bbox_to_anchor=(0.82, 0.84),
-            ncol=1,
+            ncol=self._legend_column_count(legend_labels),
+            columnspacing=1.1,
         )
 
-        plt.tight_layout(rect=[0, 0, 0.78, 1])
+        plt.tight_layout(rect=[0, 0, 0.70, 1])
 
     def _plot_heatmap(
         self,
@@ -515,14 +512,44 @@ class PlotHelpersMixin:
         else:
             heatmap_data = self.df.copy()
 
-        numeric_data = heatmap_data.select_dtypes(include="number")
+        numeric_columns = {}
+        unusable_columns = []
+
+        for column in heatmap_data.columns:
+            values = heatmap_data[column]
+            if pd.api.types.is_numeric_dtype(values):
+                numeric_values = pd.to_numeric(values, errors="coerce")
+            else:
+                cleaned_values = (
+                    values.astype("string")
+                    .str.strip()
+                    .str.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789"))
+                    .str.replace(r"[%$€£₪,\s]", "", regex=True)
+                    .str.replace(r"(?<=\d)-(?=\d)", "", regex=True)
+                )
+                numeric_values = pd.to_numeric(cleaned_values, errors="coerce")
+
+            if numeric_values.notna().sum() >= 2:
+                numeric_columns[column] = numeric_values
+            else:
+                unusable_columns.append(column)
+
+        numeric_data = pd.DataFrame(numeric_columns)
 
         if numeric_data.empty:
-            raise ValueError("Heatmap requires at least one numeric column.")
+            raise ValueError("Heatmap needs at least two numeric columns.")
+
+        if numeric_data.shape[1] < 2:
+            if unusable_columns:
+                raise ValueError(
+                    "Heatmap needs at least two usable numeric columns. "
+                    f"These selected columns do not have enough numeric values: {', '.join(unusable_columns)}."
+                )
+            raise ValueError("Heatmap needs at least two numeric columns.")
 
         correlation = numeric_data.corr(numeric_only=True)
 
-        if correlation.empty:
+        if correlation.empty or correlation.dropna(how="all").empty:
             raise ValueError("Heatmap could not compute correlations.")
 
         cmap = self._palette_cmap(palette, color)
@@ -620,8 +647,10 @@ class PlotHelpersMixin:
             )
 
         lane = getattr(axis, "_madar_fixed_legend_lane", None)
-        if lane in {"bar", "scatter", "line", "stats", "pie"}:
-            plt.tight_layout(rect=[0, 0, 0.78, 1])
+        if lane in {"bar", "scatter", "line", "pie"}:
+            plt.tight_layout(rect=[0, 0, 0.70, 1])
+        elif lane == "stats":
+            plt.tight_layout(rect=[0, 0, 0.72, 1])
         else:
             plt.tight_layout()
 

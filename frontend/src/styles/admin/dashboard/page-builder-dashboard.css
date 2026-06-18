@@ -105,6 +105,27 @@
   color: var(--theme-primary);
 }
 
+html.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active,
+html[data-theme="light"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active,
+body.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active,
+.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active,
+[data-theme="light"] .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active,
+body.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active {
+  background: rgba(26, 39, 68, 0.08) !important;
+  color: #1a2744 !important;
+}
+
+html.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active svg,
+html[data-theme="light"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active svg,
+body.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active svg,
+.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active svg,
+[data-theme="light"] .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active svg,
+body.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active svg {
+  color: #1a2744 !important;
+  stroke: currentColor !important;
+  opacity: 1 !important;
+}
+
 /* ============================================================
    COMPACT THEME ICON
    Important: previous CSS hid every span, which also hid the icon.

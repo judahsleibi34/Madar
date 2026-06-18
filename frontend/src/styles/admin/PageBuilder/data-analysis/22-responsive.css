@@ -7,6 +7,10 @@
     grid-template-columns: 1fr;
   }
 
+  .page-builder .daw-advanced-cleaning-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .page-builder .daw-step-report .daw-step-content {
     grid-template-columns: 1fr;
   }
@@ -35,6 +39,9 @@
 
   .page-builder .daw-review-shell,
   .page-builder .daw-review-summary-grid,
+  .page-builder .daw-cleaning-grid,
+  .page-builder .daw-advanced-cleaning-grid,
+  .page-builder .daw-cleaning-tool-wide .daw-form-grid,
   .page-builder .daw-dataset-stats,
   .page-builder .daw-kpi-grid,
   .page-builder .daw-object-grid {

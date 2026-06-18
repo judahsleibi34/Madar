@@ -226,6 +226,98 @@
   width: 88px;
 }
 
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+
+:root[data-theme="dark"] .auth-page,
+:root[data-theme="dark"] .login-page,
+:root[data-theme="dark"] .already-signed-page,
+html.theme-dark .auth-page,
+html.theme-dark .login-page,
+html.theme-dark .already-signed-page,
+body.theme-dark .auth-page,
+body.theme-dark .login-page,
+body.theme-dark .already-signed-page {
+  background:
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.16), transparent 34%),
+    radial-gradient(circle at top right, rgba(var(--theme-secondary-rgb), 0.12), transparent 36%),
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 56%, #151018 100%);
+  color: var(--theme-text);
+}
+
+:root[data-theme="dark"] .already-signed-card,
+:root[data-theme="dark"] .auth-skeleton-card,
+html.theme-dark .already-signed-card,
+html.theme-dark .auth-skeleton-card,
+body.theme-dark .already-signed-card,
+body.theme-dark .auth-skeleton-card {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)) padding-box,
+    linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(var(--theme-primary-rgb), 0.2)) border-box;
+  border-color: transparent;
+  color: var(--theme-text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+}
+
+:root[data-theme="dark"] .already-signed-card::after,
+:root[data-theme="dark"] .auth-skeleton-card::after,
+html.theme-dark .already-signed-card::after,
+html.theme-dark .auth-skeleton-card::after,
+body.theme-dark .already-signed-card::after,
+body.theme-dark .auth-skeleton-card::after {
+  background: var(--theme-primary-hover);
+  opacity: 0.11;
+}
+
+:root[data-theme="dark"] .already-signed-card h1,
+html.theme-dark .already-signed-card h1,
+body.theme-dark .already-signed-card h1 {
+  color: var(--theme-text);
+}
+
+:root[data-theme="dark"] .already-signed-card p,
+html.theme-dark .already-signed-card p,
+body.theme-dark .already-signed-card p {
+  color: var(--theme-text-muted);
+}
+
+:root[data-theme="dark"] .already-signed-actions button:not(:first-child),
+:root[data-theme="dark"] .already-signed-actions a:not(:first-child),
+html.theme-dark .already-signed-actions button:not(:first-child),
+html.theme-dark .already-signed-actions a:not(:first-child),
+body.theme-dark .already-signed-actions button:not(:first-child),
+body.theme-dark .already-signed-actions a:not(:first-child) {
+  background: rgba(var(--theme-primary-rgb), 0.12);
+  border-color: rgba(var(--theme-primary-rgb), 0.38);
+  color: var(--theme-text);
+}
+
+:root[data-theme="dark"] .already-signed-actions button:not(:first-child):hover,
+:root[data-theme="dark"] .already-signed-actions a:not(:first-child):hover,
+html.theme-dark .already-signed-actions button:not(:first-child):hover,
+html.theme-dark .already-signed-actions a:not(:first-child):hover,
+body.theme-dark .already-signed-actions button:not(:first-child):hover,
+body.theme-dark .already-signed-actions a:not(:first-child):hover {
+  background: rgba(var(--theme-primary-rgb), 0.18);
+  border-color: rgba(var(--theme-primary-rgb), 0.5);
+}
+
+:root[data-theme="dark"] .auth-skeleton-line,
+:root[data-theme="dark"] .auth-skeleton-button,
+html.theme-dark .auth-skeleton-line,
+html.theme-dark .auth-skeleton-button,
+body.theme-dark .auth-skeleton-line,
+body.theme-dark .auth-skeleton-button {
+  background: linear-gradient(
+    90deg,
+    rgba(244, 240, 232, 0.1),
+    rgba(var(--theme-primary-rgb), 0.16),
+    rgba(244, 240, 232, 0.1)
+  );
+  background-size: 220% 100%;
+}
+
 @keyframes auth-skeleton-loading {
   0% {
     background-position: 120% 0;

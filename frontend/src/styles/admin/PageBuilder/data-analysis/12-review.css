@@ -4,8 +4,8 @@
 
 .page-builder .daw-review-shell {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  gap: 20px;
   align-items: start;
 }
 
@@ -17,11 +17,11 @@
 
 .page-builder .daw-review-sidebar button {
   display: grid;
-  gap: 4px;
-  min-height: 66px;
+  gap: 7px;
+  min-height: 82px;
   border: 1px solid var(--daw-tab-border);
   border-radius: 12px;
-  padding: 12px;
+  padding: 14px 12px;
   background: var(--daw-tab-bg);
   color: var(--daw-text);
   text-align: start;
@@ -57,7 +57,7 @@
   color: inherit;
   font-size: 11px;
   font-weight: 750;
-  line-height: 1.35;
+  line-height: 1.45;
   opacity: 0.72;
 }
 
@@ -68,7 +68,7 @@
   border-radius: 20px;
   background: #ffffff;
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
   scrollbar-color: rgba(var(--theme-primary-rgb), 0.48) transparent;
   scrollbar-width: thin;
 }
