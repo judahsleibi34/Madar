@@ -1,0 +1,977 @@
+.page-builder .daw-report-builder {
+  --daw-report-ink: var(--theme-text);
+  --daw-report-muted: var(--theme-text-soft);
+  --daw-report-border: var(--theme-border-strong);
+  --daw-report-surface: var(--theme-surface);
+  --daw-report-soft: var(--theme-surface-2);
+  --daw-report-paper: var(--theme-paper-surface);
+  --daw-report-paper-soft: var(--theme-paper-surface-soft);
+  --daw-report-paper-ink: var(--theme-paper-text);
+  --daw-report-paper-muted: var(--theme-paper-text-soft);
+  --daw-report-paper-border: var(--theme-paper-border);
+  display: grid;
+  grid-template-columns: 250px minmax(420px, 1fr) 260px;
+  gap: 14px;
+  align-items: start;
+}
+
+.page-builder .daw-report-panel,
+.page-builder .daw-report-canvas-shell {
+  min-width: 0;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 16px;
+  background: var(--daw-report-surface) !important;
+}
+
+.page-builder .daw-report-panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.page-builder .daw-report-panel-heading span {
+  color: var(--daw-report-muted) !important;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-report-panel-heading h3 {
+  margin: 4px 0 0;
+  color: var(--daw-report-ink) !important;
+  font-size: 16px;
+}
+
+.page-builder .daw-report-panel-heading p {
+  margin: 5px 0 0;
+  color: var(--daw-report-muted) !important;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.page-builder .daw-report-source-field {
+  position: relative;
+  display: grid;
+  gap: 7px;
+}
+
+.page-builder .daw-report-source-field > span {
+  color: var(--daw-report-ink) !important;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .daw-report-source-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--daw-report-surface) !important;
+  color: var(--daw-report-ink) !important;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: start;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-source-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-builder .daw-report-source-popover {
+  position: absolute;
+  z-index: 30;
+  inset-inline: 0;
+  top: calc(100% + 6px);
+  overflow: hidden;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 12px;
+  background: var(--daw-report-surface) !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+.page-builder .daw-report-source-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 9px;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 9px;
+  padding: 0 9px;
+  background: var(--daw-report-soft) !important;
+  color: var(--daw-report-muted) !important;
+}
+
+.page-builder .daw-report-source-search input {
+  min-width: 0;
+  width: 100%;
+  height: 36px;
+  border: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: var(--daw-report-ink) !important;
+  outline: 0;
+}
+
+.page-builder .daw-report-source-list {
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-primary) var(--daw-report-soft);
+}
+
+.page-builder .daw-report-source-list::-webkit-scrollbar {
+  width: 9px;
+}
+
+.page-builder .daw-report-source-list::-webkit-scrollbar-track {
+  background: var(--daw-report-soft);
+}
+
+.page-builder .daw-report-source-list::-webkit-scrollbar-thumb {
+  border: 2px solid var(--daw-report-soft);
+  border-radius: 999px;
+  background: var(--theme-primary);
+}
+
+.page-builder .daw-report-source-list section {
+  display: grid;
+  gap: 2px;
+  border-top: 1px solid var(--daw-report-border);
+  padding: 8px;
+}
+
+.page-builder .daw-report-source-list section > strong {
+  padding: 5px 7px;
+  color: var(--daw-report-muted) !important;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-report-source-list section > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px;
+  background: transparent;
+  color: var(--daw-report-ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: start;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-source-list section > button:hover,
+.page-builder .daw-report-source-list section > button.active {
+  background: rgba(var(--theme-primary-rgb), 0.12);
+  color: var(--daw-red);
+}
+
+.page-builder .daw-report-source-list > p {
+  margin: 0;
+  padding: 18px;
+  color: var(--daw-report-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.page-builder .daw-report-logo-control {
+  display: grid;
+  gap: 7px;
+  color: var(--daw-report-ink) !important;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .daw-report-logo-control > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.page-builder .daw-report-logo-control input {
+  width: 100%;
+  border: 1px solid var(--daw-report-border) !important;
+  border-radius: 10px;
+  padding: 8px;
+  background: var(--daw-report-surface) !important;
+  color: var(--daw-report-ink) !important;
+  font-size: 11px;
+}
+
+.page-builder .daw-report-remove-logo {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--daw-red);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: start;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-block-library {
+  display: grid;
+  gap: 8px;
+}
+
+.page-builder .daw-report-block-library > strong {
+  color: var(--daw-report-ink) !important;
+  font-size: 12px;
+}
+
+.page-builder .daw-report-block-library > button,
+.page-builder .daw-report-page-block {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 11px;
+  padding: 10px;
+  background: var(--daw-report-soft) !important;
+  color: var(--daw-report-ink) !important;
+  text-align: start;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-drag-handle {
+  position: absolute;
+  z-index: 3;
+  inset-inline-start: -29px;
+  top: 2px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: #71809a;
+  opacity: 0;
+  cursor: grab;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.page-builder .daw-report-page-block:hover .daw-report-drag-handle,
+.page-builder .daw-report-page-block.is-selected .daw-report-drag-handle,
+.page-builder .daw-report-drag-handle:focus-visible {
+  opacity: 1;
+}
+
+.page-builder .daw-report-drag-handle:hover {
+  background: #edf2f8;
+  color: var(--theme-primary);
+}
+
+.page-builder .daw-report-drag-handle:active {
+  cursor: grabbing;
+}
+
+.page-builder .daw-report-page-block:focus-visible {
+  outline: 1px dashed var(--theme-primary);
+  outline-offset: 4px;
+}
+
+.page-builder .daw-report-page-block.is-text .daw-report-block-body:empty {
+  min-height: 1.6em;
+}
+
+.page-builder .daw-report-block-library > button:hover {
+  border-color: var(--theme-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.1);
+}
+
+.page-builder .daw-report-block-library > button.is-dragging {
+  opacity: 0.52;
+  transform: scale(0.98);
+}
+
+.page-builder .daw-report-block-library > button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.page-builder .daw-report-no-generated-blocks {
+  margin: 4px 0 0;
+  border: 1px dashed var(--theme-border-strong);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--theme-text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.page-builder .daw-report-no-generated-blocks p {
+  margin: 0;
+}
+
+.page-builder .daw-report-no-generated-blocks .daw-primary {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.page-builder .daw-report-block-library button > span,
+.page-builder .daw-report-page-block > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.page-builder .daw-report-block-library small {
+  color: var(--daw-report-muted) !important;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.page-builder .daw-report-block-library button strong {
+  color: var(--daw-report-ink) !important;
+}
+
+.page-builder .daw-report-canvas-shell {
+  padding: 18px;
+  background: var(--theme-bg-soft) !important;
+}
+
+.page-builder .daw-report-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.page-builder .daw-report-preview-actions button {
+  gap: 7px;
+}
+
+.page-builder .daw-report-builder.is-preview {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.page-builder .daw-report-builder.is-preview > .daw-report-panel {
+  display: none;
+}
+
+.page-builder .daw-report-canvas-shell.is-preview .daw-report-page {
+  box-shadow: 0 18px 48px rgba(15, 29, 56, 0.18);
+}
+
+.page-builder .daw-report-canvas-shell.is-preview .daw-report-page-block {
+  border-inline-start-color: transparent;
+  cursor: default;
+}
+
+.page-builder .daw-document-toolbar {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  margin: 0 0 8px;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 10px;
+  padding: 7px;
+  background: var(--theme-surface) !important;
+  box-shadow: 0 8px 20px rgba(var(--theme-primary-rgb), 0.08);
+}
+
+.page-builder .daw-document-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.page-builder .daw-document-toolbar button,
+.page-builder .daw-document-toolbar select {
+  flex: 0 0 auto;
+  min-width: 34px;
+  min-height: 32px;
+  border: 1px solid var(--theme-border);
+  border-radius: 7px;
+  padding: 0 8px;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.page-builder .daw-toolbar-color {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: 1px solid var(--theme-border);
+  border-radius: 7px;
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.page-builder .daw-toolbar-color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0 !important;
+  padding: 0 !important;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.page-builder .daw-toolbar-palette {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.page-builder .daw-toolbar-palette > button {
+  position: relative;
+  padding: 0 8px;
+}
+
+.page-builder .daw-toolbar-palette > button i {
+  position: absolute;
+  inset-inline: 6px;
+  bottom: 3px;
+  height: 3px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(15, 29, 56, 0.18);
+}
+
+.page-builder .daw-toolbar-palette-menu {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  inset-inline-start: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 26px);
+  gap: 6px;
+  width: max-content;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 10px;
+  padding: 8px;
+  background: var(--theme-surface) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+}
+
+.page-builder .daw-document-toolbar .daw-toolbar-palette-menu > button {
+  min-width: 26px;
+  width: 26px;
+  min-height: 26px;
+  height: 26px;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  padding: 0;
+  background: var(--palette-color) !important;
+  box-shadow: inset 0 0 0 1px rgba(15, 29, 56, 0.2);
+}
+
+.page-builder .daw-document-toolbar .daw-toolbar-palette-menu > button:hover,
+.page-builder .daw-document-toolbar .daw-toolbar-palette-menu > button.active {
+  border-color: var(--theme-primary);
+  transform: scale(1.06);
+}
+
+.page-builder .daw-toolbar-hex-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px;
+  width: 122px;
+  border-top: 1px solid var(--theme-border);
+  padding-top: 7px;
+}
+
+.page-builder .daw-toolbar-hex-row input {
+  min-width: 0;
+  width: 100%;
+  height: 30px;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 6px;
+  padding: 0 6px !important;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  outline: 0;
+}
+
+.page-builder .daw-document-toolbar .daw-toolbar-hex-row > button {
+  min-width: 42px;
+  min-height: 30px;
+  height: 30px;
+  border-radius: 6px;
+  padding: 0 6px;
+  font-size: 9px;
+}
+
+.page-builder .daw-document-toolbar button:hover,
+.page-builder .daw-document-toolbar select:hover {
+  border-color: var(--theme-primary);
+  color: var(--theme-primary) !important;
+}
+
+.page-builder .daw-document-toolbar select {
+  flex: 1 1 150px;
+  min-width: 130px;
+}
+
+.page-builder .daw-report-block-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.page-builder .daw-report-block-position {
+  min-width: 0;
+}
+
+.page-builder .daw-report-drop-zone {
+  display: grid;
+  place-items: center;
+  height: 20px;
+  margin: 0;
+  border: 1px dashed transparent;
+  border-radius: 6px;
+  color: transparent;
+  font-size: 10px;
+  font-weight: 900;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.page-builder .daw-report-drop-zone > button {
+  border: 0;
+  padding: 2px 8px;
+  background: transparent;
+  color: transparent;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-drop-zone:hover {
+  border: 1px dashed rgba(var(--theme-primary-rgb), 0.28);
+}
+
+.page-builder .daw-report-drop-zone:hover > button,
+.page-builder .daw-report-drop-zone.is-active > button {
+  color: var(--theme-primary);
+}
+
+.page-builder .daw-report-drop-zone.is-active {
+  border: 1px dashed var(--theme-primary);
+  background: rgba(var(--theme-primary-rgb), 0.08);
+  color: var(--theme-primary);
+}
+
+.page-builder .daw-report-empty-canvas.is-drop-active {
+  border-color: var(--theme-primary);
+  background: rgba(var(--theme-primary-rgb), 0.06);
+}
+
+.page-builder .daw-report-header-shell {
+  position: relative;
+}
+
+.page-builder .daw-report-header-shell > .daw-document-toolbar,
+.page-builder .daw-report-block-shell > .daw-document-toolbar {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(100% + 7px);
+  z-index: 20;
+  margin: 0;
+}
+
+.page-builder .daw-report-page {
+  width: min(816px, 100%);
+  min-height: 1056px;
+  margin: 0 auto;
+  border: 1px solid var(--daw-report-paper-border);
+  border-radius: 3px;
+  padding: 64px 68px;
+  background: var(--daw-report-paper) !important;
+  box-shadow: var(--theme-shadow);
+}
+
+.page-builder .daw-report-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 2px solid var(--theme-primary);
+  padding-bottom: 18px;
+  padding-inline: 10px;
+  background: var(--daw-header-background, transparent);
+}
+
+.page-builder .daw-report-page-header img {
+  width: 72px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.page-builder .daw-report-page-header > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.page-builder .daw-report-page .daw-report-editable {
+  width: 100%;
+  min-height: 1em;
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  color: var(--daw-report-paper-ink) !important;
+  font-family: inherit;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-report-page .daw-report-page-block .daw-report-editable,
+.page-builder .daw-report-page .daw-report-page-block .daw-report-block-body {
+  color: var(--daw-block-text, var(--daw-report-paper-ink)) !important;
+}
+
+.page-builder .daw-report-page .daw-report-inline-title {
+  font-size: 25px;
+  font-weight: 950;
+}
+
+.page-builder .daw-report-page .daw-report-editable:empty::before {
+  color: var(--daw-report-paper-muted);
+  content: attr(data-placeholder);
+  opacity: 0.62;
+}
+
+.page-builder .daw-report-page .daw-report-editable:focus {
+  box-shadow: inset 0 -1px 0 var(--theme-primary);
+}
+
+.page-builder .daw-report-page .daw-report-editable p,
+.page-builder .daw-report-page .daw-report-editable h1,
+.page-builder .daw-report-page .daw-report-editable h2,
+.page-builder .daw-report-page .daw-report-editable h3 {
+  margin: 0 0 0.55em;
+}
+
+.page-builder .daw-report-page .daw-report-editable ul,
+.page-builder .daw-report-page .daw-report-editable ol {
+  margin: 0.35em 0;
+  padding-inline-start: 1.6em;
+}
+
+.page-builder .daw-report-page-blocks {
+  display: grid;
+  gap: 4px;
+  margin-top: 30px;
+}
+
+.page-builder .daw-report-page-block {
+  display: block;
+  min-height: 0;
+  border: 0;
+  border-inline-start: 3px solid transparent;
+  border-radius: 0;
+  padding: 2px 0 2px 12px;
+  background: var(--daw-block-background, transparent) !important;
+  color: var(--daw-report-paper-ink) !important;
+  cursor: text;
+}
+
+.page-builder .daw-report-page-block > div {
+  gap: 2px;
+}
+
+.page-builder .daw-report-page .daw-report-block-title {
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.page-builder .daw-report-page .daw-report-block-body {
+  margin-top: 3px;
+  color: var(--daw-report-paper-muted) !important;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.page-builder .daw-report-page-block.is-selected {
+  border-inline-start-color: var(--theme-primary);
+  box-shadow: none;
+}
+
+.page-builder .daw-report-page-block.is-heading {
+  margin-top: 8px;
+}
+
+.page-builder .daw-report-page .daw-report-page-block.is-heading .daw-report-block-title {
+  font-size: 23px;
+  line-height: 1.25;
+}
+
+.page-builder .daw-report-page .daw-report-page-block.is-text .daw-report-block-title {
+  font-size: 16px;
+}
+
+.page-builder .daw-report-page-block.is-metric,
+.page-builder .daw-report-page-block.is-chart,
+.page-builder .daw-report-page-block.is-table {
+  padding-block: 8px;
+  border-bottom: 1px solid var(--daw-report-paper-border);
+}
+
+.page-builder .daw-report-page-block.is-image {
+  padding: 8px 0;
+  text-align: center;
+}
+
+.page-builder .daw-report-page-block.is-spacer {
+  padding-block: 0;
+}
+
+.page-builder .daw-report-spacer-block {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 12px;
+  border: 1px dashed rgba(var(--theme-primary-rgb), 0.32);
+  border-radius: 8px;
+  background: rgba(var(--theme-primary-rgb), 0.035);
+  color: #71809a;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.page-builder .daw-report-canvas-shell.is-preview .daw-report-spacer-block {
+  border-color: transparent;
+  background: transparent;
+}
+
+.page-builder .daw-report-content-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 520px;
+  margin: 0 auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.page-builder .daw-report-content-image.has-fixed-ratio {
+  height: 100%;
+  object-fit: cover;
+}
+
+.page-builder .daw-report-generated-chart {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+.page-builder .daw-report-generated-table-wrap {
+  width: 100%;
+  max-height: 440px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-primary) #edf2f8;
+}
+
+.page-builder .daw-report-generated-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--daw-block-text, #17233f) !important;
+  font-size: 11px;
+  background: #ffffff;
+}
+
+.page-builder .daw-report-generated-table th,
+.page-builder .daw-report-generated-table td {
+  border: 1px solid var(--daw-report-paper-border);
+  padding: 6px 8px;
+  text-align: start;
+  color: var(--daw-block-text, #17233f) !important;
+  background: #ffffff !important;
+}
+
+.page-builder .daw-report-generated-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #edf2f8 !important;
+  color: var(--daw-block-text, #0f1d38) !important;
+  font-weight: 900;
+}
+
+.page-builder .daw-report-generated-table tbody tr:nth-child(even) td {
+  background: #f8fafc !important;
+}
+
+.page-builder .daw-report-image-frame {
+  position: relative;
+  max-width: 100%;
+  margin-inline: auto;
+  cursor: move;
+  touch-action: none;
+  will-change: transform;
+}
+
+.page-builder .daw-report-image-resize-handle {
+  position: absolute;
+  inset-inline-end: -6px;
+  bottom: -6px;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  border: 2px solid var(--theme-primary) !important;
+  border-radius: 3px !important;
+  padding: 0 !important;
+  background: var(--theme-paper-surface) !important;
+  box-shadow: 0 2px 6px rgba(var(--theme-primary-rgb), 0.18);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.page-builder .daw-report-page .daw-report-image-caption {
+  margin-top: 8px;
+  color: var(--daw-report-paper-muted) !important;
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+}
+
+.page-builder .daw-report-empty-canvas {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  border: 1px dashed rgba(var(--theme-primary-rgb), 0.35);
+  border-radius: 12px;
+  padding: 54px 20px;
+  color: var(--daw-report-paper-ink) !important;
+  text-align: center;
+}
+
+.page-builder .daw-report-page .daw-report-empty-canvas strong,
+.page-builder .daw-report-page .daw-report-empty-canvas svg {
+  color: var(--daw-report-paper-ink) !important;
+}
+
+.page-builder .daw-report-empty-canvas span {
+  color: var(--daw-report-paper-muted) !important;
+  font-size: 12px;
+}
+
+.page-builder .daw-report-properties label {
+  display: grid;
+  gap: 7px;
+  color: var(--daw-report-ink) !important;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .daw-report-builder .daw-report-properties input,
+.page-builder .daw-report-builder .daw-report-properties textarea {
+  width: 100%;
+  border: 1px solid var(--daw-report-border) !important;
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--daw-report-surface) !important;
+  color: var(--daw-report-ink) !important;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+  resize: vertical;
+}
+
+.page-builder .daw-report-builder .daw-report-properties input:focus,
+.page-builder .daw-report-builder .daw-report-properties textarea:focus {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.1);
+}
+
+.page-builder .daw-report-properties .daw-report-color-property input[type="color"] {
+  width: 56px;
+  height: 38px;
+  border-radius: 9px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-block-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.page-builder .daw-report-block-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 10px;
+  background: var(--daw-report-soft) !important;
+  color: var(--daw-report-ink) !important;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-block-actions .is-danger {
+  grid-column: 1 / -1;
+  border-color: var(--theme-danger);
+  color: var(--theme-danger) !important;
+}
+
+@media (max-width: 1280px) {
+  .page-builder .daw-report-builder {
+    grid-template-columns: 220px minmax(380px, 1fr);
+  }
+
+  .page-builder .daw-report-properties {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  .page-builder .daw-report-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-report-properties {
+    grid-column: auto;
+  }
+
+  .page-builder .daw-report-page {
+    min-height: 760px;
+    padding: 38px 28px;
+  }
+}

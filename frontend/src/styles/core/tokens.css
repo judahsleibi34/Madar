@@ -36,6 +36,11 @@
   --theme-text: #1a2744;
   --theme-text-soft: #4d5668;
   --theme-text-muted: #746b62;
+  --theme-paper-surface: #ffffff;
+  --theme-paper-surface-soft: #f6f8fb;
+  --theme-paper-text: #1a2744;
+  --theme-paper-text-soft: #4d5668;
+  --theme-paper-border: rgba(26, 39, 68, 0.18);
   --theme-primary: #8b2a1a;
   --theme-primary-hover: #6e2014;
   --theme-primary-soft: rgba(139, 42, 26, 0.12);

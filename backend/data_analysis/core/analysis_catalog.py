@@ -31,6 +31,15 @@ ANALYSIS_CATALOG = {
             {"id": "quantity_by_department", "label": "Quantity by department", "fields": {"department_column": "category", "quantity_column": "number"}, "chart": "bar"},
         ],
     },
+    "hr": {
+        "label": "Human resources",
+        "description": "Workforce, compensation, department, and attendance analysis.",
+        "reports": [
+            {"id": "workforce_summary", "label": "Workforce summary", "fields": {"department_column": "category?"}, "chart": "bar"},
+            {"id": "compensation_summary", "label": "Compensation summary", "fields": {"salary_column": "money", "department_column": "category?"}, "chart": "kpi"},
+            {"id": "attendance_summary", "label": "Attendance summary", "fields": {"attended_days_column": "number", "working_days_column": "number", "department_column": "category?"}, "chart": "kpi"},
+        ],
+    },
     "ngo_meal": {
         "label": "Program monitoring",
         "description": "Progress, beneficiaries, activities, surveys, cases, and feedback.",
@@ -56,7 +65,7 @@ ANALYSIS_CATALOG = {
         "reports": [
             {"id": "response_overview", "label": "Response overview", "fields": {"date_column": "date?", "status_column": "category?"}, "chart": "line"},
             {"id": "question_distribution", "label": "Question distribution", "fields": {"question_column": "category", "rows": "number?"}, "chart": "bar"},
-            {"id": "numeric_question_summary", "label": "Numeric question summary", "fields": {"numeric_columns": "number[]"}, "chart": "table"},
+            {"id": "numeric_question_summary", "label": "Column statistics", "fields": {"numeric_columns": "number[]"}, "chart": "table"},
             {"id": "rating_summary", "label": "Rating summary", "fields": {"rating_column": "number", "max_rating": "number?", "group_column": "category?"}, "chart": "bar"},
             {"id": "multi_select_summary", "label": "Multi-select summary", "fields": {"column": "multi_choice", "separator": "text?"}, "chart": "bar"},
             {"id": "column_suggestions", "label": "Column suggestions", "fields": {}, "chart": "table"},

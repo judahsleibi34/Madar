@@ -203,6 +203,19 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertIn(CSRF_HEADER_NAME, response.headers)
         self.assertIn(CSRF_COOKIE_NAME, response.cookies)
 
+        set_cookie_headers = response.headers.get_list("set-cookie")
+        session_cookie_headers = [
+            header
+            for header in set_cookie_headers
+            if header.startswith("madar_access_token=")
+            or header.startswith("madar_refresh_token=")
+            or header.startswith(f"{CSRF_COOKIE_NAME}=")
+        ]
+        self.assertEqual(len(session_cookie_headers), 3)
+        for header in session_cookie_headers:
+            self.assertNotIn("Max-Age=", header)
+            self.assertNotIn("Expires=", header)
+
     def test_logout_cookie_helper_clears_csrf_cookie(self):
         client = self.build_origin_client()
 

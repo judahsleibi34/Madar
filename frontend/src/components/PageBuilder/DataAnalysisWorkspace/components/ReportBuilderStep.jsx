@@ -1,270 +1,222 @@
-import Field from './Field';
-import Toggle from './Toggle';
-import ColumnSelect from './ColumnSelect';
-import MultiColumnSelect from './MultiColumnSelect';
-import EmptyState from './EmptyState';
-import { analysisGroups, reportGroupText } from '../constants/analysisConfig';
-import { methodLabel, toLabel } from '../utils/formatters';
+import { useRef, useState } from "react";
+import ReportLibraryPanel from "./report-builder/ReportLibraryPanel";
+import ReportPageCanvas from "./report-builder/ReportPageCanvas";
+import ReportPropertiesPanel from "./report-builder/ReportPropertiesPanel";
+import { reportBlockDefaults } from "./report-builder/reportBuilderConfig";
+import "../../../../styles/admin/PageBuilder/data-analysis/24-report-builder.css";
 
 export default function ReportBuilderStep({
-  dataset,
-  activeLang,
-  analysisDomain,
-  setDomain,
-  methods,
-  analysisMethod,
-  setMethod,
-  activeMethod,
-  params,
-  updateParams,
-  columns,
-  numericColumns,
-  runAnalysis,
-  isLoading,
-  reportOptions,
-  updateReportOptions,
-  t,
+  availablePlots = [],
+  availableMetrics = [],
+  availableTables = [],
+  onGenerateMetrics,
+  isGeneratingMetrics = false,
 }) {
-  const groups = reportGroupText[activeLang];
-  const getParamValue = (key) =>
-    Object.prototype.hasOwnProperty.call(params || {}, key)
-      ? params[key]
-      : activeMethod.template[key];
+  const nextBlockId = useRef(1);
+  const [report, setReport] = useState({
+    title: "Untitled report",
+    titleDirection: "auto",
+    headerBackground: "",
+    logo: "",
+  });
+  const [blocks, setBlocks] = useState([]);
+  const [selectedBlockId, setSelectedBlockId] = useState("");
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const selectedBlock = blocks.find((block) => block.id === selectedBlockId) || null;
 
-  const renderParamControl = ([key, value]) => {
-    const label = toLabel(key, activeLang);
+  const updateReport = (key, value) => setReport((current) => ({ ...current, [key]: value }));
 
-    const optional =
-      key.includes("group") ||
-      key.includes("category") ||
-      key.includes("expense_column") ||
-      key.includes("transaction_id") ||
-      key.includes("numerator") ||
-      key.includes("denominator");
+  const insertBlock = (type, index = blocks.length) => {
+    if (type === "chart" && !availablePlots.length) return;
+    if (type === "metric" && !availableMetrics.length) return;
+    if (type === "table" && !availableTables.length) return;
 
-    if (Array.isArray(value)) {
-      return (
-        <MultiColumnSelect
-          key={key}
-          label={label}
-          value={value}
-          columns={key.includes("numeric") || key.includes("value") ? numericColumns : columns}
-          onChange={(nextValue) => updateParams(key, nextValue)}
-          activeLang={activeLang}
-          t={t}
-        />
-      );
-    }
+    const id = `report-block-${nextBlockId.current++}`;
+    const generatedContent =
+      type === "chart"
+        ? { title: availablePlots[0].title, body: "", src: availablePlots[0].src, sourceId: availablePlots[0].id }
+        : type === "metric"
+        ? { title: availableMetrics[0].label, body: availableMetrics[0].display_value || String(availableMetrics[0].value ?? ""), sourceId: availableMetrics[0].id }
+        : type === "table"
+        ? { title: availableTables[0].title, body: "", rows: availableTables[0].rows || [], sourceId: availableTables[0].id }
+        : {};
+    setBlocks((current) => {
+      const next = [...current];
+      next.splice(Math.max(0, Math.min(index, next.length)), 0, {
+        id,
+        type,
+        ...reportBlockDefaults[type],
+        ...generatedContent,
+      });
+      return next;
+    });
+    setSelectedBlockId(id);
+  };
 
-    if (key === "rows" || key === "max_rating") {
-      return (
-        <Field key={key} label={label}>
-          <input
-            type="number"
-            min="1"
-            value={value}
-            onChange={(event) => updateParams(key, Number(event.target.value || 1))}
-          />
-        </Field>
-      );
-    }
+  const insertParagraph = (index) => {
+    const id = `report-block-${nextBlockId.current++}`;
+    setBlocks((current) => {
+      const next = [...current];
+      next.splice(Math.max(0, Math.min(index, next.length)), 0, {
+        id,
+        type: "text",
+        title: "",
+        body: "",
+        hideTitle: true,
+      });
+      return next;
+    });
+    setSelectedBlockId(id);
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-report-block-id="${id}"] .daw-report-block-body`)
+        ?.focus();
+    });
+  };
 
-    if (key === "operation") {
-      return (
-        <Field key={key} label={label}>
-          <select value={value || "sum"} onChange={(event) => updateParams(key, event.target.value)}>
-            {[
-              "sum",
-              "mean",
-              "median",
-              "min",
-              "max",
-              "count",
-              "rate",
-              "ratio",
-              "percentage",
-              "difference",
-              "variance",
-              "gap",
-            ].map((option) => (
-              <option key={option} value={option}>
-                {toLabel(option, activeLang)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      );
-    }
+  const moveBlockToIndex = (blockId, targetIndex) => {
+    setBlocks((current) => {
+      const sourceIndex = current.findIndex((block) => block.id === blockId);
+      if (sourceIndex < 0) return current;
+      const next = [...current];
+      const [moving] = next.splice(sourceIndex, 1);
+      const adjustedIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+      next.splice(Math.max(0, Math.min(adjustedIndex, next.length)), 0, moving);
+      return next;
+    });
+    setSelectedBlockId(blockId);
+  };
 
-    if (key === "question") {
-      return (
-        <Field key={key} label={label}>
-          <textarea
-            value={value || ""}
-            rows={3}
-            onChange={(event) => updateParams(key, event.target.value)}
-          />
-        </Field>
-      );
-    }
+  const addBlock = (type) => insertBlock(type, blocks.length);
 
-    if (key.endsWith("_column") || key === "column") {
-      const numericHints = [
-        "amount",
-        "cost",
-        "revenue",
-        "actual",
-        "target",
-        "price",
-        "quantity",
-        "budget",
-        "baseline",
-        "endline",
-        "value",
-        "numerator",
-        "denominator",
-        "rating",
-      ];
+  const insertImage = (src, fileName) => {
+    const id = `report-block-${nextBlockId.current++}`;
+    setBlocks((current) => [
+      ...current,
+      {
+        id,
+        type: "image",
+        title: fileName || "Image",
+        body: "",
+        src,
+        imageWidthPercent: 76,
+        imageRatio: "original",
+        imageOffsetX: 0,
+        imageOffsetY: 0,
+      },
+    ]);
+    setSelectedBlockId(id);
+  };
 
-      return (
-        <ColumnSelect
-          key={key}
-          label={label}
-          value={value}
-          columns={numericHints.some((hint) => key.includes(hint)) ? numericColumns : columns}
-          optional={optional}
-          onChange={(nextValue) => updateParams(key, nextValue)}
-          activeLang={activeLang}
-          t={t}
-        />
-      );
-    }
+  const updateSelectedBlock = (key, value) => {
+    setBlocks((current) => current.map((block) =>
+      block.id === selectedBlockId ? { ...block, [key]: value } : block
+    ));
+  };
 
-    return (
-      <Field key={key} label={label}>
-        <input
-          type="text"
-          value={value || ""}
-          onChange={(event) => updateParams(key, event.target.value)}
-        />
-      </Field>
+  const updateBlock = (blockId, key, value) => {
+    setBlocks((current) => current.map((block) =>
+      block.id === blockId ? { ...block, [key]: value } : block
+    ));
+  };
+
+  const updateGeneratedSource = (type, sourceId) => {
+    const sources =
+      type === "metric"
+        ? availableMetrics
+        : type === "table"
+        ? availableTables
+        : availablePlots;
+    const source = sources.find((item) => item.id === sourceId);
+    if (!source) return;
+
+    setBlocks((current) =>
+      current.map((block) => {
+        if (block.id !== selectedBlockId) return block;
+        if (type === "metric") {
+          return {
+            ...block,
+            sourceId,
+            title: source.label,
+            body: source.display_value || String(source.value ?? ""),
+          };
+        }
+        if (type === "table") {
+          return { ...block, sourceId, title: source.title, rows: source.rows || [] };
+        }
+        return { ...block, sourceId, title: source.title, src: source.src };
+      })
     );
   };
 
+  const moveSelectedBlock = (direction) => {
+    setBlocks((current) => {
+      const index = current.findIndex((block) => block.id === selectedBlockId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
+  const removeSelectedBlock = () => {
+    setBlocks((current) => current.filter((block) => block.id !== selectedBlockId));
+    setSelectedBlockId("");
+  };
+
+  const handleLogoChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => updateReport("logo", String(reader.result || ""));
+    reader.readAsDataURL(file);
+  };
+
   return (
-    <section className="daw-card daw-section-card">
-      <div className="daw-section-heading">
-        <span>{t.report}</span>
-        <h3>{t.reportTitle}</h3>
-        <p>{t.reportSubtitle}</p>
-      </div>
-
-      {!dataset ? (
-        <EmptyState title={t.noDataset}>{t.noDatasetHint}</EmptyState>
-      ) : (
-        <>
-          <div className="daw-group-grid" aria-label={t.reportGroup}>
-            {Object.keys(analysisGroups).map((key) => (
-              <button
-                key={key}
-                type="button"
-                className={analysisDomain === key ? "active" : ""}
-                onClick={() => setDomain(key)}
-              >
-                <strong>{groups[key]?.label || key}</strong>
-                <span>{groups[key]?.description}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="daw-form-grid">
-            <Field label={t.reportType} wide>
-              <select value={analysisMethod} onChange={(event) => setMethod(event.target.value)}>
-                {methods.map((method) => (
-                  <option key={method.id} value={method.id}>
-                    {methodLabel(method, activeLang)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            {Object.keys(activeMethod.template).map((key) =>
-              renderParamControl([key, getParamValue(key)])
-            )}
-          </div>
-
-          <section className="daw-report-customize">
-            <div className="daw-section-heading compact">
-              <span>{t.optional}</span>
-              <h4>{t.customizeReport}</h4>
-              <p>{t.customizeReportHint}</p>
-            </div>
-
-            <Field label={t.reportDisplayTitle} wide>
-              <input
-                type="text"
-                value={reportOptions.title}
-                placeholder={methodLabel(activeMethod, activeLang)}
-                onChange={(event) => updateReportOptions("title", event.target.value)}
-              />
-            </Field>
-
-            <div className="daw-report-options-grid">
-              <Toggle
-                checked={reportOptions.includeSummary}
-                onChange={(value) => updateReportOptions("includeSummary", value)}
-              >
-                {t.includeSummary}
-              </Toggle>
-              <Toggle
-                checked={reportOptions.includeKpis}
-                onChange={(value) => updateReportOptions("includeKpis", value)}
-              >
-                {t.includeKpis}
-              </Toggle>
-              <Toggle
-                checked={reportOptions.includeInsights}
-                onChange={(value) => updateReportOptions("includeInsights", value)}
-              >
-                {t.includeInsights}
-              </Toggle>
-              <Toggle
-                checked={reportOptions.includeTables}
-                onChange={(value) => updateReportOptions("includeTables", value)}
-              >
-                {t.includeTables}
-              </Toggle>
-              <Toggle
-                checked={reportOptions.includeCharts}
-                onChange={(value) => updateReportOptions("includeCharts", value)}
-              >
-                {t.includeCharts}
-              </Toggle>
-              <Toggle
-                checked={reportOptions.includeWarnings}
-                onChange={(value) => updateReportOptions("includeWarnings", value)}
-              >
-                {t.includeWarnings}
-              </Toggle>
-            </div>
-          </section>
-
-          <div className="daw-report-submit-row">
-            <div>
-              <strong>{t.readyToGenerate}</strong>
-              <span>{t.generateReportHint}</span>
-            </div>
-            <button
-              type="button"
-              className="daw-primary"
-              disabled={isLoading || !dataset}
-              onClick={runAnalysis}
-            >
-              {isLoading ? t.working : t.runReport}
-            </button>
-          </div>
-        </>
-      )}
+    <section className={`daw-report-builder ${isPreviewMode ? "is-preview" : ""}`} aria-label="Report builder">
+      <ReportLibraryPanel
+        logo={report.logo}
+        onLogoChange={handleLogoChange}
+        onRemoveLogo={() => updateReport("logo", "")}
+        onAddBlock={addBlock}
+        availability={{
+          chart: availablePlots.length > 0,
+          metric: availableMetrics.length > 0,
+          table: availableTables.length > 0,
+        }}
+        onGenerateMetrics={onGenerateMetrics}
+        isGeneratingMetrics={isGeneratingMetrics}
+      />
+      <ReportPageCanvas
+        report={report}
+        blocks={blocks}
+        selectedBlockId={selectedBlockId}
+        onSelectBlock={setSelectedBlockId}
+        onUpdateReport={updateReport}
+        onUpdateBlock={updateBlock}
+        onInsertImage={insertImage}
+        onInsertBlock={insertBlock}
+        onInsertParagraph={insertParagraph}
+        onMoveBlockToIndex={moveBlockToIndex}
+        isPreviewMode={isPreviewMode}
+        onTogglePreview={() => {
+          setIsPreviewMode((current) => !current);
+          setSelectedBlockId("");
+        }}
+      />
+      <ReportPropertiesPanel
+        report={report}
+        selectedBlock={selectedBlock}
+        onUpdateReport={updateReport}
+        onUpdateBlock={updateSelectedBlock}
+        onMoveBlock={moveSelectedBlock}
+        onRemoveBlock={removeSelectedBlock}
+        availableMetrics={availableMetrics}
+        availableTables={availableTables}
+        availablePlots={availablePlots}
+        onSelectGeneratedSource={updateGeneratedSource}
+      />
     </section>
   );
 }

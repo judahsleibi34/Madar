@@ -8,6 +8,10 @@ export const reportGroupText = {
       label: "Operations",
       description: "Departments, quantities, prices, revenue, and activity summaries.",
     },
+    hr: {
+      label: "Human resources",
+      description: "Workforce, compensation, department, and attendance reports.",
+    },
     ngo_meal: {
       label: "Program monitoring",
       description: "Progress, beneficiaries, activities, surveys, cases, and feedback.",
@@ -284,6 +288,32 @@ export const analysisGroups = {
       },
     ],
   },
+  hr: {
+    methods: [
+      {
+        id: "workforce_summary",
+        label: "Workforce summary",
+        template: { department_column: "" },
+        optionalFields: ["department_column"],
+      },
+      {
+        id: "compensation_summary",
+        label: "Compensation summary",
+        template: { salary_column: "", department_column: "" },
+        optionalFields: ["department_column"],
+      },
+      {
+        id: "attendance_summary",
+        label: "Attendance summary",
+        template: {
+          attended_days_column: "",
+          working_days_column: "",
+          department_column: "",
+        },
+        optionalFields: ["department_column"],
+      },
+    ],
+  },
   ngo_meal: {
     methods: [
       {
@@ -384,7 +414,7 @@ export const analysisGroups = {
       },
       {
         id: "numeric_question_summary",
-        label: "Numeric question summary",
+        label: "Column statistics (count, sum, average, median, min, max)",
         template: { numeric_columns: [] },
       },
       {

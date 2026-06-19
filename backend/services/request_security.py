@@ -166,7 +166,6 @@ def set_csrf_cookie(response: Response, csrf_token: str):
         httponly=False,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
-        max_age=CSRF_TOKEN_MAX_AGE_SECONDS,
         path="/",
     )
     response.headers[CSRF_HEADER_NAME] = csrf_token

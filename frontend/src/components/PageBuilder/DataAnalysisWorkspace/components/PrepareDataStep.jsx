@@ -10,6 +10,10 @@ export default function PrepareDataStep({
   textColumns,
   cleaning,
   updateCleaning,
+  onGenerateMetrics,
+  isGeneratingMetrics,
+  metricsReady,
+  metricCount = 0,
   t,
 }) {
   const labellingHelp =
@@ -49,40 +53,40 @@ export default function PrepareDataStep({
                 <Toggle
                   checked={cleaning.trimText}
                   onChange={(value) => updateCleaning("trimText", value)}
+                  description={t.trimTextHint || "Fix extra spaces before and after answers."}
                 >
                   {t.trimText}
                 </Toggle>
-                <p>{t.trimTextHint || "Fix extra spaces before and after answers."}</p>
               </div>
 
               <div className="daw-cleaning-option">
                 <Toggle
                   checked={cleaning.lowercaseText}
                   onChange={(value) => updateCleaning("lowercaseText", value)}
+                  description={t.lowercaseTextHint || "Make text answers easier to group together."}
                 >
                   {t.lowercaseText}
                 </Toggle>
-                <p>{t.lowercaseTextHint || "Make text answers easier to group together."}</p>
               </div>
 
               <div className="daw-cleaning-option">
                 <Toggle
                   checked={cleaning.removeDuplicates}
                   onChange={(value) => updateCleaning("removeDuplicates", value)}
+                  description={t.removeDuplicatesHint || "Remove repeated rows from the dataset."}
                 >
                   {t.removeDuplicates}
                 </Toggle>
-                <p>{t.removeDuplicatesHint || "Remove repeated rows from the dataset."}</p>
               </div>
 
               <div className="daw-cleaning-option">
                 <Toggle
                   checked={cleaning.removeMissingRows}
                   onChange={(value) => updateCleaning("removeMissingRows", value)}
+                  description={t.removeMissingRowsHint || "Use only when blank rows should not be included."}
                 >
                   {t.removeMissingRows}
                 </Toggle>
-                <p>{t.removeMissingRowsHint || "Use only when blank rows should not be included."}</p>
               </div>
             </div>
           </details>
@@ -237,7 +241,7 @@ export default function PrepareDataStep({
                 <strong>{t.labellingCard || "Make answers usable in charts"}</strong>
                 <p>{t.labellingCardHint || "Use this when text answers need to become number fields."}</p>
 
-                <div className="daw-form-grid">
+                <div className="daw-form-grid daw-form-grid-single">
                   <Field label={t.encodingMethod || "Choose how labels are created"}>
                     <select
                       value={cleaning.encodeMethod}
@@ -247,13 +251,6 @@ export default function PrepareDataStep({
                       <option value="label">{t.labelEncoding || "Create one number column"}</option>
                     </select>
                   </Field>
-
-                  <Toggle
-                    checked={cleaning.keepEncodedOriginals}
-                    onChange={(value) => updateCleaning("keepEncodedOriginals", value)}
-                  >
-                    {t.keepOriginalColumns || "Keep the original text columns too"}
-                  </Toggle>
                 </div>
                 <p className="daw-cleaning-note">{labellingHelp}</p>
 
@@ -268,6 +265,50 @@ export default function PrepareDataStep({
               </section>
             </div>
           </details>
+
+          <div className="daw-save-dataframe-row">
+            <div>
+              <strong>{t.saveDataframesTitle || "Save dataframes"}</strong>
+              <span>
+                {t.saveDataframesHint ||
+                  "Save both the original and cleaned dataframe."}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="daw-primary"
+              data-action="save-dataframes"
+            >
+              {t.saveDataframes || "Save dataframes"}
+            </button>
+          </div>
+
+          <div className={`daw-generate-metrics-row ${metricsReady ? "is-ready" : ""}`}>
+            <div>
+              <strong>
+                {metricsReady
+                  ? `${metricCount} report metric${metricCount === 1 ? " is" : "s are"} ready`
+                  : "Generate report metrics"}
+              </strong>
+              <span>
+                {metricsReady
+                  ? "Your cleaned data has been analyzed. Metrics and tables are now available in the report builder."
+                  : "After choosing your cleaning options, generate the KPIs and summary table used by the report builder."}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="daw-primary"
+              onClick={onGenerateMetrics}
+              disabled={isGeneratingMetrics}
+            >
+              {isGeneratingMetrics
+                ? t.working
+                : metricsReady
+                ? "Regenerate metrics"
+                : "Generate metrics"}
+            </button>
+          </div>
         </div>
       )}
     </section>

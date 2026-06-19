@@ -56,7 +56,7 @@ class FormsAnalysis(AnalysisBase):
         rows = []
         for column in numeric_columns:
             values = self.numeric(column)
-            rows.append({
+            row = {
                 "column": column,
                 "count": int(values.count()),
                 "sum": float(values.sum()),
@@ -65,7 +65,14 @@ class FormsAnalysis(AnalysisBase):
                 "min": float(values.min()),
                 "max": float(values.max()),
                 "std": float(values.std()) if values.count() > 1 else None,
-            })
+            }
+            rows.append(row)
+            report.add_kpi(f"{column} - Count", row["count"])
+            report.add_kpi(f"{column} - Sum", row["sum"])
+            report.add_kpi(f"{column} - Average", row["mean"])
+            report.add_kpi(f"{column} - Median", row["median"])
+            report.add_kpi(f"{column} - Minimum", row["min"])
+            report.add_kpi(f"{column} - Maximum", row["max"])
         report.summary = f"Numeric summaries were calculated for {len(numeric_columns):,} columns."
         report.add_table("Numeric question summary", rows)
         return report.to_dict()

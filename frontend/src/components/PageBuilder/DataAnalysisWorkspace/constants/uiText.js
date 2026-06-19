@@ -5,6 +5,9 @@ export const uiText = {
     subtitle:
       "Load your data, review it, prepare it, then generate a focused report from one guided workspace.",
     working: "Working...",
+    saveDataframes: "Save dataframes",
+    saveDataframesTitle: "Save dataframes",
+    saveDataframesHint: "Save both the original and cleaned dataframe.",
     flowIssueTitle: "Action needed",
     continue: "Continue",
     back: "Back",
@@ -205,7 +208,6 @@ export const uiText = {
     oneHotEncodingHint: "Best for answer choices. Example: Red creates a Red yes/no column, Blue creates a Blue yes/no column.",
     labelEncoding: "Create one number column",
     labelEncodingHint: "Best when one answer should become one code. Example: Red, Blue, Green become 1, 2, 3.",
-    keepOriginalColumns: "Keep the original text columns too",
     reportTitle: "Build the report",
     reportSubtitle:
       "Choose one report type, map the needed fields, then generate.",
@@ -227,6 +229,7 @@ export const uiText = {
     reportWaiting: "Generate a report to display results here.",
     loadDataBeforeReview: "Load data before reviewing it.",
     loadDataBeforeAnalysis: "Load data before generating a report.",
+    generateMetricsFirst: "Generate metrics after cleaning your data before opening Visualization or Report.",
     missingRequiredFields: (fields) => `Please choose the required fields first: ${fields.join(", ")}.`,
     chooseFileFirst: "Choose a file first.",
     pasteLinkFirst: "Paste a public data link or API URL first.",
