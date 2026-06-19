@@ -71,29 +71,106 @@ def ensure_subdomain_available(supabase_client: Any, subdomain: str) -> None:
 def default_builder_schema(business_name: str) -> dict[str, Any]:
     title = business_name.strip() or "New Site"
     return {
+        "name": f"{title} Website",
+        "status": "draft",
+        "activePageId": "home",
+        "activeFormId": "",
+        "activeCollectionId": "",
+        "activeWorkflowId": "",
+        "activeRoleId": "",
+        "siteChrome": {
+            "brandName": title,
+            "logoText": title,
+            "subdomain": "",
+        },
+        "theme": {},
         "pages": [
             {
                 "id": "home",
                 "name": "Home",
-                "path": "/",
+                "slug": "/",
+                "backgroundColor": "#ffffff",
+                "visibility": "public",
+                "showInNavigation": True,
+                "pageType": "main",
                 "sections": [
                     {
                         "id": "hero",
-                        "type": "hero",
-                        "elements": [
+                        "name": "Hero",
+                        "mode": "auto",
+                        "layout": {
+                            "width": "large",
+                            "paddingY": "large",
+                            "background": "#fbfaf8",
+                            "minHeight": 560,
+                        },
+                        "rows": [
                             {
-                                "id": "hero-title",
-                                "type": "heading",
-                                "content": title,
+                                "id": "hero-row",
+                                "layout": {
+                                    "columns": "1",
+                                    "align": "center",
+                                    "gap": "medium",
+                                },
+                                "columns": [
+                                    {
+                                        "id": "hero-column",
+                                        "name": "Column",
+                                        "layout": {"align": "left"},
+                                        "elements": [
+                                            {
+                                                "id": "hero-title",
+                                                "type": "heading",
+                                                "name": "Heading",
+                                                "content": title,
+                                                "mode": "auto",
+                                                "connectedFormId": "",
+                                                "action": {
+                                                    "type": "none",
+                                                    "pageId": "",
+                                                    "sectionId": "",
+                                                    "formId": "",
+                                                    "url": "",
+                                                    "message": "",
+                                                    "status": "",
+                                                },
+                                                "position": {
+                                                    "desktop": {"x": 56, "y": 56, "width": 380, "height": 96},
+                                                    "tablet": {"x": 40, "y": 44, "width": 320, "height": 96},
+                                                    "mobile": {"x": 22, "y": 34, "width": 300, "height": 96},
+                                                },
+                                                "styles": {
+                                                    "color": "#1a2744",
+                                                    "backgroundColor": "",
+                                                    "borderRadius": "16px",
+                                                    "fontSize": "46px",
+                                                    "fontWeight": "950",
+                                                    "textAlign": "left",
+                                                    "lineHeight": "1.04",
+                                                    "alignSelf": "auto",
+                                                },
+                                            }
+                                        ],
+                                    }
+                                ],
                             }
                         ],
+                        "freeElements": [],
                     }
                 ],
             }
         ],
         "forms": [],
+        "collections": [],
+        "workflows": [],
+        "roles": [],
+        "users": [],
+        "publish": {
+            "environment": "local",
+            "lastSavedAt": "",
+            "lastPublishedAt": "",
+        },
     }
-
 
 def split_owner_name(first_name: str, last_name: str) -> str:
     return f"{first_name.strip()} {last_name.strip()}".strip()

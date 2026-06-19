@@ -213,6 +213,30 @@ class OnboardingRoutesTests(unittest.TestCase):
         self.assertEqual(projects[0]["owner_user_id"], users[0]["id"])
         self.assertEqual(projects[0]["status"], "draft")
         self.assertFalse(projects[0].get("published_schema"))
+        self.assertEqual(projects[0].get("published_version"), 0)
+
+        draft_schema = projects[0]["draft_schema"]
+        self.assertEqual(draft_schema["status"], "draft")
+        self.assertEqual(draft_schema["activePageId"], "home")
+        page = draft_schema["pages"][0]
+        self.assertEqual(page["id"], "home")
+        self.assertEqual(page["slug"], "/")
+        section = page["sections"][0]
+        self.assertEqual(section["mode"], "auto")
+        self.assertIn("width", section["layout"])
+        self.assertIn("paddingY", section["layout"])
+        self.assertIn("background", section["layout"])
+        row = section["rows"][0]
+        self.assertIn("columns", row["layout"])
+        self.assertIn("align", row["layout"])
+        self.assertIn("gap", row["layout"])
+        column = row["columns"][0]
+        self.assertIn("align", column["layout"])
+        element = column["elements"][0]
+        self.assertEqual(element["type"], "heading")
+        self.assertEqual(element["content"], "Madar Demo Cafe")
+        self.assertIn("styles", element)
+        self.assertIn("width", element["position"]["desktop"])
 
         features = fake_supabase.tables["features"]
         self.assertGreaterEqual(len(features), 1)
