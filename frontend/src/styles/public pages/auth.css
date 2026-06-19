@@ -717,3 +717,28 @@ html[dir="rtl"] .forgot-card .form-status-message {
     font-size: 28px;
   }
 }
+
+.auth-section-title {
+  position: relative;
+  z-index: 1;
+  margin: 2px 0 -2px;
+  color: #695f55;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.subdomain-preview {
+  color: #695f55;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.login-card[dir="rtl"] .auth-section-title,
+html[dir="rtl"] .auth-section-title {
+  text-align: right;
+}
