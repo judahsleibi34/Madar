@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -14,6 +14,7 @@ export default function LoginPage({
   forgotPasswordPath = "/forgot-password",
 }) {
   const { t } = useTranslation("auth");
+  const location = useLocation();
   const pageDir = lang === "ar" ? "rtl" : "ltr";
 
   const [formData, setFormData] = useState({
@@ -22,7 +23,9 @@ export default function LoginPage({
   });
 
   const [errors, setErrors] = useState({});
-  const [statusMessage, setStatusMessage] = useState("");
+  const [statusMessage, setStatusMessage] = useState(() =>
+    typeof location.state?.message === "string" ? location.state.message : ""
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
