@@ -1,4 +1,4 @@
-export default function Toggle({ checked, onChange, children }) {
+export default function Toggle({ checked, onChange, children, description = "" }) {
   return (
     <label className="daw-toggle">
       <input
@@ -6,7 +6,12 @@ export default function Toggle({ checked, onChange, children }) {
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
       />
-      <span>{children}</span>
+      <span>
+        <span className="daw-toggle-title">{children}</span>
+        {description ? (
+          <span className="daw-toggle-description">{description}</span>
+        ) : null}
+      </span>
     </label>
   );
 }

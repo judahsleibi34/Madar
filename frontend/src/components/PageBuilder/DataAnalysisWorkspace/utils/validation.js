@@ -1,11 +1,12 @@
 import { toLabel } from './formatters';
 
-export const getMissingRequiredParams = (template, params, activeLang = 'en') => {
+export const getMissingRequiredParams = (template, params, activeLang = 'en', optionalFields = []) => {
   return Object.entries(template || {})
     .filter(([key, defaultValue]) => {
       const value = params?.[key];
 
       const isOptional =
+        optionalFields.includes(key) ||
         key.includes('group') ||
         key.includes('category') ||
         key.includes('expense_column') ||

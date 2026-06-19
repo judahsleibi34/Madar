@@ -6,15 +6,20 @@ import { analysisGroups } from "../constants/analysisConfig";
 import { API_URL, getFriendlyExternalError, readApiResponse } from "../utils/api";
 import { cleanObject, escapeCsvValue } from "../utils/formatters";
 import { getMissingRequiredParams } from "../utils/validation";
+import {
+  clearDataset as clearSavedDataset,
+  loadDataset as loadSavedDataset,
+  saveDataset as saveDatasetLocally,
+} from "../utils/datasetStorage";
 import { apiFetch } from "../../../../utils/apiClient";
 
 import Stepper from "./Stepper";
 import DataSourceStep from "./DataSourceStep";
 import DatasetReviewStep from "./DatasetReviewStep";
 import PrepareDataStep from "./PrepareDataStep";
+import AnalysisGeneratorPanel from "./AnalysisGeneratorPanel";
 import ReportBuilderStep from "./ReportBuilderStep";
 import AssistantPanel from "./AssistantPanel";
-import ReportCanvas from "./ReportCanvas";
 import PageVerticalSlider from "./PageVerticalSlider";
 import Field from "./Field";
 
@@ -469,6 +474,9 @@ const createVisualizationPlot = (index, columns = [], numericColumns = []) => ({
 
 const DATA_WORKSPACE_CACHE_VERSION = 1;
 const DATA_WORKSPACE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const DATA_WORKSPACE_CACHE_WRITE_DELAY_MS = 150;
+const dataWorkspaceMemoryCache = new Map();
+const dataWorkspaceCacheWriteTimers = new Map();
 
 const getDataWorkspaceCacheKey = (user, project) => {
   const userId = user?.id || user?.email || "anonymous";
@@ -480,6 +488,19 @@ const safeReadDataWorkspaceCache = (storageKey) => {
   if (typeof window === "undefined") return null;
 
   try {
+    const memoryValue = dataWorkspaceMemoryCache.get(storageKey);
+    const memorySavedAt = Number(memoryValue?.savedAt || 0);
+
+    if (memoryValue && Date.now() - memorySavedAt <= DATA_WORKSPACE_CACHE_TTL_MS) {
+      if (!Object.prototype.hasOwnProperty.call(memoryValue, "dataset")) return memoryValue;
+      const metadataOnlyValue = { ...memoryValue };
+      delete metadataOnlyValue.dataset;
+      dataWorkspaceMemoryCache.set(storageKey, metadataOnlyValue);
+      return metadataOnlyValue;
+    }
+
+    dataWorkspaceMemoryCache.delete(storageKey);
+
     const rawValue = window.localStorage.getItem(storageKey);
     if (!rawValue) return null;
 
@@ -487,11 +508,18 @@ const safeReadDataWorkspaceCache = (storageKey) => {
     const savedAt = Number(cachedValue?.savedAt || 0);
     const isExpired = Date.now() - savedAt > DATA_WORKSPACE_CACHE_TTL_MS;
 
-    if (isExpired || !cachedValue?.dataset?.file_path) {
+    if (isExpired) {
       window.localStorage.removeItem(storageKey);
       return null;
     }
 
+    // Legacy versions cached dataset previews in localStorage. Remove them during migration.
+    if (Object.prototype.hasOwnProperty.call(cachedValue, "dataset")) {
+      delete cachedValue.dataset;
+      window.localStorage.setItem(storageKey, JSON.stringify(cachedValue));
+    }
+
+    dataWorkspaceMemoryCache.set(storageKey, cachedValue);
     return cachedValue;
   } catch {
     window.localStorage.removeItem(storageKey);
@@ -502,22 +530,41 @@ const safeReadDataWorkspaceCache = (storageKey) => {
 const safeWriteDataWorkspaceCache = (storageKey, payload) => {
   if (typeof window === "undefined") return;
 
-  try {
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        ...payload,
-        savedAt: Date.now(),
-        version: DATA_WORKSPACE_CACHE_VERSION,
-      })
-    );
-  } catch {
-    // localStorage can be full or blocked; the app should keep working without cache.
-  }
+  const cachedValue = {
+    ...payload,
+    savedAt: Date.now(),
+    version: DATA_WORKSPACE_CACHE_VERSION,
+  };
+
+  // Route-to-route navigation reads this hot cache without parsing localStorage.
+  dataWorkspaceMemoryCache.set(storageKey, cachedValue);
+
+  const pendingTimer = dataWorkspaceCacheWriteTimers.get(storageKey);
+  if (pendingTimer) window.clearTimeout(pendingTimer);
+
+  const timerId = window.setTimeout(() => {
+    dataWorkspaceCacheWriteTimers.delete(storageKey);
+
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(cachedValue));
+    } catch {
+      // localStorage can be full or blocked; the in-memory cache still works.
+    }
+  }, DATA_WORKSPACE_CACHE_WRITE_DELAY_MS);
+
+  dataWorkspaceCacheWriteTimers.set(storageKey, timerId);
 };
 
 const safeRemoveDataWorkspaceCache = (storageKey) => {
   if (typeof window === "undefined") return;
+
+  dataWorkspaceMemoryCache.delete(storageKey);
+
+  const pendingTimer = dataWorkspaceCacheWriteTimers.get(storageKey);
+  if (pendingTimer) {
+    window.clearTimeout(pendingTimer);
+    dataWorkspaceCacheWriteTimers.delete(storageKey);
+  }
 
   try {
     window.localStorage.removeItem(storageKey);
@@ -539,7 +586,37 @@ const getCacheableDataset = (dataset) => {
 };
 
 const getRestorableDataWorkspaceStep = (step) =>
-  ["review", "prepare", "visualization"].includes(step) ? step : "review";
+  ["review", "prepare"].includes(step) ? step : "review";
+
+const mergeAnalysisResponses = (current, next) => {
+  if (!current?.results) return next;
+  if (!next?.results) return current;
+
+  const results = { ...current.results };
+  Object.entries(next.results).forEach(([key, value]) => {
+    let outputKey = key;
+    let suffix = 2;
+    while (Object.prototype.hasOwnProperty.call(results, outputKey)) {
+      outputKey = `${key} (${suffix++})`;
+    }
+    results[outputKey] = value;
+  });
+
+  return {
+    ...next,
+    results,
+    warnings: [...(current.warnings || []), ...(next.warnings || [])],
+  };
+};
+
+const friendlyAnalysisTitle = (title) => {
+  const titles = {
+    "Form response overview": "Dataset overview",
+    "Numeric question summary": "Column statistics",
+    "Assisted analysis": "AI suggestions",
+  };
+  return titles[title] || title || "Report calculations";
+};
 
 export default function DataAnalysisWorkspace({
   lang = "en",
@@ -571,9 +648,7 @@ export default function DataAnalysisWorkspace({
     availableForms.find((form) => form.responses?.length) || availableForms[0];
 
   const [currentStep, setCurrentStep] = useState(() =>
-    cachedWorkspace?.dataset
-      ? getRestorableDataWorkspaceStep(cachedWorkspace.currentStep)
-      : "source"
+    "source"
   );
   const [sourceMode, setSourceMode] = useState(
     () => cachedWorkspace?.sourceMode || "forms"
@@ -581,7 +656,8 @@ export default function DataAnalysisWorkspace({
   const [selectedFormId, setSelectedFormId] = useState(
     () => cachedWorkspace?.selectedFormId || firstFormWithResponses?.id || ""
   );
-  const [dataset, setDataset] = useState(() => cachedWorkspace?.dataset || null);
+  const [dataset, setDataset] = useState(null);
+  const [isDatasetStorageReady, setIsDatasetStorageReady] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [externalUrl, setExternalUrl] = useState(
     () => cachedWorkspace?.externalUrl || ""
@@ -640,7 +716,6 @@ export default function DataAnalysisWorkspace({
     dropColumnsConfirmed: false,
     encodeColumns: [],
     encodeMethod: "one_hot",
-    keepEncodedOriginals: false,
     convertColumn: "",
     convertType: "numeric",
     renameColumn: "",
@@ -721,46 +796,31 @@ export default function DataAnalysisWorkspace({
   }, [currentStep]);
 
   useEffect(() => {
-    if (dataset?.file_path || !cachedWorkspace?.dataset?.file_path) return;
+    let cancelled = false;
 
-    setDataset(cachedWorkspace.dataset);
-    setCurrentStep(getRestorableDataWorkspaceStep(cachedWorkspace.currentStep));
-    setSourceMode(cachedWorkspace.sourceMode || "forms");
-    setSelectedFormId(cachedWorkspace.selectedFormId || firstFormWithResponses?.id || "");
-    setExternalUrl(cachedWorkspace.externalUrl || "");
-    setCleaning((current) => ({ ...current, ...(cachedWorkspace.cleaning || {}) }));
-    setReportOptions((current) => ({
-      ...current,
-      ...(cachedWorkspace.reportOptions || {}),
-    }));
-    setAnalysisDomain(cachedWorkspace.analysisDomain || "finance");
-    setAnalysisMethod((current) => cachedWorkspace.analysisMethod || current);
-    setParams((current) => ({ ...current, ...(cachedWorkspace.params || {}) }));
-    if (
-      Array.isArray(cachedWorkspace.visualizationPlots) &&
-      cachedWorkspace.visualizationPlots.length
-    ) {
-      setVisualizationPlots(cachedWorkspace.visualizationPlots);
-    }
-    setActiveVisualizationPlotId(
-      cachedWorkspace.activeVisualizationPlotId || "plot-1"
-    );
-  }, [
-    cachedWorkspace,
-    dataset?.file_path,
-    firstFormWithResponses?.id,
-  ]);
+    loadSavedDataset({ scope: dataWorkspaceCacheKey })
+      .then((saved) => {
+        if (cancelled || !saved?.dataset?.file_path) return;
+        setDataset(saved.dataset);
+        setSelectedFile(saved.file instanceof File ? saved.file : null);
+        setCurrentStep(getRestorableDataWorkspaceStep(cachedWorkspace?.currentStep));
+      })
+      .catch(() => {
+        if (!cancelled) setFlowToast("The locally saved dataset could not be restored.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsDatasetStorageReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cachedWorkspace?.currentStep, dataWorkspaceCacheKey]);
 
   useEffect(() => {
-    if (!dataset?.file_path) {
-      if (!cachedWorkspace?.dataset?.file_path) {
-        safeRemoveDataWorkspaceCache(dataWorkspaceCacheKey);
-      }
-      return;
-    }
+    if (!isDatasetStorageReady) return;
 
     safeWriteDataWorkspaceCache(dataWorkspaceCacheKey, {
-      dataset: getCacheableDataset(dataset),
       currentStep: getRestorableDataWorkspaceStep(currentStep),
       sourceMode,
       selectedFormId,
@@ -777,17 +837,16 @@ export default function DataAnalysisWorkspace({
     activeVisualizationPlotId,
     analysisDomain,
     analysisMethod,
-    cachedWorkspace,
     cleaning,
     currentStep,
     dataWorkspaceCacheKey,
-    dataset,
     externalUrl,
     params,
     reportOptions,
     selectedFormId,
     sourceMode,
     visualizationPlots,
+    isDatasetStorageReady,
   ]);
 
   useEffect(() => {
@@ -1025,7 +1084,6 @@ export default function DataAnalysisWorkspace({
         params: {
           columns: cleaning.encodeColumns,
           method: cleaning.encodeMethod,
-          keep_original: cleaning.keepEncodedOriginals,
         },
       });
     }
@@ -1060,6 +1118,7 @@ export default function DataAnalysisWorkspace({
 
   const updateCleaning = (key, value) => {
     setCleaning((current) => ({ ...current, [key]: value }));
+    setAnalysisResult(null);
   };
 
   const updateParams = (key, value) => {
@@ -1773,6 +1832,16 @@ export default function DataAnalysisWorkspace({
         throw new Error(data.detail || "The data could not be loaded.");
       }
 
+      await saveDatasetLocally(
+        {
+          dataset: getCacheableDataset(data),
+          file,
+          sourceMode: sourceContext.sourceMode || "upload",
+          savedAt: Date.now(),
+        },
+        { scope: dataWorkspaceCacheKey }
+      );
+
       setLoadedDataset(data, {
         sourceMode: sourceContext.sourceMode || "upload",
         selectedFormId: sourceContext.selectedFormId,
@@ -1820,6 +1889,18 @@ export default function DataAnalysisWorkspace({
           externalUrl: inputPath,
         }
       );
+      await saveDatasetLocally(
+        {
+          dataset: getCacheableDataset({
+            ...data,
+            file_path: data.file_path || inputPath,
+            original_filename: data.original_filename || inputPath,
+          }),
+          sourceMode: "external",
+          savedAt: Date.now(),
+        },
+        { scope: dataWorkspaceCacheKey }
+      );
     } catch (error) {
       showFlowError(error.message);
     } finally {
@@ -1864,6 +1945,24 @@ export default function DataAnalysisWorkspace({
       sourceMode: "forms",
       selectedFormId: selectedForm.id,
     });
+  };
+
+  const clearLocalDataset = async () => {
+    try {
+      await clearSavedDataset({ scope: dataWorkspaceCacheKey });
+      setDataset(null);
+      setSelectedFile(null);
+      setInspection(null);
+      setInspectionCache({});
+      setAnalysisResult(null);
+      setAssistResult(null);
+      setVisualizationResultsByPlot({});
+      setVisualizationPreview(null);
+      setCurrentStep("source");
+      setFlowToast("");
+    } catch {
+      showFlowError("The saved browser copy could not be cleared.");
+    }
   };
 
   const runInspection = async (type) => {
@@ -1926,7 +2025,8 @@ export default function DataAnalysisWorkspace({
     const missingRequiredParams = getMissingRequiredParams(
       activeMethod.template,
       params,
-      activeLang
+      activeLang,
+      activeMethod.optionalFields || []
     );
 
     if (missingRequiredParams.length) {
@@ -1970,8 +2070,67 @@ export default function DataAnalysisWorkspace({
         throw new Error(data.detail || "The analysis could not be completed.");
       }
 
-      setAnalysisResult(data);
-      setCurrentStep("report");
+      setAnalysisResult((current) => mergeAnalysisResponses(current, data));
+    } catch (error) {
+      showFlowError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateReportMetrics = async () => {
+    if (!dataset?.file_path) {
+      showFlowError(t.loadDataBeforeAnalysis);
+      return;
+    }
+
+    setIsLoading(true);
+    setAnalysisError("");
+
+    try {
+      const cleanedNumericColumns = numericColumns
+        .filter((column) => !cleaning.dropColumns?.includes(column))
+        .map((column) =>
+          cleaning.renameColumn === column && cleaning.renameTo.trim()
+            ? cleaning.renameTo.trim()
+            : column
+        );
+      const analysisRequests = [
+        {
+          domain: "forms",
+          method: "response_overview",
+          key: "Data overview",
+          params: {},
+        },
+      ];
+      if (cleanedNumericColumns.length) {
+        analysisRequests.push({
+          domain: "forms",
+          method: "numeric_question_summary",
+          key: "Numeric column statistics",
+          params: { numeric_columns: cleanedNumericColumns },
+        });
+      }
+
+      const response = await apiFetch(userApiPath("/analysis/run"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input_path: dataset.file_path,
+          cleaning_actions: cleaningActions,
+          language: activeLang,
+          analysis_requests: analysisRequests,
+        }),
+      });
+
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.detail || "The metrics could not be generated.");
+      }
+
+      setAnalysisResult((current) => mergeAnalysisResponses(current, data));
     } catch (error) {
       showFlowError(error.message);
     } finally {
@@ -2150,12 +2309,101 @@ export default function DataAnalysisWorkspace({
   const analysisPayload = useMemo(() => {
     if (!analysisResult?.results) return analysisResult;
 
-    return (
-      analysisResult.results[activeMethod.label] ||
-      Object.values(analysisResult.results)[0] ||
-      analysisResult.results
-    );
-  }, [analysisResult, activeMethod.label]);
+    const outputs = Object.values(analysisResult.results).filter(Boolean);
+    return {
+      kpis: outputs.flatMap((output) =>
+        (output.kpis || []).map((item) => ({
+          ...item,
+          analysisTitle: output.title || "Backend analysis",
+        }))
+      ),
+      tables: outputs.flatMap((output) =>
+        (output.tables || []).map((item) => ({
+          ...item,
+          analysisTitle: output.title || "Backend analysis",
+        }))
+      ),
+      charts: outputs.flatMap((output) => output.charts || []),
+      summaries: outputs.map((output) => output.summary).filter(Boolean),
+      warnings: outputs.flatMap((output) => output.warnings || []),
+    };
+  }, [analysisResult]);
+
+  const reportMetrics = useMemo(() => {
+    const backendMetrics = Array.isArray(analysisPayload?.kpis)
+      ? analysisPayload.kpis
+      : [];
+    const assistedMetrics = Array.isArray(assistResult?.kpis)
+      ? assistResult.kpis
+      : [];
+
+    return [
+      ...backendMetrics.map((metric, index) => ({
+        ...metric,
+        id: `backend-metric-${index}`,
+        sourceGroup: friendlyAnalysisTitle(metric.analysisTitle),
+        displayLabel: metric.label,
+      })),
+      ...assistedMetrics.map((metric, index) => ({
+        ...metric,
+        id: `assisted-metric-${index}`,
+        sourceGroup: "AI suggestions",
+        displayLabel: metric.label,
+      })),
+    ].map((metric) => {
+      if (metric.sourceGroup !== "Column statistics") return metric;
+      const separatorIndex = String(metric.label || "").lastIndexOf(" - ");
+      if (separatorIndex < 0) return metric;
+      return {
+        ...metric,
+        sourceGroup: `Column: ${metric.label.slice(0, separatorIndex)}`,
+        displayLabel: metric.label.slice(separatorIndex + 3),
+      };
+    });
+  }, [analysisPayload, assistResult]);
+
+  const reportTables = useMemo(() => {
+    const backendTables = Array.isArray(analysisPayload?.tables)
+      ? analysisPayload.tables
+      : [];
+    const assistedTables = Array.isArray(assistResult?.tables)
+      ? assistResult.tables
+      : [];
+
+    return [
+      ...backendTables.map((table, index) => ({
+        ...table,
+        id: `backend-table-${index}`,
+        sourceGroup: friendlyAnalysisTitle(table.analysisTitle),
+        displayLabel: table.title,
+      })),
+      ...assistedTables.map((table, index) => ({
+        ...table,
+        id: `assisted-table-${index}`,
+        sourceGroup: "AI suggestions",
+        displayLabel: table.title,
+      })),
+    ];
+  }, [analysisPayload, assistResult]);
+
+  const reportGeneratedPlots = useMemo(
+    () =>
+      Object.values(visualizationResultsByPlot)
+        .flatMap((result) => getVisualizationPlots(result))
+        .map((result, index) => ({
+          id: result.chart_path || `generated-plot-${index + 1}`,
+          title:
+            result.chart_path?.split(/[\\/]/).pop() ||
+            `Generated plot ${index + 1}`,
+          src: getVisualizationUrl(result, "chart_url"),
+          sourceGroup: "Generated charts",
+          displayLabel:
+            result.chart_path?.split(/[\\/]/).pop() ||
+            `Chart ${index + 1}`,
+        }))
+        .filter((plot) => plot.src),
+    [visualizationResultsByPlot]
+  );
 
   const goToPreviousStep = () => {
     const order = ["source", "review", "prepare", "visualization", "report"];
@@ -2163,7 +2411,23 @@ export default function DataAnalysisWorkspace({
     setCurrentStep(order[Math.max(0, currentIndex - 1)]);
   };
 
+  const metricsReady = Boolean(
+    analysisPayload?.kpis?.length || analysisPayload?.tables?.length
+  );
+  const showMetricsRequiredWarning = () => {
+    showFlowError(
+      t.generateMetricsFirst ||
+        "Generate metrics after cleaning your data before opening Visualization or Report."
+    );
+    setCurrentStep("prepare");
+  };
+
   const goToNextStep = () => {
+    if (currentStep === "prepare" && !metricsReady) {
+      showMetricsRequiredWarning();
+      return;
+    }
+
     const order = ["source", "review", "prepare", "visualization", "report"];
     const currentIndex = order.indexOf(currentStep);
     setCurrentStep(order[Math.min(order.length - 1, currentIndex + 1)]);
@@ -2889,14 +3153,37 @@ export default function DataAnalysisWorkspace({
 
     if (currentStep === "prepare") {
       return (
-        <PrepareDataStep
-          dataset={dataset}
-          columns={columns}
-          textColumns={textColumns}
-          cleaning={cleaning}
-          updateCleaning={updateCleaning}
-          t={t}
-        />
+        <>
+          <PrepareDataStep
+            dataset={dataset}
+            columns={columns}
+            textColumns={textColumns}
+            cleaning={cleaning}
+            updateCleaning={updateCleaning}
+            onGenerateMetrics={generateReportMetrics}
+            isGeneratingMetrics={isLoading}
+            metricsReady={metricsReady}
+            metricCount={analysisPayload?.kpis?.length || 0}
+            t={t}
+          />
+          <AnalysisGeneratorPanel
+            activeLang={activeLang}
+            analysisDomain={analysisDomain}
+            setDomain={setDomain}
+            methods={methods}
+            analysisMethod={analysisMethod}
+            setMethod={setMethod}
+            activeMethod={activeMethod}
+            params={params}
+            updateParams={updateParams}
+            columns={columns}
+            numericColumns={numericColumns}
+            runAnalysis={runAnalysis}
+            isLoading={isLoading}
+            generatedCount={(analysisPayload?.kpis?.length || 0) + (analysisPayload?.tables?.length || 0)}
+            t={t}
+          />
+        </>
       );
     }
 
@@ -3067,23 +3354,11 @@ export default function DataAnalysisWorkspace({
     return (
       <ReportBuilderStep
         dataset={dataset}
-        activeLang={activeLang}
-        analysisDomain={analysisDomain}
-        setDomain={setDomain}
-        methods={methods}
-        analysisMethod={analysisMethod}
-        setMethod={setMethod}
-        activeMethod={activeMethod}
-        params={params}
-        updateParams={updateParams}
-        columns={columns}
-        numericColumns={numericColumns}
-        runAnalysis={runAnalysis}
-        runVisualization={runVisualization}
-        isLoading={isLoading}
-        reportOptions={reportOptions}
-        updateReportOptions={updateReportOptions}
-        t={t}
+        availablePlots={reportGeneratedPlots}
+        availableMetrics={reportMetrics}
+        availableTables={reportTables}
+        onGenerateMetrics={generateReportMetrics}
+        isGeneratingMetrics={isLoading}
       />
     );
   };
@@ -3102,8 +3377,24 @@ export default function DataAnalysisWorkspace({
         currentStep={currentStep}
         setCurrentStep={setCurrentStep}
         dataset={dataset}
+        metricsReady={metricsReady}
+        onLockedStep={showMetricsRequiredWarning}
         t={t}
       />
+
+      {dataset ? (
+        <div className="daw-local-dataset-notice" role="status">
+          <div>
+            <strong>Saved in this browser</strong>
+            <span>
+              A local copy of this dataset is stored in IndexedDB so it can be restored after a refresh.
+            </span>
+          </div>
+          <button type="button" className="daw-secondary" onClick={clearLocalDataset}>
+            Clear saved dataset
+          </button>
+        </div>
+      ) : null}
 
       {flowToast ? (
         <div className="daw-flow-toast" role="alert" aria-live="assertive">
@@ -3132,32 +3423,21 @@ export default function DataAnalysisWorkspace({
           <div className="daw-step-content">
             {renderCurrentStep()}
 
-            {currentStep === "report" ? (
-              <aside className="daw-canvas-column" id="daw-report-preview">
-                <ReportCanvas
-                  dataset={dataset}
-                  analysisResult={analysisResult}
-                  analysisPayload={analysisPayload}
-                  activeMethod={activeMethod}
-                  activeLang={activeLang}
-                  reportOptions={reportOptions}
-                  t={t}
-                />
-              </aside>
-            ) : null}
           </div>
 
-          <div id="daw-assistant">
-            <AssistantPanel
-              dataset={dataset}
-              assistQuestion={assistQuestion}
-              setAssistQuestion={setAssistQuestion}
-              runAssistedQuestion={runAssistedQuestion}
-              assistResult={assistResult}
-              isLoading={isLoading}
-              t={t}
-            />
-          </div>
+          {currentStep !== "report" ? (
+            <div id="daw-assistant">
+              <AssistantPanel
+                dataset={dataset}
+                assistQuestion={assistQuestion}
+                setAssistQuestion={setAssistQuestion}
+                runAssistedQuestion={runAssistedQuestion}
+                assistResult={assistResult}
+                isLoading={isLoading}
+                t={t}
+              />
+            </div>
+          ) : null}
 
           {dataset ? (
             <div

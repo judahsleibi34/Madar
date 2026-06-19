@@ -32,8 +32,12 @@
 }
 
 .page-builder .daw-step-report .daw-step-content {
-  grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+}
+
+.page-builder .daw-report-builder-foundation {
+  min-height: 1px;
 }
 
 .page-builder .daw-canvas-column {

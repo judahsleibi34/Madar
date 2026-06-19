@@ -1,10 +1,17 @@
-export default function Stepper({ currentStep, setCurrentStep, dataset, t }) {
+export default function Stepper({
+  currentStep,
+  setCurrentStep,
+  dataset,
+  metricsReady = false,
+  onLockedStep,
+  t,
+}) {
   const steps = [
     { id: "source", label: t.source, enabled: true },
     { id: "review", label: t.review, enabled: Boolean(dataset) },
     { id: "prepare", label: t.prepare, enabled: Boolean(dataset) },
-    { id: "visualization", label: t.visualization, enabled: Boolean(dataset) },
-    { id: "report", label: t.report, enabled: Boolean(dataset) },
+    { id: "visualization", label: t.visualization, enabled: Boolean(dataset), requiresMetrics: true },
+    { id: "report", label: t.report, enabled: Boolean(dataset), requiresMetrics: true },
   ];
 
   return (
@@ -13,9 +20,23 @@ export default function Stepper({ currentStep, setCurrentStep, dataset, t }) {
         <button
           key={step.id}
           type="button"
-          className={currentStep === step.id ? "active" : ""}
+          className={`${currentStep === step.id ? "active" : ""} ${
+            step.requiresMetrics && !metricsReady ? "locked" : ""
+          }`.trim()}
           disabled={!step.enabled}
-          onClick={() => setCurrentStep(step.id)}
+          aria-disabled={step.requiresMetrics && !metricsReady}
+          title={
+            step.requiresMetrics && !metricsReady
+              ? "Generate metrics in Prepare before opening this step"
+              : undefined
+          }
+          onClick={() => {
+            if (step.requiresMetrics && !metricsReady) {
+              onLockedStep?.(step.id);
+              return;
+            }
+            setCurrentStep(step.id);
+          }}
         >
           <span>{index + 1}</span>
           <strong>{step.label}</strong>

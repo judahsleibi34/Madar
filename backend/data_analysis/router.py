@@ -6,6 +6,7 @@ from data_analysis.domains.finance_analysis import FinanceAnalysis
 from data_analysis.domains.forms_analysis import FormsAnalysis
 from data_analysis.domains.meal_analysis import MealAnalysis
 from data_analysis.domains.ngo_meal_analysis import NgoMealAnalysis
+from data_analysis.domains.hr_analysis import HrAnalysis
 from data_analysis.assisted.assisted_analysis import AssistedAnalysis
 from data_analysis.core.analysis_catalog import ANALYSIS_CATALOG
 
@@ -14,6 +15,7 @@ ANALYZER_CLASSES = {
     "finance": FinanceAnalysis,
     "meal": MealAnalysis,
     "ngo_meal": NgoMealAnalysis,
+    "hr": HrAnalysis,
     "forms": FormsAnalysis,
     "assisted": AssistedAnalysis,
 }
