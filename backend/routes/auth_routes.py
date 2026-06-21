@@ -14,6 +14,7 @@ from services.auth_service import (
 from services.billing_service import get_billing_summary_for_tenant
 from services.onboarding_service import create_onboarded_tenant
 from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
+from services.audit_service import record_security_event
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
@@ -71,6 +72,17 @@ def get_local_user_by_auth_id(auth_id: str):
         return result.data[0]
 
     return None
+
+
+def get_login_audit_user(clean_email: str):
+    try:
+        return get_local_user_by_email(clean_email)
+    except Exception as audit_lookup_error:
+        logger.warning(
+            "auth.login.audit_user_lookup_failed",
+            extra={"error_type": type(audit_lookup_error).__name__},
+        )
+        return None
 
 
 def assert_email_is_available(clean_email: str, allowed_auth_id: str | None = None):
@@ -299,6 +311,9 @@ def signup_onboard(payload: OnboardingSignupRequest, request: Request):
 
 @router.post("/login")
 def login(user: LogIn, response: Response, request: Request):
+    clean_email = ""
+    local_user = None
+
     try:
         clean_email = normalize_email(user.email)
 
@@ -376,6 +391,15 @@ def login(user: LogIn, response: Response, request: Request):
             "auth.login.success",
             extra={"user_id": local_user.get("id"), "tenant_id": local_user.get("tenant_id")},
         )
+        record_security_event(
+            request=request,
+            tenant_id=local_user.get("tenant_id"),
+            actor_user_id=local_user.get("id"),
+            action="auth.login_succeeded",
+            target_type="user",
+            target_id=local_user.get("id"),
+            metadata={"login_method": "credentials"},
+        )
 
         return {
             "message": "User is logged in",
@@ -383,11 +407,39 @@ def login(user: LogIn, response: Response, request: Request):
             "csrf_token": csrf_token,
         }
 
-    except HTTPException:
+    except HTTPException as error:
+        audit_user = local_user or get_login_audit_user(clean_email)
+        record_security_event(
+            request=request,
+            tenant_id=(audit_user or {}).get("tenant_id"),
+            actor_user_id=(audit_user or {}).get("id"),
+            action="auth.login_failed",
+            target_type="user" if audit_user else "auth",
+            target_id=(audit_user or {}).get("id"),
+            metadata={
+                "method": "password",
+                "status_code": error.status_code,
+                "reason": "login_rejected",
+            },
+        )
         raise
 
     except Exception as e:
+        audit_user = local_user or get_login_audit_user(clean_email)
         logger.warning("auth.login.failed", extra={"error_type": type(e).__name__})
+        record_security_event(
+            request=request,
+            tenant_id=(audit_user or {}).get("tenant_id"),
+            actor_user_id=(audit_user or {}).get("id"),
+            action="auth.login_failed",
+            target_type="user" if audit_user else "auth",
+            target_id=(audit_user or {}).get("id"),
+            metadata={
+                "method": "password",
+                "reason": "invalid_credentials",
+                "error_type": type(e).__name__,
+            },
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
@@ -540,6 +592,16 @@ def change_password(
 
         except Exception as session_error:
             logger.warning("auth.password.session_refresh_failed", extra={"user_id": user_data.get("id"), "error_type": type(session_error).__name__})
+
+        record_security_event(
+            request=request,
+            tenant_id=user_data.get("tenant_id"),
+            actor_user_id=user_data.get("id"),
+            action="auth.password_changed",
+            target_type="user",
+            target_id=user_data.get("id"),
+            metadata={"method": "current_password"},
+        )
 
         return {
             "message": "Password updated successfully",

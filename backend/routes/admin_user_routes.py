@@ -67,7 +67,7 @@ def change_user_type(
         request=request,
         tenant_id=updated_user.get("tenant_id"),
         actor_user_id=admin_user.get("id"),
-        action="admin.user_type_updated",
+        action="admin.permission_changed",
         target_type="user",
         target_id=user_id,
         metadata=metadata,

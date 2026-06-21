@@ -297,6 +297,24 @@ def enforce_rate_limit(
         count = fallback_store.incr_with_ttl(key, window_seconds)
 
     if count > limit:
+        try:
+            from services.audit_service import hash_audit_identifier, record_security_event
+
+            record_security_event(
+                request=request,
+                action="security.rate_limit_exceeded",
+                target_type="rate_limit",
+                metadata={
+                    "scope": scope,
+                    "limit": limit,
+                    "count": count,
+                    "window_seconds": window_seconds,
+                    "identifier_hash": hash_audit_identifier(identity),
+                },
+            )
+        except Exception as audit_error:
+            logger.warning("rate_limit.audit_failed", extra={"error_type": type(audit_error).__name__})
+
         raise HTTPException(
             status_code=429,
             detail="Too many requests. Please try again later.",
