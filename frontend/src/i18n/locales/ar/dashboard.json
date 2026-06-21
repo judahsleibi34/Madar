@@ -16,7 +16,8 @@
     "themeMode": "السمة",
     "userManagement": "إدارة المستخدمين",
     "admin": "مسؤول",
-    "userRole": "مستخدم"
+    "userRole": "مستخدم",
+    "security": "الأمان"
   },
   "loading": {
     "dashboard": "جار تحميل لوحة التحكم",
@@ -26,7 +27,8 @@
     "myPlan": "جار تحميل خطتي",
     "userManagement": "جار تحميل إدارة المستخدمين",
     "settings": "جار تحميل الإعدادات",
-    "passwordSettings": "جار تحميل إعدادات كلمة المرور"
+    "passwordSettings": "جار تحميل إعدادات كلمة المرور",
+    "securitySettings": "جار تحميل إعدادات الأمان"
   },
   "user": {
     "fallbackName": "مستخدم مدار"
@@ -141,6 +143,56 @@
     "next": {
       "title": "الخطوة التالية المقترحة",
       "subtitle": "حدّث موقعك العام، ثم استخدم ردود النماذج وسجلات البيانات لمراجعة ما يرسله الزوار."
+    }
+  },
+  "securityMfa": {
+    "eyebrow": "أمان الحساب",
+    "title": "المصادقة متعددة العوامل",
+    "subtitle": "إدارة عوامل تحقق TOTP لهذا الحساب.",
+    "loading": "جار تحميل إعدادات المصادقة",
+    "statusTitle": "حالة المصادقة",
+    "statusDescription": "راجع حالة الإلزام ومستوى ضمان المصادقة الحالي.",
+    "required": "مطلوبة",
+    "currentAal": "مستوى AAL الحالي",
+    "nextAal": "مستوى AAL التالي",
+    "yes": "نعم",
+    "no": "لا",
+    "notProvided": "غير متوفر",
+    "factorsTitle": "عوامل TOTP",
+    "factorsDescription": "عوامل تطبيق المصادقة المؤكدة والمعلقة على حسابك.",
+    "factorFallback": "تطبيق مصادقة",
+    "noFactors": "لا توجد عوامل TOTP مسجلة.",
+    "verifiedCount": "{{count}} مؤكدة",
+    "unverifiedCount": "{{count}} غير مؤكدة",
+    "enrollTitle": "تسجيل تطبيق مصادقة",
+    "enrollDescription": "ابدأ التسجيل، امسح رمز QR، ثم تحقق من الرمز المكون من ستة أرقام.",
+    "friendlyName": "اسم الجهاز",
+    "verificationCode": "رمز التحقق",
+    "qrAlt": "رمز QR للمصادقة",
+    "status": {
+      "unknown": "غير معروف"
+    },
+    "actions": {
+      "start": "بدء التسجيل",
+      "starting": "جار البدء...",
+      "verify": "تأكيد التسجيل",
+      "verifying": "جار التحقق...",
+      "cancel": "إلغاء",
+      "remove": "إزالة",
+      "removing": "جار الإزالة..."
+    },
+    "messages": {
+      "enrollStarted": "بدأ التسجيل. امسح رمز QR ثم أدخل رمز التحقق.",
+      "verified": "تم تأكيد المصادقة متعددة العوامل.",
+      "removed": "تمت إزالة عامل المصادقة."
+    },
+    "errors": {
+      "generic": "تعذر إكمال الطلب.",
+      "load": "تعذر تحميل إعدادات المصادقة.",
+      "enroll": "تعذر بدء تسجيل المصادقة.",
+      "verify": "تعذر التحقق من رمز المصادقة.",
+      "remove": "تعذر إزالة عامل المصادقة.",
+      "missingCode": "أدخل رمز التحقق من تطبيق المصادقة."
     }
   }
 }

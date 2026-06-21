@@ -290,6 +290,16 @@ export default function DashboardSidebar({
             className="admin-sidebar-theme-row"
           />
 
+          <button
+            type="button"
+            className={isActive("/settings/security") ? "active" : ""}
+            onClick={() => goTo("/settings/security")}
+            title={t("sidebar.security")}
+          >
+            <ShieldCheck size={18} aria-hidden="true" />
+            <span>{t("sidebar.security")}</span>
+          </button>
+
           {showSettingsLink && (
             <button
               type="button"

@@ -575,3 +575,229 @@
     min-width: 0;
   }
 }
+
+
+.security-mfa-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+}
+
+.security-mfa-header {
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.security-mfa-header span,
+.security-mfa-panel-heading p,
+.security-mfa-status-grid span,
+.security-mfa-factor span,
+.security-mfa-factor-counts {
+  color: var(--text-muted, #64748b);
+}
+
+.security-mfa-header h1,
+.security-mfa-panel h2 {
+  margin: 0;
+  color: var(--text-primary, #0f172a);
+}
+
+.security-mfa-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.security-mfa-panel {
+  background: var(--surface-primary, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  padding: 22px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+.security-mfa-enroll-panel {
+  grid-column: 1 / -1;
+}
+
+.security-mfa-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.security-mfa-panel-heading svg {
+  color: #2563eb;
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.security-mfa-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.security-mfa-status-grid div,
+.security-mfa-factor {
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface-secondary, #f8fafc);
+}
+
+.security-mfa-status-grid div,
+.security-mfa-factor div {
+  display: grid;
+  gap: 4px;
+}
+
+.security-mfa-factor-list {
+  display: grid;
+  gap: 10px;
+}
+
+.security-mfa-factor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.security-mfa-factor-counts,
+.security-mfa-actions,
+.security-mfa-enroll-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.security-mfa-factor-counts {
+  margin-top: 14px;
+}
+
+.security-mfa-enroll-form label,
+.security-mfa-verify-flow label {
+  display: grid;
+  gap: 8px;
+  min-width: min(100%, 320px);
+}
+
+.security-mfa-enroll-form input,
+.security-mfa-verify-flow input {
+  min-height: 44px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  padding: 0 12px;
+}
+
+.security-mfa-primary,
+.security-mfa-danger,
+.security-mfa-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.security-mfa-danger {
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  background: #fff5f5;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.security-mfa-verify-flow {
+  display: grid;
+  gap: 16px;
+}
+
+.security-mfa-qr {
+  width: min(240px, 100%);
+  aspect-ratio: 1;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.security-mfa-uri {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-secondary, #f8fafc);
+  color: var(--text-primary, #0f172a);
+}
+
+.security-mfa-success,
+.security-mfa-error,
+.security-mfa-empty,
+.security-mfa-loading {
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.security-mfa-success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.security-mfa-error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.security-mfa-empty,
+.security-mfa-loading {
+  background: var(--surface-secondary, #f8fafc);
+  color: var(--text-muted, #64748b);
+}
+
+.security-mfa-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.security-mfa-page[dir="rtl"] .security-mfa-panel-heading,
+.security-mfa-page[dir="rtl"] .security-mfa-factor,
+.security-mfa-page[dir="rtl"] .security-mfa-factor-counts,
+.security-mfa-page[dir="rtl"] .security-mfa-actions,
+.security-mfa-page[dir="rtl"] .security-mfa-enroll-form {
+  direction: rtl;
+}
+
+@media (max-width: 900px) {
+  .security-mfa-grid,
+  .security-mfa-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .security-mfa-page {
+    padding: 22px;
+  }
+
+  .security-mfa-factor,
+  .security-mfa-actions,
+  .security-mfa-enroll-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .security-mfa-danger,
+  .security-mfa-primary,
+  .security-mfa-actions button {
+    width: 100%;
+  }
+}

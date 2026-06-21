@@ -29,6 +29,7 @@ import DashboardSidebar from "./components/DashboardBuilder/DashboardSidebar";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import SettingsPage from "./components/DashboardBuilder/SettingsPage";
 import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage";
+import SecurityMfaPage from "./components/DashboardBuilder/SecurityMfaPage";
 import UserManagementPage from "./components/DashboardBuilder/UserManagementPage";
 import UserDashboard from "./components/DashboardBuilder/UserDashboard";
 import MyPlanPage from "./components/MainPages/MyPlanPage";
@@ -1095,6 +1096,22 @@ export default function App() {
                 renderRestrictedPage(
                   appShellContent.restrictedAccess.adminOnly
                 )
+              )
+            }
+          />
+
+          <Route
+            path="/settings/security/*"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton(t("dashboard:loading.securitySettings"))
+              ) : !isLoggedIn ? (
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
+              ) : (
+                renderDashboardShell(<SecurityMfaPage lang={lang} />)
               )
             }
           />

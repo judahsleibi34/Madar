@@ -16,7 +16,8 @@
     "themeMode": "Theme",
     "userManagement": "User Management",
     "admin": "Admin",
-    "userRole": "User"
+    "userRole": "User",
+    "security": "Security"
   },
   "loading": {
     "dashboard": "Loading dashboard",
@@ -26,7 +27,8 @@
     "myPlan": "Loading my plan",
     "userManagement": "Loading user management",
     "settings": "Loading settings",
-    "passwordSettings": "Loading password settings"
+    "passwordSettings": "Loading password settings",
+    "securitySettings": "Loading security settings"
   },
   "user": {
     "fallbackName": "Madar User"
@@ -141,6 +143,56 @@
     "next": {
       "title": "Recommended next step",
       "subtitle": "Update your public website, then use form responses and data logs to review what visitors submit."
+    }
+  },
+  "securityMfa": {
+    "eyebrow": "Account security",
+    "title": "Multi-factor authentication",
+    "subtitle": "Manage TOTP verification factors for this account.",
+    "loading": "Loading MFA settings",
+    "statusTitle": "MFA status",
+    "statusDescription": "Review requirement state and current authenticator assurance level.",
+    "required": "Required",
+    "currentAal": "Current AAL",
+    "nextAal": "Next AAL",
+    "yes": "Yes",
+    "no": "No",
+    "notProvided": "Not provided",
+    "factorsTitle": "TOTP factors",
+    "factorsDescription": "Verified and pending authenticator app factors on your account.",
+    "factorFallback": "Authenticator app",
+    "noFactors": "No TOTP factors are enrolled.",
+    "verifiedCount": "{{count}} verified",
+    "unverifiedCount": "{{count}} unverified",
+    "enrollTitle": "Enroll authenticator app",
+    "enrollDescription": "Start enrollment, scan the QR code, then verify the six-digit code.",
+    "friendlyName": "Device name",
+    "verificationCode": "Verification code",
+    "qrAlt": "Authenticator QR code",
+    "status": {
+      "unknown": "Unknown"
+    },
+    "actions": {
+      "start": "Start enrollment",
+      "starting": "Starting...",
+      "verify": "Verify enrollment",
+      "verifying": "Verifying...",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "removing": "Removing..."
+    },
+    "messages": {
+      "enrollStarted": "Enrollment started. Scan the QR code and verify the code.",
+      "verified": "MFA enrollment verified.",
+      "removed": "MFA factor removed."
+    },
+    "errors": {
+      "generic": "Could not complete the request.",
+      "load": "Could not load MFA settings.",
+      "enroll": "Could not start MFA enrollment.",
+      "verify": "Could not verify the MFA code.",
+      "remove": "Could not remove the MFA factor.",
+      "missingCode": "Enter the verification code from your authenticator app."
     }
   }
 }
