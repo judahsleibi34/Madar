@@ -35,6 +35,9 @@ MFA_CHALLENGE_FAILED = "auth.mfa_challenge_failed"
 MFA_VERIFIED = "auth.mfa_verified"
 MFA_FACTOR_REMOVED = "auth.mfa_factor_removed"
 MFA_REQUIRED_CHANGED = "auth.mfa_required_changed"
+MFA_LOGIN_CHALLENGE_STARTED = "auth.mfa_login_challenge_started"
+MFA_LOGIN_VERIFIED = "auth.mfa_login_verified"
+MFA_LOGIN_FAILED = "auth.mfa_login_failed"
 
 
 def normalize_metadata_key(key: Any) -> str:

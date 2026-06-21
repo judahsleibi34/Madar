@@ -10,11 +10,19 @@ from services.auth_service import (
     delete_auth_cookies,
     build_user_payload,
     get_authenticated_user_row,
+    normalize_user_type,
 )
 from services.billing_service import get_billing_summary_for_tenant
 from services.onboarding_service import create_onboarded_tenant
 from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
+from services.mfa_login_service import (
+    create_pending_mfa_client,
+    is_admin_mfa_login_enforcement_enabled,
+    set_pending_mfa_cookie,
+    verified_totp_factors_for_client,
+)
 from services.audit_service import record_security_event
+from services.user_security_settings_service import get_user_security_settings
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
@@ -381,6 +389,50 @@ def login(user: LogIn, response: Response, request: Request):
 
             local_user = update_response.data[0]
 
+        mfa_enrollment_recommended = False
+
+        if (
+            is_admin_mfa_login_enforcement_enabled()
+            and normalize_user_type(local_user.get("user_type")) == "admin"
+        ):
+            security_settings = get_user_security_settings(local_user.get("id"))
+
+            if security_settings and security_settings.get("mfa_required"):
+                try:
+                    mfa_client = create_pending_mfa_client(
+                        {
+                            "access_token": auth_response.session.access_token,
+                            "refresh_token": auth_response.session.refresh_token,
+                        }
+                    )
+                    verified_factors = verified_totp_factors_for_client(mfa_client)
+
+                except Exception as mfa_lookup_error:
+                    logger.warning(
+                        "auth.login.mfa_factor_lookup_failed",
+                        extra={
+                            "user_id": local_user.get("id"),
+                            "error_type": type(mfa_lookup_error).__name__,
+                        },
+                    )
+                    verified_factors = []
+
+                if verified_factors:
+                    set_pending_mfa_cookie(
+                        response,
+                        access_token=auth_response.session.access_token,
+                        refresh_token=auth_response.session.refresh_token,
+                        auth_id=auth_user_id,
+                        user_id=local_user.get("id"),
+                        tenant_id=local_user.get("tenant_id"),
+                    )
+                    return {
+                        "mfa_required": True,
+                        "factors": verified_factors,
+                    }
+
+                mfa_enrollment_recommended = True
+
         csrf_token = set_auth_cookies(
             response,
             auth_response.session.access_token,
@@ -401,11 +453,16 @@ def login(user: LogIn, response: Response, request: Request):
             metadata={"login_method": "credentials"},
         )
 
-        return {
+        login_payload = {
             "message": "User is logged in",
             "user": build_user_payload(local_user),
             "csrf_token": csrf_token,
         }
+
+        if mfa_enrollment_recommended:
+            login_payload["mfa_enrollment_recommended"] = True
+
+        return login_payload
 
     except HTTPException as error:
         audit_user = local_user or get_login_audit_user(clean_email)

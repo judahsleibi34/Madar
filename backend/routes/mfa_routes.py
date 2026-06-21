@@ -6,16 +6,37 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from classes import MfaEnrollRequest, MfaEnrollVerifyRequest
-from database import supabase
-from services.auth_service import get_authenticated_user_row, normalize_user_type
+from classes import (
+    MfaEnrollRequest,
+    MfaEnrollVerifyRequest,
+    MfaLoginChallengeRequest,
+    MfaLoginVerifyRequest,
+)
+from database import service_supabase, supabase
+from services.auth_service import (
+    build_user_payload,
+    get_authenticated_user_row,
+    normalize_user_type,
+    set_auth_cookies,
+)
 from services.audit_service import (
     MFA_CHALLENGE_FAILED,
     MFA_ENROLL_STARTED,
     MFA_ENROLL_VERIFIED,
     MFA_FACTOR_REMOVED,
+    MFA_LOGIN_CHALLENGE_STARTED,
+    MFA_LOGIN_FAILED,
+    MFA_LOGIN_VERIFIED,
     MFA_VERIFIED,
     record_mfa_event,
+    record_security_event,
+)
+from services.mfa_login_service import (
+    aal_payload_from_response as login_aal_payload_from_response,
+    clear_pending_mfa_cookie,
+    create_pending_mfa_client,
+    get_session_from_verify_response,
+    read_pending_mfa_cookie,
 )
 from services.user_security_settings_service import (
     get_user_security_settings,
@@ -24,6 +45,7 @@ from services.user_security_settings_service import (
 
 router = APIRouter(prefix="/auth/mfa", tags=["MFA"])
 logger = logging.getLogger(__name__)
+
 
 
 def read_value(value: Any, *names: str) -> Any:
@@ -130,6 +152,32 @@ def get_authenticator_assurance_level() -> dict[str, Any]:
             extra={"error_type": type(error).__name__},
         )
         return {}
+
+
+def get_local_user_for_pending_mfa(pending_payload: dict[str, Any]):
+    user_id = pending_payload.get("user_id")
+    auth_id = str(pending_payload.get("auth_id") or "")
+    query = service_supabase.table("users").select("*")
+
+    if user_id is not None:
+        result = query.eq("id", user_id).limit(1).execute()
+    else:
+        result = query.eq("auth_id", auth_id).limit(1).execute()
+
+    if result.data:
+        return result.data[0]
+
+    return None
+
+
+def require_pending_mfa_payload(request: Request, response: Response) -> dict[str, Any]:
+    pending_payload = read_pending_mfa_cookie(request)
+
+    if not pending_payload:
+        clear_pending_mfa_cookie(response)
+        raise HTTPException(status_code=401, detail="MFA login session expired")
+
+    return pending_payload
 
 
 @router.get("/status")
@@ -297,3 +345,184 @@ def mfa_remove_factor(factor_id: str, request: Request, response: Response):
         "removed": True,
         "factor_id": clean_factor_id,
     }
+
+
+@router.post("/login/challenge")
+def mfa_login_challenge(
+    payload: MfaLoginChallengeRequest,
+    request: Request,
+    response: Response,
+):
+    pending_payload = require_pending_mfa_payload(request, response)
+    factor_id = payload.factor_id.strip()
+
+    try:
+        mfa_client = create_pending_mfa_client(pending_payload)
+        challenge_response = mfa_client.auth.mfa.challenge({"factor_id": factor_id})
+        challenge_id = challenge_id_from_response(challenge_response)
+
+        if not challenge_id:
+            raise ValueError("Missing MFA challenge id")
+
+    except Exception as error:
+        logger.warning(
+            "auth.mfa.login_challenge_failed",
+            extra={"user_id": pending_payload.get("user_id"), "error_type": type(error).__name__},
+        )
+        clear_pending_mfa_cookie(response)
+        record_mfa_event(
+            request=request,
+            tenant_id=pending_payload.get("tenant_id"),
+            actor_user_id=pending_payload.get("user_id"),
+            action=MFA_CHALLENGE_FAILED,
+            target_user_id=pending_payload.get("user_id"),
+            factor_id=factor_id,
+            metadata={"factor_type": "totp", "stage": "login_challenge"},
+        )
+        raise HTTPException(status_code=400, detail="Could not start MFA challenge")
+
+    record_mfa_event(
+        request=request,
+        tenant_id=pending_payload.get("tenant_id"),
+        actor_user_id=pending_payload.get("user_id"),
+        action=MFA_LOGIN_CHALLENGE_STARTED,
+        target_user_id=pending_payload.get("user_id"),
+        factor_id=factor_id,
+        metadata={"factor_type": "totp"},
+    )
+
+    return {"challenge_id": challenge_id}
+
+
+@router.post("/login/verify")
+def mfa_login_verify(
+    payload: MfaLoginVerifyRequest,
+    request: Request,
+    response: Response,
+):
+    pending_payload = require_pending_mfa_payload(request, response)
+    factor_id = payload.factor_id.strip()
+
+    try:
+        mfa_client = create_pending_mfa_client(pending_payload)
+
+        if payload.challenge_id:
+            verify_response = mfa_client.auth.mfa.verify(
+                {
+                    "factor_id": factor_id,
+                    "challenge_id": payload.challenge_id.strip(),
+                    "code": payload.code.strip(),
+                }
+            )
+        else:
+            verify_response = mfa_client.auth.mfa.challenge_and_verify(
+                {"factor_id": factor_id, "code": payload.code.strip()}
+            )
+
+        aal = {}
+        get_aal = getattr(mfa_client.auth.mfa, "get_authenticator_assurance_level", None)
+
+        if get_aal:
+            aal = login_aal_payload_from_response(get_aal())
+            if aal.get("current_level") and aal.get("current_level") != "aal2":
+                raise ValueError("MFA verification did not produce aal2")
+
+        session = get_session_from_verify_response(verify_response)
+
+        if not session:
+            session_response = mfa_client.auth.get_session()
+            session = getattr(session_response, "session", None) or session_response
+
+        access_token = getattr(session, "access_token", None) or (
+            session.get("access_token") if isinstance(session, dict) else None
+        )
+        refresh_token = getattr(session, "refresh_token", None) or (
+            session.get("refresh_token") if isinstance(session, dict) else None
+        )
+
+        if not access_token or not refresh_token:
+            raise ValueError("MFA verification did not return a session")
+
+        local_user = get_local_user_for_pending_mfa(pending_payload)
+
+        if not local_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        csrf_token = set_auth_cookies(response, access_token, refresh_token)
+        clear_pending_mfa_cookie(response)
+
+        try:
+            mark_aal2_verified(
+                user_id=local_user.get("id"),
+                auth_id=str(local_user.get("auth_id") or pending_payload.get("auth_id") or ""),
+                verified_at=current_utc_iso(),
+            )
+        except Exception as error:
+            logger.warning(
+                "auth.mfa.login_aal2_tracking_failed",
+                extra={"user_id": local_user.get("id"), "error_type": type(error).__name__},
+            )
+
+        record_security_event(
+            request=request,
+            tenant_id=local_user.get("tenant_id"),
+            actor_user_id=local_user.get("id"),
+            action="auth.login_succeeded",
+            target_type="user",
+            target_id=local_user.get("id"),
+            metadata={"login_method": "credentials_mfa"},
+        )
+        record_mfa_event(
+            request=request,
+            tenant_id=local_user.get("tenant_id"),
+            actor_user_id=local_user.get("id"),
+            action=MFA_LOGIN_VERIFIED,
+            target_user_id=local_user.get("id"),
+            factor_id=factor_id,
+            metadata={"factor_type": "totp", "aal": aal},
+        )
+        record_mfa_event(
+            request=request,
+            tenant_id=local_user.get("tenant_id"),
+            actor_user_id=local_user.get("id"),
+            action=MFA_VERIFIED,
+            target_user_id=local_user.get("id"),
+            factor_id=factor_id,
+            metadata={"factor_type": "totp", "stage": "login"},
+        )
+
+        return {
+            "message": "User is logged in",
+            "user": build_user_payload(local_user),
+            "csrf_token": csrf_token,
+        }
+
+    except HTTPException:
+        clear_pending_mfa_cookie(response)
+        raise
+
+    except Exception as error:
+        logger.warning(
+            "auth.mfa.login_verify_failed",
+            extra={"user_id": pending_payload.get("user_id"), "error_type": type(error).__name__},
+        )
+        clear_pending_mfa_cookie(response)
+        record_mfa_event(
+            request=request,
+            tenant_id=pending_payload.get("tenant_id"),
+            actor_user_id=pending_payload.get("user_id"),
+            action=MFA_LOGIN_FAILED,
+            target_user_id=pending_payload.get("user_id"),
+            factor_id=factor_id,
+            metadata={"factor_type": "totp", "stage": "login_verify"},
+        )
+        record_mfa_event(
+            request=request,
+            tenant_id=pending_payload.get("tenant_id"),
+            actor_user_id=pending_payload.get("user_id"),
+            action=MFA_CHALLENGE_FAILED,
+            target_user_id=pending_payload.get("user_id"),
+            factor_id=factor_id,
+            metadata={"factor_type": "totp", "stage": "login_verify"},
+        )
+        raise HTTPException(status_code=400, detail="Could not verify MFA code")

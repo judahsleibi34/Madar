@@ -80,3 +80,13 @@ class MfaEnrollVerifyRequest(BaseModel):
     factor_id: str = Field(..., min_length=1, max_length=200)
     code: str = Field(..., min_length=6, max_length=12)
 
+
+class MfaLoginChallengeRequest(BaseModel):
+    factor_id: str = Field(..., min_length=1, max_length=200)
+
+
+class MfaLoginVerifyRequest(BaseModel):
+    factor_id: str = Field(..., min_length=1, max_length=200)
+    code: str = Field(..., min_length=6, max_length=12)
+    challenge_id: Optional[str] = Field(default=None, max_length=200)
+
