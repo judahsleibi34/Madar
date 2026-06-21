@@ -71,5 +71,12 @@ class AdminUserTypeUpdateRequest(BaseModel):
 class UpdatePassword(BaseModel):
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8)
-    
-    
+
+class MfaEnrollRequest(BaseModel):
+    friendly_name: Optional[str] = Field(default=None, max_length=64)
+
+
+class MfaEnrollVerifyRequest(BaseModel):
+    factor_id: str = Field(..., min_length=1, max_length=200)
+    code: str = Field(..., min_length=6, max_length=12)
+
