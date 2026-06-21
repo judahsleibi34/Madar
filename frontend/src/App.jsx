@@ -16,6 +16,7 @@ import AboutSection from "./components/MainPages/AboutSection";
 import ContactPage from "./components/MainPages/ContactPage";
 import FeaturesPage from "./components/MainPages/FeaturesPage";
 import PricingPage from "./components/MainPages/PricingPage";
+import PrivacyPolicyPage from "./components/MainPages/PrivacyPolicyPage";
 import Footer from "./components/MainPages/Footer";
 
 import LoginPage from "./components/AuthPages/LoginPage";
@@ -1232,6 +1233,15 @@ export default function App() {
             element={
               <main className="app-main">
                 <TeamPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+
+          <Route
+            path="/privacy-policy"
+            element={
+              <main className="app-main">
+                <PrivacyPolicyPage key={lang} lang={lang} />
               </main>
             }
           />

@@ -7,6 +7,11 @@ import LanguageSwitcher from "../LanguageSwitcher";
 import logo from "../../assets/MadarTemplates/madar_header.svg";
 import { getNavigationContent, primaryNavigationItems } from "../../content";
 
+const publicNavItems = [
+  ...primaryNavigationItems,
+  { id: "privacy", labelKey: "privacy", path: "/privacy-policy" },
+];
+
 export default function Header({
   lang = "en",
   onLanguageChange,
@@ -24,10 +29,10 @@ export default function Header({
 
   const finalNavItems = isLoggedIn
     ? [
-        ...primaryNavigationItems,
+        ...publicNavItems,
         { id: "dashboard", labelKey: "dashboard", path: "/dashboard" },
       ]
-    : primaryNavigationItems;
+    : publicNavItems;
 
   const closeMenu = () => {
     setMenuOpen(false);

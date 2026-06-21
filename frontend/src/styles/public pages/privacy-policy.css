@@ -1,0 +1,96 @@
+/* ============================================================
+   PRIVACY POLICY PAGE
+   ============================================================ */
+
+.privacy-policy-page {
+  width: min(980px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 64px 0 88px;
+  color: #1a2744;
+}
+
+.privacy-policy-hero {
+  margin-bottom: 44px;
+}
+
+.privacy-policy-hero p {
+  margin: 0 0 12px;
+  color: var(--theme-primary);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.privacy-policy-hero h1 {
+  margin: 0 0 16px;
+  color: #1a2744;
+  font-size: clamp(34px, 6vw, 58px);
+  line-height: 1.05;
+  font-weight: 900;
+}
+
+.privacy-policy-hero span {
+  display: block;
+  max-width: 760px;
+  color: #3a3530;
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.privacy-policy-content {
+  display: grid;
+  gap: 24px;
+}
+
+.privacy-policy-section {
+  border-top: 1px solid rgba(26, 39, 68, 0.14);
+  padding-top: 24px;
+}
+
+.privacy-policy-section h2 {
+  margin: 0 0 10px;
+  color: #1a2744;
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 850;
+}
+
+.privacy-policy-section p {
+  margin: 0;
+  color: #3a3530;
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+html[data-theme="dark"] .privacy-policy-page,
+body.theme-dark .privacy-policy-page,
+html[data-theme="dark"] .privacy-policy-hero h1,
+body.theme-dark .privacy-policy-hero h1,
+html[data-theme="dark"] .privacy-policy-section h2,
+body.theme-dark .privacy-policy-section h2 {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .privacy-policy-hero span,
+body.theme-dark .privacy-policy-hero span,
+html[data-theme="dark"] .privacy-policy-section p,
+body.theme-dark .privacy-policy-section p {
+  color: var(--theme-text-muted);
+}
+
+html[data-theme="dark"] .privacy-policy-section,
+body.theme-dark .privacy-policy-section {
+  border-top-color: var(--theme-border);
+}
+
+@media (max-width: 720px) {
+  .privacy-policy-page {
+    width: min(100% - 28px, 980px);
+    padding: 44px 0 64px;
+  }
+
+  .privacy-policy-hero {
+    margin-bottom: 32px;
+  }
+}
