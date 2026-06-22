@@ -4,6 +4,7 @@ const BLOCKED_MEDIA_SCHEMES = new Set(["javascript", "data", "vbscript", "file",
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
+const RELATIVE_MEDIA_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i;
 
 const isSvgPath = (value) => {
   const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();
@@ -36,6 +37,10 @@ export const resolveMediaUrl = (value) => {
   }
 
   const relativeSource = source.startsWith("/") ? source : `/${source}`;
+
+  if (!RELATIVE_MEDIA_FILE_PATTERN.test(relativeSource)) {
+    return "";
+  }
 
   if (relativeSource.startsWith("/uploads/") && !MANAGED_UPLOAD_ASSET_PATTERN.test(relativeSource)) {
     return "";

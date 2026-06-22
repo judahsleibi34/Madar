@@ -346,7 +346,11 @@ export default function App() {
 
       const now = Date.now();
 
-      if (reason !== "interval" && now - lastKeepAliveAt < EVENT_COOLDOWN_MS) {
+      if (
+        reason !== "interval" &&
+        reason !== "pagehide" &&
+        now - lastKeepAliveAt < EVENT_COOLDOWN_MS
+      ) {
         return;
       }
 
@@ -357,6 +361,7 @@ export default function App() {
         const response = await apiFetch(`${API_URL}/auth/user_status`, {
           method: "GET",
           cache: "no-store",
+          keepalive: reason === "pagehide",
         });
 
         if (response.status === 401 || response.status === 403) {
@@ -419,14 +424,20 @@ export default function App() {
       keepAlive("online");
     };
 
+    const handlePageHide = () => {
+      keepAlive("pagehide");
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("online", handleOnline);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
+      window.removeEventListener("pagehide", handlePageHide);
     };
   }, [isLoggedIn, authChecked, normalizeUser]);
 

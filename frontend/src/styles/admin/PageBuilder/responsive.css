@@ -122,7 +122,7 @@
     grid-template-columns: 1fr;
   }
 
-  .tenant-runtime-page .free-canvas-frame {
+  .tenant-runtime-page .direct-layout-frame {
     width: min(100%, 1200px) !important;
   }
 }

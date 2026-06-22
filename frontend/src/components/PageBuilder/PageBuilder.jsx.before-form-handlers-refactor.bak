@@ -184,15 +184,6 @@ import {
   getBuilderElementStyle,
   getBuilderFreeElementStyle,
 } from "./PageBuilder.styles";
-import {
-  createFormHandlers,
-} from "./PageBuilder.formHandlers";
-import {
-  createUserHandlers,
-} from "./PageBuilder.userHandlers";
-import {
-  createUploadHandlers,
-} from "./PageBuilder.uploadHandlers";
 const getFieldType = (type) => getFieldTypeById(fieldTypes, type);
 
 const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
@@ -200,278 +191,6 @@ const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
   getSectionElements,
   carouselElementTypes,
 });
-
-const normalizeBuilderElementShape = (element) => {
-  if (!element || typeof element !== "object" || Array.isArray(element)) {
-    return createElement("text");
-  }
-
-  return createElement(element.type || "text", element);
-};
-
-const normalizeBuilderColumnShape = (column) => {
-  const source =
-    column && typeof column === "object" && !Array.isArray(column)
-      ? column
-      : {};
-  const elements = Array.isArray(source.elements)
-    ? source.elements.map(normalizeBuilderElementShape)
-    : [];
-
-  return createColumn(elements, {
-    ...source,
-    name: source.name || "Column",
-    layout: {
-      align: "left",
-      ...(source.layout || {}),
-    },
-    elements,
-  });
-};
-
-const normalizeBuilderRowShape = (row) => {
-  const source =
-    row && typeof row === "object" && !Array.isArray(row)
-      ? row
-      : {};
-  const columns = Array.isArray(source.columns) && source.columns.length > 0
-    ? source.columns.map(normalizeBuilderColumnShape)
-    : [normalizeBuilderColumnShape({ elements: source.elements || [] })];
-
-  return createRow(columns, {
-    ...source,
-    layout: {
-      columns: String(source.layout?.columns || columns.length || 1),
-      align: source.layout?.align || "center",
-      gap: source.layout?.gap || "medium",
-      ...(source.layout || {}),
-    },
-    columns,
-  });
-};
-
-const normalizeBuilderSectionShape = (section) => {
-  const source =
-    section && typeof section === "object" && !Array.isArray(section)
-      ? section
-      : {};
-  const legacyElements = Array.isArray(source.elements) ? source.elements : [];
-  const rows = Array.isArray(source.rows) && source.rows.length > 0
-    ? source.rows.map(normalizeBuilderRowShape)
-    : [normalizeBuilderRowShape({ elements: legacyElements })];
-  const freeElements = Array.isArray(source.freeElements)
-    ? source.freeElements.map(normalizeBuilderElementShape)
-    : [];
-
-  const base = createSection({
-    name: source.name || source.type || "Section",
-    mode: source.mode || "auto",
-    layout: source.layout || {},
-    rows,
-    freeElements,
-  });
-
-  return {
-    ...base,
-    ...source,
-    mode: source.mode || base.mode,
-    layout: {
-      ...base.layout,
-      ...(source.layout || {}),
-    },
-    rows,
-    freeElements,
-  };
-};
-
-const normalizeBuilderPageShape = (page, fallbackPage) => {
-  const source =
-    page && typeof page === "object" && !Array.isArray(page)
-      ? page
-      : fallbackPage || {};
-  const sections = Array.isArray(source.sections)
-    ? source.sections.map(normalizeBuilderSectionShape)
-    : [];
-
-  return createPage(source.name || fallbackPage?.name || "Home", sections, {
-    ...source,
-    slug: source.slug || source.path || fallbackPage?.slug || "/",
-    backgroundColor: source.backgroundColor || fallbackPage?.backgroundColor || "#ffffff",
-    visibility: source.visibility || fallbackPage?.visibility || "public",
-    showInNavigation:
-      typeof source.showInNavigation === "boolean"
-        ? source.showInNavigation
-        : fallbackPage?.showInNavigation ?? true,
-    pageType: source.pageType || fallbackPage?.pageType || "main",
-    sections,
-  });
-};
-
-const normalizeBuilderProjectShape = (project) => {
-  const fallback = createInitialProject();
-  const source =
-    project && typeof project === "object" && !Array.isArray(project)
-      ? project
-      : {};
-
-  const sourcePages =
-    Array.isArray(source.pages) && source.pages.length > 0
-      ? source.pages
-      : fallback.pages;
-  const pages = sourcePages.map((page, index) =>
-    normalizeBuilderPageShape(page, fallback.pages[index])
-  );
-
-  const forms =
-    Array.isArray(source.forms) && source.forms.length > 0
-      ? source.forms
-      : fallback.forms;
-
-  const workflows = Array.isArray(source.workflows)
-    ? source.workflows
-    : fallback.workflows || [];
-
-  const roles = Array.isArray(source.roles) ? source.roles : fallback.roles || [];
-  const users = Array.isArray(source.users) ? source.users : fallback.users || [];
-  const collections = Array.isArray(source.collections)
-    ? source.collections
-    : fallback.collections || [];
-
-  return {
-    ...fallback,
-    ...source,
-    pages,
-    forms,
-    workflows,
-    roles,
-    users,
-    collections,
-    activePageId: pages.some((page) => page.id === source.activePageId)
-      ? source.activePageId
-      : pages[0]?.id || "",
-    activeFormId: forms.some((form) => form.id === source.activeFormId)
-      ? source.activeFormId
-      : forms[0]?.id || "",
-    activeWorkflowId: workflows.some(
-      (workflow) => workflow.id === source.activeWorkflowId
-    )
-      ? source.activeWorkflowId
-      : workflows[0]?.id || "",
-    activeRoleId: roles.some((role) => role.id === source.activeRoleId)
-      ? source.activeRoleId
-      : roles[0]?.id || "",
-    siteChrome: {
-      ...(fallback.siteChrome || defaultSiteChrome),
-      ...(source.siteChrome || {}),
-    },
-    theme: {
-      ...(fallback.theme || {}),
-      ...(source.theme || {}),
-    },
-  };
-};
-
-const cleanBuilderProject = (project) => {
-  const normalizedProject = normalizeBuilderProjectShape(project);
-
-  if (!normalizedProject.pages.length) return normalizedProject;
-
-  const formSectionsToKeep = normalizedProject.pages
-    .slice(1)
-    .flatMap((page) => page.sections || [])
-    .filter((section) =>
-      getSectionElements(section).some((element) => element.type === "formBlock")
-    );
-
-  const cleanedPages = normalizedProject.pages
-    .filter(
-      (page, index) =>
-        index === 0 ||
-        !internalPageNames.has(String(page.name || "").toLowerCase())
-    )
-    .map((page, index) => {
-      const baseSections = (page.sections || []).filter(
-        (section) => !isMetricsSection(section) && !isResponsesSection(section)
-      );
-
-      const sections =
-        index === 0 && !hasFormSection({ ...page, sections: baseSections })
-          ? [...baseSections, ...formSectionsToKeep]
-          : baseSections;
-
-      return {
-        ...page,
-        sections: sections.map(removeDuplicateFormHeadings),
-        showInNavigation: index === 0 ? true : page.showInNavigation,
-      };
-    })
-    .filter((page, index) => index === 0 || (page.sections || []).length > 0);
-
-  const pages = cleanedPages.length ? cleanedPages : normalizedProject.pages;
-
-  return {
-    ...normalizedProject,
-    activePageId: pages.some((page) => page.id === normalizedProject.activePageId)
-      ? normalizedProject.activePageId
-      : pages[0]?.id || "",
-    siteChrome: {
-      ...normalizedProject.siteChrome,
-      footerShopLinks: String(normalizedProject.siteChrome?.footerShopLinks || "")
-        .split("\n")
-        .filter((item) => !["Responses", "Reports", "Orders"].includes(item.trim()))
-        .join("\n"),
-    },
-    pages,
-  };
-};
-
-const loadInitialProject = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return cleanBuilderProject(raw ? JSON.parse(raw) : createInitialProject());
-  } catch {
-    return cleanBuilderProject(createInitialProject());
-  }
-};
-
-const normalizeProjectSlug = (value) => {
-  const cleanValue = String(value || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return cleanValue || `builder-project-${Date.now()}`;
-};
-
-const getBuilderProjectName = (project) =>
-  String(project?.name || project?.siteChrome?.brandName || "Page Builder Project").trim() ||
-  "Page Builder Project";
-
-const getBuilderProjectSlug = (project, record) =>
-  normalizeProjectSlug(record?.slug || project?.slug || project?.siteChrome?.subdomain || project?.siteChrome?.brandName || project?.name);
-
-const getDraftProjectFromRecord = (record) => {
-  if (!record?.draft_schema || typeof record.draft_schema !== "object" || Array.isArray(record.draft_schema)) {
-    return null;
-  }
-
-  return cleanBuilderProject(record.draft_schema);
-};
-
-const getPreviewCanvasStyle = (viewport, isPreview) => {
-  if (isPreview && viewport === "desktop") {
-    return { width: "100%" };
-  }
-
-  const viewportWidth = viewports[viewport] || viewports.desktop;
-
-  return {
-    width: `${viewportWidth}px`,
-    maxWidth: "100%",
-  };
-};
 
 export default function PageBuilder({
   initialTab = "design",
@@ -844,33 +563,180 @@ export default function PageBuilder({
     setSelected({ type: "section", id: copy.id });
   };
 
-  const {
-    addForm,
-    addFormSection,
-    addFieldToForm,
-    updateActiveFormQuiz,
-    updateFormField,
-    updateFormSection,
-    moveFormField,
-    duplicateFormField,
-    deleteFormField,
-    deleteFormSection,
-  } = createFormHandlers({
-    project,
-    activeForm,
-    updateProject,
-    updateActiveForm,
-    setSelected,
-    createId,
-    createField,
-    createForm,
-    createWorkflow,
-    getFormSections,
-    getFormFields,
-    getQuizSettings,
-    cloneWithNewIds,
-  });
+  const addForm = () => {
+    const form = createForm(`Form ${project.forms.length + 1}`, [
+      createField("Question 1", "shortText"),
+    ]);
 
+    updateProject((prev) => ({
+      ...prev,
+      forms: [...prev.forms, form],
+      activeFormId: form.id,
+      workflows: [
+        ...prev.workflows,
+        createWorkflow(`After ${form.title} is submitted`, form.id),
+      ],
+    }));
+
+    setSelected({ type: "form", id: form.id });
+  };
+
+  const addFormSection = () => {
+    const section = {
+      id: createId("formSection"),
+      title: `Section ${getFormSections(activeForm).length + 1}`,
+      description: "",
+      collapsed: false,
+      fields: [],
+    };
+
+    updateActiveForm((form) => ({
+      ...form,
+      sections: [...getFormSections(form), section],
+    }));
+  };
+
+  const addFieldToForm = (sectionId = null, type = "shortText") => {
+    if (!activeForm) return;
+
+    const field = createField(`Question ${getFormFields(activeForm).length + 1}`, type);
+
+    updateActiveForm((form) => {
+      const sections = getFormSections(form);
+
+      if (!sections.length || !sectionId) {
+        return {
+          ...form,
+          fields: [...(form.fields || []), field],
+        };
+      }
+
+      return {
+        ...form,
+        sections: sections.map((section) =>
+          section.id === sectionId
+            ? { ...section, fields: [...(section.fields || []), field] }
+            : section
+        ),
+      };
+    });
+  };
+
+  const updateActiveFormQuiz = (updates) => {
+    updateActiveForm((form) => ({
+      ...form,
+      quiz: {
+        ...getQuizSettings(form),
+        ...updates,
+      },
+    }));
+  };
+
+  const updateFormField = (fieldId, updates) => {
+    updateActiveForm((form) => ({
+      ...form,
+      fields: (form.fields || []).map((field) =>
+        field.id === fieldId ? { ...field, ...updates } : field
+      ),
+      sections: getFormSections(form).map((section) => ({
+        ...section,
+        fields: (section.fields || []).map((field) =>
+          field.id === fieldId ? { ...field, ...updates } : field
+        ),
+      })),
+    }));
+  };
+
+  const updateFormSection = (sectionId, updates) => {
+    updateActiveForm((form) => ({
+      ...form,
+      sections: getFormSections(form).map((section) =>
+        section.id === sectionId ? { ...section, ...updates } : section
+      ),
+    }));
+  };
+
+  const moveFormField = (fieldId, direction) => {
+    updateActiveForm((form) => {
+      const sections = getFormSections(form);
+      const sectionIndex = sections.findIndex((section) =>
+        (section.fields || []).some((field) => field.id === fieldId)
+      );
+
+      if (sectionIndex === -1) {
+        const fields = [...(form.fields || [])];
+        const index = fields.findIndex((field) => field.id === fieldId);
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+        if (index < 0 || targetIndex < 0 || targetIndex >= fields.length) return form;
+
+        const [field] = fields.splice(index, 1);
+        fields.splice(targetIndex, 0, field);
+
+        return { ...form, fields };
+      }
+
+      const sectionsCopy = sections.map((section) => ({
+        ...section,
+        fields: [...(section.fields || [])],
+      }));
+      const fields = sectionsCopy[sectionIndex].fields;
+      const index = fields.findIndex((field) => field.id === fieldId);
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+      if (index < 0 || targetIndex < 0 || targetIndex >= fields.length) return form;
+
+      const [field] = fields.splice(index, 1);
+      fields.splice(targetIndex, 0, field);
+
+      return { ...form, sections: sectionsCopy };
+    });
+  };
+
+  const duplicateFormField = (fieldId) => {
+    updateActiveForm((form) => {
+      const cloneField = (field) => ({
+        ...cloneWithNewIds(field),
+        label: `${field.label || "Question"} Copy`,
+      });
+
+      const rootField = (form.fields || []).find((field) => field.id === fieldId);
+
+      if (rootField) {
+        return {
+          ...form,
+          fields: [...(form.fields || []), cloneField(rootField)],
+        };
+      }
+
+      return {
+        ...form,
+        sections: getFormSections(form).map((section) => {
+          const field = (section.fields || []).find((item) => item.id === fieldId);
+          return field
+            ? { ...section, fields: [...(section.fields || []), cloneField(field)] }
+            : section;
+        }),
+      };
+    });
+  };
+  const deleteFormField = (fieldId) => {
+    updateActiveForm((form) => ({
+      ...form,
+      fields: (form.fields || []).filter((field) => field.id !== fieldId),
+      sections: getFormSections(form).map((section) => ({
+        ...section,
+        fields: (section.fields || []).filter((field) => field.id !== fieldId),
+      })),
+    }));
+  };
+
+  const deleteFormSection = (sectionId) => {
+    updateActiveForm((form) => ({
+      ...form,
+      sections: getFormSections(form).filter((section) => section.id !== sectionId),
+    }));
+  };
   const updateSelectedSection = (updates) => {
     if (!selectedSection) return;
 
@@ -1313,20 +1179,69 @@ export default function PageBuilder({
   const findElementLocation = (elementId) =>
     findElementLocationInPage(activePage, elementId);
 
-  const {
-    addUser,
-    updateUser,
-    deleteUser,
-    addRole,
-    updateRole,
-  } = createUserHandlers({
-    project,
-    updateProject,
-    setSelected,
-    showToast,
-    createRole,
-    createUser,
-  });
+  const addUser = () => {
+    const user = createUser();
+
+    updateProject((prev) => ({
+      ...prev,
+      users: [...prev.users, user],
+      activeUserId: user.id,
+    }));
+
+    setSelected({ type: "user", id: user.id });
+    showToast("User added.");
+  };
+
+  const updateUser = (userId, updates) => {
+    updateProject((prev) => ({
+      ...prev,
+      users: prev.users.map((user) =>
+        user.id === userId ? { ...user, ...updates } : user
+      ),
+    }));
+  };
+
+  const deleteUser = (userId) => {
+    const user = project.users.find((item) => item.id === userId);
+
+    if (!user) return;
+
+    const isMainAdmin = user.email === "admin@madar.local";
+
+    if (isMainAdmin) {
+      alert("You cannot delete the main admin user.");
+      return;
+    }
+
+    if (!window.confirm(`Delete user "${user.name}"?`)) return;
+
+    updateProject((prev) => ({
+      ...prev,
+      users: prev.users.filter((item) => item.id !== userId),
+    }));
+
+    showToast("User deleted.");
+  };
+
+  const addRole = () => {
+    const role = createRole(`Role ${project.roles.length + 1}`);
+
+    updateProject((prev) => ({
+      ...prev,
+      roles: [...prev.roles, role],
+    }));
+
+    setSelected({ type: "role", id: role.id });
+  };
+
+  const updateRole = (roleId, updates) => {
+    updateProject((prev) => ({
+      ...prev,
+      roles: prev.roles.map((role) =>
+        role.id === roleId ? { ...role, ...updates } : role
+      ),
+    }));
+  };
   const getResponseCount = () => getResponseCountFromProject(project);
 
   const getSavedRecordCount = () => getSavedRecordCountFromProject(project);
@@ -1727,26 +1642,52 @@ export default function PageBuilder({
       getSectionCanvasHeight,
       getMetricMinimumHeight,
     });
+  const handleSelectedElementImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedElement || selectedElement.type !== "image") return;
 
-  const {
-    handleSelectedElementImageUpload,
-    handleSiteLogoUpload,
-    handleCarouselSlideImageUpload,
-  } = createUploadHandlers({
-    selectedElement,
-    carouselElementTypes,
-    defaultSiteChrome,
-    builderAssetMimeTypes,
-    builderAssetMaxBytes,
-    uploadBuilderAsset,
-    user,
-    setAssetUploadBusy,
-    updateSelectedElement,
-    updateProject,
-    showToast,
-    parseCarouselSlides,
-    serializeCarouselSlides,
-  });
+    const assetUrl = await uploadBuilderImageFile(file);
+    if (!assetUrl) return;
+
+    updateSelectedElement({
+      content: assetUrl,
+      name: selectedElement.name || file.name || "Image",
+    });
+    showToast("Image uploaded.");
+  };
+  const handleSiteLogoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const assetUrl = await uploadBuilderImageFile(file);
+    if (!assetUrl) return;
+
+    updateProject((prev) => ({
+      ...prev,
+      siteChrome: {
+        ...(prev.siteChrome || defaultSiteChrome),
+        logoUrl: assetUrl,
+      },
+    }));
+
+    showToast("Logo uploaded.");
+  };
+
+  const handleCarouselSlideImageUpload = async (event, slideIndex) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedElement || !carouselElementTypes.has(selectedElement.type)) return;
+    const assetUrl = await uploadBuilderImageFile(file);
+    if (!assetUrl) return;
+    const slides = parseCarouselSlides(selectedElement.content).map((slide, index) =>
+      index === slideIndex ? { ...slide, image: assetUrl } : slide
+    );
+    updateSelectedElement({ content: serializeCarouselSlides(slides) });
+    showToast("Carousel image uploaded.");
+  };
+
   const getElementSection = (elementId) =>
     getElementSectionFromPage({
       page: activePage,
@@ -2572,31 +2513,6 @@ export default function PageBuilder({
     );
   };
 
-  const getSectionLayerElements = (section) => {
-    if (!section) return [];
-
-    if (section.mode === "direct") {
-      return Array.isArray(section.freeElements) ? section.freeElements : [];
-    }
-
-    return (section.rows || []).flatMap((row) =>
-      (row.columns || []).flatMap((column) => column.elements || [])
-    );
-  };
-
-  const getElementLayerLabel = (element, elementIndex, elements = []) => {
-    const typeLabel =
-      elementTypes.find((item) => item.id === element.type)?.label ||
-      element.type ||
-      "Element";
-
-    const sameTypeIndex =
-      elements
-        .slice(0, elementIndex + 1)
-        .filter((item) => item.type === element.type).length;
-
-    return element.name || `${typeLabel} ${sameTypeIndex}`;
-  };
   const renderDesignTab = () => (
     <div className="builder-layout">
       {!preview && (
@@ -3447,7 +3363,6 @@ export default function PageBuilder({
       </div>
     );
   };
-
   const renderFormsTab = () => (
     <FormsTab
       project={project}
@@ -3722,23 +3637,6 @@ export default function PageBuilder({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -8,7 +8,13 @@ from fastapi.testclient import TestClient
 
 from services import rate_limit_service
 from services.rate_limit_service import InMemoryRateLimitStore, enforce_rate_limit
-from services.auth_service import delete_auth_cookies, set_auth_cookies
+from services.auth_service import (
+    SESSION_ACTIVITY_COOKIE_NAME,
+    create_session_activity_value,
+    delete_auth_cookies,
+    is_session_activity_valid,
+    set_auth_cookies,
+)
 from services.request_security import (
     CSRF_COOKIE_NAME,
     CSRF_HEADER_NAME,
@@ -215,8 +221,9 @@ class SecurityFoundationTests(unittest.TestCase):
             if header.startswith("madar_access_token=")
             or header.startswith("madar_refresh_token=")
             or header.startswith(f"{CSRF_COOKIE_NAME}=")
+            or header.startswith(f"{SESSION_ACTIVITY_COOKIE_NAME}=")
         ]
-        self.assertEqual(len(session_cookie_headers), 3)
+        self.assertEqual(len(session_cookie_headers), 4)
         for header in session_cookie_headers:
             self.assertNotIn("Max-Age=", header)
             self.assertNotIn("Expires=", header)
@@ -230,6 +237,26 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(
             any(header.startswith(f"{CSRF_COOKIE_NAME}=") for header in set_cookie_headers)
+        )
+        self.assertTrue(
+            any(
+                header.startswith(f"{SESSION_ACTIVITY_COOKIE_NAME}=")
+                for header in set_cookie_headers
+            )
+        )
+
+    def test_session_activity_is_valid_for_one_hour(self):
+        activity = create_session_activity_value(now=1_000)
+
+        self.assertTrue(is_session_activity_valid(activity, now=4_600))
+        self.assertFalse(is_session_activity_valid(activity, now=4_601))
+
+    def test_session_activity_rejects_tampering(self):
+        activity = create_session_activity_value(now=1_000)
+        timestamp, _ = activity.split(".", 1)
+
+        self.assertFalse(
+            is_session_activity_valid(f"{timestamp}.invalid-signature", now=1_001)
         )
 
     def test_logout_route_is_csrf_exempt_with_auth_cookies_and_missing_header(self):

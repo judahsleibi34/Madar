@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { resolveMediaUrl } from "../../utils/media";
 import "./PageBuilderCarousel.css";
 
@@ -20,7 +21,7 @@ const fallbackSlides = [
   },
 ];
 
-const parseSlides = (content = "") => {
+export const parseCarouselSlides = (content = "") => {
   const blocks = String(content || "")
     .split(/\n\s*\n/g)
     .map((block) => block.trim())
@@ -37,6 +38,11 @@ const parseSlides = (content = "") => {
   return slides.length > 0 ? slides : fallbackSlides;
 };
 
+export const serializeCarouselSlides = (slides = []) =>
+  slides
+    .map((slide) => [slide.title || "", slide.description || "", slide.image || ""].join("\n"))
+    .join("\n\n");
+
 export default function PageBuilderCarousel({
   autoScroll = false,
   autoScrollMs = 4000,
@@ -44,7 +50,7 @@ export default function PageBuilderCarousel({
   name = "Carousel",
   variant = "hero",
 }) {
-  const slides = useMemo(() => parseSlides(content), [content]);
+  const slides = useMemo(() => parseCarouselSlides(content), [content]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [rotation, setRotation] = useState(0);
   const [dragStart, setDragStart] = useState(null);
@@ -54,6 +60,9 @@ export default function PageBuilderCarousel({
   const safeAutoScrollMs = Math.max(1000, Number(autoScrollMs) || 4000);
 
   const goToSlide = (direction) => {
+    if (variant === "circular") {
+      setRotation((current) => current - direction * (360 / slides.length));
+    }
     setActiveIndex((current) => {
       const nextIndex = current + direction;
       if (nextIndex < 0) return slides.length - 1;
@@ -134,6 +143,49 @@ export default function PageBuilderCarousel({
           <strong>{activeSlide.title}</strong>
           <p>{activeSlide.description}</p>
         </div>
+
+        <div className="carousel-controls carousel-arrow-controls">
+          <button type="button" onClick={() => goToSlide(-1)} aria-label="Previous slide">
+            <ArrowLeft size={18} aria-hidden="true" />
+          </button>
+          <span>{activeIndex + 1} / {slides.length}</span>
+          <button type="button" onClick={() => goToSlide(1)} aria-label="Next slide">
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === "stack") {
+    const visibleSlides = [0, 1, 2].map((offset) => ({
+      offset,
+      slide: slides[(activeIndex + offset) % slides.length],
+      index: (activeIndex + offset) % slides.length,
+    }));
+
+    return (
+      <div className={`page-builder-carousel ${variantClass}`} aria-label={name}>
+        <div className="stack-carousel-stage">
+          {visibleSlides.reverse().map(({ slide, index, offset }) => (
+            <button
+              type="button"
+              className={`stack-carousel-card stack-offset-${offset}`}
+              key={`${slide.title}_${index}`}
+              onClick={() => setActiveIndex(index)}
+              aria-label={`Open ${slide.title}`}
+            >
+              {resolveMediaUrl(slide.image) && <img src={resolveMediaUrl(slide.image)} alt={slide.title || name} />}
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div><strong>{slide.title}</strong><p>{slide.description}</p></div>
+            </button>
+          ))}
+        </div>
+        <div className="carousel-controls">
+          <button type="button" onClick={() => goToSlide(-1)} aria-label="Previous slide"><ArrowLeft size={18} aria-hidden="true" /></button>
+          <span>{activeIndex + 1} / {slides.length}</span>
+          <button type="button" onClick={() => goToSlide(1)} aria-label="Next slide"><ArrowRight size={18} aria-hidden="true" /></button>
+        </div>
       </div>
     );
   }
@@ -142,10 +194,10 @@ export default function PageBuilderCarousel({
     <div className={`page-builder-carousel ${variantClass}`} aria-label={name}>
       <div className="carousel-stage">
         {resolveMediaUrl(activeSlide.image) && (
-          <img src={resolveMediaUrl(activeSlide.image)} alt={activeSlide.title || name} />
+          <img key={`image_${activeIndex}`} src={resolveMediaUrl(activeSlide.image)} alt={activeSlide.title || name} />
         )}
 
-        <div className="carousel-copy">
+        <div className="carousel-copy" key={`copy_${activeIndex}`}>
           <span>{activeIndex + 1} / {slides.length}</span>
           <h3>{activeSlide.title}</h3>
           <p>{activeSlide.description}</p>
@@ -154,7 +206,7 @@ export default function PageBuilderCarousel({
 
       <div className="carousel-controls">
         <button type="button" onClick={() => goToSlide(-1)} aria-label="Previous slide">
-          Prev
+          <ArrowLeft size={18} aria-hidden="true" />
         </button>
 
         <div className="carousel-dots" aria-label="Carousel slides">
@@ -170,7 +222,7 @@ export default function PageBuilderCarousel({
         </div>
 
         <button type="button" onClick={() => goToSlide(1)} aria-label="Next slide">
-          Next
+          <ArrowRight size={18} aria-hidden="true" />
         </button>
       </div>
     </div>
