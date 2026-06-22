@@ -371,108 +371,6 @@ const normalizeBuilderProjectShape = (project) => {
   };
 };
 
-const cleanBuilderProject = (project) => {
-  const normalizedProject = normalizeBuilderProjectShape(project);
-
-  if (!normalizedProject.pages.length) return normalizedProject;
-
-  const formSectionsToKeep = normalizedProject.pages
-    .slice(1)
-    .flatMap((page) => page.sections || [])
-    .filter((section) =>
-      getSectionElements(section).some((element) => element.type === "formBlock")
-    );
-
-  const cleanedPages = normalizedProject.pages
-    .filter(
-      (page, index) =>
-        index === 0 ||
-        !internalPageNames.has(String(page.name || "").toLowerCase())
-    )
-    .map((page, index) => {
-      const baseSections = (page.sections || []).filter(
-        (section) => !isMetricsSection(section) && !isResponsesSection(section)
-      );
-
-      const sections =
-        index === 0 && !hasFormSection({ ...page, sections: baseSections })
-          ? [...baseSections, ...formSectionsToKeep]
-          : baseSections;
-
-      return {
-        ...page,
-        sections: sections.map(removeDuplicateFormHeadings),
-        showInNavigation: index === 0 ? true : page.showInNavigation,
-      };
-    })
-    .filter((page, index) => index === 0 || (page.sections || []).length > 0);
-
-  const pages = cleanedPages.length ? cleanedPages : normalizedProject.pages;
-
-  return {
-    ...normalizedProject,
-    activePageId: pages.some((page) => page.id === normalizedProject.activePageId)
-      ? normalizedProject.activePageId
-      : pages[0]?.id || "",
-    siteChrome: {
-      ...normalizedProject.siteChrome,
-      footerShopLinks: String(normalizedProject.siteChrome?.footerShopLinks || "")
-        .split("\n")
-        .filter((item) => !["Responses", "Reports", "Orders"].includes(item.trim()))
-        .join("\n"),
-    },
-    pages,
-  };
-};
-
-const loadInitialProject = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return cleanBuilderProject(raw ? JSON.parse(raw) : createInitialProject());
-  } catch {
-    return cleanBuilderProject(createInitialProject());
-  }
-};
-
-const normalizeProjectSlug = (value) => {
-  const cleanValue = String(value || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return cleanValue || `builder-project-${Date.now()}`;
-};
-
-const getBuilderProjectName = (project) =>
-  String(project?.name || project?.siteChrome?.brandName || "Page Builder Project").trim() ||
-  "Page Builder Project";
-
-const getBuilderProjectSlug = (project, record) =>
-  normalizeProjectSlug(record?.slug || project?.slug || project?.siteChrome?.subdomain || project?.siteChrome?.brandName || project?.name);
-
-const getDraftProjectFromRecord = (record) => {
-  if (!record?.draft_schema || typeof record.draft_schema !== "object" || Array.isArray(record.draft_schema)) {
-    return null;
-  }
-
-  return cleanBuilderProject(record.draft_schema);
-};
-
-const getPreviewCanvasStyle = (viewport, isPreview) => {
-  if (isPreview && viewport === "desktop") {
-    return { width: "100%" };
-  }
-
-  const viewportWidth = viewports[viewport] || viewports.desktop;
-
-  return {
-    width: `${viewportWidth}px`,
-    maxWidth: "100%",
-  };
-};
-
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
@@ -3722,6 +3620,7 @@ export default function PageBuilder({
     </div>
   );
 }
+
 
 
 
