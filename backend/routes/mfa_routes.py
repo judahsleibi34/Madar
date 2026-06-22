@@ -154,6 +154,36 @@ def get_authenticator_assurance_level() -> dict[str, Any]:
         return {}
 
 
+def session_tokens_from_response(response: Any) -> tuple[str | None, str | None]:
+    session = get_session_from_verify_response(response)
+
+    if not session:
+        return None, None
+
+    access_token = read_value(session, "access_token")
+    refresh_token = read_value(session, "refresh_token")
+
+    return access_token, refresh_token
+
+
+def sanitized_exception_metadata(error: Exception) -> dict[str, Any]:
+    metadata = {"error_type": type(error).__name__}
+
+    for attr in ("status", "code", "message"):
+        value = getattr(error, attr, None)
+
+        if value is not None:
+            metadata[attr] = str(value)
+
+    if "message" not in metadata:
+        message = str(error).strip()
+
+        if message:
+            metadata["message"] = message
+
+    return metadata
+
+
 def get_local_user_for_pending_mfa(pending_payload: dict[str, Any]):
     user_id = pending_payload.get("user_id")
     auth_id = str(pending_payload.get("auth_id") or "")
@@ -247,7 +277,7 @@ def mfa_enroll_verify(payload: MfaEnrollVerifyRequest, request: Request, respons
         if not challenge_id:
             raise ValueError("Missing MFA challenge id")
 
-        supabase.auth.mfa.verify(
+        verify_response = supabase.auth.mfa.verify(
             {
                 "factor_id": factor_id,
                 "challenge_id": challenge_id,
@@ -270,6 +300,11 @@ def mfa_enroll_verify(payload: MfaEnrollVerifyRequest, request: Request, respons
             metadata={"factor_type": "totp", "stage": "enroll_verify"},
         )
         raise HTTPException(status_code=400, detail="Could not verify MFA code")
+
+    access_token, refresh_token = session_tokens_from_response(verify_response)
+
+    if access_token and refresh_token:
+        set_auth_cookies(response, access_token, refresh_token)
 
     record_mfa_event(
         request=request,
@@ -322,12 +357,24 @@ def mfa_remove_factor(factor_id: str, request: Request, response: Response):
     if not clean_factor_id:
         raise HTTPException(status_code=400, detail="MFA factor id is required")
 
+    aal = get_authenticator_assurance_level()
+    current_level = aal.get("current_level")
+
+    if current_level and current_level != "aal2":
+        raise HTTPException(
+            status_code=403,
+            detail="MFA verification required before removing this factor",
+        )
+
     try:
         supabase.auth.mfa.unenroll({"factor_id": clean_factor_id})
     except Exception as error:
         logger.warning(
             "auth.mfa.factor_remove_failed",
-            extra={"user_id": user_data.get("id"), "error_type": type(error).__name__},
+            extra={
+                "user_id": user_data.get("id"),
+                **sanitized_exception_metadata(error),
+            },
         )
         raise HTTPException(status_code=400, detail="Could not remove MFA factor")
 

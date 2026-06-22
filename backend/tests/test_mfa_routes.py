@@ -108,6 +108,31 @@ class MfaRoutesTests(unittest.TestCase):
         actions = [call.kwargs["action"] for call in record_mfa_event.call_args_list]
         self.assertEqual(actions, [audit_service.MFA_ENROLL_VERIFIED, audit_service.MFA_VERIFIED])
 
+    def test_enroll_verify_sets_refreshed_aal2_auth_cookies_when_session_returned(self):
+        client = build_client()
+        challenge_response = SimpleNamespace(data=SimpleNamespace(id="challenge-1"))
+        verify_response = SimpleNamespace(
+            data=SimpleNamespace(
+                session=SimpleNamespace(access_token="aal2-access", refresh_token="aal2-refresh")
+            )
+        )
+
+        with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
+             patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
+             patch.object(mfa_routes.supabase.auth.mfa, "challenge", return_value=challenge_response), \
+             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=verify_response), \
+             patch.object(mfa_routes, "set_auth_cookies", return_value="csrf") as set_auth_cookies, \
+             patch.object(mfa_routes, "mark_aal2_verified"), \
+             patch.object(mfa_routes, "record_mfa_event"):
+            response = client.post(
+                "/auth/mfa/enroll/verify",
+                json={"factor_id": "factor-1", "code": "123456"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        set_auth_cookies.assert_called_once()
+        self.assertEqual(set_auth_cookies.call_args.args[1:], ("aal2-access", "aal2-refresh"))
+
     def test_enroll_verify_records_challenge_failed_on_error(self):
         client = build_client()
 
@@ -137,11 +162,25 @@ class MfaRoutesTests(unittest.TestCase):
         self.assertEqual(response.json()["factors"], [{"id": "factor-1", "factor_type": "totp"}])
         self.assertNotIn("hidden", str(response.json()))
 
-    def test_remove_factor_unenrolls_and_records_event(self):
+    def test_remove_factor_with_aal1_returns_403_and_does_not_unenroll(self):
         client = build_client()
 
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
+             patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal1"}), \
+             patch.object(mfa_routes.supabase.auth.mfa, "unenroll") as unenroll:
+            response = client.delete("/auth/mfa/factors/factor-1")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "MFA verification required before removing this factor")
+        unenroll.assert_not_called()
+
+    def test_remove_factor_with_aal2_unenrolls_and_records_event(self):
+        client = build_client()
+
+        with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
+             patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
+             patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
              patch.object(mfa_routes.supabase.auth.mfa, "unenroll", return_value=SimpleNamespace(data={})) as unenroll, \
              patch.object(mfa_routes, "record_mfa_event") as record_mfa_event:
             response = client.delete("/auth/mfa/factors/factor-1")
@@ -150,6 +189,31 @@ class MfaRoutesTests(unittest.TestCase):
         unenroll.assert_called_once_with({"factor_id": "factor-1"})
         self.assertEqual(record_mfa_event.call_args.kwargs["action"], audit_service.MFA_FACTOR_REMOVED)
         self.assertEqual(response.json(), {"removed": True, "factor_id": "factor-1"})
+
+    def test_remove_factor_failure_logs_sanitized_error_fields(self):
+        client = build_client()
+
+        class SupabaseError(Exception):
+            status = 400
+            code = "insufficient_aal"
+            message = "AAL2 required"
+
+        with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
+             patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
+             patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
+             patch.object(mfa_routes.supabase.auth.mfa, "unenroll", side_effect=SupabaseError("token should not appear")), \
+             patch.object(mfa_routes.logger, "warning") as warning:
+            response = client.delete("/auth/mfa/factors/factor-1")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Could not remove MFA factor")
+        warning.assert_called_once()
+        extra = warning.call_args.kwargs["extra"]
+        self.assertEqual(extra["error_type"], "SupabaseError")
+        self.assertEqual(extra["status"], "400")
+        self.assertEqual(extra["code"], "insufficient_aal")
+        self.assertEqual(extra["message"], "AAL2 required")
+        self.assertNotIn("token should not appear", str(extra))
 
 
 if __name__ == "__main__":
