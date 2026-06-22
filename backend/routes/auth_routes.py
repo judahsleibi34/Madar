@@ -389,6 +389,7 @@ def user_status(request: Request, response: Response):
         }
 
     except HTTPException:
+        delete_auth_cookies(response)
         return {
             "logged_in": False,
             "user": None,

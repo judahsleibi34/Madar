@@ -46,12 +46,20 @@ export const apiFetch = async (input, init = {}) => {
     }
   }
 
-  const response = await fetch(input, {
+  const runFetch = () => fetch(input, {
     ...init,
     method,
     credentials: init.credentials || "include",
     headers,
   });
+
+  const inputUrl = typeof input === "string" ? input : input?.url || "";
+  const serializesAuthSession =
+    method === "GET" && inputUrl.includes("/auth/user_status");
+  const response =
+    serializesAuthSession && typeof navigator !== "undefined" && navigator.locks?.request
+      ? await navigator.locks.request("madar-auth-session", runFetch)
+      : await runFetch();
 
   const responseToken = response.headers.get(CSRF_HEADER_NAME);
 

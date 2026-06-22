@@ -262,7 +262,7 @@ class DataVisualization(
             plot_color = self._resolve_color(color, hue)
             plot_palette = self._resolve_palette(palette, histogram_data, hue, series_count, plot_color)
             axis = sns.histplot(
-                data=histogram_data,
+                # data=histogram_data,
                 x=histogram_x,
                 hue=hue,
                 kde=True,
