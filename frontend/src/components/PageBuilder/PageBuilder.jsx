@@ -201,6 +201,278 @@ const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
   carouselElementTypes,
 });
 
+const normalizeBuilderElementShape = (element) => {
+  if (!element || typeof element !== "object" || Array.isArray(element)) {
+    return createElement("text");
+  }
+
+  return createElement(element.type || "text", element);
+};
+
+const normalizeBuilderColumnShape = (column) => {
+  const source =
+    column && typeof column === "object" && !Array.isArray(column)
+      ? column
+      : {};
+  const elements = Array.isArray(source.elements)
+    ? source.elements.map(normalizeBuilderElementShape)
+    : [];
+
+  return createColumn(elements, {
+    ...source,
+    name: source.name || "Column",
+    layout: {
+      align: "left",
+      ...(source.layout || {}),
+    },
+    elements,
+  });
+};
+
+const normalizeBuilderRowShape = (row) => {
+  const source =
+    row && typeof row === "object" && !Array.isArray(row)
+      ? row
+      : {};
+  const columns = Array.isArray(source.columns) && source.columns.length > 0
+    ? source.columns.map(normalizeBuilderColumnShape)
+    : [normalizeBuilderColumnShape({ elements: source.elements || [] })];
+
+  return createRow(columns, {
+    ...source,
+    layout: {
+      columns: String(source.layout?.columns || columns.length || 1),
+      align: source.layout?.align || "center",
+      gap: source.layout?.gap || "medium",
+      ...(source.layout || {}),
+    },
+    columns,
+  });
+};
+
+const normalizeBuilderSectionShape = (section) => {
+  const source =
+    section && typeof section === "object" && !Array.isArray(section)
+      ? section
+      : {};
+  const legacyElements = Array.isArray(source.elements) ? source.elements : [];
+  const rows = Array.isArray(source.rows) && source.rows.length > 0
+    ? source.rows.map(normalizeBuilderRowShape)
+    : [normalizeBuilderRowShape({ elements: legacyElements })];
+  const freeElements = Array.isArray(source.freeElements)
+    ? source.freeElements.map(normalizeBuilderElementShape)
+    : [];
+
+  const base = createSection({
+    name: source.name || source.type || "Section",
+    mode: source.mode || "auto",
+    layout: source.layout || {},
+    rows,
+    freeElements,
+  });
+
+  return {
+    ...base,
+    ...source,
+    mode: source.mode || base.mode,
+    layout: {
+      ...base.layout,
+      ...(source.layout || {}),
+    },
+    rows,
+    freeElements,
+  };
+};
+
+const normalizeBuilderPageShape = (page, fallbackPage) => {
+  const source =
+    page && typeof page === "object" && !Array.isArray(page)
+      ? page
+      : fallbackPage || {};
+  const sections = Array.isArray(source.sections)
+    ? source.sections.map(normalizeBuilderSectionShape)
+    : [];
+
+  return createPage(source.name || fallbackPage?.name || "Home", sections, {
+    ...source,
+    slug: source.slug || source.path || fallbackPage?.slug || "/",
+    backgroundColor: source.backgroundColor || fallbackPage?.backgroundColor || "#ffffff",
+    visibility: source.visibility || fallbackPage?.visibility || "public",
+    showInNavigation:
+      typeof source.showInNavigation === "boolean"
+        ? source.showInNavigation
+        : fallbackPage?.showInNavigation ?? true,
+    pageType: source.pageType || fallbackPage?.pageType || "main",
+    sections,
+  });
+};
+
+const normalizeBuilderProjectShape = (project) => {
+  const fallback = createInitialProject();
+  const source =
+    project && typeof project === "object" && !Array.isArray(project)
+      ? project
+      : {};
+
+  const sourcePages =
+    Array.isArray(source.pages) && source.pages.length > 0
+      ? source.pages
+      : fallback.pages;
+  const pages = sourcePages.map((page, index) =>
+    normalizeBuilderPageShape(page, fallback.pages[index])
+  );
+
+  const forms =
+    Array.isArray(source.forms) && source.forms.length > 0
+      ? source.forms
+      : fallback.forms;
+
+  const workflows = Array.isArray(source.workflows)
+    ? source.workflows
+    : fallback.workflows || [];
+
+  const roles = Array.isArray(source.roles) ? source.roles : fallback.roles || [];
+  const users = Array.isArray(source.users) ? source.users : fallback.users || [];
+  const collections = Array.isArray(source.collections)
+    ? source.collections
+    : fallback.collections || [];
+
+  return {
+    ...fallback,
+    ...source,
+    pages,
+    forms,
+    workflows,
+    roles,
+    users,
+    collections,
+    activePageId: pages.some((page) => page.id === source.activePageId)
+      ? source.activePageId
+      : pages[0]?.id || "",
+    activeFormId: forms.some((form) => form.id === source.activeFormId)
+      ? source.activeFormId
+      : forms[0]?.id || "",
+    activeWorkflowId: workflows.some(
+      (workflow) => workflow.id === source.activeWorkflowId
+    )
+      ? source.activeWorkflowId
+      : workflows[0]?.id || "",
+    activeRoleId: roles.some((role) => role.id === source.activeRoleId)
+      ? source.activeRoleId
+      : roles[0]?.id || "",
+    siteChrome: {
+      ...(fallback.siteChrome || defaultSiteChrome),
+      ...(source.siteChrome || {}),
+    },
+    theme: {
+      ...(fallback.theme || {}),
+      ...(source.theme || {}),
+    },
+  };
+};
+
+const cleanBuilderProject = (project) => {
+  const normalizedProject = normalizeBuilderProjectShape(project);
+
+  if (!normalizedProject.pages.length) return normalizedProject;
+
+  const formSectionsToKeep = normalizedProject.pages
+    .slice(1)
+    .flatMap((page) => page.sections || [])
+    .filter((section) =>
+      getSectionElements(section).some((element) => element.type === "formBlock")
+    );
+
+  const cleanedPages = normalizedProject.pages
+    .filter(
+      (page, index) =>
+        index === 0 ||
+        !internalPageNames.has(String(page.name || "").toLowerCase())
+    )
+    .map((page, index) => {
+      const baseSections = (page.sections || []).filter(
+        (section) => !isMetricsSection(section) && !isResponsesSection(section)
+      );
+
+      const sections =
+        index === 0 && !hasFormSection({ ...page, sections: baseSections })
+          ? [...baseSections, ...formSectionsToKeep]
+          : baseSections;
+
+      return {
+        ...page,
+        sections: sections.map(removeDuplicateFormHeadings),
+        showInNavigation: index === 0 ? true : page.showInNavigation,
+      };
+    })
+    .filter((page, index) => index === 0 || (page.sections || []).length > 0);
+
+  const pages = cleanedPages.length ? cleanedPages : normalizedProject.pages;
+
+  return {
+    ...normalizedProject,
+    activePageId: pages.some((page) => page.id === normalizedProject.activePageId)
+      ? normalizedProject.activePageId
+      : pages[0]?.id || "",
+    siteChrome: {
+      ...normalizedProject.siteChrome,
+      footerShopLinks: String(normalizedProject.siteChrome?.footerShopLinks || "")
+        .split("\n")
+        .filter((item) => !["Responses", "Reports", "Orders"].includes(item.trim()))
+        .join("\n"),
+    },
+    pages,
+  };
+};
+
+const loadInitialProject = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return cleanBuilderProject(raw ? JSON.parse(raw) : createInitialProject());
+  } catch {
+    return cleanBuilderProject(createInitialProject());
+  }
+};
+
+const normalizeProjectSlug = (value) => {
+  const cleanValue = String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return cleanValue || `builder-project-${Date.now()}`;
+};
+
+const getBuilderProjectName = (project) =>
+  String(project?.name || project?.siteChrome?.brandName || "Page Builder Project").trim() ||
+  "Page Builder Project";
+
+const getBuilderProjectSlug = (project, record) =>
+  normalizeProjectSlug(record?.slug || project?.slug || project?.siteChrome?.subdomain || project?.siteChrome?.brandName || project?.name);
+
+const getDraftProjectFromRecord = (record) => {
+  if (!record?.draft_schema || typeof record.draft_schema !== "object" || Array.isArray(record.draft_schema)) {
+    return null;
+  }
+
+  return cleanBuilderProject(record.draft_schema);
+};
+
+const getPreviewCanvasStyle = (viewport, isPreview) => {
+  if (isPreview && viewport === "desktop") {
+    return { width: "100%" };
+  }
+
+  const viewportWidth = viewports[viewport] || viewports.desktop;
+
+  return {
+    width: `${viewportWidth}px`,
+    maxWidth: "100%",
+  };
+};
+
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,

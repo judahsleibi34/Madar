@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import ForgotPasswordPage from "../AuthPages/ForgotPasswordPage";
-import LoginPage from "../AuthPages/LoginPage";
-import SignUpPage from "../AuthPages/SignUpPage";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "./PageBuilder.constants";
 import { fetchPublicSite, submitPublicFormSubmission } from "./PageBuilder.api";
 import { getFormSections } from "./PageBuilder.factories";
@@ -202,6 +199,18 @@ const getRowCarouselElements = (row) =>
     (column.elements || []).filter((element) => carouselElementTypes.has(element.type))
   );
 
+const unsupportedWorkspacePaths = new Set([
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/dashboard",
+]);
+
+const isUnsupportedWorkspacePath = (value = "") =>
+  unsupportedWorkspacePaths.has(
+    `/${String(value || "").replace(/^\/+/, "").replace(/\/+$/, "")}`
+  );
+
 const getCleanSubdomain = (value = "") =>
   String(value)
     .toLowerCase()
@@ -278,27 +287,34 @@ export default function TenantSiteRuntime() {
   const site = {
     ...defaultSiteChrome,
     ...(project?.siteChrome || {}),
-    headerButtonLabel: "Login",
   };
 
-  const pages = useMemo(() => project?.pages || [], [project?.pages]);
+  const pages = useMemo(
+    () => (project?.pages || []).filter((page) => !isUnsupportedWorkspacePath(page.slug)),
+    [project?.pages]
+  );
   const activePath = location.pathname;
-  const isLoginPage = activePath.endsWith("/login");
-  const isSignupPage = activePath.endsWith("/signup");
-  const isForgotPasswordPage = activePath.endsWith("/forgot-password");
-  const isDashboardPage = activePath.endsWith("/dashboard");
+  const isUnsupportedWorkspaceRoute =
+    activePath.endsWith("/login") ||
+    activePath.endsWith("/signup") ||
+    activePath.endsWith("/forgot-password") ||
+    activePath.endsWith("/dashboard");
   const pagePath = `/${params["*"] || ""}`;
 
   const siteHomePath = `/site/${cleanSubdomain}`;
-  const loginPath = `/site/${cleanSubdomain}/login`;
-  const signupPath = `/site/${cleanSubdomain}/signup`;
-  const forgotPasswordPath = `/site/${cleanSubdomain}/forgot-password`;
-  const dashboardPath = `/site/${cleanSubdomain}/dashboard`;
 
   const pageLinks = splitLines(site.footerShopLinks || "Home\nSubmit Request\nReports");
   const helpLinks = splitLines(site.footerHelpLinks || "About Us\nPolicies\nContact");
   const socialLinks = splitLines(site.footerSocialLinks || "Facebook\nLinkedIn\nX\nInstagram");
-  const footerLinks = [...pageLinks, ...helpLinks];
+  const footerLinks = [...pageLinks, ...helpLinks].filter(
+    (item) => !isUnsupportedWorkspacePath(item)
+  );
+
+  useEffect(() => {
+    if (isUnsupportedWorkspaceRoute) {
+      navigate(siteHomePath, { replace: true });
+    }
+  }, [isUnsupportedWorkspaceRoute, navigate, siteHomePath]);
 
   const brandName = site.brand || "Madar";
   const footerBrand = site.footerStoreName || brandName;
@@ -339,8 +355,8 @@ export default function TenantSiteRuntime() {
       return;
     }
 
-    if (normalizedLabel === "login") {
-      navigate(loginPath);
+    if (isUnsupportedWorkspacePath(normalizedLabel)) {
+      navigate(siteHomePath);
     }
   };
 
@@ -880,14 +896,6 @@ export default function TenantSiteRuntime() {
             );
           })}
         </nav>
-
-        <button
-          type="button"
-          className="tenant-site-cta"
-          onClick={() => navigate(loginPath)}
-        >
-          Login
-        </button>
       </div>
     </header>
   );
@@ -968,62 +976,8 @@ export default function TenantSiteRuntime() {
   );
 
   const renderMainContent = () => {
-    if (isLoginPage) {
-      return (
-        <main className="tenant-login-runtime">
-          <LoginPage
-            lang="en"
-            signupPath={signupPath}
-            forgotPasswordPath={forgotPasswordPath}
-            onLoginSuccess={() => navigate(dashboardPath, { replace: true })}
-          />
-        </main>
-      );
-    }
-
-    if (isSignupPage) {
-      return (
-        <main className="tenant-login-runtime">
-          <SignUpPage
-            lang="en"
-            loginPath={loginPath}
-            onSignupSuccess={() => navigate(loginPath, { replace: true })}
-          />
-        </main>
-      );
-    }
-
-    if (isForgotPasswordPage) {
-      return (
-        <main className="tenant-login-runtime">
-          <ForgotPasswordPage lang="en" />
-        </main>
-      );
-    }
-
-    if (isDashboardPage) {
-      return (
-        <main className="tenant-runtime-main">
-          <section className="tenant-runtime-card">
-            <p className="tenant-eyebrow">{cleanSubdomain}.madar.app</p>
-            <h1>Website workspace</h1>
-            <p>
-              This is the private workspace for this website. Later, this page
-              will show internal dashboards, forms, responses, and team tools.
-            </p>
-
-            <div className="tenant-runtime-actions">
-              <button type="button" onClick={() => navigate(siteHomePath)}>
-                Open website
-              </button>
-
-              <button type="button" onClick={() => navigate(loginPath)}>
-                Open login page
-              </button>
-            </div>
-          </section>
-        </main>
-      );
+    if (isUnsupportedWorkspaceRoute) {
+      return null;
     }
 
     return renderPublishedPage();

@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from database import service_supabase, supabase
-from classes import SignUpRequest, LogIn, UpdatePassword
+from classes import SignUpRequest, OnboardingSignupRequest, LogIn, UpdatePassword
 from services.rate_limit_service import enforce_auth_rate_limit
 from services.auth_service import (
     set_auth_cookies,
@@ -12,6 +12,7 @@ from services.auth_service import (
     get_authenticated_user_row,
 )
 from services.billing_service import get_billing_summary_for_tenant
+from services.onboarding_service import create_onboarded_tenant
 from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -278,6 +279,22 @@ def signup(user: SignUpRequest, request: Request):
                 service_supabase.auth.admin.delete_user(auth_user_id)
             except Exception as cleanup_error:
                 logger.warning("auth.signup.auth_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
+
+
+@router.post("/signup/onboard")
+def signup_onboard(payload: OnboardingSignupRequest, request: Request):
+    clean_email = normalize_email(payload.email)
+
+    if not clean_email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    enforce_auth_rate_limit(request, "signup", clean_email)
+    assert_email_is_available(clean_email)
+
+    return create_onboarded_tenant(
+        supabase_client=service_supabase,
+        payload=payload,
+    )
 
 
 @router.post("/login")

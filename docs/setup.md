@@ -27,6 +27,15 @@ MAX_JSON_BODY_BYTES=3145728
 MAX_SMALL_JSON_BODY_BYTES=262144
 MAX_DATA_JSON_BODY_BYTES=1048576
 ALLOW_INSECURE_HTTP_URLS=false
+ALLOW_REMOTE_DATASET_URLS=false
+ALLOW_INSECURE_REMOTE_DATASET_HTTP=false
+MAX_EXCEL_FILE_BYTES=10485760
+MAX_EXCEL_UNCOMPRESSED_BYTES=52428800
+MAX_EXCEL_ZIP_ENTRIES=200
+MAX_EXCEL_SHEETS=20
+MAX_EXCEL_ROWS=100000
+MAX_EXCEL_COLUMNS=1000
+MAX_EXCEL_CELL_CHARS=10000
 DATA_WORKSPACE_RATE_LIMIT_LIMIT=60
 DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS=300
 DATA_UPLOAD_RATE_LIMIT_LIMIT=20
@@ -60,6 +69,19 @@ Authenticated data workspace routes are rate limited per action and authenticate
 user, with the tenant included when available. Tune `DATA_*_RATE_LIMIT_*` values
 for production based on server capacity, dataset size, and expected chart or
 analysis usage.
+
+Remote dataset URL imports are disabled by default for SSRF safety. Keep
+`ALLOW_REMOTE_DATASET_URLS=false` for the MVP and have users upload CSV/XLS/XLSX
+files instead. Only enable remote URL imports in controlled environments after
+reviewing the SSRF protections, and keep
+`ALLOW_INSECURE_REMOTE_DATASET_HTTP=false` unless a local fixture explicitly
+requires `http://`.
+
+Excel uploads are checked before parsing. `.xlsx` workbooks are validated as ZIP
+containers without extracting them to disk, with limits for compressed file size,
+uncompressed ZIP size, ZIP entry count, sheet count, worksheet dimensions, and
+cell text length. `.xls` files cannot be inspected the same way, so keep
+`MAX_EXCEL_FILE_BYTES` conservative and prefer `.xlsx` or CSV for untrusted data.
 
 Builder and website image assets are uploaded through the backend and served from
 managed `/uploads/...` paths. `BUILDER_ASSET_MAX_BYTES` defaults to 5 MiB and

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Literal
+from typing import Any, Optional, Literal
 
 class ContactMessage(BaseModel):
     name: str = Field(..., max_length=120)
@@ -15,6 +15,18 @@ class SignUpRequest(BaseModel):
 class LogIn(BaseModel): 
     email: EmailStr
     password: str
+
+class OnboardingSignupRequest(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    password: str
+    business_name: str
+    business_type: str
+    subdomain: str
+    selected_plan: Optional[dict[str, Any]] = None
+    selected_base_plan: Optional[dict[str, Any]] = None
+    selected_features: Optional[list[dict[str, Any]]] = None
 
 class UserProfileUpdate(BaseModel):
     first_name: Optional[str] = None

@@ -112,6 +112,26 @@ class UserProfileUrlValidationTests(unittest.TestCase):
 
             self.assertEqual(response.status_code, 400)
 
+    def test_profile_update_ignores_client_supplied_user_type_and_tenant_id(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+
+        with patch.object(user_routes, "service_supabase", fake_supabase), \
+             patch.object(user_routes, "require_regular_user_id", return_value=(object(), fake_user())):
+            response = client.put(
+                "/users/3/profile",
+                json={
+                    "first_name": "Updated",
+                    "tenant_id": 99,
+                    "user_type": "admin",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(fake_supabase.users_query.payload, {"first_name": "Updated"})
+        self.assertEqual(response.json()["user"]["tenant_id"], 7)
+        self.assertEqual(response.json()["user"]["user_type"], "user")
+
 
 if __name__ == "__main__":
     unittest.main()
