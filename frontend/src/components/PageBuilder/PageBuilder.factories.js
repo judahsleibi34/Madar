@@ -181,13 +181,18 @@ export const createElement = (type = "text", overrides = {}) => {
       },
     },
     card: {
-      name: "Card",
-      content: "Starter card\nUse this for services, offers, instructions, or dashboard blocks.",
+      name: "Card Carousel",
+      carouselVariant: "cards",
+      autoScroll: true,
+      autoScrollMs: 4000,
+      content:
+        "Starter card\nUse this for services, offers, instructions, or dashboard blocks.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop\n\nSecond card\nRename every title, description, and image from the inspector.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop",
       styles: {
         ...base.styles,
         backgroundColor: "#ffffff",
         borderRadius: "22px",
         alignSelf: "stretch",
+        "--carousel-height": "340px",
       },
     },
     carousel: {
@@ -235,6 +240,33 @@ export const createElement = (type = "text", overrides = {}) => {
         "--carousel-height": "360px",
       },
     },
+    carouselSpotlight: {
+      name: "Spotlight Carousel",
+      carouselVariant: "spotlight",
+      autoScroll: true,
+      autoScrollMs: 4500,
+      content:
+        "A brighter idea\nPut one bold story in the spotlight with cinematic depth.\nhttps://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1400&auto=format&fit=crop\n\nShape the future\nLayer luminous color, oversized type, and focused imagery.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1400&auto=format&fit=crop\n\nMake it memorable\nChoose a different image for every story directly in the inspector.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1400&auto=format&fit=crop",
+      styles: { ...base.styles, backgroundColor: "#080b18", borderRadius: "30px", alignSelf: "stretch", "--carousel-height": "400px" },
+    },
+    carouselStack: {
+      name: "Stacked Cards Carousel",
+      carouselVariant: "stack",
+      autoScroll: true,
+      autoScrollMs: 4000,
+      content:
+        "Behind the scenes\nA tactile stack of stories that feels draggable and alive.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&auto=format&fit=crop\n\nThe next chapter\nClick the peeking cards or use the controls to move through the stack.\nhttps://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&auto=format&fit=crop\n\nBuilt together\nPerfect for teams, case studies, portfolios, and product collections.\nhttps://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&auto=format&fit=crop",
+      styles: { ...base.styles, backgroundColor: "#f4f1ff", borderRadius: "30px", alignSelf: "stretch", "--carousel-height": "420px" },
+    },
+    carouselEditorial: {
+      name: "Editorial Carousel",
+      carouselVariant: "editorial",
+      autoScroll: true,
+      autoScrollMs: 5000,
+      content:
+        "Issue No. 01\nAn editorial layout with dramatic numbering and gallery-like composition.\nhttps://images.unsplash.com/photo-1497215842964-222b430dc094?w=1400&auto=format&fit=crop\n\nIssue No. 02\nUse it for campaigns, reports, interviews, or curated project stories.\nhttps://images.unsplash.com/photo-1497366216548-37526070297c?w=1400&auto=format&fit=crop\n\nIssue No. 03\nEvery title, caption, and image remains yours to customize.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1400&auto=format&fit=crop",
+      styles: { ...base.styles, backgroundColor: "#f5efe5", borderRadius: "8px", alignSelf: "stretch", "--carousel-height": "380px" },
+    },
     circularGallery: {
       name: "Circular Gallery",
       carouselVariant: "circular",
@@ -254,6 +286,9 @@ export const createElement = (type = "text", overrides = {}) => {
     list: {
       name: "List",
       content: "First item\nSecond item\nThird item",
+      listTitle: "",
+      listStyle: "disc",
+      listItems: ["First item", "Second item", "Third item"],
       styles: {
         ...base.styles,
         color: "#53627a",
@@ -282,13 +317,22 @@ export const createElement = (type = "text", overrides = {}) => {
       },
     },
     metric: {
-      name: "Metric",
+      name: "Metric Group",
       content: "Total Requests\n128",
+      metricColumns: 4,
+      metrics: [
+        { label: "Total Requests", value: "5,000+", description: "Impactful Reach" },
+        { label: "Completed Requests", value: "30+", description: "Programs & Initiatives" },
+        { label: "Active Partners", value: "10+", description: "Community Engagement" },
+        { label: "Completion Rate", value: "80%", description: "Successful Outcomes" },
+      ],
       styles: {
         ...base.styles,
         backgroundColor: "#ffffff",
         borderRadius: "22px",
         alignSelf: "stretch",
+        metricTextColor: "#172b4d",
+        metricSymbolColor: "#f1f66b",
       },
     },
     loginBlock: {
@@ -347,16 +391,6 @@ export const createElement = (type = "text", overrides = {}) => {
         fields: ["name", "contact", "service", "date", "time", "guests", "notes"],
         submitLabel: "Request reservation",
       },
-      styles: {
-        ...base.styles,
-        backgroundColor: "#ffffff",
-        borderRadius: "22px",
-        alignSelf: "stretch",
-      },
-    },
-    responsesTable: {
-      name: "Responses Table",
-      content: "Responses",
       styles: {
         ...base.styles,
         backgroundColor: "#ffffff",

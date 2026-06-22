@@ -80,7 +80,7 @@ export const loginSection = () =>
   createSection({
     name: "Login Section",
     layout: {
-      width: "small",
+      width: "full",
       paddingY: "large",
       background: "#fbfaf8",
     },
@@ -300,53 +300,17 @@ export const showcaseAuthSection = () =>
     ],
   });
 
-export const freeCanvasSection = () =>
-  createSection({
-    name: "Free Canvas",
-    mode: "free",
-    layout: {
-      width: "large",
-      paddingY: "none",
-      background: "#ffffff",
-      minHeight: 560,
-    },
-    rows: [],
-    freeElements: [
-      createElement("heading", {
-        mode: "free",
-        content: "Free canvas section",
-        position: {
-          desktop: { x: 60, y: 70, width: 520, height: 90 },
-          tablet: { x: 40, y: 60, width: 440, height: 90 },
-          mobile: { x: 24, y: 50, width: 300, height: 90 },
-        },
-      }),
-      createElement("text", {
-        mode: "free",
-        content: "Use free canvas only when you need exact positioning. Auto layout is safer for responsive pages.",
-        position: {
-          desktop: { x: 60, y: 170, width: 520, height: 110 },
-          tablet: { x: 40, y: 160, width: 440, height: 110 },
-          mobile: { x: 24, y: 150, width: 300, height: 120 },
-        },
-      }),
-    ],
-  });
-
 export const sectionLibrary = [
   { id: "hero", title: "Hero Section", category: "Website", description: "Headline, text, button, and card.", create: heroSection },
   { id: "login", title: "Login Section", category: "Auth", description: "Login page block for private/internal website areas.", create: loginSection },
   { id: "form", title: "Form Section", category: "Forms", description: "Place the active form on the page.", create: formSection },
-  { id: "responses", title: "Responses Table", category: "Data", description: "Show saved responses.", create: responsesSection },
   { id: "metrics", title: "Metrics Section", category: "Dashboard", description: "Counters for responses and statuses.", create: metricsSection },
-  { id: "free", title: "Free Canvas", category: "Advanced", description: "Drag-anywhere design section.", create: freeCanvasSection },
 ];
 
 const createBaseRolesAndUsers = () => {
   const admin = createRole("Admin", {
     editPages: true,
     editTheme: true,
-    useFreeCanvas: true,
     editCollections: true,
     viewResponses: true,
     exportData: true,
@@ -597,7 +561,6 @@ export const buildStarterProject = (starterId = "website") => {
         showcaseCarouselSection(),
         showcaseConnectedSection(form.id),
         showcaseAuthSection(),
-        freeCanvasSection(),
       ]),
       createPage("Operations", [
         responsesSection(form.id),
@@ -1104,6 +1067,15 @@ export const buildStarterProject = (starterId = "website") => {
       forms: [form],
       collections: [collection],
       workflows: [createWorkflow("After form is submitted", form.id)],
+      roles: common.roles,
+      users: common.users,
+    });
+  }
+
+  if (starterId === "blankPage") {
+    return createProject({
+      name: "Blank Page",
+      pages: [createPage("Home")],
       roles: common.roles,
       users: common.users,
     });

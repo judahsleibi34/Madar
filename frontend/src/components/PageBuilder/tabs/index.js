@@ -1,0 +1,8 @@
+export { default as FormsTab } from "./FormsTab";
+export { default as DesignTab } from "./DesignTab";
+export { default as DataTab } from "./DataTab";
+export { default as ResponsesTab } from "./ResponsesTab";
+export { default as UsersTab } from "./UsersTab";
+export { default as ThemeTab } from "./ThemeTab";
+export { default as PublishTab } from "./PublishTab";
+export { default as WorkflowsTab } from "./WorkflowsTab";

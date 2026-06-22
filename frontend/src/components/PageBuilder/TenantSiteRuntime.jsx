@@ -8,6 +8,7 @@ import { fetchPublicSite, submitPublicFormSubmission } from "./PageBuilder.api";
 import { getFormSections } from "./PageBuilder.factories";
 import "../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "./PageBuilderCarousel";
+import CountUpText from "./CountUpText";
 import { resolveMediaUrl } from "../../utils/media";
 
 const splitLines = (value) =>
@@ -16,7 +17,38 @@ const splitLines = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const carouselElementTypes = new Set(["carousel", "carouselCards", "carouselSplit", "circularGallery"]);
+const getListItems = (element) =>
+  Array.isArray(element?.listItems) && element.listItems.length
+    ? element.listItems
+    : splitLines(element?.content);
+
+const getRichTextRanges = (element, field, itemIndex = null) =>
+  (element?.richTextColors || []).filter(
+    (range) => range.field === field && (range.itemIndex ?? null) === itemIndex
+  );
+
+const renderRichText = (value, ranges = []) => {
+  const text = String(value ?? "");
+  const parts = [];
+  let runStart = 0;
+  let runColor = null;
+
+  for (let index = 0; index <= text.length; index += 1) {
+    const color = index < text.length
+      ? [...ranges].reverse().find((range) => index >= range.start && index < range.end)?.color || null
+      : null;
+    if (index === 0) runColor = color;
+    if (color === runColor && index < text.length) continue;
+    const content = text.slice(runStart, index);
+    if (content) parts.push(runColor ? <span style={{ color: runColor }} key={`${runStart}_${runColor}`}>{content}</span> : content);
+    runStart = index;
+    runColor = color;
+  }
+
+  return parts.length ? parts : text;
+};
+
+const carouselElementTypes = new Set(["card", "carousel", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
 
 const getFieldType = (type) => fieldTypes.find((item) => item.id === type) || fieldTypes[0];
 
@@ -155,8 +187,12 @@ const getElementPlacementMargins = (value) => {
 
 const getCarouselVariant = (element) => {
   if (element.carouselVariant) return element.carouselVariant;
+  if (element.type === "card") return "cards";
   if (element.type === "carouselCards") return "cards";
   if (element.type === "carouselSplit") return "split";
+  if (element.type === "carouselSpotlight") return "spotlight";
+  if (element.type === "carouselStack") return "stack";
+  if (element.type === "carouselEditorial") return "editorial";
   if (element.type === "circularGallery") return "circular";
   return "lightswind";
 };
@@ -189,6 +225,21 @@ const getScreenViewport = () => {
   if (window.innerWidth <= viewports.tablet) return "tablet";
   return "desktop";
 };
+
+const getMetricItems = (element) => {
+  if (Array.isArray(element?.metrics) && element.metrics.length) return element.metrics;
+  const lines = String(element?.content || "").split("\n").map((line) => line.trim()).filter(Boolean);
+  const items = [];
+  for (let index = 0; index < lines.length; index += 2) {
+    items.push({ label: lines[index] || `Metric ${items.length + 1}`, value: lines[index + 1] || "0" });
+  }
+  return items.length ? items : [{ label: "Metric", value: "0" }];
+};
+
+const getSectionCanvasHeight = (section, viewportName) =>
+  Number(section?.layout?.minHeightByViewport?.[viewportName]) ||
+  Number(section?.layout?.minHeight) ||
+  560;
 
 export default function TenantSiteRuntime() {
   const params = useParams();
@@ -313,7 +364,7 @@ export default function TenantSiteRuntime() {
     if (isFree) {
       const position = element.position?.[runtimeViewport] || element.position?.desktop || {};
       const viewportWidth = viewports[runtimeViewport] || viewports.desktop;
-      const sectionHeight = Number(section?.layout?.minHeight) || 560;
+      const sectionHeight = getSectionCanvasHeight(section, runtimeViewport);
       const left = `${((Number(position.x) || 0) / viewportWidth) * 100}%`;
       const top = `${((Number(position.y) || 0) / sectionHeight) * 100}%`;
       const width = `${((Number(position.width) || 240) / viewportWidth) * 100}%`;
@@ -608,66 +659,20 @@ export default function TenantSiteRuntime() {
     );
   };
 
-  const renderResponsesTable = (formId) => {
-    const form = project?.forms?.find((item) => item.id === formId) || project?.forms?.[0];
-    if (!form) return <div className="empty-connected">No form selected.</div>;
-
-    const fields = (form.sections || [])
-      .flatMap((section) => section.fields || [])
-      .slice(0, 4);
-    const responses = form.responses || [];
-
-    return (
-      <div className="responses-preview">
-        <div className="responses-preview-header">
-          <strong>{form.title}</strong>
-          <span>{responses.length} responses</span>
-        </div>
-
-        <div className="mock-table">
-          <div className="mock-table-row mock-table-head">
-            <span>Status</span>
-            {fields.map((field) => (
-              <span key={field.id}>{field.label}</span>
-            ))}
-          </div>
-
-          {(responses.length ? responses : [{ id: "sample", status: "Sample", answers: {} }]).map((response) => (
-            <div className="mock-table-row" key={response.id}>
-              <span>{response.status || "New"}</span>
-              {fields.map((field) => (
-                <span key={field.id}>{response.answers?.[field.id] || "-"}</span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   const renderElement = (element, isFree = false, section = null) => {
     const props = {
       className: `builder-element builder-element-${element.type}`,
       style: getElementStyle(element, isFree, section),
     };
 
-    if (element.type === "heading") return <h1 key={element.id} {...props}>{element.content}</h1>;
-    if (element.type === "text") return <p key={element.id} {...props}>{element.content}</p>;
-    if (element.type === "button") return <button key={element.id} type="button" {...props}>{element.content}</button>;
+    if (element.type === "heading") return <h1 key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</h1>;
+    if (element.type === "text") return <p key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</p>;
+    if (element.type === "button") return <button key={element.id} type="button" {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</button>;
     if (element.type === "image") {
       const imageSrc = resolveMediaUrl(element.content);
       return imageSrc ? (
         <img key={element.id} {...props} src={imageSrc} alt={element.name || ""} />
       ) : null;
-    }
-    if (element.type === "card") {
-      return (
-        <div key={element.id} {...props}>
-          {String(element.content || "").split("\n").map((line, index) => (
-            <span key={`${element.id}_${index}`}>{line}</span>
-          ))}
-        </div>
-      );
     }
     if (carouselElementTypes.has(element.type)) {
       const carouselWidth = getCarouselWidthValue(element);
@@ -706,9 +711,12 @@ export default function TenantSiteRuntime() {
     }
     if (element.type === "list") {
       return (
-        <ul key={element.id} {...props}>
-          {splitLines(element.content).map((item) => <li key={item}>{item}</li>)}
-        </ul>
+        <div key={element.id} {...props} className={`${props.className} list-style-${element.listStyle || "disc"}`} style={{ ...props.style, "--list-count": Math.max(1, getListItems(element).length) }}>
+          {element.listTitle && <h3 className="builder-list-title">{renderRichText(element.listTitle, getRichTextRanges(element, "listTitle"))}</h3>}
+          <ul>
+            {getListItems(element).map((item, index) => <li key={`${item}_${index}`} style={{ "--list-index": index }}>{renderRichText(item, getRichTextRanges(element, "listItem", index))}</li>)}
+          </ul>
+        </div>
       );
     }
     if (element.type === "divider") return <hr key={element.id} {...props} />;
@@ -721,16 +729,46 @@ export default function TenantSiteRuntime() {
       );
     }
     if (element.type === "metric") {
-      const [label, value] = String(element.content || "").split("\n");
+      const metrics = getMetricItems(element);
+      const columns = Math.max(2, Math.min(4, Number(element.metricColumns) || 2));
+      return (
+        <div key={element.id} {...props} className={`${props.className} metric-group`} style={{ ...props.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "#172b4d", "--metric-symbol-color": element.styles?.metricSymbolColor || "#f1f66b" }}>
+          {metrics.map((metric, index) => (
+            <div className="metric-group-item" key={`${element.id}_${index}`}>
+              <strong className="metric-value"><CountUpText value={metric.value} /></strong>
+              <span className="metric-label">{metric.label}</span>
+              {metric.description && <span className="metric-description">{metric.description}</span>}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (element.type === "loginBlock" || element.type === "registrationBlock") {
+      const isRegistration = element.type === "registrationBlock";
+      const auth = element.auth || {};
+
       return (
         <div key={element.id} {...props}>
-          <span className="metric-label">{label}</span>
-          <strong className="metric-value">{value}</strong>
+          <form className="builder-auth-component" onSubmit={(event) => event.preventDefault()}>
+            <div className="builder-auth-heading">
+              <h3>{auth.title || (isRegistration ? "Create account" : "Log in")}</h3>
+              <p>{auth.subtitle || (isRegistration ? "Create your account." : "Access your account.")}</p>
+            </div>
+            {isRegistration && <label>Full name<input type="text" placeholder="Your name" /></label>}
+            <label>Email address<input type="email" placeholder="name@example.com" /></label>
+            <label>Password<input type="password" placeholder="Enter password" /></label>
+            <button type="submit" className="runtime-submit">
+              {auth.buttonText || (isRegistration ? "Create account" : "Log in")}
+            </button>
+            <p className="builder-auth-switch">
+              {auth.switchText} <strong>{auth.switchActionText}</strong>
+            </p>
+          </form>
         </div>
       );
     }
     if (element.type === "formBlock") return <div key={element.id} {...props}>{renderConnectedForm(element.connectedFormId, element.id)}</div>;
-    if (element.type === "responsesTable") return <div key={element.id} {...props}>{renderResponsesTable(element.connectedFormId)}</div>;
+    if (element.type === "responsesTable") return null;
 
     return <div key={element.id} {...props}>{element.content}</div>;
   };
@@ -752,18 +790,18 @@ export default function TenantSiteRuntime() {
       <main className="tenant-runtime-page">
         <div className={`builder-canvas viewport-${runtimeViewport}`}>
           {(activePage.sections || []).map((section) => {
-            if (section.mode === "free") {
+            if (section.mode === "free" || section.mode === "direct") {
               return (
                 <section
                   key={section.id}
-                  className={`site-section free-canvas-section width-${section.layout.width}`}
-                  style={{ backgroundColor: section.layout.background, minHeight: section.layout.minHeight }}
+                  className={`site-section direct-layout-section width-${section.layout.width}`}
+                  style={{ backgroundColor: section.layout.background, minHeight: getSectionCanvasHeight(section, runtimeViewport) }}
                 >
                   <div
-                    className="free-canvas-frame"
+                    className="direct-layout-frame"
                     style={{
                       width: `min(100%, ${viewports[runtimeViewport] || viewports.desktop}px)`,
-                      minHeight: `${section.layout.minHeight}px`,
+                      minHeight: `${getSectionCanvasHeight(section, runtimeViewport)}px`,
                     }}
                   >
                     {(section.freeElements || []).map((element) => renderElement(element, true, section))}

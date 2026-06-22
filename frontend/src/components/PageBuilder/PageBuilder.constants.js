@@ -52,8 +52,6 @@ export const builderTabs = [
   },
 ];
 
-export const designPanels = ["Pages", "Sections", "Layers", "Elements"];
-
 export const sectionWidths = [
   { value: "small", label: "Small" },
   { value: "medium", label: "Medium" },
@@ -87,12 +85,20 @@ export const elementTypes = [
   { id: "button", label: "Button", group: "Content" },
   { id: "image", label: "Image", group: "Content" },
   { id: "card", label: "Card", group: "Content" },
+  { id: "carousel", label: "Glow Carousel", group: "Content" },
+  { id: "carouselCards", label: "Card Carousel", group: "Content" },
+  { id: "carouselSplit", label: "Split Story Carousel", group: "Content" },
+  { id: "carouselSpotlight", label: "Spotlight Carousel", group: "Content" },
+  { id: "carouselStack", label: "Stacked Cards Carousel", group: "Content" },
+  { id: "carouselEditorial", label: "Editorial Carousel", group: "Content" },
+  { id: "circularGallery", label: "Circular Gallery", group: "Content" },
   { id: "list", label: "List", group: "Content" },
   { id: "divider", label: "Divider", group: "Content" },
   { id: "embed", label: "Embed", group: "Content" },
   { id: "metric", label: "Metric", group: "Dashboard" },
+  { id: "loginBlock", label: "Login Form", group: "Auth" },
+  { id: "registrationBlock", label: "Registration Form", group: "Auth" },
   { id: "formBlock", label: "Form Block", group: "Connected" },
-  { id: "responsesTable", label: "Responses Table", group: "Connected" },
 ];
 
 export const fieldTypes = [
@@ -125,7 +131,6 @@ export const permissionGroups = [
     permissions: [
       { key: "editPages", label: "Edit pages" },
       { key: "editTheme", label: "Edit theme" },
-      { key: "useFreeCanvas", label: "Use free canvas" },
     ],
   },
   {
@@ -150,7 +155,6 @@ export const permissionGroups = [
 export const defaultPermissions = {
   editPages: false,
   editTheme: false,
-  useFreeCanvas: false,
   editCollections: false,
   viewResponses: false,
   exportData: false,
@@ -258,5 +262,10 @@ export const starterSystems = [
     id: "blank",
     title: "Blank Custom System",
     subtitle: "Start clean with one page, one form, and admin role.",
+  },
+  {
+    id: "blankPage",
+    title: "Blank Page",
+    subtitle: "Start with one completely empty page.",
   },
 ];
