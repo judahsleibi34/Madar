@@ -37,6 +37,19 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     fontFamily: "Inter",
     ...theme,
   };
+  const formTheme = {
+    background: safeTheme.background,
+    surface: safeTheme.surface,
+    inputBackground: "#ffffff",
+    text: safeTheme.text,
+    muted: safeTheme.muted,
+    border: safeTheme.border,
+    accent: safeTheme.accent,
+    buttonText: "#ffffff",
+    radius: 8,
+    fieldRadius: 14,
+    ...(safeTheme.form || {}),
+  };
   const isDarkMode = safeTheme.mode === "dark";
 
   return {
@@ -60,6 +73,16 @@ export const getPageBuilderThemeVars = (theme = {}) => {
       ? "var(--theme-gradient-hover)"
       : `linear-gradient(135deg, ${safeTheme.primary} 0%, ${safeTheme.accentDark} 100%)`,
     "--madar-radius": `${safeTheme.radius}px`,
+    "--form-theme-bg": formTheme.background,
+    "--form-theme-surface": formTheme.surface,
+    "--form-theme-input": formTheme.inputBackground,
+    "--form-theme-text": formTheme.text,
+    "--form-theme-muted": formTheme.muted,
+    "--form-theme-border": formTheme.border,
+    "--form-theme-accent": formTheme.accent,
+    "--form-theme-button-text": formTheme.buttonText,
+    "--form-theme-radius": `${formTheme.radius}px`,
+    "--form-theme-field-radius": `${formTheme.fieldRadius}px`,
     fontFamily: safeTheme.fontFamily,
   };
 };

@@ -394,7 +394,7 @@ def login(user: LogIn, response: Response, request: Request):
 @router.get("/user_status")
 def user_status(request: Request, response: Response):
     try:
-        _, user_data = get_authenticated_user_row(request, response)
+        _, user_data = get_authenticated_user_row(request, response, allow_refresh=False)
         user_payload = build_user_payload(user_data)
         user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
         csrf_token = ensure_csrf_token(request, response)
@@ -406,7 +406,9 @@ def user_status(request: Request, response: Response):
         }
 
     except HTTPException:
-        delete_auth_cookies(response)
+        # Keep this status probe non-destructive. A delayed/failed background
+        # auth check can otherwise erase newer cookies from a successful refresh
+        # or login response that reached the browser first.
         return {
             "logged_in": False,
             "user": None,

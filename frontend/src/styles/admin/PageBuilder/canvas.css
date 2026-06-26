@@ -731,6 +731,18 @@
   user-select: none;
 }
 
+.preview-mode .direct-element-frame,
+.tenant-runtime-page .direct-element-frame {
+  cursor: auto;
+  touch-action: auto;
+  user-select: auto;
+}
+
+.preview-mode .direct-element-frame .runtime-form,
+.tenant-runtime-page .direct-element-frame .runtime-form {
+  pointer-events: auto;
+}
+
 .direct-element-frame:hover {
   border-color: rgba(var(--theme-primary-rgb), 0.3);
 }

@@ -7,6 +7,43 @@
   color: #1a2744;
 }
 
+.tenant-site-draft-preview .tenant-runtime-page {
+  display: block;
+  padding: 0;
+  background: #ffffff;
+}
+
+.tenant-draft-preview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 8000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 8px 18px;
+  border-bottom: 1px solid rgba(26, 39, 68, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1a2744;
+  box-shadow: 0 10px 24px rgba(26, 39, 68, 0.08);
+}
+
+.tenant-draft-preview-bar strong {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.tenant-draft-preview-bar button {
+  min-height: 36px;
+  border: 1px solid rgba(26, 39, 68, 0.14);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: #ffffff;
+  color: #1a2744;
+  font-weight: 900;
+}
+
 .tenant-login-card {
   width: min(520px, 100%);
   background: #ffffff;

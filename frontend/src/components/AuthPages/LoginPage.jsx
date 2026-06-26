@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { syncCsrfTokenFromResponseData } from "../../utils/apiClient";
+import { normalizeAuthMessage } from "./authMessages";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -105,7 +106,7 @@ export default function LoginPage({
         }
 
         setStatusMessage(
-          typeof data.detail === "string" ? data.detail : t("login.loginFailed")
+          normalizeAuthMessage(data.detail, t("login.loginFailed"))
         );
         return;
       }

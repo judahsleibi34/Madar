@@ -117,7 +117,17 @@ const normalizeBackendResponse = (submission) => ({
 });
 
 const RESPONSE_PAGE_SIZE = 50;
-const SUBMISSION_STATUSES = ["New", "Contacted", "Closed", "Spam", "Archived"];
+const SUBMISSION_STATUSES = [
+  "New",
+  "Contacted",
+  "In review",
+  "Approved",
+  "Rejected",
+  "Completed",
+  "Cancelled",
+  "Spam",
+  "Archived",
+];
 const STATUS_FILTER_OPTIONS = ["All", ...SUBMISSION_STATUSES];
 
 const normalizeStatus = (status) => String(status || "New").trim().toLowerCase();

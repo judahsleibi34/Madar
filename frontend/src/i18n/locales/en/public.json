@@ -11,15 +11,12 @@
     "signup": "Sign Up",
     "logout": "Logout"
   },
-  "hero": {
-    "titleRich": "Welcome to <brand>Madar</brand>",
-    "name": "Madar",
-    "description": "is an adaptive business management platform designed to help organizations create and manage their own digital systems based on their unique needs."
+  "hero": { "titleRich": "Digitize Your Business with <brand>Confidence.</brand>", "name": "Madar", "description": "helps organizations replace manual paperwork with reliable digital workflows that save time, reduce operational errors, and give teams better control over every process."
   },
   "footer": {
     "brandAria": "Madar footer brand",
     "homeAria": "Madar Home",
-    "description": "An adaptive business management platform for creating, managing, and scaling digital systems.",
+    "description": "Simple digital workflows that save time, reduce mistakes, and keep work moving.",
     "linksTitle": "Company",
     "contactTitle": "Get in touch",
     "emailLabel": "Email",
@@ -32,3 +29,4 @@
     "copyright": "© 2026 {{brand}}. {{rights}}"
   }
 }
+

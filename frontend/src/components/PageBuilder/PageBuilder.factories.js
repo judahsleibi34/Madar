@@ -55,7 +55,7 @@ export const createCollection = (name = "Requests", fields = []) => ({
       ? fields
       : [
           createField("Title", "shortText", { required: true }),
-          createField("Status", "status", {
+          createField("Status", "dropdown", {
             options: ["New", "Pending", "Approved", "Rejected"],
             defaultValue: "New",
           }),
@@ -64,7 +64,7 @@ export const createCollection = (name = "Requests", fields = []) => ({
   records: [],
 });
 
-export const createFormSection = (title = "Section 1", fields = []) => ({
+export const createFormSection = (title = "Page 1", fields = []) => ({
   id: createId("formSection"),
   title,
   description: "",
@@ -101,7 +101,8 @@ export const createForm = (title = "Untitled Form", fields = [], overrides = {})
       allowRetakes: true,
       maxRetakes: 0,
     },
-    sections: [createFormSection("Section 1", defaultFields)],
+    pageMode: "paged",
+    sections: [createFormSection("Page 1", defaultFields)],
     responses: [],
     ...overrides,
   };

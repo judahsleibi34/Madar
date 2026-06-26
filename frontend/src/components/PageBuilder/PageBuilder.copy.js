@@ -7,10 +7,10 @@ export const builderWorkspaceCopy = {
     },
     topbar: {
       templates: "Templates",
-      preview: "Preview",
-      exitPreview: "Exit Preview",
-      save: "Save",
-      goLive: "Go Live",
+      preview: "Preview site",
+      exitPreview: "Exit site preview",
+      save: "Save builder",
+      goLive: "Publish site",
     },
     tabs: {
       design: {
@@ -26,12 +26,12 @@ export const builderWorkspaceCopy = {
         helper: "Manage team members, roles, and permissions.",
       },
       theme: {
-        label: "Theme",
+        label: "Themes",
         helper: "Control global colors, typography, spacing, and radius.",
       },
       publish: {
         label: "Publish",
-        helper: "Preview, save locally, export JSON, and publish status.",
+        helper: "Preview, save, export, and publish the builder site.",
       },
       responses: {
         label: "Responses",

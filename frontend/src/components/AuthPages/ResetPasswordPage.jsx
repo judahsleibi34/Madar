@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { normalizeAuthMessage } from "./authMessages";
 
 const readRecoveryToken = () => {
   const hash = window.location.hash;
@@ -52,7 +53,7 @@ export default function ResetPasswordPage({ lang = "en" }) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.detail || t("resetPassword.unknownError"));
+        setError(normalizeAuthMessage(data.detail, t("resetPassword.unknownError")));
         return;
       }
 

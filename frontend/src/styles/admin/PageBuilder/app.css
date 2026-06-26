@@ -708,6 +708,23 @@ summary {
   gap: 16px;
 }
 
+.theme-workspace-page {
+  display: grid;
+  gap: 20px;
+}
+
+.theme-section {
+  display: grid;
+  gap: 14px;
+}
+
+.theme-section-heading h3 {
+  margin: 0;
+  color: var(--madar-text);
+  font-size: 16px;
+  font-weight: 950;
+}
+
 .theme-control {
   background: var(--madar-surface);
   border: 1px solid var(--madar-border);

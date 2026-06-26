@@ -7,42 +7,42 @@ const content = {
     title: "About Madar",
     name: "Madar",
     description:
-      "is an adaptive business management platform built by Palestinian youth to help organizations create digital systems that fit their real needs. It gives businesses a flexible way to manage records, users, operations, and workflows from one centralized place.",
+      "helps organizations move beyond manual paperwork by turning daily operations into reliable digital workflows. From records and users to approvals and processes, Madar gives teams one organized platform to manage work with more clarity, speed, and control.",
     secondDescription:
-      "Whether used by a store, clinic, supermarket, warehouse, school, or service center, Madar adapts to the way each organization works. With simplicity, flexibility, and local identity at its core, Madar helps businesses move from paper records and scattered tools to a smarter digital management experience.",
+      "Built for businesses that want to modernize without complexity, Madar adapts to different sectors such as stores, clinics, supermarkets, warehouses, schools, and service centers. It brings everything together in one simple experience, helping teams save time, reduce operational errors, and keep work moving smoothly.",
 
     purposeTitle: "Our Purpose",
     purpose:
-      "Madar was created to support small and medium organizations that need simple, affordable, and flexible digital tools. Our purpose is to make business management easier by giving each organization the ability to shape its own system instead of being forced to use a fixed solution.",
+      "Our purpose is to make digital transformation practical and accessible for small and medium organizations. Madar gives each business the flexibility to build a system around the way it actually works, instead of forcing teams into rigid tools that do not match their operations.",
 
     differenceTitle: "What Makes Madar Different?",
     difference:
-      "Madar is not limited to one industry. It is designed as a customizable platform where organizations can define their own structure, modules, fields, records, permissions, and workflows while keeping a clean and consistent user experience.",
+      "Madar is designed to be flexible from the start. Organizations can customize modules, fields, records, permissions, users, and workflows while keeping a clean, professional, and easy-to-use experience. It is not just software; it is a foundation for better business control.",
 
     visionTitle: "Our Vision",
     vision:
-      "Our vision is to build a trusted Palestinian-made digital platform that helps organizations become more organized, efficient, and ready for growth. Madar aims to be a flexible foundation for businesses that want technology shaped around their real operations.",
+      "Our vision is to become a trusted digital transformation platform for organizations that want to work smarter, grow faster, and operate with confidence. Madar aims to help businesses replace scattered paperwork with a modern system built for clarity, efficiency, and long-term growth.",
   },
 
   ar: {
     title: "عن مدار",
     name: "مدار",
     description:
-      "منصة إدارة أعمال تكيفية بُنيت بأيادٍ شبابية فلسطينية لمساعدة المؤسسات على إنشاء أنظمة رقمية تناسب احتياجاتها الفعلية. توفر المنصة طريقة مرنة لإدارة السجلات والمستخدمين والعمليات وسير العمل من مكان مركزي واحد.",
+      "يساعد المؤسسات على تجاوز العمل الورقي اليدوي من خلال تحويل العمليات اليومية إلى سير عمل رقمي موثوق. من السجلات والمستخدمين إلى الموافقات والإجراءات، يمنح مدار الفرق منصة واحدة منظمة لإدارة العمل بوضوح وسرعة وتحكم أفضل.",
     secondDescription:
-      "سواء تم استخدام مدار في متجر أو عيادة أو سوبرماركت أو مستودع أو مدرسة أو مركز خدمات، فهو يتكيف مع طريقة عمل كل مؤسسة. ومن خلال التركيز على البساطة والمرونة والهوية المحلية، يساعد مدار الأعمال على الانتقال من السجلات الورقية والأدوات المتفرقة إلى تجربة إدارة رقمية أكثر ذكاءً.",
+      "صُمم مدار للأعمال التي ترغب في التطور الرقمي دون تعقيد، ويتناسب مع قطاعات مختلفة مثل المتاجر والعيادات والسوبرماركت والمستودعات والمدارس ومراكز الخدمات. يجمع مدار كل ما تحتاجه المؤسسة في تجربة بسيطة تساعد الفرق على توفير الوقت، وتقليل الأخطاء التشغيلية، والحفاظ على سير العمل بسلاسة.",
 
     purposeTitle: "هدفنا",
     purpose:
-      "تم إنشاء مدار لدعم المؤسسات الصغيرة والمتوسطة التي تحتاج إلى أدوات رقمية بسيطة ومرنة ومناسبة. هدفنا هو تسهيل إدارة الأعمال من خلال منح كل مؤسسة القدرة على تشكيل نظامها الخاص بدلًا من الاعتماد على حلول ثابتة لا تناسب طبيعة عملها.",
+      "هدفنا هو جعل التحول الرقمي عمليًا ومتاحًا للمؤسسات الصغيرة والمتوسطة. يمنح مدار كل مؤسسة المرونة لبناء نظام يناسب طريقة عملها الفعلية، بدلًا من الاعتماد على أدوات جامدة لا تعكس احتياجاتها اليومية.",
 
     differenceTitle: "ما الذي يجعل مدار مختلفًا؟",
     difference:
-      "مدار ليس مخصصًا لمجال واحد فقط، بل هو منصة قابلة للتخصيص تتيح للمؤسسات تحديد هيكلها الخاص، وإنشاء الوحدات والحقول والسجلات والصلاحيات وسير العمل، مع الحفاظ على تجربة استخدام واضحة ومتناسقة.",
+      "تم تصميم مدار ليكون مرنًا من البداية. تستطيع المؤسسات تخصيص الوحدات والحقول والسجلات والصلاحيات والمستخدمين وسير العمل مع الحفاظ على تجربة استخدام واضحة واحترافية وسهلة. مدار ليس مجرد برنامج، بل أساس يمنح الأعمال تحكمًا أفضل.",
 
     visionTitle: "رؤيتنا",
     vision:
-      "رؤيتنا هي بناء منصة رقمية فلسطينية موثوقة تساعد المؤسسات على أن تصبح أكثر تنظيمًا وكفاءة واستعدادًا للنمو. يهدف مدار إلى أن يكون أساسًا مرنًا للأعمال التي تحتاج إلى تقنية مصممة حول عملياتها الفعلية.",
+      "رؤيتنا هي أن يصبح مدار منصة موثوقة للتحول الرقمي للمؤسسات التي تريد العمل بذكاء أكبر، والنمو بسرعة، والإدارة بثقة. نهدف إلى مساعدة الأعمال على استبدال الأوراق والأدوات المتفرقة بنظام حديث مصمم للوضوح والكفاءة والنمو طويل المدى.",
   },
 };
 

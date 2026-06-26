@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Copy,
   FilePlus2,
@@ -46,7 +47,7 @@ import {
   createInitialProject,
 } from "./PageBuilder.starters";
 import { sanitizeSubdomain } from "./PageBuilder.routing";
-import PageBuilderCarousel, { parseCarouselSlides, serializeCarouselSlides } from "./PageBuilderCarousel";
+import { parseCarouselSlides, serializeCarouselSlides } from "./PageBuilderCarousel";
 import PageBuilderTopbar from "./PageBuilderTopbar";
 import PageBuilderSubbar from "./PageBuilderSubbar";
 import {
@@ -59,7 +60,6 @@ import {
   WorkflowsTab,
 } from "./tabs";
 import PageDeleteConfirmModal from "./PageDeleteConfirmModal";
-import CountUpText from "./CountUpText";
 import {
   createBuilderProject,
   fetchBuilderProject,
@@ -69,7 +69,6 @@ import {
   updateBuilderProject,
   uploadBuilderAsset,
 } from "./PageBuilder.api";
-import { resolveMediaUrl } from "../../utils/media";
 import {
   applyThemeModeToProject,
   getPageBuilderThemeClassName,
@@ -81,7 +80,6 @@ import {
   mobileBlockerCopy,
   templateModalText,
   starterArabicText,
-  internalPageNames,
 } from "./PageBuilder.copy";
 import {
   getStoredUrlError,
@@ -90,19 +88,14 @@ import {
 import {
   splitLines,
   getListItems,
-  getRichTextRanges,
-  renderRichText,
   getCanvasTextSelectionRange,
   createInputTextSelection,
 } from "./PageBuilder.text";
 import {
   singleAnswerQuizTypes,
   correctableQuizTypes,
-  hasQuizAnswerKey,
-  isQuizAnswerCorrect,
   gradeQuizResponse,
   getQuizSettings,
-  formatQuizTime,
 } from "./PageBuilder.quiz";
 import {
   designPanelOptions,
@@ -113,23 +106,16 @@ import {
   builderInitialProjectLoadPromises,
 } from "./PageBuilder.config";
 import {
-  getModernFieldPlaceholder,
   getFieldOptions,
   scaleRange,
 } from "./PageBuilder.fields";
 import {
   getSectionElements,
-  isMetricsSection,
-  isResponsesSection,
-  removeDeprecatedBuilderElements,
-  hasFormSection,
-  removeDuplicateFormHeadings,
   directElementHeight,
   getMetricItems,
   getMetricMinimumHeight,
   getSectionCanvasHeight,
   convertSectionToDirectLayout,
-  mergeSectionsIntoPageCanvas,
   positionsOverlap,
   getProjectOverlapWarnings as getProjectOverlapWarningsFromLayout,
   snapToGrid,
@@ -140,7 +126,6 @@ import {
 } from "./PageBuilder.layout";
 import {
   cleanBuilderProject,
-  normalizeProjectSlug,
   getBuilderProjectName,
   getBuilderProjectSlug,
   getDraftProjectFromRecord,
@@ -150,12 +135,9 @@ import {
   normalizeElementAlignSelf,
   getElementLayoutWidth,
   getElementAlignControlValue,
-  getComponentPositionClass,
-  getCarouselWidthValue,
   getElementPlacementMargins,
   isDirectionalElementPlacement,
   getClosestColumnIdFromEvent,
-  getCarouselVariant,
   getRowCarouselElements,
 } from "./PageBuilder.elementLayout";
 import {
@@ -193,183 +175,51 @@ import {
 import {
   createUploadHandlers,
 } from "./PageBuilder.uploadHandlers";
+import {
+  createRuntimeFormRenderers,
+} from "./PageBuilder.runtime";
+import {
+  createElementRenderer,
+} from "./PageBuilder.elementRenderer";
+import {
+  createSiteChromeRenderers,
+} from "./PageBuilder.siteChrome";
 const getFieldType = (type) => getFieldTypeById(fieldTypes, type);
+
+const builderTabPathById = {
+  design: "/page-builder/pages",
+  forms: "/page-builder/forms",
+  users: "/page-builder/users",
+  theme: "/page-builder/theme",
+  publish: "/page-builder/publish",
+  data: "/page-builder/data",
+  responses: "/page-builder/responses",
+  workflows: "/page-builder/workflows",
+};
+
+const builderTabIdByPathSegment = {
+  pages: "design",
+  design: "design",
+  forms: "forms",
+  users: "users",
+  theme: "theme",
+  publish: "publish",
+  data: "data",
+  responses: "responses",
+  workflows: "workflows",
+};
+
+const getBuilderTabFromPath = (pathname = "") => {
+  const match = pathname.match(/^\/page-builder\/([^/?#]+)/);
+  if (!match) return null;
+  return builderTabIdByPathSegment[match[1]] || null;
+};
 
 const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
   collectBuilderUrlErrorsFromUtils,
   getSectionElements,
   carouselElementTypes,
 });
-
-const normalizeBuilderElementShape = (element) => {
-  if (!element || typeof element !== "object" || Array.isArray(element)) {
-    return createElement("text");
-  }
-
-  return createElement(element.type || "text", element);
-};
-
-const normalizeBuilderColumnShape = (column) => {
-  const source =
-    column && typeof column === "object" && !Array.isArray(column)
-      ? column
-      : {};
-  const elements = Array.isArray(source.elements)
-    ? source.elements.map(normalizeBuilderElementShape)
-    : [];
-
-  return createColumn(elements, {
-    ...source,
-    name: source.name || "Column",
-    layout: {
-      align: "left",
-      ...(source.layout || {}),
-    },
-    elements,
-  });
-};
-
-const normalizeBuilderRowShape = (row) => {
-  const source =
-    row && typeof row === "object" && !Array.isArray(row)
-      ? row
-      : {};
-  const columns = Array.isArray(source.columns) && source.columns.length > 0
-    ? source.columns.map(normalizeBuilderColumnShape)
-    : [normalizeBuilderColumnShape({ elements: source.elements || [] })];
-
-  return createRow(columns, {
-    ...source,
-    layout: {
-      columns: String(source.layout?.columns || columns.length || 1),
-      align: source.layout?.align || "center",
-      gap: source.layout?.gap || "medium",
-      ...(source.layout || {}),
-    },
-    columns,
-  });
-};
-
-const normalizeBuilderSectionShape = (section) => {
-  const source =
-    section && typeof section === "object" && !Array.isArray(section)
-      ? section
-      : {};
-  const legacyElements = Array.isArray(source.elements) ? source.elements : [];
-  const rows = Array.isArray(source.rows) && source.rows.length > 0
-    ? source.rows.map(normalizeBuilderRowShape)
-    : [normalizeBuilderRowShape({ elements: legacyElements })];
-  const freeElements = Array.isArray(source.freeElements)
-    ? source.freeElements.map(normalizeBuilderElementShape)
-    : [];
-
-  const base = createSection({
-    name: source.name || source.type || "Section",
-    mode: source.mode || "auto",
-    layout: source.layout || {},
-    rows,
-    freeElements,
-  });
-
-  return {
-    ...base,
-    ...source,
-    mode: source.mode || base.mode,
-    layout: {
-      ...base.layout,
-      ...(source.layout || {}),
-    },
-    rows,
-    freeElements,
-  };
-};
-
-const normalizeBuilderPageShape = (page, fallbackPage) => {
-  const source =
-    page && typeof page === "object" && !Array.isArray(page)
-      ? page
-      : fallbackPage || {};
-  const sections = Array.isArray(source.sections)
-    ? source.sections.map(normalizeBuilderSectionShape)
-    : [];
-
-  return createPage(source.name || fallbackPage?.name || "Home", sections, {
-    ...source,
-    slug: source.slug || source.path || fallbackPage?.slug || "/",
-    backgroundColor: source.backgroundColor || fallbackPage?.backgroundColor || "#ffffff",
-    visibility: source.visibility || fallbackPage?.visibility || "public",
-    showInNavigation:
-      typeof source.showInNavigation === "boolean"
-        ? source.showInNavigation
-        : fallbackPage?.showInNavigation ?? true,
-    pageType: source.pageType || fallbackPage?.pageType || "main",
-    sections,
-  });
-};
-
-const normalizeBuilderProjectShape = (project) => {
-  const fallback = createInitialProject();
-  const source =
-    project && typeof project === "object" && !Array.isArray(project)
-      ? project
-      : {};
-
-  const sourcePages =
-    Array.isArray(source.pages) && source.pages.length > 0
-      ? source.pages
-      : fallback.pages;
-  const pages = sourcePages.map((page, index) =>
-    normalizeBuilderPageShape(page, fallback.pages[index])
-  );
-
-  const forms =
-    Array.isArray(source.forms) && source.forms.length > 0
-      ? source.forms
-      : fallback.forms;
-
-  const workflows = Array.isArray(source.workflows)
-    ? source.workflows
-    : fallback.workflows || [];
-
-  const roles = Array.isArray(source.roles) ? source.roles : fallback.roles || [];
-  const users = Array.isArray(source.users) ? source.users : fallback.users || [];
-  const collections = Array.isArray(source.collections)
-    ? source.collections
-    : fallback.collections || [];
-
-  return {
-    ...fallback,
-    ...source,
-    pages,
-    forms,
-    workflows,
-    roles,
-    users,
-    collections,
-    activePageId: pages.some((page) => page.id === source.activePageId)
-      ? source.activePageId
-      : pages[0]?.id || "",
-    activeFormId: forms.some((form) => form.id === source.activeFormId)
-      ? source.activeFormId
-      : forms[0]?.id || "",
-    activeWorkflowId: workflows.some(
-      (workflow) => workflow.id === source.activeWorkflowId
-    )
-      ? source.activeWorkflowId
-      : workflows[0]?.id || "",
-    activeRoleId: roles.some((role) => role.id === source.activeRoleId)
-      ? source.activeRoleId
-      : roles[0]?.id || "",
-    siteChrome: {
-      ...(fallback.siteChrome || defaultSiteChrome),
-      ...(source.siteChrome || {}),
-    },
-    theme: {
-      ...(fallback.theme || {}),
-      ...(source.theme || {}),
-    },
-  };
-};
 
 export default function PageBuilder({
   initialTab = "design",
@@ -382,12 +232,15 @@ export default function PageBuilder({
   onAppThemeModeChange,
   user = null,
 } = {}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const routeTab = getBuilderTabFromPath(location.pathname);
   const [project, setProject] = useState(() =>
     demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
   );
   const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
   const [builderProjectLoading, setBuilderProjectLoading] = useState(!demoMode);
-  const [activeTab, setActiveTab] = useState(initialTab || "design");
+  const [activeTab, setActiveTabState] = useState(routeTab || initialTab || "design");
   const [designPanel, setDesignPanel] = useState("Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
@@ -396,9 +249,12 @@ export default function PageBuilder({
   const [dragState, setDragState] = useState(null);
   const [paletteDropSectionId, setPaletteDropSectionId] = useState("");
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
+  const [pagePendingDelete, setPagePendingDelete] = useState(null);
   const [insertTarget, setInsertTarget] = useState(null);
   const [runtimeAnswers, setRuntimeAnswers] = useState({});
   const [runtimeErrors, setRuntimeErrors] = useState({});
+  const [runtimeFormPages, setRuntimeFormPages] = useState({});
+  const [runtimeFormLanguages, setRuntimeFormLanguages] = useState({});
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
   const [liveSitePath, setLiveSitePath] = useState("");
@@ -406,6 +262,51 @@ export default function PageBuilder({
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
   const [textSelection, setTextSelection] = useState(null);
+
+  const setActiveTab = useCallback(
+    (nextTab) => {
+      setActiveTabState(nextTab);
+
+      if (hideWorkspaceTabs) return;
+
+      const nextPath = builderTabPathById[nextTab];
+      if (nextPath && location.pathname !== nextPath) {
+        navigate(nextPath);
+      }
+    },
+    [hideWorkspaceTabs, location.pathname, navigate]
+  );
+
+  useEffect(() => {
+    if (!routeTab) return;
+    setActiveTabState(routeTab);
+    if (routeTab !== "design" && modal === "starter") {
+      setModal(null);
+      setActiveTopbarAction("");
+    }
+  }, [modal, routeTab]);
+
+  useEffect(() => {
+    if (hideWorkspaceTabs || routeTab) return;
+    if (location.pathname === "/page-builder" || location.pathname === "/page-builder/") {
+      navigate(builderTabPathById.design, { replace: true });
+    }
+  }, [hideWorkspaceTabs, location.pathname, navigate, routeTab]);
+
+  const openPreviewPage = () => {
+    if (!demoMode) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+    }
+    window.open("/page-builder/preview", "_blank", "noopener,noreferrer");
+  };
+
+  const openFormPreviewPage = (formId = activeForm?.id) => {
+    if (!formId) return;
+    if (!demoMode) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+    }
+    window.open(`/page-builder/form-preview/${formId}`, "_blank", "noopener,noreferrer");
+  };
 
   useEffect(() => {
     if (demoMode) return;
@@ -672,6 +573,54 @@ export default function PageBuilder({
     setSelected({ type: "workflow", id: workflowId });
   };
 
+  const addWorkflow = () => {
+    const workflow = createWorkflow(
+      `Workflow ${project.workflows.length + 1}`,
+      project.activeFormId
+    );
+
+    updateProject((prev) => ({
+      ...prev,
+      workflows: [...prev.workflows, workflow],
+      activeWorkflowId: workflow.id,
+    }));
+
+    setSelected({ type: "workflow", id: workflow.id });
+  };
+
+  const addWorkflowStep = () => {
+    if (!activeWorkflow) return;
+
+    updateActiveWorkflow((workflow) => ({
+      ...workflow,
+      steps: [
+        ...(workflow.steps || []),
+        {
+          id: createId("step"),
+          type: workflowStepTypes[0]?.id || "email",
+          label: `Step ${(workflow.steps || []).length + 1}`,
+          details: "",
+        },
+      ],
+    }));
+  };
+
+  const updateWorkflowStep = (stepId, updates) => {
+    updateActiveWorkflow((workflow) => ({
+      ...workflow,
+      steps: (workflow.steps || []).map((step) =>
+        step.id === stepId ? { ...step, ...updates } : step
+      ),
+    }));
+  };
+
+  const deleteWorkflowStep = (stepId) => {
+    updateActiveWorkflow((workflow) => ({
+      ...workflow,
+      steps: (workflow.steps || []).filter((step) => step.id !== stepId),
+    }));
+  };
+
   const addPage = () => {
     const page = createPage(`Page ${project.pages.length + 1}`, [heroSection()]);
     updateProject((prev) => ({
@@ -698,20 +647,20 @@ export default function PageBuilder({
   };
 
   const deleteActivePage = () => {
-    if (!activePage || project.pages.length <= 1) {
-      alert("You need at least one page.");
-      return;
-    }
+    if (!activePage) return;
+    setPagePendingDelete(activePage);
+  };
 
-    if (!window.confirm(`Delete page "${activePage.name}"?`)) return;
-
-    const nextPage = project.pages.find((page) => page.id !== activePage.id);
+  const confirmDeleteActivePage = () => {
+    if (!pagePendingDelete) return;
+    const nextPage = project.pages.find((page) => page.id !== pagePendingDelete.id) || null;
     updateProject((prev) => ({
       ...prev,
-      pages: prev.pages.filter((page) => page.id !== activePage.id),
-      activePageId: nextPage.id,
+      pages: (prev.pages || []).filter((page) => page.id !== pagePendingDelete.id),
+      activePageId: nextPage?.id || "",
     }));
-    setSelected({ type: "page", id: nextPage.id });
+    setSelected({ type: "page", id: nextPage?.id || "" });
+    setPagePendingDelete(null);
   };
 
   const addBlankSection = () => {
@@ -744,6 +693,7 @@ export default function PageBuilder({
 
   const {
     addForm,
+    deleteActiveForm,
     addFormSection,
     addFieldToForm,
     updateActiveFormQuiz,
@@ -1120,6 +1070,23 @@ export default function PageBuilder({
     );
   };
 
+  const updateSelectedElementPlacement = (value) => {
+    const alignSelf = normalizeElementAlignSelf(value);
+    const isDirectional = isDirectionalElementPlacement(value);
+
+    updateSelectedElement({
+      styles: {
+        alignSelf,
+        width:
+          alignSelf === "stretch"
+            ? "100%"
+            : isDirectional
+              ? getElementLayoutWidth(selectedElement?.styles?.width, alignSelf)
+              : selectedElement?.styles?.width,
+      },
+    });
+  };
+
   const deleteSelectedElement = () => {
     if (!selectedElement) return;
     setElementPendingDelete({
@@ -1245,13 +1212,108 @@ export default function PageBuilder({
     });
   };
 
+  const resetQuizSession = (formId) => {
+    setQuizSessions((prev) => {
+      const next = { ...prev };
+      delete next[formId];
+      return next;
+    });
+  };
+
+  const lockFocusedQuizAttempt = (formId) => {
+    setQuizSessions((prev) => {
+      const session = prev[formId];
+      if (!session?.active || session.locked) return prev;
+
+      return {
+        ...prev,
+        [formId]: {
+          ...session,
+          active: false,
+          locked: true,
+          lockedReason: "Focus mode was interrupted. This quiz cannot be continued or retaken.",
+        },
+      };
+    });
+
+    showToast("Focus mode was interrupted. This quiz cannot be retaken.");
+  };
+
+  const startQuizSession = (form) => {
+    const settings = getQuizSettings(form);
+    if (quizSessions[form.id]?.locked) {
+      showToast("Focus mode was interrupted. This quiz cannot be retaken.");
+      return;
+    }
+
+    const fields = getFormFields(form);
+    const firstField = fields[0];
+    const firstQuestionLimit = Number(
+      firstField?.quizTimeLimitSec || settings.questionTimeLimitSec || 0
+    );
+
+    setQuizSessions((prev) => ({
+      ...prev,
+      [form.id]: {
+        active: true,
+        currentIndex: 0,
+        totalRemaining: Number(settings.totalTimeLimitSec || 0),
+        questionRemaining: firstQuestionLimit,
+      },
+    }));
+
+    if (settings.lockScreen) {
+      document.documentElement.requestFullscreen?.().catch(() => undefined);
+    }
+  };
+
+  const moveQuizQuestion = (form, direction) => {
+    const fields = getFormFields(form);
+    const settings = getQuizSettings(form);
+
+    setQuizSessions((prev) => {
+      const current = prev[form.id] || { active: true, currentIndex: 0 };
+      const delta = direction === "previous" ? -1 : 1;
+      const currentIndex = Math.max(
+        0,
+        Math.min(fields.length - 1, Number(current.currentIndex || 0) + delta)
+      );
+      const field = fields[currentIndex];
+      const questionLimit = Number(
+        field?.quizTimeLimitSec || settings.questionTimeLimitSec || 0
+      );
+
+      return {
+        ...prev,
+        [form.id]: {
+          ...current,
+          active: true,
+          currentIndex,
+          questionRemaining: questionLimit,
+        },
+      };
+    });
+  };
+
+  const normalizeRuntimeAnswerValue = (value) => {
+    if (Array.isArray(value)) {
+      return value.map(normalizeRuntimeAnswerValue);
+    }
+
+    if (value && typeof value === "object" && "value" in value) {
+      return value.value;
+    }
+
+    return value;
+  };
+
   const submitRuntimeForm = (form, { skipValidation = false } = {}) => {
     const enteredAnswers = runtimeAnswers[form.id] || {};
     const answers = getFormFields(form).reduce((acc, field) => {
       if (enteredAnswers[field.id] !== undefined) {
-        acc[field.id] = enteredAnswers[field.id];
+        acc[field.id] = normalizeRuntimeAnswerValue(enteredAnswers[field.id]);
       } else if (field.defaultValue) {
-        acc[field.id] = field.defaultValue;
+        acc[field.id] = normalizeRuntimeAnswerValue(field.defaultValue);
       }
       return acc;
     }, {});
@@ -1848,153 +1910,25 @@ export default function PageBuilder({
     showToast(`Moved ${selectedElement.name || "component"} to ${targetSection.name || "section"}.`);
   };
 
-  const renderFieldInput = (form, field, disabled = false) => {
-    const value = runtimeAnswers[form.id]?.[field.id] || field.defaultValue || "";
-    const error = runtimeErrors[field.id];
-    const meta = getFieldType(field.type);
-    const placeholder = getModernFieldPlaceholder(field);
-
-    const common = {
-      disabled,
-      value,
-      onChange: (event) => setAnswer(form.id, field.id, event.target.value),
-    };
-
-    let inputNode = null;
-
-    if (["text", "email", "tel", "number", "date", "time", "url"].includes(meta.input)) {
-      inputNode = <input type={meta.input} placeholder={placeholder} {...common} />;
-    } else if (meta.input === "textarea") {
-      inputNode = <textarea placeholder={placeholder} {...common} />;
-    } else if (meta.input === "select") {
-      inputNode = (
-        <select {...common}>
-          <option value="">{placeholder}</option>
-          {getFieldOptions(field).map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      );
-    } else if (meta.input === "radio") {
-      inputNode = (
-        <div className="choice-list">
-          {getFieldOptions(field).map((option) => (
-            <label key={option}>
-              <input
-                type="radio"
-                name={field.id}
-                checked={value === option}
-                disabled={disabled}
-                onChange={() => setAnswer(form.id, field.id, option)}
-              />
-              <span>{option}</span>
-            </label>
-          ))}
-        </div>
-      );
-    } else if (meta.input === "checkboxes") {
-      const values = Array.isArray(runtimeAnswers[form.id]?.[field.id])
-        ? runtimeAnswers[form.id][field.id]
-        : [];
-
-      inputNode = (
-        <div className="choice-list">
-          {getFieldOptions(field).map((option) => (
-            <label key={option}>
-              <input
-                type="checkbox"
-                checked={values.includes(option)}
-                disabled={disabled}
-                onChange={(event) => {
-                  const next = event.target.checked
-                    ? [...values, option]
-                    : values.filter((item) => item !== option);
-                  setAnswer(form.id, field.id, next);
-                }}
-              />
-              <span>{option}</span>
-            </label>
-          ))}
-        </div>
-      );
-    } else if (meta.input === "linearScale") {
-      inputNode = (
-        <div className="scale-choice">
-          <span>{field.scaleMinLabel || field.scaleMin || 1}</span>
-          {scaleRange(field).map((option) => (
-            <button
-              type="button"
-              key={option}
-              disabled={disabled}
-              className={value === option ? "active" : ""}
-              onClick={() => setAnswer(form.id, field.id, option)}
-            >
-              {option}
-            </button>
-          ))}
-          <span>{field.scaleMaxLabel || field.scaleMax || 5}</span>
-        </div>
-      );
-    } else if (meta.input === "rating") {
-      const maxRating = Math.max(2, Math.min(10, Number(field.maxRating || 5)));
-      inputNode = (
-        <div className="rating-choice">
-          {Array.from({ length: maxRating }, (_, index) => String(index + 1)).map((option) => (
-            <button
-              type="button"
-              key={option}
-              disabled={disabled}
-              className={Number(value) >= Number(option) ? "active" : ""}
-              onClick={() => setAnswer(form.id, field.id, option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      );
-    } else if (meta.input === "yesNo") {
-      inputNode = (
-        <div className="choice-pills">
-          {["Yes", "No"].map((option) => (
-            <button
-              type="button"
-              key={option}
-              disabled={disabled}
-              className={value === option ? "active" : ""}
-              onClick={() => setAnswer(form.id, field.id, option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      );
-    } else if (meta.input === "file") {
-      inputNode = (
-        <input
-          type="file"
-          disabled={disabled}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            setAnswer(form.id, field.id, file ? { name: file.name, size: file.size, type: file.type } : "");
-          }}
-        />
-      );
-    }
-
-    return (
-      <div className={`runtime-question ${error ? "has-error" : ""}`} key={field.id}>
-        <label>
-          <span>
-            {field.label}
-            {field.required ? " *" : ""}
-          </span>
-          {field.helpText && <small>{field.helpText}</small>}
-          {inputNode}
-          {error && <strong>{error}</strong>}
-        </label>
-      </div>
-    );
-  };
+  const {
+    renderConnectedForm,
+  } = createRuntimeFormRenderers({
+    project,
+    preview,
+    lang,
+    runtimeAnswers,
+    runtimeErrors,
+    runtimeFormPages,
+    setRuntimeFormPages,
+    runtimeFormLanguages,
+    setRuntimeFormLanguages,
+    quizSessions,
+    getFieldType,
+    setAnswer,
+    submitRuntimeForm,
+    startQuizSession,
+    moveQuizQuestion,
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -2051,425 +1985,63 @@ export default function PageBuilder({
     });
   }, [quizSessions, project.forms]);
 
-  const renderConnectedForm = (formId, { allowInteraction = preview } = {}) => {
-    const form = project.forms.find((item) => item.id === formId) || project.forms[0];
-    if (!form) return <div className="empty-connected">No form selected.</div>;
-    const isQuiz = form.mode === "quiz";
-    const quizSettings = getQuizSettings(form);
-    const quizFields = getFormFields(form);
-    const quizSession = quizSessions[form.id];
-    const quizStarted = !isQuiz || quizSession?.active;
-    const currentQuestionIndex = Math.min(quizSession?.currentIndex || 0, Math.max(quizFields.length - 1, 0));
-    const currentField = quizFields[currentQuestionIndex];
-
-    return (
-      <div className={`runtime-form ${isQuiz ? "runtime-quiz-form" : ""} ${quizSettings.lockScreen ? "runtime-quiz-lockable" : ""}`}>
-        <div className="runtime-form-header">
-          <h3>{form.title}</h3>
-          <p>{form.description}</p>
-          {isQuiz && (
-            <div className="quiz-runtime-meta">
-              <span>{quizFields.length} questions</span>
-              {quizSettings.totalTimeLimitSec > 0 && (
-                <span>Total: {formatQuizTime(quizStarted ? quizSession?.totalRemaining : quizSettings.totalTimeLimitSec)}</span>
-              )}
-              {quizSettings.questionTimeLimitSec > 0 && (
-                <span>Per question: {formatQuizTime(quizSettings.questionTimeLimitSec)}</span>
-              )}
-              {quizSettings.lockScreen && <span>Focus mode</span>}
-            </div>
-          )}
-        </div>
-
-        {isQuiz && !quizStarted ? (
-          <div className="quiz-start-panel">
-            <strong>Ready to start?</strong>
-            <p>
-              {quizSettings.lockScreen
-                ? "This quiz opens in focus mode. Timers begin when you start."
-                : "Timers begin when you start the quiz."}
-            </p>
-            <button
-              type="button"
-              className="runtime-submit"
-              disabled={!allowInteraction || quizFields.length === 0}
-              onClick={() => startQuizSession(form)}
-            >
-              Start quiz
-            </button>
-          </div>
-        ) : isQuiz ? (
-          <div className="runtime-form-section quiz-question-stage">
-            <div className="runtime-form-section-header">
-              <h4>Question {currentQuestionIndex + 1} of {quizFields.length}</h4>
-              {quizSession?.questionRemaining > 0 && (
-                <p>Question time: {formatQuizTime(quizSession.questionRemaining)}</p>
-              )}
-            </div>
-
-            {currentField && renderFieldInput(form, currentField, !allowInteraction)}
-
-            <div className="quiz-navigation">
-              <button
-                type="button"
-                disabled={!allowInteraction || currentQuestionIndex === 0}
-                onClick={() => moveQuizQuestion(form, "previous")}
-              >
-                Previous
-              </button>
-              {currentQuestionIndex < quizFields.length - 1 ? (
-                <button
-                  type="button"
-                  disabled={!allowInteraction}
-                  onClick={() => moveQuizQuestion(form, "next")}
-                >
-                  Next
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="runtime-submit"
-                  disabled={!allowInteraction}
-                  onClick={() => submitRuntimeForm(form)}
-                >
-                  Submit quiz
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <>
-            {getFormSections(form).map((section) => (
-              <div className="runtime-form-section" key={section.id}>
-                <div className="runtime-form-section-header">
-                  <h4>{section.title}</h4>
-                  {section.description && <p>{section.description}</p>}
-                </div>
-
-                {(section.fields || []).map((field) => renderFieldInput(form, field, !allowInteraction))}
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className="runtime-submit"
-              disabled={!allowInteraction}
-              onClick={() => submitRuntimeForm(form)}
-            >
-              Submit
-            </button>
-          </>
-        )}
-
-        {!allowInteraction && <p className="builder-note">Enable Preview to test this form.</p>}
-      </div>
-    );
-  };
-
-  const renderElement = (element, isFree = false) => {
-    const isSelected = selected.type === "element" && selected.id === element.id;
-
-    const commonProps = {
-      className: `builder-element builder-element-${element.type} ${isSelected ? "is-selected" : ""}`,
-      style: isFree ? getFreeElementStyle(element) : getElementStyle(element),
-      onMouseDown: (event) => startDrag(event, element),
-      onClick: (event) => {
-        event.stopPropagation();
-        if (!preview) {
-          const location = findElementLocation(element.id);
-          if (location?.isFree === false) {
-            setInsertTarget({
-              sectionId: location.sectionId,
-              mode: "auto",
-              columnId: location.columnId,
-              afterElementId: element.id,
-            });
-          } else if (location?.isFree) {
-            setInsertTarget({
-              sectionId: location.sectionId,
-              mode: "direct",
-              afterElementId: element.id,
-            });
-          }
-          setSelected({ type: "element", id: element.id });
-        }
-      },
-    };
-
-    if (element.type === "heading") {
-      return <h1 key={element.id} {...commonProps} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</h1>;
-    }
-
-    if (element.type === "text") {
-      return <p key={element.id} {...commonProps} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</p>;
-    }
-
-    if (element.type === "button") {
-      return (
-        <button
-          key={element.id}
-          type="button"
-          {...commonProps}
-          onClick={(event) => {
-            commonProps.onClick(event);
-            if (preview) runElementAction(element);
-          }}
-        >
-          {renderRichText(element.content, getRichTextRanges(element, "content"))}
-        </button>
-      );
-    }
-
-    if (element.type === "image") {
-      const imageSrc = resolveMediaUrl(element.content);
-      return imageSrc ? (
-        <img key={element.id} {...commonProps} src={imageSrc} alt={element.name} />
-      ) : (
-        <div key={element.id} {...commonProps}>Image URL unavailable</div>
-      );
-    }
-
-    if (carouselElementTypes.has(element.type)) {
-      const carouselWidth = getCarouselWidthValue(element);
-      const carouselFrameStyle = {
-        ...commonProps.style,
-        width: "100%",
-        maxWidth: "100%",
-        alignSelf: "stretch",
-        marginLeft: undefined,
-        marginRight: undefined,
-        "--builder-element-width": "100%",
-        "--builder-element-align": "stretch",
-      };
-
-      return (
-        <div
-          key={element.id}
-          {...commonProps}
-          className={`${commonProps.className} carousel-position-frame ${getComponentPositionClass(element.styles.alignSelf)}`}
-          style={carouselFrameStyle}
-        >
-          <div
-            className="carousel-position-inner"
-            style={{ width: carouselWidth, maxWidth: carouselWidth }}
-          >
-            <PageBuilderCarousel
-              autoScroll={Boolean(element.autoScroll)}
-              autoScrollMs={element.autoScrollMs}
-              content={element.content}
-              name={element.name}
-              variant={getCarouselVariant(element)}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    if (element.type === "list") {
-      return (
-        <div key={element.id} {...commonProps} className={`${commonProps.className} list-style-${element.listStyle || "disc"}`} style={{ ...commonProps.style, "--list-count": Math.max(1, getListItems(element).length) }}>
-          {element.listTitle && <h3 className="builder-list-title" onMouseUp={(event) => captureCanvasTextSelection(event, "listTitle", null, element.id)}>{renderRichText(element.listTitle, getRichTextRanges(element, "listTitle"))}</h3>}
-          <ul>
-            {getListItems(element).map((item, index) => <li key={`${item}_${index}`} style={{ "--list-index": index }} onMouseUp={(event) => captureCanvasTextSelection(event, "listItem", index, element.id)}>{renderRichText(item, getRichTextRanges(element, "listItem", index))}</li>)}
-          </ul>
-        </div>
-      );
-    }
-
-    if (element.type === "divider") {
-      return <hr key={element.id} {...commonProps} />;
-    }
-
-    if (element.type === "embed") {
-      return (
-        <div key={element.id} {...commonProps}>
-          <strong>Embed</strong>
-          <a href={element.content} target="_blank" rel="noreferrer">{element.content}</a>
-        </div>
-      );
-    }
-
-    if (element.type === "metric") {
-      const metrics = getMetricItems(element);
-      const columns = Math.max(2, Math.min(4, Number(element.metricColumns) || 2));
-      return (
-        <div key={element.id} {...commonProps} className={`${commonProps.className} metric-group`} style={{ ...commonProps.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "#172b4d", "--metric-symbol-color": element.styles?.metricSymbolColor || "#f1f66b" }}>
-          {metrics.map((metric, index) => (
-            <div className="metric-group-item" key={`${element.id}_${index}`}>
-              <strong className="metric-value"><CountUpText value={metric.value} /></strong>
-              <span className="metric-label">{metric.label}</span>
-              {metric.description && <span className="metric-description">{metric.description}</span>}
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (element.type === "loginBlock" || element.type === "registrationBlock") {
-      const isRegistration = element.type === "registrationBlock";
-      const auth = element.auth || {};
-
-      return (
-        <div key={element.id} {...commonProps}>
-          <div className="builder-auth-component">
-            <div className="builder-auth-heading">
-              <h3>{auth.title || (isRegistration ? "Create account" : "Log in")}</h3>
-              <p>{auth.subtitle || (isRegistration ? "Create your account." : "Access your account.")}</p>
-            </div>
-            {isRegistration && <label>Full name<input type="text" placeholder="Your name" disabled={!preview} /></label>}
-            <label>Email address<input type="email" placeholder="name@example.com" disabled={!preview} /></label>
-            <label>Password<input type="password" placeholder="Enter password" disabled={!preview} /></label>
-            <button type="button" className="runtime-submit">
-              {auth.buttonText || (isRegistration ? "Create account" : "Log in")}
-            </button>
-            <p className="builder-auth-switch">
-              {auth.switchText} <strong>{auth.switchActionText}</strong>
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (element.type === "formBlock") {
-      return <div key={element.id} {...commonProps}>{renderConnectedForm(element.connectedFormId)}</div>;
-    }
-
-    return <div key={element.id} {...commonProps}>{element.content}</div>;
-  };
-
-  const renderSiteHeader = () => {
-    const site = project.siteChrome || defaultSiteChrome;
-    if (!site.showHeader) return null;
-
-    const logoSrc = resolveMediaUrl(site.logoUrl);
-
-    return (
-      <header
-        className={`built-site-header header-align-${site.headerAlign || "center"} ${selected.type === "siteHeader" ? "is-selected" : ""}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (!preview) setSelected({ type: "siteHeader", id: "site-header" });
-        }}
-      >
-        <div className="built-site-header-inner">
-          <button
-            type="button"
-            className="built-site-brand"
-            onClick={(event) => {
-              event.stopPropagation();
-              const homePage = project.pages.find((page) => page.slug === "/") || project.pages[0];
-              if (homePage) selectPage(homePage.id);
-            }}
-          >
-            {logoSrc ? <img src={logoSrc} alt={`${site.brand || "Website"} logo`} /> : <span className="logo-fallback">M</span>}
-            <span>{site.brand || "Website"}</span>
-          </button>
-
-          <nav className="built-site-nav">
-            {project.pages.map((page) => (
-              <button
-                type="button"
-                key={page.id}
-                className={activePage?.id === page.id ? "active" : ""}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  selectPage(page.id);
-                }}
-              >
-                {page.name}
-              </button>
-            ))}
-          </nav>
-
-          <button type="button" className="built-site-cta">
-            {site.headerButtonLabel || "Contact"}
-          </button>
-        </div>
-      </header>
-    );
-  };
-
-  const renderSiteFooter = () => {
-    const site = project.siteChrome || defaultSiteChrome;
-    if (!site.showFooter) return null;
-
-    const pageLinks = splitLines(site.footerShopLinks || "");
-    const helpLinks = splitLines(site.footerHelpLinks || "About Us\nPolicies\nContact");
-    const socialLinks = splitLines(site.footerSocialLinks || "Facebook\nLinkedIn\nX\nInstagram");
-    const footerLinks = [...pageLinks, ...helpLinks];
-    const footerBrand = site.footerStoreName || site.brand || "Your Brand";
-    const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || "B";
-    const navigateFooterLink = (label) => {
-      const normalizedLabel = label.toLowerCase().trim();
-      const target = project.pages.find((page) => {
-        const normalizedName = page.name.toLowerCase().trim();
-        const normalizedSlug = page.slug.toLowerCase().replace(/^\//, "");
-        return normalizedName === normalizedLabel || normalizedSlug === normalizedLabel.replace(/\s+/g, "-");
+  useEffect(() => {
+    const lockActiveFocusedQuizzes = () => {
+      Object.entries(quizSessions).forEach(([formId, session]) => {
+        if (!session?.active || session.locked) return;
+        const form = project.forms.find((item) => item.id === formId);
+        if (!form || form.mode !== "quiz" || !getQuizSettings(form).lockScreen) return;
+        lockFocusedQuizAttempt(formId);
       });
-
-      if (target) selectPage(target.id);
     };
 
-    return (
-      <footer
-        className={`built-site-footer ecommerce-style-footer ${selected.type === "siteFooter" ? "is-selected" : ""}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (!preview) setSelected({ type: "siteFooter", id: "site-footer" });
-          if (event.target.closest(".powered-by-madar")) {
-            window.location.href = site.madarLink || "/";
-          }
-        }}
-      >
-        <div className="ecommerce-footer-grid">
-          <div className="ecommerce-footer-brand">
-            <div className="ecommerce-footer-logo-row">
-              {resolveMediaUrl(site.logoUrl) ? (
-                <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={`${footerBrand} logo`} />
-              ) : (
-                <div className="ecommerce-footer-logo footer-logo-fallback">{footerInitial}</div>
-              )}
-              <h3>{footerBrand}</h3>
-            </div>
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) lockActiveFocusedQuizzes();
+    };
 
-            <p>{site.description}</p>
+    const handleVisibilityChange = () => {
+      if (document.hidden) lockActiveFocusedQuizzes();
+    };
 
-            <div className="ecommerce-social-row">
-              {socialLinks.map((item) => (
-                <button type="button" key={item} aria-label={item}>
-                  {item.slice(0, 2).toUpperCase()}
-                </button>
-              ))}
-            </div>
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", lockActiveFocusedQuizzes);
+    window.addEventListener("pagehide", lockActiveFocusedQuizzes);
 
-          </div>
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", lockActiveFocusedQuizzes);
+      window.removeEventListener("pagehide", lockActiveFocusedQuizzes);
+    };
+  }, [quizSessions, project.forms]);
 
-          <div className="ecommerce-footer-column ecommerce-footer-links-column">
-            <h4>Links</h4>
-            <div className="ecommerce-footer-links-grid">
-              {footerLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}
-            </div>
-          </div>
+  const renderElement = createElementRenderer({
+    carouselElementTypes,
+    selected,
+    preview,
+    getFreeElementStyle,
+    getElementStyle,
+    startDrag,
+    findElementLocation,
+    setInsertTarget,
+    setSelected,
+    captureCanvasTextSelection,
+    runElementAction,
+    renderConnectedForm,
+  });
 
-          <div className="ecommerce-footer-contact">
-            <h4>Contact</h4>
-            <div className="footer-language-pill">
-              <span>|</span>
-              <strong>{site.footerLanguageLabel || "AR"}</strong>
-            </div>
-            <p>{site.contactEmail || "info@madar.com"}</p>
-            <p dir="ltr">{site.phone || "+972599203857"}</p>
-          </div>
-        </div>
-
-        <div className="ecommerce-footer-bottom">
-          <p>(c) 2026 {site.footerStoreName || site.brand || "Your Website"}. {site.rights || "All rights reserved."}</p>
-          <button type="button" className="powered-by-madar">Powered by Madar</button>
-        </div>
-      </footer>
-    );
-  };
-
+  const {
+    renderSiteHeader,
+    renderSiteFooter,
+  } = createSiteChromeRenderers({
+    project,
+    activePage,
+    selected,
+    preview,
+    selectPage,
+    setSelected,
+  });
   const getSectionLayerElements = (section) => {
     if (!section) return [];
 
@@ -2568,17 +2140,12 @@ export default function PageBuilder({
                 <div className="page-danger-zone">
                   <div>
                     <strong>Remove this page</strong>
-                    <small>
-                      {project.pages.length <= 1
-                        ? "Your project must keep at least one page."
-                        : `Delete ${activePage?.name || "the selected page"} from this project.`}
-                    </small>
+                    <small>{`Delete ${activePage?.name || "the selected page"} from this project.`}</small>
                   </div>
                   <button
                     type="button"
                     className="page-delete-action"
                     onClick={deleteActivePage}
-                    disabled={project.pages.length <= 1}
                   >
                     <Trash2 size={16} aria-hidden="true" />
                     <span>Delete page</span>
@@ -2740,12 +2307,16 @@ export default function PageBuilder({
                             event.currentTarget.focus({ preventScroll: true });
                             setSelected({ type: "element", id: element.id });
                           }}
-                          onMouseDown={(event) =>
-                            startDrag(event, element, "move", element.type === "button")
+                          onMouseDown={
+                            preview
+                              ? undefined
+                              : (event) =>
+                                  startDrag(event, element, "move", element.type === "button")
                           }
                           onClick={(event) => {
+                            if (preview) return;
                             event.stopPropagation();
-                            if (!preview) setSelected({ type: "element", id: element.id });
+                            setSelected({ type: "element", id: element.id });
                           }}
                         >
                           <div className="direct-element-content">
@@ -3352,12 +2923,14 @@ export default function PageBuilder({
       activeForm={activeForm}
       fieldTypes={fieldTypes}
       selected={selected}
+      lang={lang}
       selectForm={selectForm}
       selectPage={selectPage}
       setActiveTab={setActiveTab}
       setDesignPanel={setDesignPanel}
       setSelected={setSelected}
       addForm={addForm}
+      deleteActiveForm={deleteActiveForm}
       addFormSection={addFormSection}
       addFieldToForm={addFieldToForm}
       updateActiveForm={updateActiveForm}
@@ -3375,6 +2948,10 @@ export default function PageBuilder({
       getFormPlacements={getFormPlacements}
       addConnectedFormSectionToPage={addConnectedFormSectionToPage}
       renderConnectedForm={renderConnectedForm}
+      openFormPreviewPage={openFormPreviewPage}
+      openPreviewPage={openPreviewPage}
+      saveProject={saveProject}
+      publishProject={publishProject}
       quizOptionsOpen={quizOptionsOpen}
       setQuizOptionsOpen={setQuizOptionsOpen}
     />
@@ -3438,6 +3015,8 @@ export default function PageBuilder({
       loadProject={loadProject}
       exportProject={exportProject}
       publishProject={publishProject}
+      openPreviewPage={openPreviewPage}
+      openFormPreviewPage={openFormPreviewPage}
     />
   );
 
@@ -3502,7 +3081,7 @@ export default function PageBuilder({
       className={getPageBuilderThemeClassName({
         mode: project.theme?.mode || "light",
         preview,
-      })}
+      }) + (activeTab === "forms" ? " forms-workspace-active" : "")}
       style={getPageBuilderThemeVars(project.theme)}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -3514,12 +3093,15 @@ export default function PageBuilder({
           displayName={projectDisplayName}
           activeHelper={activeHelper}
           hideWorkspaceTabs={hideWorkspaceTabs}
+          hideActions
+          activeTab={activeTab}
           preview={preview}
           demoMode={demoMode}
           copy={builderCopy.topbar}
           activeTopbarAction={activeTopbarAction}
           setActiveTopbarAction={setActiveTopbarAction}
           setModal={setModal}
+          openPreviewPage={openPreviewPage}
           setPreview={setPreview}
           saveProject={saveProject}
           publishProject={publishProject}
@@ -3559,7 +3141,17 @@ export default function PageBuilder({
         />
       )}
 
-      {modal === "starter" && (
+      {pagePendingDelete && (
+        <PageDeleteConfirmModal
+          page={pagePendingDelete}
+          cancelLabel="Keep page"
+          confirmLabel="Delete page"
+          onCancel={() => setPagePendingDelete(null)}
+          onConfirm={confirmDeleteActivePage}
+        />
+      )}
+
+      {modal === "starter" && activeTab === "design" && (
         <div className="builder-modal-backdrop" onClick={() => setModal(null)}>
           <div
             className="builder-modal wide template-picker-modal"
@@ -3620,84 +3212,4 @@ export default function PageBuilder({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
