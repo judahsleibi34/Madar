@@ -31,19 +31,70 @@ export const createFormHandlers = ({
     setSelected({ type: "form", id: form.id });
   };
 
-  const addFormSection = () => {
-    const section = {
-      id: createId("formSection"),
-      title: `Section ${getFormSections(activeForm).length + 1}`,
-      description: "",
-      collapsed: false,
-      fields: [],
-    };
+  const deleteActiveForm = () => {
+    if (!activeForm) return;
 
-    updateActiveForm((form) => ({
-      ...form,
-      sections: [...getFormSections(form), section],
+    const remainingForms = (project.forms || []).filter((form) => form.id !== activeForm.id);
+    const nextForm = remainingForms[0] || null;
+
+    updateProject((prev) => ({
+      ...prev,
+      forms: (prev.forms || []).filter((form) => form.id !== activeForm.id),
+      activeFormId: nextForm?.id || "",
+      workflows: (prev.workflows || []).filter((workflow) => workflow.formId !== activeForm.id),
+      pages: (prev.pages || []).map((page) => ({
+        ...page,
+        sections: (page.sections || []).map((section) => ({
+          ...section,
+          rows: (section.rows || []).map((row) => ({
+            ...row,
+            columns: (row.columns || []).map((column) => ({
+              ...column,
+              elements: (column.elements || []).map((element) =>
+                element.connectedFormId === activeForm.id
+                  ? { ...element, connectedFormId: nextForm?.id || "" }
+                  : element
+              ),
+            })),
+          })),
+          freeElements: (section.freeElements || []).map((element) =>
+            element.connectedFormId === activeForm.id
+              ? { ...element, connectedFormId: nextForm?.id || "" }
+              : element
+          ),
+        })),
+      })),
     }));
+
+    setSelected({ type: "form", id: nextForm?.id || "" });
+  };
+
+  const addFormSection = () => {
+    updateActiveForm((form) => {
+      const sections = getFormSections(form);
+      const usedPageNumbers = sections
+        .map((section, index) => {
+          const match = String(section.title || "").match(/^Page\s+(\d+)$/i);
+          return match ? Number(match[1]) : index + 1;
+        })
+        .filter((value) => Number.isFinite(value));
+      const nextPageNumber = Math.max(1, ...usedPageNumbers) + 1;
+
+      return {
+        ...form,
+        pageMode: "paged",
+        sections: [
+          ...sections,
+          {
+            id: createId("formSection"),
+            title: `Page ${nextPageNumber}`,
+            description: "",
+            collapsed: false,
+            fields: [],
+          },
+        ],
+      };
+    });
   };
 
   const addFieldToForm = (sectionId = null, type = "shortText") => {
@@ -134,7 +185,27 @@ export const createFormHandlers = ({
       const index = fields.findIndex((field) => field.id === fieldId);
       const targetIndex = direction === "up" ? index - 1 : index + 1;
 
-      if (index < 0 || targetIndex < 0 || targetIndex >= fields.length) return form;
+      if (index < 0) return form;
+
+      if (targetIndex < 0) {
+        const previousSection = sectionsCopy[sectionIndex - 1];
+        if (!previousSection) return form;
+
+        const [field] = fields.splice(index, 1);
+        previousSection.fields = [...(previousSection.fields || []), field];
+
+        return { ...form, sections: sectionsCopy };
+      }
+
+      if (targetIndex >= fields.length) {
+        const nextSection = sectionsCopy[sectionIndex + 1];
+        if (!nextSection) return form;
+
+        const [field] = fields.splice(index, 1);
+        nextSection.fields = [field, ...(nextSection.fields || [])];
+
+        return { ...form, sections: sectionsCopy };
+      }
 
       const [field] = fields.splice(index, 1);
       fields.splice(targetIndex, 0, field);
@@ -191,6 +262,7 @@ export const createFormHandlers = ({
 
   return {
     addForm,
+    deleteActiveForm,
     addFormSection,
     addFieldToForm,
     updateActiveFormQuiz,

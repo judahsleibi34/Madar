@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { normalizeAuthMessage } from "./authMessages";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -57,7 +58,7 @@ export default function ForgotPasswordPage({ lang = "en", loginPath = "/login" }
           return;
         }
 
-        setStatusMessage(data.detail || t("forgotPassword.unknownError"));
+        setStatusMessage(normalizeAuthMessage(data.detail, t("forgotPassword.unknownError")));
         return;
       }
 

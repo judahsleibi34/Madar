@@ -3,6 +3,15 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "./PageBuilder.constants";
 import { fetchPublicSite, submitPublicFormSubmission } from "./PageBuilder.api";
 import { getFormSections } from "./PageBuilder.factories";
+import { getPageBuilderThemeVars } from "./PageBuilder.theme";
+import {
+  getContentDirection,
+  getDirectionForLanguage,
+  getLocalizedOptions,
+  getLocalizedValue,
+  getRuntimeLanguage,
+  normalizeLanguageMode,
+} from "./PageBuilder.localization";
 import "../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "./PageBuilderCarousel";
 import CountUpText from "./CountUpText";
@@ -18,6 +27,38 @@ const getListItems = (element) =>
   Array.isArray(element?.listItems) && element.listItems.length
     ? element.listItems
     : splitLines(element?.content);
+
+const getRuntimeFieldOptions = (field, lang = "en") =>
+  getLocalizedOptions(field, lang).filter((option) =>
+    String(option || "").trim()
+  );
+
+const getAnswerValue = (answer) =>
+  answer && typeof answer === "object" && !Array.isArray(answer) && "value" in answer
+    ? answer.value
+    : answer;
+
+const normalizeRuntimeAnswerValue = (value) => {
+  if (Array.isArray(value)) return value.map(normalizeRuntimeAnswerValue);
+  return getAnswerValue(value);
+};
+
+const isOptionAnswerChecked = (answer, option, optionIndex) => {
+  if (answer && typeof answer === "object" && !Array.isArray(answer)) {
+    return answer.optionIndex === optionIndex;
+  }
+
+  return answer === option;
+};
+
+const isCheckboxOptionChecked = (answers, option, optionIndex) =>
+  answers.some((answer) => {
+    if (answer && typeof answer === "object" && !Array.isArray(answer)) {
+      return answer.optionIndex === optionIndex;
+    }
+
+    return answer === option;
+  });
 
 const getRichTextRanges = (element, field, itemIndex = null) =>
   (element?.richTextColors || []).filter(
@@ -47,7 +88,15 @@ const renderRichText = (value, ranges = []) => {
 
 const carouselElementTypes = new Set(["card", "carousel", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
 
-const getFieldType = (type) => fieldTypes.find((item) => item.id === type) || fieldTypes[0];
+const legacyFieldTypes = {
+  money: { id: "money", label: "Price or budget", group: "Number", input: "number" },
+  phone: { id: "phone", label: "Phone", group: "Contact", input: "tel" },
+  radio: { id: "radio", label: "Radio buttons", group: "Choice", input: "radio" },
+  yesNo: { id: "yesNo", label: "Yes or no", group: "Choice", input: "yesNo" },
+  status: { id: "status", label: "Status selector", group: "Workflow", input: "select" },
+};
+
+const getFieldType = (type) => fieldTypes.find((item) => item.id === type) || legacyFieldTypes[type] || fieldTypes[0];
 
 const getModernFieldPlaceholder = (field = {}) => {
   const customPlaceholder = String(field.placeholder || "").trim();
@@ -250,7 +299,7 @@ const getSectionCanvasHeight = (section, viewportName) =>
   Number(section?.layout?.minHeight) ||
   560;
 
-export default function TenantSiteRuntime() {
+export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const params = useParams();
   const { subdomain = "my-site" } = params;
   const location = useLocation();
@@ -261,8 +310,12 @@ export default function TenantSiteRuntime() {
   const [project, setProject] = useState(() => loadPublishedProject());
   const [formAnswers, setFormAnswers] = useState({});
   const [formStatus, setFormStatus] = useState({});
+  const [formPages, setFormPages] = useState({});
+  const [formLanguages, setFormLanguages] = useState({});
 
   useEffect(() => {
+    if (draftPreview) return;
+
     let cancelled = false;
 
     const loadBackendPublishedSite = async () => {
@@ -283,11 +336,19 @@ export default function TenantSiteRuntime() {
     return () => {
       cancelled = true;
     };
-  }, [cleanSubdomain]);
+  }, [cleanSubdomain, draftPreview]);
   const site = {
     ...defaultSiteChrome,
     ...(project?.siteChrome || {}),
   };
+  const runtimeLanguage =
+    project?.language ||
+    project?.lang ||
+    site.language ||
+    site.lang ||
+    site.footerLanguageLabel;
+  const runtimeDirection =
+    String(runtimeLanguage || "").toLowerCase().startsWith("ar") ? "rtl" : "ltr";
 
   const pages = useMemo(
     () => (project?.pages || []).filter((page) => !isUnsupportedWorkspacePath(page.slug)),
@@ -443,11 +504,32 @@ export default function TenantSiteRuntime() {
     }));
   };
 
+  const getVisibleFieldsForInstance = (form, fields, instanceKey) => {
+    const answers = formAnswers[instanceKey] || {};
+    const rules = Array.isArray(form?.logicRules) ? form.logicRules : [];
+    if (!rules.length) return fields;
+
+    return fields.filter((field) => {
+      const relatedRules = rules.filter((rule) => rule.targetFieldId === field.id);
+      if (!relatedRules.length) return true;
+
+      return relatedRules.reduce((visible, rule) => {
+        const rawAnswer = normalizeRuntimeAnswerValue(answers[rule.sourceFieldId]);
+        const matched = String(rawAnswer ?? "").trim() === String(rule.value ?? "").trim();
+        if (rule.action === "show") return matched;
+        if (rule.action === "hide") return matched ? false : visible;
+        return visible;
+      }, true);
+    });
+  };
+
   const buildSubmissionAnswers = (form, instanceKey) => {
     const enteredAnswers = formAnswers[instanceKey] || {};
 
-    return getRuntimeFormFields(form).reduce((acc, field) => {
-      const value = enteredAnswers[field.id] !== undefined ? enteredAnswers[field.id] : field.defaultValue;
+    return getVisibleFieldsForInstance(form, getRuntimeFormFields(form), instanceKey).reduce((acc, field) => {
+      const value = normalizeRuntimeAnswerValue(
+        enteredAnswers[field.id] !== undefined ? enteredAnswers[field.id] : field.defaultValue
+      );
 
       if (!isEmptyAnswer(value)) {
         acc[field.id] = value;
@@ -457,11 +539,60 @@ export default function TenantSiteRuntime() {
     }, {});
   };
 
+  const getMissingFieldForSection = (form, section, instanceKey) => {
+    const enteredAnswers = formAnswers[instanceKey] || {};
+
+    return getVisibleFieldsForInstance(form, section?.fields || [], instanceKey).find((field) => {
+      if (!field.required) return false;
+
+      const value = normalizeRuntimeAnswerValue(
+        enteredAnswers[field.id] !== undefined ? enteredAnswers[field.id] : field.defaultValue
+      );
+
+      return isEmptyAnswer(value);
+    });
+  };
+
+  const setRuntimeFormPage = (instanceKey, pageIndex, pageCount = 1) => {
+    setFormPages((prev) => ({
+      ...prev,
+      [instanceKey]: Math.max(0, Math.min(pageIndex, Math.max(pageCount - 1, 0))),
+    }));
+    setFormStatus((prev) => ({
+      ...prev,
+      [instanceKey]: {
+        ...(prev[instanceKey] || {}),
+        error: "",
+        success: "",
+      },
+    }));
+  };
+
+  const goToNextFormPage = (form, instanceKey, currentPage, currentPageIndex, pageCount) => {
+    const missingField = getMissingFieldForSection(form, currentPage, instanceKey);
+
+    if (missingField) {
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: {
+          ...(prev[instanceKey] || {}),
+          submitting: false,
+          success: "",
+          error: `${getLocalizedValue(missingField, "label", formLanguages[instanceKey] || "en") || "A required field"} is required.`,
+        },
+      }));
+      return;
+    }
+
+    setRuntimeFormPage(instanceKey, currentPageIndex + 1, pageCount);
+  };
+
   const submitRuntimeForm = async (event, form, formElementId, instanceKey) => {
     event.preventDefault();
 
     const answers = buildSubmissionAnswers(form, instanceKey);
-    const missingField = getRuntimeFormFields(form).find(
+    const formLang = formLanguages[instanceKey] || getRuntimeLanguage(form, runtimeDirection === "rtl" ? "ar" : "en");
+    const missingField = getVisibleFieldsForInstance(form, getRuntimeFormFields(form), instanceKey).find(
       (field) => field.required && isEmptyAnswer(answers[field.id])
     );
 
@@ -471,7 +602,9 @@ export default function TenantSiteRuntime() {
         [instanceKey]: {
           submitting: false,
           success: "",
-          error: `${missingField.label || "A required field"} is required.`,
+          error: formLang === "ar"
+            ? `${getLocalizedValue(missingField, "label", formLang) || "هذا الحقل"} مطلوب.`
+            : `${getLocalizedValue(missingField, "label", formLang) || "A required field"} is required.`,
         },
       }));
       return;
@@ -489,12 +622,13 @@ export default function TenantSiteRuntime() {
       });
 
       setFormAnswers((prev) => ({ ...prev, [instanceKey]: {} }));
+      setFormPages((prev) => ({ ...prev, [instanceKey]: 0 }));
       setFormStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           submitting: false,
           error: "",
-          success: form.successMessage || "Thank you. Your response has been submitted.",
+          success: getLocalizedValue(form, "successMessage", formLang) || "Thank you. Your response has been submitted.",
         },
       }));
     } catch (error) {
@@ -509,27 +643,63 @@ export default function TenantSiteRuntime() {
     }
   };
 
-  const renderRuntimeField = (field, form, instanceKey, disabled) => {
+  const renderRuntimeField = (field, form, instanceKey, disabled, formLang = "en") => {
     const meta = getFieldType(field.type);
-    const placeholder = getModernFieldPlaceholder(field);
+    const placeholder = getLocalizedValue(field, "placeholder", formLang) || getModernFieldPlaceholder(field);
     const currentValue = formAnswers[instanceKey]?.[field.id] ?? field.defaultValue ?? "";
     const baseId = `${instanceKey}_${field.id}`;
+    const fieldDirection = getContentDirection(
+      `${getLocalizedValue(field, "label", formLang)} ${getLocalizedValue(field, "helpText", formLang)} ${getRuntimeFieldOptions(field, formLang).join(" ")}`,
+      getDirectionForLanguage(formLang)
+    );
 
     if (field.type === "file") {
-      return <p className="runtime-form-note">File uploads are not supported yet.</p>;
+      const selectedFile = currentValue && typeof currentValue === "object" ? currentValue : null;
+      const maxBytes = Number(field.maxFileSizeMb || 0) > 0 ? Number(field.maxFileSizeMb) * 1024 * 1024 : 0;
+      return (
+        <div className="runtime-file-upload">
+          <input
+            type="file"
+            accept={field.accept || undefined}
+            disabled={disabled}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file && maxBytes && file.size > maxBytes) {
+                setFormStatus((prev) => ({
+                  ...prev,
+                  [instanceKey]: {
+                    ...(prev[instanceKey] || {}),
+                    error: formLang === "ar" ? `حجم الملف يتجاوز ${field.maxFileSizeMb}MB.` : `File is larger than ${field.maxFileSizeMb}MB.`,
+                  },
+                }));
+                event.target.value = "";
+                return;
+              }
+              setFormAnswer(instanceKey, field.id, file ? { name: file.name, size: file.size, type: file.type } : "");
+            }}
+          />
+          {selectedFile && <small>{selectedFile.name}</small>}
+          <p className="runtime-form-note">
+            {formLang === "ar"
+              ? "سيتم حفظ الملف بعد ربط تخزين الملفات في الخلفية."
+              : "File storage will attach after backend storage is connected."}
+          </p>
+        </div>
+      );
     }
 
     if (field.type === "dropdown" || field.type === "status" || field.type === "yesNo") {
-      const options = field.type === "yesNo" ? ["Yes", "No"] : field.options || [];
+      const options = field.type === "yesNo" ? (formLang === "ar" ? ["نعم", "لا"] : ["Yes", "No"]) : getRuntimeFieldOptions(field, formLang);
       return (
         <select
+          dir={fieldDirection}
           value={currentValue}
           onChange={(event) => setFormAnswer(instanceKey, field.id, event.target.value)}
           disabled={disabled}
         >
           <option value="">{placeholder}</option>
-          {options.map((option) => (
-            <option key={option} value={option}>{option}</option>
+          {options.map((option, optionIndex) => (
+            <option key={`${option}_${optionIndex}`} value={option}>{option}</option>
           ))}
         </select>
       );
@@ -538,20 +708,34 @@ export default function TenantSiteRuntime() {
     if (field.type === "radio") {
       return (
         <div className="runtime-choice-list">
-          {(field.options || []).map((option) => (
-            <label className="runtime-choice" key={option} htmlFor={`${baseId}_${option}`}>
+          {getRuntimeFieldOptions(field, formLang).map((option, optionIndex) => {
+            const optionId = `${baseId}_${optionIndex}`;
+
+            return (
+            <label
+              className="runtime-choice"
+              key={optionId}
+              htmlFor={optionId}
+              dir={getContentDirection(option, fieldDirection)}
+            >
               <input
-                id={`${baseId}_${option}`}
+                id={optionId}
                 type="radio"
                 name={baseId}
                 value={option}
-                checked={currentValue === option}
-                onChange={(event) => setFormAnswer(instanceKey, field.id, event.target.value)}
+                checked={isOptionAnswerChecked(currentValue, option, optionIndex)}
+                onChange={(event) =>
+                  setFormAnswer(instanceKey, field.id, {
+                    value: event.target.value,
+                    optionIndex,
+                  })
+                }
                 disabled={disabled}
               />
-              <span>{option}</span>
+              <span dir={getContentDirection(option, fieldDirection)}>{option}</span>
             </label>
-          ))}
+            );
+          })}
         </div>
       );
     }
@@ -560,24 +744,39 @@ export default function TenantSiteRuntime() {
       const selectedValues = Array.isArray(currentValue) ? currentValue : [];
       return (
         <div className="runtime-choice-list">
-          {(field.options || []).map((option) => (
-            <label className="runtime-choice" key={option} htmlFor={`${baseId}_${option}`}>
+          {getRuntimeFieldOptions(field, formLang).map((option, optionIndex) => {
+            const optionId = `${baseId}_${optionIndex}`;
+
+            return (
+            <label
+              className="runtime-choice"
+              key={optionId}
+              htmlFor={optionId}
+              dir={getContentDirection(option, fieldDirection)}
+            >
               <input
-                id={`${baseId}_${option}`}
+                id={optionId}
                 type="checkbox"
                 value={option}
-                checked={selectedValues.includes(option)}
+                checked={isCheckboxOptionChecked(selectedValues, option, optionIndex)}
                 onChange={(event) => {
                   const nextValue = event.target.checked
-                    ? [...selectedValues, option]
-                    : selectedValues.filter((item) => item !== option);
+                    ? [...selectedValues, { value: option, optionIndex }]
+                    : selectedValues.filter((item) => {
+                        if (item && typeof item === "object" && !Array.isArray(item)) {
+                          return item.optionIndex !== optionIndex;
+                        }
+
+                        return item !== option;
+                      });
                   setFormAnswer(instanceKey, field.id, nextValue);
                 }}
                 disabled={disabled}
               />
-              <span>{option}</span>
+              <span dir={getContentDirection(option, fieldDirection)}>{option}</span>
             </label>
-          ))}
+            );
+          })}
         </div>
       );
     }
@@ -609,6 +808,7 @@ export default function TenantSiteRuntime() {
     if (meta.input === "textarea" || field.type === "paragraph") {
       return (
         <textarea
+          dir={fieldDirection}
           placeholder={placeholder}
           value={currentValue}
           onChange={(event) => setFormAnswer(instanceKey, field.id, event.target.value)}
@@ -619,6 +819,7 @@ export default function TenantSiteRuntime() {
 
     return (
       <input
+        dir={fieldDirection}
         type={inputTypeForField(field.type)}
         placeholder={placeholder}
         value={currentValue}
@@ -635,42 +836,122 @@ export default function TenantSiteRuntime() {
     const instanceKey = `${formElementId || "form"}_${form.id}`;
     const status = formStatus[instanceKey] || {};
     const isSubmitting = Boolean(status.submitting);
-
-    return (
-      <form className="runtime-form" onSubmit={(event) => submitRuntimeForm(event, form, formElementId, instanceKey)}>
-        <div className="runtime-form-header">
-          <h3>{form.title}</h3>
-          <p>{form.description}</p>
+    const languageMode = normalizeLanguageMode(form.languageMode || form.localeMode || runtimeDirection);
+    const formLang = formLanguages[instanceKey] || getRuntimeLanguage(form, runtimeDirection === "rtl" ? "ar" : "en");
+    const formDir = getDirectionForLanguage(formLang);
+    const formSections = getFormSections(form);
+    const isPagedForm = (form.pageMode || "paged") === "paged" && formSections.length > 1;
+    const currentPageIndex = Math.max(
+      0,
+      Math.min(Number(formPages[instanceKey] || 0), Math.max(formSections.length - 1, 0))
+    );
+    const currentPage = formSections[currentPageIndex];
+    const renderRuntimeFormPage = (section) => {
+      const visibleFields = getVisibleFieldsForInstance(form, section.fields || [], instanceKey);
+      return (
+      <div className="runtime-form-section" key={section.id}>
+        <div className="runtime-form-section-header">
+          <h4>{getLocalizedValue(section, "title", formLang) || section.title}</h4>
+          {(getLocalizedValue(section, "description", formLang) || section.description) && (
+            <p>{getLocalizedValue(section, "description", formLang) || section.description}</p>
+          )}
         </div>
 
-        {getFormSections(form).map((section) => (
-          <div className="runtime-form-section" key={section.id}>
-            <div className="runtime-form-section-header">
-              <h4>{section.title}</h4>
-              {section.description && <p>{section.description}</p>}
-            </div>
+        {visibleFields.map((field) => {
+          const label = getLocalizedValue(field, "label", formLang) || field.label;
+          const helpText = getLocalizedValue(field, "helpText", formLang) || field.helpText;
+          const fieldDirection = getContentDirection(
+            `${label || ""} ${helpText || ""} ${getRuntimeFieldOptions(field, formLang).join(" ")}`,
+            formDir
+          );
 
-            {(section.fields || []).map((field) => (
-              <div className="runtime-question" key={field.id}>
-                <div className="runtime-question-field">
-                  <span>
-                    {field.label}
-                    {field.required ? " *" : ""}
-                  </span>
-                  {field.helpText && <small>{field.helpText}</small>}
-                  {renderRuntimeField(field, form, instanceKey, isSubmitting)}
-                </div>
+          return (
+            <div className="runtime-question" key={field.id}>
+              <div className="runtime-question-field" dir={fieldDirection}>
+                <span className="runtime-question-title" dir={fieldDirection}>
+                  {label}
+                  {field.required ? " *" : ""}
+                </span>
+                {helpText && (
+                  <small dir={getContentDirection(helpText, fieldDirection)}>
+                    {helpText}
+                  </small>
+                )}
+                {renderRuntimeField(field, form, instanceKey, isSubmitting, formLang)}
               </div>
-            ))}
-          </div>
-        ))}
+            </div>
+          );
+        })}
+      </div>
+      );
+    };
+
+    return (
+      <form
+        className="runtime-form"
+        dir={formDir}
+        onSubmit={(event) => submitRuntimeForm(event, form, formElementId, instanceKey)}
+      >
+        <div className="runtime-form-header">
+          {languageMode === "bilingual" && (
+            <div className="runtime-language-switch" role="group" aria-label="Form language">
+              <button type="button" className={formLang === "en" ? "active" : ""} onClick={() => setFormLanguages((prev) => ({ ...prev, [instanceKey]: "en" }))}>English</button>
+              <button type="button" className={formLang === "ar" ? "active" : ""} onClick={() => setFormLanguages((prev) => ({ ...prev, [instanceKey]: "ar" }))}>العربية</button>
+            </div>
+          )}
+          <h3>{getLocalizedValue(form, "title", formLang) || form.title}</h3>
+          <p>{getLocalizedValue(form, "description", formLang) || form.description}</p>
+          {isPagedForm && (
+            <div className="runtime-form-progress" aria-label="Form progress">
+              <span style={{ width: `${Math.round(((currentPageIndex + 1) / formSections.length) * 100)}%` }} />
+            </div>
+          )}
+        </div>
+
+        {isPagedForm
+          ? currentPage
+            ? renderRuntimeFormPage(currentPage)
+            : null
+          : formSections.map((section) => renderRuntimeFormPage(section))}
 
         {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
         {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}
 
-        <button type="submit" className="runtime-submit" disabled={isSubmitting}>
-          {isSubmitting ? "Submitting..." : "Submit"}
-        </button>
+        <div className="runtime-form-pagination">
+          {isPagedForm ? (
+            <button
+              type="button"
+              disabled={currentPageIndex === 0 || isSubmitting}
+              onClick={() => setRuntimeFormPage(instanceKey, currentPageIndex - 1, formSections.length)}
+            >
+              {formLang === "ar" ? "السابق" : "Previous"}
+            </button>
+          ) : (
+            <span />
+          )}
+
+          <span className="runtime-form-page-count">
+                {isPagedForm
+                  ? formLang === "ar"
+                    ? `صفحة ${currentPageIndex + 1} من ${formSections.length}`
+                    : `Page ${currentPageIndex + 1} of ${formSections.length}`
+                  : `${formSections.length} sections`}
+          </span>
+
+          {isPagedForm && currentPageIndex < formSections.length - 1 ? (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => goToNextFormPage(form, instanceKey, currentPage, currentPageIndex, formSections.length)}
+            >
+              {formLang === "ar" ? "التالي" : "Next"}
+            </button>
+          ) : (
+            <button type="submit" className="runtime-submit" disabled={isSubmitting}>
+              {isSubmitting ? (formLang === "ar" ? "جار الإرسال..." : "Submitting...") : (formLang === "ar" ? "إرسال" : "Submit")}
+            </button>
+          )}
+        </div>
       </form>
     );
   };
@@ -796,7 +1077,7 @@ export default function TenantSiteRuntime() {
           <section className="tenant-runtime-card">
             <p className="tenant-eyebrow">{cleanSubdomain}.madar.app</p>
             <h1>No published site found</h1>
-            <p>Save the project in Page Builder, then use Go Live again.</p>
+            <p>Save the project in Page Builder, then publish the site again.</p>
           </section>
         </main>
       );
@@ -984,7 +1265,18 @@ export default function TenantSiteRuntime() {
   };
 
   return (
-    <div className="tenant-site-runtime">
+    <div
+      className={`tenant-site-runtime ${draftPreview ? "tenant-site-draft-preview" : ""}`}
+      style={getPageBuilderThemeVars(project?.theme)}
+    >
+      {draftPreview && (
+        <div className="tenant-draft-preview-bar">
+          <strong>Draft preview</strong>
+          <button type="button" onClick={() => navigate("/page-builder")}>
+            Back to builder
+          </button>
+        </div>
+      )}
       {renderHeader()}
       {renderMainContent()}
       {renderFooter()}

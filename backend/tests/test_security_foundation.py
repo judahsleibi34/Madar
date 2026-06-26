@@ -3,9 +3,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
 
+from routes import auth_routes
 from services import rate_limit_service
 from services.rate_limit_service import InMemoryRateLimitStore, enforce_rate_limit
 from services.auth_service import (
@@ -82,6 +83,10 @@ class SecurityFoundationTests(unittest.TestCase):
         def log_out(response: Response):
             delete_auth_cookies(response)
             return {"message": "Logged out successfully"}
+
+        @app.post("/auth/refresh")
+        def refresh():
+            return {"logged_in": True}
 
         return TestClient(app)
 
@@ -303,6 +308,51 @@ class SecurityFoundationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"message": "Logged out successfully"})
+
+    def test_refresh_route_is_csrf_exempt_with_auth_cookies_and_missing_header(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/auth/refresh",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+                CSRF_COOKIE_NAME: "stale-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"logged_in": True})
+
+    def test_user_status_failure_does_not_clear_auth_cookies(self):
+        app = FastAPI()
+        app.include_router(auth_routes.router)
+        client = TestClient(app)
+
+        with patch.object(
+            auth_routes,
+            "get_authenticated_user_row",
+            side_effect=HTTPException(status_code=401, detail="Invalid session"),
+        ):
+            response = client.get(
+                "/auth/user_status",
+                cookies={
+                    "madar_access_token": "stale-access-token",
+                    "madar_refresh_token": "stale-refresh-token",
+                },
+            )
+
+        set_cookie_headers = response.headers.get_list("set-cookie")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"logged_in": False, "user": None})
+        self.assertFalse(
+            any(header.startswith("madar_access_token=") for header in set_cookie_headers)
+        )
+        self.assertFalse(
+            any(header.startswith("madar_refresh_token=") for header in set_cookie_headers)
+        )
 
     def build_rate_limit_request(self, host="198.51.100.10", headers=None):
         return SimpleNamespace(

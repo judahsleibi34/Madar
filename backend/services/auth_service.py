@@ -46,7 +46,7 @@ def _refresh_session_once(refresh_token: str):
             raise RuntimeError("Session refresh returned no active session")
 
         result = (auth_user, session.access_token, session.refresh_token)
-        _AUTH_REFRESH_REPLAY[token_key] = (now, *result)
+        _AUTH_REFRESH_REPLAY[token_key] = (time.monotonic(), *result)
         return result
 
 APP_ENV = (
@@ -229,7 +229,12 @@ def build_user_payload(user_data):
     }
 
 
-def get_authenticated_user_row(request: Request, response: Response | None = None):
+def get_authenticated_user_row(
+    request: Request,
+    response: Response | None = None,
+    *,
+    allow_refresh: bool = True,
+):
     access_token = request.cookies.get("madar_access_token")
     refresh_token = request.cookies.get("madar_refresh_token")
 
@@ -256,7 +261,7 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
                 auth_response = supabase.auth.get_user(access_token)
                 auth_user = getattr(auth_response, "user", None)
             except Exception as access_error:
-                if not refresh_token:
+                if not refresh_token or not allow_refresh:
                     raise
                 logger.warning(
                     "auth.session.access_expired",
@@ -266,7 +271,7 @@ def get_authenticated_user_row(request: Request, response: Response | None = Non
                     refresh_token
                 )
 
-        elif refresh_token:
+        elif refresh_token and allow_refresh:
             auth_user, next_access_token, next_refresh_token = _refresh_session_once(
                 refresh_token
             )

@@ -55,7 +55,8 @@ export const apiFetch = async (input, init = {}) => {
 
   const inputUrl = typeof input === "string" ? input : input?.url || "";
   const serializesAuthSession =
-    method === "GET" && inputUrl.includes("/auth/user_status");
+    (method === "GET" && inputUrl.includes("/auth/user_status")) ||
+    (method === "POST" && inputUrl.includes("/auth/refresh"));
   const response =
     serializesAuthSession && typeof navigator !== "undefined" && navigator.locks?.request
       ? await navigator.locks.request("madar-auth-session", runFetch)

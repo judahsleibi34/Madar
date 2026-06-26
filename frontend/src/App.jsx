@@ -33,6 +33,7 @@ import UserDashboard from "./components/DashboardBuilder/UserDashboard";
 import MyPlanPage from "./components/MainPages/MyPlanPage";
 
 import PageBuilder from "./components/PageBuilder";
+import BuilderFormPreviewPage from "./components/PageBuilder/BuilderFormPreviewPage";
 import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
 
 import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
@@ -160,6 +161,25 @@ export default function App() {
     return normalizeUser(data.user || data);
   }, [normalizeUser]);
 
+  const refreshAuthSession = useCallback(async () => {
+    const response = await apiFetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      cache: "no-store",
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    syncCsrfTokenFromResponseData(data);
+
+    const loggedIn =
+      data.logged_in === true || data.authenticated === true;
+
+    if (!loggedIn || !data.user) return null;
+
+    return normalizeUser(data.user);
+  }, [normalizeUser]);
+
   const bootstrapAuth = useCallback(async () => {
     try {
       const statusResponse = await apiFetch(`${API_URL}/auth/user_status`, {
@@ -188,6 +208,14 @@ export default function App() {
         statusData.logged_in === true || statusData.authenticated === true;
 
       if (!loggedIn) {
+        const refreshedUser = await refreshAuthSession();
+        if (refreshedUser?.id) {
+          return {
+            loggedIn: true,
+            user: refreshedUser,
+          };
+        }
+
         return {
           loggedIn: false,
           user: null,
@@ -197,6 +225,14 @@ export default function App() {
       const userInfo = normalizeUser(statusData.user || statusData);
 
       if (!userInfo?.id) {
+        const refreshedUser = await refreshAuthSession();
+        if (refreshedUser?.id) {
+          return {
+            loggedIn: true,
+            user: refreshedUser,
+          };
+        }
+
         return {
           loggedIn: false,
           user: null,
@@ -215,7 +251,7 @@ export default function App() {
         user: null,
       };
     }
-  }, [normalizeUser]);
+  }, [normalizeUser, refreshAuthSession]);
 
   useEffect(() => {
     const safeLanguage = lang === "ar" ? "ar" : "en";
@@ -346,11 +382,7 @@ export default function App() {
 
       const now = Date.now();
 
-      if (
-        reason !== "interval" &&
-        reason !== "pagehide" &&
-        now - lastKeepAliveAt < EVENT_COOLDOWN_MS
-      ) {
+      if (reason !== "interval" && now - lastKeepAliveAt < EVENT_COOLDOWN_MS) {
         return;
       }
 
@@ -361,7 +393,6 @@ export default function App() {
         const response = await apiFetch(`${API_URL}/auth/user_status`, {
           method: "GET",
           cache: "no-store",
-          keepalive: reason === "pagehide",
         });
 
         if (response.status === 401 || response.status === 403) {
@@ -386,7 +417,21 @@ export default function App() {
           data.logged_in === true || data.authenticated === true;
 
         if (!loggedIn) {
-          clearSession();
+          const refreshedUser = await refreshAuthSession();
+
+          if (refreshedUser?.id) {
+            softFailureCount = 0;
+            authBootstrapPromise = Promise.resolve({
+              loggedIn: true,
+              user: refreshedUser,
+            });
+            setUser(refreshedUser);
+          } else {
+            softFailureCount += 1;
+            if (softFailureCount >= MAX_SOFT_FAILURES) {
+              clearSession();
+            }
+          }
           return;
         }
 
@@ -424,22 +469,16 @@ export default function App() {
       keepAlive("online");
     };
 
-    const handlePageHide = () => {
-      keepAlive("pagehide");
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("online", handleOnline);
-    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
-      window.removeEventListener("pagehide", handlePageHide);
     };
-  }, [isLoggedIn, authChecked, normalizeUser]);
+  }, [isLoggedIn, authChecked, normalizeUser, refreshAuthSession]);
 
   const handleLanguageChange = (code) => {
     if (code !== "ar" && code !== "en") return;
@@ -640,6 +679,105 @@ export default function App() {
     </div>
   );
 
+  const renderFormBuilderSkeleton = () => (
+    <div
+      className="forms-loading-shell"
+      aria-label="Loading forms"
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <aside className="forms-loading-app-rail" aria-hidden="true">
+        <span className="forms-loading-avatar forms-loading-shimmer" />
+        <div className="forms-loading-rail-stack">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <span className="forms-loading-rail-icon forms-loading-shimmer" key={index} />
+          ))}
+        </div>
+        <span className="forms-loading-avatar small forms-loading-shimmer" />
+      </aside>
+
+      <main className="forms-loading-page">
+        <header className="forms-loading-header">
+          <span className="forms-loading-line title forms-loading-shimmer" />
+          <span className="forms-loading-line subtitle forms-loading-shimmer" />
+        </header>
+
+        <div className="forms-loading-workspace">
+          <aside className="forms-loading-controls">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div className="forms-loading-control-group" key={index}>
+                <span className="forms-loading-line label forms-loading-shimmer" />
+                <span className="forms-loading-control forms-loading-shimmer" />
+              </div>
+            ))}
+            <div className="forms-loading-actions">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <span className="forms-loading-button forms-loading-shimmer" key={index} />
+              ))}
+            </div>
+          </aside>
+
+          <section className="forms-loading-document">
+            <div className="forms-loading-document-top">
+              <span className="forms-loading-line page-title forms-loading-shimmer" />
+              <span className="forms-loading-pill forms-loading-shimmer" />
+            </div>
+            <span className="forms-loading-textarea forms-loading-shimmer" />
+            <div className="forms-loading-toolbar">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <span className="forms-loading-tool forms-loading-shimmer" key={index} />
+              ))}
+            </div>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <article className="forms-loading-question" key={index}>
+                <span className="forms-loading-dot forms-loading-shimmer" />
+                <div className="forms-loading-question-body">
+                  <span className="forms-loading-line question-title forms-loading-shimmer" />
+                  <span className="forms-loading-control answer forms-loading-shimmer" />
+                  <span className="forms-loading-line hint forms-loading-shimmer" />
+                </div>
+                <span className="forms-loading-type forms-loading-shimmer" />
+              </article>
+            ))}
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+
+  const renderFormPreviewSkeleton = () => (
+    <main
+      className="form-preview-loading-page"
+      aria-label="Loading form preview"
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <header className="form-preview-loading-topbar">
+        <span className="form-preview-loading-button forms-loading-shimmer" />
+        <span className="form-preview-loading-title forms-loading-shimmer" />
+      </header>
+
+      <section className="form-preview-loading-shell">
+        <div className="form-preview-loading-header">
+          <span className="form-preview-loading-line heading forms-loading-shimmer" />
+          <span className="form-preview-loading-line copy forms-loading-shimmer" />
+        </div>
+
+        {Array.from({ length: 4 }).map((_, index) => (
+          <article className="form-preview-loading-question" key={index}>
+            <span className="form-preview-loading-line label forms-loading-shimmer" />
+            <span className="form-preview-loading-input forms-loading-shimmer" />
+            {index < 2 && <span className="form-preview-loading-line help forms-loading-shimmer" />}
+          </article>
+        ))}
+
+        <footer className="form-preview-loading-actions">
+          <span className="form-preview-loading-small-button forms-loading-shimmer" />
+          <span className="form-preview-loading-page-pill forms-loading-shimmer" />
+          <span className="form-preview-loading-submit forms-loading-shimmer" />
+        </footer>
+      </section>
+    </main>
+  );
+
   const renderDashboardShell = (
     children,
     isPageBuilderShell = false,
@@ -778,10 +916,52 @@ export default function App() {
           />
 
           <Route
-            path="/page-builder/*"
+            path="/page-builder/form-preview/:formId"
+            element={
+              !authChecked ? (
+                renderFormPreviewSkeleton()
+              ) : !isLoggedIn ? (
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
+              ) : isRegularUser ? (
+                <BuilderFormPreviewPage />
+              ) : (
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
+              )
+            }
+          />
+
+          <Route
+            path="/page-builder/preview"
             element={
               !authChecked ? (
                 renderDashboardSkeleton(t("dashboard:loading.pageBuilder"))
+              ) : !isLoggedIn ? (
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
+              ) : isRegularUser ? (
+                <TenantSiteRuntime draftPreview />
+              ) : (
+                renderRestrictedPage(
+                  "This page is only available for workspace user accounts."
+                )
+              )
+            }
+          />
+
+          <Route
+            path="/page-builder/*"
+            element={
+              !authChecked ? (
+                location.pathname.startsWith("/page-builder/forms")
+                  ? renderFormBuilderSkeleton()
+                  : renderDashboardSkeleton(t("dashboard:loading.pageBuilder"))
               ) : !isLoggedIn ? (
                 <Navigate
                   to={`/login?returnTo=${getCurrentReturnTo()}`}

@@ -63,8 +63,16 @@ export const collectBuilderUrlErrorsForProject = ({
     carouselElementTypes,
   });
 
+const legacyFieldTypes = {
+  money: { id: "money", label: "Price or budget", group: "Number", input: "number" },
+  phone: { id: "phone", label: "Phone", group: "Contact", input: "tel" },
+  radio: { id: "radio", label: "Radio buttons", group: "Choice", input: "radio" },
+  yesNo: { id: "yesNo", label: "Yes or no", group: "Choice", input: "yesNo" },
+  status: { id: "status", label: "Status selector", group: "Workflow", input: "select" },
+};
+
 export const getFieldTypeById = (fieldTypes, type) =>
-  fieldTypes.find((item) => item.id === type) || fieldTypes[0];
+  fieldTypes.find((item) => item.id === type) || legacyFieldTypes[type] || fieldTypes[0];
 
 export const createBuilderUrlErrorCollector = ({
   collectBuilderUrlErrorsFromUtils,

@@ -481,22 +481,24 @@ export const buildStarterProject = (starterId = "website") => {
     const fields = [
       createField("Full name", "shortText", { required: true }),
       createField("Email", "email", { required: true }),
-      createField("Phone number", "phone"),
+      createField("Phone number", "shortText", { placeholder: "+972 50 123 4567" }),
       createField("Company website", "url"),
       createField("Request summary", "paragraph", { required: true }),
       createField("Department", "dropdown", {
         required: true,
         options: ["Sales", "Operations", "Finance", "Support"],
       }),
-      createField("Priority", "radio", {
+      createField("Priority", "dropdown", {
         options: ["Low", "Medium", "High"],
         defaultValue: "Medium",
       }),
       createField("Needed services", "checkboxes", {
         options: ["Website", "Forms", "Reports", "Automation"],
       }),
-      createField("Approved to contact", "yesNo"),
-      createField("Expected budget", "money"),
+      createField("Approved to contact", "dropdown", {
+        options: ["Yes", "No"],
+      }),
+      createField("Expected budget", "number", { placeholder: "Example: 7,500" }),
       createField("Team size", "number"),
       createField("Preferred date", "date"),
       createField("Preferred time", "time"),
@@ -508,7 +510,7 @@ export const buildStarterProject = (starterId = "website") => {
       }),
       createField("Readiness rating", "rating", { maxRating: 5 }),
       createField("Attachment", "file"),
-      createField("Status", "status", {
+      createField("Status", "dropdown", {
         options: ["New", "In review", "Approved", "Delivered"],
         defaultValue: "New",
       }),
@@ -601,7 +603,7 @@ export const buildStarterProject = (starterId = "website") => {
         options: ["Public", "Customers", "Internal team", "Partners"],
       }),
       createField("Summary", "paragraph", { required: true }),
-      createField("Status", "status", {
+      createField("Status", "dropdown", {
         options: ["Draft", "In review", "Approved", "Published"],
         defaultValue: "Draft",
       }),
@@ -684,7 +686,7 @@ export const buildStarterProject = (starterId = "website") => {
     const fields = [
       createField("Customer name", "shortText", { required: true }),
       createField("Email", "email", { required: true }),
-      createField("Phone number", "phone", { required: true }),
+      createField("Phone number", "shortText", { required: true, placeholder: "+972 50 123 4567" }),
       createField("Product or service", "dropdown", {
         required: true,
         options: ["Starter package", "Growth package", "Custom order", "Consultation"],
@@ -692,7 +694,7 @@ export const buildStarterProject = (starterId = "website") => {
       createField("Quantity", "number"),
       createField("Delivery date", "date"),
       createField("Order notes", "paragraph"),
-      createField("Order status", "status", {
+      createField("Order status", "dropdown", {
         options: ["New", "Confirmed", "Preparing", "Ready", "Completed"],
         defaultValue: "New",
       }),
@@ -784,11 +786,13 @@ export const buildStarterProject = (starterId = "website") => {
         required: true,
         options: ["Leave request", "Reimbursement", "Budget approval", "Payroll support", "Procurement"],
       }),
-      createField("Amount", "money"),
+      createField("Amount", "number", { placeholder: "Example: 7,500" }),
       createField("Due date", "date"),
-      createField("Manager approval", "yesNo"),
+      createField("Manager approval", "dropdown", {
+        options: ["Yes", "No"],
+      }),
       createField("Request details", "paragraph", { required: true }),
-      createField("Status", "status", {
+      createField("Status", "dropdown", {
         options: ["Submitted", "Manager review", "Finance review", "Approved", "Rejected"],
         defaultValue: "Submitted",
       }),
@@ -881,7 +885,7 @@ export const buildStarterProject = (starterId = "website") => {
       createField("Actual value", "number"),
       createField("Accountability issue", "paragraph"),
       createField("Learning note", "paragraph"),
-      createField("Status", "status", {
+      createField("Status", "dropdown", {
         options: ["Draft", "Submitted", "Reviewed", "Action required", "Closed"],
         defaultValue: "Draft",
       }),
@@ -971,9 +975,9 @@ export const buildStarterProject = (starterId = "website") => {
         required: true,
         options: ["HR", "Finance", "Procurement", "General"],
       }),
-      createField("Amount", "money"),
+      createField("Amount", "number", { placeholder: "Example: 7,500" }),
       createField("Details", "paragraph", { required: true }),
-      createField("Status", "status", { options: ["Pending", "Approved", "Rejected"], defaultValue: "Pending" }),
+      createField("Status", "dropdown", { options: ["Pending", "Approved", "Rejected"], defaultValue: "Pending" }),
     ]);
 
     const form = createForm("Request Form", collection.fields, {
@@ -1002,7 +1006,7 @@ export const buildStarterProject = (starterId = "website") => {
       createField("Date", "date", { required: true }),
       createField("Participants", "number"),
       createField("Notes", "paragraph"),
-      createField("Status", "status", { options: ["Draft", "Submitted", "Reviewed"], defaultValue: "Draft" }),
+      createField("Status", "dropdown", { options: ["Draft", "Submitted", "Reviewed"], defaultValue: "Draft" }),
     ]);
 
     const form = createForm("Activity Report Form", collection.fields, {
@@ -1027,10 +1031,10 @@ export const buildStarterProject = (starterId = "website") => {
   if (starterId === "orders") {
     const collection = createCollection("Orders", [
       createField("Customer name", "shortText", { required: true }),
-      createField("Phone number", "phone", { required: true }),
+      createField("Phone number", "shortText", { required: true, placeholder: "+972 50 123 4567" }),
       createField("Order details", "paragraph", { required: true }),
-      createField("Payment amount", "money"),
-      createField("Order status", "status", {
+      createField("Payment amount", "number", { placeholder: "Example: 7,500" }),
+      createField("Order status", "dropdown", {
         options: ["New", "Processing", "Ready", "Completed", "Cancelled"],
         defaultValue: "New",
       }),
@@ -1085,7 +1089,7 @@ export const buildStarterProject = (starterId = "website") => {
     createField("Full name", "shortText", { required: true }),
     createField("Email", "email", { required: true }),
     createField("Message", "paragraph"),
-    createField("Status", "status", { options: ["New", "Contacted", "Closed"], defaultValue: "New" }),
+    createField("Status", "dropdown", { options: ["New", "Contacted", "Closed"], defaultValue: "New" }),
   ]);
 
   const form = createForm("Contact Form", collection.fields, {

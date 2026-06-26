@@ -42,7 +42,7 @@ export const builderTabs = [
   },
   {
     id: "theme",
-    label: "Theme",
+    label: "Themes",
     helper: "Control global colors, typography, spacing, and radius.",
   },
   {
@@ -102,18 +102,14 @@ export const elementTypes = [
 ];
 
 export const fieldTypes = [
-  { id: "shortText", label: "Short answer", group: "Basic", input: "text" },
-  { id: "paragraph", label: "Paragraph", group: "Basic", input: "textarea" },
+  { id: "shortText", label: "Short answer", group: "Text", input: "text" },
+  { id: "paragraph", label: "Long answer", group: "Text", input: "textarea" },
   { id: "email", label: "Email", group: "Contact", input: "email" },
-  { id: "phone", label: "Phone number", group: "Contact", input: "tel" },
-  { id: "number", label: "Number", group: "Business", input: "number" },
-  { id: "money", label: "Money amount", group: "Business", input: "number" },
-  { id: "date", label: "Date", group: "Business", input: "date" },
-  { id: "dropdown", label: "Dropdown", group: "Choice", input: "select" },
-  { id: "radio", label: "Single choice", group: "Choice", input: "radio" },
+  { id: "number", label: "Numeric answer", group: "Number", input: "number" },
+  { id: "date", label: "Date", group: "Date", input: "date" },
+  { id: "dropdown", label: "Dropdown menu", group: "Choice", input: "select" },
+  { id: "radio", label: "Radio buttons", group: "Choice", input: "radio" },
   { id: "checkboxes", label: "Checkboxes", group: "Choice", input: "checkboxes" },
-  { id: "yesNo", label: "Yes / No", group: "Choice", input: "yesNo" },
-  { id: "status", label: "Status", group: "Workflow", input: "select" },
   { id: "file", label: "File upload", group: "Advanced", input: "file" },
 ];
 

@@ -21,6 +21,7 @@ CSRF_EXEMPT_PATHS = {
     ("POST", "/auth/signup"),
     ("POST", "/auth/forgot-password"),
     ("POST", "/auth/password-reset"),
+    ("POST", "/auth/refresh"),
     ("POST", "/auth/log_out"),
     ("POST", "/billing/webhook"),
     ("POST", "/public/contact"),
