@@ -196,9 +196,12 @@ def get_project_for_tenant(project_id: str, tenant_id: int):
     if not project_rows:
         raise HTTPException(status_code=404, detail="Builder project not found")
 
-    return project_rows[0]
+    project = project_rows[0]
 
+    if str(project.get("status") or "").strip().lower() == "archived":
+        raise HTTPException(status_code=404, detail="Builder project not found")
 
+    return project
 
 def format_form_submission(row: dict):
     return {
