@@ -1,9 +1,11 @@
+import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Trans, useTranslation } from "react-i18next";
 
 import GradientText from "../Animations/GradientText";
-import OrbitVisual from "./OrbitVisual";
 import SplitText from "../Animations/SplitText";
+
+const OrbitVisual = lazy(() => import("./OrbitVisual"));
 
 export default function HeroSection({ lang }) {
   const { t } = useTranslation("public");
@@ -41,7 +43,9 @@ export default function HeroSection({ lang }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
       >
-        <OrbitVisual lang={lang} />
+        <Suspense fallback={<div className="hero-visual-fallback" aria-hidden="true" />}>
+          <OrbitVisual lang={lang} />
+        </Suspense>
       </motion.div>
     </section>
   );

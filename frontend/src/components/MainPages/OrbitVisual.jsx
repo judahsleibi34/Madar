@@ -218,63 +218,6 @@ function createLabel(text, extraClass = "") {
   return el;
 }
 
-/* ── label collision resolver ───────────────────────────────
-   Takes an array of { x, y, w, h } boxes and nudges them apart
-   so none overlap. Runs a few iterations of spring repulsion. */
-function resolveOverlap(boxes, iterations = 8) {
-  const PAD = 10;
-
-  for (let iter = 0; iter < iterations; iter++) {
-    for (let i = 0; i < boxes.length; i++) {
-      for (let j = i + 1; j < boxes.length; j++) {
-        const a = boxes[i];
-        const b = boxes[j];
-
-        const overlapX = (a.w / 2 + b.w / 2 + PAD) - Math.abs(a.x - b.x);
-        const overlapY = (a.h / 2 + b.h / 2 + PAD) - Math.abs(a.y - b.y);
-
-        if (overlapX > 0 && overlapY > 0) {
-          if (overlapX < overlapY) {
-            const push = overlapX / 2;
-
-            if (a.x < b.x) {
-              a.x -= push;
-              b.x += push;
-            } else {
-              a.x += push;
-              b.x -= push;
-            }
-          } else {
-            const push = overlapY / 2;
-
-            if (a.y < b.y) {
-              a.y -= push;
-              b.y += push;
-            } else {
-              a.y += push;
-              b.y -= push;
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-/* ── planet–label overlap guard ────────────────────────────
-   Pushes a label box away from a planet screen circle. */
-function pushOffPlanet(lbl, planetX, planetY, planetScreenR) {
-  const dx = lbl.x - planetX;
-  const dy = lbl.y - planetY;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const minDist = planetScreenR + Math.max(lbl.w, lbl.h) / 2 + 12;
-
-  if (dist < minDist) {
-    const scale = (minDist - dist) / dist;
-    lbl.x += dx * scale;
-    lbl.y += dy * scale;
-  }
-}
 
 export default function OrbitVisual({ lang = "en" }) {
   const containerRef = useRef(null);
@@ -303,7 +246,7 @@ export default function OrbitVisual({ lang = "en" }) {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35;
-    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.className = "orbit-visual-canvas";
 
     container.prepend(renderer.domElement);

@@ -1045,6 +1045,12 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             {isRegistration && <label>{runtimeCopy.runtime.fullName}<input type="text" placeholder={runtimeCopy.runtime.yourName} /></label>}
             <label>{runtimeCopy.runtime.emailAddress}<input type="email" placeholder={runtimeCopy.runtime.emailPlaceholder} /></label>
             <label>{runtimeCopy.runtime.password}<input type="password" placeholder={runtimeCopy.runtime.passwordPlaceholder} /></label>
+            {isRegistration && (
+              <label>
+                {runtimeCopy.runtime.confirmPassword}
+                <input type="password" placeholder={runtimeCopy.runtime.confirmPasswordPlaceholder} />
+              </label>
+            )}
             <button type="submit" className="runtime-submit">
               {auth.buttonText || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}
             </button>

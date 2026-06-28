@@ -3,10 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { syncCsrfTokenFromResponseData } from "../../utils/apiClient";
+import { postAuthJson } from "../../utils/apiClient";
 import { normalizeAuthMessage } from "./authMessages";
-
-const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 export default function LoginPage({
   lang = "en",
@@ -72,20 +70,13 @@ export default function LoginPage({
     setStatusMessage("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const { response, data } = await postAuthJson(
+        "/auth/login",
+        {
           email: formData.email.trim(),
           password: formData.password,
-        }),
-      });
-
-      const data = await response.json();
-      syncCsrfTokenFromResponseData(data);
+        }
+      );
 
       if (!response.ok) {
         if (response.status === 422 && Array.isArray(data.detail)) {

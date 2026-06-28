@@ -232,6 +232,14 @@ export const cleanBuilderProject = (project) => {
     });
 
   const pages = cleanedPages.length ? cleanedPages : normalizedProject.pages;
+  const forms = normalizedProject.forms.map((form) => ({
+    ...form,
+    responses: [],
+  }));
+  const collections = normalizedProject.collections.map((collection) => ({
+    ...collection,
+    records: [],
+  }));
 
   return {
     ...normalizedProject,
@@ -247,6 +255,8 @@ export const cleanBuilderProject = (project) => {
         .join("\n"),
     },
     pages,
+    forms,
+    collections,
   };
 };
 

@@ -1,0 +1,307 @@
+import { Menu, X } from "lucide-react";
+
+import DashboardSidebar from "../components/DashboardBuilder/DashboardSidebar";
+import { appShellContent } from "../content";
+
+export function RestrictedAccessWindow({
+  title = appShellContent.restrictedAccess.title,
+  message = appShellContent.restrictedAccess.defaultMessage,
+  actionLabel = appShellContent.restrictedAccess.actionLabel,
+  onAction,
+}) {
+  return (
+    <section className="restricted-access-page">
+      <div className="restricted-access-card" role="status">
+        <div className="restricted-access-content">
+          <p className="restricted-access-eyebrow">{title}</p>
+          <h1>{title}</h1>
+          <p>{message}</p>
+        </div>
+
+        <button type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export function DashboardSkeleton({ label, lang }) {
+  return (
+    <div
+      className="dashboard-skeleton-layout"
+      aria-label={label}
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <aside className="dashboard-skeleton-sidebar">
+        <div className="skeleton-logo-row">
+          <div className="skeleton-circle" />
+          <div>
+            <div className="skeleton-line skeleton-title" />
+            <div className="skeleton-line skeleton-small" />
+          </div>
+        </div>
+
+        <div className="skeleton-nav">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div className="skeleton-sidebar-row" key={index}>
+              <div className="skeleton-circle skeleton-sidebar-icon" />
+              <div className="skeleton-line skeleton-sidebar-label" />
+            </div>
+          ))}
+        </div>
+
+        <div className="skeleton-sidebar-bottom">
+          <div className="skeleton-sidebar-row">
+            <div className="skeleton-circle skeleton-sidebar-icon" />
+            <div className="skeleton-line skeleton-sidebar-label" />
+          </div>
+
+          <div className="skeleton-sidebar-row">
+            <div className="skeleton-circle skeleton-sidebar-icon" />
+            <div className="skeleton-line skeleton-sidebar-label" />
+          </div>
+
+          <div className="skeleton-user-row">
+            <div className="skeleton-circle skeleton-user-avatar" />
+            <div className="skeleton-user-lines">
+              <div className="skeleton-line skeleton-user-badge" />
+              <div className="skeleton-line skeleton-user-name" />
+              <div className="skeleton-line skeleton-user-email" />
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section className="dashboard-skeleton-page">
+        <div className="dashboard-skeleton-header">
+          <div className="skeleton-line skeleton-heading" />
+          <div className="skeleton-line skeleton-subheading" />
+        </div>
+
+        <div className="dashboard-skeleton-cards">
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+        </div>
+
+        <div className="dashboard-skeleton-panels">
+          <div className="skeleton-panel skeleton-panel-large" />
+          <div className="skeleton-panel" />
+        </div>
+
+        <div className="dashboard-skeleton-panels lower">
+          <div className="skeleton-panel" />
+          <div className="skeleton-panel" />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function FormBuilderSkeleton({ lang }) {
+  return (
+    <div
+      className="forms-loading-shell"
+      aria-label="Loading forms"
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <aside className="forms-loading-app-rail" aria-hidden="true">
+        <span className="forms-loading-avatar forms-loading-shimmer" />
+        <div className="forms-loading-rail-stack">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <span className="forms-loading-rail-icon forms-loading-shimmer" key={index} />
+          ))}
+        </div>
+        <span className="forms-loading-avatar small forms-loading-shimmer" />
+      </aside>
+
+      <main className="forms-loading-page">
+        <header className="forms-loading-header">
+          <span className="forms-loading-line title forms-loading-shimmer" />
+          <span className="forms-loading-line subtitle forms-loading-shimmer" />
+        </header>
+
+        <div className="forms-loading-workspace">
+          <aside className="forms-loading-controls">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div className="forms-loading-control-group" key={index}>
+                <span className="forms-loading-line label forms-loading-shimmer" />
+                <span className="forms-loading-control forms-loading-shimmer" />
+              </div>
+            ))}
+            <div className="forms-loading-actions">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <span className="forms-loading-button forms-loading-shimmer" key={index} />
+              ))}
+            </div>
+          </aside>
+
+          <section className="forms-loading-document">
+            <div className="forms-loading-document-top">
+              <span className="forms-loading-line page-title forms-loading-shimmer" />
+              <span className="forms-loading-pill forms-loading-shimmer" />
+            </div>
+            <span className="forms-loading-textarea forms-loading-shimmer" />
+            <div className="forms-loading-toolbar">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <span className="forms-loading-tool forms-loading-shimmer" key={index} />
+              ))}
+            </div>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <article className="forms-loading-question" key={index}>
+                <span className="forms-loading-dot forms-loading-shimmer" />
+                <div className="forms-loading-question-body">
+                  <span className="forms-loading-line question-title forms-loading-shimmer" />
+                  <span className="forms-loading-control answer forms-loading-shimmer" />
+                  <span className="forms-loading-line hint forms-loading-shimmer" />
+                </div>
+                <span className="forms-loading-type forms-loading-shimmer" />
+              </article>
+            ))}
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function FormPreviewSkeleton({ lang }) {
+  return (
+    <main
+      className="form-preview-loading-page"
+      aria-label={appShellContent.loading.formPreview}
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <header className="form-preview-loading-topbar">
+        <span className="form-preview-loading-button forms-loading-shimmer" />
+        <span className="form-preview-loading-title forms-loading-shimmer" />
+      </header>
+
+      <section className="form-preview-loading-shell">
+        <div className="form-preview-loading-header">
+          <span className="form-preview-loading-line heading forms-loading-shimmer" />
+          <span className="form-preview-loading-line copy forms-loading-shimmer" />
+        </div>
+
+        {Array.from({ length: 4 }).map((_, index) => (
+          <article className="form-preview-loading-question" key={index}>
+            <span className="form-preview-loading-line label forms-loading-shimmer" />
+            <span className="form-preview-loading-input forms-loading-shimmer" />
+            {index < 2 && <span className="form-preview-loading-line help forms-loading-shimmer" />}
+          </article>
+        ))}
+
+        <footer className="form-preview-loading-actions">
+          <span className="form-preview-loading-small-button forms-loading-shimmer" />
+          <span className="form-preview-loading-page-pill forms-loading-shimmer" />
+          <span className="form-preview-loading-submit forms-loading-shimmer" />
+        </footer>
+      </section>
+    </main>
+  );
+}
+
+export function DashboardLoadingElement({ pathname, labels, lang }) {
+  if (pathname.startsWith("/page-builder/form-preview")) {
+    return <FormPreviewSkeleton lang={lang} />;
+  }
+
+  if (pathname.startsWith("/page-builder/forms")) {
+    return <FormBuilderSkeleton lang={lang} />;
+  }
+
+  const safeLabels = labels || appShellContent.loading || {};
+  let label = safeLabels.dashboard || "Loading dashboard";
+
+  if (pathname.startsWith("/page-builder")) label = safeLabels.pageBuilder || label;
+  if (pathname.startsWith("/builder-responses")) label = safeLabels.submissions || label;
+  if (pathname.startsWith("/builder-data")) label = safeLabels.dataLogs || label;
+  if (pathname.startsWith("/my-plan")) label = safeLabels.myPlan || label;
+  if (pathname.startsWith("/admin/users")) label = safeLabels.userManagement || label;
+  if (pathname.startsWith("/settings/change-password")) label = safeLabels.passwordSettings || label;
+  if (pathname.startsWith("/settings")) label = safeLabels.settings || label;
+
+  return <DashboardSkeleton label={label} lang={lang} />;
+}
+
+export function DashboardShell({
+  children,
+  compactSidebar = false,
+  hideLanguage = false,
+  isPageBuilderShell = false,
+  lang,
+  onLanguageChange,
+  onLogout,
+  onNavigate,
+  onSidebarToggle,
+  onThemeModeChange,
+  open,
+  openMenuLabel,
+  closeMenuLabel,
+  shellLang,
+  themeMode,
+  user,
+}) {
+  const activeLang = shellLang || lang;
+  const isShellRtl = activeLang === "ar";
+  const useCompactBuilderSidebar = isPageBuilderShell || compactSidebar;
+
+  return (
+    <div
+      className={[
+        "admin-dashboard-layout",
+        useCompactBuilderSidebar ? "admin-dashboard-layout-builder" : "",
+        isShellRtl ? "is-rtl" : "is-ltr",
+        open ? "sidebar-open" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      dir={isShellRtl ? "rtl" : "ltr"}
+    >
+      <button
+        type="button"
+        className="dashboard-mobile-menu-button"
+        onClick={onSidebarToggle}
+        aria-label={open ? closeMenuLabel : openMenuLabel}
+        aria-expanded={open}
+        aria-controls="dashboard-sidebar"
+      >
+        {open ? <X size={22} /> : <Menu size={22} />}
+      </button>
+
+      <button
+        type="button"
+        className="dashboard-sidebar-backdrop"
+        onClick={onNavigate}
+        aria-label={closeMenuLabel}
+      />
+
+      <DashboardSidebar
+        id="dashboard-sidebar"
+        lang={activeLang}
+        user={user}
+        onLogout={onLogout}
+        onLanguageChange={hideLanguage ? undefined : onLanguageChange}
+        hideLanguage={hideLanguage}
+        themeMode={themeMode}
+        onThemeModeChange={onThemeModeChange}
+        compact={useCompactBuilderSidebar}
+        onNavigate={onNavigate}
+      />
+
+      <main
+        className={[
+          "admin-dashboard-page",
+          isPageBuilderShell ? "page-builder-dashboard-page" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        dir={isShellRtl ? "rtl" : "ltr"}
+      >
+        {children}
+      </main>
+    </div>
+  );
+}

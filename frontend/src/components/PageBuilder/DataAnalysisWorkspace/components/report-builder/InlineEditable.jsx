@@ -1,6 +1,7 @@
 export default function InlineEditable({
   value,
   placeholder,
+  ariaLabel,
   className = "",
   multiline = false,
   direction = "auto",
@@ -20,37 +21,35 @@ export default function InlineEditable({
     }
   };
 
+  const getPlainEditableText = (element) => {
+    const text = element.textContent || "";
+    return multiline ? text.replace(/\r\n/g, "\n") : text.replace(/\s*\n\s*/g, " ");
+  };
+
   const commonProps = {
     className: `daw-report-editable ${className}`,
     contentEditable: editable,
     suppressContentEditableWarning: true,
     role: "textbox",
     "aria-multiline": multiline,
+    "aria-label": ariaLabel || placeholder || "Editable report text",
     dir: direction,
     "data-placeholder": placeholder,
     onKeyDown: handleKeyDown,
     onFocus,
+    onBlur: (event) => {
+      onChange(getPlainEditableText(event.currentTarget), event.currentTarget.dir);
+    },
     onPaste: (event) => {
       event.preventDefault();
-      document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
+      const text = event.clipboardData.getData("text/plain");
+      document.execCommand("insertText", false, text);
     },
   };
 
-  if (multiline) {
-    return (
-      <div
-        {...commonProps}
-        onBlur={(event) => onChange(event.currentTarget.innerHTML, event.currentTarget.dir)}
-        dangerouslySetInnerHTML={{ __html: value }}
-      />
-    );
-  }
-
   return (
-    <div
-      {...commonProps}
-    onBlur={(event) => onChange(event.currentTarget.innerHTML, event.currentTarget.dir)}
-    dangerouslySetInnerHTML={{ __html: value }}
-    />
+    <div {...commonProps}>
+      {String(value || "")}
+    </div>
   );
 }

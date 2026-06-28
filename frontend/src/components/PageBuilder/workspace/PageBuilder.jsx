@@ -161,6 +161,7 @@ import {
   createBuilderProjectPayload,
   exportBuilderProjectJson,
 } from "../core/PageBuilder.persistence";
+import useDebouncedProjectStorage from "./hooks/useDebouncedProjectStorage";
 
 import {
   getBuilderElementStyle,
@@ -209,10 +210,31 @@ const builderTabIdByPathSegment = {
   workflows: "workflows",
 };
 
+const STARTER_MODAL_DISMISSED_KEY = `${STORAGE_KEY}:starter-template-selected`;
+
 const getBuilderTabFromPath = (pathname = "") => {
   const match = pathname.match(/^\/page-builder\/([^/?#]+)/);
   if (!match) return null;
   return builderTabIdByPathSegment[match[1]] || null;
+};
+
+const hasStoredStarterChoice = () => {
+  try {
+    return (
+      localStorage.getItem(STARTER_MODAL_DISMISSED_KEY) === "true" ||
+      Boolean(localStorage.getItem(STORAGE_KEY))
+    );
+  } catch {
+    return false;
+  }
+};
+
+const rememberStarterChoice = () => {
+  try {
+    localStorage.setItem(STARTER_MODAL_DISMISSED_KEY, "true");
+  } catch {
+    // Local storage may be unavailable in private or restricted contexts.
+  }
 };
 
 const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
@@ -238,6 +260,11 @@ export default function PageBuilder({
   const [project, setProject] = useState(() =>
     demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
   );
+  const persistProjectNow = useDebouncedProjectStorage({
+    disabled: demoMode,
+    project,
+    storageKey: STORAGE_KEY,
+  });
   const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
   const [builderProjectLoading, setBuilderProjectLoading] = useState(!demoMode);
   const [activeTab, setActiveTabState] = useState(routeTab || initialTab || "design");
@@ -245,12 +272,15 @@ export default function PageBuilder({
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
   const [selected, setSelected] = useState({ type: "page", id: null });
-  const [modal, setModal] = useState(() => (hideWorkspaceTabs ? null : "starter"));
+  const [modal, setModal] = useState(() =>
+    hideWorkspaceTabs || hasStoredStarterChoice() ? null : "starter"
+  );
   const [dragState, setDragState] = useState(null);
   const [paletteDropSectionId, setPaletteDropSectionId] = useState("");
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
   const [pagePendingDelete, setPagePendingDelete] = useState(null);
-  const [insertTarget, setInsertTarget] = useState(null);
+  const [previewOverlapWarnings, setPreviewOverlapWarnings] = useState([]);
+  const [, setInsertTarget] = useState(null);
   const [runtimeAnswers, setRuntimeAnswers] = useState({});
   const [runtimeErrors, setRuntimeErrors] = useState({});
   const [runtimeFormPages, setRuntimeFormPages] = useState({});
@@ -294,24 +324,15 @@ export default function PageBuilder({
   }, [hideWorkspaceTabs, location.pathname, navigate, routeTab]);
 
   const openPreviewPage = () => {
-    if (!demoMode) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
-    }
+    persistProjectNow(project);
     window.open("/page-builder/preview", "_blank", "noopener,noreferrer");
   };
 
   const openFormPreviewPage = (formId = activeForm?.id) => {
     if (!formId) return;
-    if (!demoMode) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
-    }
+    persistProjectNow(project);
     window.open(`/page-builder/form-preview/${formId}`, "_blank", "noopener,noreferrer");
   };
-
-  useEffect(() => {
-    if (demoMode) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
-  }, [demoMode, project]);
 
   useEffect(() => {
     const requiresLayoutNormalization =
@@ -377,7 +398,13 @@ export default function PageBuilder({
           setBuilderProjectRecord(fullRecord);
           setProject(loadedProject);
           setSelected({ type: "page", id: loadedProject.activePageId });
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedProject));
+          persistProjectNow(loadedProject);
+          rememberStarterChoice();
+          setModal((currentModal) => {
+            if (currentModal !== "starter") return currentModal;
+            setActiveTopbarAction("");
+            return null;
+          });
         }
       } catch (error) {
         console.warn("Could not load builder project from backend:", error);
@@ -396,7 +423,7 @@ export default function PageBuilder({
     return () => {
       cancelled = true;
     };
-  }, [demoMode, user?.id]);
+  }, [demoMode, persistProjectNow, user?.id]);
 
   const safeProjectPages = Array.isArray(project?.pages) ? project.pages : [];
   const safeProjectForms = Array.isArray(project?.forms) ? project.forms : [];
@@ -954,85 +981,6 @@ export default function PageBuilder({
     });
   };
 
-  const smartAddElement = (type) => {
-    const element = createElement(type, type === "formBlock" ? { connectedFormId: project.activeFormId } : {});
-    const selectedElementLocation = selectedElement ? findElementLocation(selectedElement.id) : null;
-
-    if (selectedSection?.mode === "direct") {
-      addComponentToSection(
-        type,
-        selectedSection.id,
-        insertTarget?.sectionId === selectedSection.id && insertTarget.mode === "direct"
-          ? { x: insertTarget.x, y: insertTarget.y }
-          : null
-      );
-      return;
-    }
-
-    const insertTargetColumnExists = activePage.sections.some((section) =>
-      (section.rows || []).some((row) =>
-        (row.columns || []).some((column) => column.id === insertTarget?.columnId)
-      )
-    );
-
-    let targetColumnId =
-      selectedElementLocation?.isFree === false
-        ? selectedElementLocation.columnId
-        : selectedColumn?.id || (insertTargetColumnExists ? insertTarget.columnId : "");
-    const afterElementId =
-      selectedElementLocation?.isFree === false
-        ? selectedElement.id
-        : insertTarget?.columnId === targetColumnId
-          ? insertTarget.afterElementId
-          : "";
-
-    if (!targetColumnId && selectedSection?.mode === "auto") {
-      targetColumnId = selectedSection.rows?.[0]?.columns?.[0]?.id;
-    }
-
-    if (!targetColumnId) {
-      const latestSection = activePage.sections[activePage.sections.length - 1];
-      targetColumnId = latestSection?.rows?.[0]?.columns?.[0]?.id;
-    }
-
-    if (!targetColumnId) {
-      const section = createSection({
-        name: "Quick Section",
-        rows: [createRow([createColumn([element])])],
-      });
-      updateSections((sections) => [...sections, section]);
-      setSelected({ type: "element", id: element.id });
-      return;
-    }
-
-    updateSections((sections) =>
-      sections.map((section) => ({
-        ...section,
-        rows: section.rows.map((row) => ({
-          ...row,
-          columns: row.columns.map((column) => {
-            if (column.id !== targetColumnId) return column;
-
-            if (!afterElementId) {
-              return { ...column, elements: [...column.elements, element] };
-            }
-
-            const insertIndex = column.elements.findIndex((item) => item.id === afterElementId);
-            if (insertIndex < 0) {
-              return { ...column, elements: [...column.elements, element] };
-            }
-
-            const elements = [...column.elements];
-            elements.splice(insertIndex + 1, 0, element);
-            return { ...column, elements };
-          }),
-        })),
-      }))
-    );
-
-    setSelected({ type: "element", id: element.id });
-  };
-
   const updateSelectedElement = (updates) => {
     if (!selectedElement) return;
 
@@ -1340,35 +1288,6 @@ export default function PageBuilder({
     if (Object.keys(nextErrors).length > 0) return;
 
     const quizResult = form.mode === "quiz" ? gradeQuizResponse(form, answers) : null;
-    const responseStatus =
-      quizResult?.passed === true
-        ? "Passed"
-        : quizResult?.passed === false
-          ? "Failed"
-          : form.mode === "quiz"
-            ? "Submitted"
-            : "New";
-
-    const response = {
-      id: createId("response"),
-      createdAt: new Date().toISOString(),
-      status: responseStatus,
-      answers,
-      ...(quizResult ? { quiz: quizResult } : {}),
-    };
-
-    updateProject((prev) => ({
-      ...prev,
-      forms: prev.forms.map((item) =>
-        item.id === form.id ? { ...item, responses: [response, ...item.responses] } : item
-      ),
-      collections: prev.collections.map((collection) =>
-        collection.id === form.connectedCollectionId
-          ? { ...collection, records: [response, ...(collection.records || [])] }
-          : collection
-      ),
-    }));
-
     setRuntimeAnswers((prev) => ({ ...prev, [form.id]: {} }));
     resetQuizSession(form.id);
     if (form.mode === "quiz" && document.fullscreenElement) {
@@ -1473,7 +1392,7 @@ export default function PageBuilder({
           setBuilderProjectRecord(fullRecord);
           setProject(loadedProject);
           setSelected({ type: "page", id: loadedProject.activePageId });
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedProject));
+          persistProjectNow(loadedProject);
           showToast("Loaded backend project.");
           return;
         }
@@ -1601,6 +1520,8 @@ export default function PageBuilder({
   const exportProject = () => exportBuilderProjectJson({ project, showToast });
 
   const applyStarter = (starterId) => {
+    rememberStarterChoice();
+
     if (starterId === "blankPage") {
       const canvasSection = convertSectionToDirectLayout(
         createSection({
@@ -1826,6 +1747,25 @@ export default function PageBuilder({
       createPosition,
       positionsOverlap,
     });
+
+  const handlePreviewClick = () => {
+    if (preview) {
+      setPreview(false);
+      showToast("Preview closed.");
+      return;
+    }
+
+    const overlapWarnings = getProjectOverlapWarnings(project);
+
+    if (overlapWarnings.length > 0) {
+      setPreviewOverlapWarnings(overlapWarnings);
+      showToast("Preview blocked. Fix the overlapping elements first.");
+      return;
+    }
+
+    setPreview(true);
+    showToast("Preview mode on.");
+  };
 
   const startDrag = (event, element, interaction = "move", forceInteraction = false) => {
     if (preview || element.mode !== "direct") return;
@@ -2257,6 +2197,14 @@ export default function PageBuilder({
                     <span>Delete page</span>
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  className="page-preview-action"
+                  onClick={handlePreviewClick}
+                >
+                  {builderCopy.topbar.preview}
+                </button>
               </section>
             )}
 
@@ -2293,19 +2241,6 @@ export default function PageBuilder({
             <section className="builder-panel">
               <h2>Layers</h2>
               <p className="panel-help">Page outline. Select a section or component to edit it.</p>
-              <div className="layer-add-actions">
-                {[
-                  ["heading", "Headline"],
-                  ["text", "Description"],
-                  ["button", "Button"],
-                  ["image", "Image"],
-                  ["formBlock", "Form"],
-                ].map(([type, label]) => (
-                  <button type="button" key={type} onClick={() => smartAddElement(type)}>
-                    Add {label}
-                  </button>
-                ))}
-              </div>
               <div className="layer-tree">
                 {activePage?.sections.map((section, sectionIndex) => {
                   const elements = getSectionLayerElements(section);
@@ -2926,9 +2861,11 @@ export default function PageBuilder({
   );
 
   const formatSavedValue = (value) => {
+    if (Array.isArray(value) && !value.length) return "-";
     if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
     if (value === true) return "Yes";
     if (value === false) return "No";
+    if (value === null || value === undefined || value === "") return "-";
     if (value === null || value === undefined || value === "") return "—";
     if (typeof value === "object" && value.name) return value.name;
     if (typeof value === "object") return JSON.stringify(value);
@@ -3221,6 +3158,8 @@ export default function PageBuilder({
           viewports={viewports}
           viewport={viewport}
           setViewport={setViewport}
+          copy={builderCopy.topbar}
+          onPreviewClick={handlePreviewClick}
           renderWorkspaceNavigator={renderWorkspaceNavigator}
         />
 
@@ -3257,6 +3196,66 @@ export default function PageBuilder({
           onCancel={() => setPagePendingDelete(null)}
           onConfirm={confirmDeleteActivePage}
         />
+      )}
+
+      {previewOverlapWarnings.length > 0 && (
+        <div
+          className="builder-modal-backdrop"
+          onClick={() => setPreviewOverlapWarnings([])}
+        >
+          <section
+            className="builder-modal overlap-warning-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="overlap-warning-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <span className="modal-eyebrow">Layout check</span>
+                <h2 id="overlap-warning-title">
+                  Almost ready to preview
+                </h2>
+                <p>
+                  I found {previewOverlapWarnings.length} place
+                  {previewOverlapWarnings.length === 1 ? "" : "s"} where elements are sitting on top of each other. Move one of them a little, then preview again.
+                </p>
+              </div>
+              <button type="button" onClick={() => setPreviewOverlapWarnings([])}>
+                Close
+              </button>
+            </div>
+
+            <div className="overlap-warning-list">
+              {previewOverlapWarnings.slice(0, 5).map((warning, index) => (
+                <article
+                  className="overlap-warning-item"
+                  key={`${warning.page}_${warning.section}_${warning.viewport}_${warning.first}_${warning.second}_${index}`}
+                >
+                  <div className="overlap-warning-item-top">
+                    <span>{warning.viewport}</span>
+                    <small>{warning.page} / {warning.section}</small>
+                  </div>
+                  <strong>{warning.first} is covering {warning.second}</strong>
+                  <p>Move or resize one of these components so both are readable.</p>
+                </article>
+              ))}
+            </div>
+
+            {previewOverlapWarnings.length > 5 && (
+              <p className="overlap-warning-more">
+                Plus {previewOverlapWarnings.length - 5} more overlap
+                {previewOverlapWarnings.length - 5 === 1 ? "" : "s"}.
+              </p>
+            )}
+
+            <div className="overlap-warning-actions">
+              <button type="button" onClick={() => setPreviewOverlapWarnings([])}>
+                Fix layout
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {modal === "starter" && activeTab === "design" && (

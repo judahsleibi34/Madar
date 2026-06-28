@@ -3,8 +3,7 @@ import { useState } from "react";
 import GradientText from "../Animations/GradientText";
 import { getContactContent } from "../../content";
 import { FormBlock, HeroBlock, SectionBlock } from "../../blocks";
-
-const API_URL = import.meta.env.VITE_API_URL || "/api";
+import { postPublicJson, readApiError } from "../../utils/apiClient";
 
 export default function ContactPage({ lang = "en" }) {
   const t = getContactContent(lang);
@@ -23,19 +22,17 @@ export default function ContactPage({ lang = "en" }) {
     setStatus({ type: "", message: "" });
 
     try {
-      const response = await fetch(`${API_URL}/public/contact`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { response, data } = await postPublicJson(
+        "/public/contact",
+        {
           name: form.name,
           phone: form.phone || null,
           message: form.message,
-        }),
-      });
+        }
+      );
 
       if (!response.ok) {
-        throw new Error("Contact request failed");
+        throw new Error(readApiError(data, "Contact request failed"));
       }
 
       setForm({ name: "", phone: "", message: "" });

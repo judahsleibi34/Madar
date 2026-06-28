@@ -5,6 +5,8 @@ export default function PageBuilderSubbar({
   viewport,
   setViewport,
   renderWorkspaceNavigator,
+  copy,
+  onPreviewClick,
 }) {
   if (!preview && !hideWorkspaceTabs) {
     return (
@@ -16,20 +18,30 @@ export default function PageBuilderSubbar({
 
   if (preview) {
     return (
-      <div className="preview-device-toolbar">
-        <div className="viewport-switcher">
-          {Object.keys(viewports).map((item) => (
-            <button
-              type="button"
-              key={item}
-              className={viewport === item ? "active" : ""}
-              onClick={() => setViewport(item)}
-            >
-              {item}
-            </button>
-          ))}
+      <>
+        <button
+          type="button"
+          className="preview-floating-exit"
+          onClick={onPreviewClick}
+        >
+          {copy?.exitPreview || "Exit preview"}
+        </button>
+
+        <div className="preview-device-toolbar">
+          <div className="viewport-switcher">
+            {Object.keys(viewports).map((item) => (
+              <button
+                type="button"
+                key={item}
+                className={viewport === item ? "active" : ""}
+                onClick={() => setViewport(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 

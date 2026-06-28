@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { postAuthJson } from "../../utils/apiClient";
 import { normalizeAuthMessage } from "./authMessages";
-
-const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 export default function ForgotPasswordPage({ lang = "en", loginPath = "/login" }) {
   const { t } = useTranslation("auth");
@@ -44,13 +43,10 @@ export default function ForgotPasswordPage({ lang = "en", loginPath = "/login" }
     setStatusMessage("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-
-      const data = await response.json();
+      const { response, data } = await postAuthJson(
+        "/auth/forgot-password",
+        { email: email.trim() }
+      );
 
       if (!response.ok) {
         if (response.status === 404) {
