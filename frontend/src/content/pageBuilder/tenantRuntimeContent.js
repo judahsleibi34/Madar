@@ -85,6 +85,8 @@ export const tenantRuntimeContent = {
       emailPlaceholder: "name@example.com",
       password: "Password",
       passwordPlaceholder: "Enter password",
+      confirmPassword: "Confirm password",
+      confirmPasswordPlaceholder: "Confirm password",
       noPublishedTitle: "No published site found",
       noPublishedBody: "Save the project in Page Builder, then publish the site again.",
       defaultDescription: "An adaptive business management platform for creating and managing digital systems.",

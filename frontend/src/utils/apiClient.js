@@ -2,12 +2,12 @@ export const CSRF_HEADER_NAME = "X-CSRF-Token";
 export const CSRF_COOKIE_NAME = "madar_csrf_token";
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const API_URL = import.meta.env.VITE_API_URL || "/api";
+export const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 let csrfToken = "";
 let refreshSessionPromise = null;
 
-const getApiUrl = (path) =>
+export const getApiUrl = (path) =>
   `${String(API_URL).replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
 
 const getCookieValue = (name) => {
@@ -37,6 +37,40 @@ export const syncCsrfTokenFromResponseData = (data) => {
   if (data?.csrf_token) {
     setCsrfToken(data.csrf_token);
   }
+};
+
+export const readApiResponse = async (response) => {
+  const contentType = response.headers.get("Content-Type") || "";
+
+  if (contentType.includes("application/json")) {
+    const data = await response.json().catch(() => null);
+    syncCsrfTokenFromResponseData(data);
+    return data;
+  }
+
+  const text = await response.text();
+  return {
+    detail: text || response.statusText || "The server returned an unreadable response.",
+  };
+};
+
+export const readApiError = (data, fallback = "Request failed") => {
+  if (typeof data?.detail === "string" && data.detail.trim()) {
+    return data.detail;
+  }
+
+  if (typeof data?.message === "string" && data.message.trim()) {
+    return data.message;
+  }
+
+  if (Array.isArray(data?.detail)) {
+    return data.detail
+      .map((error) => error?.msg || "")
+      .filter(Boolean)
+      .join(" ") || fallback;
+  }
+
+  return fallback;
 };
 
 export const apiFetch = async (input, init = {}) => {
@@ -111,3 +145,31 @@ export const apiFetch = async (input, init = {}) => {
 
   return response;
 };
+
+const postJson = async (path, payload, init = {}) => {
+  const { headers: initHeaders, ...fetchInit } = init;
+  const response = await apiFetch(getApiUrl(path), {
+    ...fetchInit,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(initHeaders || {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await readApiResponse(response);
+  return { response, data };
+};
+
+export const postAuthJson = (path, payload, init = {}) =>
+  postJson(path, payload, {
+    skipAuthRefresh: true,
+    ...init,
+  });
+
+export const postPublicJson = (path, payload, init = {}) =>
+  postJson(path, payload, {
+    skipAuthRefresh: true,
+    ...init,
+  });

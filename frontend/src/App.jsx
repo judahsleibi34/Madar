@@ -1,12 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  Routes,
-  Route,
-  useNavigate,
-  Navigate,
-  useLocation,
-} from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import TeamPage from "./components/MainPages/TeamPage";
@@ -44,41 +37,18 @@ import {
   clearCsrfToken,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
-import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
-import { appShellContent } from "./content";
+import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
+const AdminRoutes = lazy(() => import("./routes/AdminRoutes"));
+const PublicRoutes = lazy(() => import("./routes/PublicRoutes"));
+const TenantSiteRoutes = lazy(() => import("./routes/TenantSiteRoutes"));
+const UserWorkspaceRoutes = lazy(() => import("./routes/UserWorkspaceRoutes"));
+
 let authBootstrapPromise = null;
-
-function normalizeUserType(value) {
-  return String(value || "user").trim().toLowerCase();
-}
-
-function RestrictedAccessWindow({
-  title = appShellContent.restrictedAccess.title,
-  message = appShellContent.restrictedAccess.defaultMessage,
-  actionLabel = appShellContent.restrictedAccess.actionLabel,
-  onAction,
-}) {
-  return (
-    <section className="restricted-access-page">
-      <div className="restricted-access-card" role="status">
-        <div className="restricted-access-content">
-          <p className="restricted-access-eyebrow">{title}</p>
-          <h1>{title}</h1>
-          <p>{message}</p>
-        </div>
-
-        <button type="button" onClick={onAction}>
-          {actionLabel}
-        </button>
-      </div>
-    </section>
-  );
-}
 
 export default function App() {
   const { t, i18n } = useTranslation(["auth", "dashboard", "common"]);
@@ -95,18 +65,8 @@ export default function App() {
 
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
-  const isRegularUser = !isAdminUser;
-
-  const isTenantSiteRoute = location.pathname.startsWith("/site/");
-
-  const isDashboardRoute =
-    location.pathname.startsWith("/dashboard") ||
-    location.pathname.startsWith("/page-builder") ||
-    location.pathname.startsWith("/builder-responses") ||
-    location.pathname.startsWith("/builder-data") ||
-    location.pathname.startsWith("/my-plan") ||
-    location.pathname.startsWith("/admin/users") ||
-    location.pathname.startsWith("/settings");
+  const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
+  const isDashboardRoute = isDashboardRoutePath(location.pathname);
 
   const getCurrentReturnTo = () =>
     encodeURIComponent(
@@ -175,8 +135,7 @@ export default function App() {
     const data = await response.json();
     syncCsrfTokenFromResponseData(data);
 
-    const loggedIn =
-      data.logged_in === true || data.authenticated === true;
+    const loggedIn = data.logged_in === true || data.authenticated === true;
 
     if (!loggedIn || !data.user) return null;
 
@@ -212,6 +171,7 @@ export default function App() {
 
       if (!loggedIn) {
         const refreshedUser = await refreshAuthSession();
+
         if (refreshedUser?.id) {
           return {
             loggedIn: true,
@@ -229,6 +189,7 @@ export default function App() {
 
       if (!userInfo?.id) {
         const refreshedUser = await refreshAuthSession();
+
         if (refreshedUser?.id) {
           return {
             loggedIn: true,
@@ -431,10 +392,12 @@ export default function App() {
             setUser(refreshedUser);
           } else {
             softFailureCount += 1;
+
             if (softFailureCount >= MAX_SOFT_FAILURES) {
               clearSession();
             }
           }
+
           return;
         }
 
@@ -486,44 +449,6 @@ export default function App() {
   const handleLanguageChange = (code) => {
     if (code !== "ar" && code !== "en") return;
     setLang(setAppLanguage(code));
-  };
-
-  const getSafePostLoginPath = (userInfo, returnTo) => {
-    const nextUserType = normalizeUserType(userInfo?.user_type);
-    const nextUserIsAdmin = nextUserType === "admin";
-
-    let nextPath =
-      returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
-        ? returnTo
-        : "/dashboard";
-
-    const adminOnlyPaths = ["/admin/users"];
-
-    const userOnlyPaths = [
-      "/page-builder",
-      "/builder-responses",
-      "/builder-data",
-      "/my-plan",
-      "/settings",
-    ];
-
-    const isAdminOnlyPath = adminOnlyPaths.some((path) =>
-      nextPath.startsWith(path)
-    );
-
-    const isUserOnlyPath = userOnlyPaths.some((path) =>
-      nextPath.startsWith(path)
-    );
-
-    if (nextUserIsAdmin && isUserOnlyPath) {
-      nextPath = "/dashboard";
-    }
-
-    if (!nextUserIsAdmin && isAdminOnlyPath) {
-      nextPath = "/dashboard";
-    }
-
-    return nextPath;
   };
 
   const handleLoginSuccess = async () => {
@@ -606,263 +531,94 @@ export default function App() {
     [isLoggedIn, normalizeUser]
   );
 
-  const goBackToDashboard = () => {
-    navigate("/dashboard", { replace: true });
+  const shellProps = {
+    closeMenuLabel: t("common:navigation.closeMenu"),
+    lang,
+    onLanguageChange: handleLanguageChange,
+    onLogout: handleLogout,
+    onNavigate: () => setDashboardSidebarOpen(false),
+    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
+    onThemeModeChange: handleThemeModeChange,
+    open: dashboardSidebarOpen,
+    openMenuLabel: t("common:navigation.openMenu"),
+    themeMode,
+    user,
   };
 
-  const renderDashboardSkeleton = (label = t("dashboard:loading.dashboard")) => (
-    <div
-      className="dashboard-skeleton-layout"
-      aria-label={label}
-      dir={lang === "ar" ? "rtl" : "ltr"}
-    >
-      <aside className="dashboard-skeleton-sidebar">
-        <div className="skeleton-logo-row">
-          <div className="skeleton-circle" />
-          <div>
-            <div className="skeleton-line skeleton-title" />
-            <div className="skeleton-line skeleton-small" />
-          </div>
-        </div>
+  const dashboardLoadingLabels = {
+    dashboard: t("dashboard:loading.dashboard"),
+    pageBuilder: t("dashboard:loading.pageBuilder"),
+    submissions: t("dashboard:loading.submissions"),
+    dataLogs: t("dashboard:loading.dataLogs"),
+    myPlan: t("dashboard:loading.myPlan"),
+    userManagement: t("dashboard:loading.userManagement"),
+    passwordSettings: t("dashboard:loading.passwordSettings"),
+    settings: t("dashboard:loading.settings"),
+  };
 
-        <div className="skeleton-nav">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <div className="skeleton-sidebar-row" key={index}>
-              <div className="skeleton-circle skeleton-sidebar-icon" />
-              <div className="skeleton-line skeleton-sidebar-label" />
-            </div>
-          ))}
-        </div>
-
-        <div className="skeleton-sidebar-bottom">
-          <div className="skeleton-sidebar-row">
-            <div className="skeleton-circle skeleton-sidebar-icon" />
-            <div className="skeleton-line skeleton-sidebar-label" />
-          </div>
-
-          <div className="skeleton-sidebar-row">
-            <div className="skeleton-circle skeleton-sidebar-icon" />
-            <div className="skeleton-line skeleton-sidebar-label" />
-          </div>
-
-          <div className="skeleton-user-row">
-            <div className="skeleton-circle skeleton-user-avatar" />
-            <div className="skeleton-user-lines">
-              <div className="skeleton-line skeleton-user-badge" />
-              <div className="skeleton-line skeleton-user-name" />
-              <div className="skeleton-line skeleton-user-email" />
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <section className="dashboard-skeleton-page">
-        <div className="dashboard-skeleton-header">
-          <div className="skeleton-line skeleton-heading" />
-          <div className="skeleton-line skeleton-subheading" />
-        </div>
-
-        <div className="dashboard-skeleton-cards">
-          <div className="skeleton-card" />
-          <div className="skeleton-card" />
-          <div className="skeleton-card" />
-          <div className="skeleton-card" />
-        </div>
-
-        <div className="dashboard-skeleton-panels">
-          <div className="skeleton-panel skeleton-panel-large" />
-          <div className="skeleton-panel" />
-        </div>
-
-        <div className="dashboard-skeleton-panels lower">
-          <div className="skeleton-panel" />
-          <div className="skeleton-panel" />
-        </div>
-      </section>
+  const routeFallback = isDashboardRoute ? (
+    <DashboardLoadingElement
+      pathname={location.pathname}
+      labels={dashboardLoadingLabels}
+      lang={lang}
+    />
+  ) : (
+    <div className="route-loading" role="status" aria-live="polite">
+      Loading...
     </div>
   );
 
-  const renderFormBuilderSkeleton = () => (
-    <div
-      className="forms-loading-shell"
-      aria-label="Loading forms"
-      dir={lang === "ar" ? "rtl" : "ltr"}
-    >
-      <aside className="forms-loading-app-rail" aria-hidden="true">
-        <span className="forms-loading-avatar forms-loading-shimmer" />
-        <div className="forms-loading-rail-stack">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <span className="forms-loading-rail-icon forms-loading-shimmer" key={index} />
-          ))}
-        </div>
-        <span className="forms-loading-avatar small forms-loading-shimmer" />
-      </aside>
+  let routeContent;
 
-      <main className="forms-loading-page">
-        <header className="forms-loading-header">
-          <span className="forms-loading-line title forms-loading-shimmer" />
-          <span className="forms-loading-line subtitle forms-loading-shimmer" />
-        </header>
-
-        <div className="forms-loading-workspace">
-          <aside className="forms-loading-controls">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div className="forms-loading-control-group" key={index}>
-                <span className="forms-loading-line label forms-loading-shimmer" />
-                <span className="forms-loading-control forms-loading-shimmer" />
-              </div>
-            ))}
-            <div className="forms-loading-actions">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <span className="forms-loading-button forms-loading-shimmer" key={index} />
-              ))}
-            </div>
-          </aside>
-
-          <section className="forms-loading-document">
-            <div className="forms-loading-document-top">
-              <span className="forms-loading-line page-title forms-loading-shimmer" />
-              <span className="forms-loading-pill forms-loading-shimmer" />
-            </div>
-            <span className="forms-loading-textarea forms-loading-shimmer" />
-            <div className="forms-loading-toolbar">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <span className="forms-loading-tool forms-loading-shimmer" key={index} />
-              ))}
-            </div>
-            {Array.from({ length: 3 }).map((_, index) => (
-              <article className="forms-loading-question" key={index}>
-                <span className="forms-loading-dot forms-loading-shimmer" />
-                <div className="forms-loading-question-body">
-                  <span className="forms-loading-line question-title forms-loading-shimmer" />
-                  <span className="forms-loading-control answer forms-loading-shimmer" />
-                  <span className="forms-loading-line hint forms-loading-shimmer" />
-                </div>
-                <span className="forms-loading-type forms-loading-shimmer" />
-              </article>
-            ))}
-          </section>
-        </div>
-      </main>
-    </div>
-  );
-
-  const renderFormPreviewSkeleton = () => (
-    <main
-      className="form-preview-loading-page"
-      aria-label={appShellContent.loading.formPreview}
-      dir={lang === "ar" ? "rtl" : "ltr"}
-    >
-      <header className="form-preview-loading-topbar">
-        <span className="form-preview-loading-button forms-loading-shimmer" />
-        <span className="form-preview-loading-title forms-loading-shimmer" />
-      </header>
-
-      <section className="form-preview-loading-shell">
-        <div className="form-preview-loading-header">
-          <span className="form-preview-loading-line heading forms-loading-shimmer" />
-          <span className="form-preview-loading-line copy forms-loading-shimmer" />
-        </div>
-
-        {Array.from({ length: 4 }).map((_, index) => (
-          <article className="form-preview-loading-question" key={index}>
-            <span className="form-preview-loading-line label forms-loading-shimmer" />
-            <span className="form-preview-loading-input forms-loading-shimmer" />
-            {index < 2 && <span className="form-preview-loading-line help forms-loading-shimmer" />}
-          </article>
-        ))}
-
-        <footer className="form-preview-loading-actions">
-          <span className="form-preview-loading-small-button forms-loading-shimmer" />
-          <span className="form-preview-loading-page-pill forms-loading-shimmer" />
-          <span className="form-preview-loading-submit forms-loading-shimmer" />
-        </footer>
-      </section>
-    </main>
-  );
-
-  const renderDashboardShell = (
-    children,
-    isPageBuilderShell = false,
-    options = {}
-  ) => {
-    const shellLang = options.lang || lang;
-    const isShellRtl = shellLang === "ar";
-    const useCompactBuilderSidebar =
-      isPageBuilderShell || options.compactSidebar;
-
-    const openMenuLabel = t("common:navigation.openMenu");
-    const closeMenuLabel = t("common:navigation.closeMenu");
-
-    const closeDashboardSidebar = () => setDashboardSidebarOpen(false);
-
-    return (
-      <div
-        className={[
-          "admin-dashboard-layout",
-          useCompactBuilderSidebar ? "admin-dashboard-layout-builder" : "",
-          isShellRtl ? "is-rtl" : "is-ltr",
-          dashboardSidebarOpen ? "sidebar-open" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        dir={isShellRtl ? "rtl" : "ltr"}
-      >
-        <button
-          type="button"
-          className="dashboard-mobile-menu-button"
-          onClick={() => setDashboardSidebarOpen((open) => !open)}
-          aria-label={dashboardSidebarOpen ? closeMenuLabel : openMenuLabel}
-          aria-expanded={dashboardSidebarOpen}
-          aria-controls="dashboard-sidebar"
-        >
-          {dashboardSidebarOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
-
-        <button
-          type="button"
-          className="dashboard-sidebar-backdrop"
-          onClick={closeDashboardSidebar}
-          aria-label={closeMenuLabel}
+  if (isTenantSiteRoute) {
+    routeContent = <TenantSiteRoutes />;
+  } else if (isDashboardRoute) {
+    if (!authChecked) {
+      routeContent = (
+        <DashboardLoadingElement
+          pathname={location.pathname}
+          labels={dashboardLoadingLabels}
+          lang={lang}
         />
-
-        <DashboardSidebar
-          id="dashboard-sidebar"
-          lang={shellLang}
-          user={user}
-          onLogout={handleLogout}
-          onLanguageChange={
-            options.hideLanguage ? undefined : handleLanguageChange
-          }
-          hideLanguage={options.hideLanguage}
+      );
+    } else if (!isLoggedIn) {
+      routeContent = (
+        <Navigate to={`/login?returnTo=${getCurrentReturnTo()}`} replace />
+      );
+    } else if (isAdminUser) {
+      routeContent = (
+        <AdminRoutes
+          lang={lang}
+          onGoToDashboard={() => navigate("/dashboard", { replace: true })}
+          shellProps={shellProps}
           themeMode={themeMode}
-          onThemeModeChange={handleThemeModeChange}
-          compact={useCompactBuilderSidebar}
-          onNavigate={closeDashboardSidebar}
+          user={user}
         />
-
-        <main
-          className={[
-            "admin-dashboard-page",
-            isPageBuilderShell ? "page-builder-dashboard-page" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          dir={isShellRtl ? "rtl" : "ltr"}
-        >
-          {children}
-        </main>
-      </div>
-    );
-  };
-
-  const renderRestrictedPage = (message) =>
-    renderDashboardShell(
-      <RestrictedAccessWindow
-        title={appShellContent.restrictedAccess.title}
-        message={message}
-        actionLabel={appShellContent.restrictedAccess.actionLabel}
-        onAction={goBackToDashboard}
+      );
+    } else {
+      routeContent = (
+        <UserWorkspaceRoutes
+          lang={lang}
+          onGoToDashboard={() => navigate("/dashboard", { replace: true })}
+          onUserUpdated={handleUserUpdated}
+          shellProps={shellProps}
+          themeMode={themeMode}
+          user={user}
+        />
+      );
+    }
+  } else {
+    routeContent = (
+      <PublicRoutes
+        authChecked={authChecked}
+        isLoggedIn={isLoggedIn}
+        lang={lang}
+        onLanguageChange={handleLanguageChange}
+        onLoginSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
+        onThemeModeChange={handleThemeModeChange}
+        themeMode={themeMode}
+        user={user}
       />
     );
 

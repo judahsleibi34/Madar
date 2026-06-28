@@ -79,10 +79,10 @@
   },
 };
 
-const platformPlans = ["starter", "pro", "business"];
-const builderPlans = ["basic", "premium"];
-const builderTypes = ["website", "forms", "quiz", "reservation", "reports", "data"];
-const paymentStatuses = ["pending", "active", "past_due", "canceled"];
+export const platformPlans = ["starter", "pro", "business"];
+export const builderPlans = ["basic", "premium"];
+export const builderTypes = ["website", "forms", "quiz", "reservation", "reports", "data"];
+export const paymentStatuses = ["pending", "active", "past_due", "canceled"];
 
 export const userManagementLabelOverrides = {
   ar: {

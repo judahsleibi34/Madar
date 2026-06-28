@@ -82,8 +82,7 @@ export function useBuilderResponsesData({
   const getDisplayResponsesForForm = (form) => {
     if (!form) return [];
     if (builderProjectId && backendResponsesByForm[form.id]) return backendResponsesByForm[form.id];
-    if (builderProjectId) return [];
-    return form.responses || [];
+    return [];
   };
 
   const fields = selectedForm ? getFormFields(selectedForm) : [];

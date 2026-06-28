@@ -1,5 +1,3 @@
-﻿import { useLayoutEffect } from "react";
-
 import {
   Activity,
   BarChart3,
@@ -29,36 +27,6 @@ const serviceHealthData = [
   { key: "queueDepth", value: "24", percent: 24 },
   { key: "databaseLoad", value: "68%", percent: 68 },
 ];
-
-function forceScrollTop() {
-  if ("scrollRestoration" in window.history) {
-    window.history.scrollRestoration = "manual";
-  }
-
-  window.scrollTo({
-    top: 0,
-    left: 0,
-    behavior: "instant",
-  });
-
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-
-  const root = document.getElementById("root");
-  if (root) {
-    root.scrollTop = 0;
-  }
-
-  const dashboardPage = document.querySelector(".admin-dashboard-page");
-  if (dashboardPage) {
-    dashboardPage.scrollTop = 0;
-  }
-
-  const dashboardLayout = document.querySelector(".admin-dashboard-layout");
-  if (dashboardLayout) {
-    dashboardLayout.scrollTop = 0;
-  }
-}
 
 function OverviewCard({ title, value, sub, icon: Icon, variant }) {
   return (
@@ -114,37 +82,8 @@ function SignalCard({ label, value, trend, percent }) {
 
 export default function Dashboard({
   lang = "en",
-  user,
   themeMode = "light",
-  onThemeModeChange,
 }) {
-  useLayoutEffect(() => {
-    forceScrollTop();
-
-    const frame1 = requestAnimationFrame(() => {
-      forceScrollTop();
-    });
-
-    const frame2 = requestAnimationFrame(() => {
-      forceScrollTop();
-    });
-
-    const timeout1 = setTimeout(() => {
-      forceScrollTop();
-    }, 0);
-
-    const timeout2 = setTimeout(() => {
-      forceScrollTop();
-    }, 100);
-
-    return () => {
-      cancelAnimationFrame(frame1);
-      cancelAnimationFrame(frame2);
-      clearTimeout(timeout1);
-      clearTimeout(timeout2);
-    };
-  }, []);
-
   const safeLang = lang === "ar" ? "ar" : "en";
   const t = getAdminDashboardContent(lang);
   const maxCash = Math.max(...cashData);

@@ -20,3 +20,6 @@ export * from "./components/cardsContent";
 export * from "./components/formsContent";
 export * from "./components/sectionsContent";
 export * from "./pageBuilder";
+
+export * from "./pages/pricingContent";
+export * from "./pages/myPlanContent";

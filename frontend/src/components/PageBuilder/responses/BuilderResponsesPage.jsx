@@ -37,35 +37,9 @@ export default function BuilderResponsesPage({
       )
     : null;
 
-  const copyResults = () => {
-    if (!data.selectedForm) return;
-
-    const payload = {
-      form: data.selectedForm.title,
-      totalResponses: data.displayedResponses.length,
-      selectedStatuses: data.selectedStatuses,
-      selectedFields: data.selectedFieldIds,
-      exportedAt: new Date().toISOString(),
-      responses: data.displayedResponses,
-    };
-
-    try {
-      navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-      showToast(t.copied);
-    } catch {
-      console.log(payload);
-      showToast(t.printed);
-    }
-  };
-
   return (
     <div className="workspace-page responses-results-page" dir={isArabic ? "rtl" : "ltr"}>
-      <ResponsesHeader
-        t={t}
-        selectedForm={data.selectedForm}
-        selectForm={selectForm}
-        copyResults={copyResults}
-      />
+      <ResponsesHeader t={t} />
 
       <ResponsesSummary
         t={t}

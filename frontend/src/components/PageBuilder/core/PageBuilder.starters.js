@@ -467,19 +467,9 @@ const industryOperationsSection = ({ formId, title, description }) =>
     ],
   });
 
-const addSampleResponse = ({ form, collection, fields, answers, status = "New" }) => {
-  const response = {
-    id: `response_${collection.key}_sample`,
-    createdAt: "2026-05-25T08:00:00.000Z",
-    status,
-    answers: fields.reduce((acc, field, index) => {
-      acc[field.id] = answers[index] ?? "";
-      return acc;
-    }, {}),
-  };
-
-  form.responses = [response];
-  collection.records = [response];
+const clearStarterRecords = ({ form, collection }) => {
+  form.responses = [];
+  collection.records = [];
 };
 
 export const buildStarterProject = (starterId = "website") => {
@@ -535,33 +525,7 @@ export const buildStarterProject = (starterId = "website") => {
       successMessage: "Your request was received. The team can now review it in the workspace.",
     });
 
-    const sampleResponse = {
-      id: "response_showcase_sample",
-      createdAt: "2026-05-25T08:00:00.000Z",
-      status: "New",
-      answers: {
-        [fields[0].id]: "Sample Customer",
-        [fields[1].id]: "customer@example.com",
-        [fields[2].id]: "+972599203857",
-        [fields[3].id]: "https://madar.com",
-        [fields[4].id]: "Launch a service portal with intake, booking, reporting, and approvals.",
-        [fields[5].id]: "Operations",
-        [fields[6].id]: "High",
-        [fields[7].id]: ["Website", "Forms", "Reports"],
-        [fields[8].id]: "Yes",
-        [fields[9].id]: "7500",
-        [fields[10].id]: "12",
-        [fields[11].id]: "2026-06-10",
-        [fields[12].id]: "10:30",
-        [fields[13].id]: "9",
-        [fields[14].id]: "5",
-        [fields[15].id]: "brief.pdf",
-        [fields[16].id]: "New",
-      },
-    };
-
-    form.responses = [sampleResponse];
-    collection.records = [sampleResponse];
+    clearStarterRecords({ form, collection });
 
     const pages = [
       createPage("Builder Demo", [
@@ -626,20 +590,9 @@ export const buildStarterProject = (starterId = "website") => {
       successMessage: "Content request received. The editorial team can review it now.",
     });
 
-    addSampleResponse({
+    clearStarterRecords({
       form,
       collection,
-      fields,
-      status: "In review",
-      answers: [
-        "Customer onboarding guide",
-        "Resource",
-        "Content Manager",
-        "2026-06-12",
-        "Customers",
-        "Create a practical onboarding guide with setup steps, support links, and common questions.",
-        "In review",
-      ],
     });
 
     const pages = [
@@ -717,21 +670,9 @@ export const buildStarterProject = (starterId = "website") => {
       successMessage: "Order received. The team can confirm availability and fulfillment next.",
     });
 
-    addSampleResponse({
+    clearStarterRecords({
       form,
       collection,
-      fields,
-      status: "Confirmed",
-      answers: [
-        "Maya Haddad",
-        "maya@example.com",
-        "+972 50 555 1212",
-        "Growth package",
-        "2",
-        "2026-06-18",
-        "Need delivery before the weekend.",
-        "Confirmed",
-      ],
     });
 
     const pages = [
@@ -815,21 +756,9 @@ export const buildStarterProject = (starterId = "website") => {
       successMessage: "Employee request submitted. The review workflow can begin.",
     });
 
-    addSampleResponse({
+    clearStarterRecords({
       form,
       collection,
-      fields,
-      status: "Finance review",
-      answers: [
-        "Omar Salim",
-        "Programs",
-        "Reimbursement",
-        "420",
-        "2026-06-08",
-        "Yes",
-        "Travel reimbursement for project coordination meetings.",
-        "Finance review",
-      ],
     });
 
     const pages = [
@@ -909,22 +838,9 @@ export const buildStarterProject = (starterId = "website") => {
       successMessage: "MEAL report submitted. The coordination team can review and follow up.",
     });
 
-    addSampleResponse({
+    clearStarterRecords({
       form,
       collection,
-      fields,
-      status: "Reviewed",
-      answers: [
-        "Youth employment program",
-        "North district",
-        "Monthly",
-        "Participants completing training",
-        "120",
-        "108",
-        "Two partner sites requested clearer feedback channels.",
-        "Evening sessions improved attendance for working participants.",
-        "Reviewed",
-      ],
     });
 
     const pages = [

@@ -182,6 +182,7 @@ export const createElementRenderer = ({
             {isRegistration && <label>Full name<input type="text" placeholder="Your name" disabled={!preview} /></label>}
             <label>Email address<input type="email" placeholder="name@example.com" disabled={!preview} /></label>
             <label>Password<input type="password" placeholder="Enter password" disabled={!preview} /></label>
+            {isRegistration && <label>Confirm password<input type="password" placeholder="Confirm password" disabled={!preview} /></label>}
             <button type="button" className="runtime-submit">
               {auth.buttonText || (isRegistration ? "Create account" : "Log in")}
             </button>

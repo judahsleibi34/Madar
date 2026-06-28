@@ -168,7 +168,8 @@
 
 .page-builder .page-primary-action,
 .page-builder .page-utility-actions button,
-.page-builder .page-delete-action {
+.page-builder .page-delete-action,
+.page-builder .page-preview-action {
   min-height: 42px;
   display: inline-flex;
   align-items: center;
@@ -244,6 +245,21 @@
 
 .page-builder .page-delete-action:not(:disabled):hover {
   background: rgba(var(--theme-primary-rgb), 0.1);
+}
+
+.page-builder .page-preview-action {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--madar-border);
+  background: var(--madar-surface-soft);
+  color: var(--madar-text);
+  box-shadow: none;
+}
+
+.page-builder .page-preview-action:hover {
+  transform: translateY(-1px);
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--madar-red);
 }
 
 .page-builder .page-delete-action:disabled {

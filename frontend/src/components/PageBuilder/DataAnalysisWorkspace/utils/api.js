@@ -1,79 +1,10 @@
-export const API_URL = import.meta.env.VITE_API_URL || "/api";
-
-const CSRF_HEADER_NAME = "X-CSRF-Token";
-const CSRF_COOKIE_NAME = "madar_csrf_token";
-
-const getCookieValue = (name) => {
-  if (typeof document === "undefined") return "";
-
-  return (
-    document.cookie
-      .split(";")
-      .map((part) => part.trim())
-      .find((part) => part.startsWith(`${name}=`))
-      ?.slice(name.length + 1) || ""
-  );
-};
-
-const getCsrfToken = () => decodeURIComponent(getCookieValue(CSRF_COOKIE_NAME));
-
-export const readApiResponse = async (response) => {
-  const contentType = response.headers.get("Content-Type") || "";
-
-  if (contentType.includes("application/json")) {
-    return response.json();
-  }
-
-  const text = await response.text();
-
-  return {
-    detail: text || response.statusText || "The server returned an unreadable response.",
-  };
-};
-
-let refreshSessionPromise = null;
-
-export const refreshSession = async () => {
-  if (!refreshSessionPromise) {
-    const csrfToken = getCsrfToken();
-    const headers = csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : undefined;
-
-    refreshSessionPromise = fetch(`${API_URL}/auth/refresh`, {
-      method: "POST",
-      credentials: "include",
-      cache: "no-store",
-      headers,
-    }).finally(() => {
-      refreshSessionPromise = null;
-    });
-  }
-
-  return refreshSessionPromise;
-};
-
-export const authFetch = async (input, init = {}) => {
-  const requestInit = {
-    ...init,
-    credentials: init.credentials || "include",
-  };
-
-  const response = await fetch(input, requestInit);
-
-  if (response.status !== 401) {
-    return response;
-  }
-
-  const refreshResponse = await refreshSession();
-
-  if (!refreshResponse.ok) {
-    return response;
-  }
-
-  return fetch(input, {
-    ...requestInit,
-    credentials: "include",
-  });
-};
+export {
+  API_URL,
+  apiFetch as authFetch,
+  getApiUrl,
+  readApiError,
+  readApiResponse,
+} from "../../../../utils/apiClient";
 
 export const getFriendlyExternalError = (detail) => {
   const message = String(detail || "");

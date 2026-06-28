@@ -2,17 +2,11 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { postAuthJson, readApiError } from "../../utils/apiClient";
 
-const API_URL = import.meta.env.VITE_API_URL || "/api";
 const PUBLIC_SITE_DOMAIN = import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
-
-const getApiDetail = (data) => {
-  if (typeof data?.detail === "string") return data.detail;
-  if (typeof data?.message === "string") return data.message;
-  return "";
-};
 
 export default function SignUpPage({
   lang = "en",
@@ -164,7 +158,7 @@ export default function SignUpPage({
       return true;
     }
 
-    const detail = getApiDetail(data).toLowerCase();
+    const detail = readApiError(data, "").toLowerCase();
 
     if (detail.includes("already registered")) {
       setStatusMessage(t("signup.alreadyRegistered"));
@@ -201,22 +195,16 @@ export default function SignUpPage({
     setStatusMessage("");
 
     try {
-      const response = await fetch(
-        `${API_URL}${isTenantOnboarding ? "/auth/signup/onboard" : "/auth/signup"}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(getRequestPayload()),
-        }
+      const { response, data } = await postAuthJson(
+        isTenantOnboarding ? "/auth/signup/onboard" : "/auth/signup",
+        getRequestPayload()
       );
-
-      const data = await response.json();
 
       if (!response.ok) {
         if (applyApiErrors(response, data)) return;
 
         setStatusMessage(
-          typeof data.detail === "string" ? data.detail : t("signup.signupFailed")
+          readApiError(data, t("signup.signupFailed"))
         );
         return;
       }

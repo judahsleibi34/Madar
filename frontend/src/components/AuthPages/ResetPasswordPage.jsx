@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { postAuthJson } from "../../utils/apiClient";
 import { normalizeAuthMessage } from "./authMessages";
 
 const readRecoveryToken = () => {
@@ -41,16 +42,10 @@ export default function ResetPasswordPage({ lang = "en" }) {
     setError("");
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "/api"}/auth/password-reset`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ access_token: accessToken, password }),
-        }
+      const { response, data } = await postAuthJson(
+        "/auth/password-reset",
+        { access_token: accessToken, password }
       );
-
-      const data = await response.json();
 
       if (!response.ok) {
         setError(normalizeAuthMessage(data.detail, t("resetPassword.unknownError")));

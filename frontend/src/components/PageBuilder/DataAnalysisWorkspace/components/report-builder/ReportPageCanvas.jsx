@@ -21,6 +21,7 @@ export default function ReportPageCanvas({
 }) {
   const [isHeaderEditing, setIsHeaderEditing] = useState(false);
   const [activeDropIndex, setActiveDropIndex] = useState(null);
+  const getEditablePlainText = (editable) => editable?.textContent || "";
 
   const handleDrop = (event, index) => {
     event.preventDefault();
@@ -76,7 +77,7 @@ export default function ReportPageCanvas({
               blockColor={report.headerBackground}
               onBlockColor={(value) => onUpdateReport("headerBackground", value)}
               onContentFormatted={(editable) => {
-                onUpdateReport("title", editable.innerHTML);
+                onUpdateReport("title", getEditablePlainText(editable));
                 onUpdateReport("titleDirection", editable.dir);
               }}
             />
@@ -94,6 +95,7 @@ export default function ReportPageCanvas({
               value={report.title}
               direction={report.titleDirection}
               placeholder="Untitled report"
+              ariaLabel="Report title"
               editable={!isPreviewMode}
               onFocus={() => setIsHeaderEditing(true)}
               onChange={(value, direction) => {
@@ -123,7 +125,7 @@ export default function ReportPageCanvas({
                     onTextColor={(value) => onUpdateBlock(block.id, "textColor", value)}
                     onContentFormatted={(editable) => {
                       const isTitle = editable.classList.contains("daw-report-block-title");
-                      onUpdateBlock(block.id, isTitle ? "title" : "body", editable.innerHTML);
+                      onUpdateBlock(block.id, isTitle ? "title" : "body", getEditablePlainText(editable));
                       onUpdateBlock(
                         block.id,
                         isTitle ? "titleDirection" : "bodyDirection",
@@ -189,6 +191,7 @@ export default function ReportPageCanvas({
                         value={block.title}
                         direction={block.titleDirection}
                         placeholder="Chart title"
+                        ariaLabel="Chart title"
                         onChange={(value, direction) => {
                           onUpdateBlock(block.id, "title", value);
                           onUpdateBlock(block.id, "titleDirection", direction);
@@ -204,6 +207,7 @@ export default function ReportPageCanvas({
                         value={block.title}
                         direction={block.titleDirection}
                         placeholder="Table title"
+                        ariaLabel="Table title"
                         onChange={(value, direction) => {
                           onUpdateBlock(block.id, "title", value);
                           onUpdateBlock(block.id, "titleDirection", direction);
@@ -240,6 +244,7 @@ export default function ReportPageCanvas({
                         value={block.body}
                         direction={block.bodyDirection}
                         placeholder="Add an image caption..."
+                        ariaLabel="Image caption"
                         multiline
                         onChange={(value, direction) => {
                           onUpdateBlock(block.id, "body", value);
@@ -256,6 +261,7 @@ export default function ReportPageCanvas({
                           value={block.title}
                           direction={block.titleDirection}
                           placeholder={`${blockType?.label || "Block"} title`}
+                          ariaLabel={`${blockType?.label || "Block"} title`}
                           onEnter={() => onInsertParagraph(index + 1)}
                           onChange={(value, direction) => {
                             onUpdateBlock(block.id, "title", value);
@@ -269,6 +275,7 @@ export default function ReportPageCanvas({
                         value={block.body}
                         direction={block.bodyDirection}
                         placeholder="Write here..."
+                        ariaLabel={`${blockType?.label || "Block"} body`}
                         multiline
                         onChange={(value, direction) => {
                           onUpdateBlock(block.id, "body", value);
