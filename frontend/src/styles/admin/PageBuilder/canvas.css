@@ -770,6 +770,22 @@
   overflow: hidden;
 }
 
+.direct-element-frame-formBlock {
+  height: auto !important;
+}
+
+.direct-element-frame-formBlock .direct-element-content,
+.direct-element-frame-formBlock .direct-element-content > .builder-element-formBlock {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.direct-element-frame-formBlock .builder-element-formBlock,
+.direct-element-frame-formBlock .runtime-form {
+  width: 100%;
+}
+
 .direct-resize-handle {
   position: absolute;
   right: -7px;

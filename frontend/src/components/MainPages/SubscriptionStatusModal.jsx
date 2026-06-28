@@ -1,4 +1,5 @@
 import "../../styles/public pages/subscription-modal.css";
+import { getSubscriptionModalContent } from "../../content";
 
 export default function SubscriptionStatusModal({
   open,
@@ -12,25 +13,7 @@ export default function SubscriptionStatusModal({
   if (!open) return null;
 
   const isArabic = lang === "ar";
-
-  const defaultText = {
-    en: {
-      successTitle: "Subscription saved",
-      successMessage: "Your subscription was saved successfully.",
-      errorTitle: "Subscription failed",
-      errorMessage: "Could not save your subscription. Please try again.",
-      confirm: "Continue",
-    },
-    ar: {
-      successTitle: "تم حفظ الاشتراك",
-      successMessage: "تم حفظ اشتراكك بنجاح.",
-      errorTitle: "فشل الاشتراك",
-      errorMessage: "تعذر حفظ اشتراكك. يرجى المحاولة مرة أخرى.",
-      confirm: "متابعة",
-    },
-  };
-
-  const t = defaultText[isArabic ? "ar" : "en"];
+  const t = getSubscriptionModalContent(lang);
 
   const modalTitle =
     title || (type === "success" ? t.successTitle : t.errorTitle);

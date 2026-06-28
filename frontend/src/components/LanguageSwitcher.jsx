@@ -30,6 +30,9 @@ export default function LanguageSwitcher({
   const nextLabel = t(`language.${nextLanguage}`, {
     defaultValue: next.label,
   });
+  const switchLabel = t("language.switchTo", {
+    language: nextLabel,
+  });
 
   const handleToggle = () => {
     const selectedLanguage = setAppLanguage(nextLanguage);
@@ -55,14 +58,8 @@ export default function LanguageSwitcher({
         .filter(Boolean)
         .join(" ")}
       onClick={handleToggle}
-      aria-label={t("language.switchTo", {
-        language: nextLabel,
-        defaultValue: `Switch language to ${nextLabel}`,
-      })}
-      title={t("language.switchTo", {
-        language: nextLabel,
-        defaultValue: `Switch language to ${nextLabel}`,
-      })}
+      aria-label={switchLabel}
+      title={switchLabel}
       data-language={safeLanguage}
       data-next-language={nextLanguage}
     >

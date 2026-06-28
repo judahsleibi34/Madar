@@ -25,7 +25,7 @@ import {
   Underline,
   Undo2,
 } from "lucide-react";
-import { applyFormTemplate, FORM_TEMPLATES } from "../PageBuilder.formTemplates";
+import { applyFormTemplate, FORM_TEMPLATES } from "../core/PageBuilder.formTemplates";
 import {
   getDirectionForLanguage,
   getLocalizedOptions,
@@ -33,8 +33,11 @@ import {
   normalizeLanguageMode,
   setLocalizedOptions,
   setLocalizedValue,
-} from "../PageBuilder.localization";
-import PageDeleteConfirmModal from "../PageDeleteConfirmModal";
+} from "../core/PageBuilder.localization";
+import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
+import { getFormsTabContent } from "../../../content/pageBuilder";
+
+const defaultFormsCopy = getFormsTabContent("en");
 
 const choiceFieldTypes = new Set(["dropdown", "radio", "checkboxes", "status"]);
 
@@ -50,25 +53,25 @@ const commonFieldTypes = [
 ];
 
 const legacyFieldTypes = {
-  money: { id: "money", label: "Price or budget", group: "Number", input: "number" },
-  phone: { id: "phone", label: "Phone", group: "Contact", input: "tel" },
-  radio: { id: "radio", label: "Radio buttons", group: "Choice", input: "radio" },
-  yesNo: { id: "yesNo", label: "Yes or no", group: "Choice", input: "yesNo" },
-  status: { id: "status", label: "Status selector", group: "Workflow", input: "select" },
+  money: { id: "money", label: defaultFormsCopy.legacyFieldTypes.money.label, group: defaultFormsCopy.legacyFieldTypes.money.group, input: "number" },
+  phone: { id: "phone", label: defaultFormsCopy.legacyFieldTypes.phone.label, group: defaultFormsCopy.legacyFieldTypes.phone.group, input: "tel" },
+  radio: { id: "radio", label: defaultFormsCopy.legacyFieldTypes.radio.label, group: defaultFormsCopy.legacyFieldTypes.radio.group, input: "radio" },
+  yesNo: { id: "yesNo", label: defaultFormsCopy.legacyFieldTypes.yesNo.label, group: defaultFormsCopy.legacyFieldTypes.yesNo.group, input: "yesNo" },
+  status: { id: "status", label: defaultFormsCopy.legacyFieldTypes.status.label, group: defaultFormsCopy.legacyFieldTypes.status.group, input: "select" },
 };
 
 const textToolbarButtons = [
-  { action: "undo", label: "Undo", icon: Undo2 },
-  { action: "redo", label: "Redo", icon: Redo2 },
-  { action: "bold", label: "Bold", icon: Bold },
-  { action: "italic", label: "Italic", icon: Italic },
-  { action: "underline", label: "Underline", icon: Underline },
-  { action: "bullets", label: "Bulleted list", icon: List },
-  { action: "numbers", label: "Numbered list", icon: ListOrdered },
-  { action: "align-left", label: "Align left", icon: AlignLeft },
-  { action: "align-center", label: "Align center", icon: AlignCenter },
-  { action: "align-right", label: "Align right", icon: AlignRight },
-  { action: "align-justify", label: "Justify", icon: AlignJustify },
+  { action: "undo", label: defaultFormsCopy.toolbar.undo, icon: Undo2 },
+  { action: "redo", label: defaultFormsCopy.toolbar.redo, icon: Redo2 },
+  { action: "bold", label: defaultFormsCopy.toolbar.bold, icon: Bold },
+  { action: "italic", label: defaultFormsCopy.toolbar.italic, icon: Italic },
+  { action: "underline", label: defaultFormsCopy.toolbar.underline, icon: Underline },
+  { action: "bullets", label: defaultFormsCopy.toolbar.bullets, icon: List },
+  { action: "numbers", label: defaultFormsCopy.toolbar.numbers, icon: ListOrdered },
+  { action: "align-left", label: defaultFormsCopy.toolbar.alignLeft, icon: AlignLeft },
+  { action: "align-center", label: defaultFormsCopy.toolbar.alignCenter, icon: AlignCenter },
+  { action: "align-right", label: defaultFormsCopy.toolbar.alignRight, icon: AlignRight },
+  { action: "align-justify", label: defaultFormsCopy.toolbar.justify, icon: AlignJustify },
 ];
 
 function FormButton({
@@ -140,6 +143,7 @@ export default function FormsTab({
   quizOptionsOpen,
   setQuizOptionsOpen,
 }) {
+  const copy = getFormsTabContent(lang);
   const [questionType, setQuestionType] = useState("shortText");
   const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [templateId, setTemplateId] = useState("");
@@ -155,6 +159,13 @@ export default function FormsTab({
   const translationsEnabled = formLanguageMode === "bilingual";
   const formDirection = getDirectionForLanguage(primaryLanguage);
   const translationDirection = getDirectionForLanguage(translationLanguage);
+  const getLanguageName = (language) =>
+    language === "ar" ? copy.labels.arabic : copy.labels.english;
+  const formatCopy = (value, replacements = {}) =>
+    Object.entries(replacements).reduce(
+      (text, [key, replacement]) => text.replaceAll(`{${key}}`, replacement),
+      value
+    );
 
   const getFieldType = (type) =>
     fieldTypes.find((item) => item.id === type) || legacyFieldTypes[type] || fieldTypes[0];
@@ -169,10 +180,10 @@ export default function FormsTab({
   const activeSectionId = sections[0]?.id || null;
   const placements = activeForm ? getFormPlacements(activeForm.id) : [];
   const getFriendlyPageTitle = (section, sectionIndex) => {
-    if (sectionIndex === 0) return "Title page";
+    if (sectionIndex === 0) return copy.labels.titlePage;
     const title = section.title || "";
     const legacyMatch = title.match(/^Section\s+(\d+)$/i);
-    return legacyMatch ? `Page ${legacyMatch[1]}` : title || `Page ${sectionIndex + 1}`;
+    return legacyMatch ? `${copy.labels.page} ${legacyMatch[1]}` : title || `${copy.labels.page} ${sectionIndex + 1}`;
   };
 
   const addQuestion = (typeId = questionType, sectionId = activeSectionId) => {
@@ -182,7 +193,7 @@ export default function FormsTab({
   const applyTemplate = (nextTemplateId) => {
     setTemplateId(nextTemplateId);
     if (!nextTemplateId) return;
-    if (!window.confirm("Replace this form with the selected template?")) {
+    if (!window.confirm(copy.messages.replaceTemplateConfirm)) {
       setTemplateId("");
       return;
     }
@@ -558,10 +569,10 @@ export default function FormsTab({
       <div className="workspace-page forms-workbench forms-simple-workbench">
         <section className="forms-empty-state">
           <FilePlus2 size={34} aria-hidden="true" />
-          <h2>Create your first form</h2>
-          <p>Start with a clean form, add questions, then place it on a page.</p>
+          <h2>{copy.messages.createFirstFormTitle}</h2>
+          <p>{copy.messages.createFirstFormBody}</p>
           <FormButton variant="primary" icon={Plus} onClick={addForm}>
-            New form
+            {copy.messages.newForm}
           </FormButton>
         </section>
       </div>
@@ -571,25 +582,25 @@ export default function FormsTab({
   return (
     <div className="workspace-page forms-workbench forms-simple-workbench" dir={formDirection}>
       <div className="forms-simple-shell">
-        <aside className="simple-add-question" aria-label="Form controls">
+        <aside className="simple-add-question" aria-label={copy.labels.formControls}>
           <label>
-            Current form
+            {copy.labels.currentForm}
             <select value={activeForm.id} onChange={(event) => selectForm(event.target.value)}>
               {project.forms.map((form) => (
                 <option key={form.id} value={form.id}>
-                  {form.title || "Untitled form"}
+                  {form.title || copy.labels.untitledForm}
                 </option>
               ))}
             </select>
           </label>
           <FormButton icon={Plus} onClick={addForm}>
-            New form
+            {copy.messages.newForm}
           </FormButton>
 
           <label>
-            Templates
+            {copy.labels.templates}
             <select value={templateId} onChange={(event) => applyTemplate(event.target.value)}>
-              <option value="">Choose a template</option>
+              <option value="">{copy.labels.chooseTemplate}</option>
               {FORM_TEMPLATES.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.label}
@@ -599,13 +610,13 @@ export default function FormsTab({
           </label>
 
           <label>
-            Language
+            {copy.labels.language}
             <select
               value={primaryLanguage}
               onChange={(event) => setPrimaryLanguage(event.target.value)}
             >
-              <option value="en">English</option>
-              <option value="ar">Arabic</option>
+              <option value="en">{copy.labels.english}</option>
+              <option value="ar">{copy.labels.arabic}</option>
             </select>
           </label>
 
@@ -616,12 +627,12 @@ export default function FormsTab({
                 checked={translationsEnabled}
                 onChange={(event) => setTranslationsEnabled(event.target.checked)}
               />
-              Add {translationLanguage === "ar" ? "Arabic" : "English"} translations
+              {formatCopy(copy.messages.addTranslations, { language: getLanguageName(translationLanguage) })}
             </label>
           </div>
 
           <label>
-            Add question
+            {copy.labels.addQuestion}
             <select value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
               {getVisibleFieldTypes().map((type) => (
                 <option key={type.id} value={type.id}>
@@ -631,29 +642,29 @@ export default function FormsTab({
             </select>
           </label>
           <FormButton variant="primary" icon={Plus} onClick={() => addQuestion()}>
-            Add question
+            {copy.labels.addQuestion}
           </FormButton>
           <FormButton icon={ListPlus} onClick={addFormSection}>
-            Add page
+            {copy.labels.addPage}
           </FormButton>
           <div className="simple-action-groups">
             <section className="simple-action-group">
-              <span className="simple-action-group-title">Form actions</span>
+              <span className="simple-action-group-title">{copy.labels.formActions}</span>
               <FormButton icon={Settings} onClick={() => setQuizOptionsOpen(true)}>
-                Form settings
+                {copy.labels.formSettings}
               </FormButton>
               <FormButton icon={Eye} onClick={() => openFormPreviewPage?.(activeForm.id)}>
-                Preview form
+                {copy.labels.previewForm}
               </FormButton>
               <FormButton variant="primary" icon={Send} onClick={() => setShowPublishPanel((value) => !value)}>
-                Place form
+                {copy.labels.placeForm}
               </FormButton>
               <FormButton
                 variant="danger"
                 icon={Trash2}
                 onClick={deleteCurrentForm}
               >
-                Delete form
+                {copy.labels.deleteForm}
               </FormButton>
             </section>
 
@@ -665,7 +676,7 @@ export default function FormsTab({
           <section className="simple-side-panel">
             <div className="simple-panel-grid">
               <label>
-                Page
+                {copy.labels.pageLabel}
                 <select
                   value={project.activePageId || ""}
                   onChange={(event) => selectPage(event.target.value)}
@@ -676,7 +687,7 @@ export default function FormsTab({
                 </select>
               </label>
               <label>
-                Save submissions to
+                {copy.labels.saveSubmissionsTo}
                 <select
                   value={activeForm.connectedCollectionId || ""}
                   onChange={(event) =>
@@ -686,20 +697,20 @@ export default function FormsTab({
                     }))
                   }
                 >
-                  <option value="">Form submissions only</option>
+                  <option value="">{copy.labels.formSubmissionsOnly}</option>
                   {project.collections.map((collection) => (
                     <option key={collection.id} value={collection.id}>{collection.name}</option>
                   ))}
                 </select>
               </label>
               <FormButton variant="primary" icon={Send} onClick={() => addConnectedFormSectionToPage(activeForm.id)}>
-                Add to page
+                {copy.labels.addToPage}
               </FormButton>
             </div>
 
             {placements.length > 0 && (
               <div className="connected-placement-list">
-                <span>Already placed on</span>
+                <span>{copy.labels.alreadyPlacedOn}</span>
                 {placements.map((placement) => (
                   <button
                     type="button"
@@ -713,7 +724,7 @@ export default function FormsTab({
             )}
 
             <label>
-              Success message
+              {copy.labels.successMessage}
               <textarea
                 dir={formDirection}
                 value={getLocalizedValue(activeForm, "successMessage", primaryLanguage)}
@@ -734,7 +745,7 @@ export default function FormsTab({
               <div className="forms-section-heading">
                 <input
                   value={getFriendlyPageTitle(section, sectionIndex)}
-                  placeholder={sectionIndex === 0 ? "Title page" : `Page ${sectionIndex + 1}`}
+                  placeholder={sectionIndex === 0 ? copy.labels.titlePage : `${copy.labels.page} ${sectionIndex + 1}`}
                   readOnly={sectionIndex === 0}
                   onChange={(event) =>
                     updateFormSection(section.id, { title: event.target.value })
@@ -750,13 +761,13 @@ export default function FormsTab({
                     })
                   }
                 >
-                  Delete page
+                  {copy.messages.deletePage}
                 </FormButton>
               </div>
 
               <textarea
                 value={section.description || ""}
-                placeholder="Page description"
+                placeholder={copy.placeholders.pageDescription}
                 onChange={(event) =>
                   updateFormSection(section.id, { description: event.target.value })
                 }
@@ -764,16 +775,16 @@ export default function FormsTab({
 
               {sectionIndex === 0 && (
                 <div className="form-page-intro">
-                  <div className="question-format-toolbar form-title-toolbar" role="toolbar" aria-label="Form title formatting">
+                  <div className="question-format-toolbar form-title-toolbar" role="toolbar" aria-label={copy.labels.formTitleFormatting}>
                     <select
-                      aria-label="Text style"
+                      aria-label={copy.toolbar.textStyle}
                       defaultValue="h1"
                       onChange={(event) => applyTargetTextStyle(getActiveFormTextTarget(), event.target.value)}
                     >
-                      <option value="text">Text</option>
-                      <option value="h1">H1</option>
-                      <option value="h2">H2</option>
-                      <option value="h3">H3</option>
+                      <option value="text">{copy.toolbar.text}</option>
+                      <option value="h1">{copy.toolbar.heading1}</option>
+                      <option value="h2">{copy.toolbar.heading2}</option>
+                      <option value="h3">{copy.toolbar.heading3}</option>
                     </select>
                     {textToolbarButtons.map(({ action, label, icon: Icon }) => (
                       <button
@@ -791,25 +802,25 @@ export default function FormsTab({
                     ))}
                     <button
                       type="button"
-                      title="Left-to-right"
+                      title={copy.toolbar.leftToRight}
                       onMouseDown={(event) => {
                         event.preventDefault();
                         setActiveFormTextDirection("ltr");
                       }}
                     >
-                      LTR
+                      {copy.toolbar.directionLtrShort}
                     </button>
                     <button
                       type="button"
-                      title="Right-to-left"
+                      title={copy.toolbar.rightToLeft}
                       onMouseDown={(event) => {
                         event.preventDefault();
                         setActiveFormTextDirection("rtl");
                       }}
                     >
-                      RTL
+                      {copy.toolbar.directionRtlShort}
                     </button>
-                    <label className="question-toolbar-color" title="Text color">
+                    <label className="question-toolbar-color" title={copy.toolbar.textColor}>
                       <Baseline size={16} aria-hidden="true" />
                       <input
                         type="color"
@@ -817,7 +828,7 @@ export default function FormsTab({
                         onChange={(event) => applyTargetColor(getActiveFormTextTarget(), "color", event.target.value)}
                       />
                     </label>
-                    <label className="question-toolbar-color" title="Background color">
+                    <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}>
                       <Highlighter size={16} aria-hidden="true" />
                       <input
                         type="color"
@@ -831,7 +842,7 @@ export default function FormsTab({
                     data-form-text="title"
                     dir={formDirection}
                     value={getLocalizedValue(activeForm, "title", primaryLanguage)}
-                    placeholder="Untitled form"
+                    placeholder={copy.placeholders.untitledForm}
                     onFocus={(event) => {
                       activeTextTargetRef.current = event.currentTarget;
                     }}
@@ -841,14 +852,14 @@ export default function FormsTab({
                   />
                   {translationsEnabled && (
                     <label className="translation-entry-field">
-                      <span>{translationLanguage === "ar" ? "Arabic" : "English"} title translation</span>
+                      <span>{getLanguageName(translationLanguage)} {copy.suffixes.titleTranslation}</span>
                       <textarea
                         data-form-text="title"
                         data-form-lang={translationLanguage}
                         rows={2}
                         dir={translationDirection}
                         value={getExplicitLocalizedValue(activeForm, "title", translationLanguage)}
-                        placeholder={`Add ${translationLanguage === "ar" ? "Arabic" : "English"} title`}
+                        placeholder={formatCopy(copy.placeholders.addTitle, { language: getLanguageName(translationLanguage) })}
                         onFocus={(event) => {
                           activeTextTargetRef.current = event.currentTarget;
                         }}
@@ -859,17 +870,17 @@ export default function FormsTab({
                     </label>
                   )}
                   <label className="form-description-field">
-                    <span>Form description, shown to people filling it out</span>
-                    <div className="question-format-toolbar form-description-toolbar" role="toolbar" aria-label="Form description formatting">
+                    <span>{copy.messages.formDescriptionHelp}</span>
+                    <div className="question-format-toolbar form-description-toolbar" role="toolbar" aria-label={copy.labels.formDescriptionFormatting}>
                       <select
-                        aria-label="Text style"
+                        aria-label={copy.toolbar.textStyle}
                         defaultValue="text"
                         onChange={(event) => applyTargetTextStyle(getActiveFormTextTarget(), event.target.value)}
                       >
-                        <option value="text">Text</option>
-                        <option value="h1">H1</option>
-                        <option value="h2">H2</option>
-                        <option value="h3">H3</option>
+                        <option value="text">{copy.toolbar.text}</option>
+                        <option value="h1">{copy.toolbar.heading1}</option>
+                        <option value="h2">{copy.toolbar.heading2}</option>
+                        <option value="h3">{copy.toolbar.heading3}</option>
                       </select>
                       {textToolbarButtons.map(({ action, label, icon: Icon }) => (
                         <button
@@ -887,25 +898,25 @@ export default function FormsTab({
                       ))}
                       <button
                         type="button"
-                        title="Left-to-right"
+                        title={copy.toolbar.leftToRight}
                         onMouseDown={(event) => {
                           event.preventDefault();
                           setActiveFormTextDirection("ltr");
                         }}
                       >
-                        LTR
+                      {copy.toolbar.directionLtrShort}
                       </button>
                       <button
                         type="button"
-                        title="Right-to-left"
+                        title={copy.toolbar.rightToLeft}
                         onMouseDown={(event) => {
                           event.preventDefault();
                           setActiveFormTextDirection("rtl");
                         }}
                       >
-                        RTL
+                      {copy.toolbar.directionRtlShort}
                       </button>
-                      <label className="question-toolbar-color" title="Text color">
+                      <label className="question-toolbar-color" title={copy.toolbar.textColor}>
                         <Baseline size={16} aria-hidden="true" />
                         <input
                           type="color"
@@ -913,7 +924,7 @@ export default function FormsTab({
                           onChange={(event) => applyTargetColor(getActiveFormTextTarget(), "color", event.target.value)}
                         />
                       </label>
-                      <label className="question-toolbar-color" title="Background color">
+                      <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}>
                         <Highlighter size={16} aria-hidden="true" />
                         <input
                           type="color"
@@ -927,7 +938,7 @@ export default function FormsTab({
                       data-form-text="description"
                       dir={formDirection}
                       value={getLocalizedValue(activeForm, "description", primaryLanguage)}
-                      placeholder="Add a short description or leave this empty"
+                      placeholder={copy.placeholders.formDescription}
                       onFocus={(event) => {
                         activeTextTargetRef.current = event.currentTarget;
                       }}
@@ -937,14 +948,14 @@ export default function FormsTab({
                     />
                     {translationsEnabled && (
                       <div className="translation-entry-field">
-                        <span>{translationLanguage === "ar" ? "Arabic" : "English"} description translation</span>
+                        <span>{getLanguageName(translationLanguage)} {copy.suffixes.descriptionTranslation}</span>
                         <textarea
                           data-form-text="description"
                           data-form-lang={translationLanguage}
                           rows={3}
                           dir={translationDirection}
                           value={getExplicitLocalizedValue(activeForm, "description", translationLanguage)}
-                          placeholder={`Add ${translationLanguage === "ar" ? "Arabic" : "English"} description`}
+                          placeholder={formatCopy(copy.placeholders.addDescription, { language: getLanguageName(translationLanguage) })}
                           onFocus={(event) => {
                             activeTextTargetRef.current = event.currentTarget;
                           }}
@@ -956,10 +967,10 @@ export default function FormsTab({
                     )}
                   </label>
                   <div className="forms-simple-meta">
-                    <span>{getFormFields(activeForm).length} questions</span>
-                    <span>{sections.length} pages</span>
-                    <span>{activeForm.responses.length} responses</span>
-                    <span>{activeForm.mode === "quiz" ? "Quiz" : "Form"}</span>
+                    <span>{getFormFields(activeForm).length} {copy.counts.questions}</span>
+                    <span>{sections.length} {copy.counts.pages}</span>
+                    <span>{activeForm.responses.length} {copy.counts.responses}</span>
+                    <span>{activeForm.mode === "quiz" ? copy.counts.quiz : copy.counts.form}</span>
                   </div>
                 </div>
               )}
@@ -967,8 +978,8 @@ export default function FormsTab({
               <div className="questions-stack">
                 {(section.fields || []).length === 0 && (
                   <div className="forms-empty-inline">
-                    <strong>No questions on this page yet.</strong>
-                    <span>Add a question from the side panel to start building this form.</span>
+                    <strong>{copy.messages.emptyPageTitle}</strong>
+                    <span>{copy.messages.emptyPageBody}</span>
                   </div>
                 )}
                 {(section.fields || []).map((field, fieldIndex) => (
@@ -983,7 +994,7 @@ export default function FormsTab({
                         className="question-title-input"
                         dir={formDirection}
                         value={getLocalizedValue(field, "label", primaryLanguage)}
-                        placeholder="Question"
+                        placeholder={copy.placeholders.question}
                         onChange={(event) =>
                           updateLocalizedFieldValue(field, "label", event.target.value)
                         }
@@ -1001,7 +1012,7 @@ export default function FormsTab({
                     </div>
                     {translationsEnabled && (
                       <label className="translation-entry-field question-translation-title">
-                        <span>{translationLanguage === "ar" ? "Arabic" : "English"} question translation</span>
+                        <span>{getLanguageName(translationLanguage)} {copy.suffixes.questionTranslation}</span>
                         <textarea
                           data-field-id={field.id}
                           data-field-key="label"
@@ -1009,7 +1020,7 @@ export default function FormsTab({
                           rows={2}
                           dir={translationDirection}
                           value={getExplicitLocalizedValue(field, "label", translationLanguage)}
-                          placeholder={`Add ${translationLanguage === "ar" ? "Arabic" : "English"} question text`}
+                          placeholder={formatCopy(copy.placeholders.addQuestionText, { language: getLanguageName(translationLanguage) })}
                           onFocus={(event) => {
                             activeTextTargetRef.current = event.currentTarget;
                           }}
@@ -1021,16 +1032,16 @@ export default function FormsTab({
                     )}
 
                     <div className="question-advanced">
-                      <div className="question-format-toolbar" role="toolbar" aria-label="Description and example formatting">
+                      <div className="question-format-toolbar" role="toolbar" aria-label={copy.toolbar.descriptionExampleFormatting}>
                         <select
-                          aria-label="Text style"
+                          aria-label={copy.toolbar.textStyle}
                           defaultValue="text"
                           onChange={(event) => applyTargetTextStyle(getActiveTextTarget(field), event.target.value)}
                         >
-                          <option value="text">Text</option>
-                          <option value="h1">H1</option>
-                          <option value="h2">H2</option>
-                          <option value="h3">H3</option>
+                          <option value="text">{copy.toolbar.text}</option>
+                          <option value="h1">{copy.toolbar.heading1}</option>
+                          <option value="h2">{copy.toolbar.heading2}</option>
+                          <option value="h3">{copy.toolbar.heading3}</option>
                         </select>
                         {textToolbarButtons.map(({ action, label, icon: Icon }) => (
                           <button
@@ -1048,25 +1059,25 @@ export default function FormsTab({
                         ))}
                         <button
                           type="button"
-                          title="Left-to-right"
+                          title={copy.toolbar.leftToRight}
                           onMouseDown={(event) => {
                             event.preventDefault();
                             setTextDirection(field, "ltr");
                           }}
                         >
-                          LTR
+                          {copy.toolbar.directionLtrShort}
                         </button>
                         <button
                           type="button"
-                          title="Right-to-left"
+                          title={copy.toolbar.rightToLeft}
                           onMouseDown={(event) => {
                             event.preventDefault();
                             setTextDirection(field, "rtl");
                           }}
                         >
-                          RTL
+                          {copy.toolbar.directionRtlShort}
                         </button>
-                        <label className="question-toolbar-color" title="Text color">
+                        <label className="question-toolbar-color" title={copy.toolbar.textColor}>
                           <Baseline size={16} aria-hidden="true" />
                           <input
                             type="color"
@@ -1074,7 +1085,7 @@ export default function FormsTab({
                             onChange={(event) => applyTargetColor(getActiveTextTarget(field), "color", event.target.value)}
                           />
                         </label>
-                        <label className="question-toolbar-color" title="Background color">
+                        <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}>
                           <Highlighter size={16} aria-hidden="true" />
                           <input
                             type="color"
@@ -1085,13 +1096,13 @@ export default function FormsTab({
                       </div>
                       <div className="question-detail-row">
                         <label className="question-mini-field">
-                          <span>Description</span>
+                          <span>{copy.labels.description}</span>
                           <textarea
                             data-field-id={field.id}
                             data-field-key="helpText"
                             dir={formDirection}
                             value={getLocalizedValue(field, "helpText", primaryLanguage)}
-                            placeholder="Shown under the question"
+                            placeholder={copy.placeholders.shownUnderQuestion}
                             onFocus={(event) => {
                               activeTextTargetRef.current = event.currentTarget;
                             }}
@@ -1101,7 +1112,7 @@ export default function FormsTab({
                           />
                           {translationsEnabled && (
                             <div className="translation-entry-field">
-                              <span>{translationLanguage === "ar" ? "Arabic" : "English"} description translation</span>
+                              <span>{getLanguageName(translationLanguage)} {copy.suffixes.descriptionTranslation}</span>
                               <textarea
                                 data-field-id={field.id}
                                 data-field-key="helpText"
@@ -1109,7 +1120,7 @@ export default function FormsTab({
                                 rows={2}
                                 dir={translationDirection}
                                 value={getExplicitLocalizedValue(field, "helpText", translationLanguage)}
-                                placeholder={`Add ${translationLanguage === "ar" ? "Arabic" : "English"} description`}
+                                placeholder={formatCopy(copy.placeholders.addDescription, { language: getLanguageName(translationLanguage) })}
                                 onFocus={(event) => {
                                   activeTextTargetRef.current = event.currentTarget;
                                 }}
@@ -1121,13 +1132,13 @@ export default function FormsTab({
                           )}
                         </label>
                         <label className="question-mini-field">
-                          <span>Example</span>
+                          <span>{copy.labels.example}</span>
                           <input
                             data-field-id={field.id}
                             data-field-key="placeholder"
                             dir={formDirection}
                             value={getLocalizedValue(field, "placeholder", primaryLanguage)}
-                            placeholder="Example answer or placeholder"
+                            placeholder={copy.placeholders.example}
                             onFocus={(event) => {
                               activeTextTargetRef.current = event.currentTarget;
                             }}
@@ -1137,7 +1148,7 @@ export default function FormsTab({
                           />
                           {translationsEnabled && (
                             <div className="translation-entry-field">
-                              <span>{translationLanguage === "ar" ? "Arabic" : "English"} example translation</span>
+                              <span>{getLanguageName(translationLanguage)} {copy.suffixes.exampleTranslation}</span>
                               <textarea
                                 data-field-id={field.id}
                                 data-field-key="placeholder"
@@ -1145,7 +1156,7 @@ export default function FormsTab({
                                 rows={2}
                                 dir={translationDirection}
                                 value={getExplicitLocalizedValue(field, "placeholder", translationLanguage)}
-                                placeholder={`Add ${translationLanguage === "ar" ? "Arabic" : "English"} example`}
+                                placeholder={formatCopy(copy.placeholders.addExample, { language: getLanguageName(translationLanguage) })}
                                 onFocus={(event) => {
                                   activeTextTargetRef.current = event.currentTarget;
                                 }}
@@ -1161,9 +1172,9 @@ export default function FormsTab({
                       {choiceFieldTypes.has(field.type) && (
                         <div className="options-editor option-row-editor" dir={formDirection}>
                           <div className="option-row-editor-header">
-                            <strong>Answer options</strong>
+                            <strong>{copy.labels.answerOptions}</strong>
                             <FormButton icon={Plus} onClick={() => insertFieldOption(field)}>
-                              Add option
+                              {copy.labels.addOption}
                             </FormButton>
                           </div>
 
@@ -1174,31 +1185,31 @@ export default function FormsTab({
                                 <input
                                   value={option}
                                   dir={formDirection}
-                                  placeholder={`Option ${optionIndex + 1}`}
+                                  placeholder={formatCopy(copy.placeholders.option, { number: optionIndex + 1 })}
                                   onChange={(event) =>
                                     updateFieldOption(field, optionIndex, event.target.value)
                                   }
                                 />
                                 <FormButton
                                   icon={Plus}
-                                  title="Insert option below"
+                                  title={copy.labels.insertOptionBelow}
                                   onClick={() => insertFieldOption(field, optionIndex)}
                                 />
                                 <FormButton
                                   variant="danger"
                                   icon={Trash2}
-                                  title="Delete option"
+                                  title={copy.labels.deleteOption}
                                   onClick={() => deleteFieldOption(field, optionIndex)}
                                 />
                               </div>
                               {translationsEnabled && (
                                 <label className="translation-entry-field option-translation-field">
-                                  <span>{translationLanguage === "ar" ? "Arabic" : "English"} option {optionIndex + 1} translation</span>
+                                  <span>{getLanguageName(translationLanguage)} {formatCopy(copy.suffixes.optionTranslation, { number: optionIndex + 1 })}</span>
                                   <textarea
                                     rows={2}
                                     dir={translationDirection}
                                     value={getExplicitTranslationOptions(field)[optionIndex] || ""}
-                                    placeholder={`Translate option ${optionIndex + 1}`}
+                                    placeholder={formatCopy(copy.placeholders.translateOption, { number: optionIndex + 1 })}
                                     onChange={(event) =>
                                       updateFieldTranslationOption(field, optionIndex, event.target.value)
                                     }
@@ -1213,7 +1224,7 @@ export default function FormsTab({
                       {field.type === "linearScale" && (
                         <div className="scale-editor compact-scale-editor">
                           <label>
-                            From
+                            {copy.labels.from}
                             <input
                               type="number"
                               min="0"
@@ -1225,7 +1236,7 @@ export default function FormsTab({
                             />
                           </label>
                           <label>
-                            To
+                            {copy.labels.to}
                             <input
                               type="number"
                               min="2"
@@ -1237,7 +1248,7 @@ export default function FormsTab({
                             />
                           </label>
                           <label>
-                            Low label
+                            {copy.labels.lowLabel}
                             <input
                               value={field.scaleMinLabel || ""}
                               onChange={(event) =>
@@ -1246,7 +1257,7 @@ export default function FormsTab({
                             />
                           </label>
                           <label>
-                            High label
+                            {copy.labels.highLabel}
                             <input
                               value={field.scaleMaxLabel || ""}
                               onChange={(event) =>
@@ -1259,7 +1270,7 @@ export default function FormsTab({
 
                       {field.type === "rating" && (
                         <label className="inline-setting">
-                          Max rating
+                          {copy.labels.maxRating}
                           <input
                             type="number"
                             min="2"
@@ -1276,7 +1287,7 @@ export default function FormsTab({
                         <div className="quiz-question-settings">
                           {renderQuizAnswerKeyEditor(field)}
                           <label>
-                            Time override
+                            {copy.labels.timeOverride}
                             <input
                               type="number"
                               min="0"
@@ -1301,19 +1312,19 @@ export default function FormsTab({
                             updateFormField(field.id, { required: event.target.checked })
                           }
                         />
-                        Required
+                        {copy.labels.required}
                       </label>
-                      <FormButton icon={ChevronUp} title="Move question up" onClick={() => moveFormField(field.id, "up")} />
-                      <FormButton icon={ChevronDown} title="Move question down" onClick={() => moveFormField(field.id, "down")} />
+                      <FormButton icon={ChevronUp} title={copy.labels.moveQuestionUp} onClick={() => moveFormField(field.id, "up")} />
+                      <FormButton icon={ChevronDown} title={copy.labels.moveQuestionDown} onClick={() => moveFormField(field.id, "down")} />
                       <FormButton icon={Copy} onClick={() => duplicateFormField(field.id)}>
-                        Duplicate
+                        {copy.labels.duplicate}
                       </FormButton>
                       <FormButton
                         variant="danger"
                         icon={Trash2}
-                        title="Delete question"
+                        title={copy.labels.deleteQuestion}
                         onClick={() => {
-                          if (window.confirm("Delete this question?")) deleteFormField(field.id);
+                          if (window.confirm(copy.messages.deleteQuestionConfirm)) deleteFormField(field.id);
                         }}
                       />
                     </footer>
@@ -1326,7 +1337,7 @@ export default function FormsTab({
                 icon={Plus}
                 onClick={() => addQuestion(questionType, section.id)}
               >
-                Add question here
+                {copy.labels.addQuestionHere}
               </FormButton>
             </section>
           ))}
@@ -1340,18 +1351,18 @@ export default function FormsTab({
             className="quiz-options-drawer"
             role="dialog"
             aria-modal="true"
-            aria-label="Quiz options"
+            aria-label={copy.labels.quizOptions}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="quiz-drawer-header">
               <div>
-                <h3>Form settings</h3>
-                <p>Control language, success message, quiz mode, focus mode, scoring, and retakes.</p>
+                <h3>{copy.labels.formSettings}</h3>
+                <p>{copy.messages.settingsDescription}</p>
               </div>
               <button
                 type="button"
                 className="quiz-drawer-close"
-                aria-label="Close settings"
+                aria-label={copy.labels.closeSettings}
                 onClick={() => setQuizOptionsOpen(false)}
               >
                 ×
@@ -1360,21 +1371,21 @@ export default function FormsTab({
 
             <div className="quiz-settings-grid quiz-drawer-grid">
               <label>
-                <span className="quiz-setting-title">Primary language</span>
-                <small>Sets the default writing direction. Translations are entered manually.</small>
+                <span className="quiz-setting-title">{copy.labels.primaryLanguage}</span>
+                <small>{copy.messages.primaryLanguageHelp}</small>
                 <select
                   value={primaryLanguage}
                   onChange={(event) => setPrimaryLanguage(event.target.value)}
                 >
-                  <option value="en">English</option>
-                  <option value="ar">Arabic</option>
+                  <option value="en">{copy.labels.english}</option>
+                  <option value="ar">{copy.labels.arabic}</option>
                 </select>
               </label>
 
               <section className="translation-settings-card">
                 <div>
-                  <span className="quiz-setting-title">Translations</span>
-                  <small>Show translation fields throughout the form editor. Madar does not auto-translate these fields.</small>
+                  <span className="quiz-setting-title">{copy.labels.translations}</span>
+                  <small>{copy.messages.translationsHelp}</small>
                 </div>
                 <label className="checkbox-control">
                   <input
@@ -1382,13 +1393,13 @@ export default function FormsTab({
                     checked={translationsEnabled}
                     onChange={(event) => setTranslationsEnabled(event.target.checked)}
                   />
-                  Add {translationLanguage === "ar" ? "Arabic" : "English"} translations
+                  {formatCopy(copy.messages.addTranslations, { language: getLanguageName(translationLanguage) })}
                 </label>
               </section>
 
               <label>
-                <span className="quiz-setting-title">Success message</span>
-                <small>Shown after submit in the primary language.</small>
+                <span className="quiz-setting-title">{copy.labels.successMessage}</span>
+                <small>{copy.messages.successMessageHelp}</small>
                 <textarea
                   dir={formDirection}
                   value={getLocalizedValue(activeForm, "successMessage", primaryLanguage)}
@@ -1396,14 +1407,14 @@ export default function FormsTab({
                 />
                 {translationsEnabled && (
                   <div className="translation-entry-field">
-                    <span>{translationLanguage === "ar" ? "Arabic" : "English"} success message translation</span>
+                    <span>{getLanguageName(translationLanguage)} {copy.suffixes.successMessageTranslation}</span>
                     <textarea
                       data-form-text="successMessage"
                       data-form-lang={translationLanguage}
                       rows={3}
                       dir={translationDirection}
                       value={getExplicitLocalizedValue(activeForm, "successMessage", translationLanguage)}
-                      placeholder={`Add ${translationLanguage === "ar" ? "Arabic" : "English"} success message`}
+                      placeholder={formatCopy(copy.placeholders.addSuccessMessage, { language: getLanguageName(translationLanguage) })}
                       onFocus={(event) => {
                         activeTextTargetRef.current = event.currentTarget;
                       }}
@@ -1428,9 +1439,9 @@ export default function FormsTab({
                       }))
                     }
                   />
-                  Enable quiz mode
+                  {copy.labels.enableQuizMode}
                 </span>
-                <small>Turns this form into a scored assessment with quiz-specific controls.</small>
+                <small>{copy.messages.quizModeHelp}</small>
               </label>
 
               <label className="checkbox-control">
@@ -1440,14 +1451,14 @@ export default function FormsTab({
                     checked={Boolean(getQuizSettings(activeForm).lockScreen)}
                     onChange={(event) => updateActiveFormQuiz({ lockScreen: event.target.checked })}
                   />
-                  Focus mode
+                  {copy.labels.focusMode}
                 </span>
-                <small>Requires fullscreen while the quiz is active. Exiting fullscreen locks the attempt and prevents retakes.</small>
+                <small>{copy.messages.focusModeHelp}</small>
               </label>
 
               <label>
-                <span className="quiz-setting-title">Total time limit (minutes)</span>
-                <small>Set the maximum time allowed for the full quiz. Use 0 for no limit.</small>
+                <span className="quiz-setting-title">{copy.labels.totalTimeLimit}</span>
+                <small>{copy.messages.totalTimeHelp}</small>
                 <input
                   type="number"
                   min="0"
@@ -1461,8 +1472,8 @@ export default function FormsTab({
               </label>
 
               <label>
-                <span className="quiz-setting-title">Time per question (seconds)</span>
-                <small>Limit each question individually. Use 0 when questions should not be timed.</small>
+                <span className="quiz-setting-title">{copy.labels.timePerQuestion}</span>
+                <small>{copy.messages.questionTimeHelp}</small>
                 <input
                   type="number"
                   min="0"
@@ -1476,21 +1487,21 @@ export default function FormsTab({
               </label>
 
               <label>
-                <span className="quiz-setting-title">Scoring</span>
-                <small>Choose whether answers are graded automatically, manually, or by completion.</small>
+                <span className="quiz-setting-title">{copy.labels.scoring}</span>
+                <small>{copy.messages.scoringHelp}</small>
                 <select
                   value={getQuizSettings(activeForm).scoring}
                   onChange={(event) => updateActiveFormQuiz({ scoring: event.target.value })}
                 >
-                  <option value="automatic">Automatic</option>
-                  <option value="manual">Manual review</option>
-                  <option value="completion">Completion only</option>
+                  <option value="automatic">{copy.scoringOptions.automatic}</option>
+                  <option value="manual">{copy.scoringOptions.manual}</option>
+                  <option value="completion">{copy.scoringOptions.completion}</option>
                 </select>
               </label>
 
               <label>
-                <span className="quiz-setting-title">Passing score (%)</span>
-                <small>Minimum score required to pass when scoring is enabled.</small>
+                <span className="quiz-setting-title">{copy.labels.passingScore}</span>
+                <small>{copy.messages.passingScoreHelp}</small>
                 <input
                   type="number"
                   min="0"
@@ -1511,9 +1522,9 @@ export default function FormsTab({
                     checked={Boolean(getQuizSettings(activeForm).showResults)}
                     onChange={(event) => updateActiveFormQuiz({ showResults: event.target.checked })}
                   />
-                  Show results
+                  {copy.labels.showResults}
                 </span>
-                <small>Displays the respondent's result after submission.</small>
+                <small>{copy.messages.showResultsHelp}</small>
               </label>
 
               <label className="checkbox-control">
@@ -1523,14 +1534,14 @@ export default function FormsTab({
                     checked={Boolean(getQuizSettings(activeForm).allowRetakes)}
                     onChange={(event) => updateActiveFormQuiz({ allowRetakes: event.target.checked })}
                   />
-                  Allow retakes
+                  {copy.labels.allowRetakes}
                 </span>
-                <small>Lets respondents submit the same quiz again when allowed.</small>
+                <small>{copy.messages.allowRetakesHelp}</small>
               </label>
 
               <label>
-                <span className="quiz-setting-title">Max retakes</span>
-                <small>Maximum number of additional attempts. Use 0 for unlimited retakes.</small>
+                <span className="quiz-setting-title">{copy.labels.maxRetakes}</span>
+                <small>{copy.messages.maxRetakesHelp}</small>
                 <input
                   type="number"
                   min="0"
@@ -1546,16 +1557,16 @@ export default function FormsTab({
               <section className="logic-settings-card">
                 <div className="logic-settings-header">
                   <div>
-                    <span className="quiz-setting-title">Conditional logic</span>
-                    <small>If a question equals an answer, show or hide another question.</small>
+                    <span className="quiz-setting-title">{copy.labels.conditionalLogic}</span>
+                    <small>{copy.messages.logicHelp}</small>
                   </div>
                   <FormButton icon={Plus} disabled={getFormFields(activeForm).length < 2} onClick={addLogicRule}>
-                    Add rule
+                    {copy.labels.addRule}
                   </FormButton>
                 </div>
 
                 {(activeForm.logicRules || []).length === 0 ? (
-                  <p className="logic-empty">No logic rules yet.</p>
+                  <p className="logic-empty">{copy.messages.noLogicRules}</p>
                 ) : (
                   <div className="logic-rule-list">
                     {(activeForm.logicRules || []).map((rule) => (
@@ -1566,22 +1577,22 @@ export default function FormsTab({
                         >
                           {getFormFields(activeForm).map((field) => (
                             <option key={field.id} value={field.id}>
-                              {getLocalizedValue(field, "label", primaryLanguage) || "Untitled question"}
+                              {getLocalizedValue(field, "label", primaryLanguage) || copy.labels.untitledQuestion}
                             </option>
                           ))}
                         </select>
-                        <span>equals</span>
+                        <span>{copy.labels.equals}</span>
                         <input
                           value={rule.value || ""}
-                          placeholder="Answer"
+                          placeholder={copy.labels.answer}
                           onChange={(event) => updateLogicRule(rule.id, { value: event.target.value })}
                         />
                         <select
                           value={rule.action || "show"}
                           onChange={(event) => updateLogicRule(rule.id, { action: event.target.value })}
                         >
-                          <option value="show">show</option>
-                          <option value="hide">hide</option>
+                          <option value="show">{copy.labels.show}</option>
+                          <option value="hide">{copy.labels.hide}</option>
                         </select>
                         <select
                           value={rule.targetFieldId}
@@ -1589,14 +1600,14 @@ export default function FormsTab({
                         >
                           {getFormFields(activeForm).map((field) => (
                             <option key={field.id} value={field.id}>
-                              {getLocalizedValue(field, "label", primaryLanguage) || "Untitled question"}
+                              {getLocalizedValue(field, "label", primaryLanguage) || copy.labels.untitledQuestion}
                             </option>
                           ))}
                         </select>
                         <FormButton
                           variant="danger"
                           icon={Trash2}
-                          title="Delete rule"
+                          title={copy.labels.deleteRule}
                           onClick={() => deleteLogicRule(rule.id)}
                         />
                       </div>
@@ -1607,10 +1618,10 @@ export default function FormsTab({
             </div>
 
             <footer className="quiz-drawer-footer">
-              <button type="button" onClick={() => setQuizOptionsOpen(false)}>Close</button>
+              <button type="button" onClick={() => setQuizOptionsOpen(false)}>{copy.labels.close}</button>
               <button type="button" className="quiz-drawer-save" onClick={saveSettings}>
                 <Save size={16} aria-hidden="true" />
-                Save
+                {copy.labels.save}
               </button>
             </footer>
           </div>
@@ -1619,16 +1630,14 @@ export default function FormsTab({
 
       {deleteFormCandidate && (
         <PageDeleteConfirmModal
-          title="Delete this form?"
+          title={copy.messages.deleteFormTitle}
           message={
             <>
-              <strong>"{deleteFormCandidate.title || "Untitled form"}"</strong> and its
-              questions, translations, placements, and workflows will be removed. This cannot
-              be undone.
+              <strong>"{deleteFormCandidate.title || copy.labels.untitledForm}"</strong> {copy.messages.deleteFormMessage}
             </>
           }
-          cancelLabel="Keep form"
-          confirmLabel="Delete form"
+          cancelLabel={copy.messages.keepForm}
+          confirmLabel={copy.labels.deleteForm}
           onCancel={() => setDeleteFormCandidate(null)}
           onConfirm={confirmDeleteCurrentForm}
         />
@@ -1636,15 +1645,14 @@ export default function FormsTab({
 
       {deleteFormPageCandidate && (
         <PageDeleteConfirmModal
-          title="Delete this form page?"
+          title={copy.messages.deleteFormPageTitle}
           message={
             <>
-              <strong>"{deleteFormPageCandidate.name}"</strong> and its questions will be
-              removed from this form. This cannot be undone.
+              <strong>"{deleteFormPageCandidate.name}"</strong> {copy.messages.deleteFormPageMessage}
             </>
           }
-          cancelLabel="Keep page"
-          confirmLabel="Delete page"
+          cancelLabel={copy.messages.keepPage}
+          confirmLabel={copy.messages.deletePage}
           onCancel={() => setDeleteFormPageCandidate(null)}
           onConfirm={confirmDeleteFormPage}
         />

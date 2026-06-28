@@ -2,19 +2,19 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import logo from "../../assets/MadarTemplates/madar_header.svg";
-
-const navItems = [
-  { id: "home", labelKey: "nav.home", path: "/" },
-  { id: "features", labelKey: "nav.features", path: "/features" },
-  { id: "pricing", labelKey: "nav.pricing", path: "/pricing" },
-  { id: "contact", labelKey: "nav.contact", path: "/contact" },
-];
+import {
+  footerNavigationItems,
+  getFooterContent,
+  getNavigationContent,
+} from "../../content";
 
 export default function Footer({ lang = "en" }) {
   const { t } = useTranslation(["common", "public"]);
   const currentLang = lang === "ar" ? "ar" : "en";
   const isAr = currentLang === "ar";
   const brand = t("common:app.brand");
+  const content = getFooterContent(currentLang);
+  const navigation = getNavigationContent(currentLang);
 
   return (
     <footer
@@ -24,20 +24,20 @@ export default function Footer({ lang = "en" }) {
     >
       <div className="footer-shell">
         <div className="footer-main">
-          <section className="footer-brand" aria-label={t("public:footer.brandAria")}>
-            <NavLink to="/" className="footer-logo-link" aria-label={t("public:footer.homeAria")}>
+          <section className="footer-brand" aria-label={content.brandAria}>
+            <NavLink to="/" className="footer-logo-link" aria-label={content.homeAria}>
               <img className="footer-logo" src={logo} alt={t("common:app.logoAlt")} />
               <span>{brand}</span>
             </NavLink>
 
-            <p>{t("public:footer.description")}</p>
+            <p>{content.description}</p>
           </section>
 
-          <nav className="footer-links" aria-label={t("public:footer.navigation")}>
-            <h4>{t("public:footer.linksTitle")}</h4>
+          <nav className="footer-links" aria-label={content.navigation}>
+            <h4>{content.linksTitle}</h4>
 
             <div className="footer-links-grid">
-              {navItems.map((item) => (
+              {footerNavigationItems.map((item) => (
                 <NavLink
                   key={item.id}
                   to={item.path}
@@ -46,35 +46,35 @@ export default function Footer({ lang = "en" }) {
                     isActive ? "footer-link active" : "footer-link"
                   }
                 >
-                  {t(`public:${item.labelKey}`)}
+                  {navigation[item.labelKey]}
                 </NavLink>
               ))}
             </div>
           </nav>
 
-          <section className="footer-contact" aria-label={t("public:footer.contactAria")}>
-            <h4>{t("public:footer.contactTitle")}</h4>
+          <section className="footer-contact" aria-label={content.contactAria}>
+            <h4>{content.contactTitle}</h4>
 
             <div className="footer-contact-list">
-              <a href="mailto:info@madar.com" className="footer-contact-item">
-                <span>{t("public:footer.emailLabel")}</span>
-                <strong dir="ltr">info@madar.com</strong>
+              <a href={content.emailHref} className="footer-contact-item">
+                <span>{content.emailLabel}</span>
+                <strong dir="ltr">{content.email}</strong>
               </a>
 
-              <a href="tel:+972599203857" className="footer-contact-item">
-                <span>{t("public:footer.phoneLabel")}</span>
-                <strong dir="ltr">+972 599 203 857</strong>
+              <a href={content.phoneHref} className="footer-contact-item">
+                <span>{content.phoneLabel}</span>
+                <strong dir="ltr">{content.phone}</strong>
               </a>
             </div>
 
             <div className="footer-social-row">
               <a
                 className="footer-social-link"
-                href="https://www.instagram.com/maadar_ps/"
+                href={content.instagramHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={t("public:footer.instagramAria")}
-                title="Instagram"
+                aria-label={content.instagramAria}
+                title={content.instagramTitle}
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -93,17 +93,16 @@ export default function Footer({ lang = "en" }) {
                 </svg>
               </a>
 
-              <span>{t("public:footer.followLabel")}</span>
+              <span>{content.followLabel}</span>
             </div>
           </section>
         </div>
 
         <div className="footer-bottom">
           <p>
-            {t("public:footer.copyright", {
-              brand,
-              rights: t("public:footer.rights"),
-            })}
+            {content.copyright
+              .replace("{{brand}}", brand)
+              .replace("{{rights}}", content.rights)}
           </p>
         </div>
       </div>

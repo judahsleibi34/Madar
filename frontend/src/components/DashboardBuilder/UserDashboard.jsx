@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -18,7 +18,10 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
+import { STORAGE_KEY } from "../PageBuilder/core/PageBuilder.constants";
+import { listBuilderProjects } from "../PageBuilder/services/PageBuilder.api";
 
 const BUILDER_FEATURES = [
   {
@@ -53,12 +56,28 @@ const BUILDER_FEATURES = [
   },
 ];
 
-const usageItems = [
-  { key: "projects", value: 1, max: 5 },
-  { key: "users", value: 3, max: 10 },
-  { key: "responses", value: 128, max: 1000 },
-  { key: "storage", value: 2.4, max: 10, suffix: "GB" },
-];
+const PLAN_LIMITS = {
+  basic: { projects: 1, users: 2, responses: 100, storage: 1 },
+  starter: { projects: 3, users: 5, responses: 500, storage: 3 },
+  premium: { projects: 8, users: 15, responses: 2500, storage: 10 },
+  pro: { projects: 20, users: 50, responses: 10000, storage: 25 },
+  full_platform: { projects: 20, users: 50, responses: 10000, storage: 25 },
+};
+
+const DEFAULT_DASHBOARD_STATS = {
+  projects: 0,
+  forms: 0,
+  fields: 0,
+  responses: 0,
+  users: 1,
+  storage: 0.2,
+  latestFormTitle: "",
+  latestResponseDate: "",
+  topStatus: "New",
+  topStatusCount: 0,
+  topValueLabel: "",
+  topValue: "",
+};
 
 function toTitleCase(value) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -98,6 +117,116 @@ function formatStatus(status, t) {
   });
 }
 
+function parseProjectSchema(record) {
+  const source = record?.draft_schema || record?.draftSchema || record?.schema || record;
+
+  if (typeof source === "string") {
+    try {
+      return JSON.parse(source);
+    } catch {
+      return null;
+    }
+  }
+
+  return source && typeof source === "object" ? source : null;
+}
+
+function getLocalProject() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getResponseDate(response) {
+  return response?.createdAt || response?.created_at || response?.submittedAt || response?.submitted_at || "";
+}
+
+function getAnswerText(value) {
+  if (Array.isArray(value)) return value.map(getAnswerText).filter(Boolean).join(", ");
+  if (value && typeof value === "object") return getAnswerText(value.value ?? value.label ?? "");
+  return String(value ?? "").trim();
+}
+
+function getFormFields(form) {
+  if (Array.isArray(form?.fields)) return form.fields;
+  if (!Array.isArray(form?.sections)) return [];
+  return form.sections.flatMap((section) => section?.fields || []);
+}
+
+function buildDashboardStats(projects = []) {
+  const statusCounts = new Map();
+  const valueCounts = new Map();
+  let latestResponse = null;
+  let latestFormTitle = "";
+  let fields = 0;
+  let forms = 0;
+  let responses = 0;
+
+  projects.forEach((project) => {
+    const projectForms = Array.isArray(project?.forms) ? project.forms : [];
+    forms += projectForms.length;
+
+    projectForms.forEach((form) => {
+      const formFields = getFormFields(form);
+      const formResponses = Array.isArray(form.responses) ? form.responses : [];
+      fields += formFields.length;
+      responses += formResponses.length;
+
+      formResponses.forEach((response) => {
+        const status = response?.status || "New";
+        statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
+
+        const responseDate = getResponseDate(response);
+        if (responseDate && (!latestResponse || new Date(responseDate) > new Date(getResponseDate(latestResponse)))) {
+          latestResponse = response;
+          latestFormTitle = form.title || form.name || "";
+        }
+
+        Object.entries(response?.answers || {}).forEach(([fieldId, answer]) => {
+          const text = getAnswerText(answer);
+          if (!text) return;
+          const field = formFields.find((item) => item.id === fieldId);
+          const label = field?.label || field?.title || fieldId;
+          const key = `${label}::${text}`;
+          valueCounts.set(key, {
+            label,
+            value: text,
+            count: (valueCounts.get(key)?.count || 0) + 1,
+          });
+        });
+      });
+    });
+  });
+
+  const [topStatus = "New", topStatusCount = 0] =
+    [...statusCounts.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  const topAnswer = [...valueCounts.values()].sort((a, b) => b.count - a.count)[0];
+
+  return {
+    ...DEFAULT_DASHBOARD_STATS,
+    projects: projects.length,
+    forms,
+    fields,
+    responses,
+    users: 1,
+    storage: Math.max(0.2, Number((projects.length * 0.2 + responses * 0.002).toFixed(1))),
+    latestFormTitle,
+    latestResponseDate: latestResponse ? getResponseDate(latestResponse) : "",
+    topStatus,
+    topStatusCount,
+    topValueLabel: topAnswer?.label || "",
+    topValue: topAnswer?.value || "",
+  };
+}
+
+function getPlanLimits(activePlan, subscriptionType) {
+  if (subscriptionType === "full_platform") return PLAN_LIMITS.full_platform;
+  return PLAN_LIMITS[activePlan] || PLAN_LIMITS.basic;
+}
+
 export default function UserDashboard({ user }) {
   const { t } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -109,6 +238,9 @@ export default function UserDashboard({ user }) {
   const activePlan = user?.plan || "";
   const activeBuilderType = user?.builder_type || "";
   const paymentStatus = user?.payment_status || "";
+  const [dashboardStats, setDashboardStats] = useState(() =>
+    buildDashboardStats([getLocalProject()].filter(Boolean))
+  );
 
   const enabledBuilderIds = useMemo(() => {
     if (subscriptionType === "full_platform") {
@@ -143,6 +275,34 @@ export default function UserDashboard({ user }) {
     t
   );
   const statusLabel = formatStatus(paymentStatus, t);
+  const planLimits = getPlanLimits(activePlan, subscriptionType);
+  const usageItems = [
+    { key: "projects", value: dashboardStats.projects, max: planLimits.projects },
+    { key: "users", value: dashboardStats.users, max: planLimits.users },
+    { key: "responses", value: dashboardStats.responses, max: planLimits.responses },
+    { key: "storage", value: dashboardStats.storage, max: planLimits.storage, suffix: "GB" },
+  ];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    listBuilderProjects()
+      .then((records) => {
+        if (cancelled) return;
+        const projects = records.map(parseProjectSchema).filter(Boolean);
+        const localProject = getLocalProject();
+        const allProjects = projects.length ? projects : [localProject].filter(Boolean);
+        setDashboardStats(buildDashboardStats(allProjects));
+      })
+      .catch(() => {
+        const localProject = getLocalProject();
+        if (!cancelled) setDashboardStats(buildDashboardStats([localProject].filter(Boolean)));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const summaryCards = [
     {
@@ -164,7 +324,7 @@ export default function UserDashboard({ user }) {
     },
     {
       label: t("userDashboard.summary.responses"),
-      value: "128",
+      value: dashboardStats.responses.toLocaleString(),
       note: t("userDashboard.summary.fromWebsiteForms"),
       icon: MessageSquare,
       tone: "navy",
@@ -177,6 +337,39 @@ export default function UserDashboard({ user }) {
       note: t("userDashboard.summary.reportsAndImports"),
       icon: BarChart3,
       tone: "red",
+    },
+  ];
+
+  const formDataCards = [
+    {
+      label: t("userDashboard.formData.totalAnswers", { defaultValue: "Total answers" }),
+      value: dashboardStats.responses.toLocaleString(),
+      note: t("userDashboard.formData.fromForms", {
+        defaultValue: "{{count}} forms, {{fields}} fields",
+        count: dashboardStats.forms,
+        fields: dashboardStats.fields,
+      }),
+      icon: ClipboardList,
+    },
+    {
+      label: t("userDashboard.formData.newestAnswer", { defaultValue: "Newest answer" }),
+      value: dashboardStats.latestResponseDate
+        ? new Date(dashboardStats.latestResponseDate).toLocaleDateString()
+        : t("userDashboard.formData.noneYet", { defaultValue: "None yet" }),
+      note: dashboardStats.latestFormTitle || t("userDashboard.formData.waiting", { defaultValue: "Waiting for form data" }),
+      icon: MessageSquare,
+    },
+    {
+      label: t("userDashboard.formData.topValue", { defaultValue: "Top value" }),
+      value: dashboardStats.topValue || dashboardStats.topStatus,
+      note: dashboardStats.topValue
+        ? dashboardStats.topValueLabel
+        : t("userDashboard.formData.topStatus", {
+            defaultValue: "{{status}} status, {{count}} answers",
+            status: dashboardStats.topStatus,
+            count: dashboardStats.topStatusCount,
+          }),
+      icon: TrendingUp,
     },
   ];
 
@@ -238,6 +431,25 @@ export default function UserDashboard({ user }) {
               <span className="user-dashboard-stat-icon" aria-hidden="true">
                 <Icon size={22} />
               </span>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="user-dashboard-form-data-grid" aria-label={t("userDashboard.formData.aria", { defaultValue: "Form data summary" })}>
+        {formDataCards.map((card) => {
+          const Icon = card.icon;
+
+          return (
+            <article className="user-dashboard-form-data-card" key={card.label}>
+              <span className="user-dashboard-form-data-icon" aria-hidden="true">
+                <Icon size={19} />
+              </span>
+              <div>
+                <span>{card.label}</span>
+                <strong>{card.value}</strong>
+                <small>{card.note}</small>
+              </div>
             </article>
           );
         })}

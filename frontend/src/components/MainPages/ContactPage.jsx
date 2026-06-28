@@ -1,43 +1,13 @@
 import { useState } from "react";
 
 import GradientText from "../Animations/GradientText";
+import { getContactContent } from "../../content";
+import { FormBlock, HeroBlock, SectionBlock } from "../../blocks";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-const contactText = {
-  en: {
-    title: "Contact Us",
-    subtitle:
-      "We'd love to hear from you. Send us a message and we'll get back to you soon.",
-    name: "Full Name",
-    phone: "Phone Number",
-    message: "Issue / Message",
-    button: "Send Message",
-    sending: "Sending...",
-    success: "Thanks. Your message has been received.",
-    error: "Could not send your message. Please check the form and try again.",
-    infoTitle: "Contact Information",
-    emailLabel: "Email",
-    phoneLabel: "Phone",
-  },
-  ar: {
-    title: "تواصل معنا",
-    subtitle: "يسعدنا سماعك. أرسل لنا رسالة وسنرد عليك قريبًا.",
-    name: "الاسم الكامل",
-    phone: "رقم الهاتف",
-    message: "المشكلة / الرسالة",
-    button: "إرسال الرسالة",
-    sending: "جاري الإرسال...",
-    success: "شكرًا لك. تم استلام رسالتك.",
-    error: "تعذر إرسال رسالتك. يرجى مراجعة النموذج والمحاولة مرة أخرى.",
-    infoTitle: "معلومات التواصل",
-    emailLabel: "البريد الإلكتروني",
-    phoneLabel: "رقم الهاتف",
-  },
-};
-
 export default function ContactPage({ lang = "en" }) {
-  const t = contactText[lang] || contactText.en;
+  const t = getContactContent(lang);
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,9 +39,9 @@ export default function ContactPage({ lang = "en" }) {
       }
 
       setForm({ name: "", phone: "", message: "" });
-      setStatus({ type: "success", message: t.success });
+      setStatus({ type: "success", message: t.form.success });
     } catch {
-      setStatus({ type: "error", message: t.error });
+      setStatus({ type: "error", message: t.form.error });
     } finally {
       setIsSubmitting(false);
     }
@@ -79,17 +49,17 @@ export default function ContactPage({ lang = "en" }) {
 
   return (
     <main className="contact-page">
-      <section className="contact-hero">
+      <HeroBlock className="contact-hero">
         <h1>
-          <GradientText pauseOnHover>{t.title}</GradientText>
+          <GradientText pauseOnHover>{t.hero.title}</GradientText>
         </h1>
-        <p>{t.subtitle}</p>
-      </section>
+        <p>{t.hero.subtitle}</p>
+      </HeroBlock>
 
-      <section className="contact-content">
-        <form className="contact-form" onSubmit={submitContact}>
+      <SectionBlock className="contact-content">
+        <FormBlock className="contact-form" onSubmit={submitContact}>
           <label>
-            {t.name}
+            {t.form.name}
             <input
               type="text"
               name="name"
@@ -101,7 +71,7 @@ export default function ContactPage({ lang = "en" }) {
           </label>
 
           <label>
-            {t.phone}
+            {t.form.phone}
             <input
               type="tel"
               name="phone"
@@ -113,7 +83,7 @@ export default function ContactPage({ lang = "en" }) {
           </label>
 
           <label>
-            {t.message}
+            {t.form.message}
             <textarea
               name="message"
               rows="6"
@@ -131,28 +101,28 @@ export default function ContactPage({ lang = "en" }) {
           )}
 
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t.sending : t.button}
+            {isSubmitting ? t.form.sending : t.form.button}
           </button>
-        </form>
+        </FormBlock>
 
         <div className="contact-info-card">
           <h2>
-            <GradientText pauseOnHover>{t.infoTitle}</GradientText>
+            <GradientText pauseOnHover>{t.info.title}</GradientText>
           </h2>
 
           <div>
-            <strong>{t.emailLabel}</strong>
-            <p>info@madar.com</p>
+            <strong>{t.info.emailLabel}</strong>
+            <p>{t.info.email}</p>
           </div>
 
           <div>
-            <strong>{t.phoneLabel}</strong>
+            <strong>{t.info.phoneLabel}</strong>
             <p dir="ltr" className="phone-number">
-              +972599203857
+              {t.info.phone}
             </p>
           </div>
         </div>
-      </section>
+      </SectionBlock>
     </main>
   );
 }

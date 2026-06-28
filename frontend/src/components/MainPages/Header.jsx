@@ -5,15 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import LanguageSwitcher from "../LanguageSwitcher";
 import logo from "../../assets/MadarTemplates/madar_header.svg";
-
-const navItems = [
-  { id: "home", labelKey: "nav.home", path: "/" },
-  { id: "features", labelKey: "nav.features", path: "/features" },
-  { id: "pricing", labelKey: "nav.pricing", path: "/pricing" },
-  { id: "team", labelKey: "nav.team", path: "/team" },
-  { id: "about", labelKey: "nav.about", path: "/about" },
-  { id: "contact", labelKey: "nav.contact", path: "/contact" },
-];
+import { getNavigationContent, primaryNavigationItems } from "../../content";
 
 export default function Header({
   lang = "en",
@@ -28,10 +20,14 @@ export default function Header({
 
   const isRTL = lang === "ar";
   const isDark = themeMode === "dark";
+  const navigation = getNavigationContent(lang);
 
   const finalNavItems = isLoggedIn
-    ? [...navItems, { id: "dashboard", labelKey: "nav.dashboard", path: "/dashboard" }]
-    : navItems;
+    ? [
+        ...primaryNavigationItems,
+        { id: "dashboard", labelKey: "dashboard", path: "/dashboard" },
+      ]
+    : primaryNavigationItems;
 
   const closeMenu = () => {
     setMenuOpen(false);
@@ -111,7 +107,7 @@ export default function Header({
               end={item.path === "/"}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
-              {t(`public:${item.labelKey}`)}
+              {navigation[item.labelKey]}
             </NavLink>
           ))}
         </nav>
@@ -146,16 +142,16 @@ export default function Header({
 
           {isLoggedIn ? (
             <button type="button" className="btn-signup" onClick={handleLogout}>
-              {t("public:nav.logout")}
+              {navigation.logout}
             </button>
           ) : (
             <>
               <Link to="/login" className="btn-login">
-                {t("public:nav.login")}
+                {navigation.login}
               </Link>
 
               <Link to="/signup" className="btn-signup">
-                {t("public:nav.signup")}
+                {navigation.signup}
               </Link>
 
               <LanguageSwitcher
@@ -259,7 +255,7 @@ export default function Header({
                     className={({ isActive }) => (isActive ? "active" : "")}
                     onClick={closeMenu}
                   >
-                    <span>{t(`public:${item.labelKey}`)}</span>
+                    <span>{navigation[item.labelKey]}</span>
 
                     <svg
                       width="18"
@@ -287,7 +283,7 @@ export default function Header({
                     className="btn-signup mobile-auth-full"
                     onClick={handleLogout}
                   >
-                    {t("public:nav.logout")}
+                    {navigation.logout}
                   </button>
                 ) : (
                   <>
@@ -296,7 +292,7 @@ export default function Header({
                       className="btn-login"
                       onClick={closeMenu}
                     >
-                      {t("public:nav.login")}
+                      {navigation.login}
                     </Link>
 
                     <Link
@@ -304,7 +300,7 @@ export default function Header({
                       className="btn-signup"
                       onClick={closeMenu}
                     >
-                      {t("public:nav.signup")}
+                      {navigation.signup}
                     </Link>
                   </>
                 )}

@@ -1,3 +1,3 @@
-import PageBuilderPublishTab from "../PageBuilderPublishTab";
+import PageBuilderPublishTab from "./PageBuilderPublishTab";
 
 export default PageBuilderPublishTab;

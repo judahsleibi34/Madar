@@ -5,7 +5,7 @@ import "./ThemeToggle.css";
 export default function ThemeToggle({
   mode = "light",
   onChange,
-  label = "Theme",
+  label,
   compact = false,
   showLabel,
   showSwitch,
@@ -44,7 +44,9 @@ export default function ThemeToggle({
           {isDark ? <Moon size={17} /> : <Sun size={17} />}
         </span>
 
-        {shouldShowLabel && <span className="theme-toggle-label">{label}</span>}
+        {shouldShowLabel && (
+          <span className="theme-toggle-label">{label || t("theme.label")}</span>
+        )}
       </span>
 
       {shouldShowSwitch && (

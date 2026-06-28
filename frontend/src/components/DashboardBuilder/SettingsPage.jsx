@@ -5,15 +5,16 @@ import SmartLink from "../SmartLink";
 import {
   STORAGE_KEY,
   defaultSiteChrome,
-} from "../PageBuilder/PageBuilder.constants";
-import { createInitialProject } from "../PageBuilder/PageBuilder.starters";
+} from "../PageBuilder/core/PageBuilder.constants";
+import { createInitialProject } from "../PageBuilder/core/PageBuilder.starters";
 import {
   getConfiguredProjectSubdomain,
   sanitizeSubdomain,
-} from "../PageBuilder/PageBuilder.routing";
-import { uploadBuilderAsset } from "../PageBuilder/PageBuilder.api";
+} from "../PageBuilder/core/PageBuilder.routing";
+import { uploadBuilderAsset } from "../PageBuilder/services/PageBuilder.api";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
+import { getSettingsContent } from "../../content";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -172,130 +173,6 @@ function SettingsNotification({ notification, isArabic, label, onClose }) {
   );
 }
 
-const settingsCopy = {
-  en: {
-    eyebrow: "Workspace settings",
-    title: "Profile and website settings",
-    subtitle:
-      "Keep your personal details, brand, and public website information up to date.",
-
-    profileTitle: "Your profile",
-    profileDescription:
-      "This information helps personalize your workspace and customer-facing pages.",
-    uploadProfilePhoto: "Upload photo",
-    firstName: "First name",
-    lastName: "Last name",
-    email: "Email",
-    phoneNumber: "Phone number",
-    saveProfile: "Save profile",
-    changePassword: "Change password",
-    saving: "Saving...",
-
-    websiteTitle: "Website details",
-    websiteDescription:
-      "Set the name, contact details, and logo visitors see on your website.",
-    websiteLogoAlt: "Website logo",
-    uploadLogo: "Upload logo",
-    uploadingLogo: "Uploading...",
-    logoUploadUnavailable:
-      "Image uploads are not available yet. Use a secure HTTPS image URL for now.",
-    subdomainName: "Subdomain name",
-    logoUrl: "Logo URL",
-    brandName: "Brand name",
-    footerName: "Footer name",
-    contactEmail: "Contact email",
-    contactPhone: "Contact phone",
-    websiteDescriptionLabel: "Website description",
-    saveWebsite: "Save website details",
-
-    accountSaved: "Account settings saved.",
-    avatarUploaded: "Profile photo updated.",
-    logoUploaded: "Logo uploaded.",
-    websiteSaved: "Website settings saved.",
-    accountError: "Could not update account settings.",
-    avatarUploadError: "Could not upload profile photo.",
-    logoUploadError: "Could not upload logo.",
-    invalidAvatarType: "Please upload a PNG, JPG, or WebP image.",
-    invalidLogoType: "Please upload a PNG, JPG, or WebP image.",
-    avatarTooLarge: "Profile photo must be 5MB or smaller.",
-    logoTooLarge: "Logo image must be 5MB or smaller.",
-    invalidLogoUrl:
-      "Use an HTTPS image URL or managed internal path. Data, SVG, JavaScript, and HTTP URLs are not allowed.",
-    sessionExpired: "Your session expired. Please log in again.",
-
-    userAlt: "User",
-    userFallback: "U",
-
-    firstNameRequired: "First name is required.",
-    lastNameRequired: "Last name is required.",
-    emailRequired: "Email is required.",
-    emailInvalid: "Please enter a valid email address.",
-    subdomainRequired: "Subdomain name is required.",
-    brandRequired: "Brand name is required.",
-    contactEmailInvalid: "Please enter a valid contact email.",
-    fixErrors: "Please fix the highlighted fields.",
-    closeNotification: "Close notification",
-  },
-
-  ar: {
-    eyebrow: "إعدادات مساحة العمل",
-    title: "إعدادات الملف الشخصي والموقع",
-    subtitle: "حدّث بياناتك الشخصية وهوية العلامة ومعلومات الموقع العامة.",
-
-    profileTitle: "ملفك الشخصي",
-    profileDescription:
-      "تساعد هذه المعلومات في تخصيص مساحة عملك وصفحاتك أمام العملاء.",
-    uploadProfilePhoto: "رفع صورة",
-    firstName: "الاسم الأول",
-    lastName: "اسم العائلة",
-    email: "البريد الإلكتروني",
-    phoneNumber: "رقم الهاتف",
-    saveProfile: "حفظ الملف الشخصي",
-    changePassword: "تغيير كلمة المرور",
-    saving: "جارٍ الحفظ...",
-
-    websiteTitle: "تفاصيل الموقع",
-    websiteDescription:
-      "حدد الاسم وبيانات التواصل والشعار الذي يراه زوار موقعك.",
-    websiteLogoAlt: "شعار الموقع",
-    uploadLogo: "رفع الملفات قريباً",
-    logoUploadUnavailable:
-      "رفع الصور غير متاح حالياً. استخدم رابط صورة HTTPS آمناً في الوقت الحالي.",
-    subdomainName: "اسم النطاق الفرعي",
-    logoUrl: "رابط الشعار",
-    brandName: "اسم العلامة",
-    footerName: "اسم التذييل",
-    contactEmail: "بريد التواصل",
-    contactPhone: "هاتف التواصل",
-    websiteDescriptionLabel: "وصف الموقع",
-    saveWebsite: "حفظ تفاصيل الموقع",
-
-    accountSaved: "تم حفظ إعدادات الملف الشخصي.",
-    avatarUploaded: "تم تحديث صورة الملف الشخصي.",
-    websiteSaved: "تم حفظ تفاصيل الموقع.",
-    accountError: "تعذر حفظ إعدادات الملف الشخصي.",
-    avatarUploadError: "تعذر رفع صورة الملف الشخصي.",
-    invalidAvatarType: "يرجى رفع صورة بصيغة PNG أو JPG أو WebP.",
-    avatarTooLarge: "يجب ألا يتجاوز حجم صورة الملف الشخصي 5MB.",
-    invalidLogoUrl:
-      "استخدم رابط صورة HTTPS أو مساراً داخلياً مُداراً. روابط data و SVG و JavaScript و HTTP غير مسموحة.",
-    sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
-
-    userAlt: "المستخدم",
-    userFallback: "م",
-
-    firstNameRequired: "الاسم الأول مطلوب.",
-    lastNameRequired: "اسم العائلة مطلوب.",
-    emailRequired: "البريد الإلكتروني مطلوب.",
-    emailInvalid: "يرجى إدخال بريد إلكتروني صحيح.",
-    subdomainRequired: "اسم النطاق الفرعي مطلوب.",
-    brandRequired: "اسم العلامة مطلوب.",
-    contactEmailInvalid: "يرجى إدخال بريد تواصل صحيح.",
-    fixErrors: "يرجى تصحيح الحقول المحددة.",
-    closeNotification: "إغلاق الإشعار",
-  },
-};
-
 export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
   const [accountForm, setAccountForm] = useState(() =>
     getInitialAccountForm(user)
@@ -312,7 +189,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   const isArabic = lang === "ar";
-  const t = settingsCopy[isArabic ? "ar" : "en"];
+  const t = getSettingsContent(lang);
   const userApiPath = (path) => {
     if (!user?.id) {
       throw new Error(t.sessionExpired);
@@ -591,15 +468,15 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
       const assetUrl = await uploadBuilderAsset(file);
 
       if (!assetUrl) {
-        throw new Error(t.logoUploadError || "Could not upload logo.");
+        throw new Error(t.logoUploadError);
       }
 
       updateSiteField("logoUrl", assetUrl);
-      showNotification("success", t.logoUploaded || "Logo uploaded.");
+      showNotification("success", t.logoUploaded);
     } catch (error) {
       showNotification(
         "error",
-        error.message || t.logoUploadError || "Could not upload logo."
+        error.message || t.logoUploadError
       );
     } finally {
       setIsUploadingLogo(false);
@@ -969,7 +846,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
               className="settings-file-button settings-profile-upload"
               aria-disabled={isUploadingLogo}
             >
-              {isUploadingLogo ? t.uploadingLogo || "Uploading..." : "Upload logo"}
+              {isUploadingLogo ? t.uploadingLogo : t.uploadLogo}
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
@@ -1097,3 +974,4 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     </section>
   );
 }
+

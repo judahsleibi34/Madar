@@ -8,6 +8,7 @@
 */
 
 @import "./core/tokens.css";
+@import "./variables.css";
 @import "./core/base.css";
 
 @import "./public layout/header.css";

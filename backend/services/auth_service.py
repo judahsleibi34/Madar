@@ -22,6 +22,16 @@ _AUTH_REFRESH_REPLAY = {}
 _AUTH_REFRESH_REPLAY_SECONDS = 15
 
 
+def _get_auth_value(source, key: str):
+    if source is None:
+        return None
+
+    if isinstance(source, dict):
+        return source.get(key)
+
+    return getattr(source, key, None)
+
+
 def _refresh_session_once(refresh_token: str):
     token_key = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
 
@@ -40,12 +50,26 @@ def _refresh_session_once(refresh_token: str):
             return cached[1], cached[2], cached[3]
 
         auth_response = supabase.auth.refresh_session(refresh_token)
-        auth_user = getattr(auth_response, "user", None)
-        session = getattr(auth_response, "session", None)
-        if not auth_user or not session:
+        auth_user = _get_auth_value(auth_response, "user")
+        session = _get_auth_value(auth_response, "session")
+
+        if not session:
             raise RuntimeError("Session refresh returned no active session")
 
-        result = (auth_user, session.access_token, session.refresh_token)
+        access_token = _get_auth_value(session, "access_token")
+        next_refresh_token = _get_auth_value(session, "refresh_token") or refresh_token
+
+        if not access_token:
+            raise RuntimeError("Session refresh returned no access token")
+
+        if not auth_user:
+            auth_user_response = supabase.auth.get_user(access_token)
+            auth_user = _get_auth_value(auth_user_response, "user")
+
+        if not auth_user:
+            raise RuntimeError("Session refresh returned no authenticated user")
+
+        result = (auth_user, access_token, next_refresh_token)
         _AUTH_REFRESH_REPLAY[token_key] = (time.monotonic(), *result)
         return result
 
@@ -259,7 +283,7 @@ def get_authenticated_user_row(
         if access_token:
             try:
                 auth_response = supabase.auth.get_user(access_token)
-                auth_user = getattr(auth_response, "user", None)
+                auth_user = _get_auth_value(auth_response, "user")
             except Exception as access_error:
                 if not refresh_token or not allow_refresh:
                     raise
@@ -286,6 +310,11 @@ def get_authenticated_user_row(
     if not auth_user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
+    auth_user_id = _get_auth_value(auth_user, "id")
+
+    if not auth_user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
     if response and next_access_token and next_refresh_token:
         set_auth_cookies(
             response,
@@ -296,7 +325,7 @@ def get_authenticated_user_row(
     user_response = (
         service_supabase.table("users")
         .select("*")
-        .eq("auth_id", auth_user.id)
+        .eq("auth_id", auth_user_id)
         .single()
         .execute()
     )
