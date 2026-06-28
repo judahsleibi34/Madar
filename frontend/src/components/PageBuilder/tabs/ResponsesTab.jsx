@@ -1,3 +1,3 @@
-import BuilderResponsesPage from "../BuilderResponsesPage";
+import BuilderResponsesPage from "../responses";
 
 export default BuilderResponsesPage;

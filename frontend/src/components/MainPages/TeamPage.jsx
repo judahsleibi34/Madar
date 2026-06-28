@@ -1,9 +1,6 @@
-import FadeIn from "../Animations/FadeIn";
+﻿import FadeIn from "../Animations/FadeIn";
 import GradientText from "../Animations/GradientText";
-import judahImage from "../../assets/TeamInformation/Judah.jpg";
-import judahCv from "../../assets/TeamInformation/Judah_Sleibi_CV.pdf";
-import salibaCv from "../../assets/TeamInformation/SalibaRishmawiCV.pdf";
-import salibaImage from "../../assets/TeamInformation/Saliba.jpeg";
+import { getTeamContent } from "../../content";
 
 const icons = {
   linkedin: (
@@ -33,174 +30,8 @@ const icons = {
   ),
 };
 
-const judahLinksEn = [
-  {
-    label: "LinkedIn",
-    type: "linkedin",
-    href: "https://www.linkedin.com/in/judah-sleibi-b8578b321",
-  },
-  {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/judahsleibi34",
-  },
-  {
-    label: "CV",
-    type: "cv",
-    href: judahCv,
-  },
-  {
-    label: "Email",
-    type: "email",
-    href: "mailto:judahsleibi34@gmail.com",
-  },
-  {
-    label: "Phone",
-    type: "phone",
-    href: "tel:+972599203857",
-  },
-];
-
-const judahLinksAr = [
-  {
-    label: "لينكدإن",
-    type: "linkedin",
-    href: "https://www.linkedin.com/in/judah-sleibi-b8578b321",
-  },
-  {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/judahsleibi34",
-  },
-  {
-    label: "السيرة الذاتية",
-    type: "cv",
-    href: judahCv,
-  },
-  {
-    label: "البريد الإلكتروني",
-    type: "email",
-    href: "mailto:judahsleibi34@gmail.com",
-  },
-  {
-    label: "الهاتف",
-    type: "phone",
-    href: "tel:+972599203857",
-  },
-];
-
-const salibaLinksEn = [
-  {
-    label: "LinkedIn",
-    type: "linkedin",
-    href: "https://www.linkedin.com/in/saliba-rishmawi/",
-  },
-  {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/Saliba-codes",
-  },
-  {
-    label: "CV",
-    type: "cv",
-    href: salibaCv,
-  },
-  {
-    label: "Email",
-    type: "email",
-    href: "mailto:rishmawisaliba12@gmail.com",
-  },
-  {
-    label: "Phone",
-    type: "phone",
-    href: "tel:+970568691617",
-  },
-];
-
-const salibaLinksAr = [
-  {
-    label: "لينكدإن",
-    type: "linkedin",
-    href: "https://www.linkedin.com/in/saliba-rishmawi/",
-  },
-  {
-    label: "GitHub",
-    type: "github",
-    href: "https://github.com/Saliba-codes",
-  },
-  {
-    label: "السيرة الذاتية",
-    type: "cv",
-    href: salibaCv,
-  },
-  {
-    label: "البريد الإلكتروني",
-    type: "email",
-    href: "mailto:rishmawisaliba12@gmail.com",
-  },
-  {
-    label: "الهاتف",
-    type: "phone",
-    href: "tel:+970568691617",
-  },
-];
-
-const pageText = {
-  en: {
-    title: "Meet the Team",
-    subtitle:
-      "The people behind Madar, combining AI, software engineering, and business insight to build smarter management tools.",
-    members: [
-      {
-        name: "Judah Sleibi",
-        role: "AI Engineer & Full-Stack Developer",
-        description:
-          "Leads the technical development of Madar, with a focus on AI-powered features, backend architecture, authentication systems, data workflows, and user experience.",
-        initials: "JS",
-        image: judahImage,
-        links: judahLinksEn,
-      },
-      {
-        name: "Saliba Rishmawi",
-        role: "AI & Full-Stack Developer",
-        description:
-          "Supports Madar’s backend and AI direction, bringing experience in computer vision, medical imaging AI, and system-level problem solving.",
-        initials: "SR",
-        image: salibaImage,
-        links: salibaLinksEn,
-      },
-    ],
-  },
-
-  ar: {
-    title: "تعرف على الفريق",
-    subtitle:
-      "الفريق خلف مدار، نجمع بين الذكاء الاصطناعي، هندسة البرمجيات، وفهم الأعمال لبناء أدوات إدارة أكثر ذكاءً.",
-    members: [
-      {
-        name: "جودة صليبي",
-        role: "مهندس ذكاء اصطناعي ومطوّر أنظمة محوسبة",
-        description:
-          "يقود التطوير التقني لمنصة مدار، مع التركيز على ميزات الذكاء الاصطناعي، بنية النظام الخلفية، أنظمة تسجيل الدخول، تدفقات البيانات، وتجربة المستخدم.",
-        initials: "JS",
-        image: judahImage,
-        links: judahLinksAr,
-      },
-      {
-        name: "صليبا ريشماوي",
-        role: "مطوّر ذكاء اصطناعي وأنظمة محوسبه",
-        description:
-        "يدعم توجه مدار في الباكند والذكاء الاصطناعي، بخبرة في الرؤية الحاسوبية، والذكاء الاصطناعي للتصوير الطبي، وحل المشكلات على مستوى الأنظمة.",
-        initials: "SR",
-        image: salibaImage,
-        links: salibaLinksAr,
-      },
-    ],
-  },
-};
-
 export default function TeamPage({ lang = "en" }) {
-  const t = pageText[lang] || pageText.en;
+  const t = getTeamContent(lang);
 
   return (
     <main className="team-page">
@@ -265,3 +96,4 @@ export default function TeamPage({ lang = "en" }) {
     </main>
   );
 }
+

@@ -1,3 +1,3 @@
-import PageBuilderThemeTab from "../PageBuilderThemeTab";
+import PageBuilderThemeTab from "./PageBuilderThemeTab";
 
 export default PageBuilderThemeTab;

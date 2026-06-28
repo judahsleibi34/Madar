@@ -1,3 +1,3 @@
-import PageBuilderUsersTab from "../PageBuilderUsersTab";
+import PageBuilderUsersTab from "./PageBuilderUsersTab";
 
 export default PageBuilderUsersTab;

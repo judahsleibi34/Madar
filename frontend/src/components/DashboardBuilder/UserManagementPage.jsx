@@ -10,182 +10,34 @@ import {
   UserCog,
   UsersRound,
 } from "lucide-react";
-import PageDeleteConfirmModal from "../PageBuilder/PageDeleteConfirmModal";
+import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
 import { apiFetch } from "../../utils/apiClient";
+import {
+  getUserManagementFriendlyLabels,
+  getUserManagementLabels,
+} from "../../content";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const USER_PAGE_CACHE_MS = 30_000;
 const USER_PAGE_SIZE = 10;
 const USER_PAGE_SIZE_OPTIONS = [10, 20, 50];
 
-const pageLabels = {
-  en: {
-    kicker: "Admin",
-    title: "User Management",
-    subtitle: "Review accounts, roles, tenant plans, and payment status from one workspace.",
-    search: "Search users",
-    refresh: "Refresh",
-    totalUsers: "Total users",
-    admins: "Admins",
-    activePlans: "Active plans",
-    page: "Page",
-    previous: "Previous",
-    next: "Next",
-    shownUsers: "All users",
-    usersPerPage: "Users per page",
-    role: "Role",
-    plan: "Plan",
-    status: "Status",
-    builder: "Builder",
-    tenant: "Tenant",
-    user: "User",
-    admin: "Admin",
-    saveRole: "Save role",
-    applyPlan: "Apply plan",
-    deleteUser: "Delete",
-    deleteTitle: "Delete this user?",
-    deleteMessage: "This user account and its access will be removed. This cannot be undone.",
-    confirmDelete: "Confirm delete",
-    deletingUser: "Deleting...",
-    cancelDelete: "Keep user",
-    noUsers: "No users found.",
-    loading: "Loading users",
-    forbidden: "Only admins can manage users.",
-    loadError: "Could not load users.",
-    saved: "Changes saved.",
-    deleted: "User deleted.",
-    fullPlatform: "Full platform",
-    individualBuilder: "Individual builder",
-    none: "None",
-  },
-  ar: {
-    kicker: "مسؤول",
-    title: "إدارة المستخدمين",
-    subtitle: "راجع الحسابات والأدوار وخطط المستأجرين وحالة الدفع من مساحة واحدة.",
-    search: "ابحث عن مستخدمين",
-    refresh: "تحديث",
-    totalUsers: "إجمالي المستخدمين",
-    admins: "المسؤولون",
-    activePlans: "الخطط النشطة",
-    page: "الصفحة",
-    previous: "السابق",
-    next: "التالي",
-    shownUsers: "المستخدمون المعروضون",
-    usersPerPage: "عدد المستخدمين في الصفحة",
-    role: "الدور",
-    plan: "الخطة",
-    status: "الحالة",
-    builder: "المنشئ",
-    tenant: "المستأجر",
-    user: "مستخدم",
-    admin: "مسؤول",
-    saveRole: "حفظ الدور",
-    applyPlan: "تطبيق الخطة",
-    deleteUser: "حذف",
-    confirmDelete: "تأكيد الحذف",
-    deletingUser: "جاري الحذف...",
-    cancelDelete: "إلغاء",
-    noUsers: "لا يوجد مستخدمون.",
-    loading: "جاري تحميل المستخدمين",
-    forbidden: "يمكن للمسؤولين فقط إدارة المستخدمين.",
-    loadError: "تعذر تحميل المستخدمين.",
-    saved: "تم حفظ التغييرات.",
-    deleted: "تم حذف المستخدم.",
-    fullPlatform: "المنصة الكاملة",
-    individualBuilder: "منشئ فردي",
-    none: "لا يوجد",
-  },
-};
-
-const platformPlans = ["starter", "pro", "business"];
-const builderPlans = ["basic", "premium"];
-const builderTypes = ["website", "forms", "quiz", "reservation", "reports", "data"];
-const paymentStatuses = ["pending", "active", "past_due", "canceled"];
-
-const cleanPageLabelOverrides = {
-  ar: {
-    shownUsers: "كل المستخدمين",
-    deleteTitle: "حذف هذا المستخدم؟",
-    deleteMessage: "سيتم حذف حساب المستخدم وصلاحيات الوصول الخاصة به. لا يمكن التراجع عن هذا الإجراء.",
-    confirmDelete: "تأكيد الحذف",
-    deletingUser: "جاري الحذف...",
-    cancelDelete: "إبقاء المستخدم",
-  },
-};
-
-const friendlyLabels = {
-  en: {
-    subscription_type: {
-      full_platform: "Full platform",
-      individual_builder: "Single builder",
-    },
-    plan: {
-      starter: "Starter",
-      pro: "Pro",
-      business: "Business",
-      basic: "Basic",
-      premium: "Premium",
-    },
-    builder_type: {
-      website: "Website",
-      forms: "Forms",
-      quiz: "Quiz",
-      reservation: "Reservation",
-      reports: "Reports",
-      data: "Data analysis",
-    },
-    payment_status: {
-      pending: "Pending setup",
-      active: "Active",
-      past_due: "Payment issue",
-      canceled: "Canceled",
-    },
-  },
-  ar: {
-    subscription_type: {
-      full_platform: "المنصة الكاملة",
-      individual_builder: "منشئ واحد",
-    },
-    plan: {
-      starter: "المبتدئ",
-      pro: "الاحترافي",
-      business: "الأعمال",
-      basic: "أساسي",
-      premium: "مميز",
-    },
-    builder_type: {
-      website: "الموقع",
-      forms: "النماذج",
-      quiz: "الاختبارات",
-      reservation: "الحجوزات",
-      reports: "التقارير",
-      data: "تحليل البيانات",
-    },
-    payment_status: {
-      pending: "بانتظار الإعداد",
-      active: "نشطة",
-      past_due: "مشكلة دفع",
-      canceled: "ملغاة",
-    },
-  },
-};
-
 function friendlyValue(group, value, lang = "en") {
-  const activeLabels = friendlyLabels[lang] || friendlyLabels.en;
-  const fallbackLabels = friendlyLabels.en;
+  const activeLabels = getUserManagementFriendlyLabels(lang);
+  const fallbackLabels = getUserManagementFriendlyLabels("en");
 
   return (
     activeLabels[group]?.[value] ||
     fallbackLabels[group]?.[value] ||
     value ||
-    pageLabels[lang]?.none ||
-    pageLabels.en.none
+    getUserManagementLabels(lang).none ||
+    getUserManagementLabels("en").none
   );
 }
 
-function getDisplayName(user) {
+function getDisplayName(user, labels = getUserManagementLabels("en")) {
   const name = `${user.first_name || ""} ${user.last_name || ""}`.trim();
-  return name || user.email || "Madar User";
+  return name || user.email || labels.fallbackUser;
 }
 
 function getPrimaryFeature(user) {
@@ -257,10 +109,10 @@ function UserRow({
       <div className="user-management-half user-management-identity-half">
         <div className="user-management-profile">
           <div className="user-management-avatar">
-            {getDisplayName(user).slice(0, 1).toUpperCase()}
+            {getDisplayName(user, labels).slice(0, 1).toUpperCase()}
           </div>
           <div>
-            <h3>{getDisplayName(user)}</h3>
+            <h3>{getDisplayName(user, labels)}</h3>
             <p>{user.email}</p>
             <span>
               {labels.tenant}: {user.tenant_id || labels.none}
@@ -429,10 +281,7 @@ function UserManagementSkeleton({ labels }) {
 
 export default function UserManagementPage({ currentUser, lang = "en" }) {
   const activeLang = lang === "ar" ? "ar" : "en";
-  const labels = {
-    ...pageLabels[activeLang],
-    ...(cleanPageLabelOverrides[activeLang] || {}),
-  };
+  const labels = getUserManagementLabels(activeLang);
   const [users, setUsers] = useState([]);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -710,11 +559,11 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
 
       {deleteTargetUser && (
         <PageDeleteConfirmModal
-          page={{ name: getDisplayName(deleteTargetUser) }}
+          page={{ name: getDisplayName(deleteTargetUser, labels) }}
           title={labels.deleteTitle}
           message={
             <>
-              <strong>{getDisplayName(deleteTargetUser)}</strong>
+              <strong>{getDisplayName(deleteTargetUser, labels)}</strong>
               <br />
               {labels.deleteMessage}
             </>
@@ -807,3 +656,4 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     </section>
   );
 }
+

@@ -26,33 +26,33 @@
 
 .hero-title {
   margin: 0 0 20px 0;
-  color: #1a2744;
-  font-size: 42px;
-  font-weight: 800;
-  font-family: inherit;
+  color: var(--color-text-main);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-heading);
 }
 
 .hero-subtitle {
   margin: 40px 0 12px 0;
-  color: #1a2744;
-  font-size: 26px;
-  font-weight: 800;
-  font-family: inherit;
+  color: var(--color-text-main);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-heading);
 }
 
 .hero-description {
   margin: 0 0 20px 0;
-  color: #3a3530;
-  font-size: 18px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
   line-height: 1.8;
-  font-family: inherit;
+  font-family: var(--font-main);
 }
 
 .arabic-name {
-  color: var(--theme-primary);
-  font-weight: 800;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
   font-size: 22px;
-  font-family: inherit;
+  font-family: var(--font-main);
 }
 
 /* ============================================================

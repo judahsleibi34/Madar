@@ -33,8 +33,8 @@ import UserDashboard from "./components/DashboardBuilder/UserDashboard";
 import MyPlanPage from "./components/MainPages/MyPlanPage";
 
 import PageBuilder from "./components/PageBuilder";
-import BuilderFormPreviewPage from "./components/PageBuilder/BuilderFormPreviewPage";
-import TenantSiteRuntime from "./components/PageBuilder/TenantSiteRuntime";
+import BuilderFormPreviewPage from "./components/PageBuilder/preview/BuilderFormPreviewPage";
+import TenantSiteRuntime from "./components/PageBuilder/runtime/TenantSiteRuntime";
 
 import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
 import {
@@ -43,6 +43,7 @@ import {
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
+import { appShellContent } from "./content";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -55,16 +56,16 @@ function normalizeUserType(value) {
 }
 
 function RestrictedAccessWindow({
-  title = "Restricted area",
-  message = "This page is not available for your account type.",
-  actionLabel = "Go back to dashboard",
+  title = appShellContent.restrictedAccess.title,
+  message = appShellContent.restrictedAccess.defaultMessage,
+  actionLabel = appShellContent.restrictedAccess.actionLabel,
   onAction,
 }) {
   return (
     <section className="restricted-access-page">
       <div className="restricted-access-card" role="status">
         <div className="restricted-access-content">
-          <p className="restricted-access-eyebrow">Restricted area</p>
+          <p className="restricted-access-eyebrow">{title}</p>
           <h1>{title}</h1>
           <p>{message}</p>
         </div>
@@ -117,7 +118,7 @@ export default function App() {
       userInfo?.name ||
       `${firstName} ${lastName}`.trim() ||
       userInfo?.username ||
-      "User";
+      appShellContent.user.fallbackName;
 
     return {
       id: userInfo?.id || "",
@@ -151,7 +152,7 @@ export default function App() {
     }
 
     if (!response.ok) {
-      const error = new Error("Could not fetch user info");
+      const error = new Error(appShellContent.errors.fetchUserInfo);
       error.status = response.status;
       throw error;
     }
@@ -531,7 +532,7 @@ export default function App() {
       const userInfo = await fetchUserInfo();
 
       if (!userInfo) {
-        throw new Error("Login succeeded but user info was unauthorized");
+        throw new Error(appShellContent.errors.postLoginUnauthorized);
       }
 
       authBootstrapPromise = Promise.resolve({
@@ -545,7 +546,7 @@ export default function App() {
 
       navigate(getSafePostLoginPath(userInfo, returnTo), { replace: true });
     } catch (error) {
-      console.error("Could not load user info after login:", error);
+      console.error(appShellContent.errors.postLoginLoad, error);
 
       authBootstrapPromise = Promise.resolve({
         loggedIn: false,
@@ -747,7 +748,7 @@ export default function App() {
   const renderFormPreviewSkeleton = () => (
     <main
       className="form-preview-loading-page"
-      aria-label="Loading form preview"
+      aria-label={appShellContent.loading.formPreview}
       dir={lang === "ar" ? "rtl" : "ltr"}
     >
       <header className="form-preview-loading-topbar">
@@ -856,9 +857,9 @@ export default function App() {
   const renderRestrictedPage = (message) =>
     renderDashboardShell(
       <RestrictedAccessWindow
-        title="Restricted area"
+        title={appShellContent.restrictedAccess.title}
         message={message}
-        actionLabel="Go back to dashboard"
+        actionLabel={appShellContent.restrictedAccess.actionLabel}
         onAction={goBackToDashboard}
       />
     );
@@ -929,7 +930,7 @@ export default function App() {
                 <BuilderFormPreviewPage />
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
@@ -949,7 +950,7 @@ export default function App() {
                 <TenantSiteRuntime draftPreview />
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
@@ -981,7 +982,7 @@ export default function App() {
                 )
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
@@ -1015,7 +1016,7 @@ export default function App() {
                 )
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
@@ -1049,7 +1050,7 @@ export default function App() {
                 )
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
@@ -1069,7 +1070,7 @@ export default function App() {
                 renderDashboardShell(<MyPlanPage lang={lang} />)
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
@@ -1091,7 +1092,7 @@ export default function App() {
                 )
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for admin accounts."
+                  appShellContent.restrictedAccess.adminOnly
                 )
               )
             }
@@ -1111,7 +1112,7 @@ export default function App() {
                 renderDashboardShell(<ChangePasswordPage lang={lang} />)
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
@@ -1137,7 +1138,7 @@ export default function App() {
                 )
               ) : (
                 renderRestrictedPage(
-                  "This page is only available for workspace user accounts."
+                  appShellContent.restrictedAccess.workspaceOnly
                 )
               )
             }
