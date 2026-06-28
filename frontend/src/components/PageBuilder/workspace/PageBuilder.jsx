@@ -1417,8 +1417,13 @@ export default function PageBuilder({
     }
   };
 
+  const resolveLiveSitePath = (subdomain) => `/site/${encodeURIComponent(String(subdomain || "").trim())}/`;
+
   const publishProject = async () => {
     setActiveTopbarAction("publish");
+    setLiveSitePath("");
+    setToast("");
+
     const publishedProject = {
       ...project,
       status: "published",
@@ -1447,7 +1452,11 @@ export default function PageBuilder({
         .join("\n");
       const remainingCount = Math.max(0, overlapWarnings.length - 3);
       const confirmed = window.confirm(
-        `Your design contains ${overlapWarnings.length} overlapping component pair${overlapWarnings.length === 1 ? "" : "s"}. Overlapping content may be difficult to read after publishing.\n\n${examples}${remainingCount ? `\n- Plus ${remainingCount} more` : ""}\n\nGo live anyway?`
+        `Your design contains ${overlapWarnings.length} overlapping component pair${overlapWarnings.length === 1 ? "" : "s"}. Overlapping content may be difficult to read after publishing.
+
+${examples}${remainingCount ? `\n- Plus ${remainingCount} more` : ""}
+
+Go live anyway?`
       );
 
       if (!confirmed) {
@@ -1468,21 +1477,15 @@ export default function PageBuilder({
     }
 
     persistProject(publishedProject, "Publishing to backend...");
-    setLiveSitePath("");
-    const liveWindow = window.open("about:blank", "_blank");
 
     try {
       const websiteSettings = await fetchWebsiteSettings(user?.id);
       const publicSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
 
       if (!publicSubdomain) {
-        if (liveWindow && !liveWindow.closed) {
-          liveWindow.close();
-        }
         throw new Error("Configure a website subdomain before going live.");
       }
 
-      const liveSitePath = `/site/${publicSubdomain}/`;
       const payload = createBuilderProjectPayload({
         project: publishedProject,
         builderProjectRecord,
@@ -1494,24 +1497,22 @@ export default function PageBuilder({
         ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
         : await createBuilderProject(payload, user?.id);
 
-      const publishedRecord = await publishBuilderProject(savedRecord.id, user?.id);
+      const publishResponse = await publishBuilderProject(savedRecord.id, user?.id);
+      const publishedRecord = publishResponse?.project || savedRecord;
+      const publishedSite = publishResponse?.site || {};
+      const resolvedLiveSitePath = resolveLiveSitePath(
+        sanitizeSubdomain(publishedSite?.subdomain || publicSubdomain) || publicSubdomain
+      );
+
+      if (import.meta.env.DEV) {
+        console.debug("builder.publish.response", publishResponse);
+        console.debug("builder.publish.live_url", resolvedLiveSitePath);
+      }
 
       setBuilderProjectRecord(publishedRecord);
-      showToast("Site published to backend.");
-
-      if (liveWindow && !liveWindow.closed) {
-        liveWindow.location.href = liveSitePath;
-      } else {
-        const openedWindow = window.open(liveSitePath, "_blank", "noopener,noreferrer");
-        if (!openedWindow) {
-          setLiveSitePath(liveSitePath);
-          showToast("Site published. Use the open live site link.");
-        }
-      }
+      setLiveSitePath(resolvedLiveSitePath);
+      showToast("Site published successfully.");
     } catch (error) {
-      if (liveWindow && !liveWindow.closed) {
-        liveWindow.close();
-      }
       console.error("Could not publish builder project:", error);
       showToast(error?.message || "Publish failed. Local draft cache was updated.");
     }

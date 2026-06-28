@@ -10,10 +10,19 @@ from services.auth_service import (
     delete_auth_cookies,
     build_user_payload,
     get_authenticated_user_row,
+    normalize_user_type,
 )
 from services.billing_service import get_billing_summary_for_tenant
 from services.onboarding_service import create_onboarded_tenant
 from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
+from services.mfa_login_service import (
+    create_pending_mfa_client,
+    is_admin_mfa_login_enforcement_enabled,
+    set_pending_mfa_cookie,
+    verified_totp_factors_for_client,
+)
+from services.audit_service import record_security_event
+from services.user_security_settings_service import get_user_security_settings
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
@@ -71,6 +80,17 @@ def get_local_user_by_auth_id(auth_id: str):
         return result.data[0]
 
     return None
+
+
+def get_login_audit_user(clean_email: str):
+    try:
+        return get_local_user_by_email(clean_email)
+    except Exception as audit_lookup_error:
+        logger.warning(
+            "auth.login.audit_user_lookup_failed",
+            extra={"error_type": type(audit_lookup_error).__name__},
+        )
+        return None
 
 
 def assert_email_is_available(clean_email: str, allowed_auth_id: str | None = None):
@@ -299,6 +319,9 @@ def signup_onboard(payload: OnboardingSignupRequest, request: Request):
 
 @router.post("/login")
 def login(user: LogIn, response: Response, request: Request):
+    clean_email = ""
+    local_user = None
+
     try:
         clean_email = normalize_email(user.email)
 
@@ -366,6 +389,50 @@ def login(user: LogIn, response: Response, request: Request):
 
             local_user = update_response.data[0]
 
+        mfa_enrollment_recommended = False
+
+        if (
+            is_admin_mfa_login_enforcement_enabled()
+            and normalize_user_type(local_user.get("user_type")) == "admin"
+        ):
+            security_settings = get_user_security_settings(local_user.get("id"))
+
+            if security_settings and security_settings.get("mfa_required"):
+                try:
+                    mfa_client = create_pending_mfa_client(
+                        {
+                            "access_token": auth_response.session.access_token,
+                            "refresh_token": auth_response.session.refresh_token,
+                        }
+                    )
+                    verified_factors = verified_totp_factors_for_client(mfa_client)
+
+                except Exception as mfa_lookup_error:
+                    logger.warning(
+                        "auth.login.mfa_factor_lookup_failed",
+                        extra={
+                            "user_id": local_user.get("id"),
+                            "error_type": type(mfa_lookup_error).__name__,
+                        },
+                    )
+                    verified_factors = []
+
+                if verified_factors:
+                    set_pending_mfa_cookie(
+                        response,
+                        access_token=auth_response.session.access_token,
+                        refresh_token=auth_response.session.refresh_token,
+                        auth_id=auth_user_id,
+                        user_id=local_user.get("id"),
+                        tenant_id=local_user.get("tenant_id"),
+                    )
+                    return {
+                        "mfa_required": True,
+                        "factors": verified_factors,
+                    }
+
+                mfa_enrollment_recommended = True
+
         csrf_token = set_auth_cookies(
             response,
             auth_response.session.access_token,
@@ -376,18 +443,60 @@ def login(user: LogIn, response: Response, request: Request):
             "auth.login.success",
             extra={"user_id": local_user.get("id"), "tenant_id": local_user.get("tenant_id")},
         )
+        record_security_event(
+            request=request,
+            tenant_id=local_user.get("tenant_id"),
+            actor_user_id=local_user.get("id"),
+            action="auth.login_succeeded",
+            target_type="user",
+            target_id=local_user.get("id"),
+            metadata={"login_method": "credentials"},
+        )
 
-        return {
+        login_payload = {
             "message": "User is logged in",
             "user": build_user_payload(local_user),
             "csrf_token": csrf_token,
         }
 
-    except HTTPException:
+        if mfa_enrollment_recommended:
+            login_payload["mfa_enrollment_recommended"] = True
+
+        return login_payload
+
+    except HTTPException as error:
+        audit_user = local_user or get_login_audit_user(clean_email)
+        record_security_event(
+            request=request,
+            tenant_id=(audit_user or {}).get("tenant_id"),
+            actor_user_id=(audit_user or {}).get("id"),
+            action="auth.login_failed",
+            target_type="user" if audit_user else "auth",
+            target_id=(audit_user or {}).get("id"),
+            metadata={
+                "method": "password",
+                "status_code": error.status_code,
+                "reason": "login_rejected",
+            },
+        )
         raise
 
     except Exception as e:
+        audit_user = local_user or get_login_audit_user(clean_email)
         logger.warning("auth.login.failed", extra={"error_type": type(e).__name__})
+        record_security_event(
+            request=request,
+            tenant_id=(audit_user or {}).get("tenant_id"),
+            actor_user_id=(audit_user or {}).get("id"),
+            action="auth.login_failed",
+            target_type="user" if audit_user else "auth",
+            target_id=(audit_user or {}).get("id"),
+            metadata={
+                "method": "password",
+                "reason": "invalid_credentials",
+                "error_type": type(e).__name__,
+            },
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
@@ -540,6 +649,16 @@ def change_password(
 
         except Exception as session_error:
             logger.warning("auth.password.session_refresh_failed", extra={"user_id": user_data.get("id"), "error_type": type(session_error).__name__})
+
+        record_security_event(
+            request=request,
+            tenant_id=user_data.get("tenant_id"),
+            actor_user_id=user_data.get("id"),
+            action="auth.password_changed",
+            target_type="user",
+            target_id=user_data.get("id"),
+            metadata={"method": "current_password"},
+        )
 
         return {
             "message": "Password updated successfully",

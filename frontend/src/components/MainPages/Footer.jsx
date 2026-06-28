@@ -8,6 +8,11 @@ import {
   getNavigationContent,
 } from "../../content";
 
+const publicFooterNavItems = [
+  ...footerNavigationItems,
+  { id: "privacy", labelKey: "privacy", path: "/privacy-policy" },
+];
+
 export default function Footer({ lang = "en" }) {
   const { t } = useTranslation(["common", "public"]);
   const currentLang = lang === "ar" ? "ar" : "en";
@@ -37,7 +42,7 @@ export default function Footer({ lang = "en" }) {
             <h4>{content.linksTitle}</h4>
 
             <div className="footer-links-grid">
-              {footerNavigationItems.map((item) => (
+              {publicFooterNavItems.map((item) => (
                 <NavLink
                   key={item.id}
                   to={item.path}

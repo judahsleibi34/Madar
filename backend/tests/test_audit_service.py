@@ -143,6 +143,93 @@ class AuditServiceTests(unittest.TestCase):
 
         self.assertEqual(fake_supabase.table_names, ["audit_logs"])
 
+    def test_hash_audit_identifier_is_stable_and_not_raw_value(self):
+        digest = audit_service.hash_audit_identifier("User@Example.com")
+
+        self.assertEqual(digest, audit_service.hash_audit_identifier(" user@example.com "))
+        self.assertNotIn("user@example.com", digest)
+        self.assertEqual(len(digest), 64)
+
+    def test_record_tenant_role_change_uses_explicit_event_type(self):
+        fake_supabase = FakeSupabase()
+
+        with patch.object(audit_service, "service_supabase", fake_supabase):
+            audit_service.record_tenant_role_change(
+                tenant_id=7,
+                actor_user_id=3,
+                target_user_id=9,
+                old_role="member",
+                new_role="admin",
+            )
+
+        payload = fake_supabase.query.payload
+        self.assertEqual(payload["action"], "tenant.role_changed")
+        self.assertEqual(payload["actor_user_id"], 3)
+        self.assertEqual(payload["target_id"], "9")
+        self.assertEqual(payload["metadata"]["old_role"], "member")
+        self.assertEqual(payload["metadata"]["new_role"], "admin")
+
+    def test_record_user_restoration_uses_explicit_event_type(self):
+        fake_supabase = FakeSupabase()
+
+        with patch.object(audit_service, "service_supabase", fake_supabase):
+            audit_service.record_user_restoration(
+                tenant_id=7,
+                actor_user_id=3,
+                restored_user_id=9,
+            )
+
+        payload = fake_supabase.query.payload
+        self.assertEqual(payload["action"], "admin.user_restored")
+        self.assertEqual(payload["actor_user_id"], 3)
+        self.assertEqual(payload["target_id"], "9")
+        self.assertEqual(payload["metadata"], {"restored_user_id": 9, "source": "admin"})
+
+    def test_mfa_audit_event_constants_are_explicit(self):
+        self.assertEqual(audit_service.MFA_ENROLL_STARTED, "auth.mfa_enroll_started")
+        self.assertEqual(audit_service.MFA_ENROLL_VERIFIED, "auth.mfa_enroll_verified")
+        self.assertEqual(audit_service.MFA_CHALLENGE_FAILED, "auth.mfa_challenge_failed")
+        self.assertEqual(audit_service.MFA_VERIFIED, "auth.mfa_verified")
+        self.assertEqual(audit_service.MFA_FACTOR_REMOVED, "auth.mfa_factor_removed")
+        self.assertEqual(audit_service.MFA_REQUIRED_CHANGED, "auth.mfa_required_changed")
+
+    def test_record_mfa_event_uses_explicit_event_type(self):
+        fake_supabase = FakeSupabase()
+
+        with patch.object(audit_service, "service_supabase", fake_supabase):
+            audit_service.record_mfa_event(
+                tenant_id=7,
+                actor_user_id=3,
+                action=audit_service.MFA_ENROLL_STARTED,
+                target_user_id=3,
+                factor_id="factor-1",
+                metadata={"factor_type": "totp"},
+            )
+
+        payload = fake_supabase.query.payload
+        self.assertEqual(payload["action"], "auth.mfa_enroll_started")
+        self.assertEqual(payload["target_type"], "mfa_factor")
+        self.assertEqual(payload["target_id"], "factor-1")
+        self.assertEqual(payload["metadata"]["factor_type"], "totp")
+        self.assertEqual(payload["metadata"]["factor_id"], "factor-1")
+
+    def test_record_mfa_required_changed_uses_explicit_event_type(self):
+        fake_supabase = FakeSupabase()
+
+        with patch.object(audit_service, "service_supabase", fake_supabase):
+            audit_service.record_mfa_required_changed(
+                tenant_id=7,
+                actor_user_id=3,
+                target_user_id=9,
+                required=True,
+            )
+
+        payload = fake_supabase.query.payload
+        self.assertEqual(payload["action"], "auth.mfa_required_changed")
+        self.assertEqual(payload["target_type"], "user")
+        self.assertEqual(payload["target_id"], "9")
+        self.assertEqual(payload["metadata"], {"required": True, "source": "admin"})
+
 
 if __name__ == "__main__":
     unittest.main()

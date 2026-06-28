@@ -435,6 +435,54 @@ body.theme-dark .register-card input:focus,
   align-self: center;
 }
 
+
+.mfa-factor-select {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(26, 39, 68, 0.2);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1a2744;
+  font-size: 15px;
+  font-weight: 650;
+  font-family: inherit;
+  outline: none;
+}
+
+.mfa-factor-select:focus {
+  border-color: var(--theme-primary);
+  background: #fffdfb;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
+}
+
+.auth-secondary-button {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.24);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--theme-primary);
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 850;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.auth-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+[data-theme="dark"] .mfa-factor-select,
+body.theme-dark .mfa-factor-select,
+.theme-dark .mfa-factor-select {
+  background: var(--theme-bg-soft);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+}
+
 /* ============================================================
    LOGIN LTR / ENGLISH
    ============================================================ */
