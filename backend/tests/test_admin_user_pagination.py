@@ -84,7 +84,7 @@ class AdminUserPaginationTests(unittest.TestCase):
         audit_kwargs = record_audit.call_args.kwargs
         self.assertEqual(audit_kwargs["tenant_id"], 7)
         self.assertEqual(audit_kwargs["actor_user_id"], 1)
-        self.assertEqual(audit_kwargs["action"], "admin.user_type_updated")
+        self.assertEqual(audit_kwargs["action"], "admin.permission_changed")
         self.assertEqual(audit_kwargs["target_type"], "user")
         self.assertEqual(audit_kwargs["target_id"], 4)
         self.assertEqual(

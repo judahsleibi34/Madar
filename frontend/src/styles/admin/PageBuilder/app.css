@@ -1393,10 +1393,11 @@ summary {
   z-index: 9999;
 
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
   min-height: 38px;
-  padding: 8px 14px;
+  padding: 10px 16px;
   border-radius: 999px;
 
   background: var(--madar-gradient);
@@ -1405,10 +1406,22 @@ summary {
   font-size: 13px;
   font-weight: 950;
   text-decoration: none;
+  text-align: center;
 }
 
-.page-builder .builder-live-site-link:hover {
-  filter: brightness(1.04);
+.page-builder .builder-live-site-link p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.page-builder .builder-live-site-link a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.page-builder .builder-live-site-link a:hover {
+  text-decoration: underline;
 }
 
 .page-builder .builder-toast::before {

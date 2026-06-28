@@ -16,6 +16,7 @@ import AboutSection from "./components/MainPages/AboutSection";
 import ContactPage from "./components/MainPages/ContactPage";
 import FeaturesPage from "./components/MainPages/FeaturesPage";
 import PricingPage from "./components/MainPages/PricingPage";
+import PrivacyPolicyPage from "./components/MainPages/PrivacyPolicyPage";
 import Footer from "./components/MainPages/Footer";
 
 import LoginPage from "./components/AuthPages/LoginPage";
@@ -28,6 +29,7 @@ import DashboardSidebar from "./components/DashboardBuilder/DashboardSidebar";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import SettingsPage from "./components/DashboardBuilder/SettingsPage";
 import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage";
+import SecurityMfaPage from "./components/DashboardBuilder/SecurityMfaPage";
 import UserManagementPage from "./components/DashboardBuilder/UserManagementPage";
 import UserDashboard from "./components/DashboardBuilder/UserDashboard";
 import MyPlanPage from "./components/MainPages/MyPlanPage";
@@ -1099,6 +1101,22 @@ export default function App() {
           />
 
           <Route
+            path="/settings/security/*"
+            element={
+              !authChecked ? (
+                renderDashboardSkeleton(t("dashboard:loading.securitySettings"))
+              ) : !isLoggedIn ? (
+                <Navigate
+                  to={`/login?returnTo=${getCurrentReturnTo()}`}
+                  replace
+                />
+              ) : (
+                renderDashboardShell(<SecurityMfaPage lang={lang} />)
+              )
+            }
+          />
+
+          <Route
             path="/settings/change-password/*"
             element={
               !authChecked ? (
@@ -1232,6 +1250,15 @@ export default function App() {
             element={
               <main className="app-main">
                 <TeamPage key={lang} lang={lang} />
+              </main>
+            }
+          />
+
+          <Route
+            path="/privacy-policy"
+            element={
+              <main className="app-main">
+                <PrivacyPolicyPage key={lang} lang={lang} />
               </main>
             }
           />

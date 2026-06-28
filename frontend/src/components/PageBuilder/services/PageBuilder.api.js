@@ -143,8 +143,7 @@ export const publishBuilderProject = async (projectId) => {
     body: JSON.stringify({}),
   });
 
-  const data = await parseJsonResponse(response);
-  return data?.project || null;
+  return parseJsonResponse(response);
 };
 
 export const uploadBuilderAsset = async (file) => {

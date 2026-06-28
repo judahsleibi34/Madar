@@ -9,7 +9,8 @@
     "dashboard": "Dashboard",
     "login": "Log In",
     "signup": "Sign Up",
-    "logout": "Logout"
+    "logout": "Logout",
+    "privacy": "Privacy Policy"
   },
   "hero": { "titleRich": "Digitize Your Business with <brand>Confidence.</brand>", "name": "Madar", "description": "helps organizations replace manual paperwork with reliable digital workflows that save time, reduce operational errors, and give teams better control over every process."
   },

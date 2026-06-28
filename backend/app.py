@@ -17,6 +17,7 @@ from routes.auth_routes import router as auth_router
 from routes.billing_routes import router as billing_router
 from routes.builder_routes import router as builder_router
 from routes.health_routes import router as health_router
+from routes.mfa_routes import router as mfa_router
 from routes.password_routes import router as password_router
 from routes.public_contact_routes import router as public_contact_router
 from routes.public_site_routes import router as public_site_router
@@ -98,6 +99,7 @@ app.include_router(health_router)
 app.include_router(user_router)
 app.include_router(website_router)
 app.include_router(password_router)
+app.include_router(mfa_router)
 app.include_router(server_status_router)
 app.include_router(billing_router)
 app.include_router(admin_billing_router)

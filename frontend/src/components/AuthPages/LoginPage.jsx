@@ -29,6 +29,9 @@ export default function LoginPage({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [mfaStep, setMfaStep] = useState(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [isMfaSubmitting, setIsMfaSubmitting] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -70,6 +73,8 @@ export default function LoginPage({
 
     setIsSubmitting(true);
     setStatusMessage("");
+    setMfaStep(null);
+    setMfaCode("");
 
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -111,7 +116,23 @@ export default function LoginPage({
         return;
       }
 
-      setStatusMessage(t("login.success"));
+      if (data.mfa_required) {
+        const factors = Array.isArray(data.factors) ? data.factors : [];
+        const firstFactorId = factors[0]?.id || "";
+
+        setMfaStep({
+          factors,
+          factorId: firstFactorId,
+        });
+        setStatusMessage(t("login.mfaRequired"));
+        return;
+      }
+
+      setStatusMessage(
+        data.mfa_enrollment_recommended
+          ? t("login.mfaRecommended")
+          : t("login.success")
+      );
 
       if (onLoginSuccess) {
         onLoginSuccess(data.user);
@@ -124,69 +145,232 @@ export default function LoginPage({
     }
   };
 
+  const handleMfaSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!mfaStep?.factorId) {
+      setStatusMessage(t("login.mfaFailed"));
+      return;
+    }
+
+    if (!mfaCode.trim()) {
+      setErrors((prev) => ({
+        ...prev,
+        mfaCode: t("login.mfaCodeRequired"),
+      }));
+      return;
+    }
+
+    setIsMfaSubmitting(true);
+    setStatusMessage("");
+    setErrors((prev) => ({
+      ...prev,
+      mfaCode: "",
+    }));
+
+    try {
+      const challengeResponse = await fetch(`${API_URL}/auth/mfa/login/challenge`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ factor_id: mfaStep.factorId }),
+      });
+      const challengeData = await challengeResponse.json();
+
+      if (!challengeResponse.ok) {
+        setStatusMessage(
+          typeof challengeData.detail === "string"
+            ? challengeData.detail
+            : t("login.mfaFailed")
+        );
+        return;
+      }
+
+      const verifyResponse = await fetch(`${API_URL}/auth/mfa/login/verify`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          factor_id: mfaStep.factorId,
+          challenge_id: challengeData.challenge_id,
+          code: mfaCode.trim(),
+        }),
+      });
+      const verifyData = await verifyResponse.json();
+      syncCsrfTokenFromResponseData(verifyData);
+
+      if (!verifyResponse.ok) {
+        setStatusMessage(
+          typeof verifyData.detail === "string"
+            ? verifyData.detail
+            : t("login.mfaFailed")
+        );
+        return;
+      }
+
+      setStatusMessage(t("login.success"));
+
+      if (onLoginSuccess) {
+        onLoginSuccess(verifyData.user);
+      }
+    } catch (error) {
+      console.error(error);
+      setStatusMessage(t("login.serverError"));
+    } finally {
+      setIsMfaSubmitting(false);
+    }
+  };
+
+  const resetMfaStep = () => {
+    setMfaStep(null);
+    setMfaCode("");
+    setErrors((prev) => ({
+      ...prev,
+      mfaCode: "",
+    }));
+    setStatusMessage("");
+  };
+
   return (
     <main className="login-page" dir={pageDir}>
-      <form className="login-card" onSubmit={handleSubmit} dir={pageDir}>
+      <form
+        className="login-card"
+        onSubmit={mfaStep ? handleMfaSubmit : handleSubmit}
+        dir={pageDir}
+      >
         <div className="login-heading">
-          <h1>{t("login.title")}</h1>
-          <p>{t("login.subtitle")}</p>
+          <h1>{mfaStep ? t("login.mfaTitle") : t("login.title")}</h1>
+          <p>{mfaStep ? t("login.mfaSubtitle") : t("login.subtitle")}</p>
         </div>
 
         {statusMessage && (
           <p className="form-status-message">{statusMessage}</p>
         )}
 
-        <label>
-          {t("login.email")}
+        {mfaStep ? (
+          <>
+            {mfaStep.factors.length > 1 && (
+              <label>
+                {t("login.mfaFactor")}
 
-          <input
-            type="email"
-            name="email"
-            placeholder={t("login.email")}
-            value={formData.email}
-            onChange={handleChange}
-            dir="ltr"
-          />
+                <select
+                  className="mfa-factor-select"
+                  value={mfaStep.factorId}
+                  onChange={(event) =>
+                    setMfaStep((prev) => ({
+                      ...prev,
+                      factorId: event.target.value,
+                    }))
+                  }
+                >
+                  {mfaStep.factors.map((factor) => (
+                    <option key={factor.id} value={factor.id}>
+                      {factor.friendly_name || factor.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
-          {errors.email && <span>{errors.email}</span>}
-        </label>
+            <label>
+              {t("login.mfaCode")}
 
-        <label>
-          {t("login.password")}
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder={t("login.mfaCode")}
+                value={mfaCode}
+                onChange={(event) => {
+                  setMfaCode(event.target.value);
+                  setErrors((prev) => ({
+                    ...prev,
+                    mfaCode: "",
+                  }));
+                  setStatusMessage("");
+                }}
+                dir="ltr"
+              />
 
-          <div className="password-field">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder={t("login.password")}
-              value={formData.password}
-              onChange={handleChange}
-              dir="ltr"
-            />
+              {errors.mfaCode && <span>{errors.mfaCode}</span>}
+            </label>
 
             <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={t("login.togglePassword")}
+              className="login-submit"
+              type="submit"
+              disabled={isMfaSubmitting}
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {isMfaSubmitting ? t("login.mfaVerifying") : t("login.mfaSubmit")}
             </button>
-          </div>
 
-          {errors.password && <span>{errors.password}</span>}
-        </label>
+            <button
+              className="auth-secondary-button"
+              type="button"
+              onClick={resetMfaStep}
+              disabled={isMfaSubmitting}
+            >
+              {t("login.backToLogin")}
+            </button>
+          </>
+        ) : (
+          <>
+            <label>
+              {t("login.email")}
 
-        <div className="login-options">
-          <Link to={forgotPasswordPath}>{t("login.forgotPassword")}</Link>
-        </div>
+              <input
+                type="email"
+                name="email"
+                placeholder={t("login.email")}
+                value={formData.email}
+                onChange={handleChange}
+                dir="ltr"
+              />
 
-        <button className="login-submit" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? t("login.loading") : t("login.submit")}
-        </button>
+              {errors.email && <span>{errors.email}</span>}
+            </label>
 
-        <p className="login-signup-text">
-          {t("login.noAccount")} <Link to={signupPath}>{t("login.signup")}</Link>
-        </p>
+            <label>
+              {t("login.password")}
+
+              <div className="password-field">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  placeholder={t("login.password")}
+                  value={formData.password}
+                  onChange={handleChange}
+                  dir="ltr"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={t("login.togglePassword")}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+
+              {errors.password && <span>{errors.password}</span>}
+            </label>
+
+            <div className="login-options">
+              <Link to={forgotPasswordPath}>{t("login.forgotPassword")}</Link>
+            </div>
+
+            <button className="login-submit" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? t("login.loading") : t("login.submit")}
+            </button>
+
+            <p className="login-signup-text">
+              {t("login.noAccount")} <Link to={signupPath}>{t("login.signup")}</Link>
+            </p>
+          </>
+        )}
       </form>
     </main>
   );
