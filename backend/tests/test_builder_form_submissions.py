@@ -954,7 +954,7 @@ class PublicSiteTenantResolutionTests(unittest.TestCase):
 
         self.assertEqual(tenant_id, 11)
 
-    def test_public_resolve_tenant_id_uses_legacy_user_fallback_when_tenant_id_missing(self):
+    def test_public_resolve_tenant_id_rejects_missing_tenant_even_with_legacy_user_mapping(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["website_settings"] = [
             {"id": 1, "tenant_id": None, "user_id": 2, "subdomain": "legacy-site"}
@@ -962,9 +962,11 @@ class PublicSiteTenantResolutionTests(unittest.TestCase):
         fake_supabase.tables["users"] = [{"id": 2, "tenant_id": 22}]
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase):
-            tenant_id = public_site_routes.resolve_tenant_id(fake_supabase.tables["website_settings"][0])
+            with self.assertRaises(HTTPException) as exc:
+                public_site_routes.resolve_tenant_id(fake_supabase.tables["website_settings"][0])
 
-        self.assertEqual(tenant_id, 22)
+        self.assertEqual(exc.exception.status_code, 404)
+        self.assertEqual(exc.exception.detail, "Published site not found")
 
     def test_public_resolve_tenant_id_rejects_missing_tenant_and_user(self):
         fake_supabase = FakeSupabase()
