@@ -14,6 +14,7 @@ from services.tenant_service import TenantContext, require_builder_admin_access
 class FakeQuery:
     def __init__(self):
         self.payload = None
+        self.base_row = None
 
     def update(self, payload):
         self.payload = payload
@@ -23,7 +24,12 @@ class FakeQuery:
         return self
 
     def execute(self):
-        return type("Response", (), {"data": [{"id": "project-1", **(self.payload or {})}]})()
+        row = {"id": "project-1"}
+        if self.base_row:
+            row.update(self.base_row)
+        if self.payload:
+            row.update(self.payload)
+        return type("Response", (), {"data": [row]})()
 
 
 class FakeSupabase:
@@ -169,6 +175,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
             response.json()["detail"],
             "Configure a website subdomain before going live.",
         )
+        self.assertIsNone(fake_supabase.query.payload)
 
     def test_update_rejects_oversized_draft_schema(self):
         fake_supabase = FakeSupabase()
@@ -391,6 +398,123 @@ class BuilderBackendHardeningTests(unittest.TestCase):
         self.assertEqual(audit_kwargs["metadata"]["project_slug"], "landing-page")
         self.assertEqual(audit_kwargs["metadata"]["project_name"], "Landing Page")
         self.assertEqual(audit_kwargs["metadata"]["published_version"], 1)
+
+    def test_successful_publish_returns_updated_project_and_site_contract(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.query.base_row = {
+            "tenant_id": 1,
+            "owner_user_id": 77,
+            "name": "Landing Page",
+            "slug": "landing-page",
+            "draft_schema": {"pages": [{"id": "page-1"}]},
+            "status": "draft",
+            "published_version": 3,
+            "last_published_at": None,
+        }
+        client = build_client(fake_supabase)
+        draft_schema = {"pages": [{"id": "page-1"}]}
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase),              patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()),              patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "name": "Landing Page",
+                     "slug": "landing-page",
+                     "draft_schema": draft_schema,
+                     "published_version": 3,
+                     "status": "draft",
+                 },
+             ),              patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
+             ),              patch.object(builder_routes, "record_audit_event"):
+            response = client.post("/builder/projects/project-1/publish")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["site"], {"subdomain": "tenant-site", "tenant_id": 1})
+        self.assertEqual(body["project"]["published_schema"], draft_schema)
+        self.assertEqual(body["project"]["published_version"], 4)
+        self.assertEqual(body["project"]["status"], "published")
+        self.assertTrue(body["project"]["last_published_at"])
+        self.assertNotIn("owner_user_id", body["project"])
+
+    def test_publish_rejects_non_object_draft_schema(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase),              patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()),              patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 return_value={
+                     "id": "project-1",
+                     "tenant_id": 1,
+                     "draft_schema": ["not", "an", "object"],
+                     "published_version": 0,
+                 },
+             ),              patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
+             ):
+            response = client.post("/builder/projects/project-1/publish")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "draft_schema must be a JSON object")
+        self.assertIsNone(fake_supabase.query.payload)
+
+    def test_repeated_publish_increments_version_and_draft_remains_editable(self):
+        fake_supabase = FakeSupabase()
+        client = build_client(fake_supabase)
+        project_v0 = {
+            "id": "project-1",
+            "tenant_id": 1,
+            "name": "Landing Page",
+            "slug": "landing-page",
+            "draft_schema": {"pages": [{"id": "page-1"}]},
+            "published_version": 0,
+            "status": "draft",
+        }
+        project_v1 = {
+            **project_v0,
+            "status": "published",
+            "published_schema": {"pages": [{"id": "page-1"}]},
+            "published_version": 1,
+            "last_published_at": "2026-06-03T13:00:00+00:00",
+        }
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase),              patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()),              patch.object(
+                 builder_routes,
+                 "get_project_for_tenant",
+                 side_effect=[project_v0, project_v1, project_v1],
+             ),              patch.object(
+                 builder_routes,
+                 "require_public_subdomain",
+                 return_value={"subdomain": "tenant-site", "tenant_id": 1},
+             ),              patch.object(builder_routes, "record_audit_event"):
+            first_response = client.post("/builder/projects/project-1/publish")
+            first_payload = dict(fake_supabase.query.payload)
+            second_response = client.post("/builder/projects/project-1/publish")
+            second_payload = dict(fake_supabase.query.payload)
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(first_response.json()["project"]["published_version"], 1)
+        self.assertEqual(second_response.json()["project"]["published_version"], 2)
+        self.assertEqual(first_payload["published_version"], 1)
+        self.assertEqual(second_payload["published_version"], 2)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase),              patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()),              patch.object(builder_routes, "get_project_for_tenant", return_value=project_v1):
+            update_response = client.put(
+                "/builder/projects/project-1",
+                json={"draft_schema": {"pages": [{"id": "page-2"}]}} ,
+            )
+
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(fake_supabase.query.payload["draft_schema"], {"pages": [{"id": "page-2"}]})
 
     def test_failed_publish_does_not_record_success_audit_event(self):
         fake_supabase = FakeSupabase()
