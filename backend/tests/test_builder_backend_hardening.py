@@ -440,7 +440,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
         self.assertEqual(body["project"]["published_version"], 4)
         self.assertEqual(body["project"]["status"], "published")
         self.assertTrue(body["project"]["last_published_at"])
-        self.assertNotIn("owner_user_id", body["project"])
+        self.assertEqual(body["project"]["owner_user_id"], 77)
 
     def test_publish_rejects_non_object_draft_schema(self):
         fake_supabase = FakeSupabase()

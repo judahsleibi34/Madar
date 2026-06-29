@@ -1,3 +1,4 @@
+import copy
 import unittest
 from unittest.mock import patch
 
@@ -366,6 +367,89 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             public_site_routes.MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES,
         )
 
+
+    def test_public_submission_rejects_form_only_in_draft_schema(self):
+        fake_supabase = FakeSupabase()
+        project = fake_supabase.tables["builder_projects"][0]
+        project["draft_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
+        project["draft_schema"]["forms"][0]["title"] = "Draft-only contact form"
+        project["published_schema"] = {
+            "forms": [],
+            "pages": [],
+        }
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Form not found")
+
+    def test_public_submission_rejects_form_without_published_block(self):
+        fake_supabase = FakeSupabase()
+        project = fake_supabase.tables["builder_projects"][0]
+        project["published_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
+        project["published_schema"]["pages"] = []
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Form not found")
+
+    def test_public_submission_rejects_archived_project(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"][0]["status"] = "archived"
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")
+
+    def test_public_submission_rejects_invalid_answers_shape(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": ["not", "an", "object"]},
+            )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_public_submission_field_snapshot_is_based_on_published_form(self):
+        fake_supabase = FakeSupabase()
+        project = fake_supabase.tables["builder_projects"][0]
+        project["draft_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada", "field_email": "ada@example.com"}},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        saved = fake_supabase.tables["builder_form_submissions"][-1]
+        expected_snapshot = copy.deepcopy(PUBLISHED_SCHEMA["forms"][0]["sections"][0]["fields"])
+        self.assertEqual(saved["field_snapshot"], expected_snapshot)
+
+        project["draft_schema"]["forms"][0]["sections"][0]["fields"][0]["label"] = "Changed in draft"
+        self.assertEqual(saved["field_snapshot"], expected_snapshot)
+        self.assertEqual(saved["field_snapshot"][0]["label"], "Full name")
     def test_unknown_form_id_fails(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
@@ -513,6 +597,15 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(over_limit.status_code, 422)
         self.assertEqual(negative_offset.status_code, 422)
 
+
+    def test_project_form_submissions_list_requires_auth(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase):
+            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
+
+        self.assertEqual(response.status_code, 401)
     def test_form_submissions_custom_pagination(self):
         fake_supabase = FakeSupabase()
         for index in range(3):
