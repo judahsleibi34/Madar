@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import TeamPage from "./components/MainPages/TeamPage";
@@ -18,7 +18,6 @@ import ForgotPasswordPage from "./components/AuthPages/ForgotPasswordPage";
 import ResetPasswordPage from "./components/AuthPages/ResetPasswordPage";
 
 import Dashboard from "./components/DashboardBuilder/Dashboard";
-import DashboardSidebar from "./components/DashboardBuilder/DashboardSidebar";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import SettingsPage from "./components/DashboardBuilder/SettingsPage";
 import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage";
@@ -32,6 +31,19 @@ import BuilderFormPreviewPage from "./components/PageBuilder/preview/BuilderForm
 import TenantSiteRuntime from "./components/PageBuilder/runtime/TenantSiteRuntime";
 
 import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
+import { appShellContent } from "./content";
+import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
+import {
+  getSafePostLoginPath,
+  isDashboardRoutePath,
+  isTenantSiteRoutePath,
+  normalizeUserType,
+} from "./routes/routeUtils";
+import {
+  DashboardLoadingElement,
+  DashboardShell,
+  RestrictedAccessWindow,
+} from "./routes/shared";
 import {
   apiFetch,
   clearCsrfToken,
@@ -41,11 +53,6 @@ import {
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-
-const AdminRoutes = lazy(() => import("./routes/AdminRoutes"));
-const PublicRoutes = lazy(() => import("./routes/PublicRoutes"));
-const TenantSiteRoutes = lazy(() => import("./routes/TenantSiteRoutes"));
-const UserWorkspaceRoutes = lazy(() => import("./routes/UserWorkspaceRoutes"));
 
 let authBootstrapPromise = null;
 
@@ -64,6 +71,7 @@ export default function App() {
 
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
+  const isRegularUser = !isAdminUser;
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
 
@@ -530,19 +538,53 @@ export default function App() {
     [isLoggedIn, normalizeUser]
   );
 
-  const shellProps = {
-    closeMenuLabel: t("common:navigation.closeMenu"),
-    lang,
-    onLanguageChange: handleLanguageChange,
-    onLogout: handleLogout,
-    onNavigate: () => setDashboardSidebarOpen(false),
-    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
-    onThemeModeChange: handleThemeModeChange,
-    open: dashboardSidebarOpen,
-    openMenuLabel: t("common:navigation.openMenu"),
-    themeMode,
-    user,
-  };
+  const renderDashboardSkeleton = () => (
+    <DashboardLoadingElement
+      pathname={location.pathname}
+      labels={dashboardLoadingLabels}
+      lang={lang}
+    />
+  );
+
+  const renderFormPreviewSkeleton = () => (
+    <DashboardLoadingElement
+      pathname="/page-builder/form-preview"
+      lang={lang}
+    />
+  );
+
+  const renderFormBuilderSkeleton = () => (
+    <DashboardLoadingElement pathname="/page-builder/forms" lang={lang} />
+  );
+
+  const renderRestrictedPage = (message) => (
+    <RestrictedAccessWindow
+      message={message}
+      onAction={() => navigate("/dashboard", { replace: true })}
+    />
+  );
+
+  const renderDashboardShell = (children, isPageBuilderShell = false, options = {}) => (
+    <DashboardShell
+      closeMenuLabel={t("common:navigation.closeMenu")}
+      compactSidebar={options.compactSidebar}
+      hideLanguage={options.hideLanguage}
+      isPageBuilderShell={isPageBuilderShell}
+      lang={lang}
+      onLanguageChange={handleLanguageChange}
+      onLogout={handleLogout}
+      onNavigate={() => setDashboardSidebarOpen(false)}
+      onSidebarToggle={() => setDashboardSidebarOpen((open) => !open)}
+      onThemeModeChange={handleThemeModeChange}
+      open={dashboardSidebarOpen}
+      openMenuLabel={t("common:navigation.openMenu")}
+      shellLang={options.lang}
+      themeMode={themeMode}
+      user={user}
+    >
+      {children}
+    </DashboardShell>
+  );
 
   const dashboardLoadingLabels = {
     dashboard: t("dashboard:loading.dashboard"),
@@ -554,73 +596,6 @@ export default function App() {
     passwordSettings: t("dashboard:loading.passwordSettings"),
     settings: t("dashboard:loading.settings"),
   };
-
-  const routeFallback = isDashboardRoute ? (
-    <DashboardLoadingElement
-      pathname={location.pathname}
-      labels={dashboardLoadingLabels}
-      lang={lang}
-    />
-  ) : (
-    <div className="route-loading" role="status" aria-live="polite">
-      Loading...
-    </div>
-  );
-
-  let routeContent;
-
-  if (isTenantSiteRoute) {
-    routeContent = <TenantSiteRoutes />;
-  } else if (isDashboardRoute) {
-    if (!authChecked) {
-      routeContent = (
-        <DashboardLoadingElement
-          pathname={location.pathname}
-          labels={dashboardLoadingLabels}
-          lang={lang}
-        />
-      );
-    } else if (!isLoggedIn) {
-      routeContent = (
-        <Navigate to={`/login?returnTo=${getCurrentReturnTo()}`} replace />
-      );
-    } else if (isAdminUser) {
-      routeContent = (
-        <AdminRoutes
-          lang={lang}
-          onGoToDashboard={() => navigate("/dashboard", { replace: true })}
-          shellProps={shellProps}
-          themeMode={themeMode}
-          user={user}
-        />
-      );
-    } else {
-      routeContent = (
-        <UserWorkspaceRoutes
-          lang={lang}
-          onGoToDashboard={() => navigate("/dashboard", { replace: true })}
-          onUserUpdated={handleUserUpdated}
-          shellProps={shellProps}
-          themeMode={themeMode}
-          user={user}
-        />
-      );
-    }
-  } else {
-    routeContent = (
-      <PublicRoutes
-        authChecked={authChecked}
-        isLoggedIn={isLoggedIn}
-        lang={lang}
-        onLanguageChange={handleLanguageChange}
-        onLoginSuccess={handleLoginSuccess}
-        onLogout={handleLogout}
-        onThemeModeChange={handleThemeModeChange}
-        themeMode={themeMode}
-        user={user}
-      />
-    );
-    }
 
   if (isTenantSiteRoute) {
     return (
