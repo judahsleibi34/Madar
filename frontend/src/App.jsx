@@ -25,7 +25,7 @@ import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage
 import SecurityMfaPage from "./components/DashboardBuilder/SecurityMfaPage";
 import UserManagementPage from "./components/DashboardBuilder/UserManagementPage";
 import UserDashboard from "./components/DashboardBuilder/UserDashboard";
-import MyPlanPage from "./components/MainPages/MyPlanPage";
+import MyPlanPage from "./components/DashboardBuilder/MyPlanPage";
 
 import PageBuilder from "./components/PageBuilder";
 import BuilderFormPreviewPage from "./components/PageBuilder/preview/BuilderFormPreviewPage";
@@ -37,7 +37,6 @@ import {
   clearCsrfToken,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
-import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -621,7 +620,7 @@ export default function App() {
         user={user}
       />
     );
-
+    }
 
   if (isTenantSiteRoute) {
     return (
