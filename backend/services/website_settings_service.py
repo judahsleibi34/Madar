@@ -21,40 +21,7 @@ def get_settings_for_tenant(tenant_id: int, user_id: int | None = None):
         .execute()
     )
 
-    settings = first_row(tenant_response)
-
-    if settings:
-        return settings
-
-    if user_id is None:
-        return None
-
-    user_response = (
-        service_supabase.table("website_settings")
-        .select("*")
-        .eq("user_id", user_id)
-        .limit(1)
-        .execute()
-    )
-
-    settings = first_row(user_response)
-
-    if not settings:
-        return None
-
-    if settings.get("tenant_id") is None:
-        update_response = (
-            service_supabase.table("website_settings")
-            .update({"tenant_id": tenant_id})
-            .eq("id", settings["id"])
-            .execute()
-        )
-        return first_row(update_response) or {**settings, "tenant_id": tenant_id}
-
-    if settings.get("tenant_id") != tenant_id:
-        raise HTTPException(status_code=409, detail="Website settings belong to another tenant")
-
-    return settings
+    return first_row(tenant_response)
 
 
 def ensure_settings_for_tenant(tenant_id: int, user_id: int):
