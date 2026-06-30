@@ -10,7 +10,8 @@ import { getPublishContent } from "../../../content/pageBuilder";
 
 export default function PageBuilderPublishTab({
   project,
-  openPreviewPage,
+  persistProjectNow,
+  liveSitePath = "",
   openFormPreviewPage,
   lang = "en",
 }) {
@@ -18,8 +19,7 @@ export default function PageBuilderPublishTab({
   const activePage = project.pages?.find((page) => page.id === project.activePageId) || project.pages?.[0];
   const activeForm = project.forms?.find((form) => form.id === project.activeFormId) || project.forms?.[0];
   const hasForm = Boolean(activeForm);
-  const publicPath = activePage?.slug || "/";
-  const publicLink = `${window.location.origin}/site/${project.siteChrome?.subdomain || project.id}${publicPath === "/" ? "" : publicPath}`;
+  const publicLink = liveSitePath ? `${window.location.origin}${liveSitePath}` : "";
   const formPreviewLink = activeForm
     ? `${window.location.origin}/page-builder/form-preview/${activeForm.id}`
     : "";
@@ -41,6 +41,7 @@ export default function PageBuilderPublishTab({
   ];
 
   const copyPublicLink = async () => {
+    if (!publicLink) return;
     await navigator.clipboard?.writeText(publicLink);
   };
 
@@ -49,8 +50,8 @@ export default function PageBuilderPublishTab({
     await navigator.clipboard?.writeText(formPreviewLink);
   };
 
-  const whatsAppUrl = `https://wa.me/?text=${encodeURIComponent(publicLink)}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(publicLink)}`;
+  const whatsAppUrl = publicLink ? `https://wa.me/?text=${encodeURIComponent(publicLink)}` : "";
+  const qrUrl = publicLink ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(publicLink)}` : "";
   const formWhatsAppUrl = `https://wa.me/?text=${encodeURIComponent(formPreviewLink)}`;
   const formQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(formPreviewLink)}`;
 
@@ -121,18 +122,27 @@ export default function PageBuilderPublishTab({
             <div className="publish-link-content">
               <div className="publish-link-main">
                 <div className="publish-link-box">
-                  <input value={publicLink} readOnly />
-                  <button type="button" onClick={copyPublicLink}>
+                  <input value={publicLink} readOnly placeholder={content.notPublished} />
+                  <button type="button" onClick={copyPublicLink} disabled={!publicLink}>
                     <Copy size={15} aria-hidden="true" />
                     {content.copyLink}
                   </button>
                 </div>
                 <div className="publish-share-row">
-                  <a href={whatsAppUrl} target="_blank" rel="noreferrer">
+                  <a href={whatsAppUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!publicLink}>
                     <MessageCircle size={15} aria-hidden="true" />
                     {content.shareWhatsApp}
                   </a>
-                  <button type="button" onClick={openPreviewPage}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      persistProjectNow?.(project);
+                      if (publicLink) {
+                        window.open(publicLink, "_blank", "noopener,noreferrer");
+                      }
+                    }}
+                    disabled={!publicLink}
+                  >
                     <Eye size={15} aria-hidden="true" />
                     {content.previewSite}
                   </button>

@@ -432,3 +432,69 @@ class ArchivedBuilderProjectTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class PublicSiteContractTests(unittest.TestCase):
+    def test_public_site_returns_latest_published_project_and_hides_draft_schema(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"] = [
+            {
+                "id": "project-old",
+                "tenant_id": 1,
+                "name": "Older Published Site",
+                "slug": "older-published-site",
+                "status": "published",
+                "draft_schema": {"pages": [{"id": "draft-old"}]},
+                "published_schema": {"pages": [{"id": "published-old"}]},
+                "published_version": 1,
+                "last_published_at": "2026-06-01T10:00:00+00:00",
+                "updated_at": "2026-06-01T10:00:00+00:00",
+            },
+            {
+                "id": "project-new",
+                "tenant_id": 1,
+                "name": "Newest Published Site",
+                "slug": "newest-published-site",
+                "status": "published",
+                "draft_schema": {"pages": [{"id": "draft-new"}]},
+                "published_schema": {"pages": [{"id": "published-new"}]},
+                "published_version": 2,
+                "last_published_at": "2026-06-02T10:00:00+00:00",
+                "updated_at": "2026-06-02T10:00:00+00:00",
+            },
+        ]
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(set(body["project"].keys()), {"published_schema"})
+        self.assertEqual(
+            body["project"]["published_schema"],
+            {"pages": [{"id": "published-new"}]},
+        )
+        self.assertNotIn("draft_schema", body["project"])
+
+    def test_public_site_without_published_project_returns_not_found(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"] = [
+            {
+                "id": "draft-project",
+                "tenant_id": 1,
+                "name": "Draft Site",
+                "slug": "draft-site",
+                "status": "draft",
+                "draft_schema": {"pages": []},
+                "updated_at": "2026-06-02T10:00:00+00:00",
+            }
+        ]
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")
