@@ -909,9 +909,10 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "User id does not match session")
 
-    def test_public_site_response_does_not_expose_draft_schema(self):
+    def test_public_site_response_exposes_only_render_safe_fields(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"][0]["draft_schema"] = {"secret": True}
+        fake_supabase.tables["builder_projects"][0]["owner_user_id"] = 77
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
@@ -920,8 +921,26 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertIn("published_schema", body["project"])
+        self.assertEqual(
+            body["site"],
+            {
+                "subdomain": "tenant-site",
+                "brand": None,
+                "footer_store_name": None,
+                "logo_url": None,
+                "contact_email": None,
+                "phone": None,
+                "description": None,
+            },
+        )
+        self.assertEqual(body["project"], {"published_schema": PUBLISHED_SCHEMA})
+        self.assertNotIn("tenant_id", body["site"])
+        self.assertNotIn("id", body["project"])
+        self.assertNotIn("owner_user_id", body["project"])
         self.assertNotIn("draft_schema", body["project"])
+        self.assertNotIn("status", body["project"])
+        self.assertNotIn("published_version", body["project"])
+        self.assertNotIn("last_published_at", body["project"])
         self.assertNotIn("draft_schema", str(body))
 
     def test_public_submission_rejects_unpublished_project(self):

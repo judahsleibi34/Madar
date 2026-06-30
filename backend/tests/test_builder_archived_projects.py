@@ -470,9 +470,11 @@ class PublicSiteContractTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["project"]["id"], "project-new")
-        self.assertEqual(body["project"]["published_version"], 2)
-        self.assertEqual(body["project"]["published_schema"], {"pages": [{"id": "published-new"}]})
+        self.assertEqual(set(body["project"].keys()), {"published_schema"})
+        self.assertEqual(
+            body["project"]["published_schema"],
+            {"pages": [{"id": "published-new"}]},
+        )
         self.assertNotIn("draft_schema", body["project"])
 
     def test_public_site_without_published_project_returns_not_found(self):

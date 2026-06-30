@@ -288,7 +288,6 @@ def get_public_site(subdomain: str, request: Request):
         "success": True,
         "site": {
             "subdomain": clean_subdomain,
-            "tenant_id": tenant_id,
             "brand": settings.get("brand"),
             "footer_store_name": settings.get("footer_store_name"),
             "logo_url": settings.get("logo_url"),
@@ -297,12 +296,6 @@ def get_public_site(subdomain: str, request: Request):
             "description": settings.get("description"),
         },
         "project": {
-            "id": project.get("id"),
-            "name": project.get("name"),
-            "slug": project.get("slug"),
-            "status": project.get("status"),
-            "published_version": project.get("published_version"),
-            "last_published_at": project.get("last_published_at"),
             "published_schema": project.get("published_schema") or {},
         },
     }
