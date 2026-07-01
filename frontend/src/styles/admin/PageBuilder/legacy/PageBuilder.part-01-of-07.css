@@ -5,8 +5,8 @@
 
 .page-builder {
   min-height: 100vh;
-  background: #f5f2ee;
-  color: #1a2744;
+  background: var(--theme-bg-soft);
+  color: var(--theme-text);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -23,8 +23,8 @@ button {
 
 .builder-topbar {
   min-height: 68px;
-  background: #ffffff;
-  border-bottom: 1px solid rgba(26, 39, 68, 0.1);
+  background: var(--theme-surface);
+  border-bottom: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -33,19 +33,19 @@ button {
   position: sticky;
   top: 0;
   z-index: 80;
-  box-shadow: 0 8px 24px rgba(26, 39, 68, 0.04);
+  box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.04);
 }
 
 .builder-brand h1 {
   margin: 0;
   font-size: 20px;
   font-weight: 900;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .builder-brand p {
   margin: 3px 0 0;
-  color: rgba(26, 39, 68, 0.66);
+  color: rgba(var(--theme-shadow-rgb), 0.66);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -58,8 +58,8 @@ button {
 
 .builder-subbar {
   min-height: 58px;
-  background: rgba(255, 255, 255, 0.94);
-  border-bottom: 1px solid rgba(26, 39, 68, 0.1);
+  background: rgba(var(--theme-text-inverse-rgb), 0.94);
+  border-bottom: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,8 +75,8 @@ button {
   display: flex;
   justify-content: center;
   gap: 6px;
-  background: rgba(26, 39, 68, 0.06);
-  border: 1px solid rgba(26, 39, 68, 0.1);
+  background: rgba(var(--theme-shadow-rgb), 0.06);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
   border-radius: 16px;
   padding: 5px;
   overflow-x: auto;
@@ -104,8 +104,8 @@ button {
   padding: 9px 12px;
   font-weight: 900;
   cursor: pointer;
-  background: rgba(26, 39, 68, 0.08);
-  color: #1a2744;
+  background: rgba(var(--theme-shadow-rgb), 0.08);
+  color: var(--theme-text);
   white-space: nowrap;
 }
 
@@ -114,8 +114,8 @@ button {
 .sidebar-tabs button.active,
 .runtime-nav button.active,
 .object-list button.active {
-  background: #1a2744;
-  color: #ffffff;
+  background: var(--theme-text);
+  color: var(--theme-text-inverse);
 }
 
 .builder-topbar-actions > button.primary-action,
@@ -126,15 +126,15 @@ button {
 .builder-modal .section-card button,
 .runtime-submit {
   background: var(--theme-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 .viewport-switcher {
   display: flex;
   gap: 5px;
-  background: rgba(26, 39, 68, 0.06);
-  border: 1px solid rgba(26, 39, 68, 0.1);
+  background: rgba(var(--theme-shadow-rgb), 0.06);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
   border-radius: 15px;
   padding: 4px;
 }
@@ -156,15 +156,15 @@ button {
 
 .builder-sidebar,
 .builder-inspector {
-  background: #ffffff;
-  border-right: 1px solid rgba(26, 39, 68, 0.12);
+  background: var(--theme-surface);
+  border-right: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   padding: 18px;
   overflow-y: auto;
 }
 
 .builder-inspector {
   border-right: none;
-  border-left: 1px solid rgba(26, 39, 68, 0.12);
+  border-left: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
 }
 
 .sidebar-tabs {
@@ -172,7 +172,7 @@ button {
   grid-template-columns: repeat(4, 1fr);
   gap: 5px;
   padding: 4px;
-  background: rgba(26, 39, 68, 0.06);
+  background: rgba(var(--theme-shadow-rgb), 0.06);
   border-radius: 14px;
   margin-bottom: 16px;
 }
@@ -183,13 +183,13 @@ button {
   font-size: 12px;
   font-weight: 900;
   background: transparent;
-  color: #1a2744;
+  color: var(--theme-text);
   cursor: pointer;
 }
 
 .builder-panel,
 .inspector-group {
-  border-bottom: 1px solid rgba(26, 39, 68, 0.12);
+  border-bottom: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   padding-bottom: 18px;
   margin-bottom: 18px;
   display: flex;
@@ -207,12 +207,12 @@ button {
 .workspace-header h2 {
   margin: 0;
   font-size: 18px;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .panel-help {
   margin: 0;
-  color: rgba(26, 39, 68, 0.62);
+  color: rgba(var(--theme-shadow-rgb), 0.62);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -225,8 +225,8 @@ button {
 }
 
 .inspector-title span {
-  background: rgba(26, 39, 68, 0.08);
-  color: rgba(26, 39, 68, 0.72);
+  background: rgba(var(--theme-shadow-rgb), 0.08);
+  color: rgba(var(--theme-shadow-rgb), 0.72);
   padding: 5px 8px;
   border-radius: 999px;
   font-size: 12px;
@@ -237,7 +237,7 @@ button {
 .inspector-group h3 {
   margin: 0;
   font-size: 15px;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .compact-actions {
@@ -255,11 +255,11 @@ button {
 .workspace-page textarea,
 .workspace-page select {
   width: 100%;
-  border: 1px solid rgba(26, 39, 68, 0.18);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.18);
   border-radius: 12px;
   padding: 10px 12px;
-  color: #1a2744;
-  background: #ffffff;
+  color: var(--theme-text);
+  background: var(--theme-surface);
 }
 
 .builder-inspector label,
@@ -267,7 +267,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 13px;
   font-weight: 850;
 }
@@ -293,10 +293,10 @@ input[type="color"] {
 }
 
 details {
-  border: 1px solid rgba(26, 39, 68, 0.12);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   border-radius: 14px;
   padding: 10px;
-  background: rgba(26, 39, 68, 0.025);
+  background: rgba(var(--theme-shadow-rgb), 0.025);
 }
 
 details label {
@@ -306,7 +306,7 @@ details label {
 summary {
   cursor: pointer;
   font-weight: 900;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .add-group {
@@ -316,7 +316,7 @@ summary {
 }
 
 .add-group span {
-  color: rgba(26, 39, 68, 0.56);
+  color: rgba(var(--theme-shadow-rgb), 0.56);
   font-size: 11px;
   font-weight: 950;
   text-transform: uppercase;
@@ -328,8 +328,8 @@ summary {
   text-align: left;
   border-radius: 11px;
   padding: 10px 12px;
-  background: rgba(26, 39, 68, 0.05);
-  color: #1a2744;
+  background: rgba(var(--theme-shadow-rgb), 0.05);
+  color: var(--theme-text);
   cursor: pointer;
   font-weight: 850;
 }
@@ -347,7 +347,7 @@ summary {
 }
 
 .layer-item {
-  border: 1px solid rgba(26, 39, 68, 0.1);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
   border-radius: 14px;
   padding: 8px;
 }
@@ -367,16 +367,16 @@ summary {
 .builder-canvas-shell {
   padding: 28px;
   overflow: auto;
-  background: linear-gradient(180deg, #ffffff 0%, #f5f2ee 100%);
+  background: linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg-soft) 100%);
 }
 
 .builder-canvas {
-  background: #ffffff;
+  background: var(--theme-surface);
   min-height: calc(100vh - 182px);
   border-radius: 24px;
-  border: 1px solid rgba(26, 39, 68, 0.12);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   overflow: hidden;
-  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
   margin: 0 auto;
 }
 
@@ -403,15 +403,15 @@ summary {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  border-bottom: 1px solid rgba(26, 39, 68, 0.1);
-  background: #ffffff;
+  border-bottom: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
+  background: var(--theme-surface);
 }
 
 .runtime-nav button {
   padding: 9px 12px;
   border-radius: 999px;
-  background: rgba(26, 39, 68, 0.06);
-  color: #1a2744;
+  background: rgba(var(--theme-shadow-rgb), 0.06);
+  color: var(--theme-text);
   font-weight: 850;
   cursor: pointer;
 }
@@ -520,8 +520,8 @@ summary {
 }
 
 .site-column.is-selected {
-  border-color: #1a2744;
-  background: rgba(26, 39, 68, 0.04);
+  border-color: var(--theme-text);
+  background: rgba(var(--theme-shadow-rgb), 0.04);
 }
 
 .column-align-left {
@@ -540,10 +540,10 @@ summary {
 }
 
 .empty-column {
-  border: 2px dashed rgba(26, 39, 68, 0.24);
+  border: 2px dashed rgba(var(--theme-shadow-rgb), 0.24);
   border-radius: 14px;
   padding: 24px;
-  color: rgba(26, 39, 68, 0.68);
+  color: rgba(var(--theme-shadow-rgb), 0.68);
   font-size: 13px;
   text-align: center;
   width: 100%;
@@ -572,7 +572,7 @@ summary {
 .free-canvas-toolbar button {
   border-radius: 999px;
   padding: 8px 12px;
-  background: #ffffff;
+  background: var(--theme-surface);
   color: var(--theme-primary);
   font-weight: 900;
   cursor: pointer;
@@ -580,12 +580,12 @@ summary {
 
 .free-canvas-frame {
   position: relative;
-  border: 1px dashed rgba(26, 39, 68, 0.22);
+  border: 1px dashed rgba(var(--theme-shadow-rgb), 0.22);
   background-image:
-    linear-gradient(rgba(26, 39, 68, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(26, 39, 68, 0.1) 1px, transparent 1px);
+    linear-gradient(rgba(var(--theme-shadow-rgb), 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--theme-shadow-rgb), 0.1) 1px, transparent 1px);
   background-size: 24px 24px;
-  background-color: #ffffff;
+  background-color: var(--theme-text-inverse);
   border-radius: 18px;
   overflow: hidden;
 }

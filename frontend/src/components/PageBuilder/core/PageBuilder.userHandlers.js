@@ -5,6 +5,7 @@ export const createUserHandlers = ({
   showToast,
   createRole,
   createUser,
+  requestDeleteUser,
 }) => {
   const addUser = () => {
     const user = createUser();
@@ -40,14 +41,7 @@ export const createUserHandlers = ({
       return;
     }
 
-    if (!window.confirm(`Delete user "${user.name}"?`)) return;
-
-    updateProject((prev) => ({
-      ...prev,
-      users: prev.users.filter((item) => item.id !== userId),
-    }));
-
-    showToast("User deleted.");
+    requestDeleteUser?.(user);
   };
 
   const addRole = () => {

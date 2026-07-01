@@ -23,7 +23,7 @@
 
 .settings-header h1 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: clamp(34px, 4vw, 48px);
   line-height: 1.05;
   font-weight: 950;
@@ -33,7 +33,7 @@
 .settings-header span {
   display: block;
   margin-top: 10px;
-  color: #6d7484;
+  color: var(--theme-text-muted);
   font-size: 16px;
   line-height: 1.6;
 }
@@ -51,11 +51,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  background: #ffffff;
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  background: var(--theme-surface);
   box-shadow:
-    0 20px 56px rgba(26, 39, 68, 0.24),
-    0 1px 0 rgba(255, 255, 255, 0.95) inset;
+    0 20px 56px rgba(var(--theme-shadow-rgb), 0.24),
+    0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.95) inset;
   animation: settingsToastIn 0.22s ease;
   pointer-events: auto;
 }
@@ -83,28 +83,28 @@
 }
 
 .settings-toast-success .settings-toast-content::before {
-  background: var(--theme-gradient);
+  background: var(--theme-primary);
 }
 
 .settings-toast-error .settings-toast-content::before {
-  background: #d7471f;
+  background: var(--theme-danger);
 }
 
 .settings-toast span {
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 14px;
   line-height: 1.55;
   font-weight: 900;
 }
 
 .settings-toast-success {
-  border-color: rgba(26, 39, 68, 0.12);
-  background: #ffffff;
+  border-color: rgba(var(--theme-shadow-rgb), 0.12);
+  background: var(--theme-surface);
 }
 
 .settings-toast-error {
-  border-color: rgba(215, 71, 31, 0.22);
-  background: #fff8f6;
+  border-color: rgba(var(--theme-danger-rgb), 0.22);
+  background: rgba(var(--theme-danger-rgb), 0.06);
 }
 
 .settings-toast-error span {
@@ -118,8 +118,8 @@
   border-radius: 10px;
   display: grid;
   place-items: center;
-  color: #1a2744;
-  background: rgba(26, 39, 68, 0.06);
+  color: var(--theme-text);
+  background: rgba(var(--theme-shadow-rgb), 0.06);
   cursor: pointer;
   flex: 0 0 30px;
 }
@@ -150,10 +150,10 @@
 
 .settings-card {
   min-width: 0;
-  border: 1px solid rgba(26, 39, 68, 0.12);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   border-radius: 24px;
-  background: #ffffff;
-  box-shadow: 0 16px 38px rgba(26, 39, 68, 0.07);
+  background: var(--theme-surface);
+  box-shadow: 0 16px 38px rgba(var(--theme-shadow-rgb), 0.07);
 }
 
 .settings-profile-card {
@@ -168,11 +168,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  background:
-    radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.2), transparent 28%),
-    radial-gradient(circle at 84% 26%, rgba(255, 255, 255, 0.14), transparent 26%),
-    var(--theme-gradient);
-  color: #ffffff;
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
 }
 
 .settings-profile-cover div {
@@ -181,7 +178,7 @@
 }
 
 .settings-profile-cover span {
-  color: rgba(255, 255, 255, 0.74);
+  color: rgba(var(--theme-text-inverse-rgb), 0.74);
   font-size: 12px;
   font-weight: 950;
   text-transform: uppercase;
@@ -189,7 +186,7 @@
 }
 
 .settings-profile-cover strong {
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   font-size: clamp(28px, 4vw, 42px);
   line-height: 1.05;
   font-weight: 950;
@@ -212,8 +209,8 @@
   height: 116px;
   border-radius: 28px;
   padding: 6px;
-  background: #ffffff;
-  box-shadow: 0 18px 36px rgba(26, 39, 68, 0.16);
+  background: var(--theme-surface);
+  box-shadow: 0 18px 36px rgba(var(--theme-shadow-rgb), 0.16);
   margin-top: -88px;
   overflow: hidden;
   flex: 0 0 116px;
@@ -228,8 +225,8 @@
   place-items: center;
   object-fit: cover;
   object-position: center;
-  background: var(--theme-gradient);
-  color: #ffffff;
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
   font-size: 42px;
   font-weight: 950;
   line-height: 1;
@@ -241,7 +238,7 @@
 
 .settings-profile-summary h2 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 30px;
   line-height: 1.08;
   font-weight: 950;
@@ -251,7 +248,7 @@
 .settings-profile-summary p {
   margin: 7px 0 0;
   max-width: 620px;
-  color: #6d7484;
+  color: var(--theme-text-muted);
   line-height: 1.55;
   font-weight: 750;
 }
@@ -277,7 +274,7 @@
   min-width: 0;
   display: grid;
   gap: 8px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 14px;
   font-weight: 950;
 }
@@ -286,10 +283,10 @@
 .settings-card textarea {
   width: 100%;
   min-width: 0;
-  border: 1px solid rgba(26, 39, 68, 0.16);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.16);
   border-radius: 16px;
-  background: #ffffff;
-  color: #1a2744;
+  background: var(--theme-surface);
+  color: var(--theme-text);
   padding: 13px 15px;
   font: inherit;
   font-weight: 850;
@@ -353,8 +350,8 @@
   justify-content: center;
   gap: 9px;
   cursor: pointer;
-  background: var(--theme-gradient);
-  color: #ffffff;
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
   box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.2);
   font-weight: 950;
   transition:
@@ -448,12 +445,12 @@
 }
 
 .settings-website-card .settings-profile-avatar {
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .settings-website-card .settings-profile-avatar span {
-  background: var(--theme-gradient);
-  color: #ffffff;
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
 }
 
 .settings-website-card .settings-profile-avatar svg {

@@ -17,7 +17,7 @@
   display: grid;
   place-items: center;
   background: var(--madar-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   font-size: 22px;
   font-weight: 950;
   box-shadow: var(--madar-red-shadow);
@@ -70,7 +70,7 @@
   border: 1px solid var(--madar-border-strong);
   border-radius: 14px;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .subdomain-input-row input {
@@ -129,7 +129,7 @@
   border-radius: 12px;
   padding: 10px 14px;
   color: var(--madar-text);
-  background: rgba(26, 39, 68, 0.08);
+  background: rgba(var(--theme-shadow-rgb), 0.08);
   font-weight: 950;
 }
 

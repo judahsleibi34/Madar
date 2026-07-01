@@ -33,45 +33,45 @@
   font-weight: 800;
   white-space: nowrap;
   background: transparent;
-  color: #1a1a1a;
+  color: var(--theme-text);
   border: none;
   box-shadow: none;
   backdrop-filter: none;
   pointer-events: none;
   transform: translate(-50%, -50%);
   transition: opacity 0.3s;
-  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--theme-surface) 70%, transparent);
 }
 
 .orbit-label--core {
   background: transparent;
-  color: #8b2a1a;
+  color: var(--theme-primary);
   border: none;
   box-shadow: none;
   font-size: 13px;
   font-weight: 900;
   letter-spacing: -0.02em;
-  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--theme-surface) 70%, transparent);
 }
 
 :root[data-theme="dark"] .orbit-label,
 html.theme-dark .orbit-label,
 body.theme-dark .orbit-label {
   background: transparent;
-  color: #f4f0e8;
+  color: var(--theme-text);
   border: none;
   box-shadow: none;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 6px rgba(var(--theme-black-rgb), 0.8);
 }
 
 :root[data-theme="dark"] .orbit-label--core,
 html.theme-dark .orbit-label--core,
 body.theme-dark .orbit-label--core {
   background: transparent;
-  color: #f4f0e8;
+  color: var(--theme-text);
   border: none;
   box-shadow: none;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 8px rgba(var(--theme-black-rgb), 0.8);
 }
 
 @media (max-width: 1100px) {

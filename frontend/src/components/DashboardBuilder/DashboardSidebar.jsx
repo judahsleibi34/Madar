@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   UsersRound,
+  KeyRound,
 } from "lucide-react";
 
 import LanguageSwitcher from "../LanguageSwitcher";
@@ -126,6 +127,13 @@ export default function DashboardSidebar({
       label: t("sidebar.userManagement"),
       path: "/admin/users",
       icon: UsersRound,
+    },
+    {
+      label: t("sidebar.accountAccess", {
+        defaultValue: "Account Access",
+      }),
+      path: "/admin/account-access",
+      icon: KeyRound,
     },
   ];
 

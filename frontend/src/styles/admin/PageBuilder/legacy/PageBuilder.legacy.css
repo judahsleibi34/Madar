@@ -52,10 +52,10 @@
   border-radius: 999px !important;
   padding: 9px 15px 9px 11px !important;
 
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border: 1px solid var(--madar-border) !important;
-  box-shadow: 0 14px 34px rgba(26, 39, 68, 0.14) !important;
+  box-shadow: 0 14px 34px rgba(var(--theme-shadow-rgb), 0.14) !important;
 
   font-size: 14px !important;
   font-weight: 950 !important;
@@ -76,7 +76,7 @@
 
   border-radius: 999px !important;
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   font-size: 14px !important;
   font-weight: 950 !important;
   box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.2) !important;
@@ -115,7 +115,7 @@
   font-size: 14px !important;
   font-weight: 950 !important;
 
-  background: rgba(26, 39, 68, 0.08) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
   color: var(--madar-text) !important;
   box-shadow: none !important;
 }
@@ -167,14 +167,14 @@
 /* Keep Go Live styled */
 .page-builder .go-live-action {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.24) !important;
 }
 
 .page-builder .go-live-action:hover {
   transform: translateY(-1px) !important;
   background: var(--madar-gradient-hover) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 .page-builder .reservation-field-picker {
@@ -184,7 +184,7 @@
   padding: 12px !important;
   border: 1px solid var(--madar-border) !important;
   border-radius: 14px !important;
-  background: rgba(26, 39, 68, 0.035) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.035) !important;
 }
 
 .page-builder .reservation-field-picker > strong {
@@ -220,8 +220,8 @@
 .page-builder .data-card {
   border: 1px solid var(--madar-border) !important;
   border-radius: 8px !important;
-  background: #ffffff !important;
-  box-shadow: 0 8px 24px rgba(26, 39, 68, 0.08) !important;
+  background: var(--theme-surface) !important;
+  box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.08) !important;
 }
 
 .page-builder .data-summary-grid article {
@@ -306,7 +306,7 @@
 .page-builder .data-table-row span {
   min-width: 0 !important;
   padding: 11px 12px !important;
-  color: rgba(26, 39, 68, 0.78) !important;
+  color: rgba(var(--theme-shadow-rgb), 0.78) !important;
   font-size: 13px !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -314,7 +314,7 @@
 }
 
 .page-builder .data-table-head {
-  background: rgba(26, 39, 68, 0.05) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.05) !important;
   font-weight: 950 !important;
 }
 
@@ -417,14 +417,14 @@
   padding: 10px !important;
   border: 1px solid var(--madar-border) !important;
   border-radius: 14px !important;
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
 }
 
 .page-builder .layer-children {
   display: grid !important;
   gap: 7px !important;
   padding-left: 16px !important;
-  border-left: 2px solid rgba(26, 39, 68, 0.12) !important;
+  border-left: 2px solid rgba(var(--theme-shadow-rgb), 0.12) !important;
 }
 
 .page-builder .layer-tree .layer-section-button {
@@ -440,7 +440,7 @@
   min-height: 38px !important;
   border-radius: 10px !important;
   background: #f8f9fb !important;
-  color: #23324f !important;
+  color: var(--theme-text) !important;
   font-size: 13px !important;
   font-weight: 900 !important;
 }
@@ -458,10 +458,10 @@
 }
 
 .page-builder .layer-tree button.active {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-red-dark) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
-  box-shadow: inset 4px 0 0 var(--madar-red), 0 8px 18px rgba(26, 39, 68, 0.08) !important;
+  box-shadow: inset 4px 0 0 var(--madar-red), 0 8px 18px rgba(var(--theme-shadow-rgb), 0.08) !important;
   transform: none !important;
 }
 
@@ -495,7 +495,7 @@
   min-height: 38px !important;
   border-radius: 10px !important;
   padding: 8px 10px !important;
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border: 1px solid var(--madar-border) !important;
   box-shadow: none !important;
@@ -675,7 +675,7 @@
 .page-builder:not(.preview-mode) .builder-side-panel::-webkit-scrollbar-thumb,
 .page-builder .builder-canvas-shell::-webkit-scrollbar-thumb,
 .page-builder .workspace-page::-webkit-scrollbar-thumb {
-  background: rgba(26, 39, 68, 0.28) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.28) !important;
   border: 2px solid #f1eee9 !important;
   border-radius: 999px !important;
 }
@@ -700,7 +700,7 @@
 }
 
 .page-builder .workspace-tabs button:hover {
-  background: rgba(26, 39, 68, 0.06) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.06) !important;
 }
 
 .page-builder .workspace-tabs button.active {
@@ -730,13 +730,13 @@
 }
 
 .page-builder .builder-topbar-actions > button:first-child {
-  background: #ffffff !important;
-  border-color: rgba(26, 39, 68, 0.18) !important;
+  background: var(--theme-surface) !important;
+  border-color: rgba(var(--theme-shadow-rgb), 0.18) !important;
   color: var(--madar-text) !important;
 }
 
 .page-builder .builder-topbar-actions > button:nth-child(2) {
-  background: rgba(26, 39, 68, 0.07) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.07) !important;
   color: var(--madar-text) !important;
 }
 
@@ -749,7 +749,7 @@
 }
 
 .page-builder .builder-topbar-actions > button.action-active {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   border-color: transparent !important;
   color: var(--madar-red) !important;
   box-shadow: inset 0 -3px 0 rgba(var(--theme-primary-rgb), 0.28) !important;
@@ -799,7 +799,7 @@
 }
 
 .page-builder .viewport-switcher button:hover {
-  background: rgba(26, 39, 68, 0.06) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.06) !important;
 }
 
 .page-builder .viewport-switcher button.active {

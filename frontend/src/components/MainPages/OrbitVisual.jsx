@@ -5,7 +5,7 @@ import "./OrbitVisual.css";
 const TOKENS = {
   madar:    { colors: ["#e8c9a0", "#c08050", "#8b4020", "#4a1a08"], emissive: "#2a0800" },
   records:  { colors: ["#d4b896", "#b07848", "#7a4020", "#3a1400"], emissive: "#1a0600" },
-  users:    { colors: ["#c8d4e8", "#8098c0", "#3a5888", "#1a2744"], emissive: "#060e20" },
+  users:    { colors: ["#c8d4e8", "#8098c0", "#3a5888", "#1b2a4a"], emissive: "#060e20" },
   workflows:{ colors: ["#e8c0a0", "#c07848", "#8b3018", "#4a1000"], emissive: "#1e0600" },
 };
 
@@ -80,7 +80,7 @@ function buildTexture(colors) {
 
     rg.addColorStop(0, `rgba(255,190,100,0.16)`);
     rg.addColorStop(0.5, `rgba(160,60,10,0.08)`);
-    rg.addColorStop(1, `rgba(0,0,0,0)`);
+    rg.addColorStop(1, "rgba(0,0,0,0)");
 
     ctx.fillStyle = rg;
     ctx.beginPath();

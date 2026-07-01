@@ -1,5 +1,6 @@
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import CountUpText from "../ui/CountUpText";
+import ReservationBlock from "../blocks/ReservationBlock";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
   getListItems,
@@ -28,6 +29,7 @@ export const createElementRenderer = ({
   captureCanvasTextSelection,
   runElementAction,
   renderConnectedForm,
+  getReservationBlockValue,
 }) => {
   const renderElement = (element, isFree = false) => {
     const isSelected = selected.type === "element" && selected.id === element.id;
@@ -156,7 +158,7 @@ export const createElementRenderer = ({
       const metrics = getMetricItems(element);
       const columns = Math.max(2, Math.min(4, Number(element.metricColumns) || 2));
       return (
-        <div key={element.id} {...commonProps} className={`${commonProps.className} metric-group`} style={{ ...commonProps.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "#172b4d", "--metric-symbol-color": element.styles?.metricSymbolColor || "#f1f66b" }}>
+        <div key={element.id} {...commonProps} className={`${commonProps.className} metric-group`} style={{ ...commonProps.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "var(--theme-text)", "--metric-symbol-color": element.styles?.metricSymbolColor || "var(--theme-warning)" }}>
           {metrics.map((metric, index) => (
             <div className="metric-group-item" key={`${element.id}_${index}`}>
               <strong className="metric-value"><CountUpText value={metric.value} /></strong>
@@ -203,6 +205,22 @@ export const createElementRenderer = ({
         : commonProps;
 
       return <div key={element.id} {...formBlockProps}>{renderConnectedForm(element.connectedFormId)}</div>;
+    }
+
+    if (element.type === "reservationBlock") {
+      const reservation = getReservationBlockValue?.(element) || element.reservation || {};
+
+      return (
+        <div key={element.id} {...commonProps}>
+          <ReservationBlock
+            title={reservation.title}
+            description={reservation.description}
+            services={reservation.services}
+            submitLabel={reservation.submitLabel}
+            disabled={!preview}
+          />
+        </div>
+      );
     }
 
     return <div key={element.id} {...commonProps}>{element.content}</div>;

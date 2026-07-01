@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Review
    ============================================================ */
 
@@ -66,7 +66,7 @@
   max-height: min(720px, calc(100vh - 260px));
   border: 1px solid var(--daw-card-border);
   border-radius: 20px;
-  background: #ffffff;
+  background: var(--theme-surface);
   overflow: auto;
   overscroll-behavior: auto;
   scrollbar-color: rgba(var(--theme-primary-rgb), 0.48) transparent;

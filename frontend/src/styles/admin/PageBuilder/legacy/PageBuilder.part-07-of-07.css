@@ -11,7 +11,7 @@
 .page-builder .publish-card,
 .page-builder .starter-card,
 .page-builder .section-card {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border-color: var(--madar-border) !important;
   box-shadow: var(--madar-shadow-sm) !important;
@@ -28,7 +28,7 @@
 .page-builder .submit-flow-card span,
 .page-builder .simple-flow span {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 @media (max-width: 1380px) {

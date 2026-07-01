@@ -123,7 +123,7 @@ export default function ReportPropertiesPanel({
               <span>Text color</span>
               <input
                 type="color"
-                value={selectedBlock.textColor || "#1a2744"}
+                value={selectedBlock.textColor || "var(--theme-text)"}
                 onChange={(event) => onUpdateBlock("textColor", event.target.value)}
               />
             </label>

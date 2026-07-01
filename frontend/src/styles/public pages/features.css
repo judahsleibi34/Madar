@@ -7,7 +7,7 @@
   max-width: 1120px;
   margin: 0 auto;
   padding: 64px 5% 90px;
-  color: #1a2744;
+  color: var(--theme-text);
   overflow-x: hidden;
 }
 
@@ -31,7 +31,7 @@
 
 .features-hero h1 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   max-width: 100%;
   font-size: clamp(36px, 4.6vw, 58px);
   line-height: 1.06;
@@ -44,7 +44,7 @@
 .features-hero p {
   margin: 16px auto 0;
   max-width: 720px;
-  color: #6d7484;
+  color: var(--theme-text-muted);
   font-size: 17px;
   line-height: 1.7;
   font-weight: 700;
@@ -61,11 +61,11 @@
   width: 100%;
   min-width: 0;
   margin: 0 0 22px;
-  border: 1px solid rgba(26, 39, 68, 0.12);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   border-radius: 22px;
-  background: #ffffff;
+  background: var(--theme-surface);
   padding: 24px;
-  box-shadow: 0 16px 38px rgba(26, 39, 68, 0.07);
+  box-shadow: 0 16px 38px rgba(var(--theme-shadow-rgb), 0.07);
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.9fr) auto;
   gap: 22px;
@@ -86,14 +86,14 @@
   border-radius: 18px;
   display: grid;
   place-items: center;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   background: var(--theme-gradient);
   box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.18);
 }
 
 .features-demo-copy h2 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 26px;
   line-height: 1.14;
   font-weight: 950;
@@ -103,7 +103,7 @@
 
 .features-demo-copy p {
   margin: 10px 0 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 15px;
   line-height: 1.65;
   font-weight: 650;
@@ -113,7 +113,7 @@
 .features-demo-list {
   margin: 0;
   padding-left: 18px;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   display: grid;
   gap: 8px;
   font-size: 14px;
@@ -130,7 +130,7 @@
   padding: 0 20px;
   border-radius: 12px;
   background: var(--theme-primary);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   font-size: 15px;
   font-weight: 850;
   box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.2);
@@ -146,11 +146,11 @@
 .feature-card {
   min-width: 0;
   min-height: 250px;
-  border: 1px solid rgba(26, 39, 68, 0.12);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   border-radius: 22px;
-  background: #ffffff;
+  background: var(--theme-surface);
   padding: 24px;
-  box-shadow: 0 16px 38px rgba(26, 39, 68, 0.07);
+  box-shadow: 0 16px 38px rgba(var(--theme-shadow-rgb), 0.07);
   display: grid;
   align-content: start;
   gap: 13px;
@@ -162,14 +162,14 @@
   border-radius: 16px;
   display: grid;
   place-items: center;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   background: var(--theme-gradient);
   box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.18);
 }
 
 .feature-card h2 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 22px;
   line-height: 1.18;
   font-weight: 950;
@@ -179,7 +179,7 @@
 
 .feature-card p {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 15px;
   line-height: 1.65;
   font-weight: 650;
@@ -195,7 +195,7 @@ body.theme-dark .features-page {
   color: var(--theme-text);
   background:
     radial-gradient(circle at 50% 0%, rgba(var(--theme-primary-rgb), 0.09), transparent 32%),
-    linear-gradient(180deg, var(--theme-bg) 0%, #0b0a0e 100%);
+    linear-gradient(180deg, var(--theme-bg) 0%, var(--theme-bg) 100%);
 }
 
 [data-theme="dark"] .features-hero h1,
@@ -226,7 +226,7 @@ body.theme-dark .feature-card {
   background: var(--theme-surface);
   border: 1px solid var(--theme-border);
   color: var(--theme-text);
-  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.26);
 }
 
 [data-theme="dark"] .features-demo-copy h2,
@@ -259,7 +259,7 @@ body.theme-dark .feature-card p {
 [data-theme="dark"] .feature-card-icon,
 body.theme-dark .features-demo-icon,
 body.theme-dark .feature-card-icon {
-  background: linear-gradient(135deg, #352936 0%, var(--theme-primary) 100%);
+  background: linear-gradient(135deg, var(--theme-bg-soft) 0%, var(--theme-primary) 100%);
   box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
 }
 

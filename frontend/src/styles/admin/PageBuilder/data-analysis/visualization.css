@@ -10,7 +10,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
   padding: 14px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-visualization-card h4 {
@@ -33,7 +33,7 @@
   min-height: 420px;
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
-  background: rgba(26, 39, 68, 0.035);
+  background: rgba(var(--theme-shadow-rgb), 0.035);
   overflow: hidden;
 }
 
@@ -51,7 +51,7 @@
   height: auto;
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-visualization-json {
@@ -120,7 +120,7 @@
   height: 30px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  color: var(--theme-danger);
 }
 
 .page-builder .daw-modal-alert strong {
@@ -184,7 +184,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 12px;
   padding: 12px;
-  background: rgba(26, 39, 68, 0.035);
+  background: rgba(var(--theme-shadow-rgb), 0.035);
 }
 
 .page-builder .daw-plot-summary-grid article.active {
@@ -255,7 +255,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 12px;
   padding: 10px 12px;
-  background: rgba(26, 39, 68, 0.035);
+  background: rgba(var(--theme-shadow-rgb), 0.035);
 }
 
 .page-builder .daw-plot-output-copy {
@@ -292,7 +292,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
   padding: 10px;
-  background: #ffffff;
+  background: var(--theme-surface);
   overflow: hidden;
 }
 
@@ -355,8 +355,8 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 18px;
   padding: 20px;
-  background: #f8fafc;
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.32);
+  background: var(--theme-surface-2);
+  box-shadow: 0 28px 90px rgba(var(--theme-black-rgb), 0.32);
 }
 
 .page-builder .daw-visualization-settings-modal {
@@ -383,7 +383,7 @@
 
 .page-builder .daw-danger-icon-button {
   border-color: rgba(239, 68, 68, 0.34);
-  color: #ef4444;
+  color: var(--theme-danger);
 }
 
 .page-builder .daw-danger-icon-button:hover {
@@ -479,7 +479,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
   padding: 0 13px;
-  background: #ffffff;
+  background: var(--theme-surface);
   color: var(--daw-text);
   font: inherit;
   font-size: 13px;
@@ -517,7 +517,7 @@
   border-radius: 14px;
   padding: 8px;
   background: var(--daw-card-bg);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 18px 45px rgba(var(--theme-black-rgb), 0.18);
 }
 
 .page-builder .daw-multi-select-menu button {
@@ -562,7 +562,7 @@
   place-items: center;
   border: 1px solid var(--daw-card-border);
   border-radius: 5px;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
 }
 
 .page-builder .daw-multi-select-menu button.selected .daw-multi-select-check {
@@ -581,7 +581,7 @@
   border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
   border-radius: 18px;
   padding: 18px;
-  background: rgba(26, 39, 68, 0.025);
+  background: rgba(var(--theme-shadow-rgb), 0.025);
 }
 
 .page-builder .daw-plot-editor-card.active {
@@ -699,7 +699,7 @@
   gap: 8px;
   border-radius: 10px;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(var(--theme-text-inverse-rgb), 0.055);
 }
 
 .page-builder .daw-series-color-row input[type="color"] {
@@ -737,14 +737,14 @@
 [data-theme="dark"] .page-builder .daw-visualization-card,
 .theme-dark .page-builder .daw-visualization-frame,
 [data-theme="dark"] .page-builder .daw-visualization-frame {
-  background: rgba(255, 255, 255, 0.055);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(var(--theme-text-inverse-rgb), 0.055);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
 }
 
 .theme-dark .page-builder .daw-visualization-image,
 [data-theme="dark"] .page-builder .daw-visualization-image {
   background: rgba(15, 23, 38, 0.74);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
 }
 
 .theme-dark .page-builder .daw-visualization-settings-summary article,
@@ -757,8 +757,8 @@
 [data-theme="dark"] .page-builder .daw-modal,
 .theme-dark .page-builder .daw-icon-button,
 [data-theme="dark"] .page-builder .daw-icon-button {
-  background: rgba(255, 255, 255, 0.055);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(var(--theme-text-inverse-rgb), 0.055);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
 }
 
 .theme-dark .page-builder .daw-multi-select-trigger,
@@ -766,13 +766,13 @@
 .theme-dark .page-builder .daw-multi-select-menu,
 [data-theme="dark"] .page-builder .daw-multi-select-menu {
   background: rgba(15, 23, 38, 0.92);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
 }
 
 .theme-dark .page-builder .daw-series-colors,
 [data-theme="dark"] .page-builder .daw-series-colors {
   background: rgba(15, 23, 38, 0.35);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
 }
 
 .theme-dark .page-builder .daw-axis-select-row,
@@ -781,14 +781,14 @@
 [data-theme="dark"] .page-builder .daw-color-mode-toggle,
 .theme-dark .page-builder .daw-comparison-hint,
 [data-theme="dark"] .page-builder .daw-comparison-hint {
-  background: rgba(255, 255, 255, 0.035);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--theme-text-inverse-rgb), 0.035);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.1);
 }
 
 .theme-dark .page-builder .daw-modal,
 [data-theme="dark"] .page-builder .daw-modal {
   background: #1f2530;
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.14);
 }
 
 /* Responsive */

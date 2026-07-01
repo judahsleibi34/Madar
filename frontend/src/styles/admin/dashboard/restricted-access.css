@@ -12,10 +12,10 @@
   justify-items: center;
   text-align: center;
   padding: 48px 38px;
-  border: 1px solid rgba(126, 32, 21, 0.12);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.12);
   border-radius: 30px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+  background: rgba(var(--theme-text-inverse-rgb), 0.94);
+  box-shadow: 0 24px 70px rgba(var(--theme-shadow-rgb), 0.12);
 }
 
 .restricted-access-content {
@@ -26,7 +26,7 @@
 
 .restricted-access-eyebrow {
   margin: 0;
-  color: #667085;
+  color: var(--theme-text-muted);
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -35,7 +35,7 @@
 
 .restricted-access-card h1 {
   margin: 0;
-  color: #0f2a52;
+  color: var(--theme-text);
   font-size: clamp(2.4rem, 5vw, 4.2rem);
   line-height: 0.95;
   letter-spacing: -0.06em;
@@ -44,7 +44,7 @@
 .restricted-access-card p {
   max-width: 420px;
   margin: 0;
-  color: #667085;
+  color: var(--theme-text-muted);
   font-size: 1rem;
   font-weight: 800;
   line-height: 1.55;
@@ -54,27 +54,27 @@
   border: 0;
   border-radius: 999px;
   padding: 13px 22px;
-  color: #fff;
-  background: linear-gradient(135deg, #0f2a52, #7e2015);
+  color: var(--theme-text-inverse);
+  background: linear-gradient(135deg, var(--theme-text), var(--theme-primary-hover));
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 16px 35px rgba(126, 32, 21, 0.2);
+  box-shadow: 0 16px 35px rgba(var(--theme-primary-rgb), 0.2);
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 .restricted-access-card button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(126, 32, 21, 0.24);
+  box-shadow: 0 18px 40px rgba(var(--theme-primary-rgb), 0.24);
 }
 
 .restricted-access-card button:focus-visible {
-  outline: 3px solid rgba(126, 32, 21, 0.28);
+  outline: 3px solid rgba(var(--theme-primary-rgb), 0.28);
   outline-offset: 4px;
 }
 
 [data-theme="dark"] .restricted-access-card,
 .dark .restricted-access-card {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
   background: rgba(18, 24, 38, 0.92);
 }
 

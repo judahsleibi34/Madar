@@ -1,11 +1,11 @@
-﻿/* ============================================================
+/* ============================================================
    Assistant
    ============================================================ */
 
 .page-builder .daw-assistant-card {
   background:
-    linear-gradient(145deg, rgba(26, 39, 68, 0.05), rgba(var(--theme-primary-rgb), 0.05)),
-    rgba(255, 255, 255, 0.88);
+    linear-gradient(145deg, rgba(var(--theme-shadow-rgb), 0.05), rgba(var(--theme-primary-rgb), 0.05)),
+    rgba(var(--theme-text-inverse-rgb), 0.88);
 }
 
 .page-builder .daw-assistant-card .daw-primary {

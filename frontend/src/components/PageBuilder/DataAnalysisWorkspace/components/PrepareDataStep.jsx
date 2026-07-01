@@ -121,7 +121,7 @@ export default function PrepareDataStep({
                           onChange={(event) => updateCleaning("fillMethod", event.target.value)}
                         >
                           <option value="mode">{t.mostCommonValue}</option>
-                          <option value="mean">{t.average}</option>
+                          <option value="mean">{t.fillAverage}</option>
                           <option value="median">{t.median}</option>
                           <option value="forward_fill">{t.previousValue}</option>
                           <option value="backward_fill">{t.nextValue}</option>

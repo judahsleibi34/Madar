@@ -9,6 +9,16 @@ const COMPACT_DECIMAL_PLACES = 2;
 const isFiniteNumber = (value) =>
   typeof value === "number" && Number.isFinite(value);
 
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
+};
+
 const isNumericMetricColumn = (column, metricColumns = []) => {
   if (metricColumns.includes(column)) return true;
 
@@ -81,13 +91,17 @@ const getCompactColumnKind = (column) => {
 
 export default function ReportTable({ table, t, variant = "preview" }) {
   const [compactPage, setCompactPage] = useState(1);
-  const rows = Array.isArray(table?.rows)
-    ? table.rows
-    : Array.isArray(table?.data)
-      ? table.data
-      : Array.isArray(table)
-        ? table
-        : [];
+  const rows = useMemo(
+    () =>
+      Array.isArray(table?.rows)
+        ? table.rows
+        : Array.isArray(table?.data)
+          ? table.data
+          : Array.isArray(table)
+            ? table
+            : [],
+    [table]
+  );
 
   const title = table?.title || table?.name || t.tables;
   const metricColumns = Array.isArray(table?.metricColumns)
@@ -99,7 +113,9 @@ export default function ReportTable({ table, t, variant = "preview" }) {
   );
 
   useEffect(() => {
-    setCompactPage(1);
+    return deferEffectStateUpdate(() => {
+      setCompactPage(1);
+    });
   }, [rows, title]);
 
   if (!rows.length || !columns.length) {

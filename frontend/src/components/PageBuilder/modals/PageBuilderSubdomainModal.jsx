@@ -38,6 +38,8 @@ export default function PageBuilderSubdomainModal({
   onSave,
   onSkip,
 }) {
+  void onSkip;
+
   const content = getSubdomainModalContent(lang);
   const [websiteName, setWebsiteName] = useState(
     getSuggestedWebsiteName(project, content.defaultWebsiteName)
@@ -91,17 +93,17 @@ export default function PageBuilderSubdomainModal({
             display: grid;
             place-items: center;
             padding: 24px;
-            background: rgba(15, 23, 42, 0.62);
+            background: rgba(var(--theme-shadow-rgb), 0.62);
             backdrop-filter: blur(8px);
           }
 
           .madar-website-name-modal {
             width: min(520px, 100%);
-            background: var(--color-card, #ffffff);
+            background: var(--color-card, var(--theme-surface));
             border-radius: var(--radius-xl, 28px);
             padding: 28px;
-            box-shadow: var(--shadow-lg, 0 32px 90px rgba(15, 23, 42, 0.28));
-            color: var(--color-text-main, #1a2744);
+            box-shadow: var(--shadow-lg, 0 32px 90px rgba(var(--theme-shadow-rgb), 0.28));
+            color: var(--color-text-main, var(--theme-text));
           }
 
           .madar-website-name-top {
@@ -119,7 +121,7 @@ export default function PageBuilderSubdomainModal({
             display: grid;
             place-items: center;
             background: var(--theme-gradient);
-            color: var(--color-on-theme, #ffffff);
+            color: var(--color-on-theme, var(--theme-text-inverse));
             font-size: 22px;
             font-weight: 950;
             box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
@@ -144,12 +146,12 @@ export default function PageBuilderSubdomainModal({
             line-height: 1.05;
             font-weight: 950;
             letter-spacing: -0.04em;
-            color: var(--color-text-main, #1a2744);
+            color: var(--color-text-main, var(--theme-text));
           }
 
           .madar-website-name-modal p {
             margin: 10px 0 0;
-            color: var(--color-text-muted, #6d7484);
+            color: var(--color-text-muted, var(--theme-text-soft));
             font-size: 15px;
             line-height: 1.5;
           }
@@ -162,7 +164,7 @@ export default function PageBuilderSubdomainModal({
           .madar-website-name-label {
             display: grid;
             gap: 8px;
-            color: var(--color-text-main, #1a2744);
+            color: var(--color-text-main, var(--theme-text));
             font-size: 14px;
             font-weight: 950;
           }
@@ -172,11 +174,11 @@ export default function PageBuilderSubdomainModal({
             grid-template-columns: minmax(0, 1fr) auto;
             align-items: center;
             min-height: 58px;
-            border: 1px solid rgba(26, 39, 68, 0.22);
+            border: 1px solid rgba(var(--theme-shadow-rgb), 0.22);
             border-radius: var(--radius-lg, 18px);
-            background: var(--color-card, #ffffff);
+            background: var(--color-card, var(--theme-surface));
             overflow: hidden;
-            box-shadow: 0 10px 24px rgba(26, 39, 68, 0.05);
+            box-shadow: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.05);
           }
 
           .madar-website-name-input-row:focus-within {
@@ -191,7 +193,7 @@ export default function PageBuilderSubdomainModal({
             outline: 0 !important;
             box-shadow: none !important;
             padding: 0 16px !important;
-            color: var(--color-text-main, #1a2744);
+            color: var(--color-text-main, var(--theme-text));
             font-size: 18px;
             font-weight: 950;
             background: transparent !important;
@@ -199,7 +201,7 @@ export default function PageBuilderSubdomainModal({
 
           .madar-website-name-input-row span {
             padding: 0 16px;
-            color: var(--color-text-muted, #6d7484);
+            color: var(--color-text-muted, var(--theme-text-soft));
             font-size: 16px;
             font-weight: 900;
             white-space: nowrap;
@@ -220,12 +222,12 @@ export default function PageBuilderSubdomainModal({
             gap: 6px;
             padding: 16px;
             border-radius: var(--radius-lg, 18px);
-            background: var(--color-background-soft, #fbfaf8);
-            border: 1px solid rgba(26, 39, 68, 0.12);
+            background: var(--color-background-soft, var(--theme-bg-soft));
+            border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
           }
 
           .madar-website-name-preview span {
-            color: var(--color-text-muted, #6d7484);
+            color: var(--color-text-muted, var(--theme-text-soft));
             font-size: 12px;
             font-weight: 950;
             text-transform: uppercase;
@@ -233,7 +235,7 @@ export default function PageBuilderSubdomainModal({
           }
 
           .madar-website-name-preview strong {
-            color: var(--color-text-main, #1a2744);
+            color: var(--color-text-main, var(--theme-text));
             font-size: 22px;
             font-weight: 950;
             letter-spacing: -0.03em;
@@ -242,7 +244,7 @@ export default function PageBuilderSubdomainModal({
 
           .madar-website-name-note {
             margin: 0 !important;
-            color: var(--color-text-muted, #6d7484) !important;
+            color: var(--color-text-muted, var(--theme-text-soft)) !important;
             font-size: 14px !important;
             line-height: 1.5 !important;
           }
@@ -265,13 +267,13 @@ export default function PageBuilderSubdomainModal({
           }
 
           .madar-website-name-secondary {
-            background: rgba(26, 39, 68, 0.08);
-            color: var(--color-text-main, #1a2744);
+            background: rgba(var(--theme-shadow-rgb), 0.08);
+            color: var(--color-text-main, var(--theme-text));
           }
 
           .madar-website-name-primary {
             background: var(--theme-gradient);
-            color: var(--color-on-theme, #ffffff);
+            color: var(--color-on-theme, var(--theme-text-inverse));
             box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
           }
 

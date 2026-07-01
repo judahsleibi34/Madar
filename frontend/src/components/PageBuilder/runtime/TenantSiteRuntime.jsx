@@ -19,6 +19,7 @@ import { resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
+const MADAR_ATTRIBUTION_URL = "https://madar.app/";
 
 const splitLines = (value) =>
   String(value || "")
@@ -339,25 +340,45 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const runtimeCopy = getTenantRuntimeContent(runtimeDirection === "rtl" ? "ar" : "en");
 
   const pages = useMemo(
-    () => (project?.pages || []).filter((page) => !isUnsupportedWorkspacePath(page.slug)),
+    () => (project?.pages || []),
     [project?.pages]
   );
   const activePath = location.pathname;
-  const isUnsupportedWorkspaceRoute =
-    activePath.endsWith("/login") ||
-    activePath.endsWith("/signup") ||
-    activePath.endsWith("/forgot-password") ||
-    activePath.endsWith("/dashboard");
   const pagePath = `/${params["*"] || ""}`;
+  const normalizedPagePath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
+  const hasBuilderPageForRoute = pages.some((page) => {
+    const normalizedSlug = page.slug === "/" ? "/" : String(page.slug || "").replace(/\/+$/, "");
+    return normalizedSlug === normalizedPagePath;
+  });
+  const isUnsupportedWorkspaceRoute =
+    !hasBuilderPageForRoute &&
+    (activePath.endsWith("/login") ||
+      activePath.endsWith("/signup") ||
+      activePath.endsWith("/forgot-password") ||
+      activePath.endsWith("/dashboard"));
 
   const siteHomePath = `/site/${cleanSubdomain}`;
 
   const pageLinks = splitLines(site.footerShopLinks || runtimeCopy.runtime.footerShopLinks);
   const helpLinks = splitLines(site.footerHelpLinks || runtimeCopy.runtime.footerHelpLinks);
   const socialLinks = splitLines(site.footerSocialLinks || runtimeCopy.runtime.footerSocialLinks);
-  const footerLinks = [...pageLinks, ...helpLinks].filter(
-    (item) => !isUnsupportedWorkspacePath(item)
-  );
+  const footerLinks = [...pageLinks, ...helpLinks].filter((item) => {
+    if (!isUnsupportedWorkspacePath(item)) return true;
+
+    const normalizedItem = String(item || "").toLowerCase().trim();
+    return pages.some((page) => {
+      const normalizedName = String(page.name || "").toLowerCase().trim();
+      const normalizedSlug = String(page.slug || "")
+        .toLowerCase()
+        .replace(/^\//, "")
+        .replace(/\/+$/, "");
+
+      return (
+        normalizedName === normalizedItem ||
+        normalizedSlug === normalizedItem.replace(/\s+/g, "-")
+      );
+    });
+  });
 
   useEffect(() => {
     if (isUnsupportedWorkspaceRoute) {
@@ -379,20 +400,33 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     navigate(`/site/${cleanSubdomain}${slug}`);
   };
 
-  const goToFooterLink = (label) => {
-    const normalizedLabel = label.toLowerCase().trim();
+  const resolveFooterPageLink = (value) => {
+    const normalizedValue = String(value || "")
+      .toLowerCase()
+      .replace(/^\//, "")
+      .replace(/\/+$/, "")
+      .trim();
 
-    const target = pages.find((page) => {
+    return pages.find((page) => {
+      const normalizedId = String(page.id || "").toLowerCase();
       const normalizedName = String(page.name || "").toLowerCase().trim();
       const normalizedSlug = String(page.slug || "")
         .toLowerCase()
-        .replace(/^\//, "");
+        .replace(/^\//, "")
+        .replace(/\/+$/, "");
 
       return (
-        normalizedName === normalizedLabel ||
-        normalizedSlug === normalizedLabel.replace(/\s+/g, "-")
+        normalizedId === normalizedValue ||
+        normalizedName === normalizedValue ||
+        normalizedSlug === normalizedValue ||
+        normalizedSlug === normalizedValue.replace(/\s+/g, "-")
       );
     });
+  };
+
+  const goToFooterLink = (label) => {
+    const normalizedLabel = label.toLowerCase().trim();
+    const target = resolveFooterPageLink(label);
 
     if (target) {
       goToPage(target);
@@ -406,6 +440,23 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
     if (isUnsupportedWorkspacePath(normalizedLabel)) {
       navigate(siteHomePath);
+    }
+  };
+
+  const goToHeaderButton = () => {
+    const targetValue = String(site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel || "").trim();
+    if (!targetValue) return;
+
+    const normalizedTarget = targetValue.toLowerCase().replace(/^\//, "").trim();
+    const targetPage = pages.find((page) => {
+      const normalizedId = String(page.id || "").toLowerCase();
+      const normalizedName = String(page.name || "").toLowerCase().trim();
+      const normalizedSlug = String(page.slug || "").toLowerCase().replace(/^\//, "").trim();
+      return normalizedId === normalizedTarget || normalizedName === normalizedTarget || normalizedSlug === normalizedTarget;
+    });
+
+    if (targetPage) {
+      goToPage(targetPage);
     }
   };
 
@@ -1020,7 +1071,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       const metrics = getMetricItems(element);
       const columns = Math.max(2, Math.min(4, Number(element.metricColumns) || 2));
       return (
-        <div key={element.id} {...props} className={`${props.className} metric-group`} style={{ ...props.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "#172b4d", "--metric-symbol-color": element.styles?.metricSymbolColor || "#f1f66b" }}>
+        <div key={element.id} {...props} className={`${props.className} metric-group`} style={{ ...props.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "var(--theme-text)", "--metric-symbol-color": element.styles?.metricSymbolColor || "var(--theme-warning)" }}>
           {metrics.map((metric, index) => (
             <div className="metric-group-item" key={`${element.id}_${index}`}>
               <strong className="metric-value"><CountUpText value={metric.value} /></strong>
@@ -1174,6 +1225,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             );
           })}
         </nav>
+
+        <button type="button" className="tenant-site-cta" onClick={goToHeaderButton}>
+          {site.headerButtonLabel || runtimeCopy.runtime.contact}
+        </button>
       </div>
     </header>
   );
@@ -1222,7 +1277,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                 key={item}
                 onClick={() => goToFooterLink(item)}
               >
-                {item}
+                {resolveFooterPageLink(item)?.name || item}
               </button>
             ))}
           </div>
@@ -1246,7 +1301,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           {runtimeCopy.runtime.copyright} 2026 {footerBrand}. {site.rights || runtimeCopy.runtime.rights}
         </p>
 
-        <button type="button" onClick={() => navigate("/")}>
+        <button type="button" onClick={() => { window.location.href = MADAR_ATTRIBUTION_URL; }}>
           {runtimeCopy.runtime.poweredBy}
         </button>
       </div>

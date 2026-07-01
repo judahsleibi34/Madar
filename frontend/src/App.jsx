@@ -552,6 +552,9 @@ export default function App() {
     dataLogs: t("dashboard:loading.dataLogs"),
     myPlan: t("dashboard:loading.myPlan"),
     userManagement: t("dashboard:loading.userManagement"),
+    accountAccess: t("dashboard:loading.accountAccess", {
+      defaultValue: "Account access",
+    }),
     passwordSettings: t("dashboard:loading.passwordSettings"),
     settings: t("dashboard:loading.settings"),
   };

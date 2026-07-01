@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { getReservationContent } from "../../content/pageBuilder";
+import { getReservationContent } from "../../../content/pageBuilder";
 import "./ReservationBlock.css";
 
 const reservationDefaults = getReservationContent("en");

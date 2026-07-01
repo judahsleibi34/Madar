@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, Trash2, X } from "lucide-react";
 
 import { uiText } from "../constants/uiText";
@@ -76,6 +76,29 @@ const getVisualizationUrl = (plotResult, key) => {
   if (!url) return "";
   if (/^https?:\/\//i.test(url)) return url;
   return `${API_URL}${url}`;
+};
+
+const createVisualizationSavePath = (header, name) =>
+  `${String(header || name || "madar-visualization")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || "madar-visualization"}-${Date.now()}.png`;
+
+const visualizationProfileCache = new Map();
+
+function VisualizationSettingsModalRenderer({ renderModal }) {
+  return renderModal();
+}
+
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
 };
 
 const userSafeErrorMessage = (
@@ -555,24 +578,6 @@ const safeWriteDataWorkspaceCache = (storageKey, payload) => {
   dataWorkspaceCacheWriteTimers.set(storageKey, timerId);
 };
 
-const safeRemoveDataWorkspaceCache = (storageKey) => {
-  if (typeof window === "undefined") return;
-
-  dataWorkspaceMemoryCache.delete(storageKey);
-
-  const pendingTimer = dataWorkspaceCacheWriteTimers.get(storageKey);
-  if (pendingTimer) {
-    window.clearTimeout(pendingTimer);
-    dataWorkspaceCacheWriteTimers.delete(storageKey);
-  }
-
-  try {
-    window.localStorage.removeItem(storageKey);
-  } catch {
-    // Ignore storage failures.
-  }
-};
-
 const getCacheableDataset = (dataset) => {
   if (!dataset?.file_path) return null;
 
@@ -667,7 +672,7 @@ export default function DataAnalysisWorkspace({
   const [analysisResult, setAnalysisResult] = useState(null);
   const [assistQuestion, setAssistQuestion] = useState("");
   const [assistResult, setAssistResult] = useState(null);
-  const [analysisError, setAnalysisError] = useState("");
+  const [, setAnalysisError] = useState("");
   const [flowToast, setFlowToast] = useState("");
   const [visualizationError, setVisualizationError] = useState("");
   const [visualizationSuccess, setVisualizationSuccess] = useState("");
@@ -675,7 +680,7 @@ export default function DataAnalysisWorkspace({
   const [isVisualizationChecking, setIsVisualizationChecking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [reportOptions, setReportOptions] = useState(() => ({
+  const [reportOptions] = useState(() => ({
     title: "",
     includeSummary: true,
     includeKpis: true,
@@ -699,9 +704,17 @@ export default function DataAnalysisWorkspace({
     () => cachedWorkspace?.activeVisualizationPlotId || "plot-1"
   );
   const [openAxisDropdown, setOpenAxisDropdown] = useState("");
-  const activeColorInputRef = useRef(null);
   const visualizationNoticeRequestRef = useRef(0);
-  const visualizationProfileCacheRef = useRef({});
+
+  const getNextVisualizationNoticeRequestId = useCallback(() => {
+    visualizationNoticeRequestRef.current += 1;
+    return visualizationNoticeRequestRef.current;
+  }, []);
+
+  const isLatestVisualizationNoticeRequest = useCallback(
+    (requestId) => visualizationNoticeRequestRef.current === requestId,
+    []
+  );
 
   const [cleaning, setCleaning] = useState(() => ({
     trimText: true,
@@ -852,45 +865,47 @@ export default function DataAnalysisWorkspace({
   useEffect(() => {
     if (!columns.length) return;
 
-    setVisualizationPlots((currentPlots) =>
-      currentPlots.map((plot) => {
-        const fallbackYColumns = numericColumns[0]
-          ? [numericColumns[0]]
-          : columns[1]
-          ? [columns[1]]
-          : [];
-        const lineYColumns = toArray(plot.yColumns).filter((column) =>
-          numericColumns.includes(column)
-        );
-        const heatmapColumns = toArray(plot.heatmapColumns).filter((column) =>
-          numericColumns.includes(column)
-        );
+    return deferEffectStateUpdate(() => {
+      setVisualizationPlots((currentPlots) =>
+        currentPlots.map((plot) => {
+          const fallbackYColumns = numericColumns[0]
+            ? [numericColumns[0]]
+            : columns[1]
+            ? [columns[1]]
+            : [];
+          const lineYColumns = toArray(plot.yColumns).filter((column) =>
+            numericColumns.includes(column)
+          );
+          const heatmapColumns = toArray(plot.heatmapColumns).filter((column) =>
+            numericColumns.includes(column)
+          );
 
-        return {
-          ...plot,
-          comparisonMode: normalizeComparisonMode(plot.chartType, plot.comparisonMode),
-          xColumn: plot.xColumn || columns[0] || "",
-          yColumn:
-            plot.chartType === "line"
-              ? (lineYColumns[0] || numericColumns[0] || "")
-              : plot.yColumn || numericColumns[0] || columns[1] || "",
-          xColumns: plot.xColumns?.length ? plot.xColumns : columns[0] ? [columns[0]] : [],
-          yColumns:
-            plot.chartType === "line"
-              ? lineYColumns.length
-                ? lineYColumns
-                : numericColumns[0]
-                ? [numericColumns[0]]
-                : []
-              : plot.yColumns?.length
-              ? plot.yColumns
-              : fallbackYColumns,
-          heatmapColumns: heatmapColumns.length
-            ? heatmapColumns
-            : numericColumns.slice(0, 6),
-        };
-      })
-    );
+          return {
+            ...plot,
+            comparisonMode: normalizeComparisonMode(plot.chartType, plot.comparisonMode),
+            xColumn: plot.xColumn || columns[0] || "",
+            yColumn:
+              plot.chartType === "line"
+                ? (lineYColumns[0] || numericColumns[0] || "")
+                : plot.yColumn || numericColumns[0] || columns[1] || "",
+            xColumns: plot.xColumns?.length ? plot.xColumns : columns[0] ? [columns[0]] : [],
+            yColumns:
+              plot.chartType === "line"
+                ? lineYColumns.length
+                  ? lineYColumns
+                  : numericColumns[0]
+                  ? [numericColumns[0]]
+                  : []
+                : plot.yColumns?.length
+                ? plot.yColumns
+                : fallbackYColumns,
+            heatmapColumns: heatmapColumns.length
+              ? heatmapColumns
+              : numericColumns.slice(0, 6),
+          };
+        })
+      );
+    });
   }, [columns, numericColumns]);
 
   useEffect(() => {
@@ -898,8 +913,9 @@ export default function DataAnalysisWorkspace({
 
     const blurActiveColorInput = (target) => {
       const activeColorInput =
-        activeColorInputRef.current?.matches?.('input[type="color"]')
-          ? activeColorInputRef.current
+        document.activeElement instanceof HTMLInputElement &&
+        document.activeElement.matches('input[type="color"]')
+          ? document.activeElement
           : null;
 
       if (
@@ -908,7 +924,6 @@ export default function DataAnalysisWorkspace({
         !target.closest(".daw-color-control")
       ) {
         activeColorInput.blur();
-        activeColorInputRef.current = null;
       }
     };
 
@@ -927,9 +942,11 @@ export default function DataAnalysisWorkspace({
       if (event.key !== "Escape") return;
 
       setOpenAxisDropdown("");
-      if (activeColorInputRef.current) {
-        activeColorInputRef.current.blur();
-        activeColorInputRef.current = null;
+      if (
+        document.activeElement instanceof HTMLInputElement &&
+        document.activeElement.matches('input[type="color"]')
+      ) {
+        document.activeElement.blur();
       }
     };
 
@@ -1123,10 +1140,6 @@ export default function DataAnalysisWorkspace({
 
   const updateParams = (key, value) => {
     setParams((current) => ({ ...current, [key]: value }));
-  };
-
-  const updateReportOptions = (key, value) => {
-    setReportOptions((current) => ({ ...current, [key]: value }));
   };
 
   const updateVisualizationPlot = (plotId, key, value) => {
@@ -1500,11 +1513,7 @@ export default function DataAnalysisWorkspace({
         typeof useGradient === "boolean"
           ? useGradient
           : shouldUseTrendGradient(plot, nextX),
-      save_path: `${String(header || name || "madar-visualization")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "") || "madar-visualization"}-${Date.now()}.png`,
+      save_path: createVisualizationSavePath(header, name),
     });
   };
 
@@ -1579,8 +1588,8 @@ export default function DataAnalysisWorkspace({
 
     const cacheKey = getVisualizationProfileCacheKey(plot);
 
-    if (visualizationProfileCacheRef.current[cacheKey]) {
-      return visualizationProfileCacheRef.current[cacheKey];
+    if (visualizationProfileCache.has(cacheKey)) {
+      return visualizationProfileCache.get(cacheKey);
     }
 
     const response = await apiFetch(userApiPath("/visualization/columns/profile"), {
@@ -1600,7 +1609,7 @@ export default function DataAnalysisWorkspace({
       throw new Error(data.detail || "Could not inspect selected columns.");
     }
 
-    visualizationProfileCacheRef.current[cacheKey] = data;
+    visualizationProfileCache.set(cacheKey, data);
     return data;
   };
 
@@ -1720,8 +1729,7 @@ export default function DataAnalysisWorkspace({
   async function refreshVisualizationSelectionNotice(plot, changedKey = "") {
     if (!dataset?.file_path || !plot) return;
 
-    const requestId = visualizationNoticeRequestRef.current + 1;
-    visualizationNoticeRequestRef.current = requestId;
+    const requestId = getNextVisualizationNoticeRequestId();
     setVisualizationError("");
     setVisualizationSuccess("");
     setVisualizationNotice("Checking selected column values...");
@@ -1753,12 +1761,12 @@ export default function DataAnalysisWorkspace({
         profileData,
         changedKey
       );
-      if (visualizationNoticeRequestRef.current !== requestId) return;
+      if (!isLatestVisualizationNoticeRequest(requestId)) return;
       applyVisualizationCategoryColors(nextPlot, profileData);
       setVisualizationNotice(nextNotice);
       setIsVisualizationChecking(false);
     } catch (error) {
-      if (visualizationNoticeRequestRef.current !== requestId) return;
+      if (!isLatestVisualizationNoticeRequest(requestId)) return;
       setVisualizationNotice("");
       setVisualizationError(
         userSafeErrorMessage(
@@ -2835,12 +2843,8 @@ export default function DataAnalysisWorkspace({
                                   <input
                                     type="color"
                                     value={selectedColor}
-                                    onFocus={(event) => {
-                                      activeColorInputRef.current = event.currentTarget;
+                                    onFocus={() => {
                                       setOpenAxisDropdown("");
-                                    }}
-                                    onBlur={() => {
-                                      activeColorInputRef.current = null;
                                     }}
                                     onChange={(event) =>
                                       updateVisualizationSeriesColor(
@@ -2895,8 +2899,7 @@ export default function DataAnalysisWorkspace({
                           <input
                             type="color"
                             value={plot.color}
-                            onFocus={(event) => {
-                              activeColorInputRef.current = event.currentTarget;
+                            onFocus={() => {
                               setOpenAxisDropdown("");
                               if (!plot.useSingleColor) {
                                 setVisualizationPlots((currentPlots) =>
@@ -2910,9 +2913,6 @@ export default function DataAnalysisWorkspace({
                                   )
                                 );
                               }
-                            }}
-                            onBlur={() => {
-                              activeColorInputRef.current = null;
                             }}
                             onChange={(event) => {
                               const nextColor = event.target.value;
@@ -2962,12 +2962,8 @@ export default function DataAnalysisWorkspace({
                                 <input
                                   type="color"
                                   value={selectedColor}
-                                  onFocus={(event) => {
-                                    activeColorInputRef.current = event.currentTarget;
+                                  onFocus={() => {
                                     setOpenAxisDropdown("");
-                                  }}
-                                  onBlur={() => {
-                                    activeColorInputRef.current = null;
                                   }}
                                   onChange={(event) => {
                                     updateVisualizationCategoryColor(
@@ -3415,7 +3411,7 @@ export default function DataAnalysisWorkspace({
         </div>
       ) : null}
 
-      {renderVisualizationSettingsModal()}
+      <VisualizationSettingsModalRenderer renderModal={renderVisualizationSettingsModal} />
       {renderVisualizationPreviewModal()}
 
       <section className={`daw-layout daw-step-${currentStep}`}>

@@ -9,14 +9,14 @@
 .rail-card-header h3,
 .floating-tools-card h3 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 16px;
   font-weight: 950;
 }
 
 .rail-card-header p {
   margin: 4px 0 0;
-  color: rgba(26, 39, 68, 0.62);
+  color: rgba(var(--theme-shadow-rgb), 0.62);
   font-size: 12px;
 }
 
@@ -26,7 +26,7 @@
   border-radius: 12px;
   padding: 0;
   cursor: pointer;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   background: var(--theme-gradient);
   box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.2);
   font-size: 20px;
@@ -50,10 +50,10 @@
 .form-title-clean-input {
   width: 100%;
   border: none;
-  border-bottom: 2px solid rgba(26, 39, 68, 0.14);
+  border-bottom: 2px solid rgba(var(--theme-shadow-rgb), 0.14);
   border-radius: 0;
   padding: 8px 0 12px;
-  color: #1a2744;
+  color: var(--theme-text);
   background: transparent;
   font-size: 32px;
   line-height: 1.12;
@@ -72,12 +72,12 @@
   width: 100%;
   min-height: 68px;
   border: none;
-  border-bottom: 1px solid rgba(26, 39, 68, 0.14);
+  border-bottom: 1px solid rgba(var(--theme-shadow-rgb), 0.14);
   border-radius: 0;
   padding: 10px 0;
   resize: vertical;
   background: transparent;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .clean-question-stack {
@@ -104,7 +104,7 @@
 .clean-title-input {
   width: 100%;
   border: none !important;
-  border-bottom: 2px solid rgba(26, 39, 68, 0.14) !important;
+  border-bottom: 2px solid rgba(var(--theme-shadow-rgb), 0.14) !important;
   border-radius: 0 !important;
   padding: 9px 0 !important;
   font-size: 20px;
@@ -123,11 +123,11 @@
 .clean-answer-select,
 .helper-text-clean-input {
   width: 100%;
-  border: 1px solid rgba(26, 39, 68, 0.16);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.16);
   border-radius: 12px;
   padding: 11px 12px;
-  background: #ffffff;
-  color: #1a2744;
+  background: var(--theme-surface);
+  color: var(--theme-text);
   font-weight: 850;
 }
 
@@ -140,7 +140,7 @@
   margin-top: 12px;
   display: grid;
   gap: 7px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 13px;
   font-weight: 850;
 }
@@ -148,7 +148,7 @@
 .options-clean-field textarea {
   width: 100%;
   min-height: 84px;
-  border: 1px solid rgba(26, 39, 68, 0.16);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.16);
   border-radius: 12px;
   padding: 11px 12px;
   resize: vertical;
@@ -158,9 +158,9 @@
   margin-left: 50px;
   margin-top: 14px;
   padding: 14px;
-  border: 1px dashed rgba(26, 39, 68, 0.18);
+  border: 1px dashed rgba(var(--theme-shadow-rgb), 0.18);
   border-radius: 16px;
-  background: rgba(26, 39, 68, 0.025);
+  background: rgba(var(--theme-shadow-rgb), 0.025);
 }
 
 .clean-question-footer {
@@ -190,9 +190,9 @@
 }
 
 .top-zone {
-  color: rgba(26, 39, 68, 0.42);
-  border-color: rgba(26, 39, 68, 0.12);
-  background: rgba(26, 39, 68, 0.025);
+  color: rgba(var(--theme-shadow-rgb), 0.42);
+  border-color: rgba(var(--theme-shadow-rgb), 0.12);
+  background: rgba(var(--theme-shadow-rgb), 0.025);
 }
 
 .empty-form-drop-zone {
@@ -203,11 +203,11 @@
   place-content: center;
   text-align: center;
   background: rgba(var(--theme-primary-rgb), 0.04);
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .empty-form-drop-zone p {
-  color: rgba(26, 39, 68, 0.62);
+  color: rgba(var(--theme-shadow-rgb), 0.62);
 }
 
 .floating-tools-card {
@@ -232,8 +232,8 @@
   border-radius: 14px;
   padding: 10px 11px;
   cursor: grab;
-  color: #1a2744;
-  background: rgba(26, 39, 68, 0.055);
+  color: var(--theme-text);
+  background: rgba(var(--theme-shadow-rgb), 0.055);
   font-weight: 900;
   border: 1px solid transparent;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
@@ -244,7 +244,7 @@
 }
 
 .floating-question-buttons button:hover {
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   background: var(--theme-gradient);
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.2);
   transform: translateY(-1px);
@@ -256,7 +256,7 @@
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: #ffffff;
+  background: var(--theme-surface);
   color: var(--theme-primary);
   font-weight: 950;
   flex: 0 0 auto;
@@ -269,12 +269,12 @@
 .after-submit-card textarea {
   width: 100%;
   min-height: 86px;
-  border: 1px solid rgba(26, 39, 68, 0.16);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.16);
   border-radius: 12px;
   padding: 10px 11px;
   resize: vertical;
-  color: #1a2744;
-  background: #ffffff;
+  color: var(--theme-text);
+  background: var(--theme-surface);
   font-weight: 800;
 }
 
@@ -341,16 +341,16 @@
 }
 
 .form-section-card {
-  background: #ffffff;
-  border: 1px solid rgba(26, 39, 68, 0.12);
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
   border-radius: 24px;
-  box-shadow: 0 12px 28px rgba(26, 39, 68, 0.06);
+  box-shadow: 0 12px 28px rgba(var(--theme-shadow-rgb), 0.06);
   padding: 16px;
   border-left: 6px solid transparent;
 }
 
 .form-section-card.active {
-  border-left-color: #1a2744;
+  border-left-color: var(--theme-text);
 }
 
 .form-section-top {
@@ -365,7 +365,7 @@
   height: 36px;
   border-radius: 999px;
   background: var(--theme-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   display: grid;
   place-items: center;
   font-weight: 950;
@@ -379,10 +379,10 @@
 .section-title-input {
   width: 100%;
   border: none;
-  border-bottom: 2px solid rgba(26, 39, 68, 0.14);
+  border-bottom: 2px solid rgba(var(--theme-shadow-rgb), 0.14);
   border-radius: 0;
   padding: 8px 0 10px;
-  color: #1a2744;
+  color: var(--theme-text);
   background: transparent;
   font-size: 24px;
   line-height: 1.15;
@@ -399,11 +399,11 @@
   width: 100%;
   min-height: 54px;
   border: none;
-  border-bottom: 1px solid rgba(26, 39, 68, 0.14);
+  border-bottom: 1px solid rgba(var(--theme-shadow-rgb), 0.14);
   border-radius: 0;
   padding: 8px 0;
   background: transparent;
-  color: #1a2744;
+  color: var(--theme-text);
   resize: vertical;
 }
 
@@ -421,8 +421,8 @@
   padding: 9px 12px;
   font-weight: 900;
   cursor: pointer;
-  background: rgba(26, 39, 68, 0.08);
-  color: #1a2744;
+  background: rgba(var(--theme-shadow-rgb), 0.08);
+  color: var(--theme-text);
 }
 
 .section-drop-zone {
@@ -446,8 +446,8 @@
 
 .section-question-card {
   box-shadow: none;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  background: rgba(var(--theme-text-inverse-rgb), 0.98);
 }
 
 .empty-section-drop {
@@ -459,7 +459,7 @@
   place-content: center;
   text-align: center;
   background: rgba(var(--theme-primary-rgb), 0.035);
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .empty-section-drop h3 {
@@ -468,13 +468,13 @@
 
 .empty-section-drop p {
   margin: 0;
-  color: rgba(26, 39, 68, 0.62);
+  color: rgba(var(--theme-shadow-rgb), 0.62);
 }
 
 .add-section-inline,
 .add-section-tool {
   background: var(--theme-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
 
@@ -492,7 +492,7 @@
   display: grid;
   gap: 14px;
   padding: 14px 0;
-  border-top: 1px solid rgba(26, 39, 68, 0.1);
+  border-top: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
 }
 
 .runtime-form-section:first-of-type {
@@ -502,13 +502,13 @@
 
 .runtime-form-section-header h4 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 18px;
 }
 
 .runtime-form-section-header p {
   margin: 4px 0 0;
-  color: rgba(26, 39, 68, 0.62);
+  color: rgba(var(--theme-shadow-rgb), 0.62);
 }
 
 @media (max-width: 1180px) {
@@ -565,7 +565,7 @@
 
 .inspector-help-text {
   margin: 8px 0 10px;
-  color: rgba(26, 39, 68, 0.62);
+  color: rgba(var(--theme-shadow-rgb), 0.62);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -582,8 +582,8 @@
   border-radius: 12px;
   padding: 10px 12px;
   cursor: pointer;
-  background: rgba(26, 39, 68, 0.08);
-  color: #1a2744;
+  background: rgba(var(--theme-shadow-rgb), 0.08);
+  color: var(--theme-text);
   font-weight: 900;
 }
 

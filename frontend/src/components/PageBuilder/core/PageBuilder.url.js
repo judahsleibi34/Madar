@@ -1,6 +1,9 @@
 const blockedStoredUrlSchemes = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
-const urlLikeSiteChromeKeys = new Set(["href", "image", "imageUrl", "logoUrl", "madarLink", "src", "url"]);
-const controlCharacterPattern = /[\u0000-\u001f\u007f]/;
+const urlLikeSiteChromeKeys = new Set(["href", "image", "imageUrl", "logoUrl", "src", "url"]);
+const CONTROL_CHARS_PATTERN = new RegExp(
+  `[${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}]`,
+  "u"
+);
 const urlSchemePattern = /^([a-z][a-z0-9+.-]*):/i;
 const managedUploadAssetPattern =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
@@ -17,7 +20,7 @@ export const getStoredUrlError = (
   const cleanValue = String(value ?? "").trim();
 
   if (!cleanValue) return allowEmpty ? "" : `${fieldName} is required.`;
-  if (controlCharacterPattern.test(cleanValue)) return `${fieldName} contains invalid characters.`;
+  if (CONTROL_CHARS_PATTERN.test(cleanValue)) return `${fieldName} contains invalid characters.`;
   if (cleanValue.startsWith("//")) return `${fieldName} cannot be protocol-relative.`;
 
   if (cleanValue.startsWith("/")) {

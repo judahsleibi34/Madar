@@ -11,7 +11,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(15, 23, 42, 0.58);
+  background: rgba(var(--theme-shadow-rgb), 0.58);
   backdrop-filter: blur(7px);
 }
 
@@ -22,11 +22,11 @@
   gap: 16px;
   border-radius: 28px;
   padding: 26px;
-  background: #ffffff;
+  background: var(--theme-surface);
   border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
   color: var(--madar-text);
   text-align: center;
-  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
+  box-shadow: 0 30px 90px rgba(var(--theme-shadow-rgb), 0.28);
 }
 
 .page-builder .page-delete-modal-icon {
@@ -77,27 +77,27 @@
 }
 
 .page-builder .page-delete-modal-secondary {
-  background: rgba(26, 39, 68, 0.08) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
   color: var(--madar-text) !important;
 }
 
 .page-builder .page-delete-modal-danger {
   background: var(--madar-red) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.22) !important;
 }
 
 /* Go Live button */
 .page-builder .go-live-action {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.24) !important;
 }
 
 .page-builder .go-live-action:hover {
   transform: translateY(-1px);
   background: var(--madar-gradient-hover) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 /* Delete action alignment */
@@ -128,7 +128,7 @@
   display: grid;
   place-items: center;
   background: var(--madar-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   font-size: 22px;
   font-weight: 950;
   box-shadow: var(--madar-red-shadow);
@@ -181,7 +181,7 @@
   border: 1px solid var(--madar-border-strong);
   border-radius: 14px;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .subdomain-input-row input {
@@ -240,7 +240,7 @@
   border-radius: 12px;
   padding: 10px 14px;
   color: var(--madar-text);
-  background: rgba(26, 39, 68, 0.08);
+  background: rgba(var(--theme-shadow-rgb), 0.08);
   font-weight: 950;
 }
 

@@ -59,7 +59,7 @@
 .page-builder .workspace-tabs button.active,
 .page-builder .viewport-switcher button.active {
   background: var(--madar-navy) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 /* Unified primary actions. */
@@ -73,14 +73,14 @@
 .page-builder .builder-modal .starter-card button,
 .page-builder .builder-modal .section-card button {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.2) !important;
 }
 
 /* Unified danger actions. */
 .page-builder .danger-button {
   background: var(--madar-danger) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   border: 0 !important;
 }
 
@@ -144,22 +144,22 @@
 .page-builder .quick-question-list button:hover,
 .page-builder .question-type-list button:hover {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 .page-builder .forms-list button.active,
 .page-builder .compact-form-list button.active {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 /* Canvas remains clean and light. */
 .page-builder .builder-canvas-shell {
-  background: linear-gradient(180deg, #ffffff 0%, var(--madar-bg) 100%) !important;
+  background: linear-gradient(180deg, var(--theme-surface) 0%, var(--madar-bg) 100%) !important;
 }
 
 .page-builder .builder-canvas {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border: 1px solid var(--madar-border) !important;
   box-shadow: var(--madar-shadow) !important;
@@ -183,7 +183,7 @@
 
 /* Built website header: keep user-owned, clean and centered. */
 .page-builder .built-site-header {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border-bottom: 1px solid var(--madar-border) !important;
 }
@@ -200,22 +200,22 @@
 
 .page-builder .built-site-cta {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 /* Footer: light default, matching the main Madar site footer. */
 .page-builder .ecommerce-style-footer {
-  background: #ffffff !important;
-  color: #0f1b33 !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
 }
 
 .page-builder .ecommerce-footer-grid {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
 }
 
 .page-builder .ecommerce-payment-block h4,
 .page-builder .ecommerce-footer-column h4 {
-  color: #0f1b33 !important;
+  color: var(--theme-text) !important;
 }
 
 .page-builder .ecommerce-footer-column button,
@@ -233,17 +233,17 @@
 
 .page-builder .ecommerce-payment-row span,
 .page-builder .ecommerce-social-row button {
-  border-color: rgba(15, 27, 51, 0.16) !important;
-  color: #0f1b33 !important;
-  background: #ffffff !important;
+  border-color: rgba(var(--theme-shadow-rgb), 0.16) !important;
+  color: var(--theme-text) !important;
+  background: var(--theme-surface) !important;
 }
 
 .page-builder .ecommerce-footer-logo {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
 }
 
 .page-builder .footer-language-pill strong {
-  color: #0f1b33 !important;
+  color: var(--theme-text) !important;
 }
 
 /* Keep main tabs centered. Viewport selector only appears in Preview from v3.4.9+. */
@@ -258,7 +258,7 @@
 }
 
 .page-builder .preview-device-toolbar {
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: rgba(var(--theme-text-inverse-rgb), 0.96) !important;
   border-bottom: 1px solid var(--madar-border) !important;
   display: flex !important;
   justify-content: center !important;
@@ -285,22 +285,22 @@
    ============================================================ */
 
 .page-builder {
-  --madar-bg: #f5f2ee;
-  --madar-surface: #ffffff;
-  --madar-surface-soft: #fbfaf8;
-  --madar-navy: #1a2744;
-  --madar-navy-dark: #111b31;
+  --madar-bg: var(--theme-bg-soft);
+  --madar-surface: var(--theme-surface);
+  --madar-surface-soft: var(--theme-surface-2);
+  --madar-navy: var(--theme-text);
+  --madar-navy-dark: var(--theme-bg);
   --madar-red: var(--theme-primary);
   --madar-red-dark: var(--theme-primary-hover);
-  --madar-border: rgba(26, 39, 68, 0.12);
-  --madar-border-strong: rgba(26, 39, 68, 0.22);
-  --madar-muted: #6d7484;
-  --madar-text: #1a2744;
+  --madar-border: rgba(var(--theme-shadow-rgb), 0.12);
+  --madar-border-strong: rgba(var(--theme-shadow-rgb), 0.22);
+  --madar-muted: var(--theme-text-muted);
+  --madar-text: var(--theme-text);
   --madar-danger: var(--theme-primary);
   --madar-gradient: var(--theme-gradient);
   --madar-gradient-hover: var(--theme-gradient-hover);
-  --madar-shadow-sm: 0 10px 24px rgba(26, 39, 68, 0.06);
-  --madar-shadow-md: 0 18px 45px rgba(26, 39, 68, 0.08);
+  --madar-shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.06);
+  --madar-shadow-md: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
   --madar-red-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
 
   background: var(--madar-bg) !important;
@@ -326,11 +326,11 @@
 
 .page-builder .builder-canvas-shell {
   padding: 18px !important;
-  background: linear-gradient(180deg, #ffffff 0%, var(--madar-bg) 100%) !important;
+  background: linear-gradient(180deg, var(--theme-surface) 0%, var(--madar-bg) 100%) !important;
 }
 
 .page-builder .builder-canvas {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border: 1px solid var(--madar-border) !important;
   box-shadow: var(--madar-shadow-md) !important;
@@ -339,7 +339,7 @@
 .page-builder .builder-topbar,
 .page-builder .builder-subbar,
 .page-builder .preview-device-toolbar {
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: rgba(var(--theme-text-inverse-rgb), 0.96) !important;
   color: var(--madar-text) !important;
   border-color: var(--madar-border) !important;
   backdrop-filter: blur(14px);
@@ -364,7 +364,7 @@
 
 .page-builder .workspace-tabs,
 .page-builder .viewport-switcher {
-  background: #f0f2f5 !important;
+  background: var(--theme-surface-2) !important;
   border: 1px solid var(--madar-border) !important;
   border-radius: 16px !important;
   padding: 5px !important;
@@ -381,14 +381,14 @@
 .page-builder .workspace-tabs button.active,
 .page-builder .viewport-switcher button.active {
   background: var(--madar-navy) !important;
-  color: #ffffff !important;
-  box-shadow: 0 8px 20px rgba(26, 39, 68, 0.18) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 8px 20px rgba(var(--theme-shadow-rgb), 0.18) !important;
 }
 
 .page-builder input,
 .page-builder textarea,
 .page-builder select {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border: 1px solid var(--madar-border-strong) !important;
   border-radius: 12px !important;
@@ -414,7 +414,7 @@
 .page-builder .reset-position-button,
 .page-builder .automation-template-actions button,
 .page-builder .responses-page-header button {
-  background: rgba(26, 39, 68, 0.08) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
   color: var(--madar-text) !important;
   border: 1px solid transparent !important;
   box-shadow: none !important;
@@ -438,7 +438,7 @@
 .page-builder .builder-modal .starter-card button,
 .page-builder .builder-modal .section-card button {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   border: none !important;
   box-shadow: var(--madar-red-shadow) !important;
 }
@@ -455,7 +455,7 @@
 
 .page-builder .danger-button {
   background: var(--madar-red) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   border: none !important;
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18) !important;
 }
@@ -475,7 +475,7 @@
   padding: 12px !important;
   border: 1px solid var(--madar-border) !important;
   border-radius: 18px !important;
-  background: #f7f7f8 !important;
+  background: var(--theme-surface-2) !important;
 }
 
 .page-builder .panel-mode-select label {
@@ -502,7 +502,7 @@
 .page-builder .floating-question-buttons button,
 .page-builder .quick-question-list button,
 .page-builder .question-type-list button {
-  background: #f2f4f7 !important;
+  background: var(--theme-surface-2) !important;
   color: var(--madar-text) !important;
   border: 1px solid transparent !important;
   border-radius: 14px !important;
@@ -517,14 +517,14 @@
 .page-builder .quick-question-list button:hover,
 .page-builder .question-type-list button:hover {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 .page-builder .forms-list button.active,
 .page-builder .compact-form-list button.active,
 .page-builder .layer-tree button.active {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 .page-builder .site-section.is-selected,
@@ -559,7 +559,7 @@
 }
 
 .page-builder .built-site-header {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
   border-bottom: 1px solid var(--madar-border) !important;
 }
@@ -575,29 +575,29 @@
 
 .page-builder .built-site-nav button.active,
 .page-builder .built-site-nav button:hover {
-  background: rgba(26, 39, 68, 0.08) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
   color: var(--madar-text) !important;
 }
 
 .page-builder .built-site-cta {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: var(--madar-red-shadow) !important;
 }
 
 /* Footer: final light override, matching the main Madar site footer. */
 .page-builder .ecommerce-style-footer {
-  background: #ffffff !important;
-  color: #0f1b33 !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
 }
 
 .page-builder .ecommerce-footer-grid {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
 }
 
 .page-builder .ecommerce-payment-block h4,
 .page-builder .ecommerce-footer-column h4 {
-  color: #0f1b33 !important;
+  color: var(--theme-text) !important;
 }
 
 .page-builder .ecommerce-footer-column button,
@@ -615,20 +615,20 @@
 
 .page-builder .ecommerce-payment-row span,
 .page-builder .ecommerce-social-row button {
-  border-color: rgba(15, 27, 51, 0.16) !important;
-  color: #0f1b33 !important;
-  background: #ffffff !important;
+  border-color: rgba(var(--theme-shadow-rgb), 0.16) !important;
+  color: var(--theme-text) !important;
+  background: var(--theme-surface) !important;
 }
 
 .page-builder .ecommerce-footer-logo {
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
 }
 
 .page-builder .footer-language-pill strong {
-  color: #0f1b33 !important;
+  color: var(--theme-text) !important;
 }
 
 .page-builder .forms-builder-page,
 .page-builder .workspace-page {
-  background: linear-gradient(180deg, #ffffff 0%, var(--madar-bg) 100%) !important;
+  background: linear-gradient(180deg, var(--theme-surface) 0%, var(--madar-bg) 100%) !important;
 }

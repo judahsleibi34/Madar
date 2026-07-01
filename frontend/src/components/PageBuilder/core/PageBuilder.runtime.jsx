@@ -48,7 +48,6 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
 
 export const createRuntimeFormRenderers = ({
   project,
-  preview,
   lang = "en",
   runtimeAnswers,
   runtimeErrors,

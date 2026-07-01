@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    File dropzone
    ============================================================ */
 
@@ -6,12 +6,12 @@
   display: grid;
   gap: 7px;
   min-height: 118px;
-  border: 1px dashed rgba(26, 39, 68, 0.3);
+  border: 1px dashed rgba(var(--theme-shadow-rgb), 0.3);
   border-radius: 18px;
   padding: 22px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 248, 251, 0.92)),
-    rgba(26, 39, 68, 0.03);
+    linear-gradient(180deg, rgba(var(--theme-text-inverse-rgb), 0.94), rgba(247, 248, 251, 0.92)),
+    rgba(var(--theme-shadow-rgb), 0.03);
   cursor: pointer;
 }
 

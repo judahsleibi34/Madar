@@ -43,7 +43,7 @@ export const formSection = (formId = "") =>
     layout: {
       width: "medium",
       paddingY: "large",
-      background: "#ffffff",
+      background: "var(--theme-surface)",
     },
     rows: [
       createRow([
@@ -62,7 +62,7 @@ export const responsesSection = (formId = "") =>
     layout: {
       width: "large",
       paddingY: "medium",
-      background: "#ffffff",
+      background: "var(--theme-surface)",
     },
     rows: [
       createRow([
@@ -85,7 +85,7 @@ export const loginSection = () =>
     layout: {
       width: "full",
       paddingY: "large",
-      background: "#fbfaf8",
+      background: "var(--theme-surface-2)",
     },
     rows: [
       createRow([
@@ -110,7 +110,7 @@ export const loginSection = () =>
             name: "Login Form Card",
             content: starterText.defaults.loginCard,
             styles: {
-              backgroundColor: "#ffffff",
+              backgroundColor: "var(--theme-surface)",
               borderRadius: "24px",
               alignSelf: "stretch",
             },
@@ -123,7 +123,7 @@ export const loginSection = () =>
 export const metricsSection = () =>
   createSection({
     name: "Metrics",
-    layout: { paddingY: "medium", background: "#fbfaf8" },
+    layout: { paddingY: "medium", background: "var(--theme-surface-2)" },
     rows: [
       createRow([
         createColumn([createElement("metric", { content: starterText.defaults.metrics.totalResponses })]),
@@ -140,7 +140,7 @@ export const showcaseHeroSection = (formId = "") =>
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#fbfaf8",
+      background: "var(--theme-surface-2)",
       minHeight: 560,
     },
     rows: [
@@ -180,7 +180,7 @@ export const showcaseContentSection = () =>
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#ffffff",
+      background: "var(--theme-surface)",
       minHeight: 520,
     },
     rows: [
@@ -220,7 +220,7 @@ export const showcaseCarouselSection = () =>
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#fbfaf8",
+      background: "var(--theme-surface-2)",
       minHeight: 980,
     },
     rows: [
@@ -254,7 +254,7 @@ export const showcaseConnectedSection = (formId = "") =>
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#ffffff",
+      background: "var(--theme-surface)",
       minHeight: 720,
     },
     rows: [
@@ -288,7 +288,7 @@ export const showcaseAuthSection = () =>
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#fbfaf8",
+      background: "var(--theme-surface-2)",
       minHeight: 520,
     },
     rows: [
@@ -363,7 +363,7 @@ const industryHeroSection = ({
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#fbfaf8",
+      background: "var(--theme-surface-2)",
       minHeight: 560,
     },
     rows: [
@@ -401,7 +401,7 @@ const industryCardsSection = ({ title, description, cards = [] }) =>
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#ffffff",
+      background: "var(--theme-surface)",
       minHeight: 520,
     },
     rows: [
@@ -435,7 +435,7 @@ const industryOperationsSection = ({ formId, title, description }) =>
     layout: {
       width: "large",
       paddingY: "large",
-      background: "#fbfaf8",
+      background: "var(--theme-surface-2)",
       minHeight: 720,
     },
     rows: [
@@ -549,6 +549,7 @@ export const buildStarterProject = (starterId = "website") => {
         ...defaultSiteChrome,
         brand: "Madar",
         headerButtonLabel: "Login",
+        headerButtonHref: "Login",
         footerShopLinks: "Builder Demo\nOperations\nLogin",
         description:
           "A complete service portal template with forms, data, reports, booking, and workspace controls.",
@@ -1025,6 +1026,7 @@ export const buildStarterProject = (starterId = "website") => {
     siteChrome: {
     ...defaultSiteChrome,
     headerButtonLabel: "Login",
+    headerButtonHref: "Login",
     footerShopLinks: "Home\nLogin\nContact",
     },
     pages: [

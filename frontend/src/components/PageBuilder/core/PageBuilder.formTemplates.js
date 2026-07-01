@@ -15,9 +15,11 @@ export const FORM_TEMPLATES = buildFormTemplates("en");
 export const applyFormTemplate = (form, templateId) => {
   const template = FORM_TEMPLATES.find((item) => item.id === templateId);
   if (!template) return form;
-  const fields = template.fields.map(({ id, ...field }) =>
-    createField(field.label, field.type, field)
-  );
+  const fields = template.fields.map((field) => {
+    const fieldWithoutId = { ...field };
+    delete fieldWithoutId.id;
+    return createField(fieldWithoutId.label, fieldWithoutId.type, fieldWithoutId);
+  });
 
   return {
     ...form,

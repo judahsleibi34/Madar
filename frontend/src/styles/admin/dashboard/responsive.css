@@ -80,7 +80,7 @@
     display: block;
     border: 0;
     padding: 0;
-    background: rgba(15, 23, 42, 0.44);
+    background: rgba(var(--theme-shadow-rgb), 0.44);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
@@ -109,7 +109,7 @@
 
     padding: 72px 16px 18px;
 
-    border-inline-end: 1px solid rgba(26, 39, 68, 0.12);
+    border-inline-end: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
     border-inline-start: none;
     border-bottom: none;
 
@@ -132,7 +132,7 @@
     text-align: start;
 
     border-inline-end: none;
-    border-inline-start: 1px solid rgba(26, 39, 68, 0.12);
+    border-inline-start: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
     border-bottom: none;
 
     transform: translateX(100%);

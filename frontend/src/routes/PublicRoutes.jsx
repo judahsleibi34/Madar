@@ -83,31 +83,31 @@ export default function PublicRoutes({
           element={<AboutSection key={`about-${lang}`} lang={lang} />}
         />
 
-        <Route
-          path="contact"
-          element={<ContactPage key={`contact-${lang}`} lang={lang} />}
-        />
-      </Route>
+          <Route
+            path="contact"
+            element={<ContactPage key={`contact-${lang}`} lang={lang} />}
+          />
 
-      <Route
-        path="login"
-        element={
-          authChecked && isLoggedIn ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
-            <LoginPage
-              key={`login-${lang}`}
-              lang={lang}
-              onLoginSuccess={onLoginSuccess}
-            />
-          )
-        }
-      />
+          <Route
+            path="login"
+            element={
+              authChecked && isLoggedIn ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <LoginPage
+                  key={`login-${lang}`}
+                  lang={lang}
+                  onLoginSuccess={onLoginSuccess}
+                />
+              )
+            }
+          />
 
-      <Route
-        path="signup"
-        element={<SignUpPage key={`signup-${lang}`} lang={lang} />}
-      />
+          <Route
+            path="signup"
+            element={<SignUpPage key={`signup-${lang}`} lang={lang} />}
+          />
+        </Route>
 
       <Route
         path="forgot-password"

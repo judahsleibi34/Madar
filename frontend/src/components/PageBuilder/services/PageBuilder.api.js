@@ -14,7 +14,7 @@ export const getApiUrl = (path) =>
 const parseJsonResponse = async (response) => {
   const text = await response.text();
 
-  let data = null;
+  let data;
 
   try {
     data = text ? JSON.parse(text) : null;

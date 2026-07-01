@@ -34,9 +34,9 @@ const commandButtons = [
 
 export default function DocumentToolbar({
   onInsertImage,
-  blockColor = "#ffffff",
+  blockColor = "var(--theme-surface)",
   onBlockColor,
-  textColor = "#1a2744",
+  textColor = "var(--theme-text)",
   onTextColor,
   onContentFormatted,
 }) {
@@ -204,7 +204,7 @@ export default function DocumentToolbar({
           <Baseline size={16} />
           <input
             type="color"
-            value={textColor || "#1a2744"}
+            value={textColor || "var(--theme-text)"}
             onInput={(event) => applyTextColor(event.currentTarget.value)}
             onChange={(event) => applyTextColor(event.currentTarget.value)}
           />
@@ -224,7 +224,7 @@ export default function DocumentToolbar({
               <PaintBucket size={16} />
               <input
                 type="color"
-                value={blockColor || "#ffffff"}
+                value={blockColor || "var(--theme-surface)"}
                 onInput={(event) => onBlockColor(event.currentTarget.value)}
                 onChange={(event) => onBlockColor(event.currentTarget.value)}
               />
