@@ -1,26 +1,39 @@
 import { useState } from "react";
+import { RotateCcw, Save, Wand2 } from "lucide-react";
 import { defaultTheme } from "../core/PageBuilder.constants";
+import { defaultFormTheme } from "../core/PageBuilder.theme";
 
 const websiteColorControls = [
-  ["background", "Page background"],
-  ["surface", "Content surface"],
-  ["softSurface", "Alternate section"],
+  ["background", "Site background"],
+  ["surface", "Content area"],
+  ["softSurface", "Alternate area"],
   ["text", "Main text"],
-  ["muted", "Secondary text"],
-  ["accent", "Brand accent"],
-  ["accentDark", "Accent hover"],
+  ["muted", "Supporting text"],
+  ["accent", "Main brand color"],
+  ["accentDark", "Button hover"],
   ["buttonText", "Button text"],
 ];
 
 const formColorControls = [
-  ["background", "Page background"],
-  ["surface", "Form surface"],
-  ["inputBackground", "Input background"],
+  ["background", "Form page"],
+  ["surface", "Form card"],
+  ["inputBackground", "Field background"],
   ["text", "Text"],
-  ["muted", "Help text"],
+  ["muted", "Helper text"],
   ["border", "Border"],
-  ["accent", "Accent"],
+  ["accent", "Main action"],
   ["buttonText", "Button text"],
+];
+
+const fontFamilyOptions = [
+  "Inter",
+  "Arial",
+  "Verdana",
+  "Tahoma",
+  "Trebuchet MS",
+  "Georgia",
+  "Times New Roman",
+  "Courier New",
 ];
 
 const colorFallbacks = {
@@ -39,6 +52,8 @@ const colorFallbacks = {
 
 const getColorValue = (value, fallback = "#000000") =>
   /^#[0-9a-f]{6}$/i.test(String(value || "")) ? value : fallback;
+
+const formatColorValue = (value) => String(value || "").toUpperCase();
 
 const getThemeElementStyles = (element = {}) => {
   const baseStyles = { ...(element.styles || {}) };
@@ -117,6 +132,8 @@ export default function PageBuilderThemeTab({
   saveProject,
 }) {
   const [savingTheme, setSavingTheme] = useState(false);
+  const websiteTheme = project.theme || {};
+  const formTheme = websiteTheme.form || {};
 
   const saveTheme = async () => {
     if (!saveProject || savingTheme) return;
@@ -144,7 +161,7 @@ export default function PageBuilderThemeTab({
       ...prev,
       theme: {
         ...prev.theme,
-        form: {},
+        form: { ...defaultFormTheme },
       },
     }));
   };
@@ -182,56 +199,94 @@ export default function PageBuilderThemeTab({
     }));
   };
 
+  const renderColorControl = ({
+    fallback,
+    keyName,
+    label,
+    onChange,
+    value,
+  }) => {
+    const currentValue = getColorValue(value, fallback);
+
+    return (
+      <label className="theme-token-control" key={keyName}>
+        <span className="theme-token-label">{label}</span>
+        <span className="theme-token-input">
+          <span
+            className="theme-token-swatch"
+            style={{ "--theme-token-color": currentValue }}
+            aria-hidden="true"
+          />
+          <span className="theme-token-value">{formatColorValue(currentValue)}</span>
+          <input
+            aria-label={label}
+            type="color"
+            value={currentValue}
+            onChange={(event) => onChange(keyName, event.target.value)}
+          />
+        </span>
+      </label>
+    );
+  };
+
   return (
     <div className="workspace-page theme-workspace-page">
       <section className="theme-section">
         <div className="theme-section-heading">
           <div>
-            <span className="workspace-kicker">Website</span>
-            <h3>Website theme</h3>
-            <p>Controls the published site colors, typography, buttons, header, footer, and page canvas.</p>
+            <span className="workspace-kicker">Website style</span>
+            <h3>Website look</h3>
+            <p>Choose the colors, font, buttons, header, footer, and page background visitors will see.</p>
           </div>
           <div className="theme-section-actions">
-            <button type="button" className="theme-reset-button" onClick={resetWebsiteTheme}>
-              Reset website colors
+            <button type="button" className="theme-action-button" onClick={resetWebsiteTheme}>
+              <RotateCcw size={16} />
+              <span>Reset</span>
             </button>
-            <button type="button" className="theme-reset-button" onClick={applyThemeToPageBlocks}>
-              Apply theme to page blocks
+            <button type="button" className="theme-action-button" onClick={applyThemeToPageBlocks}>
+              <Wand2 size={16} />
+              <span>Apply to pages</span>
             </button>
             <button type="button" className="theme-save-button" onClick={saveTheme} disabled={savingTheme || !saveProject}>
-              {savingTheme ? "Saving..." : "Save website theme"}
+              <Save size={16} />
+              <span>{savingTheme ? "Saving..." : "Save changes"}</span>
             </button>
           </div>
         </div>
 
         <div className="theme-grid">
-          {websiteColorControls.map(([key, label]) => (
-            <label className="theme-control" key={key}>
-              {label}
-              <input
-                type="color"
-                value={getColorValue(project.theme?.[key], colorFallbacks[key])}
-                onChange={(event) => updateThemeValue(key, event.target.value)}
-              />
-            </label>
-          ))}
+          {websiteColorControls.map(([key, label]) =>
+            renderColorControl({
+              fallback: colorFallbacks[key],
+              keyName: key,
+              label,
+              onChange: updateThemeValue,
+              value: websiteTheme[key],
+            })
+          )}
 
-          <label className="theme-control">
-            Radius
+          <label className="theme-number-control">
+            <span className="theme-token-label">Round corners</span>
             <input
               type="number"
               min="0"
-              value={project.theme?.radius || 18}
+              value={websiteTheme.radius || 18}
               onChange={(event) => updateThemeValue("radius", Number(event.target.value))}
             />
           </label>
 
-          <label className="theme-control">
-            Font family
-            <input
-              value={project.theme?.fontFamily || "Inter"}
+          <label className="theme-select-control">
+            <span className="theme-token-label">Font family</span>
+            <select
+              value={websiteTheme.fontFamily || "Inter"}
               onChange={(event) => updateThemeValue("fontFamily", event.target.value)}
-            />
+            >
+              {fontFamilyOptions.map((fontFamily) => (
+                <option key={fontFamily} value={fontFamily}>
+                  {fontFamily}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
       </section>
@@ -239,46 +294,45 @@ export default function PageBuilderThemeTab({
       <section className="theme-section">
         <div className="theme-section-heading">
           <div>
-            <span className="workspace-kicker">Website forms</span>
-            <h3>Form appearance</h3>
-            <p>Controls forms embedded on published website pages.</p>
+            <span className="workspace-kicker">Forms</span>
+            <h3>Form style</h3>
+            <p>Choose how forms look when they are shown on your published website.</p>
           </div>
-          <button type="button" className="theme-reset-button" onClick={resetFormTheme}>
-            Use website colors
-          </button>
+          <div className="theme-section-actions">
+            <button type="button" className="theme-action-button" onClick={resetFormTheme}>
+              <RotateCcw size={16} />
+              <span>Reset form</span>
+            </button>
+          </div>
         </div>
 
         <div className="theme-grid">
-          {formColorControls.map(([key, label]) => (
-            <label className="theme-control" key={key}>
-              {label}
-              <input
-                type="color"
-                value={getColorValue(
-                  project.theme?.form?.[key],
-                  getColorValue(project.theme?.[key], colorFallbacks[key])
-                )}
-                onChange={(event) => updateFormThemeValue(key, event.target.value)}
-              />
-            </label>
-          ))}
+          {formColorControls.map(([key, label]) =>
+            renderColorControl({
+              fallback: defaultFormTheme[key],
+              keyName: key,
+              label,
+              onChange: updateFormThemeValue,
+              value: formTheme[key],
+            })
+          )}
 
-          <label className="theme-control">
-            Form radius
+          <label className="theme-number-control">
+            <span className="theme-token-label">Form corners</span>
             <input
               type="number"
               min="0"
-              value={project.theme?.form?.radius ?? 8}
+              value={formTheme.radius ?? 8}
               onChange={(event) => updateFormThemeValue("radius", Number(event.target.value))}
             />
           </label>
 
-          <label className="theme-control">
-            Field radius
+          <label className="theme-number-control">
+            <span className="theme-token-label">Field corners</span>
             <input
               type="number"
               min="0"
-              value={project.theme?.form?.fieldRadius ?? 14}
+              value={formTheme.fieldRadius ?? 14}
               onChange={(event) => updateFormThemeValue("fieldRadius", Number(event.target.value))}
             />
           </label>

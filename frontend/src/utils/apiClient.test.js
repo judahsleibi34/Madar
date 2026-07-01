@@ -7,6 +7,7 @@ import {
   postPublicJson,
   readApiError,
   readApiResponse,
+  setCsrfToken,
 } from "./apiClient";
 
 const jsonResponse = (body, init = {}) =>
@@ -150,5 +151,36 @@ describe("apiFetch session refresh", () => {
     expect(await response.text()).toBe("expired");
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetchCall(1)[0]).toBe("/api/auth/refresh");
+  });
+
+  it("retries an unsafe request once after refreshing an invalid CSRF token", async () => {
+    setCsrfToken("old-token");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ detail: "Invalid CSRF token" }, { status: 403 }))
+        .mockResolvedValueOnce(jsonResponse(
+          { refreshed: true },
+          { headers: { "X-CSRF-Token": "new-token" } }
+        ))
+        .mockResolvedValueOnce(jsonResponse({ ok: true }))
+    );
+
+    const response = await apiFetch("/api/builder/projects/123", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Theme" }),
+    });
+    const data = await response.json();
+
+    expect(data).toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetchCall(0)[0]).toBe("/api/builder/projects/123");
+    expect(fetchCall(0)[1].headers.get("X-CSRF-Token")).toBe("old-token");
+    expect(fetchCall(1)[0]).toBe("/api/auth/refresh");
+    expect(fetchCall(2)[0]).toBe("/api/builder/projects/123");
+    expect(fetchCall(2)[1].headers.get("X-CSRF-Token")).toBe("new-token");
+    expect(fetchCall(2)[1].headers.get("Content-Type")).toBe("application/json");
   });
 });
