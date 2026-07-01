@@ -6,7 +6,7 @@
 .page-builder .page-type-actions button:first-child,
 .page-builder .page-type-actions button:nth-child(2) {
   background: var(--madar-gradient) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: var(--madar-red-shadow) !important;
 }
 

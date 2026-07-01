@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -25,6 +25,16 @@ const API_URL = import.meta.env.VITE_API_URL || "/api";
 const USER_PAGE_CACHE_MS = 30_000;
 const USER_PAGE_SIZE = 10;
 const USER_PAGE_SIZE_OPTIONS = [10, 20, 50];
+
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
+};
 
 function friendlyValue(group, value, lang = "en") {
   const activeLabels = getUserManagementFriendlyLabels(lang);
@@ -72,12 +82,14 @@ function UserRow({
   });
 
   useEffect(() => {
-    setRole(user.user_type || "user");
-    setPlanForm({
-      subscription_type: feature.subscription_type || "individual_builder",
-      plan: feature.plan || "basic",
-      builder_type: feature.builder_type || "website",
-      payment_status: feature.payment_status || "pending",
+    return deferEffectStateUpdate(() => {
+      setRole(user.user_type || "user");
+      setPlanForm({
+        subscription_type: feature.subscription_type || "individual_builder",
+        plan: feature.plan || "basic",
+        builder_type: feature.builder_type || "website",
+        payment_status: feature.payment_status || "pending",
+      });
     });
   }, [
     user.id,
@@ -307,13 +319,13 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
 
   const isAdmin = currentUser?.user_type === "admin";
 
-  const showToast = (type, text) => {
+  const showToast = useCallback((type, text) => {
     setToast({
       id: Date.now(),
       type,
       text,
     });
-  };
+  }, []);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -327,7 +339,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
-  const loadUsers = async ({ silent = false, force = false } = {}) => {
+  const loadUsers = useCallback(async ({ silent = false, force = false } = {}) => {
     if (!isAdmin) {
       setLoading(false);
       setRefreshing(false);
@@ -335,7 +347,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
       return;
     }
 
-    if (silent && users.length) {
+    if (silent) {
       setRefreshing(true);
     } else {
       setLoading(true);
@@ -396,7 +408,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [isAdmin, labels.forbidden, labels.loadError, page, pageSize, searchTerm, showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -408,8 +420,10 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
   }, [searchInput]);
 
   useEffect(() => {
-    loadUsers({ silent: users.length > 0 });
-  }, [isAdmin, page, pageSize, searchTerm]);
+    return deferEffectStateUpdate(() => {
+      loadUsers({ silent: users.length > 0 });
+    });
+  }, [loadUsers, users.length]);
 
   const changePageSize = (nextPageSize) => {
     setPage(1);

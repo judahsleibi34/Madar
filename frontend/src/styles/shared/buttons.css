@@ -15,7 +15,7 @@
 .small-action {
   border: none;
   background: var(--madar-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   box-shadow: var(--madar-button-shadow);
   transition:
     transform 0.2s ease,
@@ -35,7 +35,7 @@
 .primary-action:hover,
 .small-action:hover {
   background: var(--madar-gradient-hover);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   transform: translateY(-2px);
   box-shadow: var(--madar-button-shadow-hover);
 }
@@ -47,7 +47,7 @@
 .lang-toggle {
   background: transparent;
   color: var(--madar-navy);
-  border: 1.5px solid rgba(26, 39, 68, 0.25);
+  border: 1.5px solid var(--theme-border-strong);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -62,7 +62,7 @@
 .lang-toggle:hover {
   background: var(--madar-gradient);
   border-color: transparent;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   transform: translateY(-2px);
   box-shadow: var(--madar-button-shadow-hover);
 }
@@ -85,7 +85,7 @@
 .mobile-menu-auth .btn-signup:hover {
   background: var(--madar-gradient);
   border-color: transparent;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   transform: translateY(-2px);
   box-shadow: var(--madar-button-shadow);
 }
@@ -93,7 +93,7 @@
 /* Icon/social buttons */
 .profile-icon-link:hover {
   background: var(--madar-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   border-color: transparent;
   box-shadow: var(--madar-button-shadow-hover);
 }

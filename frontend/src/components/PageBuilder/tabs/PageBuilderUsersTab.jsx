@@ -1,9 +1,7 @@
 import {
-  KeyRound,
   Settings,
   ShieldCheck,
   UserPlus,
-  UsersRound,
 } from "lucide-react";
 
 const USER_STATUSES = ["Active", "Invited", "Disabled"];
@@ -63,7 +61,7 @@ export default function PageBuilderUsersTab({
           </div>
         </div>
 
-        <div className="header-actions">
+        <div className="header-actions users-header-actions">
           <button type="button" onClick={addUser}>
             <UserPlus size={17} />
             Add user
@@ -83,10 +81,15 @@ export default function PageBuilderUsersTab({
               <h3>Team members</h3>
               <p>{invitedUsers} invited member{invitedUsers === 1 ? "" : "s"} waiting.</p>
             </div>
-            <UsersRound size={22} />
           </div>
 
           <div className="user-list users-table">
+            <div className="users-table-head" aria-hidden="true">
+              <span>Member</span>
+              <span>Role</span>
+              <span>Status</span>
+              <span>Settings</span>
+            </div>
             {users.map((user) => {
               const role = getRoleForUser(roles, user);
               const isProtected = Boolean(user.isCurrentUser) || user.email === "admin@madar.local";
@@ -109,21 +112,27 @@ export default function PageBuilderUsersTab({
                       </div>
                     </div>
 
+                    <div className="user-card-summary">
+                      <span>{role?.name || "No role"}</span>
+                      <span>{user.status || "Active"}</span>
+                    </div>
+
                     <button
                       type="button"
                       className="user-settings-button"
                       aria-expanded={isUserSettingsOpen}
                       aria-label={`Open settings for ${user.name || user.email || "user"}`}
                       title="User settings"
-                      onClick={() => setSelected({ type: "user", id: user.id })}
+                      onClick={() =>
+                        setSelected(
+                          isUserSettingsOpen
+                            ? { type: "page", id: project.activePageId || null }
+                            : { type: "user", id: user.id }
+                        )
+                      }
                     >
                       <Settings size={17} />
                     </button>
-                  </div>
-
-                  <div className="user-card-summary">
-                    <span>{role?.name || "No role"}</span>
-                    <span>{user.status || "Active"}</span>
                   </div>
 
                   {isUserSettingsOpen && (
@@ -190,7 +199,6 @@ export default function PageBuilderUsersTab({
               <h3>Role permissions</h3>
               <p>{editableRolePermissions} of {totalPermissions} permissions enabled.</p>
             </div>
-            <KeyRound size={22} />
           </div>
 
           <div className="role-picker-list">

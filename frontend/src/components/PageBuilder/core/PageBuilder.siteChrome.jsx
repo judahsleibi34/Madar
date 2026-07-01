@@ -2,6 +2,8 @@ import { resolveMediaUrl } from "../../../utils/media";
 import { defaultSiteChrome } from "./PageBuilder.constants";
 import { splitLines } from "./PageBuilder.text";
 
+const MADAR_ATTRIBUTION_URL = "https://madar.app/";
+
 export const createSiteChromeRenderers = ({
   project,
   activePage,
@@ -15,6 +17,20 @@ export const createSiteChromeRenderers = ({
     if (!site.showHeader) return null;
 
     const logoSrc = resolveMediaUrl(site.logoUrl);
+    const navigateHeaderButton = (event) => {
+      event.stopPropagation();
+
+      const targetValue = String(site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel || "").trim();
+      const normalizedTarget = targetValue.toLowerCase().replace(/^\//, "").trim();
+      const targetPage = project.pages.find((page) => {
+        const normalizedId = String(page.id || "").toLowerCase();
+        const normalizedName = String(page.name || "").toLowerCase().trim();
+        const normalizedSlug = String(page.slug || "").toLowerCase().replace(/^\//, "").trim();
+        return normalizedId === normalizedTarget || normalizedName === normalizedTarget || normalizedSlug === normalizedTarget;
+      });
+
+      if (targetPage) selectPage(targetPage.id);
+    };
 
     return (
       <header
@@ -54,7 +70,7 @@ export const createSiteChromeRenderers = ({
             ))}
           </nav>
 
-          <button type="button" className="built-site-cta">
+          <button type="button" className="built-site-cta" onClick={navigateHeaderButton}>
             {site.headerButtonLabel || "Contact"}
           </button>
         </div>
@@ -69,16 +85,25 @@ export const createSiteChromeRenderers = ({
     const pageLinks = splitLines(site.footerShopLinks || "");
     const helpLinks = splitLines(site.footerHelpLinks || "About Us\nPolicies\nContact");
     const socialLinks = splitLines(site.footerSocialLinks || "Facebook\nLinkedIn\nX\nInstagram");
-    const footerLinks = [...pageLinks, ...helpLinks];
+    const paymentMethods = splitLines(site.footerPaymentMethods || "");
     const footerBrand = site.footerStoreName || site.brand || "Your Brand";
     const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || "B";
-    const navigateFooterLink = (label) => {
-      const normalizedLabel = label.toLowerCase().trim();
-      const target = project.pages.find((page) => {
-        const normalizedName = page.name.toLowerCase().trim();
-        const normalizedSlug = page.slug.toLowerCase().replace(/^\//, "");
-        return normalizedName === normalizedLabel || normalizedSlug === normalizedLabel.replace(/\s+/g, "-");
+    const resolveFooterPageLink = (value) => {
+      const normalizedValue = String(value || "").toLowerCase().replace(/^\//, "").trim();
+      return project.pages.find((page) => {
+        const normalizedId = String(page.id || "").toLowerCase();
+        const normalizedName = String(page.name || "").toLowerCase().trim();
+        const normalizedSlug = String(page.slug || "").toLowerCase().replace(/^\//, "").trim();
+        return (
+          normalizedId === normalizedValue ||
+          normalizedName === normalizedValue ||
+          normalizedSlug === normalizedValue ||
+          normalizedSlug === normalizedValue.replace(/\s+/g, "-")
+        );
       });
+    };
+    const navigateFooterLink = (label) => {
+      const target = resolveFooterPageLink(label);
 
       if (target) selectPage(target.id);
     };
@@ -90,7 +115,7 @@ export const createSiteChromeRenderers = ({
           event.stopPropagation();
           if (!preview) setSelected({ type: "siteFooter", id: "site-footer" });
           if (event.target.closest(".powered-by-madar")) {
-            window.location.href = site.madarLink || "/";
+            window.location.href = MADAR_ATTRIBUTION_URL;
           }
         }}
       >
@@ -118,9 +143,13 @@ export const createSiteChromeRenderers = ({
           </div>
 
           <div className="ecommerce-footer-column ecommerce-footer-links-column">
-            <h4>Links</h4>
+            <h4>{site.footerShopTitle || "Pages"}</h4>
             <div className="ecommerce-footer-links-grid">
-              {footerLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}
+              {pageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
+            </div>
+            <h4>{site.footerHelpTitle || "Help"}</h4>
+            <div className="ecommerce-footer-links-grid">
+              {helpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}
             </div>
           </div>
 
@@ -132,6 +161,11 @@ export const createSiteChromeRenderers = ({
             </div>
             <p>{site.contactEmail || "info@madar.com"}</p>
             <p dir="ltr">{site.phone || "+972599203857"}</p>
+            {paymentMethods.length > 0 && (
+              <div className="ecommerce-payment-row">
+                {paymentMethods.map((item) => <span key={item}>{item}</span>)}
+              </div>
+            )}
           </div>
         </div>
 

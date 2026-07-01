@@ -140,7 +140,7 @@ export default function ReportPageCanvas({
                   className={`daw-report-page-block is-${block.type} ${selectedBlockId === block.id ? "is-selected" : ""}`}
                   style={{
                     "--daw-block-background": block.backgroundColor || "transparent",
-                    "--daw-block-text": block.textColor || "#1a2744",
+                    "--daw-block-text": block.textColor || "var(--theme-text)",
                   }}
                   onClick={(event) => {
                     if (isPreviewMode) return;

@@ -63,7 +63,7 @@
 body.theme-dark .hero-section {
   background:
     radial-gradient(circle at 18% 12%, rgba(var(--theme-primary-rgb), 0.08), transparent 30%),
-    linear-gradient(180deg, var(--theme-bg) 0%, #0b0a0e 100%);
+    linear-gradient(180deg, var(--theme-bg) 0%, var(--theme-bg) 100%);
   color: var(--theme-text);
 }
 

@@ -16,7 +16,7 @@
 
 .contact-hero h1 {
   margin: 0 0 12px 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 42px;
   font-weight: 800;
   font-family: inherit;
@@ -24,7 +24,7 @@
 
 .contact-hero p {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 18px;
   line-height: 1.8;
 }
@@ -46,7 +46,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 15px;
   font-weight: 700;
   font-family: inherit;
@@ -55,12 +55,12 @@
 .contact-form input,
 .contact-form textarea {
   padding: 12px 16px;
-  border: 1px solid rgba(26, 39, 68, 0.18);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.18);
   border-radius: 10px;
   font-size: 15px;
   font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
-  color: #1a2744;
-  background: #ffffff;
+  color: var(--theme-text);
+  background: var(--theme-surface);
   outline: none;
   transition: border-color 0.2s ease;
   resize: vertical;
@@ -75,7 +75,7 @@
   align-self: center;
   padding: 12px 32px;
   background: var(--theme-primary);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   font-size: 16px;
   font-weight: 700;
   font-family: inherit;
@@ -102,16 +102,16 @@
 }
 
 .contact-form-status-success {
-  color: #157347;
+  color: var(--theme-success);
 }
 
 .contact-form-status-error {
-  color: #b42318;
+  color: var(--theme-danger);
 }
 
 .contact-info-card {
-  background: #ffffff;
-  border: 1px solid rgba(26, 39, 68, 0.08);
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.08);
   border-radius: 16px;
   padding: 32px;
   display: flex;
@@ -123,7 +123,7 @@
 
 .contact-info-card h2 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 20px;
   font-weight: 800;
   font-family: inherit;
@@ -141,7 +141,7 @@
 
 .contact-info-card p {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 15px;
   line-height: 1.6;
 }
@@ -210,7 +210,7 @@ body.theme-dark .contact-info-card {
   background: var(--theme-surface);
   border-color: var(--theme-border);
   color: var(--theme-text);
-  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24);
 }
 
 html[data-theme="dark"] .contact-info-card h2,

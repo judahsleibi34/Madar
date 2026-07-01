@@ -41,6 +41,7 @@ export const getBuilderFreeElementStyle = ({
   findElementLocation,
   getSectionCanvasHeight,
   getMetricMinimumHeight,
+  getDirectElementMinimumSize,
 }) => {
   const pos = element.position?.[viewport] || createPosition()[viewport];
   const location = findElementLocation(element.id);
@@ -61,6 +62,8 @@ export const getBuilderFreeElementStyle = ({
     minHeight:
       element.type === "metric" || element.type === "list"
         ? `${(getMetricMinimumHeight(element) / sectionHeight) * 100}%`
+        : element.type === "reservationBlock"
+          ? `${(getDirectElementMinimumSize(element).height / sectionHeight) * 100}%`
         : undefined,
     maxWidth: `calc(100% - ${left})`,
   };

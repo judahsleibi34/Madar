@@ -10,7 +10,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 60px 5% 90px;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .team-hero {
@@ -21,7 +21,7 @@
 
 .team-hero h1 {
   margin: 0 0 14px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 42px;
   font-weight: 800;
   font-family: inherit;
@@ -29,7 +29,7 @@
 
 .team-hero p {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 17px;
   line-height: 1.8;
 }
@@ -45,9 +45,9 @@
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  background: #ffffff;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
   display: flex;
   flex-direction: column;
   transition:
@@ -78,7 +78,7 @@
   width: 100%;
   height: 280px;
   border-radius: 0;
-  background: #1a2744;
+  background: var(--theme-text);
   border: none;
   display: flex;
   align-items: center;
@@ -101,7 +101,7 @@
 
 .profile-content h2 {
   margin: 0 0 8px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 26px;
   font-weight: 800;
 }
@@ -117,7 +117,7 @@
 
 .profile-description {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 15px;
   line-height: 1.8;
 }
@@ -172,7 +172,7 @@ html[dir="rtl"] .profile-glow {
   max-width: 1200px;
   margin: 0 auto;
   padding: 60px 5% 90px;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .team-hero {
@@ -183,7 +183,7 @@ html[dir="rtl"] .profile-glow {
 
 .team-hero h1 {
   margin: 0 0 14px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 42px;
   font-weight: 800;
   font-family: inherit;
@@ -191,7 +191,7 @@ html[dir="rtl"] .profile-glow {
 
 .team-hero p {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 17px;
   line-height: 1.8;
 }
@@ -207,9 +207,9 @@ html[dir="rtl"] .profile-glow {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  background: #ffffff;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
   display: flex;
   flex-direction: column;
   transition:
@@ -242,7 +242,7 @@ html[dir="rtl"] .profile-glow {
   width: 100%;
   height: 300px;
   border-radius: 0;
-  background: #1a2744;
+  background: var(--theme-text);
   border: none;
   display: flex;
   align-items: center;
@@ -259,7 +259,7 @@ html[dir="rtl"] .profile-glow {
 }
 
 .profile-avatar span {
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   font-size: 34px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -274,7 +274,7 @@ html[dir="rtl"] .profile-glow {
 
 .profile-content h2 {
   margin: 0 0 8px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 26px;
   font-weight: 800;
 }
@@ -290,7 +290,7 @@ html[dir="rtl"] .profile-glow {
 
 .profile-description {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 15px;
   line-height: 1.8;
 }
@@ -330,7 +330,7 @@ html[dir="rtl"] .profile-glow {
 
 .profile-icon-link:hover {
   background: var(--theme-primary);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   border-color: var(--theme-primary);
   transform: translateY(-3px);
   box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.22);
@@ -425,12 +425,12 @@ html[dir="rtl"] .profile-links {
    ============================================================ */
 
 :root {
-  --madar-bg: #f5f2ee;
-  --madar-navy: #1a2744;
-  --madar-navy-dark: #111b31;
+  --madar-bg: var(--theme-bg-soft);
+  --madar-navy: var(--theme-text);
+  --madar-navy-dark: var(--theme-bg);
   --madar-red: var(--theme-primary);
   --madar-red-dark: var(--theme-primary-hover);
-  --madar-cream: #f5f2ee;
+  --madar-cream: var(--theme-bg-soft);
   --madar-gradient: var(--theme-gradient);
   --madar-gradient-hover: var(--theme-gradient-hover);
   --madar-button-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.22);
@@ -449,7 +449,7 @@ html[dir="rtl"] .profile-links {
 .small-action {
   border: none;
   background: var(--madar-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   box-shadow: var(--madar-button-shadow);
   transition:
     transform 0.2s ease,
@@ -469,7 +469,7 @@ html[dir="rtl"] .profile-links {
 .primary-action:hover,
 .small-action:hover {
   background: var(--madar-gradient-hover);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   transform: translateY(-2px);
   box-shadow: var(--madar-button-shadow-hover);
 }
@@ -481,7 +481,7 @@ html[dir="rtl"] .profile-links {
 .lang-toggle {
   background: transparent;
   color: var(--madar-navy);
-  border: 1.5px solid rgba(26, 39, 68, 0.25);
+  border: 1.5px solid rgba(var(--theme-shadow-rgb), 0.25);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -496,7 +496,7 @@ html[dir="rtl"] .profile-links {
 .lang-toggle:hover {
   background: var(--madar-gradient);
   border-color: transparent;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   transform: translateY(-2px);
   box-shadow: var(--madar-button-shadow-hover);
 }
@@ -519,7 +519,7 @@ html[dir="rtl"] .profile-links {
 .mobile-menu-auth .btn-signup:hover {
   background: var(--madar-gradient);
   border-color: transparent;
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   transform: translateY(-2px);
   box-shadow: var(--madar-button-shadow);
 }
@@ -527,7 +527,7 @@ html[dir="rtl"] .profile-links {
 /* Icon/social buttons */
 .profile-icon-link:hover {
   background: var(--madar-gradient);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
   border-color: transparent;
   box-shadow: var(--madar-button-shadow-hover);
 }
@@ -561,13 +561,13 @@ body.theme-dark .team-profile-card {
   background: var(--theme-surface);
   border-color: var(--theme-border);
   color: var(--theme-text);
-  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24);
 }
 
 html[data-theme="dark"] .team-profile-card:hover,
 body.theme-dark .team-profile-card:hover {
   border-color: rgba(var(--theme-primary-rgb), 0.48);
-  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 28px 64px rgba(var(--theme-black-rgb), 0.34);
 }
 
 html[data-theme="dark"] .profile-content h2,

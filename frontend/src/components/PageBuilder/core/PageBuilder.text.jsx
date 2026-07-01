@@ -1,5 +1,3 @@
-import React from "react";
-
 export const splitLines = (value) =>
   String(value || "")
     .split("\n")

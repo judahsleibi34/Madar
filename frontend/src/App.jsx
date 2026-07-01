@@ -1,38 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import TeamPage from "./components/MainPages/TeamPage";
-import Header from "./components/MainPages/Header";
-import HeroSection from "./components/MainPages/HeroSection";
-import AboutSection from "./components/MainPages/AboutSection";
-import ContactPage from "./components/MainPages/ContactPage";
-import FeaturesPage from "./components/MainPages/FeaturesPage";
-import PricingPage from "./components/MainPages/PricingPage";
-import PrivacyPolicyPage from "./components/MainPages/PrivacyPolicyPage";
-import Footer from "./components/MainPages/Footer";
-
-import LoginPage from "./components/AuthPages/LoginPage";
-import SignUpPage from "./components/AuthPages/SignUpPage";
-import ForgotPasswordPage from "./components/AuthPages/ForgotPasswordPage";
-import ResetPasswordPage from "./components/AuthPages/ResetPasswordPage";
-
-import Dashboard from "./components/DashboardBuilder/Dashboard";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
-import SettingsPage from "./components/DashboardBuilder/SettingsPage";
-import ChangePasswordPage from "./components/DashboardBuilder/ChangePasswordPage";
-import SecurityMfaPage from "./components/DashboardBuilder/SecurityMfaPage";
-import UserManagementPage from "./components/DashboardBuilder/UserManagementPage";
-import UserDashboard from "./components/DashboardBuilder/UserDashboard";
-import MyPlanPage from "./components/DashboardBuilder/MyPlanPage";
-
-import PageBuilder from "./components/PageBuilder";
-import BuilderFormPreviewPage from "./components/PageBuilder/preview/BuilderFormPreviewPage";
-import TenantSiteRuntime from "./components/PageBuilder/runtime/TenantSiteRuntime";
-
-import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
+import { DashboardLoadingElement } from "./routes/shared";
 import {
   getSafePostLoginPath,
   isDashboardRoutePath,
@@ -40,19 +13,20 @@ import {
   normalizeUserType,
 } from "./routes/routeUtils";
 import {
-  DashboardLoadingElement,
-  DashboardShell,
-  RestrictedAccessWindow,
-} from "./routes/shared";
-import {
   apiFetch,
   clearCsrfToken,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
+import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
+
+const AdminRoutes = lazy(() => import("./routes/AdminRoutes"));
+const PublicRoutes = lazy(() => import("./routes/PublicRoutes"));
+const TenantSiteRoutes = lazy(() => import("./routes/TenantSiteRoutes"));
+const UserWorkspaceRoutes = lazy(() => import("./routes/UserWorkspaceRoutes"));
 
 let authBootstrapPromise = null;
 
@@ -593,501 +567,84 @@ export default function App() {
     dataLogs: t("dashboard:loading.dataLogs"),
     myPlan: t("dashboard:loading.myPlan"),
     userManagement: t("dashboard:loading.userManagement"),
+    accountAccess: t("dashboard:loading.accountAccess", {
+      defaultValue: "Account access",
+    }),
     passwordSettings: t("dashboard:loading.passwordSettings"),
     settings: t("dashboard:loading.settings"),
   };
 
+  const routeFallback = isDashboardRoute ? (
+    <DashboardLoadingElement
+      pathname={location.pathname}
+      labels={dashboardLoadingLabels}
+      lang={lang}
+    />
+  ) : (
+    <div className="route-loading" role="status" aria-live="polite">
+      Loading...
+    </div>
+  );
+
+  let routeContent;
+
   if (isTenantSiteRoute) {
-    return (
-      <>
-        <ScrollToTop />
-
-        <Routes>
-          <Route path="/site/:subdomain/*" element={<TenantSiteRuntime />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </>
-    );
-  }
-
-  if (isDashboardRoute) {
-    return (
-      <>
-        <ScrollToTop />
-
-        <Routes>
-          <Route
-            path="/dashboard/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.dashboard"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isAdminUser ? (
-                renderDashboardShell(
-                  <Dashboard
-                    lang={lang}
-                    user={user}
-                    themeMode={themeMode}
-                    onThemeModeChange={handleThemeModeChange}
-                  />
-                )
-              ) : (
-                renderDashboardShell(
-                  <UserDashboard
-                    lang={lang}
-                    user={user}
-                    themeMode={themeMode}
-                    onThemeModeChange={handleThemeModeChange}
-                  />
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/page-builder/form-preview/:formId"
-            element={
-              !authChecked ? (
-                renderFormPreviewSkeleton()
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                <BuilderFormPreviewPage />
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/page-builder/preview"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.pageBuilder"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                <TenantSiteRuntime draftPreview />
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/page-builder/*"
-            element={
-              !authChecked ? (
-                location.pathname.startsWith("/page-builder/forms")
-                  ? renderFormBuilderSkeleton()
-                  : renderDashboardSkeleton(t("dashboard:loading.pageBuilder"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                renderDashboardShell(
-                  <PageBuilder
-                    key="page-builder-main"
-                    user={user}
-                    templateLang={lang}
-                    appThemeMode={themeMode}
-                    onAppThemeModeChange={handleThemeModeChange}
-                  />,
-                  true,
-                  { lang: "en" }
-                )
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/builder-responses/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.submissions"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                renderDashboardShell(
-                  <PageBuilder
-                    key="builder-responses-page"
-                    user={user}
-                    initialTab="responses"
-                    visibleTabIds={["responses"]}
-                    hideWorkspaceTabs={true}
-                    lang={lang}
-                    templateLang={lang}
-                    appThemeMode={themeMode}
-                    onAppThemeModeChange={handleThemeModeChange}
-                  />,
-                  false,
-                  { compactSidebar: true }
-                )
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/builder-data/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.dataLogs"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                renderDashboardShell(
-                  <PageBuilder
-                    key="builder-data-page"
-                    user={user}
-                    initialTab="data"
-                    visibleTabIds={["data"]}
-                    hideWorkspaceTabs={true}
-                    lang={lang}
-                    templateLang={lang}
-                    appThemeMode={themeMode}
-                    onAppThemeModeChange={handleThemeModeChange}
-                  />,
-                  false,
-                  { compactSidebar: true }
-                )
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/my-plan/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.myPlan"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                renderDashboardShell(<MyPlanPage lang={lang} />)
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/admin/users/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.userManagement"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isAdminUser ? (
-                renderDashboardShell(
-                  <UserManagementPage lang={lang} currentUser={user} />
-                )
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.adminOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/settings/security/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.securitySettings"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : (
-                renderDashboardShell(<SecurityMfaPage lang={lang} />)
-              )
-            }
-          />
-
-          <Route
-            path="/settings/change-password/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.passwordSettings"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                renderDashboardShell(<ChangePasswordPage lang={lang} />)
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route
-            path="/settings/*"
-            element={
-              !authChecked ? (
-                renderDashboardSkeleton(t("dashboard:loading.settings"))
-              ) : !isLoggedIn ? (
-                <Navigate
-                  to={`/login?returnTo=${getCurrentReturnTo()}`}
-                  replace
-                />
-              ) : isRegularUser ? (
-                renderDashboardShell(
-                  <SettingsPage
-                    lang={lang}
-                    user={user}
-                    onUserUpdated={handleUserUpdated}
-                  />
-                )
-              ) : (
-                renderRestrictedPage(
-                  appShellContent.restrictedAccess.workspaceOnly
-                )
-              )
-            }
-          />
-
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </>
+    routeContent = <TenantSiteRoutes />;
+  } else if (isDashboardRoute) {
+    if (!authChecked) {
+      routeContent = (
+        <DashboardLoadingElement
+          pathname={location.pathname}
+          labels={dashboardLoadingLabels}
+          lang={lang}
+        />
+      );
+    } else if (!isLoggedIn) {
+      routeContent = (
+        <Navigate to={`/login?returnTo=${getCurrentReturnTo()}`} replace />
+      );
+    } else if (isAdminUser) {
+      routeContent = (
+        <AdminRoutes
+          lang={lang}
+          onGoToDashboard={() => navigate("/dashboard", { replace: true })}
+          shellProps={shellProps}
+          themeMode={themeMode}
+          user={user}
+        />
+      );
+    } else {
+      routeContent = (
+        <UserWorkspaceRoutes
+          lang={lang}
+          onGoToDashboard={() => navigate("/dashboard", { replace: true })}
+          onUserUpdated={handleUserUpdated}
+          shellProps={shellProps}
+          themeMode={themeMode}
+          user={user}
+        />
+      );
+    }
+  } else {
+    routeContent = (
+      <PublicRoutes
+        authChecked={authChecked}
+        isLoggedIn={isLoggedIn}
+        lang={lang}
+        onLanguageChange={handleLanguageChange}
+        onLoginSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
+        onThemeModeChange={handleThemeModeChange}
+        themeMode={themeMode}
+        user={user}
+      />
     );
   }
 
   return (
     <>
       <ScrollToTop />
-
-      <div className="app-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
-        <Header
-          lang={lang}
-          onLanguageChange={handleLanguageChange}
-          isLoggedIn={isLoggedIn}
-          onLogout={handleLogout}
-          themeMode={themeMode}
-          onThemeModeChange={handleThemeModeChange}
-        />
-
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <main className="app-main">
-                <HeroSection key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/demo"
-            element={
-              <main className="app-main builder-demo-main" dir="ltr" lang="en">
-                <PageBuilder
-                  key="page-builder-demo"
-                  demoMode
-                  user={user}
-                  lang="en"
-                  templateLang={lang}
-                  appThemeMode={themeMode}
-                  onAppThemeModeChange={handleThemeModeChange}
-                />
-              </main>
-            }
-          />
-
-          <Route
-            path="/about"
-            element={
-              <main className="app-main">
-                <AboutSection key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/contact"
-            element={
-              <main className="app-main">
-                <ContactPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/features"
-            element={
-              <main className="app-main">
-                <FeaturesPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/pricing"
-            element={
-              <main className="app-main">
-                <PricingPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/team"
-            element={
-              <main className="app-main">
-                <TeamPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/privacy-policy"
-            element={
-              <main className="app-main">
-                <PrivacyPolicyPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/reset-password"
-            element={
-              <main className="app-main">
-                <ResetPasswordPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/signup"
-            element={
-              <main className="app-main">
-                <SignUpPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/forgot-password"
-            element={
-              <main className="app-main">
-                <ForgotPasswordPage key={lang} lang={lang} />
-              </main>
-            }
-          />
-
-          <Route
-            path="/login"
-            element={
-              !authChecked ? (
-                <main
-                  className="already-signed-page"
-                  dir={lang === "ar" ? "rtl" : "ltr"}
-                >
-                  <section className="already-signed-container">
-                    <div
-                      className="auth-skeleton-card"
-                      aria-label={t("auth:login.checkingSession")}
-                    >
-                      <div className="auth-skeleton-line auth-skeleton-title" />
-                      <div className="auth-skeleton-line auth-skeleton-text" />
-
-                      <div className="auth-skeleton-actions">
-                        <div className="auth-skeleton-button primary" />
-                        <div className="auth-skeleton-button secondary" />
-                      </div>
-                    </div>
-                  </section>
-                </main>
-              ) : isLoggedIn ? (
-                <main
-                  className="already-signed-page"
-                  dir={lang === "ar" ? "rtl" : "ltr"}
-                >
-                  <section className="already-signed-container">
-                    <div className="already-signed-card">
-                      <h1>{t("auth:login.alreadySignedInTitle")}</h1>
-
-                      <p>{t("auth:login.alreadySignedInBody")}</p>
-
-                      <div className="already-signed-actions">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate("/dashboard", { replace: true })
-                          }
-                        >
-                          {t("auth:login.continueToDashboard")}
-                        </button>
-
-                        <button type="button" onClick={handleLogout}>
-                          {t("common:actions.logout")}
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                </main>
-              ) : (
-                <main className="app-main">
-                  <LoginPage
-                    key={lang}
-                    lang={lang}
-                    onLoginSuccess={handleLoginSuccess}
-                  />
-                </main>
-              )
-            }
-          />
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-
-        <Footer lang={lang} />
-      </div>
+      <Suspense fallback={routeFallback}>{routeContent}</Suspense>
     </>
   );
 }

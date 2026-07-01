@@ -15,6 +15,16 @@ import { getQuizSettings } from "../core/PageBuilder.quiz";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import "../../../styles/admin/PageBuilder/index.css";
 
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
+};
+
 const loadDraftProject = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -79,13 +89,15 @@ export default function BuilderFormPreviewPage() {
 
   useEffect(() => {
     quizCompleteRef.current = false;
-    setQuizStarted(!isQuiz);
-    setQuizDeactivated(false);
-    setSubmitted(false);
-    setPageIndex(0);
-    setFormError("");
-    setFormLang(getDefaultFormLanguage(form, "en"));
-  }, [form?.id, isQuiz]);
+    return deferEffectStateUpdate(() => {
+      setQuizStarted(!isQuiz);
+      setQuizDeactivated(false);
+      setSubmitted(false);
+      setPageIndex(0);
+      setFormError("");
+      setFormLang(getDefaultFormLanguage(form, "en"));
+    });
+  }, [form, form?.id, isQuiz]);
 
   useEffect(() => {
     if (!isQuiz || !quizSettings.lockScreen || !quizStarted || submitted) return undefined;
@@ -203,7 +215,7 @@ export default function BuilderFormPreviewPage() {
     const helpText = getLocalizedValue(field, "helpText", formLang) || field.helpText;
     const placeholder = getLocalizedValue(field, "placeholder", formLang) || field.placeholder || "";
 
-    let input = null;
+    let input;
     if (field.type === "paragraph") {
       input = <textarea value={value} placeholder={placeholder} onChange={(event) => setAnswer(field.id, event.target.value)} />;
     } else if (field.type === "dropdown" || field.type === "status") {
@@ -338,7 +350,7 @@ export default function BuilderFormPreviewPage() {
           </section>
         ) : (
           <>
-            {(isPagedForm ? [currentSection] : sections).filter(Boolean).map((section, index) => (
+            {(isPagedForm ? [currentSection] : sections).filter(Boolean).map((section) => (
               <section className="builder-form-preview-section" key={section.id}>
                 {(getLocalizedValue(section, "title", formLang) || section.title) && section !== sections[0] && (
                   <h2>{getLocalizedValue(section, "title", formLang) || section.title}</h2>

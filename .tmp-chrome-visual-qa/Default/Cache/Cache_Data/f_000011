@@ -1,0 +1,249 @@
+export const myPlanContent = {
+	en: {
+		eyebrow: "Subscription",
+		title: "Manage your plan",
+		subtitle: "Review your current Madar plan, monitor usage, and see which modules are active in your workspace.",
+		manageBilling: "Manage billing",
+		upgradePlan: "Upgrade plan",
+		currentPlan: "Current plan",
+		perMonth: "/ month",
+		billingCycle: "Billing",
+		renewsOn: "Renews on",
+		users: "Users",
+		workspace: "Workspace",
+		recommendationLabel: "Recommended",
+		recommendationTitle: "Your workspace is growing",
+		recommendationText: "You are using the main operational tools. Upgrade when you need more submissions, team members, data analysis, or advanced workflows.",
+		recommendationPoints: [
+			"Higher website, form, and response limits",
+			"Advanced data analysis and reports",
+			"More role-based workflow controls",
+			"Priority support and custom domain options"
+		],
+		viewUpgrade: "View upgrade options",
+		usageLabel: "Usage",
+		usageTitle: "Current usage",
+		usageSubtitle: "Track the limits that matter most to your workspace. High usage means your platform is becoming business-critical.",
+		modulesLabel: "Modules",
+		modulesTitle: "Workspace modules",
+		modulesSubtitle: "Enabled modules are included in your plan. Locked modules can be unlocked through upgrade or custom plan.",
+		enabled: "Enabled",
+		locked: "Locked",
+		enabledModule: "Available module",
+		lockedModule: "Upgrade module",
+		modulePrice: "Module price",
+		openModule: "Open module",
+		unlockModule: "Unlock module",
+		plan: {
+			name: "Operations",
+			status: "Active",
+			price: "$29",
+			billingCycle: "Monthly",
+			renewsOn: "February 15, 2026",
+			users: "3 users",
+			workspace: "Main workspace",
+			description: "Operations is built for teams that publish pages, collect forms, manage requests, track submissions, and run daily customer workflows."
+		},
+		usage: [
+			{
+				label: "Published websites",
+				value: 2,
+				max: 3,
+				note: "Use websites for your main brand, services, and public portals."
+			},
+			{
+				label: "Active forms",
+				value: 14,
+				max: 25,
+				note: "Forms collect requests, bookings, reports, approvals, and orders."
+			},
+			{
+				label: "Monthly submissions",
+				value: 1840,
+				max: 5e3,
+				note: "Every submission can become a lead, request, order, or data point."
+			},
+			{
+				label: "Workspace users",
+				value: 2,
+				max: 3,
+				note: "Add team members when your workflow needs shared ownership."
+			}
+		],
+		modules: [
+			{
+				id: "website",
+				name: "Website Builder",
+				price: "Included",
+				enabled: true,
+				description: "Create and publish branded pages, service pages, contact pages, and public portals.",
+				value: "Keeps your business visible and lets customers access your forms and pages online."
+			},
+			{
+				id: "forms",
+				name: "Forms & Responses",
+				price: "Included",
+				enabled: true,
+				description: "Build forms, collect submissions, search responses, and manage status updates.",
+				value: "Turns visitors and customers into structured requests, bookings, approvals, and reports."
+			},
+			{
+				id: "requests",
+				name: "Requests Portal",
+				price: "Included",
+				enabled: true,
+				description: "Manage submissions as trackable requests with statuses and follow-up.",
+				value: "Helps your team organize customer and internal work instead of losing requests in messages."
+			},
+			{
+				id: "data",
+				name: "Data Analysis Workspace",
+				price: "$39 / month",
+				enabled: false,
+				description: "Upload data files, inspect datasets, clean data, and generate analysis reports.",
+				value: "Best when your team needs quality reports, missing-values checks, statistics, and visual analysis."
+			},
+			{
+				id: "reports",
+				name: "Reports Hub",
+				price: "$29 / month",
+				enabled: false,
+				description: "Create professional reports from responses, data, projects, operations, and KPIs.",
+				value: "Useful for sharing results with managers, clients, donors, or partners."
+			},
+			{
+				id: "workflows",
+				name: "Advanced Workflows",
+				price: "$49 / month",
+				enabled: false,
+				description: "Create internal workflows for approvals, HR, finance, MEAL projects, roles, and permissions.",
+				value: "Best for organizations with multi-step processes and role-based access."
+			}
+		]
+	},
+	ar: {
+		eyebrow: "الاشتراك",
+		title: "إدارة خطتك",
+		subtitle: "راجع خطة Madar الحالية، راقب الاستخدام، وتابع الوحدات المفعلة في مساحة العمل.",
+		manageBilling: "إدارة الفوترة",
+		upgradePlan: "ترقية الخطة",
+		currentPlan: "الخطة الحالية",
+		perMonth: "/ شهر",
+		billingCycle: "الفوترة",
+		renewsOn: "تتجدد في",
+		users: "المستخدمون",
+		workspace: "مساحة العمل",
+		recommendationLabel: "موصى به",
+		recommendationTitle: "مساحة العمل تنمو",
+		recommendationText: "أنت تستخدم أدوات التشغيل الأساسية. قم بالترقية عندما تحتاج إلى ردود أكثر، مستخدمين أكثر، تحليل بيانات، أو تدفقات عمل متقدمة.",
+		recommendationPoints: [
+			"حدود أعلى للمواقع والنماذج والردود",
+			"تحليل بيانات وتقارير متقدمة",
+			"تحكم أكبر بالصلاحيات وتدفقات العمل",
+			"دعم بأولوية وخيارات نطاق مخصص"
+		],
+		viewUpgrade: "عرض خيارات الترقية",
+		usageLabel: "الاستخدام",
+		usageTitle: "الاستخدام الحالي",
+		usageSubtitle: "تابع الحدود الأهم لمساحة العمل. الاستخدام العالي يعني أن المنصة أصبحت جزءاً أساسياً من التشغيل.",
+		modulesLabel: "الوحدات",
+		modulesTitle: "وحدات مساحة العمل",
+		modulesSubtitle: "الوحدات المفعلة مشمولة في خطتك. الوحدات المقفلة يمكن فتحها من خلال الترقية أو خطة مخصصة.",
+		enabled: "مفعلة",
+		locked: "مقفلة",
+		enabledModule: "وحدة متاحة",
+		lockedModule: "تحتاج ترقية",
+		modulePrice: "سعر الوحدة",
+		openModule: "فتح الوحدة",
+		unlockModule: "فتح بالترقية",
+		plan: {
+			name: "Operations",
+			status: "نشطة",
+			price: "$29",
+			billingCycle: "شهرية",
+			renewsOn: "15 فبراير 2026",
+			users: "3 مستخدمين",
+			workspace: "مساحة العمل الرئيسية",
+			description: "خطة Operations مصممة للفرق التي تنشر الصفحات، تجمع النماذج، تدير الطلبات، تتابع الردود، وتشغل سير عمل العملاء اليومي."
+		},
+		usage: [
+			{
+				label: "المواقع المنشورة",
+				value: 2,
+				max: 3,
+				note: "استخدم المواقع لعلامتك التجارية، خدماتك، والبوابات العامة."
+			},
+			{
+				label: "النماذج النشطة",
+				value: 14,
+				max: 25,
+				note: "النماذج تجمع الطلبات، الحجوزات، التقارير، الموافقات، والأوامر."
+			},
+			{
+				label: "الردود الشهرية",
+				value: 1840,
+				max: 5e3,
+				note: "كل رد يمكن أن يصبح عميلاً محتملاً، طلباً، أمراً، أو نقطة بيانات."
+			},
+			{
+				label: "مستخدمو مساحة العمل",
+				value: 2,
+				max: 3,
+				note: "أضف أعضاء الفريق عندما يحتاج سير العمل إلى مشاركة المسؤولية."
+			}
+		],
+		modules: [
+			{
+				id: "website",
+				name: "منشئ المواقع",
+				price: "مشمول",
+				enabled: true,
+				description: "أنشئ وانشر صفحات بعلامتك التجارية، صفحات خدمات، صفحات تواصل، وبوابات عامة.",
+				value: "يحافظ على حضور عملك ويسمح للعملاء بالوصول إلى النماذج والصفحات عبر الإنترنت."
+			},
+			{
+				id: "forms",
+				name: "النماذج والردود",
+				price: "مشمول",
+				enabled: true,
+				description: "ابنِ النماذج، اجمع الردود، ابحث في الردود، وأدر تحديثات الحالة.",
+				value: "يحول الزوار والعملاء إلى طلبات، حجوزات، موافقات، وتقارير منظمة."
+			},
+			{
+				id: "requests",
+				name: "بوابة الطلبات",
+				price: "مشمول",
+				enabled: true,
+				description: "أدر الردود كطلبات قابلة للمتابعة مع الحالات والمتابعة.",
+				value: "يساعد فريقك على تنظيم طلبات العملاء والطلبات الداخلية بدلاً من فقدانها في الرسائل."
+			},
+			{
+				id: "data",
+				name: "مساحة تحليل البيانات",
+				price: "$39 / شهر",
+				enabled: false,
+				description: "ارفع ملفات البيانات، افحص البيانات، نظف البيانات، وأنشئ تقارير تحليل.",
+				value: "مناسب عندما يحتاج الفريق إلى تقارير جودة، فحص القيم الناقصة، الإحصاءات، والتحليل البصري."
+			},
+			{
+				id: "reports",
+				name: "مركز التقارير",
+				price: "$29 / شهر",
+				enabled: false,
+				description: "أنشئ تقارير احترافية من الردود، البيانات، المشاريع، التشغيل، والمؤشرات.",
+				value: "مفيد لمشاركة النتائج مع الإدارة، العملاء، الممولين، أو الشركاء."
+			},
+			{
+				id: "workflows",
+				name: "تدفقات العمل المتقدمة",
+				price: "$49 / شهر",
+				enabled: false,
+				description: "أنشئ تدفقات عمل داخلية للموافقات، الموارد البشرية، المالية، مشاريع MEAL، الأدوار، والصلاحيات.",
+				value: "مناسب للمؤسسات التي لديها عمليات متعددة الخطوات وصلاحيات حسب الدور."
+			}
+		]
+	}
+};
+export const getMyPlanContent = (lang = "en") => myPlanContent[lang === "ar" ? "ar" : "en"];
+
+//# sourceMappingURL=data:application/json;base64,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QU07SUFDTixPQUFPO0lBQ1AsU0FBUztJQUNULGFBQ0U7SUFDRixPQUNFO0lBQ0g7R0FDRDtJQUNFLElBQUk7SUFDSixNQUFNO0lBQ04sT0FBTztJQUNQLFNBQVM7SUFDVCxhQUNFO0lBQ0YsT0FDRTtJQUNIO0dBQ0Q7SUFDRSxJQUFJO0lBQ0osTUFBTTtJQUNOLE9BQU87SUFDUCxTQUFTO0lBQ1QsYUFDRTtJQUNGLE9BQ0U7SUFDSDtHQUNEO0lBQ0UsSUFBSTtJQUNKLE1BQU07SUFDTixPQUFPO0lBQ1AsU0FBUztJQUNULGFBQ0U7SUFDRixPQUNFO0lBQ0g7R0FDRDtJQUNFLElBQUk7SUFDSixNQUFNO0lBQ04sT0FBTztJQUNQLFNBQVM7SUFDVCxhQUNFO0lBQ0YsT0FDRTtJQUNIO0dBQ0Q7SUFDRSxJQUFJO0lBQ0osTUFBTTtJQUNOLE9BQU87SUFDUCxTQUFTO0lBQ1QsYUFDRTtJQUNGLE9BQ0U7SUFDSDtHQUNGO0VBQ0Y7Q0FDRjtBQUVELE9BQU8sTUFBTSxvQkFBb0IsT0FBTyxTQUN0QyxjQUFjLFNBQVMsT0FBTyxPQUFPIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIm15UGxhbkNvbnRlbnQuanMiXSwidmVyc2lvbiI6Mywic291cmNlc0NvbnRlbnQiOlsiZXhwb3J0IGNvbnN0IG15UGxhbkNvbnRlbnQgPSB7XG4gIGVuOiB7XG4gICAgZXllYnJvdzogXCJTdWJzY3JpcHRpb25cIixcbiAgICB0aXRsZTogXCJNYW5hZ2UgeW91ciBwbGFuXCIsXG4gICAgc3VidGl0bGU6XG4gICAgICBcIlJldmlldyB5b3VyIGN1cnJlbnQgTWFkYXIgcGxhbiwgbW9uaXRvciB1c2FnZSwgYW5kIHNlZSB3aGljaCBtb2R1bGVzIGFyZSBhY3RpdmUgaW4geW91ciB3b3Jrc3BhY2UuXCIsXG4gICAgbWFuYWdlQmlsbGluZzogXCJNYW5hZ2UgYmlsbGluZ1wiLFxuICAgIHVwZ3JhZGVQbGFuOiBcIlVwZ3JhZGUgcGxhblwiLFxuICAgIGN1cnJlbnRQbGFuOiBcIkN1cnJlbnQgcGxhblwiLFxuICAgIHBlck1vbnRoOiBcIi8gbW9udGhcIixcbiAgICBiaWxsaW5nQ3ljbGU6IFwiQmlsbGluZ1wiLFxuICAgIHJlbmV3c09uOiBcIlJlbmV3cyBvblwiLFxuICAgIHVzZXJzOiBcIlVzZXJzXCIsXG4gICAgd29ya3NwYWNlOiBcIldvcmtzcGFjZVwiLFxuICAgIHJlY29tbWVuZGF0aW9uTGFiZWw6IFwiUmVjb21tZW5kZWRcIixcbiAgICByZWNvbW1lbmRhdGlvblRpdGxlOiBcIllvdXIgd29ya3NwYWNlIGlzIGdyb3dpbmdcIixcbiAgICByZWNvbW1lbmRhdGlvblRleHQ6XG4gICAgICBcIllvdSBhcmUgdXNpbmcgdGhlIG1haW4gb3BlcmF0aW9uYWwgdG9vbHMuIFVwZ3JhZGUgd2hlbiB5b3UgbmVlZCBtb3JlIHN1Ym1pc3Npb25zLCB0ZWFtIG1lbWJlcnMsIGRhdGEgYW5hbHlzaXMsIG9yIGFkdmFuY2VkIHdvcmtmbG93cy5cIixcbiAgICByZWNvbW1lbmRhdGlvblBvaW50czogW1xuICAgICAgXCJIaWdoZXIgd2Vic2l0ZSwgZm9ybSwgYW5kIHJlc3BvbnNlIGxpbWl0c1wiLFxuICAgICAgXCJBZHZhbmNlZCBkYXRhIGFuYWx5c2lzIGFuZCByZXBvcnRzXCIsXG4gICAgICBcIk1vcmUgcm9sZS1iYXNlZCB3b3JrZmxvdyBjb250cm9sc1wiLFxuICAgICAgXCJQcmlvcml0eSBzdXBwb3J0IGFuZCBjdXN0b20gZG9tYWluIG9wdGlvbnNcIixcbiAgICBdLFxuICAgIHZpZXdVcGdyYWRlOiBcIlZpZXcgdXBncmFkZSBvcHRpb25zXCIsXG4gICAgdXNhZ2VMYWJlbDogXCJVc2FnZVwiLFxuICAgIHVzYWdlVGl0bGU6IFwiQ3VycmVudCB1c2FnZVwiLFxuICAgIHVzYWdlU3VidGl0bGU6XG4gICAgICBcIlRyYWNrIHRoZSBsaW1pdHMgdGhhdCBtYXR0ZXIgbW9zdCB0byB5b3VyIHdvcmtzcGFjZS4gSGlnaCB1c2FnZSBtZWFucyB5b3VyIHBsYXRmb3JtIGlzIGJlY29taW5nIGJ1c2luZXNzLWNyaXRpY2FsLlwiLFxuICAgIG1vZHVsZXNMYWJlbDogXCJNb2R1bGVzXCIsXG4gICAgbW9kdWxlc1RpdGxlOiBcIldvcmtzcGFjZSBtb2R1bGVzXCIsXG4gICAgbW9kdWxlc1N1YnRpdGxlOlxuICAgICAgXCJFbmFibGVkIG1vZHVsZXMgYXJlIGluY2x1ZGVkIGluIHlvdXIgcGxhbi4gTG9ja2VkIG1vZHVsZXMgY2FuIGJlIHVubG9ja2VkIHRocm91Z2ggdXBncmFkZSBvciBjdXN0b20gcGxhbi5cIixcbiAgICBlbmFibGVkOiBcIkVuYWJsZWRcIixcbiAgICBsb2NrZWQ6IFwiTG9ja2VkXCIsXG4gICAgZW5hYmxlZE1vZHVsZTogXCJBdmFpbGFibGUgbW9kdWxlXCIsXG4gICAgbG9ja2VkTW9kdWxlOiBcIlVwZ3JhZGUgbW9kdWxlXCIsXG4gICAgbW9kdWxlUHJpY2U6IFwiTW9kdWxlIHByaWNlXCIsXG4gICAgb3Blbk1vZHVsZTogXCJPcGVuIG1vZHVsZVwiLFxuICAgIHVubG9ja01vZHVsZTogXCJVbmxvY2sgbW9kdWxlXCIsXG4gICAgcGxhbjoge1xuICAgICAgbmFtZTogXCJPcGVyYXRpb25zXCIsXG4gICAgICBzdGF0dXM6IFwiQWN0aXZlXCIsXG4gICAgICBwcmljZTogXCIkMjlcIixcbiAgICAgIGJpbGxpbmdDeWNsZTogXCJNb250aGx5XCIsXG4gICAgICByZW5ld3NPbjogXCJGZWJydWFyeSAxNSwgMjAyNlwiLFxuICAgICAgdXNlcnM6IFwiMyB1c2Vyc1wiLFxuICAgICAgd29ya3NwYWNlOiBcIk1haW4gd29ya3NwYWNlXCIsXG4gICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgXCJPcGVyYXRpb25zIGlzIGJ1aWx0IGZvciB0ZWFtcyB0aGF0IHB1Ymxpc2ggcGFnZXMsIGNvbGxlY3QgZm9ybXMsIG1hbmFnZSByZXF1ZXN0cywgdHJhY2sgc3VibWlzc2lvbnMsIGFuZCBydW4gZGFpbHkgY3VzdG9tZXIgd29ya2Zsb3dzLlwiLFxuICAgIH0sXG4gICAgdXNhZ2U6IFtcbiAgICAgIHtcbiAgICAgICAgbGFiZWw6IFwiUHVibGlzaGVkIHdlYnNpdGVzXCIsXG4gICAgICAgIHZhbHVlOiAyLFxuICAgICAgICBtYXg6IDMsXG4gICAgICAgIG5vdGU6IFwiVXNlIHdlYnNpdGVzIGZvciB5b3VyIG1haW4gYnJhbmQsIHNlcnZpY2VzLCBhbmQgcHVibGljIHBvcnRhbHMuXCIsXG4gICAgICB9LFxuICAgICAge1xuICAgICAgICBsYWJlbDogXCJBY3RpdmUgZm9ybXNcIixcbiAgICAgICAgdmFsdWU6IDE0LFxuICAgICAgICBtYXg6IDI1LFxuICAgICAgICBub3RlOiBcIkZvcm1zIGNvbGxlY3QgcmVxdWVzdHMsIGJvb2tpbmdzLCByZXBvcnRzLCBhcHByb3ZhbHMsIGFuZCBvcmRlcnMuXCIsXG4gICAgICB9LFxuICAgICAge1xuICAgICAgICBsYWJlbDogXCJNb250aGx5IHN1Ym1pc3Npb25zXCIsXG4gICAgICAgIHZhbHVlOiAxODQwLFxuICAgICAgICBtYXg6IDUwMDAsXG4gICAgICAgIG5vdGU6IFwiRXZlcnkgc3VibWlzc2lvbiBjYW4gYmVjb21lIGEgbGVhZCwgcmVxdWVzdCwgb3JkZXIsIG9yIGRhdGEgcG9pbnQuXCIsXG4gICAgICB9LFxuICAgICAge1xuICAgICAgICBsYWJlbDogXCJXb3Jrc3BhY2UgdXNlcnNcIixcbiAgICAgICAgdmFsdWU6IDIsXG4gICAgICAgIG1heDogMyxcbiAgICAgICAgbm90ZTogXCJBZGQgdGVhbSBtZW1iZXJzIHdoZW4geW91ciB3b3JrZmxvdyBuZWVkcyBzaGFyZWQgb3duZXJzaGlwLlwiLFxuICAgICAgfSxcbiAgICBdLFxuICAgIG1vZHVsZXM6IFtcbiAgICAgIHtcbiAgICAgICAgaWQ6IFwid2Vic2l0ZVwiLFxuICAgICAgICBuYW1lOiBcIldlYnNpdGUgQnVpbGRlclwiLFxuICAgICAgICBwcmljZTogXCJJbmNsdWRlZFwiLFxuICAgICAgICBlbmFibGVkOiB0cnVlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcIkNyZWF0ZSBhbmQgcHVibGlzaCBicmFuZGVkIHBhZ2VzLCBzZXJ2aWNlIHBhZ2VzLCBjb250YWN0IHBhZ2VzLCBhbmQgcHVibGljIHBvcnRhbHMuXCIsXG4gICAgICAgIHZhbHVlOlxuICAgICAgICAgIFwiS2VlcHMgeW91ciBidXNpbmVzcyB2aXNpYmxlIGFuZCBsZXRzIGN1c3RvbWVycyBhY2Nlc3MgeW91ciBmb3JtcyBhbmQgcGFnZXMgb25saW5lLlwiLFxuICAgICAgfSxcbiAgICAgIHtcbiAgICAgICAgaWQ6IFwiZm9ybXNcIixcbiAgICAgICAgbmFtZTogXCJGb3JtcyAmIFJlc3BvbnNlc1wiLFxuICAgICAgICBwcmljZTogXCJJbmNsdWRlZFwiLFxuICAgICAgICBlbmFibGVkOiB0cnVlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcIkJ1aWxkIGZvcm1zLCBjb2xsZWN0IHN1Ym1pc3Npb25zLCBzZWFyY2ggcmVzcG9uc2VzLCBhbmQgbWFuYWdlIHN0YXR1cyB1cGRhdGVzLlwiLFxuICAgICAgICB2YWx1ZTpcbiAgICAgICAgICBcIlR1cm5zIHZpc2l0b3JzIGFuZCBjdXN0b21lcnMgaW50byBzdHJ1Y3R1cmVkIHJlcXVlc3RzLCBib29raW5ncywgYXBwcm92YWxzLCBhbmQgcmVwb3J0cy5cIixcbiAgICAgIH0sXG4gICAgICB7XG4gICAgICAgIGlkOiBcInJlcXVlc3RzXCIsXG4gICAgICAgIG5hbWU6IFwiUmVxdWVzdHMgUG9ydGFsXCIsXG4gICAgICAgIHByaWNlOiBcIkluY2x1ZGVkXCIsXG4gICAgICAgIGVuYWJsZWQ6IHRydWUsXG4gICAgICAgIGRlc2NyaXB0aW9uOlxuICAgICAgICAgIFwiTWFuYWdlIHN1Ym1pc3Npb25zIGFzIHRyYWNrYWJsZSByZXF1ZXN0cyB3aXRoIHN0YXR1c2VzIGFuZCBmb2xsb3ctdXAuXCIsXG4gICAgICAgIHZhbHVlOlxuICAgICAgICAgIFwiSGVscHMgeW91ciB0ZWFtIG9yZ2FuaXplIGN1c3RvbWVyIGFuZCBpbnRlcm5hbCB3b3JrIGluc3RlYWQgb2YgbG9zaW5nIHJlcXVlc3RzIGluIG1lc3NhZ2VzLlwiLFxuICAgICAgfSxcbiAgICAgIHtcbiAgICAgICAgaWQ6IFwiZGF0YVwiLFxuICAgICAgICBuYW1lOiBcIkRhdGEgQW5hbHlzaXMgV29ya3NwYWNlXCIsXG4gICAgICAgIHByaWNlOiBcIiQzOSAvIG1vbnRoXCIsXG4gICAgICAgIGVuYWJsZWQ6IGZhbHNlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcIlVwbG9hZCBkYXRhIGZpbGVzLCBpbnNwZWN0IGRhdGFzZXRzLCBjbGVhbiBkYXRhLCBhbmQgZ2VuZXJhdGUgYW5hbHlzaXMgcmVwb3J0cy5cIixcbiAgICAgICAgdmFsdWU6XG4gICAgICAgICAgXCJCZXN0IHdoZW4geW91ciB0ZWFtIG5lZWRzIHF1YWxpdHkgcmVwb3J0cywgbWlzc2luZy12YWx1ZXMgY2hlY2tzLCBzdGF0aXN0aWNzLCBhbmQgdmlzdWFsIGFuYWx5c2lzLlwiLFxuICAgICAgfSxcbiAgICAgIHtcbiAgICAgICAgaWQ6IFwicmVwb3J0c1wiLFxuICAgICAgICBuYW1lOiBcIlJlcG9ydHMgSHViXCIsXG4gICAgICAgIHByaWNlOiBcIiQyOSAvIG1vbnRoXCIsXG4gICAgICAgIGVuYWJsZWQ6IGZhbHNlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcIkNyZWF0ZSBwcm9mZXNzaW9uYWwgcmVwb3J0cyBmcm9tIHJlc3BvbnNlcywgZGF0YSwgcHJvamVjdHMsIG9wZXJhdGlvbnMsIGFuZCBLUElzLlwiLFxuICAgICAgICB2YWx1ZTpcbiAgICAgICAgICBcIlVzZWZ1bCBmb3Igc2hhcmluZyByZXN1bHRzIHdpdGggbWFuYWdlcnMsIGNsaWVudHMsIGRvbm9ycywgb3IgcGFydG5lcnMuXCIsXG4gICAgICB9LFxuICAgICAge1xuICAgICAgICBpZDogXCJ3b3JrZmxvd3NcIixcbiAgICAgICAgbmFtZTogXCJBZHZhbmNlZCBXb3JrZmxvd3NcIixcbiAgICAgICAgcHJpY2U6IFwiJDQ5IC8gbW9udGhcIixcbiAgICAgICAgZW5hYmxlZDogZmFsc2UsXG4gICAgICAgIGRlc2NyaXB0aW9uOlxuICAgICAgICAgIFwiQ3JlYXRlIGludGVybmFsIHdvcmtmbG93cyBmb3IgYXBwcm92YWxzLCBIUiwgZmluYW5jZSwgTUVBTCBwcm9qZWN0cywgcm9sZXMsIGFuZCBwZXJtaXNzaW9ucy5cIixcbiAgICAgICAgdmFsdWU6XG4gICAgICAgICAgXCJCZXN0IGZvciBvcmdhbml6YXRpb25zIHdpdGggbXVsdGktc3RlcCBwcm9jZXNzZXMgYW5kIHJvbGUtYmFzZWQgYWNjZXNzLlwiLFxuICAgICAgfSxcbiAgICBdLFxuICB9LFxuXG4gIGFyOiB7XG4gICAgZXllYnJvdzogXCLYp9mE2KfYtNiq2LHYp9mDXCIsXG4gICAgdGl0bGU6IFwi2KXYr9in2LHYqSDYrti32KrZg1wiLFxuICAgIHN1YnRpdGxlOlxuICAgICAgXCLYsdin2KzYuSDYrti32KkgTWFkYXIg2KfZhNit2KfZhNmK2KnYjCDYsdin2YLYqCDYp9mE2KfYs9iq2K7Yr9in2YXYjCDZiNiq2KfYqNi5INin2YTZiNit2K/Yp9iqINin2YTZhdmB2LnZhNipINmB2Yog2YXYs9in2K3YqSDYp9mE2LnZhdmELlwiLFxuICAgIG1hbmFnZUJpbGxpbmc6IFwi2KXYr9in2LHYqSDYp9mE2YHZiNiq2LHYqVwiLFxuICAgIHVwZ3JhZGVQbGFuOiBcItiq2LHZgtmK2Kkg2KfZhNiu2LfYqVwiLFxuICAgIGN1cnJlbnRQbGFuOiBcItin2YTYrti32Kkg2KfZhNit2KfZhNmK2KlcIixcbiAgICBwZXJNb250aDogXCIvINi02YfYsVwiLFxuICAgIGJpbGxpbmdDeWNsZTogXCLYp9mE2YHZiNiq2LHYqVwiLFxuICAgIHJlbmV3c09uOiBcItiq2KrYrNiv2K8g2YHZilwiLFxuICAgIHVzZXJzOiBcItin2YTZhdiz2KrYrtiv2YXZiNmGXCIsXG4gICAgd29ya3NwYWNlOiBcItmF2LPYp9it2Kkg2KfZhNi52YXZhFwiLFxuICAgIHJlY29tbWVuZGF0aW9uTGFiZWw6IFwi2YXZiNi12Ykg2KjZh1wiLFxuICAgIHJlY29tbWVuZGF0aW9uVGl0bGU6IFwi2YXYs9in2K3YqSDYp9mE2LnZhdmEINiq2YbZhdmIXCIsXG4gICAgcmVjb21tZW5kYXRpb25UZXh0OlxuICAgICAgXCLYo9mG2Kog2KrYs9iq2K7Yr9mFINij2K/ZiNin2Kog2KfZhNiq2LTYutmK2YQg2KfZhNij2LPYp9iz2YrYqS4g2YLZhSDYqNin2YTYqtix2YLZitipINi52YbYr9mF2Kcg2KrYrdiq2KfYrCDYpdmE2Ykg2LHYr9mI2K8g2KPZg9ir2LHYjCDZhdiz2KrYrtiv2YXZitmGINij2YPYq9ix2Iwg2KrYrdmE2YrZhCDYqNmK2KfZhtin2KrYjCDYo9mIINiq2K/ZgdmC2KfYqiDYudmF2YQg2YXYqtmC2K/ZhdipLlwiLFxuICAgIHJlY29tbWVuZGF0aW9uUG9pbnRzOiBbXG4gICAgICBcItit2K/ZiNivINij2LnZhNmJINmE2YTZhdmI2KfZgti5INmI2KfZhNmG2YXYp9iw2Kwg2YjYp9mE2LHYr9mI2K9cIixcbiAgICAgIFwi2KrYrdmE2YrZhCDYqNmK2KfZhtin2Kog2YjYqtmC2KfYsdmK2LEg2YXYqtmC2K/ZhdipXCIsXG4gICAgICBcItiq2K3Zg9mFINij2YPYqNixINio2KfZhNi12YTYp9it2YrYp9iqINmI2KrYr9mB2YLYp9iqINin2YTYudmF2YRcIixcbiAgICAgIFwi2K/YudmFINio2KPZiNmE2YjZitipINmI2K7Zitin2LHYp9iqINmG2LfYp9mCINmF2K7Ytdi1XCIsXG4gICAgXSxcbiAgICB2aWV3VXBncmFkZTogXCLYudix2LYg2K7Zitin2LHYp9iqINin2YTYqtix2YLZitipXCIsXG4gICAgdXNhZ2VMYWJlbDogXCLYp9mE2KfYs9iq2K7Yr9in2YVcIixcbiAgICB1c2FnZVRpdGxlOiBcItin2YTYp9iz2KrYrtiv2KfZhSDYp9mE2K3Yp9mE2YpcIixcbiAgICB1c2FnZVN1YnRpdGxlOlxuICAgICAgXCLYqtin2KjYuSDYp9mE2K3Yr9mI2K8g2KfZhNij2YfZhSDZhNmF2LPYp9it2Kkg2KfZhNi52YXZhC4g2KfZhNin2LPYqtiu2K/Yp9mFINin2YTYudin2YTZiiDZiti52YbZiiDYo9mGINin2YTZhdmG2LXYqSDYo9i12KjYrdiqINis2LLYodin2Ysg2KPYs9in2LPZitin2Ysg2YXZhiDYp9mE2KrYtNi62YrZhC5cIixcbiAgICBtb2R1bGVzTGFiZWw6IFwi2KfZhNmI2K3Yr9in2KpcIixcbiAgICBtb2R1bGVzVGl0bGU6IFwi2YjYrdiv2KfYqiDZhdiz2KfYrdipINin2YTYudmF2YRcIixcbiAgICBtb2R1bGVzU3VidGl0bGU6XG4gICAgICBcItin2YTZiNit2K/Yp9iqINin2YTZhdmB2LnZhNipINmF2LTZhdmI2YTYqSDZgdmKINiu2LfYqtmDLiDYp9mE2YjYrdiv2KfYqiDYp9mE2YXZgtmB2YTYqSDZitmF2YPZhiDZgdiq2K3Zh9inINmF2YYg2K7ZhNin2YQg2KfZhNiq2LHZgtmK2Kkg2KPZiCDYrti32Kkg2YXYrti12LXYqS5cIixcbiAgICBlbmFibGVkOiBcItmF2YHYudmE2KlcIixcbiAgICBsb2NrZWQ6IFwi2YXZgtmB2YTYqVwiLFxuICAgIGVuYWJsZWRNb2R1bGU6IFwi2YjYrdiv2Kkg2YXYqtin2K3YqVwiLFxuICAgIGxvY2tlZE1vZHVsZTogXCLYqtit2KrYp9isINiq2LHZgtmK2KlcIixcbiAgICBtb2R1bGVQcmljZTogXCLYs9i52LEg2KfZhNmI2K3Yr9ipXCIsXG4gICAgb3Blbk1vZHVsZTogXCLZgdiq2K0g2KfZhNmI2K3Yr9ipXCIsXG4gICAgdW5sb2NrTW9kdWxlOiBcItmB2KrYrSDYqNin2YTYqtix2YLZitipXCIsXG4gICAgcGxhbjoge1xuICAgICAgbmFtZTogXCJPcGVyYXRpb25zXCIsXG4gICAgICBzdGF0dXM6IFwi2YbYtNi32KlcIixcbiAgICAgIHByaWNlOiBcIiQyOVwiLFxuICAgICAgYmlsbGluZ0N5Y2xlOiBcIti02YfYsdmK2KlcIixcbiAgICAgIHJlbmV3c09uOiBcIjE1INmB2KjYsdin2YrYsSAyMDI2XCIsXG4gICAgICB1c2VyczogXCIzINmF2LPYqtiu2K/ZhdmK2YZcIixcbiAgICAgIHdvcmtzcGFjZTogXCLZhdiz2KfYrdipINin2YTYudmF2YQg2KfZhNix2KbZitiz2YrYqVwiLFxuICAgICAgZGVzY3JpcHRpb246XG4gICAgICAgIFwi2K7Yt9ipIE9wZXJhdGlvbnMg2YXYtdmF2YXYqSDZhNmE2YHYsdmCINin2YTYqtmKINiq2YbYtNixINin2YTYtdmB2K3Yp9iq2Iwg2KrYrNmF2Lkg2KfZhNmG2YXYp9iw2KzYjCDYqtiv2YrYsSDYp9mE2LfZhNio2KfYqtiMINiq2KrYp9io2Lkg2KfZhNix2K/ZiNiv2Iwg2YjYqti02LrZhCDYs9mK2LEg2LnZhdmEINin2YTYudmF2YTYp9ihINin2YTZitmI2YXZii5cIixcbiAgICB9LFxuICAgIHVzYWdlOiBbXG4gICAgICB7XG4gICAgICAgIGxhYmVsOiBcItin2YTZhdmI2KfZgti5INin2YTZhdmG2LTZiNix2KlcIixcbiAgICAgICAgdmFsdWU6IDIsXG4gICAgICAgIG1heDogMyxcbiAgICAgICAgbm90ZTogXCLYp9iz2KrYrtiv2YUg2KfZhNmF2YjYp9mC2Lkg2YTYudmE2KfZhdiq2YMg2KfZhNiq2KzYp9ix2YrYqdiMINiu2K/Zhdin2KrZg9iMINmI2KfZhNio2YjYp9io2KfYqiDYp9mE2LnYp9mF2KkuXCIsXG4gICAgICB9LFxuICAgICAge1xuICAgICAgICBsYWJlbDogXCLYp9mE2YbZhdin2LDYrCDYp9mE2YbYtNi32KlcIixcbiAgICAgICAgdmFsdWU6IDE0LFxuICAgICAgICBtYXg6IDI1LFxuICAgICAgICBub3RlOiBcItin2YTZhtmF2KfYsNisINiq2KzZhdi5INin2YTYt9mE2KjYp9iq2Iwg2KfZhNit2KzZiNiy2KfYqtiMINin2YTYqtmC2KfYsdmK2LHYjCDYp9mE2YXZiNin2YHZgtin2KrYjCDZiNin2YTYo9mI2KfZhdixLlwiLFxuICAgICAgfSxcbiAgICAgIHtcbiAgICAgICAgbGFiZWw6IFwi2KfZhNix2K/ZiNivINin2YTYtNmH2LHZitipXCIsXG4gICAgICAgIHZhbHVlOiAxODQwLFxuICAgICAgICBtYXg6IDUwMDAsXG4gICAgICAgIG5vdGU6IFwi2YPZhCDYsdivINmK2YXZg9mGINij2YYg2YrYtdio2K0g2LnZhdmK2YTYp9mLINmF2K3YqtmF2YTYp9mL2Iwg2LfZhNio2KfZi9iMINij2YXYsdin2YvYjCDYo9mIINmG2YLYt9ipINio2YrYp9mG2KfYqi5cIixcbiAgICAgIH0sXG4gICAgICB7XG4gICAgICAgIGxhYmVsOiBcItmF2LPYqtiu2K/ZhdmIINmF2LPYp9it2Kkg2KfZhNi52YXZhFwiLFxuICAgICAgICB2YWx1ZTogMixcbiAgICAgICAgbWF4OiAzLFxuICAgICAgICBub3RlOiBcItij2LbZgSDYo9i52LbYp9ihINin2YTZgdix2YrZgiDYudmG2K/ZhdinINmK2K3Yqtin2Kwg2LPZitixINin2YTYudmF2YQg2KXZhNmJINmF2LTYp9ix2YPYqSDYp9mE2YXYs9ik2YjZhNmK2KkuXCIsXG4gICAgICB9LFxuICAgIF0sXG4gICAgbW9kdWxlczogW1xuICAgICAge1xuICAgICAgICBpZDogXCJ3ZWJzaXRlXCIsXG4gICAgICAgIG5hbWU6IFwi2YXZhti02KYg2KfZhNmF2YjYp9mC2LlcIixcbiAgICAgICAgcHJpY2U6IFwi2YXYtNmF2YjZhFwiLFxuICAgICAgICBlbmFibGVkOiB0cnVlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcItij2YbYtNimINmI2KfZhti02LEg2LXZgdit2KfYqiDYqNi52YTYp9mF2KrZgyDYp9mE2KrYrNin2LHZitip2Iwg2LXZgdit2KfYqiDYrtiv2YXYp9iq2Iwg2LXZgdit2KfYqiDYqtmI2KfYtdmE2Iwg2YjYqNmI2KfYqNin2Kog2LnYp9mF2KkuXCIsXG4gICAgICAgIHZhbHVlOlxuICAgICAgICAgIFwi2YrYrdin2YHYuCDYudmE2Ykg2K3YttmI2LEg2LnZhdmE2YMg2YjZitiz2YXYrSDZhNmE2LnZhdmE2KfYoSDYqNin2YTZiNi12YjZhCDYpdmE2Ykg2KfZhNmG2YXYp9iw2Kwg2YjYp9mE2LXZgdit2KfYqiDYudio2LEg2KfZhNil2YbYqtix2YbYqi5cIixcbiAgICAgIH0sXG4gICAgICB7XG4gICAgICAgIGlkOiBcImZvcm1zXCIsXG4gICAgICAgIG5hbWU6IFwi2KfZhNmG2YXYp9iw2Kwg2YjYp9mE2LHYr9mI2K9cIixcbiAgICAgICAgcHJpY2U6IFwi2YXYtNmF2YjZhFwiLFxuICAgICAgICBlbmFibGVkOiB0cnVlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcItin2KjZhtmQINin2YTZhtmF2KfYsNis2Iwg2KfYrNmF2Lkg2KfZhNix2K/ZiNiv2Iwg2KfYqNit2Ksg2YHZiiDYp9mE2LHYr9mI2K/YjCDZiNij2K/YsSDYqtit2K/Zitir2KfYqiDYp9mE2K3Yp9mE2KkuXCIsXG4gICAgICAgIHZhbHVlOlxuICAgICAgICAgIFwi2YrYrdmI2YQg2KfZhNiy2YjYp9ixINmI2KfZhNi52YXZhNin2KEg2KXZhNmJINi32YTYqNin2KrYjCDYrdis2YjYstin2KrYjCDZhdmI2KfZgdmC2KfYqtiMINmI2KrZgtin2LHZitixINmF2YbYuNmF2KkuXCIsXG4gICAgICB9LFxuICAgICAge1xuICAgICAgICBpZDogXCJyZXF1ZXN0c1wiLFxuICAgICAgICBuYW1lOiBcItio2YjYp9io2Kkg2KfZhNi32YTYqNin2KpcIixcbiAgICAgICAgcHJpY2U6IFwi2YXYtNmF2YjZhFwiLFxuICAgICAgICBlbmFibGVkOiB0cnVlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcItij2K/YsSDYp9mE2LHYr9mI2K8g2YPYt9mE2KjYp9iqINmC2KfYqNmE2Kkg2YTZhNmF2KrYp9io2LnYqSDZhdi5INin2YTYrdin2YTYp9iqINmI2KfZhNmF2KrYp9io2LnYqS5cIixcbiAgICAgICAgdmFsdWU6XG4gICAgICAgICAgXCLZitiz2KfYudivINmB2LHZitmC2YMg2LnZhNmJINiq2YbYuNmK2YUg2LfZhNio2KfYqiDYp9mE2LnZhdmE2KfYoSDZiNin2YTYt9mE2KjYp9iqINin2YTYr9in2K7ZhNmK2Kkg2KjYr9mE2KfZiyDZhdmGINmB2YLYr9in2YbZh9inINmB2Yog2KfZhNix2LPYp9im2YQuXCIsXG4gICAgICB9LFxuICAgICAge1xuICAgICAgICBpZDogXCJkYXRhXCIsXG4gICAgICAgIG5hbWU6IFwi2YXYs9in2K3YqSDYqtit2YTZitmEINin2YTYqNmK2KfZhtin2KpcIixcbiAgICAgICAgcHJpY2U6IFwiJDM5IC8g2LTZh9ixXCIsXG4gICAgICAgIGVuYWJsZWQ6IGZhbHNlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcItin2LHZgdi5INmF2YTZgdin2Kog2KfZhNio2YrYp9mG2KfYqtiMINin2YHYrdi1INin2YTYqNmK2KfZhtin2KrYjCDZhti42YEg2KfZhNio2YrYp9mG2KfYqtiMINmI2KPZhti02KYg2KrZgtin2LHZitixINiq2K3ZhNmK2YQuXCIsXG4gICAgICAgIHZhbHVlOlxuICAgICAgICAgIFwi2YXZhtin2LPYqCDYudmG2K/ZhdinINmK2K3Yqtin2Kwg2KfZhNmB2LHZitmCINil2YTZiSDYqtmC2KfYsdmK2LEg2KzZiNiv2KnYjCDZgdit2LUg2KfZhNmC2YrZhSDYp9mE2YbYp9mC2LXYqdiMINin2YTYpdit2LXYp9ih2KfYqtiMINmI2KfZhNiq2K3ZhNmK2YQg2KfZhNio2LXYsdmKLlwiLFxuICAgICAgfSxcbiAgICAgIHtcbiAgICAgICAgaWQ6IFwicmVwb3J0c1wiLFxuICAgICAgICBuYW1lOiBcItmF2LHZg9iyINin2YTYqtmC2KfYsdmK2LFcIixcbiAgICAgICAgcHJpY2U6IFwiJDI5IC8g2LTZh9ixXCIsXG4gICAgICAgIGVuYWJsZWQ6IGZhbHNlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcItij2YbYtNimINiq2YLYp9ix2YrYsSDYp9it2KrYsdin2YHZitipINmF2YYg2KfZhNix2K/ZiNiv2Iwg2KfZhNio2YrYp9mG2KfYqtiMINin2YTZhdi02KfYsdmK2LnYjCDYp9mE2KrYtNi62YrZhNiMINmI2KfZhNmF2KTYtNix2KfYqi5cIixcbiAgICAgICAgdmFsdWU6XG4gICAgICAgICAgXCLZhdmB2YrYryDZhNmF2LTYp9ix2YPYqSDYp9mE2YbYqtin2KbYrCDZhdi5INin2YTYpdiv2KfYsdip2Iwg2KfZhNi52YXZhNin2KHYjCDYp9mE2YXZhdmI2YTZitmG2Iwg2KPZiCDYp9mE2LTYsdmD2KfYoS5cIixcbiAgICAgIH0sXG4gICAgICB7XG4gICAgICAgIGlkOiBcIndvcmtmbG93c1wiLFxuICAgICAgICBuYW1lOiBcItiq2K/ZgdmC2KfYqiDYp9mE2LnZhdmEINin2YTZhdiq2YLYr9mF2KlcIixcbiAgICAgICAgcHJpY2U6IFwiJDQ5IC8g2LTZh9ixXCIsXG4gICAgICAgIGVuYWJsZWQ6IGZhbHNlLFxuICAgICAgICBkZXNjcmlwdGlvbjpcbiAgICAgICAgICBcItij2YbYtNimINiq2K/ZgdmC2KfYqiDYudmF2YQg2K/Yp9iu2YTZitipINmE2YTZhdmI2KfZgdmC2KfYqtiMINin2YTZhdmI2KfYsdivINin2YTYqNi02LHZitip2Iwg2KfZhNmF2KfZhNmK2KnYjCDZhdi02KfYsdmK2LkgTUVBTNiMINin2YTYo9iv2YjYp9ix2Iwg2YjYp9mE2LXZhNin2K3Zitin2KouXCIsXG4gICAgICAgIHZhbHVlOlxuICAgICAgICAgIFwi2YXZhtin2LPYqCDZhNmE2YXYpNiz2LPYp9iqINin2YTYqtmKINmE2K/ZitmH2Kcg2LnZhdmE2YrYp9iqINmF2KrYudiv2K/YqSDYp9mE2K7Yt9mI2KfYqiDZiNi12YTYp9it2YrYp9iqINit2LPYqCDYp9mE2K/ZiNixLlwiLFxuICAgICAgfSxcbiAgICBdLFxuICB9LFxufTtcblxuZXhwb3J0IGNvbnN0IGdldE15UGxhbkNvbnRlbnQgPSAobGFuZyA9IFwiZW5cIikgPT5cbiAgbXlQbGFuQ29udGVudFtsYW5nID09PSBcImFyXCIgPyBcImFyXCIgOiBcImVuXCJdOyJdfQ==

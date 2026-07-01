@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Stepper
    ============================================================ */
 
@@ -15,11 +15,11 @@
   gap: 9px;
   min-height: 48px;
   padding: 9px 12px;
-  border: 1px solid rgba(26, 39, 68, 0.1);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(var(--theme-text-inverse-rgb), 0.78);
   color: var(--daw-text);
-  box-shadow: 0 10px 24px rgba(26, 39, 68, 0.05);
+  box-shadow: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.05);
   cursor: pointer;
   text-align: start;
   transition:
@@ -49,10 +49,10 @@
 }
 
 .page-builder .daw-stepper button.locked:hover:not(:disabled) {
-  border-color: rgba(26, 39, 68, 0.1);
-  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(var(--theme-shadow-rgb), 0.1);
+  background: rgba(var(--theme-text-inverse-rgb), 0.78);
   transform: none;
-  box-shadow: 0 10px 24px rgba(26, 39, 68, 0.05);
+  box-shadow: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.05);
 }
 
 .page-builder .daw-stepper button span {
@@ -61,7 +61,7 @@
   width: 28px;
   height: 28px;
   border-radius: 10px;
-  background: rgba(26, 39, 68, 0.08);
+  background: rgba(var(--theme-shadow-rgb), 0.08);
   color: var(--daw-text);
   font-size: 13px;
   font-weight: 950;
@@ -73,7 +73,7 @@
 
 .page-builder .daw-stepper button.active span {
   background: var(--daw-primary-bg);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
 }
 
 .page-builder .daw-stepper button strong {

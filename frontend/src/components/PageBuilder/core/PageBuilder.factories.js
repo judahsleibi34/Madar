@@ -130,7 +130,7 @@ export const createElement = (type = "text", overrides = {}) => {
     connectedFormId: "",
     action: createAction(),
     styles: {
-      color: "#1a2744",
+      color: "var(--theme-text)",
       backgroundColor: "",
       borderRadius: "16px",
       fontSize: "",
@@ -157,7 +157,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.text.content,
       styles: {
         ...base.styles,
-        color: "#53627a",
+        color: "var(--theme-text-soft)",
         fontSize: "17px",
         lineHeight: "1.7",
       },
@@ -168,7 +168,7 @@ export const createElement = (type = "text", overrides = {}) => {
       action: createAction("goToPage"),
       styles: {
         ...base.styles,
-        color: "#ffffff",
+        color: "var(--theme-text-inverse)",
         backgroundColor: "var(--theme-primary)",
         fontWeight: "900",
       },
@@ -191,7 +191,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.card.content,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "22px",
         alignSelf: "stretch",
         "--carousel-height": "340px",
@@ -205,7 +205,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.carousel.content,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "26px",
         alignSelf: "stretch",
         "--carousel-height": "410px",
@@ -219,7 +219,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.carouselCards.content,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "24px",
         alignSelf: "stretch",
         "--carousel-height": "340px",
@@ -233,7 +233,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.carouselSplit.content,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "24px",
         alignSelf: "stretch",
         "--carousel-height": "360px",
@@ -245,7 +245,7 @@ export const createElement = (type = "text", overrides = {}) => {
       autoScroll: true,
       autoScrollMs: 4500,
       content: factoryCopy.elements.carouselSpotlight.content,
-      styles: { ...base.styles, backgroundColor: "#080b18", borderRadius: "30px", alignSelf: "stretch", "--carousel-height": "400px" },
+      styles: { ...base.styles, backgroundColor: "var(--theme-bg)", borderRadius: "30px", alignSelf: "stretch", "--carousel-height": "400px" },
     },
     carouselStack: {
       name: factoryCopy.elements.carouselStack.name,
@@ -253,7 +253,7 @@ export const createElement = (type = "text", overrides = {}) => {
       autoScroll: true,
       autoScrollMs: 4000,
       content: factoryCopy.elements.carouselStack.content,
-      styles: { ...base.styles, backgroundColor: "#f4f1ff", borderRadius: "30px", alignSelf: "stretch", "--carousel-height": "420px" },
+      styles: { ...base.styles, backgroundColor: "var(--theme-surface-2)", borderRadius: "30px", alignSelf: "stretch", "--carousel-height": "420px" },
     },
     carouselEditorial: {
       name: factoryCopy.elements.carouselEditorial.name,
@@ -261,7 +261,7 @@ export const createElement = (type = "text", overrides = {}) => {
       autoScroll: true,
       autoScrollMs: 5000,
       content: factoryCopy.elements.carouselEditorial.content,
-      styles: { ...base.styles, backgroundColor: "#f5efe5", borderRadius: "8px", alignSelf: "stretch", "--carousel-height": "380px" },
+      styles: { ...base.styles, backgroundColor: "var(--theme-bg-soft)", borderRadius: "8px", alignSelf: "stretch", "--carousel-height": "380px" },
     },
     circularGallery: {
       name: factoryCopy.elements.circularGallery.name,
@@ -271,7 +271,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.circularGallery.content,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "26px",
         alignSelf: "stretch",
         "--carousel-height": "460px",
@@ -286,8 +286,8 @@ export const createElement = (type = "text", overrides = {}) => {
       listItems: factoryCopy.elements.list.items,
       styles: {
         ...base.styles,
-        color: "#53627a",
-        backgroundColor: "#ffffff",
+        color: "var(--theme-text-soft)",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "18px",
         alignSelf: "stretch",
       },
@@ -297,7 +297,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: "",
       styles: {
         ...base.styles,
-        backgroundColor: "rgba(26, 39, 68, 0.16)",
+        backgroundColor: "rgba(var(--theme-shadow-rgb), 0.16)",
         alignSelf: "stretch",
       },
     },
@@ -306,7 +306,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.embed.content,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "18px",
         alignSelf: "stretch",
       },
@@ -318,11 +318,11 @@ export const createElement = (type = "text", overrides = {}) => {
       metrics: factoryCopy.elements.metric.metrics,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "22px",
         alignSelf: "stretch",
-        metricTextColor: "#172b4d",
-        metricSymbolColor: "#f1f66b",
+        metricTextColor: "var(--theme-text)",
+        metricSymbolColor: "var(--theme-warning)",
       },
     },
     loginBlock: {
@@ -331,7 +331,7 @@ export const createElement = (type = "text", overrides = {}) => {
       auth: factoryCopy.elements.loginBlock.auth,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "24px",
         alignSelf: "stretch",
       },
@@ -342,7 +342,7 @@ export const createElement = (type = "text", overrides = {}) => {
       auth: factoryCopy.elements.registrationBlock.auth,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "24px",
         alignSelf: "stretch",
       },
@@ -352,7 +352,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.formBlock.content,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "22px",
         alignSelf: "stretch",
       },
@@ -363,7 +363,7 @@ export const createElement = (type = "text", overrides = {}) => {
       reservation: factoryCopy.elements.reservationBlock.reservation,
       styles: {
         ...base.styles,
-        backgroundColor: "#ffffff",
+        backgroundColor: "var(--theme-surface)",
         borderRadius: "22px",
         alignSelf: "stretch",
       },
@@ -433,7 +433,7 @@ export const createPage = (name = factoryCopy.structure.page, sections = [], ove
   id: createId("page"),
   name,
   slug: name.toLowerCase() === "home" ? "/" : `/${slugify(name)}`,
-  backgroundColor: "#ffffff",
+  backgroundColor: "var(--theme-surface)",
   visibility: "public",
   showInNavigation: true,
   pageType: "main",

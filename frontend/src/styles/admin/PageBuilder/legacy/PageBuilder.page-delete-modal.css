@@ -9,7 +9,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(15, 23, 42, 0.58);
+  background: rgba(var(--theme-shadow-rgb), 0.58);
   backdrop-filter: blur(7px);
 }
 
@@ -20,11 +20,11 @@
   gap: 16px;
   border-radius: 28px;
   padding: 26px;
-  background: #ffffff;
+  background: var(--theme-surface);
   border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
   color: var(--madar-text);
   text-align: center;
-  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
+  box-shadow: 0 30px 90px rgba(var(--theme-shadow-rgb), 0.28);
 }
 
 .page-builder .page-delete-modal-icon {
@@ -75,13 +75,13 @@
 }
 
 .page-builder .page-delete-modal-secondary {
-  background: rgba(26, 39, 68, 0.08) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
   color: var(--madar-text) !important;
 }
 
 .page-builder .page-delete-modal-danger {
   background: var(--madar-red) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.22) !important;
 }
 

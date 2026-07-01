@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Data grid
    ============================================================ */
 
@@ -6,7 +6,7 @@
   min-width: 0;
   border: 1px solid var(--daw-card-border);
   border-radius: 18px;
-  background: #ffffff;
+  background: var(--theme-surface);
   overflow: hidden;
 }
 
@@ -27,7 +27,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
   padding: 0 12px;
-  background: #ffffff;
+  background: var(--theme-surface);
   color: var(--daw-text);
   font-size: 13px;
   font-weight: 850;
@@ -67,7 +67,7 @@
 }
 
 .page-builder .daw-table th {
-  background: rgba(26, 39, 68, 0.055);
+  background: rgba(var(--theme-shadow-rgb), 0.055);
   color: var(--daw-muted);
   font-weight: 950;
 }
@@ -97,7 +97,7 @@
   background: #f8f8f9;
   color: #6b7280;
   border-right: 2px solid rgba(122, 29, 31, 0.18);
-  box-shadow: 8px 0 16px rgba(15, 23, 42, 0.06);
+  box-shadow: 8px 0 16px rgba(var(--theme-shadow-rgb), 0.06);
 }
 
 .page-builder .daw-row-index-head {
@@ -116,7 +116,7 @@
   right: 0;
   border-right: 0;
   border-left: 2px solid rgba(122, 29, 31, 0.18);
-  box-shadow: -8px 0 16px rgba(15, 23, 42, 0.06);
+  box-shadow: -8px 0 16px rgba(var(--theme-shadow-rgb), 0.06);
 }
 
 .page-builder .daw-pagination {

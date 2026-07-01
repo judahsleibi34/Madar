@@ -2,6 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import EmptyState from './EmptyState';
 import { displayValue, valueDir } from '../utils/formatters';
 
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
+};
+
 export default function DataPreviewGrid({ columns = [], rows = [], t }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -10,9 +20,11 @@ export default function DataPreviewGrid({ columns = [], rows = [], t }) {
   const pageSize = 10;
 
   useEffect(() => {
-    setPage(1);
-    setSearch("");
-    setVisibleColumns(columns.slice(0, 8));
+    return deferEffectStateUpdate(() => {
+      setPage(1);
+      setSearch("");
+      setVisibleColumns(columns.slice(0, 8));
+    });
   }, [columns]);
 
   const filteredRows = useMemo(() => {

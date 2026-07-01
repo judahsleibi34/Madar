@@ -29,7 +29,7 @@
 }
 
 .page-builder .page-kind-pill.main {
-  background: rgba(26, 39, 68, 0.09);
+  background: rgba(var(--theme-shadow-rgb), 0.09);
   color: var(--madar-navy);
 }
 
@@ -52,9 +52,9 @@
   border-radius: 18px;
   padding: 14px;
   border: 1px solid var(--madar-border) !important;
-  background: #ffffff !important;
+  background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
-  box-shadow: 0 10px 22px rgba(26, 39, 68, 0.045) !important;
+  box-shadow: 0 10px 22px rgba(var(--theme-shadow-rgb), 0.045) !important;
 }
 
 .page-builder .page-create-card strong {
@@ -76,7 +76,7 @@
 }
 
 .page-builder .page-create-card.main:hover {
-  background: rgba(26, 39, 68, 0.04) !important;
+  background: rgba(var(--theme-shadow-rgb), 0.04) !important;
 }
 
 .page-builder .page-create-card.branch:hover {
@@ -129,6 +129,6 @@
 
 .page-builder .danger-confirm-button {
   background: var(--madar-red) !important;
-  color: #ffffff !important;
+  color: var(--theme-text-inverse) !important;
   box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.18) !important;
 }

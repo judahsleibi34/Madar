@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Report group buttons
    ============================================================ */
 
@@ -17,7 +17,7 @@
   padding: 14px 16px;
   border: 1px solid var(--daw-tab-border);
   border-radius: 16px;
-  background: rgba(26, 39, 68, 0.04);
+  background: rgba(var(--theme-shadow-rgb), 0.04);
   color: var(--daw-text);
   text-align: start;
   cursor: pointer;

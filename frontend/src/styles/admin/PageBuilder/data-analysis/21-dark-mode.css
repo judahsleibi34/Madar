@@ -1,22 +1,22 @@
-﻿/* ============================================================
+/* ============================================================
    Dark mode
    ============================================================ */
 
 .theme-dark .page-builder,
 [data-theme="dark"] .page-builder {
-  --daw-secondary-bg: rgba(255, 255, 255, 0.06);
+  --daw-secondary-bg: rgba(var(--theme-text-inverse-rgb), 0.06);
   --daw-secondary-bg-hover: rgba(var(--theme-primary-rgb), 0.2);
-  --daw-secondary-border: rgba(255, 255, 255, 0.12);
+  --daw-secondary-border: rgba(var(--theme-text-inverse-rgb), 0.12);
   --daw-secondary-text: var(--theme-text);
 
-  --daw-tab-bg: rgba(255, 255, 255, 0.05);
-  --daw-tab-border: rgba(255, 255, 255, 0.12);
+  --daw-tab-bg: rgba(var(--theme-text-inverse-rgb), 0.05);
+  --daw-tab-border: rgba(var(--theme-text-inverse-rgb), 0.12);
   --daw-tab-active-bg: rgba(var(--theme-primary-rgb), 0.24);
   --daw-tab-active-border: rgba(212, 138, 117, 0.34);
-  --daw-tab-active-text: #ffffff;
+  --daw-tab-active-text: var(--theme-surface);
 
-  --daw-card-border: rgba(255, 255, 255, 0.12);
-  --daw-soft-bg: rgba(255, 255, 255, 0.055);
+  --daw-card-border: rgba(var(--theme-text-inverse-rgb), 0.12);
+  --daw-soft-bg: rgba(var(--theme-text-inverse-rgb), 0.055);
   --daw-text: var(--theme-text);
   --daw-muted: rgba(248, 250, 252, 0.68);
 }
@@ -56,7 +56,7 @@
 [data-theme="dark"] .page-builder .daw-warning-list h4,
 [data-theme="dark"] .page-builder .daw-insight-list,
 [data-theme="dark"] .page-builder .daw-chart-list strong {
-  color: #ffffff;
+  color: var(--theme-text-inverse);
 }
 
 .theme-dark .page-builder .daw-header p,
@@ -99,11 +99,11 @@
 [data-theme="dark"] .page-builder .daw-card,
 [data-theme="dark"] .page-builder .daw-stepper button {
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(var(--theme-primary-rgb), 0.28)) border-box;
+    linear-gradient(145deg, rgba(var(--theme-text-inverse-rgb), 0.08), rgba(var(--theme-text-inverse-rgb), 0.04)) padding-box,
+    linear-gradient(135deg, rgba(var(--theme-text-inverse-rgb), 0.14), rgba(var(--theme-primary-rgb), 0.28)) border-box;
   border: 1px solid transparent;
   color: var(--theme-text);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 24px 70px rgba(var(--theme-black-rgb), 0.28);
 }
 
 .theme-dark .page-builder .daw-source-tabs button,
@@ -156,8 +156,8 @@
 [data-theme="dark"] .page-builder .daw-kpi-grid article,
 [data-theme="dark"] .page-builder .daw-object-grid article,
 [data-theme="dark"] .page-builder .daw-chart-list article {
-  background: rgba(255, 255, 255, 0.055);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(var(--theme-text-inverse-rgb), 0.055);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
   color: var(--theme-text);
 }
 
@@ -177,7 +177,7 @@
 [data-theme="dark"] .page-builder .daw-compact-pagination button:not(:disabled):hover {
   background: rgba(105, 211, 207, 0.16);
   border-color: rgba(105, 211, 207, 0.42);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
 }
 
 .theme-dark .page-builder .daw-compact-pagination button:disabled,
@@ -219,19 +219,19 @@
 [data-theme="dark"] .page-builder .daw-stepper button.active {
   background: var(--theme-surface-2);
   border-color: rgba(212, 138, 117, 0.38);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
 }
 
 .theme-dark .page-builder .daw-stepper button span,
 [data-theme="dark"] .page-builder .daw-stepper button span {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--theme-text-inverse-rgb), 0.08);
   color: var(--theme-text);
 }
 
 .theme-dark .page-builder .daw-stepper button.active span,
 [data-theme="dark"] .page-builder .daw-stepper button.active span {
   background: var(--daw-primary-bg);
-  color: #ffffff;
+  color: var(--theme-text-inverse);
 }
 
 .theme-dark .page-builder .daw-field input,
@@ -251,7 +251,7 @@
 [data-theme="dark"] .page-builder .daw-data-grid,
 [data-theme="dark"] .page-builder .daw-file-dropzone {
   background: rgba(15, 23, 38, 0.74);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
   color: var(--theme-text);
 }
 
@@ -259,13 +259,13 @@
 .theme-dark .page-builder .daw-column-menu-panel label,
 [data-theme="dark"] .page-builder .daw-column-picker label,
 [data-theme="dark"] .page-builder .daw-column-menu-panel label {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(var(--theme-text-inverse-rgb), 0.07);
   color: var(--theme-text);
 }
 
 .theme-dark .page-builder .daw-table th,
 [data-theme="dark"] .page-builder .daw-table th {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(var(--theme-text-inverse-rgb), 0.07);
   color: rgba(248, 250, 252, 0.72);
 }
 
@@ -278,7 +278,7 @@
 
 .theme-dark .page-builder .daw-compact-table th,
 [data-theme="dark"] .page-builder .daw-compact-table th {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(var(--theme-text-inverse-rgb), 0.07);
   color: rgba(248, 250, 252, 0.72);
 }
 
@@ -298,7 +298,7 @@
 [data-theme="dark"] .page-builder .daw-data-grid-meta,
 [data-theme="dark"] .page-builder .daw-pagination,
 [data-theme="dark"] .page-builder .daw-data-grid-toolbar {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
 }
 
 .theme-dark .page-builder .daw-row-index-head,
@@ -308,14 +308,14 @@
   background: var(--theme-surface);
   color: rgba(248, 250, 252, 0.78);
   border-color: rgba(212, 138, 117, 0.28);
-  box-shadow: 8px 0 16px rgba(0, 0, 0, 0.22);
+  box-shadow: 8px 0 16px rgba(var(--theme-black-rgb), 0.22);
 }
 
 .theme-dark .page-builder .daw-page[dir="rtl"] .daw-row-index-head,
 .theme-dark .page-builder .daw-page[dir="rtl"] .daw-row-index-cell,
 [data-theme="dark"] .page-builder .daw-page[dir="rtl"] .daw-row-index-head,
 [data-theme="dark"] .page-builder .daw-page[dir="rtl"] .daw-row-index-cell {
-  box-shadow: -8px 0 16px rgba(0, 0, 0, 0.22);
+  box-shadow: -8px 0 16px rgba(var(--theme-black-rgb), 0.22);
 }
 
 .theme-dark .page-builder .daw-warning-list,

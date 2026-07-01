@@ -57,6 +57,18 @@ export const removeDuplicateFormHeadings = (section) => ({
 
 export const getMetricMinimumHeight = () => 170;
 
+export const getDirectElementMinimumSize = (element) => {
+  if (element?.type === "reservationBlock") {
+    return { width: 360, height: 770 };
+  }
+
+  if (element?.type === "metric" || element?.type === "list") {
+    return { width: 160, height: getMetricMinimumHeight(element) };
+  }
+
+  return { width: 80, height: 48 };
+};
+
 export const directElementHeight = (element) => {
   if (element?.type === "metric") return getMetricMinimumHeight(element);
 
@@ -68,7 +80,7 @@ export const directElementHeight = (element) => {
     card: 390,
     list: 170,
     formBlock: 460,
-    reservationBlock: 420,
+    reservationBlock: 770,
     loginBlock: 420,
     registrationBlock: 460,
     carousel: 400,
@@ -357,27 +369,29 @@ export const getDragCandidatePosition = ({
   selectedElement,
   canvasWidth,
   canvasHeight,
-  getMetricMinimumHeight,
   snapToGrid,
-}) =>
-  dragState.interaction === "resize"
-    ? {
+}) => {
+  const minimumSize = getDirectElementMinimumSize(selectedElement);
+
+  return dragState.interaction === "resize"
+    ? (() => {
+        const availableWidth = Math.max(0, canvasWidth - dragState.startX);
+        const nextWidth = Math.max(
+          Math.min(minimumSize.width, availableWidth),
+          snapToGrid(dragState.startWidth + dragState.deltaX)
+        );
+        const nextHeight = Math.max(
+          minimumSize.height,
+          snapToGrid(dragState.startHeight + dragState.deltaY)
+        );
+
+        return {
         x: dragState.startX,
         y: dragState.startY,
-        width: Math.min(
-          canvasWidth - dragState.startX,
-          Math.max(80, snapToGrid(dragState.startWidth + dragState.deltaX))
-        ),
-        height: Math.min(
-          canvasHeight - dragState.startY,
-          Math.max(
-            selectedElement.type === "metric" || selectedElement.type === "list"
-              ? getMetricMinimumHeight(selectedElement)
-              : 48,
-            snapToGrid(dragState.startHeight + dragState.deltaY)
-          )
-        ),
-      }
+        width: Math.min(availableWidth, nextWidth),
+        height: nextHeight,
+      };
+    })()
     : {
         x: Math.min(
           canvasWidth - dragState.startWidth,
@@ -390,6 +404,7 @@ export const getDragCandidatePosition = ({
         width: dragState.startWidth,
         height: dragState.startHeight,
       };
+};
 
 export const getMovedElementPosition = ({
   selectedElement,

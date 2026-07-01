@@ -18,13 +18,21 @@ const builderWorkspaceCopyEn = {
       label: "Forms",
       helper: "Create forms and place them on pages.",
     },
+    reservations: {
+      label: "Reservations",
+      helper: "Edit appointment blocks, services, and time slots.",
+    },
+    chrome: {
+      label: "Header & Footer",
+      helper: "Manage the site header, footer, navigation, links, and contact details.",
+    },
     users: {
       label: "Users",
       helper: "Manage team members, roles, and permissions.",
     },
     theme: {
       label: "Themes",
-      helper: "Control global colors, typography, spacing, and radius.",
+      helper: "Control the published website colors, typography, buttons, and form styling.",
     },
     publish: {
       label: "Publish",

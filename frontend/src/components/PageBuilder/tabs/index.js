@@ -1,4 +1,5 @@
 export { default as FormsTab } from "./FormsTab";
+export { default as ReservationsTab } from "./ReservationsTab";
 export { default as DesignTab } from "./DesignTab";
 export { default as DataTab } from "./DataTab";
 export { default as ResponsesTab } from "./ResponsesTab";

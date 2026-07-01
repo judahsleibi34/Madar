@@ -1,18 +1,8 @@
 .gradient-text {
   display: inline;
-  color: transparent;
-  background-image: var(
-    --gradient-text-image,
-    linear-gradient(
-      var(--gradient-text-angle, 90deg),
-      var(--gradient-text-colors, #1a2744, var(--theme-primary), var(--theme-primary-hover))
-    )
-  );
-  background-size: 220% 100%;
-  background-position: 0% 50%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: gradientTextMove var(--gradient-text-speed, 8s) linear infinite;
+  color: var(--gradient-text-color, var(--theme-primary));
+  background-image: none;
+  animation: none;
 }
 
 .gradient-text-yoyo {
@@ -31,8 +21,7 @@
 
 [data-theme="dark"] .gradient-text,
 body.theme-dark .gradient-text {
-  --gradient-text-colors: var(--theme-text), var(--theme-primary-hover), var(--theme-text);
-  --gradient-text-image: var(--theme-text-gradient);
+  --gradient-text-color: var(--theme-primary-hover);
 }
 
 @keyframes gradientTextMove {

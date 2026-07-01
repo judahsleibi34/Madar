@@ -16,9 +16,9 @@
   min-height: 168px;
   border-radius: 24px;
   padding: 24px;
-  background: #ffffff;
-  border: 1px solid rgba(26, 39, 68, 0.12);
-  box-shadow: 0 18px 45px rgba(26, 39, 68, 0.08);
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
 }
 
 .overview-card::after {
@@ -38,7 +38,7 @@
 }
 
 .overview-card.navy::after {
-  background: #1a2744;
+  background: var(--theme-text);
 }
 
 .overview-card.red::after {
@@ -46,7 +46,7 @@
 }
 
 .overview-card.olive::after {
-  background: #4f6246;
+  background: var(--theme-secondary);
 }
 
 .overview-card-top {
@@ -59,7 +59,7 @@
 
 .overview-card p {
   margin: 0 0 12px;
-  color: #6d7484;
+  color: var(--theme-text-muted);
   font-size: 13px;
   font-weight: 900;
   text-transform: uppercase;
@@ -68,7 +68,7 @@
 
 .overview-card h2 {
   margin: 0;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 42px;
   font-weight: 900;
   letter-spacing: -0.05em;
@@ -81,8 +81,8 @@
   border-radius: 16px;
   display: grid;
   place-items: center;
-  color: #ffffff;
-  background: var(--theme-gradient);
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
   box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.22);
   flex-shrink: 0;
 }

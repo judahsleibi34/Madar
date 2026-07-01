@@ -4,7 +4,7 @@
   --color-primary: var(--theme-primary);
   --color-primary-hover: var(--theme-primary-hover);
   --color-secondary: var(--theme-secondary);
-  --color-accent: #507597;
+  --color-accent: var(--theme-info);
 
   --color-background: var(--theme-bg);
   --color-background-soft: var(--theme-bg-soft);
@@ -15,7 +15,7 @@
   --color-text-main: var(--theme-text);
   --color-text-soft: var(--theme-text-soft);
   --color-text-muted: var(--theme-text-muted);
-  --color-text-inverse: #ffffff;
+  --color-text-inverse: var(--theme-text-inverse);
   --color-border: var(--theme-border);
   --color-border-strong: var(--theme-border-strong);
 
@@ -53,9 +53,9 @@
   --radius-xl: 1.75rem;
   --radius-full: 999px;
 
-  --shadow-sm: 0 10px 24px rgba(26, 39, 68, 0.08);
-  --shadow-md: 0 18px 44px rgba(26, 39, 68, 0.14);
-  --shadow-lg: 0 28px 70px rgba(26, 39, 68, 0.22);
+  --shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.08);
+  --shadow-md: 0 18px 44px rgba(var(--theme-shadow-rgb), 0.14);
+  --shadow-lg: 0 28px 70px rgba(var(--theme-shadow-rgb), 0.22);
 
   --container-sm: 780px;
   --container-md: 1060px;

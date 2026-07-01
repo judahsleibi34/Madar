@@ -14,6 +14,7 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith("/builder-data") ||
     pathname.startsWith("/my-plan") ||
     pathname.startsWith("/admin/users") ||
+    pathname.startsWith("/admin/account-access") ||
     pathname.startsWith("/settings")
   );
 }
@@ -27,7 +28,8 @@ export function getSafePostLoginPath(userInfo, returnTo) {
       ? returnTo
       : "/dashboard";
 
-  const adminOnlyPaths = ["/admin/users"];
+  const adminOnlyPaths = ["/admin/users", "/admin/account-access"];
+
   const userOnlyPaths = [
     "/page-builder",
     "/builder-responses",
@@ -39,6 +41,7 @@ export function getSafePostLoginPath(userInfo, returnTo) {
   const isAdminOnlyPath = adminOnlyPaths.some((path) =>
     nextPath.startsWith(path)
   );
+
   const isUserOnlyPath = userOnlyPaths.some((path) =>
     nextPath.startsWith(path)
   );

@@ -1,0 +1,2890 @@
+[
+  {
+    "route": "/",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/root_light_desktop.png",
+    "data": {
+      "requested": "/",
+      "url": "http://localhost:5173/",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nDigitize Your Business with Confidence.\n\nM\na\nd\na\nr\n helps organizations replace manual paperwork with reliable digital workflows tha"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760156031.367,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "13432.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/root_dark_desktop.png",
+    "data": {
+      "requested": "/",
+      "url": "http://localhost:5173/",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nDigitize Your Business with Confidence.\n\nM\na\nd\na\nr\n helps organizations replace manual paperwork with reliable digital workflows tha"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760158948.313,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "6640.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760159051.269,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "6640.89"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/product-tour",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/product_tour_light_desktop.png",
+    "data": {
+      "requested": "/product-tour",
+      "url": "http://localhost:5173/product-tour",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Tour the builder, then try it live\n\nOpen the demo to edit the default template i"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Page builder\n\nCreate public pages, internal screens, dashboards, and service flo"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nTour the builder, then try it live\n\nOpen the demo to edit the default template in the browser. Refreshing the demo restores the orig"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760161745.519,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "20276.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760161799.343,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "20276.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/product-tour",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/product_tour_dark_desktop.png",
+    "data": {
+      "requested": "/product-tour",
+      "url": "http://localhost:5173/product-tour",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Tour the builder, then try it live\n\nOpen the demo to edit the default template i"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Page builder\n\nCreate public pages, internal screens, dashboards, and service flo"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nTour the builder, then try it live\n\nOpen the demo to edit the default template in the browser. Refreshing the demo restores the orig"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760164475.683,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "16688.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760164536.991,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "16688.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/pricing",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/pricing_light_desktop.png",
+    "data": {
+      "requested": "/pricing",
+      "url": "http://localhost:5173/pricing",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "block",
+          "text": "PRICING\nChoose a plan that matches how you work\n\nStart with a ready base plan, o"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nPRICING\nChoose a plan that matches how you work\n\nStart with a ready base plan, or build a custom Madar package around the exact webs"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760167301.454,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "16144.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760167358.092,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "16144.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/pricing",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/pricing_dark_desktop.png",
+    "data": {
+      "requested": "/pricing",
+      "url": "http://localhost:5173/pricing",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "block",
+          "text": "PRICING\nChoose a plan that matches how you work\n\nStart with a ready base plan, o"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nPRICING\nChoose a plan that matches how you work\n\nStart with a ready base plan, or build a custom Madar package around the exact webs"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760169941.143,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "1380.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760170007.103,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "1380.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/contact",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/contact_light_desktop.png",
+    "data": {
+      "requested": "/contact",
+      "url": "http://localhost:5173/contact",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Contact Us\n\nWe'd love to hear from you. Send us a message and we'll get back to "
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nContact Us\n\nWe'd love to hear from you. Send us a message and we'll get back to you soon.\n\nFull Name\nPhone Number\nIssue / Message\nSe"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760172742.453,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "16848.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760172811.199,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "16848.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/contact",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/contact_dark_desktop.png",
+    "data": {
+      "requested": "/contact",
+      "url": "http://localhost:5173/contact",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Contact Us\n\nWe'd love to hear from you. Send us a message and we'll get back to "
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nContact Us\n\nWe'd love to hear from you. Send us a message and we'll get back to you soon.\n\nFull Name\nPhone Number\nIssue / Message\nSe"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760175500.004,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "18472.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760175550.406,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "18472.88"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/login",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/login_light_desktop.png",
+    "data": {
+      "requested": "/login",
+      "url": "http://localhost:5173/login",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760178393.326,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "19168.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760178451.168,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "19168.89"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/login",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/login_dark_desktop.png",
+    "data": {
+      "requested": "/login",
+      "url": "http://localhost:5173/login",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760181112.337,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "20008.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760181177.426,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "20008.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/signup",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/signup_light_desktop.png",
+    "data": {
+      "requested": "/signup",
+      "url": "http://localhost:5173/signup",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "flex",
+          "text": "Register\n\nStart building dashboards, pages, and reports with Madar.\n\nACCOUNT OWN"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Register\n\nStart building dashboards, pages, and reports with Madar.\n\nACCOUNT OWN"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nRegister\n\nStart building dashboards, pages, and reports with Madar.\n\nACCOUNT OWNER\nFirst name\nLast name\nEmail\nPassword\nConfirm passw"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760183931.221,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "10760.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760183995.694,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "10760.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/signup",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/signup_dark_desktop.png",
+    "data": {
+      "requested": "/signup",
+      "url": "http://localhost:5173/signup",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "flex",
+          "text": "Register\n\nStart building dashboards, pages, and reports with Madar.\n\nACCOUNT OWN"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Register\n\nStart building dashboards, pages, and reports with Madar.\n\nACCOUNT OWN"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nRegister\n\nStart building dashboards, pages, and reports with Madar.\n\nACCOUNT OWNER\nFirst name\nLast name\nEmail\nPassword\nConfirm passw"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760186647.564,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "4396.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760186705.193,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "4396.89"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/dashboard",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/dashboard_light_desktop.png",
+    "data": {
+      "requested": "/dashboard",
+      "url": "http://localhost:5173/login?returnTo=%2Fdashboard",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760189427.868,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "12024.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760189474.416,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "12024.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/dashboard",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/dashboard_dark_desktop.png",
+    "data": {
+      "requested": "/dashboard",
+      "url": "http://localhost:5173/login?returnTo=%2Fdashboard",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760192124.143,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "20128.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760192168.966,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "20128.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/settings",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/settings_light_desktop.png",
+    "data": {
+      "requested": "/settings",
+      "url": "http://localhost:5173/login?returnTo=%2Fsettings",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760194920.286,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "2908.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760194967.268,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "2908.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/settings",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/settings_dark_desktop.png",
+    "data": {
+      "requested": "/settings",
+      "url": "http://localhost:5173/login?returnTo=%2Fsettings",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760197645.159,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "16512.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760197686.322,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "16512.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/my-plan",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/my_plan_light_desktop.png",
+    "data": {
+      "requested": "/my-plan",
+      "url": "http://localhost:5173/login?returnTo=%2Fmy-plan",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760200434.293,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "8464.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760200477.88,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "8464.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/my-plan",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/my_plan_dark_desktop.png",
+    "data": {
+      "requested": "/my-plan",
+      "url": "http://localhost:5173/login?returnTo=%2Fmy-plan",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760203161.213,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "14328.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760203206.096,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "14328.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/page-builder",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/page_builder_light_desktop.png",
+    "data": {
+      "requested": "/page-builder",
+      "url": "http://localhost:5173/login?returnTo=%2Fpage-builder",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760205981.606,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "3636.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760206024.573,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "3636.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/page-builder",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/page_builder_dark_desktop.png",
+    "data": {
+      "requested": "/page-builder",
+      "url": "http://localhost:5173/login?returnTo=%2Fpage-builder",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760208698.252,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "6572.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760208746.493,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "6572.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/builder-responses",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/builder_responses_light_desktop.png",
+    "data": {
+      "requested": "/builder-responses",
+      "url": "http://localhost:5173/login?returnTo=%2Fbuilder-responses",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760211483.68,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "16036.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760211530.056,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "16036.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/builder-responses",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/builder_responses_dark_desktop.png",
+    "data": {
+      "requested": "/builder-responses",
+      "url": "http://localhost:5173/login?returnTo=%2Fbuilder-responses",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760214253.523,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "19500.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760214316.061,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "19500.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/builder-data",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/builder_data_light_desktop.png",
+    "data": {
+      "requested": "/builder-data",
+      "url": "http://localhost:5173/login?returnTo=%2Fbuilder-data",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760217005.563,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "15716.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760217050.658,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "15716.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/builder-data",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/builder_data_dark_desktop.png",
+    "data": {
+      "requested": "/builder-data",
+      "url": "http://localhost:5173/login?returnTo=%2Fbuilder-data",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760219789.4,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "5812.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/page-builder/preview",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/page_builder_preview_light_desktop.png",
+    "data": {
+      "requested": "/page-builder/preview",
+      "url": "http://localhost:5173/login?returnTo=%2Fpage-builder%2Fpreview",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760222568.149,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "12072.83"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760222655.284,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "12072.81"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/page-builder/preview",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/page_builder_preview_dark_desktop.png",
+    "data": {
+      "requested": "/page-builder/preview",
+      "url": "http://localhost:5173/login?returnTo=%2Fpage-builder%2Fpreview",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\n"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nHome\nProduct Tour\nPlans and Pricing\nMadar Team\nAbout Us\nContact Us\nLog In\nSign Up\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760225253.527,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "2664.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760225305.564,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "2664.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/site/my-site",
+    "mode": "light",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/site_my_site_light_desktop.png",
+    "data": {
+      "requested": "/site/my-site",
+      "url": "http://localhost:5173/site/my-site",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": "M\nMadar"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "MY-SITE.MADAR.APP\n\nNo published site found\n\nSave the project in Page Builder, th"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": "M\nMadar\n\nAn adaptive business management platform for creating and managing digi"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "flex",
+          "text": "M\nMadar"
+        }
+      ],
+      "visibleText": "M\nMadar\n\nMY-SITE.MADAR.APP\n\nNo published site found\n\nSave the project in Page Builder, then publish the site again.\n\nM\nMadar\n\nAn adaptive business management platform for creating and managing digital systems.\n\nFA\nLI\nX\nI"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760228057.63,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "10376.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760228105.742,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "10376.94"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "timestamp": 1782760228786.238,
+          "url": "http://localhost:5173/api/public/sites/my-site",
+          "networkRequestId": "10376.100"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "timestamp": 1782760228787.144,
+          "url": "http://localhost:5173/api/public/sites/my-site",
+          "networkRequestId": "10376.99"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/site/my-site",
+    "mode": "dark",
+    "viewport": "desktop",
+    "screenshot": "qa_screenshots/site_my_site_dark_desktop.png",
+    "data": {
+      "requested": "/site/my-site",
+      "url": "http://localhost:5173/site/my-site",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(8, 19, 33, 0.98)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "text": "M\nMadar"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "MY-SITE.MADAR.APP\n\nNo published site found\n\nSave the project in Page Builder, th"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(8, 19, 33, 0.98)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "block",
+          "text": "M\nMadar\n\nAn adaptive business management platform for creating and managing digi"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "flex",
+          "text": "M\nMadar"
+        }
+      ],
+      "visibleText": "M\nMadar\n\nMY-SITE.MADAR.APP\n\nNo published site found\n\nSave the project in Page Builder, then publish the site again.\n\nM\nMadar\n\nAn adaptive business management platform for creating and managing digital systems.\n\nFA\nLI\nX\nI"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760230739.595,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "11492.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760230785.071,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "11492.97"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "timestamp": 1782760231416.18,
+          "url": "http://localhost:5173/api/public/sites/my-site",
+          "networkRequestId": "11492.99"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "timestamp": 1782760231416.589,
+          "url": "http://localhost:5173/api/public/sites/my-site",
+          "networkRequestId": "11492.100"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/",
+    "mode": "light",
+    "viewport": "mobile",
+    "screenshot": "qa_screenshots/root_light_mobile.png",
+    "data": {
+      "requested": "/",
+      "url": "http://localhost:5173/",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nDigitize Your Business with Confidence.\n\nM\na\nd\na\nr\n helps organizations replace manual paperwork with reliable digital workflows that save time, reduce operational errors, and give teams better control over every p"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760233478.884,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "6824.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760233539.684,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "6824.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/",
+    "mode": "dark",
+    "viewport": "mobile",
+    "screenshot": "qa_screenshots/root_dark_mobile.png",
+    "data": {
+      "requested": "/",
+      "url": "http://localhost:5173/",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        }
+      ],
+      "visibleText": "Madar\nDigitize Your Business with Confidence.\n\nM\na\nd\na\nr\n helps organizations replace manual paperwork with reliable digital workflows that save time, reduce operational errors, and give teams better control over every p"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760236302.491,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "9284.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760236367.016,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "9284.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/login",
+    "mode": "light",
+    "viewport": "mobile",
+    "screenshot": "qa_screenshots/login_light_mobile.png",
+    "data": {
+      "requested": "/login",
+      "url": "http://localhost:5173/login",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign Up\n\nMadar\n\nSimple digital workflows that save time, reduce mistakes, and keep wor"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760239138.844,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "5840.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760239196.036,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "5840.89"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/login",
+    "mode": "dark",
+    "viewport": "mobile",
+    "screenshot": "qa_screenshots/login_dark_mobile.png",
+    "data": {
+      "requested": "/login",
+      "url": "http://localhost:5173/login",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign Up\n\nMadar\n\nSimple digital workflows that save time, reduce mistakes, and keep wor"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760241894.012,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "7480.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760241954.845,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "7480.90"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/page-builder",
+    "mode": "light",
+    "viewport": "mobile",
+    "screenshot": "qa_screenshots/page_builder_light_mobile.png",
+    "data": {
+      "requested": "/page-builder",
+      "url": "http://localhost:5173/login?returnTo=%2Fpage-builder",
+      "title": "Madar",
+      "theme": "light",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(27, 42, 74)",
+          "background": "color(srgb 1 1 1 / 0.94)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": "Madar"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(27, 42, 74)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213) rgb(27, 42, 74) rgb(27, 42, 74)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(226, 223, 213)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(27, 42, 74)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(226, 223, 213)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign Up\n\nMadar\n\nSimple digital workflows that save time, reduce mistakes, and keep wor"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760244681.238,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "3336.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760244720.239,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "3336.83"
+        }
+      }
+    ]
+  },
+  {
+    "route": "/page-builder",
+    "mode": "dark",
+    "viewport": "mobile",
+    "screenshot": "qa_screenshots/page_builder_dark_mobile.png",
+    "data": {
+      "requested": "/page-builder",
+      "url": "http://localhost:5173/login?returnTo=%2Fpage-builder",
+      "title": "Madar",
+      "theme": "dark",
+      "bodyBackground": "rgba(0, 0, 0, 0)",
+      "htmlBackground": "rgba(0, 0, 0, 0)",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "hasHorizontalOverflow": false,
+      "elements": [
+        {
+          "selector": "header",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(22, 31, 51, 0.94)",
+          "border": "rgb(42, 54, 80)",
+          "display": "grid",
+          "text": "Madar"
+        },
+        {
+          "selector": "main",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(237, 239, 244)",
+          "display": "grid",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        },
+        {
+          "selector": "footer",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80) rgb(237, 239, 244) rgb(237, 239, 244)",
+          "display": "block",
+          "text": "Madar\n\nSimple digital workflows that save time, reduce mistakes, and keep work m"
+        },
+        {
+          "selector": "button",
+          "color": "rgb(168, 177, 196)",
+          "background": "color(srgb 0.0862745 0.121569 0.2 / 0.82)",
+          "border": "rgba(0, 0, 0, 0)",
+          "display": "grid",
+          "text": ""
+        },
+        {
+          "selector": "input",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgb(22, 31, 51)",
+          "border": "rgb(42, 54, 80)",
+          "display": "block",
+          "text": ""
+        },
+        {
+          "selector": ".card, .feature-card, .pricing-card, .contact-card, .login-card, .register-card, .dashboard-panel, .overview-card, .builder-panel",
+          "color": "rgb(237, 239, 244)",
+          "background": "rgba(0, 0, 0, 0)",
+          "border": "rgb(42, 54, 80)",
+          "display": "flex",
+          "text": "Log In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\n"
+        }
+      ],
+      "visibleText": "Madar\nLog In\n\nWelcome back. Log in to continue to your Madar account.\n\nEmail\nPassword\nForgot password?\nLog In\n\nDon't have an account? Sign Up\n\nMadar\n\nSimple digital workflows that save time, reduce mistakes, and keep wor"
+    },
+    "errors": [
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED",
+          "timestamp": 1782760247430.843,
+          "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap",
+          "networkRequestId": "13276.81"
+        }
+      },
+      {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+          "timestamp": 1782760247472.395,
+          "url": "http://localhost:5173/api/auth/refresh",
+          "networkRequestId": "13276.83"
+        }
+      }
+    ]
+  }
+]

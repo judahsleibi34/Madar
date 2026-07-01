@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Column menu
    ============================================================ */
 
@@ -27,8 +27,8 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 18px;
   padding: 12px;
-  background: #ffffff;
-  box-shadow: 0 24px 70px rgba(26, 39, 68, 0.16);
+  background: var(--theme-surface);
+  box-shadow: 0 24px 70px rgba(var(--theme-shadow-rgb), 0.16);
 }
 
 .page-builder .daw-column-menu-panel > div {
@@ -45,7 +45,7 @@
   min-height: 38px;
   padding: 8px 10px;
   border-radius: 12px;
-  background: rgba(26, 39, 68, 0.04);
+  background: rgba(var(--theme-shadow-rgb), 0.04);
   color: var(--daw-text);
   font-size: 12px;
   font-weight: 850;

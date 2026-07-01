@@ -1,12 +1,15 @@
-const globalColorControls = [
-  ["background", "App background"],
-  ["surface", "Surface"],
-  ["softSurface", "Soft surface"],
-  ["text", "Text"],
-  ["muted", "Muted"],
-  ["primary", "Primary"],
-  ["accent", "Accent"],
-  ["accentDark", "Accent dark"],
+import { useState } from "react";
+import { defaultTheme } from "../core/PageBuilder.constants";
+
+const websiteColorControls = [
+  ["background", "Page background"],
+  ["surface", "Content surface"],
+  ["softSurface", "Alternate section"],
+  ["text", "Main text"],
+  ["muted", "Secondary text"],
+  ["accent", "Brand accent"],
+  ["accentDark", "Accent hover"],
+  ["buttonText", "Button text"],
 ];
 
 const formColorControls = [
@@ -21,15 +24,15 @@ const formColorControls = [
 ];
 
 const colorFallbacks = {
-  background: "#f5f2ee",
+  background: "#fafaf7",
   surface: "#ffffff",
-  softSurface: "#fbfaf8",
+  softSurface: "#f7f5ef",
   inputBackground: "#ffffff",
-  text: "#1a2744",
-  muted: "#6d7484",
-  primary: "#1a2744",
-  accent: "#8b1e18",
-  accentDark: "#b32620",
+  text: "#1b2a4a",
+  muted: "#6f7787",
+  primary: "#1b2a4a",
+  accent: "#852c21",
+  accentDark: "#6f241b",
   border: "#d8dde6",
   buttonText: "#ffffff",
 };
@@ -37,10 +40,125 @@ const colorFallbacks = {
 const getColorValue = (value, fallback = "#000000") =>
   /^#[0-9a-f]{6}$/i.test(String(value || "")) ? value : fallback;
 
+const getThemeElementStyles = (element = {}) => {
+  const baseStyles = { ...(element.styles || {}) };
+
+  if (element.type === "heading") {
+    return {
+      ...baseStyles,
+      color: "var(--theme-text)",
+      backgroundColor: "",
+    };
+  }
+
+  if (element.type === "text") {
+    return {
+      ...baseStyles,
+      color: "var(--theme-text-soft)",
+      backgroundColor: "",
+    };
+  }
+
+  if (element.type === "button") {
+    return {
+      ...baseStyles,
+      color: "var(--theme-text-inverse)",
+      backgroundColor: "var(--theme-primary)",
+    };
+  }
+
+  if (
+    [
+      "card",
+      "list",
+      "metric",
+      "embed",
+      "loginBlock",
+      "registrationBlock",
+      "formBlock",
+      "reservationBlock",
+      "responsesTable",
+    ].includes(element.type)
+  ) {
+    return {
+      ...baseStyles,
+      color: baseStyles.color || "var(--theme-text)",
+      backgroundColor: "var(--theme-surface)",
+    };
+  }
+
+  return baseStyles;
+};
+
+const applyThemeToElement = (element = {}) => ({
+  ...element,
+  styles: getThemeElementStyles(element),
+});
+
+const applyThemeToSection = (section = {}, sectionIndex = 0) => ({
+  ...section,
+  layout: {
+    ...(section.layout || {}),
+    background: sectionIndex % 2 === 0 ? "var(--theme-bg)" : "var(--theme-bg-soft)",
+  },
+  rows: (section.rows || []).map((row) => ({
+    ...row,
+    columns: (row.columns || []).map((column) => ({
+      ...column,
+      elements: (column.elements || []).map(applyThemeToElement),
+    })),
+  })),
+  freeElements: (section.freeElements || []).map(applyThemeToElement),
+});
+
 export default function PageBuilderThemeTab({
   project,
   updateProject,
+  saveProject,
 }) {
+  const [savingTheme, setSavingTheme] = useState(false);
+
+  const saveTheme = async () => {
+    if (!saveProject || savingTheme) return;
+
+    setSavingTheme(true);
+    try {
+      await saveProject();
+    } finally {
+      setSavingTheme(false);
+    }
+  };
+
+  const resetWebsiteTheme = () => {
+    updateProject((prev) => ({
+      ...prev,
+      theme: {
+        ...defaultTheme,
+        form: prev.theme?.form || {},
+      },
+    }));
+  };
+
+  const resetFormTheme = () => {
+    updateProject((prev) => ({
+      ...prev,
+      theme: {
+        ...prev.theme,
+        form: {},
+      },
+    }));
+  };
+
+  const applyThemeToPageBlocks = () => {
+    updateProject((prev) => ({
+      ...prev,
+      pages: (prev.pages || []).map((page) => ({
+        ...page,
+        sections: (page.sections || []).map(applyThemeToSection),
+      })),
+    }));
+  };
+
   const updateThemeValue = (key, value) => {
     updateProject((prev) => ({
       ...prev,
@@ -68,11 +186,26 @@ export default function PageBuilderThemeTab({
     <div className="workspace-page theme-workspace-page">
       <section className="theme-section">
         <div className="theme-section-heading">
-          <h3>Builder Theme</h3>
+          <div>
+            <span className="workspace-kicker">Website</span>
+            <h3>Website theme</h3>
+            <p>Controls the published site colors, typography, buttons, header, footer, and page canvas.</p>
+          </div>
+          <div className="theme-section-actions">
+            <button type="button" className="theme-reset-button" onClick={resetWebsiteTheme}>
+              Reset website colors
+            </button>
+            <button type="button" className="theme-reset-button" onClick={applyThemeToPageBlocks}>
+              Apply theme to page blocks
+            </button>
+            <button type="button" className="theme-save-button" onClick={saveTheme} disabled={savingTheme || !saveProject}>
+              {savingTheme ? "Saving..." : "Save website theme"}
+            </button>
+          </div>
         </div>
 
         <div className="theme-grid">
-          {globalColorControls.map(([key, label]) => (
+          {websiteColorControls.map(([key, label]) => (
             <label className="theme-control" key={key}>
               {label}
               <input
@@ -105,7 +238,14 @@ export default function PageBuilderThemeTab({
 
       <section className="theme-section">
         <div className="theme-section-heading">
-          <h3>Forms Theme</h3>
+          <div>
+            <span className="workspace-kicker">Website forms</span>
+            <h3>Form appearance</h3>
+            <p>Controls forms embedded on published website pages.</p>
+          </div>
+          <button type="button" className="theme-reset-button" onClick={resetFormTheme}>
+            Use website colors
+          </button>
         </div>
 
         <div className="theme-grid">

@@ -14,8 +14,6 @@ import {
   Grid2X2,
   MessageSquare,
   PieChart,
-  Rocket,
-  Settings,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -233,7 +231,10 @@ export default function UserDashboard({ user }) {
 
   const displayName =
     user?.first_name || user?.name || user?.email || t("user.fallbackName");
-  const features = Array.isArray(user?.features) ? user.features : [];
+  const features = useMemo(
+    () => (Array.isArray(user?.features) ? user.features : []),
+    [user]
+  );
   const subscriptionType = user?.subscription_type || "";
   const activePlan = user?.plan || "";
   const activeBuilderType = user?.builder_type || "";
@@ -400,17 +401,6 @@ export default function UserDashboard({ user }) {
           </span>
           <h1>{t("userDashboard.header.title", { name: displayName })}</h1>
           <p>{t("userDashboard.header.subtitle")}</p>
-        </div>
-
-        <div className="user-dashboard-header-actions">
-          <button type="button" onClick={() => navigate("/settings")}>
-            <Settings size={18} />
-            {t("userDashboard.actions.settings")}
-          </button>
-          <button type="button" className="is-primary" onClick={() => navigate("/page-builder")}>
-            <Rocket size={18} />
-            {t("userDashboard.actions.openBuilder")}
-          </button>
         </div>
       </header>
 

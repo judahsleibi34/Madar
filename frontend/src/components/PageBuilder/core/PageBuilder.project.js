@@ -114,7 +114,7 @@ const normalizeBuilderPageShape = (page, fallbackPage) => {
   return createPage(source.name || fallbackPage?.name || "Home", sections, {
     ...source,
     slug: source.slug || source.path || fallbackPage?.slug || "/",
-    backgroundColor: source.backgroundColor || fallbackPage?.backgroundColor || "#ffffff",
+    backgroundColor: source.backgroundColor || fallbackPage?.backgroundColor || "var(--theme-surface)",
     visibility: source.visibility || fallbackPage?.visibility || "public",
     showInNavigation:
       typeof source.showInNavigation === "boolean"

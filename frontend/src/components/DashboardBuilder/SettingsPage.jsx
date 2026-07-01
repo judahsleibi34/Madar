@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImagePlus, KeyRound, Save, X } from "lucide-react";
 import SmartLink from "../SmartLink";
@@ -22,10 +22,23 @@ const AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const BUILDER_ASSET_MAX_BYTES = 5 * 1024 * 1024;
 const BUILDER_ASSET_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const BLOCKED_STORED_URL_SCHEMES = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+const CONTROL_CHARS_PATTERN = new RegExp(
+  `[${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}]`,
+  "u"
+);
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
+
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
+};
 
 const readBuilderProject = () => {
   try {
@@ -114,7 +127,7 @@ const getStoredImageUrlError = (url) => {
   const cleanUrl = String(url || "").trim();
 
   if (!cleanUrl) return "";
-  if (CONTROL_CHARACTER_PATTERN.test(cleanUrl)) return "invalid";
+  if (CONTROL_CHARS_PATTERN.test(cleanUrl)) return "invalid";
   if (cleanUrl.startsWith("//")) return "invalid";
 
   if (cleanUrl.startsWith("/")) {
@@ -190,13 +203,13 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
   const isArabic = lang === "ar";
   const t = getSettingsContent(lang);
-  const userApiPath = (path) => {
+  const userApiPath = useCallback((path) => {
     if (!user?.id) {
       throw new Error(t.sessionExpired);
     }
 
     return `${API_URL}/users/${encodeURIComponent(user.id)}${path}`;
-  };
+  }, [t.sessionExpired, user]);
 
   const avatarUrl = resolveMediaUrl(accountForm.avatar);
   const shouldShowAvatarImage = Boolean(avatarUrl) && !avatarLoadFailed;
@@ -339,12 +352,16 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
   };
 
   useEffect(() => {
-    setAccountForm(getInitialAccountForm(user));
-    setAvatarLoadFailed(false);
+    return deferEffectStateUpdate(() => {
+      setAccountForm(getInitialAccountForm(user));
+      setAvatarLoadFailed(false);
+    });
   }, [user]);
 
   useEffect(() => {
-    setAvatarLoadFailed(false);
+    return deferEffectStateUpdate(() => {
+      setAvatarLoadFailed(false);
+    });
   }, [accountForm.avatar]);
 
   useEffect(() => {
@@ -394,7 +411,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     return () => {
       cancelled = true;
     };
-  }, [onUserUpdated, t.accountError, t.sessionExpired]);
+  }, [onUserUpdated, t.accountError, t.sessionExpired, userApiPath]);
 
   useEffect(() => {
     let cancelled = false;

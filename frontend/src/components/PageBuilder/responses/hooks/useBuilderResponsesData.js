@@ -12,6 +12,16 @@ import {
   uniqueByNormalizedStatus,
 } from "../utils/responsesUtils";
 
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
+};
+
 export function useBuilderResponsesData({
   project,
   builderProjectId,
@@ -41,14 +51,19 @@ export function useBuilderResponsesData({
 
   useEffect(() => {
     if (!builderProjectId || !selectedFormId) {
-      setResponsesLoading(false);
-      setResponsesError("");
-      return undefined;
+      return deferEffectStateUpdate(() => {
+        setResponsesLoading(false);
+        setResponsesError("");
+      });
     }
 
     let cancelled = false;
-    setResponsesLoading(true);
-    setResponsesError("");
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setResponsesLoading(true);
+        setResponsesError("");
+      }
+    });
 
     fetchBuilderFormSubmissionsPage(builderProjectId, {
       form_id: selectedFormId,
@@ -150,16 +165,21 @@ export function useBuilderResponsesData({
   ).length;
 
   useEffect(() => {
-    setSelectedResponseId("");
-    setSelectedFieldIds([]);
-    setSearchQuery("");
-    setSelectedStatuses([]);
+    return deferEffectStateUpdate(() => {
+      setSelectedResponseId("");
+      setSelectedFieldIds([]);
+      setSearchQuery("");
+      setSelectedStatuses([]);
+    });
   }, [selectedFormId]);
 
   useEffect(() => {
     if (!selectedResponseId && displayedResponses[0]?.id) {
-      setSelectedResponseId(displayedResponses[0].id);
+      return deferEffectStateUpdate(() => {
+        setSelectedResponseId(displayedResponses[0].id);
+      });
     }
+    return undefined;
   }, [displayedResponses, selectedResponseId]);
 
   const refreshResponses = () => {

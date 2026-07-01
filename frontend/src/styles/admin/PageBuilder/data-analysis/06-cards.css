@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Cards
    ============================================================ */
 
@@ -7,9 +7,9 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88)),
+    linear-gradient(180deg, rgba(var(--theme-text-inverse-rgb), 0.96), rgba(var(--theme-text-inverse-rgb), 0.88)),
     var(--daw-card-bg);
-  box-shadow: 0 24px 70px rgba(26, 39, 68, 0.09);
+  box-shadow: 0 24px 70px rgba(var(--theme-shadow-rgb), 0.09);
 }
 
 .page-builder .daw-section-card,

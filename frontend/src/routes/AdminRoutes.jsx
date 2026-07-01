@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import Dashboard from "../components/DashboardBuilder/Dashboard";
+import AdminAccountAccessPage from "../components/DashboardBuilder/AdminAccountAccessPage";
 import UserManagementPage from "../components/DashboardBuilder/UserManagementPage";
 import { appShellContent } from "../content";
 import { DashboardShell, RestrictedAccessWindow } from "./shared";
@@ -56,29 +57,44 @@ export default function AdminRoutes({
       />
 
       <Route
+        path="/admin/account-access/*"
+        element={renderShell(
+          <AdminAccountAccessPage
+            lang={lang}
+            themeMode={themeMode}
+            currentUser={user}
+          />
+        )}
+      />
+
+      <Route
         path="/page-builder/*"
         element={renderRestrictedPage(
           appShellContent.restrictedAccess.workspaceOnly
         )}
       />
+
       <Route
         path="/builder-responses/*"
         element={renderRestrictedPage(
           appShellContent.restrictedAccess.workspaceOnly
         )}
       />
+
       <Route
         path="/builder-data/*"
         element={renderRestrictedPage(
           appShellContent.restrictedAccess.workspaceOnly
         )}
       />
+
       <Route
         path="/my-plan/*"
         element={renderRestrictedPage(
           appShellContent.restrictedAccess.workspaceOnly
         )}
       />
+
       <Route
         path="/settings/*"
         element={renderRestrictedPage(

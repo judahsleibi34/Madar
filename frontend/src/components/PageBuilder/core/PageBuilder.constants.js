@@ -36,6 +36,16 @@ export const builderTabs = [
     helper: "Create forms and place them on pages.",
   },
   {
+    id: "reservations",
+    label: "Reservations",
+    helper: "Edit appointment blocks, services, and time slots.",
+  },
+  {
+    id: "chrome",
+    label: "Header & Footer",
+    helper: "Manage the site header, footer, navigation, links, and contact details.",
+  },
+  {
     id: "users",
     label: "Users",
     helper: "Manage team members, roles, and permissions.",
@@ -43,7 +53,7 @@ export const builderTabs = [
   {
     id: "theme",
     label: "Themes",
-    helper: "Control global colors, typography, spacing, and radius.",
+    helper: "Control the published website colors, typography, buttons, and form styling.",
   },
   {
     id: "publish",
@@ -98,6 +108,7 @@ export const elementTypes = [
   { id: "metric", label: "Metric", group: "Dashboard" },
   { id: "loginBlock", label: "Login Form", group: "Auth" },
   { id: "registrationBlock", label: "Registration Form", group: "Auth" },
+  { id: "reservationBlock", label: "Reservation", group: "Bookings" },
   { id: "formBlock", label: "Form Block", group: "Connected" },
 ];
 
@@ -163,15 +174,16 @@ export const defaultPermissions = {
 export const defaultTheme = {
   mode: "light",
   name: "Madar Light",
-  background: "#f5f2ee",
+  background: "#fafaf7",
   surface: "#ffffff",
-  softSurface: "#fbfaf8",
-  text: "#1a2744",
-  muted: "#6d7484",
-  primary: "#1a2744",
-  accent: "var(--theme-primary)",
-  accentDark: "var(--theme-primary-hover)",
-  border: "rgba(26, 39, 68, 0.12)",
+  softSurface: "#f7f5ef",
+  text: "#1b2a4a",
+  muted: "#6f7787",
+  primary: "#1b2a4a",
+  accent: "#852c21",
+  accentDark: "#6f241b",
+  buttonText: "#ffffff",
+  border: "rgba(27, 42, 74, 0.12)",
   radius: 18,
   fontFamily: "Inter",
 };
@@ -180,15 +192,16 @@ export const themePresets = {
   light: {
     mode: "light",
     name: "Madar Light",
-    background: "#f5f2ee",
+    background: "#fafaf7",
     surface: "#ffffff",
-    softSurface: "#fbfaf8",
-    text: "#1a2744",
-    muted: "#6d7484",
-    primary: "#1a2744",
-    accent: "var(--theme-primary)",
-    accentDark: "var(--theme-primary-hover)",
-    border: "rgba(26, 39, 68, 0.12)",
+    softSurface: "#f7f5ef",
+    text: "#1b2a4a",
+    muted: "#6f7787",
+    primary: "#1b2a4a",
+    accent: "#852c21",
+    accentDark: "#6f241b",
+    buttonText: "#ffffff",
+    border: "rgba(27, 42, 74, 0.12)",
     radius: 18,
     fontFamily: "Inter",
   },
@@ -202,8 +215,9 @@ export const themePresets = {
     text: "#f4f0e8",
     muted: "#98a4b7",
     primary: "#f4f0e8",
-    accent: "#8b1e18",
-    accentDark: "#b32620",
+    accent: "#852c21",
+    accentDark: "#c94730",
+    buttonText: "#ffffff",
     border: "rgba(244, 240, 232, 0.12)",
     radius: 18,
     fontFamily: "Inter",
@@ -217,6 +231,8 @@ export const defaultSiteChrome = {
   logoUrl: "",
   headerAlign: "center",
   headerButtonLabel: "Contact",
+  headerButtonHref: "Contact",
+  headerButtonPageId: "",
   description:
     "An adaptive business management platform for creating and managing digital systems.",
   contactEmail: "info@madar.com",
@@ -230,7 +246,6 @@ export const defaultSiteChrome = {
   footerSocialLinks: "Facebook\nLinkedIn\nX\nInstagram",
   footerPaymentMethods: "Visa\nMastercard\nApple Pay\nGoogle Pay",
   footerLanguageLabel: "AR",
-  madarLink: "/",
 };
 
 export const starterSystems = [

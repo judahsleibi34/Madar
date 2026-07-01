@@ -40,6 +40,28 @@ import {
   cloneWithNewIds,
   createPosition,
 } from "../core/PageBuilder.factories";
+
+function normalizeRuntimeAnswerValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeRuntimeAnswerValue);
+  }
+
+  if (value && typeof value === "object" && "value" in value) {
+    return value.value;
+  }
+
+  return value;
+}
+
+const deferEffectStateUpdate = (callback) => {
+  let cancelled = false;
+  queueMicrotask(() => {
+    if (!cancelled) callback();
+  });
+  return () => {
+    cancelled = true;
+  };
+};
 import {
   heroSection,
   formSection,
@@ -47,11 +69,12 @@ import {
   createInitialProject,
 } from "../core/PageBuilder.starters";
 import { sanitizeSubdomain } from "../core/PageBuilder.routing";
-import { parseCarouselSlides, serializeCarouselSlides } from "../ui/PageBuilderCarousel";
+import { parseCarouselSlides, serializeCarouselSlides } from "../ui/PageBuilderCarousel.utils";
 import PageBuilderTopbar from "../ui/PageBuilderTopbar";
 import PageBuilderSubbar from "../ui/PageBuilderSubbar";
 import {
   FormsTab,
+  ReservationsTab,
   DataTab,
   ResponsesTab,
   UsersTab,
@@ -114,6 +137,7 @@ import {
   directElementHeight,
   getMetricItems,
   getMetricMinimumHeight,
+  getDirectElementMinimumSize,
   getSectionCanvasHeight,
   convertSectionToDirectLayout,
   positionsOverlap,
@@ -145,8 +169,6 @@ import {
 } from "../core/PageBuilder.storage";
 import {
   findElementLocationInPage,
-  getResponseCountFromProject,
-  getSavedRecordCountFromProject,
   getFieldTypeById,
   createBuilderUrlErrorCollector,
   getElementSectionFromPage,
@@ -190,8 +212,10 @@ const getFieldType = (type) => getFieldTypeById(fieldTypes, type);
 const builderTabPathById = {
   design: "/page-builder/pages",
   forms: "/page-builder/forms",
+  reservations: "/page-builder/reservations",
+  chrome: "/page-builder/header-footer",
   users: "/page-builder/users",
-  theme: "/page-builder/theme",
+  theme: "/page-builder/website-theme",
   publish: "/page-builder/publish",
   data: "/page-builder/data",
   responses: "/page-builder/responses",
@@ -202,8 +226,16 @@ const builderTabIdByPathSegment = {
   pages: "design",
   design: "design",
   forms: "forms",
+  reservations: "reservations",
+  chrome: "chrome",
+  "header-footer": "chrome",
+  header: "chrome",
+  footer: "chrome",
   users: "users",
   theme: "theme",
+  themes: "theme",
+  "website-theme": "theme",
+  "site-theme": "theme",
   publish: "publish",
   data: "data",
   responses: "responses",
@@ -269,7 +301,6 @@ export default function PageBuilder({
   demoMode = false,
   templateLang = lang,
   appThemeMode = "light",
-  onAppThemeModeChange,
   user = null,
 } = {}) {
   const location = useLocation();
@@ -296,7 +327,9 @@ export default function PageBuilder({
   const [dragState, setDragState] = useState(null);
   const [paletteDropSectionId, setPaletteDropSectionId] = useState("");
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
+  const [sectionPendingDelete, setSectionPendingDelete] = useState(null);
   const [pagePendingDelete, setPagePendingDelete] = useState(null);
+  const [userPendingDelete, setUserPendingDelete] = useState(null);
   const [previewOverlapWarnings, setPreviewOverlapWarnings] = useState([]);
   const [, setInsertTarget] = useState(null);
   const [runtimeAnswers, setRuntimeAnswers] = useState({});
@@ -310,10 +343,17 @@ export default function PageBuilder({
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
+  const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
   const [textSelection, setTextSelection] = useState(null);
+  const pendingTabNavigationRef = useRef("");
   const backendAutosaveTimerRef = useRef(null);
   const backendProjectSnapshotRef = useRef("");
   const pendingBackendProjectSnapshotRef = useRef("");
+
+  const showToast = useCallback((message) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2200);
+  }, []);
 
   const setActiveTab = useCallback(
     (nextTab) => {
@@ -321,6 +361,7 @@ export default function PageBuilder({
 
       if (hideWorkspaceTabs) return;
 
+      pendingTabNavigationRef.current = nextTab;
       const nextPath = builderTabPathById[nextTab];
       if (nextPath && location.pathname !== nextPath) {
         navigate(nextPath);
@@ -331,11 +372,15 @@ export default function PageBuilder({
 
   useEffect(() => {
     if (!routeTab) return;
-    setActiveTabState(routeTab);
-    if (routeTab !== "design" && modal === "starter") {
-      setModal(null);
-      setActiveTopbarAction("");
-    }
+    if (pendingTabNavigationRef.current) return;
+
+    return deferEffectStateUpdate(() => {
+      setActiveTabState(routeTab);
+      if (routeTab !== "design" && modal === "starter") {
+        setModal(null);
+        setActiveTopbarAction("");
+      }
+    });
   }, [modal, routeTab]);
 
   useEffect(() => {
@@ -345,16 +390,30 @@ export default function PageBuilder({
     }
   }, [hideWorkspaceTabs, location.pathname, navigate, routeTab]);
 
-  const openPreviewPage = () => {
-    persistProjectNow(project);
-    window.open("/page-builder/preview", "_blank", "noopener,noreferrer");
-  };
+  useEffect(() => {
+    if (hideWorkspaceTabs) return;
+    if (pendingTabNavigationRef.current) {
+      const pendingTab = pendingTabNavigationRef.current;
+      const pendingPath = builderTabPathById[pendingTab];
 
-  const openFormPreviewPage = (formId = activeForm?.id) => {
-    if (!formId) return;
-    persistProjectNow(project);
-    window.open(`/page-builder/form-preview/${formId}`, "_blank", "noopener,noreferrer");
-  };
+      if (!pendingPath) {
+        pendingTabNavigationRef.current = "";
+      } else if (location.pathname !== pendingPath) {
+        navigate(pendingPath, { replace: true });
+        return;
+      } else {
+        pendingTabNavigationRef.current = "";
+      }
+
+    }
+
+    if (routeTab && routeTab !== activeTab) return;
+
+    const nextPath = builderTabPathById[activeTab];
+    if (nextPath && location.pathname !== nextPath) {
+      navigate(nextPath, { replace: true });
+    }
+  }, [activeTab, hideWorkspaceTabs, location.pathname, navigate, routeTab]);
 
   useEffect(() => {
     const requiresLayoutNormalization =
@@ -369,8 +428,52 @@ export default function PageBuilder({
 
     if (!requiresLayoutNormalization) return;
 
-    setProject((currentProject) => cleanBuilderProject(currentProject));
+    return deferEffectStateUpdate(() => {
+      setProject((currentProject) => cleanBuilderProject(currentProject));
+    });
   }, [project]);
+
+  useEffect(() => {
+    if (demoMode) return undefined;
+
+    const syncSerializedProject = (serializedProject) => {
+      if (!serializedProject) return;
+      try {
+        const nextProject = cleanBuilderProject(JSON.parse(serializedProject));
+
+        setProject((currentProject) => {
+          const currentSerialized = JSON.stringify(cleanBuilderProject(currentProject));
+          const nextSerialized = JSON.stringify(nextProject);
+
+          return currentSerialized === nextSerialized ? currentProject : nextProject;
+        });
+      } catch (error) {
+        console.warn("Could not sync builder draft from another tab:", error);
+      }
+    };
+
+    const syncDraftFromStorage = () => {
+      syncSerializedProject(localStorage.getItem(STORAGE_KEY));
+    };
+
+    const handleDraftStorageUpdate = (event) => {
+      if (event.key !== STORAGE_KEY) return;
+      syncSerializedProject(event.newValue);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") syncDraftFromStorage();
+    };
+
+    window.addEventListener("storage", handleDraftStorageUpdate);
+    window.addEventListener("focus", syncDraftFromStorage);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("storage", handleDraftStorageUpdate);
+      window.removeEventListener("focus", syncDraftFromStorage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [demoMode]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -446,7 +549,7 @@ export default function PageBuilder({
     return () => {
       cancelled = true;
     };
-  }, [demoMode, persistProjectNow, user?.id]);
+  }, [demoMode, persistProjectNow, showToast, user?.id]);
 
   useEffect(() => {
     if (demoMode) {
@@ -520,39 +623,59 @@ export default function PageBuilder({
     };
   }, [builderProjectLoading, demoMode, project]);
 
-
-  const safeProjectPages = Array.isArray(project?.pages) ? project.pages : [];
-  const safeProjectForms = Array.isArray(project?.forms) ? project.forms : [];
-  const safeProjectWorkflows = Array.isArray(project?.workflows)
-    ? project.workflows
-    : [];
-  const safeProjectRoles = Array.isArray(project?.roles) ? project.roles : [];
+  const safeProjectPages = useMemo(
+    () => (Array.isArray(project.pages) ? project.pages : []),
+    [project.pages]
+  );
+  const safeProjectForms = useMemo(
+    () => (Array.isArray(project.forms) ? project.forms : []),
+    [project.forms]
+  );
+  const safeProjectWorkflows = useMemo(
+    () => (Array.isArray(project.workflows) ? project.workflows : []),
+    [project.workflows]
+  );
+  const safeProjectRoles = useMemo(
+    () => (Array.isArray(project.roles) ? project.roles : []),
+    [project.roles]
+  );
 
   const activePage = useMemo(
     () =>
-      safeProjectPages.find((page) => page.id === project?.activePageId) ||
+      safeProjectPages.find((page) => page.id === project.activePageId) ||
       safeProjectPages[0] ||
       null,
-    [safeProjectPages, project?.activePageId]
+    [safeProjectPages, project.activePageId]
   );
 
   const activeForm = useMemo(
     () =>
-      safeProjectForms.find((form) => form.id === project?.activeFormId) ||
+      safeProjectForms.find((form) => form.id === project.activeFormId) ||
       safeProjectForms[0] ||
       null,
-    [safeProjectForms, project?.activeFormId]
+    [safeProjectForms, project.activeFormId]
   );
 
   const activeWorkflow = useMemo(
     () =>
       safeProjectWorkflows.find(
-        (workflow) => workflow.id === project?.activeWorkflowId
+        (workflow) => workflow.id === project.activeWorkflowId
       ) ||
       safeProjectWorkflows[0] ||
       null,
-    [safeProjectWorkflows, project?.activeWorkflowId]
+    [safeProjectWorkflows, project.activeWorkflowId]
   );
+
+  const openPreviewPage = () => {
+    persistProjectNow(project);
+    window.open("/page-builder/preview", "_blank", "noopener,noreferrer");
+  };
+
+  const openFormPreviewPage = (formId = activeForm?.id) => {
+    if (!formId) return;
+    persistProjectNow(project);
+    window.open(`/page-builder/form-preview/${formId}`, "_blank", "noopener,noreferrer");
+  };
 
   const selectedSection = useMemo(() => {
     if (selected.type !== "section") return null;
@@ -621,34 +744,73 @@ export default function PageBuilder({
     return null;
   }, [activePage, selected]);
 
+  const reservationBlocks = useMemo(() => {
+    const blocks = [];
+
+    (project.pages || []).forEach((page) => {
+      (page.sections || []).forEach((section) => {
+        if (section.mode === "direct") {
+          (section.freeElements || []).forEach((element) => {
+            if (element.type === "reservationBlock") {
+              blocks.push({ element, page, section });
+            }
+          });
+        }
+
+        (section.rows || []).forEach((row) => {
+          (row.columns || []).forEach((column) => {
+            (column.elements || []).forEach((element) => {
+              if (element.type === "reservationBlock") {
+                blocks.push({ element, page, section });
+              }
+            });
+          });
+        });
+      });
+    });
+
+    return blocks;
+  }, [project.pages]);
+
+  const reservationFormOptions = useMemo(
+    () =>
+      reservationBlocks.map((block, index) => {
+        const reservation = block.element.reservation || {};
+        const title = reservation.title || block.element.name || `Reservation ${index + 1}`;
+        const modeLabel = reservation.bookingMode === "flexible" ? "Date request" : "Fixed slots";
+
+        return {
+          id: block.element.id,
+          label: `${index + 1}. ${title}`,
+          meta: `${modeLabel} - ${block.page.name}`,
+        };
+      }),
+    [reservationBlocks]
+  );
+
+  const getReservationBlockValue = useCallback(
+    (element) => {
+      const sourceId = element?.connectedReservationBlockId;
+      if (!sourceId || sourceId === element?.id) return element?.reservation || null;
+
+      const source = reservationBlocks.find((block) => block.element.id === sourceId)?.element;
+      return source?.reservation || element?.reservation || null;
+    },
+    [reservationBlocks]
+  );
+
   const selectedRole = useMemo(() => {
     if (selected.type !== "role") return null;
     return safeProjectRoles.find((role) => role.id === selected.id) || null;
   }, [safeProjectRoles, selected]);
 
-  const showToast = (message) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 2200);
-  };
-
-  const updateProject = (updater) => {
+  const updateProject = useCallback((updater) => {
     setProject((prev) => updater(prev));
-  };
+  }, []);
 
   const setThemeMode = (mode) => {
     updateProject((prev) => applyThemeModeToProject(prev, mode));
-
-    if (typeof onAppThemeModeChange === "function") {
-      onAppThemeModeChange(mode);
-    }
   };
-
-  useEffect(() => {
-    if (!appThemeMode) return;
-    if (project.theme?.mode === appThemeMode) return;
-
-    setProject((prev) => applyThemeModeToProject(prev, appThemeMode));
-  }, [appThemeMode, project.theme?.mode]);
 
   const updateActivePage = (updater) => {
     updateProject((prev) => ({
@@ -774,6 +936,14 @@ export default function PageBuilder({
     setPagePendingDelete(activePage);
   };
 
+  const deleteSelectedSection = () => {
+    if (!selectedSection) return;
+    setSectionPendingDelete({
+      id: selectedSection.id,
+      name: selectedSection.name || "Section",
+    });
+  };
+
   const confirmDeleteActivePage = () => {
     if (!pagePendingDelete) return;
     const nextPage = project.pages.find((page) => page.id !== pagePendingDelete.id) || null;
@@ -786,32 +956,16 @@ export default function PageBuilder({
     setPagePendingDelete(null);
   };
 
-  const addBlankSection = () => {
-    const section = convertSectionToDirectLayout(
-      createSection({
-        name: `Section ${(activePage?.sections?.length || 0) + 1}`,
-        layout: { width: "full", minHeight: 480 },
-        rows: [],
-      })
+  const confirmDeleteSelectedSection = () => {
+    if (!sectionPendingDelete?.id || !activePage) return;
+    const sectionId = sectionPendingDelete.id;
+
+    updateSections((sections) =>
+      (sections || []).filter((section) => section.id !== sectionId)
     );
-    updateSections((sections) => [...sections, section]);
-    setSelected({ type: "section", id: section.id });
-    showToast("Empty section added. Drag a component into it.");
-  };
-
-  const duplicateSelectedSection = () => {
-    if (!selectedSection) return;
-    const copy = cloneWithNewIds(selectedSection);
-    copy.name = `${selectedSection.name} Copy`;
-
-    updateSections((sections) => {
-      const index = sections.findIndex((item) => item.id === selectedSection.id);
-      const next = [...sections];
-      next.splice(index + 1, 0, copy);
-      return next;
-    });
-
-    setSelected({ type: "section", id: copy.id });
+    setSelected({ type: "page", id: activePage.id });
+    setSectionPendingDelete(null);
+    showToast("Section deleted.");
   };
 
   const {
@@ -856,14 +1010,6 @@ export default function PageBuilder({
           : section
       )
     );
-  };
-
-  const deleteSelectedSection = () => {
-    if (!selectedSection) return;
-    if (!window.confirm(`Delete section "${selectedSection.name}"?`)) return;
-
-    updateSections((sections) => sections.filter((section) => section.id !== selectedSection.id));
-    setSelected({ type: "page", id: activePage.id });
   };
 
   const addRowToSelectedSection = () => {
@@ -984,7 +1130,7 @@ export default function PageBuilder({
     );
   };
 
-  const addComponentToSection = (type, requestedSectionId = "", dropPoint = null) => {
+  const addComponentToSection = (type, requestedSectionId = "", dropPoint = null, overrides = {}) => {
     const element = createElement(
       type,
       type === "formBlock"
@@ -1032,7 +1178,7 @@ export default function PageBuilder({
       );
     });
 
-    const nextElement = { ...element, mode: "direct", position: nextPosition };
+    const nextElement = { ...element, ...overrides, mode: "direct", position: nextPosition };
     const updateTarget = (section) => ({
       ...section,
       layout: {
@@ -1112,6 +1258,114 @@ export default function PageBuilder({
         };
       })
     );
+  };
+
+  const updateReservationBlock = (elementId, updates) => {
+    const merge = (element) => ({
+      ...element,
+      ...updates,
+      styles: { ...element.styles, ...(updates.styles || {}) },
+      action: { ...element.action, ...(updates.action || {}) },
+    });
+
+    updateProject((prev) => ({
+      ...prev,
+      pages: prev.pages.map((page) => ({
+        ...page,
+        sections: page.sections.map((section) => {
+          if (section.mode === "direct") {
+            return {
+              ...section,
+              freeElements: (section.freeElements || []).map((element) =>
+                element.id === elementId ? merge(element) : element
+              ),
+            };
+          }
+
+          return {
+            ...section,
+            rows: (section.rows || []).map((row) => ({
+              ...row,
+              columns: (row.columns || []).map((column) => ({
+                ...column,
+                elements: (column.elements || []).map((element) =>
+                  element.id === elementId ? merge(element) : element
+                ),
+              })),
+            })),
+          };
+        }),
+      })),
+    }));
+  };
+
+  const selectReservationBlock = (elementId, pageId) => {
+    updateProject((prev) => ({ ...prev, activePageId: pageId || prev.activePageId }));
+    setSelected({ type: "element", id: elementId });
+  };
+
+  const resizeReservationBlockForEditing = (elementId) => {
+    updateProject((prev) => ({
+      ...prev,
+      pages: prev.pages.map((page) => ({
+        ...page,
+        sections: page.sections.map((section) => {
+          const resizeElement = (element) => {
+            if (element.id !== elementId || element.type !== "reservationBlock") return element;
+
+            const nextPosition = {};
+            ["desktop", "tablet", "mobile"].forEach((viewportName) => {
+              const base = element.position?.[viewportName] || createPosition()[viewportName];
+              const canvasWidth = viewports[viewportName] || viewports.desktop;
+              const targetWidth = viewportName === "mobile" ? 360 : 760;
+              const targetHeight = 770;
+
+              nextPosition[viewportName] = {
+                ...base,
+                width: Math.min(Math.max(Number(base.width) || targetWidth, targetWidth), canvasWidth - 24),
+                height: Math.max(Number(base.height) || targetHeight, targetHeight),
+              };
+            });
+
+            return { ...element, position: { ...(element.position || {}), ...nextPosition } };
+          };
+
+          if (section.mode === "direct") {
+            return {
+              ...section,
+              freeElements: (section.freeElements || []).map(resizeElement),
+            };
+          }
+
+          return {
+            ...section,
+            rows: (section.rows || []).map((row) => ({
+              ...row,
+              columns: (row.columns || []).map((column) => ({
+                ...column,
+                elements: (column.elements || []).map(resizeElement),
+              })),
+            })),
+          };
+        }),
+      })),
+    }));
+  };
+
+  const openReservationBlockOnPage = (elementId, pageId) => {
+    resizeReservationBlockForEditing(elementId);
+    selectReservationBlock(elementId, pageId);
+    setActiveTab("design");
+    setDesignPanel("Sections");
+  };
+
+  const deleteReservationBlock = (elementId, pageId) => {
+    const item = reservationBlocks.find((block) => block.element.id === elementId);
+    selectReservationBlock(elementId, pageId);
+    setElementPendingDelete({
+      id: elementId,
+      name: item?.element?.reservation?.title || item?.element?.name || "Reservation block",
+    });
   };
 
   const updateSelectedElementPlacement = (value) => {
@@ -1219,6 +1473,23 @@ export default function PageBuilder({
     showToast("Element deleted.");
   };
 
+  const confirmDeletePendingUser = () => {
+    if (!userPendingDelete?.id) return;
+    const userId = userPendingDelete.id;
+
+    updateProject((prev) => ({
+      ...prev,
+      users: (prev.users || []).filter((item) => item.id !== userId),
+    }));
+
+    if (selected.type === "user" && selected.id === userId) {
+      setSelected({ type: "page", id: activePage?.id || project.activePageId || null });
+    }
+
+    setUserPendingDelete(null);
+    showToast("User deleted.");
+  };
+
   const findElementLocation = (elementId) =>
     findElementLocationInPage(activePage, elementId);
 
@@ -1235,11 +1506,8 @@ export default function PageBuilder({
     showToast,
     createRole,
     createUser,
+    requestDeleteUser: setUserPendingDelete,
   });
-  const getResponseCount = () => getResponseCountFromProject(project);
-
-  const getSavedRecordCount = () => getSavedRecordCountFromProject(project);
-
   const setAnswer = (formId, fieldId, value) => {
     setRuntimeAnswers((prev) => ({
       ...prev,
@@ -1264,7 +1532,7 @@ export default function PageBuilder({
     });
   };
 
-  const lockFocusedQuizAttempt = (formId) => {
+  const lockFocusedQuizAttempt = useCallback((formId) => {
     setQuizSessions((prev) => {
       const session = prev[formId];
       if (!session?.active || session.locked) return prev;
@@ -1281,7 +1549,7 @@ export default function PageBuilder({
     });
 
     showToast("Focus mode was interrupted. This quiz cannot be retaken.");
-  };
+  }, [showToast]);
 
   const startQuizSession = (form) => {
     const settings = getQuizSettings(form);
@@ -1311,7 +1579,7 @@ export default function PageBuilder({
     }
   };
 
-  const moveQuizQuestion = (form, direction) => {
+  const moveQuizQuestion = useCallback((form, direction) => {
     const fields = getFormFields(form);
     const settings = getQuizSettings(form);
 
@@ -1337,21 +1605,9 @@ export default function PageBuilder({
         },
       };
     });
-  };
+  }, []);
 
-  const normalizeRuntimeAnswerValue = (value) => {
-    if (Array.isArray(value)) {
-      return value.map(normalizeRuntimeAnswerValue);
-    }
-
-    if (value && typeof value === "object" && "value" in value) {
-      return value.value;
-    }
-
-    return value;
-  };
-
-  const submitRuntimeForm = (form, { skipValidation = false } = {}) => {
+  const submitRuntimeForm = useCallback((form, { skipValidation = false } = {}) => {
     const enteredAnswers = runtimeAnswers[form.id] || {};
     const answers = getFormFields(form).reduce((acc, field) => {
       if (enteredAnswers[field.id] !== undefined) {
@@ -1398,7 +1654,7 @@ export default function PageBuilder({
     } else {
       showToast(form.successMessage);
     }
-  };
+  }, [runtimeAnswers, showToast]);
 
   const runElementAction = (element) =>
     runElementActionWithHandlers({
@@ -1465,7 +1721,52 @@ export default function PageBuilder({
       showToast("Saved to backend.");
     } catch (error) {
       console.error("Could not save builder project:", error);
-      showToast("Saved local draft cache. Backend save failed.");
+      const statusLabel = error?.status ? ` (${error.status})` : "";
+      showToast(`Saved local draft cache. Backend save failed${statusLabel}.`);
+    }
+  };
+
+  const saveThemeProject = async () => {
+    setActiveTopbarAction("theme");
+
+    const nextProject = {
+      ...project,
+      publish: {
+        ...project.publish,
+        lastSavedAt: new Date().toISOString(),
+      },
+    };
+
+    if (demoMode) {
+      persistProject(nextProject, "Website theme saved for this demo session.");
+      return;
+    }
+
+    if (builderProjectLoading) {
+      showToast("Builder project is still loading. Try saving again in a moment.");
+      return;
+    }
+
+    persistProject(nextProject, "Saving website theme...");
+
+    try {
+      const payload = createBuilderProjectPayload({
+        project: nextProject,
+        builderProjectRecord,
+        getBuilderProjectName,
+        getBuilderProjectSlug,
+      });
+
+      const savedRecord = builderProjectRecord?.id
+        ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
+        : await createBuilderProject(payload, user?.id);
+
+      setBuilderProjectRecord(savedRecord);
+      showToast("Website theme saved.");
+    } catch (error) {
+      console.error("Could not save website theme:", error);
+      const statusLabel = error?.status ? ` (${error.status})` : "";
+      showToast(`Saved local theme draft. Backend save failed${statusLabel}.`);
     }
   };
 
@@ -1688,7 +1989,7 @@ Go live anyway?`
 
     setSelected({ type: "section", id: section.id });
     setActiveTab("design");
-    setDesignPanel("Layers");
+    setDesignPanel("Sections");
     showToast("Form added to the selected page.");
   };
 
@@ -1712,6 +2013,7 @@ Go live anyway?`
       findElementLocation,
       getSectionCanvasHeight,
       getMetricMinimumHeight,
+      getDirectElementMinimumSize,
     });
 
   const getDirectElementFrameStyle = (element) => {
@@ -1992,15 +2294,80 @@ Go live anyway?`
       getMetricMinimumHeight,
       snapToGrid,
     });
+    const constrainedCandidate =
+      dragState.interaction === "resize"
+        ? (() => {
+            const spacing = 12;
+            const currentElements = section.freeElements || [];
+            const minimumSize = getDirectElementMinimumSize(selectedElement);
+
+            return currentElements
+              .filter((element) => element.id !== selectedElement.id)
+              .reduce((nextCandidate, element) => {
+                const other = element.position?.[viewport] || createPosition()[viewport];
+                if (!positionsOverlap(nextCandidate, other, spacing)) return nextCandidate;
+
+                const verticalRangesMeet =
+                  nextCandidate.y < other.y + other.height + spacing &&
+                  nextCandidate.y + nextCandidate.height + spacing > other.y;
+                const horizontalRangesMeet =
+                  nextCandidate.x < other.x + other.width + spacing &&
+                  nextCandidate.x + nextCandidate.width + spacing > other.x;
+                const isRightSideNeighbor =
+                  other.x >= dragState.startX + dragState.startWidth + spacing;
+                const clamped = { ...nextCandidate };
+
+                if (isRightSideNeighbor && verticalRangesMeet) {
+                  clamped.width = Math.max(
+                    Math.min(minimumSize.width, canvasWidth - nextCandidate.x),
+                    snapToGrid(other.x - nextCandidate.x - spacing)
+                  );
+                }
+
+                if (other.y >= nextCandidate.y && horizontalRangesMeet) {
+                  clamped.height = Math.max(
+                    minimumSize.height,
+                    snapToGrid(other.y - nextCandidate.y - spacing)
+                  );
+                }
+
+                return clamped;
+              }, candidate);
+          })()
+        : candidate;
 
     const current = selectedElement.position?.[viewport] || createPosition()[viewport];
+    const requiredSectionHeight = snapToGrid((Number(constrainedCandidate.y) || 0) + (Number(constrainedCandidate.height) || 0) + 48);
+
+    if (dragState.interaction === "resize" && requiredSectionHeight > canvasHeight) {
+      updateSections((sections) =>
+        sections.map((item) =>
+          item.id === section.id
+            ? {
+                ...item,
+                layout: {
+                  ...item.layout,
+                  minHeight:
+                    viewport === "desktop"
+                      ? requiredSectionHeight
+                      : item.layout?.minHeight,
+                  minHeightByViewport: {
+                    ...(item.layout?.minHeightByViewport || {}),
+                    [viewport]: requiredSectionHeight,
+                  },
+                },
+              }
+            : item
+        )
+      );
+    }
 
     updateSelectedElement({
       position: {
         ...selectedElement.position,
         [viewport]: {
           ...current,
-          ...candidate,
+          ...constrainedCandidate,
         },
       },
     });
@@ -2134,7 +2501,7 @@ Go live anyway?`
         }
       }
     });
-  }, [quizSessions, project.forms]);
+  }, [moveQuizQuestion, quizSessions, project.forms, submitRuntimeForm]);
 
   useEffect(() => {
     const lockActiveFocusedQuizzes = () => {
@@ -2165,7 +2532,7 @@ Go live anyway?`
       window.removeEventListener("blur", lockActiveFocusedQuizzes);
       window.removeEventListener("pagehide", lockActiveFocusedQuizzes);
     };
-  }, [quizSessions, project.forms]);
+  }, [lockFocusedQuizAttempt, quizSessions, project.forms]);
 
   const renderElement = createElementRenderer({
     carouselElementTypes,
@@ -2180,6 +2547,7 @@ Go live anyway?`
     captureCanvasTextSelection,
     runElementAction,
     renderConnectedForm,
+    getReservationBlockValue,
   });
 
   const {
@@ -2193,31 +2561,193 @@ Go live anyway?`
     selectPage,
     setSelected,
   });
-  const getSectionLayerElements = (section) => {
-    if (!section) return [];
 
-    if (section.mode === "direct") {
-      return Array.isArray(section.freeElements) ? section.freeElements : [];
-    }
+  const siteChrome = { ...defaultSiteChrome, ...(project.siteChrome || {}) };
+  const updateSiteChrome = useCallback((updates) => {
+    updateProject((prev) => ({
+      ...prev,
+      siteChrome: {
+        ...defaultSiteChrome,
+        ...(prev.siteChrome || {}),
+        ...updates,
+      },
+    }));
+  }, [updateProject]);
 
-    return (section.rows || []).flatMap((row) =>
-      (row.columns || []).flatMap((column) => column.elements || [])
+  useEffect(() => {
+    setLogoUrlDraft(siteChrome.logoUrl || "");
+  }, [siteChrome.logoUrl]);
+
+  const applyLogoUrl = useCallback(() => {
+    updateSiteChrome({ logoUrl: logoUrlDraft.trim() });
+    showToast("Logo URL applied.");
+  }, [logoUrlDraft, showToast, updateSiteChrome]);
+
+  const getHeaderButtonPageTargetId = useCallback(
+    (targetValue = "") => {
+      const normalizedTarget = String(targetValue || "").toLowerCase().replace(/^\//, "").trim();
+      if (!normalizedTarget) return "";
+
+      const targetPage = safeProjectPages.find((page) => {
+        const normalizedId = String(page.id || "").toLowerCase();
+        const normalizedName = String(page.name || "").toLowerCase().trim();
+        const normalizedSlug = String(page.slug || "").toLowerCase().replace(/^\//, "").trim();
+        return (
+          normalizedId === normalizedTarget ||
+          normalizedName === normalizedTarget ||
+          normalizedSlug === normalizedTarget
+        );
+      });
+
+      return targetPage?.id || "";
+    },
+    [safeProjectPages]
+  );
+
+  const headerButtonPageId =
+    getHeaderButtonPageTargetId(siteChrome.headerButtonPageId) ||
+    getHeaderButtonPageTargetId(siteChrome.headerButtonHref) ||
+    getHeaderButtonPageTargetId(siteChrome.headerButtonLabel) ||
+    "";
+
+  const updateHeaderButtonPageTarget = useCallback(
+    (pageId) => {
+      const targetPage = safeProjectPages.find((page) => page.id === pageId);
+      updateSiteChrome({
+        headerButtonPageId: pageId,
+        headerButtonHref: targetPage?.slug || "",
+      });
+    },
+    [safeProjectPages, updateSiteChrome]
+  );
+
+  const getSiteChromeListItems = useCallback(
+    (fieldKey) => {
+      const value = String(siteChrome[fieldKey] || "");
+      const items = value.split("\n");
+      return items.length && items.some((item) => item.trim()) ? items : [""];
+    },
+    [siteChrome]
+  );
+
+  const updateSiteChromeListItem = useCallback(
+    (fieldKey, index, value) => {
+      const items = getSiteChromeListItems(fieldKey);
+      items[index] = value;
+      updateSiteChrome({ [fieldKey]: items.join("\n") });
+    },
+    [getSiteChromeListItems, updateSiteChrome]
+  );
+
+  const addSiteChromeListItem = useCallback(
+    (fieldKey) => {
+      updateSiteChrome({ [fieldKey]: [...getSiteChromeListItems(fieldKey), ""].join("\n") });
+    },
+    [getSiteChromeListItems, updateSiteChrome]
+  );
+
+  const removeSiteChromeListItem = useCallback(
+    (fieldKey, index) => {
+      const nextItems = getSiteChromeListItems(fieldKey).filter((_, itemIndex) => itemIndex !== index);
+      updateSiteChrome({ [fieldKey]: (nextItems.length ? nextItems : [""]).join("\n") });
+    },
+    [getSiteChromeListItems, updateSiteChrome]
+  );
+
+  const renderFooterPageLinksEditor = () => {
+    const fieldKey = "footerShopLinks";
+    const label = "Pages links";
+    const items = getSiteChromeListItems(fieldKey);
+    const selectedPageIds = items.map((item) => getHeaderButtonPageTargetId(item));
+
+    return (
+      <div className="site-chrome-list-editor">
+        <div className="site-chrome-list-editor-header">
+          <span>{label}</span>
+          <button
+            type="button"
+            onClick={() => addSiteChromeListItem(fieldKey)}
+            disabled={!safeProjectPages.length || safeProjectPages.every((page) => selectedPageIds.includes(page.id))}
+          >
+            + Add
+          </button>
+        </div>
+        <div className="site-chrome-list-rows">
+          {items.map((item, index) => {
+            const selectedPageId = getHeaderButtonPageTargetId(item);
+
+            return (
+              <div className="site-chrome-list-row" key={`${fieldKey}-${index}`}>
+                <span className="site-chrome-list-bullet" aria-hidden="true" />
+                <select
+                  aria-label={`${label} item ${index + 1}`}
+                  value={selectedPageId}
+                  onChange={(event) => {
+                    updateSiteChromeListItem(fieldKey, index, event.target.value);
+                  }}
+                >
+                  <option value="">Select a builder page</option>
+                  {safeProjectPages.map((page) => (
+                    <option
+                      key={page.id}
+                      value={page.id}
+                      disabled={selectedPageIds.some((pageId, selectedIndex) => pageId === page.id && selectedIndex !== index)}
+                    >
+                      {page.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  aria-label={`Remove ${label} item ${index + 1}`}
+                  title="Remove item"
+                  onClick={() => removeSiteChromeListItem(fieldKey, index)}
+                >
+                  x
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <span className="site-chrome-field-help">Only pages created in this builder can be added to this footer column.</span>
+      </div>
     );
   };
 
-  const getElementLayerLabel = (element, elementIndex, elements = []) => {
-    const typeLabel =
-      elementTypes.find((item) => item.id === element.type)?.label ||
-      element.type ||
-      "Element";
+  const renderFooterListEditor = (fieldKey, label, placeholder) => {
+    const items = getSiteChromeListItems(fieldKey);
 
-    const sameTypeIndex =
-      elements
-        .slice(0, elementIndex + 1)
-        .filter((item) => item.type === element.type).length;
-
-    return element.name || `${typeLabel} ${sameTypeIndex}`;
+    return (
+      <div className="site-chrome-list-editor">
+        <div className="site-chrome-list-editor-header">
+          <span>{label}</span>
+          <button type="button" onClick={() => addSiteChromeListItem(fieldKey)}>+ Add</button>
+        </div>
+        <div className="site-chrome-list-rows">
+          {items.map((item, index) => (
+            <div className="site-chrome-list-row" key={`${fieldKey}-${index}`}>
+              <span className="site-chrome-list-bullet" aria-hidden="true" />
+              <input
+                aria-label={`${label} item ${index + 1}`}
+                value={item}
+                placeholder={placeholder}
+                onChange={(event) => updateSiteChromeListItem(fieldKey, index, event.target.value)}
+              />
+              <button
+                type="button"
+                aria-label={`Remove ${label} item ${index + 1}`}
+                title="Remove item"
+                onClick={() => removeSiteChromeListItem(fieldKey, index)}
+              >
+                x
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
+
   const renderDesignTab = () => (
     <div className="builder-layout">
       {!preview && (
@@ -2339,47 +2869,34 @@ Go live anyway?`
                   </div>
                 ))}
               </div>
-            </section>
-          )}
 
-          {designPanel === "Layers" && (
-            <section className="builder-panel">
-              <h2>Layers</h2>
-              <p className="panel-help">Page outline. Select a section or component to edit it.</p>
-              <div className="layer-tree">
-                {activePage?.sections.map((section, sectionIndex) => {
-                  const elements = getSectionLayerElements(section);
-
-                  return (
-                    <div key={section.id} className="layer-item">
-                      <button
-                        type="button"
-                        className={`layer-section-button ${selected.id === section.id ? "active" : ""}`}
-                        onClick={() => setSelected({ type: "section", id: section.id })}
-                      >
-                        {section.name || `Section ${sectionIndex + 1}`}
-                      </button>
-
-                      <div className="layer-children">
-                        {elements.length > 0 ? (
-                          elements.map((element, elementIndex) => (
-                            <button
-                              type="button"
-                              key={element.id}
-                              className={`layer-element-button ${selected.id === element.id ? "active" : ""}`}
-                              onClick={() => setSelected({ type: "element", id: element.id })}
-                            >
-                              {getElementLayerLabel(element, elementIndex, elements)}
-                            </button>
-                          ))
-                        ) : (
-                          <span className="layer-empty">No components yet</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="page-danger-zone">
+                <div>
+                  <strong>Remove selected section</strong>
+                  <small>
+                    {selectedSection
+                      ? `Delete ${selectedSection.name || "the selected section"} from this page.`
+                      : "Select a section on the canvas first."}
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  className="page-delete-action"
+                  onClick={deleteSelectedSection}
+                  disabled={!selectedSection}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                  <span>Delete section</span>
+                </button>
               </div>
+
+              <button
+                type="button"
+                className="page-preview-action"
+                onClick={handlePreviewClick}
+              >
+                {builderCopy.topbar.preview}
+              </button>
             </section>
           )}
 
@@ -2395,7 +2912,10 @@ Go live anyway?`
       >
         <div
           className={`builder-canvas viewport-${viewport}`}
-          style={getPreviewCanvasStyle(viewport, preview, viewports)}
+          style={{
+            ...getPageBuilderThemeVars(project.theme),
+            ...getPreviewCanvasStyle(viewport, preview, viewports),
+          }}
         >
           {renderSiteHeader()}
 
@@ -2579,57 +3099,16 @@ Go live anyway?`
           <h3>Page Settings</h3>
           <label>Page name<input value={activePage.name} onChange={(event) => updateActivePage((page) => ({ ...page, name: event.target.value }))} /></label>
           <label>Page link<input value={activePage.slug} onChange={(event) => updateActivePage((page) => ({ ...page, slug: event.target.value }))} /></label>
-          <label>Page background<input type="color" value={activePage.backgroundColor || "#ffffff"} onChange={(event) => updateActivePage((page) => ({ ...page, backgroundColor: event.target.value }))} /></label>
-
-          <details>
-            <summary>Website Header & Footer</summary>
-            <label>Brand name<input value={project.siteChrome?.brand || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), brand: event.target.value } }))} /></label>
-            <label>Contact email<input value={project.siteChrome?.contactEmail || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), contactEmail: event.target.value } }))} /></label>
-            <label>Phone<input value={project.siteChrome?.phone || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), phone: event.target.value } }))} /></label>
-            <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-            <label className="upload-image-button">
-              {assetUploadBusy ? "Uploading..." : "Upload logo"}
-              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
-            </label>
-            <label>Footer brand name<input value={project.siteChrome?.footerStoreName || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerStoreName: event.target.value } }))} /></label>
-            <label>Footer description<textarea value={project.siteChrome?.description || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), description: event.target.value } }))} /></label>
-            <label>Footer rights<input value={project.siteChrome?.rights || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), rights: event.target.value } }))} /></label>
-            <label>Footer pages<textarea value={project.siteChrome?.footerShopLinks || ""} placeholder="One link per line" onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerShopLinks: event.target.value } }))} /></label>
-            <label>Footer help links<textarea value={project.siteChrome?.footerHelpLinks || ""} placeholder="One link per line" onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerHelpLinks: event.target.value } }))} /></label>
-            <label>Social links<textarea value={project.siteChrome?.footerSocialLinks || ""} placeholder="One item per line" onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerSocialLinks: event.target.value } }))} /></label>
-          </details>
         </div>
       )}
 
-      {selected.type === "siteHeader" && (
+      {(selected.type === "siteHeader" || selected.type === "siteFooter") && (
         <div className="inspector-group">
-          <h3>Header</h3>
-          <label>Brand name<input value={project.siteChrome?.brand || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), brand: event.target.value } }))} /></label>
-          <label>Logo URL<input value={project.siteChrome?.logoUrl || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), logoUrl: event.target.value } }))} /></label>
-          <label className="upload-image-button">
-            {assetUploadBusy ? "Uploading..." : "Upload logo"}
-            <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
-          </label>
-          <label>Header button<input value={project.siteChrome?.headerButtonLabel || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerButtonLabel: event.target.value } }))} /></label>
-          <label>Header alignment<select value={project.siteChrome?.headerAlign || "center"} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), headerAlign: event.target.value } }))}>
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select></label>
-        </div>
-      )}
-
-      {selected.type === "siteFooter" && (
-        <div className="inspector-group">
-          <h3>Footer</h3>
-          <label>Footer brand name<input value={project.siteChrome?.footerStoreName || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerStoreName: event.target.value } }))} /></label>
-          <label>Footer description<textarea value={project.siteChrome?.description || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), description: event.target.value } }))} /></label>
-          <label>Contact email<input value={project.siteChrome?.contactEmail || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), contactEmail: event.target.value } }))} /></label>
-          <label>Phone<input value={project.siteChrome?.phone || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), phone: event.target.value } }))} /></label>
-          <label>Footer pages<textarea value={project.siteChrome?.footerShopLinks || ""} placeholder="One link per line" onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerShopLinks: event.target.value } }))} /></label>
-          <label>Footer help links<textarea value={project.siteChrome?.footerHelpLinks || ""} placeholder="One link per line" onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerHelpLinks: event.target.value } }))} /></label>
-          <label>Social links<textarea value={project.siteChrome?.footerSocialLinks || ""} placeholder="One item per line" onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), footerSocialLinks: event.target.value } }))} /></label>
-          <label>Footer rights<input value={project.siteChrome?.rights || ""} onChange={(event) => updateProject((prev) => ({ ...prev, siteChrome: { ...(prev.siteChrome || defaultSiteChrome), rights: event.target.value } }))} /></label>
+          <h3>{selected.type === "siteHeader" ? "Header" : "Footer"}</h3>
+          <p className="builder-note">Use the Header & Footer workspace for global site chrome settings.</p>
+          <button type="button" className="full-width-action" onClick={() => setActiveTab("chrome")}>
+            Open Header & Footer
+          </button>
         </div>
       )}
 
@@ -2637,7 +3116,7 @@ Go live anyway?`
         <div className="inspector-group">
           <h3>Section</h3>
           <label>Name<input value={selectedSection.name} onChange={(event) => updateSelectedSection({ name: event.target.value })} /></label>
-          <label>Background<input type="color" value={selectedSection.layout.background === "transparent" ? "#ffffff" : selectedSection.layout.background} onChange={(event) => updateSelectedSection({ layout: { background: event.target.value } })} /></label>
+          <label>Background<input type="color" value={selectedSection.layout.background === "transparent" ? "var(--theme-surface)" : selectedSection.layout.background} onChange={(event) => updateSelectedSection({ layout: { background: event.target.value } })} /></label>
           <label>Width<select value={selectedSection.layout.width} onChange={(event) => updateSelectedSection({ layout: { width: event.target.value } })}>{sectionWidths.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
           <label>Padding<select value={selectedSection.layout.paddingY} onChange={(event) => updateSelectedSection({ layout: { paddingY: event.target.value } })}>{spacingOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
           {selectedSection.mode === "direct" && (
@@ -2696,8 +3175,10 @@ Go live anyway?`
 
       {selected.type === "element" && selectedElement && (
         <div className="inspector-group">
-          <h3>Element</h3>
-          <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
+          <h3>{selectedElement.type === "reservationBlock" ? "Reservation" : "Element"}</h3>
+          {selectedElement.type !== "reservationBlock" && (
+            <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
+          )}
           {carouselElementTypes.has(selectedElement.type) && (
             <details open className="carousel-slide-editor">
               <summary>Carousel slides</summary>
@@ -2759,7 +3240,7 @@ Go live anyway?`
               }}>+ Add item</button>
             </details>
           )}
-          {!carouselElementTypes.has(selectedElement.type) && selectedElement.type !== "list" && selectedElement.type !== "metric" && (
+          {!carouselElementTypes.has(selectedElement.type) && selectedElement.type !== "list" && selectedElement.type !== "metric" && selectedElement.type !== "reservationBlock" && (
             <label>Content<textarea value={selectedElement.content} onSelect={(event) => captureTextSelection(event, "content")} onChange={(event) => updateSelectedElement({ content: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "content") })} /></label>
           )}
           {selectedElement.type === "metric" && (
@@ -2801,11 +3282,15 @@ Go live anyway?`
               <button type="button" onClick={() => updateSelectedElement({ metrics: [...getMetricItems(selectedElement), { label: `Metric ${getMetricItems(selectedElement).length + 1}`, value: "0", description: "Description" }] })}>+ Add metric</button>
             </details>
           )}
-          <label>Text color<input type="color" value={selectedElement.styles.selectedTextColor || selectedElement.styles.color || "#1a2744"} onChange={(event) => applyTextColor(event.target.value)} /></label>
-          <label>Background<input type="color" value={selectedElement.styles.backgroundColor || "#ffffff"} onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })} /></label>
-          <label>Font size<input value={selectedElement.styles.fontSize || ""} placeholder="Example: 18px" onChange={(event) => updateSelectedElement({ styles: { fontSize: event.target.value } })} /></label>
-          <label>Border radius<input value={selectedElement.styles.borderRadius || ""} placeholder="Example: 16px" onChange={(event) => updateSelectedElement({ styles: { borderRadius: event.target.value } })} /></label>
-          <label>Text alignment<select value={selectedElement.styles.textAlign || "left"} onChange={(event) => updateSelectedElement({ styles: { textAlign: event.target.value } })}>{alignmentOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+          {selectedElement.type !== "reservationBlock" && (
+            <>
+              <label>Text color<input type="color" value={selectedElement.styles.selectedTextColor || selectedElement.styles.color || "var(--theme-text)"} onChange={(event) => applyTextColor(event.target.value)} /></label>
+              <label>Background<input type="color" value={selectedElement.styles.backgroundColor || "var(--theme-surface)"} onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })} /></label>
+              <label>Font size<input value={selectedElement.styles.fontSize || ""} placeholder="Example: 18px" onChange={(event) => updateSelectedElement({ styles: { fontSize: event.target.value } })} /></label>
+              <label>Border radius<input value={selectedElement.styles.borderRadius || ""} placeholder="Example: 16px" onChange={(event) => updateSelectedElement({ styles: { borderRadius: event.target.value } })} /></label>
+              <label>Text alignment<select value={selectedElement.styles.textAlign || "left"} onChange={(event) => updateSelectedElement({ styles: { textAlign: event.target.value } })}>{alignmentOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            </>
+          )}
           {selectedElement.mode !== "direct" && (
             <>
               <label>
@@ -2930,6 +3415,38 @@ Go live anyway?`
             <label>Connected form<select value={selectedElement.connectedFormId || ""} onChange={(event) => updateSelectedElement({ connectedFormId: event.target.value })}>{project.forms.map((form) => <option key={form.id} value={form.id}>{form.title}</option>)}</select></label>
           )}
 
+          {selectedElement.type === "reservationBlock" && (
+            <div className="reservation-form-picker">
+              <span>Reservation forms</span>
+              <div className="reservation-form-picker-list">
+                {reservationFormOptions.length === 0 && (
+                  <p className="builder-note">Create a reservation block first.</p>
+                )}
+                {reservationFormOptions.map((option) => {
+                  const isSelected = (selectedElement.connectedReservationBlockId || selectedElement.id) === option.id;
+
+                  return (
+                    <button
+                      type="button"
+                      key={option.id}
+                      className={`reservation-form-picker-item ${isSelected ? "is-selected" : ""}`}
+                      onClick={() => {
+                        const source = reservationBlocks.find((block) => block.element.id === option.id)?.element;
+                        updateSelectedElement({
+                          connectedReservationBlockId: option.id,
+                          ...(source ? { reservation: source.reservation } : {}),
+                        });
+                      }}
+                    >
+                      <strong>{option.label}</strong>
+                      <small>{option.meta}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {selectedElement.type === "image" && (
             <label className="upload-image-button">
               {assetUploadBusy ? "Uploading..." : "Upload image"}
@@ -2976,6 +3493,142 @@ Go live anyway?`
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
   };
+
+  const renderSiteChromeTab = () => (
+    <div className="workspace-page site-chrome-workspace">
+      <header className="workspace-header">
+        <div>
+          <span className="workspace-kicker">Global site settings</span>
+          <h2>Header & Footer</h2>
+          <p>Manage the site header, navigation, footer links, and contact information.</p>
+        </div>
+      </header>
+
+      <section className="site-chrome-layout">
+        <div className="site-chrome-editor">
+          <article className="site-chrome-card">
+            <div className="site-chrome-card-header">
+              <div>
+                <span>Global</span>
+                <h3>Visibility</h3>
+              </div>
+            </div>
+            <div className="site-chrome-toggle-grid">
+              <label className="toggle-field">
+                <input
+                  type="checkbox"
+                  checked={Boolean(siteChrome.showHeader)}
+                  onChange={(event) => updateSiteChrome({ showHeader: event.target.checked })}
+                />
+                <span className="toggle-box" aria-hidden="true" />
+                <span className="toggle-copy">
+                  <strong>Show header</strong>
+                  <small>Show the navigation bar on published pages.</small>
+                </span>
+              </label>
+              <label className="toggle-field">
+                <input
+                  type="checkbox"
+                  checked={Boolean(siteChrome.showFooter)}
+                  onChange={(event) => updateSiteChrome({ showFooter: event.target.checked })}
+                />
+                <span className="toggle-box" aria-hidden="true" />
+                <span className="toggle-copy">
+                  <strong>Show footer</strong>
+                  <small>Show footer links, rights, and contact details.</small>
+                </span>
+              </label>
+            </div>
+          </article>
+
+          <article className="site-chrome-card site-chrome-combined-card">
+            <div className="site-chrome-card-header">
+              <div>
+                <span>Header & footer</span>
+                <h3>Brand, navigation, contact</h3>
+              </div>
+            </div>
+            <div className="site-chrome-horizontal-settings">
+              <div className="site-chrome-pane">
+                <div className="site-chrome-pane-heading">
+                  <span>Header</span>
+                  <strong>Brand and navigation</strong>
+                </div>
+                <div className="site-chrome-form-grid compact">
+                  <label>Brand name<input value={siteChrome.brand || ""} onChange={(event) => updateSiteChrome({ brand: event.target.value })} /></label>
+                  <label>Button text<input value={siteChrome.headerButtonLabel || ""} onChange={(event) => updateSiteChrome({ headerButtonLabel: event.target.value })} /></label>
+                  <label>
+                    Redirects to page
+                    <select value={headerButtonPageId} onChange={(event) => updateHeaderButtonPageTarget(event.target.value)}>
+                      <option value="">Select a builder page</option>
+                      {safeProjectPages.map((page) => (
+                        <option key={page.id} value={page.id}>{page.name}</option>
+                      ))}
+                    </select>
+                    <span className="site-chrome-field-help">Only pages created in this builder can be selected.</span>
+                  </label>
+                  <div className="span-2 site-chrome-logo-row">
+                    <label className="site-chrome-field-title" htmlFor="site-chrome-logo-url">Logo</label>
+                    <span className="site-chrome-logo-control">
+                      <input id="site-chrome-logo-url" value={logoUrlDraft} placeholder="Image URL" onChange={(event) => setLogoUrlDraft(event.target.value)} />
+                      <button type="button" className="upload-image-button site-chrome-logo-apply" onClick={applyLogoUrl}>
+                        Apply URL
+                      </button>
+                      <label className="upload-image-button site-chrome-logo-upload">
+                        {assetUploadBusy ? "Uploading" : "Choose file"}
+                        <input type="file" accept="image/png,image/jpeg,image/webp" disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
+                      </label>
+                    </span>
+                    <small>Paste an image URL or upload a PNG, JPG, or WebP from your computer.</small>
+                  </div>
+                  <label className="span-2">
+                    Header alignment
+                    <select value={siteChrome.headerAlign || "center"} onChange={(event) => updateSiteChrome({ headerAlign: event.target.value })}>
+                      <option value="center">Centered navigation</option>
+                      <option value="split">Split navigation</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="site-chrome-pane">
+                <div className="site-chrome-pane-heading">
+                  <span>Footer</span>
+                  <strong>Contact and rights</strong>
+                </div>
+                <div className="site-chrome-form-grid compact">
+                  <label>Footer brand name<input value={siteChrome.footerStoreName || ""} onChange={(event) => updateSiteChrome({ footerStoreName: event.target.value })} /></label>
+                  <label>Contact email<input value={siteChrome.contactEmail || ""} onChange={(event) => updateSiteChrome({ contactEmail: event.target.value })} /></label>
+                  <label>Phone<input value={siteChrome.phone || ""} onChange={(event) => updateSiteChrome({ phone: event.target.value })} /></label>
+                  <label>Language badge<input value={siteChrome.footerLanguageLabel || ""} onChange={(event) => updateSiteChrome({ footerLanguageLabel: event.target.value })} /></label>
+                  <label className="span-2">Footer description<textarea value={siteChrome.description || ""} onChange={(event) => updateSiteChrome({ description: event.target.value })} /></label>
+                  <label className="span-2">Footer rights<input value={siteChrome.rights || ""} onChange={(event) => updateSiteChrome({ rights: event.target.value })} /></label>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="site-chrome-card">
+            <div className="site-chrome-card-header">
+              <div>
+                <span>Footer links</span>
+                <h3>Columns and social items</h3>
+              </div>
+            </div>
+            <div className="site-chrome-form-grid">
+              <label>Pages column title<input value={siteChrome.footerShopTitle || ""} onChange={(event) => updateSiteChrome({ footerShopTitle: event.target.value })} /></label>
+              <label>Help column title<input value={siteChrome.footerHelpTitle || ""} onChange={(event) => updateSiteChrome({ footerHelpTitle: event.target.value })} /></label>
+              {renderFooterPageLinksEditor()}
+              {renderFooterListEditor("footerHelpLinks", "Help links", "Help item")}
+              {renderFooterListEditor("footerSocialLinks", "Social links", "Social channel")}
+              {renderFooterListEditor("footerPaymentMethods", "Payment labels", "Payment label")}
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  );
+
   const renderDataTab = () => (
   <DataTab
     project={project}
@@ -3106,6 +3759,24 @@ Go live anyway?`
     />
   );
 
+  const renderReservationsTab = () => (
+    <ReservationsTab
+      reservationBlocks={reservationBlocks}
+      activeReservationId={
+        selected.type === "element" && selectedElement?.type === "reservationBlock"
+          ? selected.id
+          : ""
+      }
+      onAddReservationBlock={(reservationOverrides = {}) =>
+        addComponentToSection("reservationBlock", "", null, reservationOverrides)
+      }
+      onOpenReservationBlock={openReservationBlockOnPage}
+      onSelectReservationBlock={selectReservationBlock}
+      onUpdateReservationBlock={updateReservationBlock}
+      onDeleteReservationBlock={deleteReservationBlock}
+    />
+  );
+
   const renderWorkflowsTab = () => (
     <WorkflowsTab
       project={project}
@@ -3140,6 +3811,7 @@ Go live anyway?`
       project={project}
       updateProject={updateProject}
       setThemeMode={setThemeMode}
+      saveProject={saveThemeProject}
     />
   );
 
@@ -3175,6 +3847,8 @@ Go live anyway?`
     if (activeTab === "design") return renderDesignTab();
     if (activeTab === "data") return renderDataTab();
     if (activeTab === "forms") return renderFormsTab();
+    if (activeTab === "reservations") return renderReservationsTab();
+    if (activeTab === "chrome") return renderSiteChromeTab();
     if (activeTab === "responses") return renderResponsesTab();
     if (activeTab === "workflows") return renderWorkflowsTab();
     if (activeTab === "users") return renderUsersTab();
@@ -3230,10 +3904,9 @@ Go live anyway?`
   return (
     <div
       className={getPageBuilderThemeClassName({
-        mode: project.theme?.mode || "light",
+        mode: appThemeMode || "light",
         preview,
       }) + (activeTab === "forms" ? " forms-workspace-active" : "") + (activeTab === "responses" ? " responses-workspace-active" : "")}
-      style={getPageBuilderThemeVars(project.theme)}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={() => setDragState(null)}
@@ -3294,6 +3967,21 @@ Go live anyway?`
         />
       )}
 
+      {sectionPendingDelete && (
+        <PageDeleteConfirmModal
+          title="Delete this section?"
+          message={
+            <>
+              <strong>"{sectionPendingDelete.name}"</strong> and all components inside it will be removed from the page. This cannot be undone.
+            </>
+          }
+          cancelLabel="Keep section"
+          confirmLabel="Delete section"
+          onCancel={() => setSectionPendingDelete(null)}
+          onConfirm={confirmDeleteSelectedSection}
+        />
+      )}
+
       {pagePendingDelete && (
         <PageDeleteConfirmModal
           page={pagePendingDelete}
@@ -3301,6 +3989,21 @@ Go live anyway?`
           confirmLabel="Delete page"
           onCancel={() => setPagePendingDelete(null)}
           onConfirm={confirmDeleteActivePage}
+        />
+      )}
+
+      {userPendingDelete && (
+        <PageDeleteConfirmModal
+          title="Delete this user?"
+          message={
+            <>
+              <strong>"{userPendingDelete.name || userPendingDelete.email}"</strong> will be removed from this builder project. This cannot be undone.
+            </>
+          }
+          cancelLabel="Keep user"
+          confirmLabel="Delete user"
+          onCancel={() => setUserPendingDelete(null)}
+          onConfirm={confirmDeletePendingUser}
         />
       )}
 

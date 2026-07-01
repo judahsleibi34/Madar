@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Actions
    ============================================================ */
 
@@ -21,7 +21,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 18px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(var(--theme-text-inverse-rgb), 0.72);
 }
 
 .page-builder .daw-local-dataset-notice {
@@ -82,8 +82,8 @@
   border-radius: 18px;
   padding: 16px;
   background:
-    linear-gradient(135deg, rgba(var(--theme-primary-rgb), 0.08), rgba(26, 39, 68, 0.04)),
-    #ffffff;
+    linear-gradient(135deg, rgba(var(--theme-primary-rgb), 0.08), rgba(var(--theme-shadow-rgb), 0.04)),
+    var(--theme-surface);
 }
 
 .page-builder .daw-report-submit-row div {

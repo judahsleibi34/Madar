@@ -1,0 +1,1487 @@
+/* Route-by-route visual refinement.
+   Final CSS layer for page-specific polish without changing content or behavior. */
+
+:root {
+  --route-shell-padding: clamp(28px, 5vw, 72px);
+  --route-card-radius: 22px;
+  --route-control-radius: 14px;
+  --route-card-shadow: 0 18px 46px rgba(var(--theme-shadow-rgb), 0.09);
+  --route-card-shadow-hover: 0 22px 52px rgba(var(--theme-shadow-rgb), 0.12);
+}
+
+:root[data-theme="dark"],
+body.theme-dark {
+  --route-card-shadow: 0 22px 58px rgba(4, 8, 16, 0.34);
+  --route-card-shadow-hover: 0 26px 68px rgba(4, 8, 16, 0.42);
+}
+
+.route-loading,
+.restricted-access-page,
+.dashboard-skeleton-layout,
+.forms-loading-shell,
+.form-preview-loading-page {
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-text) !important;
+}
+
+.restricted-access-card,
+.skeleton-card,
+.skeleton-panel,
+.forms-loading-document,
+.forms-loading-controls,
+.form-preview-loading-shell {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  box-shadow: var(--route-card-shadow) !important;
+}
+
+.skeleton-line,
+.forms-loading-line,
+.forms-loading-control,
+.forms-loading-button,
+.forms-loading-pill,
+.forms-loading-textarea,
+.forms-loading-tool,
+.forms-loading-question,
+.form-preview-loading-line,
+.form-preview-loading-input,
+.form-preview-loading-button,
+.form-preview-loading-small-button,
+.form-preview-loading-submit {
+  background: var(--theme-surface-2) !important;
+}
+
+/* Public routes: home, about, product tour, pricing, team, contact */
+.hero-section,
+.about-section,
+.features-page,
+.pricing-page,
+.team-page,
+.contact-page {
+  color: var(--theme-text) !important;
+}
+
+.hero-section,
+.about-section {
+  background: var(--theme-bg-soft) !important;
+}
+
+.hero-content,
+.contact-hero,
+.features-hero,
+.pricing-hero,
+.team-hero {
+  max-width: 1180px;
+}
+
+.hero-title,
+.hero-subtitle,
+.features-hero h1,
+.pricing-hero h1,
+.team-hero h1,
+.contact-hero h1,
+.pricing-section-heading h1,
+.pricing-section-heading h2 {
+  color: var(--theme-text) !important;
+  letter-spacing: 0 !important;
+}
+
+.hero-description,
+.features-hero p,
+.pricing-hero p,
+.team-hero p,
+.contact-hero p,
+.pricing-section-heading p {
+  color: var(--theme-text-soft) !important;
+}
+
+.features-demo-panel,
+.feature-card,
+.pricing-choice-card,
+.pricing-plan-card,
+.pricing-module-card,
+.pricing-custom-summary,
+.team-profile-card,
+.contact-form,
+.contact-info-card,
+.subscription-modal {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: var(--route-card-radius) !important;
+  box-shadow: var(--route-card-shadow) !important;
+}
+
+.contact-form,
+.contact-info-card {
+  background: color-mix(in srgb, var(--theme-surface) 76%, var(--theme-bg-soft)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 82%, transparent) !important;
+  box-shadow:
+    0 16px 36px rgba(var(--theme-shadow-rgb), 0.065),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.64) !important;
+  backdrop-filter: blur(10px);
+}
+
+.contact-form {
+  padding: clamp(22px, 3vw, 30px) !important;
+}
+
+.contact-info-card {
+  background: color-mix(in srgb, var(--theme-surface) 74%, var(--theme-bg-soft)) !important;
+}
+
+.contact-form input,
+.contact-form textarea {
+  background: color-mix(in srgb, var(--theme-surface) 72%, var(--theme-bg-soft)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
+  box-shadow: inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.5) !important;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  background: var(--theme-surface) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
+  box-shadow:
+    0 0 0 4px rgba(var(--theme-primary-rgb), 0.08),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.66) !important;
+}
+
+.hero-visual {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.feature-card:hover,
+.pricing-choice-card:hover,
+.pricing-plan-card:hover,
+.pricing-module-card:hover,
+.team-profile-card:hover,
+.contact-info-card:hover {
+  border-color: rgba(var(--theme-primary-rgb), 0.24) !important;
+  box-shadow: var(--route-card-shadow-hover) !important;
+  transform: translateY(-3px) !important;
+}
+
+.pricing-choice-card.active,
+.pricing-plan-card.recommended,
+.pricing-module-card.selected {
+  border-color: rgba(var(--theme-primary-rgb), 0.36) !important;
+  background: var(--theme-surface) !important;
+}
+
+.pricing-eyebrow,
+.team-eyebrow,
+.user-dashboard-kicker,
+.admin-dashboard-eyebrow,
+.admin-access-eyebrow,
+.my-plan-eyebrow,
+.workspace-kicker,
+.modal-eyebrow,
+.tenant-eyebrow {
+  color: var(--theme-primary) !important;
+  letter-spacing: 0.06em !important;
+}
+
+.pricing-back-button,
+.pricing-plan-button,
+.pricing-choice-card,
+.pricing-module-card,
+.subscription-modal-primary,
+.contact-form button,
+.features-demo-cta {
+  border-radius: var(--route-control-radius) !important;
+}
+
+.pricing-plan-button.primary,
+.subscription-modal-primary,
+.contact-form button {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.pricing-plan-button.primary:hover,
+.subscription-modal-primary:hover,
+.contact-form button:hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+}
+
+.pricing-feature-list .included,
+.pricing-limit-list,
+.pricing-plan-meta,
+.pricing-summary-note,
+.profile-description,
+.contact-info-card p {
+  color: var(--theme-text-soft) !important;
+}
+
+.pricing-module-check,
+.pricing-feature-list .included::marker {
+  color: var(--theme-secondary) !important;
+}
+
+.profile-glow {
+  background: transparent !important;
+  filter: none !important;
+}
+
+.profile-avatar,
+.contact-info-card svg {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+.profile-icon-link {
+  color: var(--theme-text-soft) !important;
+  border-color: var(--theme-border) !important;
+  background: var(--theme-surface-2) !important;
+}
+
+.profile-icon-link:hover {
+  color: var(--theme-text-inverse) !important;
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+}
+
+/* Public header and footer */
+.site-header,
+.mobile-menu,
+.mobile-menu-head,
+.mobile-menu-body {
+  background: color-mix(in srgb, var(--theme-surface) 94%, transparent) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.hamburger,
+.mobile-menu-close,
+.mobile-menu-links a,
+.mobile-theme-toggle,
+.mobile-menu-lang {
+  color: var(--theme-text) !important;
+  border-color: var(--theme-border) !important;
+  background: var(--theme-surface-2) !important;
+}
+
+.mobile-menu-links a.active,
+.mobile-menu-links a:hover {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+}
+
+.site-footer {
+  background: var(--theme-footer-bg) !important;
+  border-top: 1px solid var(--theme-footer-border) !important;
+  color: var(--theme-footer-text) !important;
+}
+
+.footer-links,
+.footer-contact {
+  background: var(--theme-footer-surface) !important;
+  border: 1px solid var(--theme-footer-border) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--theme-text-inverse) 7%, transparent),
+    0 18px 44px rgba(var(--theme-black-rgb), 0.28) !important;
+}
+
+.footer-brand p,
+.footer-link,
+.footer-contact-item span,
+.footer-bottom p {
+  color: var(--theme-footer-text-soft) !important;
+}
+
+.footer-contact-item strong,
+.footer-links h4,
+.footer-contact h4,
+.footer-logo-link span {
+  color: var(--theme-footer-text) !important;
+}
+
+.footer-social-link {
+  color: var(--theme-footer-text) !important;
+  background: color-mix(in srgb, var(--theme-text-inverse) 9%, transparent) !important;
+  border-color: var(--theme-footer-border) !important;
+}
+
+.footer-link:hover,
+.footer-link.active,
+.footer-contact-item:hover,
+.footer-social-link:hover {
+  color: var(--theme-text-inverse) !important;
+}
+
+/* Auth routes */
+.login-page,
+.register-page,
+.forgot-page {
+  background: var(--theme-bg-soft) !important;
+}
+
+.login-card,
+.register-card,
+.forgot-card {
+  border-radius: 24px !important;
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  box-shadow: var(--route-card-shadow) !important;
+}
+
+.login-card::before,
+.register-card::before,
+.forgot-card::before {
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
+}
+
+.auth-section-title,
+.subdomain-preview,
+.form-status-message {
+  border-color: var(--theme-border) !important;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text-soft) !important;
+}
+
+.password-field button {
+  color: var(--theme-text-muted) !important;
+}
+
+.password-field button:hover {
+  color: var(--theme-primary) !important;
+}
+
+.login-submit {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.login-submit:hover {
+  background: var(--theme-primary-hover) !important;
+}
+
+/* Dashboard shell and admin/user pages */
+.admin-dashboard-layout,
+.dashboard-page,
+.user-dashboard-page,
+.admin-dashboard-page,
+.settings-page,
+.change-password-page,
+.my-plan-page,
+.user-management-page,
+.admin-account-access-page {
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-text) !important;
+}
+
+.admin-sidebar,
+.dashboard-sidebar {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: 16px 0 42px rgba(var(--theme-shadow-rgb), 0.08) !important;
+}
+
+.admin-sidebar-brand,
+.admin-sidebar-user-title-row,
+.admin-sidebar-nav a,
+.admin-sidebar-theme-row,
+.admin-sidebar-logout {
+  color: var(--theme-text) !important;
+}
+
+.admin-sidebar-nav a,
+.admin-sidebar-theme-row,
+.admin-sidebar-lang-switcher,
+.admin-sidebar-user,
+.admin-sidebar-logout {
+  border-radius: 16px !important;
+}
+
+.admin-sidebar-nav a:hover,
+.admin-sidebar-nav a.active,
+.admin-sidebar-theme-row:hover {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+}
+
+.admin-sidebar-icon,
+.admin-sidebar-avatar,
+.settings-profile-avatar,
+.user-management-avatar,
+.my-plan-module-card-icon {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.admin-dashboard-hero,
+.admin-dashboard-header,
+.settings-header,
+.my-plan-header,
+.user-management-header,
+.admin-access-hero,
+.overview-card,
+.dashboard-panel,
+.admin-signal-card,
+.user-dashboard-stat,
+.user-dashboard-panel,
+.user-dashboard-form-data-card,
+.settings-card,
+.change-password-card,
+.my-plan-current-card,
+.my-plan-recommendation-card,
+.my-plan-usage-card,
+.my-plan-module-card,
+.my-plan-module-detail,
+.user-management-row,
+.user-management-toolbar,
+.user-management-stats > *,
+.admin-access-info-card,
+.admin-access-form-card,
+.admin-access-activity-card {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: var(--route-card-radius) !important;
+  box-shadow: var(--route-card-shadow) !important;
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-hero,
+.admin-access-hero,
+.my-plan-current-card {
+  background: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-bg-soft)) !important;
+}
+
+.user-dashboard-header {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 4px 0 8px !important;
+}
+
+.user-dashboard-stat,
+.user-dashboard-panel,
+.user-dashboard-form-data-card {
+  background: color-mix(in srgb, var(--theme-surface) 76%, var(--theme-bg-soft)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 84%, transparent) !important;
+  box-shadow:
+    0 16px 38px rgba(var(--theme-shadow-rgb), 0.07),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.55) !important;
+  backdrop-filter: blur(10px);
+}
+
+.user-dashboard-builder-grid button {
+  background: color-mix(in srgb, var(--theme-surface) 62%, var(--theme-bg-soft)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 86%, transparent) !important;
+}
+
+.user-dashboard-plan-meter {
+  background: color-mix(in srgb, var(--theme-bg-soft) 84%, var(--theme-surface)) !important;
+}
+
+.overview-card p,
+.dashboard-panel p,
+.dashboard-panel small,
+.admin-dashboard-header-meta,
+.server-info-list div,
+.user-dashboard-stat p,
+.user-dashboard-panel p,
+.settings-header p,
+.my-plan-header p,
+.user-management-kicker,
+.admin-access-info-row p,
+.change-password-heading p {
+  color: var(--theme-text-soft) !important;
+}
+
+.overview-icon,
+.panel-icon,
+.user-dashboard-stat-icon,
+.user-dashboard-form-data-icon,
+.user-dashboard-plan-icon,
+.admin-access-hero-icon {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.metric-track,
+.admin-signal-track,
+.user-dashboard-usage-track,
+.user-dashboard-plan-meter,
+.my-plan-progress,
+.admin-access-code-progress span {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.metric-fill,
+.admin-signal-fill,
+.user-dashboard-usage-track span,
+.user-dashboard-plan-meter span,
+.my-plan-progress span,
+.admin-access-code-progress span.is-filled {
+  background: var(--theme-primary) !important;
+}
+
+.server-status-healthy,
+.admin-access-success,
+.settings-toast-success,
+.user-management-toast.success {
+  color: var(--theme-success) !important;
+}
+
+.admin-access-error,
+.change-password-error,
+.settings-field-error,
+.user-management-toast.error {
+  color: var(--theme-danger) !important;
+}
+
+.settings-save-button,
+.change-password-submit,
+.my-plan-button.primary,
+.user-management-primary,
+.admin-access-submit,
+.user-dashboard-header-actions .is-primary,
+.admin-dashboard-hero-action {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.settings-save-button:hover,
+.change-password-submit:hover,
+.my-plan-button.primary:hover,
+.user-management-primary:hover,
+.admin-access-submit:hover,
+.user-dashboard-header-actions .is-primary:hover,
+.admin-dashboard-hero-action:hover {
+  background: var(--theme-primary-hover) !important;
+}
+
+.settings-reset-password-button,
+.change-password-cancel,
+.my-plan-button.secondary,
+.user-management-secondary {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.settings-reset-password-button:hover,
+.change-password-cancel:hover,
+.my-plan-button.secondary:hover,
+.user-management-secondary:hover {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+}
+
+.user-management-danger,
+.danger-lite,
+.is-danger {
+  color: var(--theme-danger) !important;
+  border-color: rgba(var(--theme-danger-rgb, 196, 69, 58), 0.28) !important;
+}
+
+/* PageBuilder, reservations, forms, responses, data workspace */
+.page-builder,
+.workspace-page,
+.forms-workbench,
+.responses-results-page,
+.daw-page {
+  background: var(--theme-bg-soft) !important;
+}
+
+.builder-desktop-shell,
+.builder-layout,
+.forms-simple-shell,
+.results-layout,
+.daw-shell {
+  color: var(--theme-text) !important;
+}
+
+.builder-topbar,
+.builder-subbar,
+.workspace-header,
+.builder-sidebar,
+.builder-side-panel,
+.builder-inspector,
+.builder-canvas-shell,
+.builder-modal,
+.template-picker-modal,
+.starter-card,
+.form-editor,
+.form-side-settings,
+.object-list,
+.simple-add-question,
+.simple-side-panel,
+.forms-section-sheet,
+.simple-question-card,
+.quiz-options-drawer,
+.results-table-card,
+.form-info-grid > *,
+.results-empty-state,
+.daw-card,
+.daw-section-card,
+.daw-report-panel,
+.daw-report-canvas-shell,
+.daw-report-page,
+.daw-cleaning-tool,
+.daw-report-block,
+.daw-analysis-generator,
+.reservation-block,
+.reservation-component,
+.reservation-editor-preview-block,
+.reservation-settings-section {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: var(--route-card-shadow) !important;
+}
+
+.page-builder .builder-sidebar,
+.page-builder .builder-inspector,
+.page-builder .builder-side-panel {
+  background: var(--theme-bg-soft) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-panel,
+.page-builder .inspector-group {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.page-builder .inspector-title span,
+.page-builder .starter-card em,
+.page-builder .page-kind-pill {
+  display: none !important;
+}
+
+.page-builder .section-component-palette button {
+  background: color-mix(in srgb, var(--theme-surface) 72%, var(--theme-bg-soft)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
+  box-shadow:
+    0 8px 18px rgba(var(--theme-shadow-rgb), 0.045),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.55) !important;
+}
+
+.page-builder .section-component-palette button:hover {
+  background: color-mix(in srgb, var(--theme-primary-soft) 58%, var(--theme-surface)) !important;
+}
+
+.page-builder .builder-inspector input,
+.page-builder .builder-inspector textarea,
+.page-builder .builder-inspector select,
+.page-builder .builder-inspector details,
+.page-builder .builder-inspector summary,
+.page-builder .builder-inspector .row-editor-card,
+.page-builder .builder-inspector .element-action-grid button {
+  background: color-mix(in srgb, var(--theme-surface) 72%, var(--theme-bg-soft)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
+  box-shadow:
+    0 8px 18px rgba(var(--theme-shadow-rgb), 0.045),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.5) !important;
+}
+
+.page-builder .builder-inspector input[type="color"] {
+  background: color-mix(in srgb, var(--theme-surface) 82%, var(--theme-bg-soft)) !important;
+}
+
+.page-builder .builder-inspector details[open],
+.page-builder .builder-inspector summary:hover,
+.page-builder .builder-inspector .element-action-grid button:hover {
+  background: color-mix(in srgb, var(--theme-primary-soft) 50%, var(--theme-surface)) !important;
+}
+
+.page-builder .builder-inspector label {
+  color: var(--theme-text) !important;
+}
+
+.row-editor-card,
+.metric-editor-item,
+.list-editor-item,
+.option-editor-stack,
+.logic-rule-row,
+.daw-cleaning-option,
+.daw-source-body,
+.daw-file-dropzone,
+.daw-column-picker,
+.daw-data-grid-shell,
+.daw-report-source-popover,
+.daw-report-generated-table-wrap,
+.daw-compact-table-scroll,
+.reservation-calendar,
+.reservation-form-preview,
+.reservation-summary,
+.reservation-field,
+.reservation-calendar-mode-preview,
+.reservation-bullet-row {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+/* PageBuilder global surface balance */
+.page-builder {
+  --builder-bg: color-mix(in srgb, var(--theme-surface) 88%, var(--theme-bg-soft));
+  --builder-surface: color-mix(in srgb, var(--theme-surface) 92%, var(--theme-bg-soft));
+  --builder-surface-raised: color-mix(in srgb, var(--theme-surface) 96%, var(--theme-bg-soft));
+  --builder-surface-muted: color-mix(in srgb, var(--theme-surface) 84%, var(--theme-bg-soft));
+  --builder-border: color-mix(in srgb, var(--theme-border) 62%, transparent);
+  --builder-shadow: 0 8px 18px rgba(var(--theme-shadow-rgb), 0.035);
+  background: var(--builder-bg) !important;
+}
+
+:root[data-theme="dark"] .page-builder,
+body.theme-dark .page-builder {
+  --builder-bg: color-mix(in srgb, var(--theme-bg) 72%, var(--theme-surface));
+  --builder-surface: color-mix(in srgb, var(--theme-surface) 86%, var(--theme-bg));
+  --builder-surface-raised: color-mix(in srgb, var(--theme-surface) 92%, var(--theme-bg));
+  --builder-surface-muted: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-bg));
+  --builder-border: color-mix(in srgb, var(--theme-border) 72%, transparent);
+  --builder-shadow: 0 10px 22px rgba(var(--theme-black-rgb), 0.14);
+}
+
+.page-builder .workspace-page,
+.page-builder .builder-layout,
+.page-builder .builder-canvas-shell,
+.page-builder .builder-sidebar,
+.page-builder .builder-inspector,
+.page-builder .builder-side-panel {
+  background: var(--builder-bg) !important;
+  border-color: var(--builder-border) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-topbar,
+.page-builder .builder-subbar,
+.page-builder .workspace-header,
+.page-builder .builder-modal,
+.page-builder .template-picker-modal,
+.page-builder .starter-card,
+.page-builder .form-editor,
+.page-builder .form-side-settings,
+.page-builder .object-list,
+.page-builder .simple-add-question,
+.page-builder .simple-side-panel,
+.page-builder .forms-section-sheet,
+.page-builder .simple-question-card,
+.page-builder .quiz-options-drawer,
+.page-builder .results-table-card,
+.page-builder .form-info-grid > *,
+.page-builder .results-empty-state,
+.page-builder .daw-card,
+.page-builder .daw-section-card,
+.page-builder .daw-report-panel,
+.page-builder .daw-report-canvas-shell,
+.page-builder .daw-report-page,
+.page-builder .daw-cleaning-tool,
+.page-builder .daw-report-block,
+.page-builder .daw-analysis-generator,
+.page-builder .reservation-block,
+.page-builder .reservation-component,
+.page-builder .reservation-editor-preview-block,
+.page-builder .reservation-settings-section,
+.page-builder .panel-mode-select,
+.page-builder .page-kind-summary,
+.page-builder .page-create-card {
+  background: var(--builder-surface) !important;
+  border-color: var(--builder-border) !important;
+  box-shadow: var(--builder-shadow) !important;
+}
+
+.page-builder .section-component-palette button,
+.page-builder .builder-inspector input,
+.page-builder .builder-inspector textarea,
+.page-builder .builder-inspector select,
+.page-builder .builder-inspector details,
+.page-builder .builder-inspector summary,
+.page-builder .builder-inspector .row-editor-card,
+.page-builder .builder-inspector .element-action-grid button,
+.page-builder .row-editor-card,
+.page-builder .metric-editor-item,
+.page-builder .list-editor-item,
+.page-builder .option-editor-stack,
+.page-builder .logic-rule-row,
+.page-builder .daw-cleaning-option,
+.page-builder .daw-source-body,
+.page-builder .daw-file-dropzone,
+.page-builder .daw-column-picker,
+.page-builder .daw-data-grid-shell,
+.page-builder .daw-report-source-popover,
+.page-builder .daw-report-generated-table-wrap,
+.page-builder .daw-compact-table-scroll,
+.page-builder .reservation-summary,
+.page-builder .reservation-field,
+.page-builder .reservation-calendar-mode-preview,
+.page-builder .reservation-bullet-row {
+  background: var(--builder-surface-raised) !important;
+  border-color: var(--builder-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.page-builder .builder-inspector details,
+.page-builder .builder-inspector summary {
+  box-shadow: var(--builder-shadow) !important;
+}
+
+.page-builder .empty-connected,
+.page-builder .builder-form-preview-shell,
+.page-builder .builder-form-preview-question,
+.page-builder .builder-form-preview-section,
+.page-builder .builder-form-preview-success,
+.page-builder .builder-form-preview-quiz-state {
+  background: var(--builder-surface-raised) !important;
+  border-color: var(--builder-border) !important;
+  box-shadow: var(--builder-shadow) !important;
+}
+
+.page-builder .builder-form-preview-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.page-builder .builder-form-preview-question textarea,
+.page-builder .builder-form-preview-question select {
+  background: var(--builder-surface) !important;
+  border-color: var(--builder-border) !important;
+}
+
+.page-builder .section-component-palette button:hover,
+.page-builder .builder-inspector details[open],
+.page-builder .builder-inspector summary:hover,
+.page-builder .builder-inspector .element-action-grid button:hover {
+  background: color-mix(in srgb, var(--theme-primary-soft) 44%, var(--builder-surface-raised)) !important;
+}
+
+.builder-tool-button,
+.panel-mode-select button,
+.workspace-tabs button,
+.viewport-switcher button,
+.daw-source-tabs button,
+.daw-analysis-domain-grid button,
+.runtime-language-switch button,
+.reservation-mode-switch button,
+.reservation-date-picker-grid button,
+.reservation-time-slots button,
+.runtime-choice,
+.choice-pills button,
+.scale-choice button,
+.rating-choice button {
+  border-color: var(--theme-border) !important;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+}
+
+.builder-tool-button:hover,
+.panel-mode-select button:hover,
+.workspace-tabs button:hover,
+.viewport-switcher button:hover,
+.daw-source-tabs button:hover,
+.daw-analysis-domain-grid button:hover,
+.runtime-choice:hover,
+.choice-pills button:hover,
+.scale-choice button:hover,
+.rating-choice button:hover {
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+}
+
+.builder-tool-button.active,
+.panel-mode-select button.active,
+.workspace-tabs button.active,
+.viewport-switcher button.active,
+.daw-source-tabs button.active,
+.daw-analysis-domain-grid button.active,
+.runtime-language-switch button.active,
+.reservation-mode-switch button.active,
+.reservation-date-picker-grid button.active,
+.reservation-time-slots button.active,
+.runtime-choice.active,
+.choice-pills button.active,
+.scale-choice button.active,
+.rating-choice button.active {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .builder-tool-button,
+.page-builder .panel-mode-select button,
+.page-builder .workspace-tabs button,
+.page-builder .viewport-switcher button,
+.page-builder .daw-source-tabs button,
+.page-builder .daw-analysis-domain-grid button,
+.page-builder .runtime-language-switch button,
+.page-builder .reservation-mode-switch button,
+.page-builder .reservation-date-picker-grid button,
+.page-builder .reservation-time-slots button,
+.page-builder .runtime-choice,
+.page-builder .choice-pills button,
+.page-builder .scale-choice button,
+.page-builder .rating-choice button,
+.page-builder .page-preview-action,
+.page-builder .form-command-button,
+.page-builder .page-delete-modal-secondary,
+.page-builder .madar-website-name-actions button:not(.madar-website-name-primary) {
+  background: var(--builder-surface-raised) !important;
+  border-color: var(--builder-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .workspace-tabs,
+.page-builder .viewport-switcher {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.page-builder .workspace-tabs button,
+.page-builder .viewport-switcher button {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.page-builder .builder-tool-button:hover,
+.page-builder .panel-mode-select button:hover,
+.page-builder .workspace-tabs button:hover,
+.page-builder .viewport-switcher button:hover,
+.page-builder .daw-source-tabs button:hover,
+.page-builder .daw-analysis-domain-grid button:hover,
+.page-builder .runtime-choice:hover,
+.page-builder .choice-pills button:hover,
+.page-builder .scale-choice button:hover,
+.page-builder .rating-choice button:hover,
+.page-builder .page-preview-action:hover,
+.page-builder .form-command-button:hover {
+  background: color-mix(in srgb, var(--theme-primary-soft) 44%, var(--builder-surface-raised)) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  color: var(--theme-primary) !important;
+}
+
+.page-builder .builder-tool-button.active,
+.page-builder .panel-mode-select button.active,
+.page-builder .workspace-tabs button.active,
+.page-builder .viewport-switcher button.active,
+.page-builder .daw-source-tabs button.active,
+.page-builder .daw-analysis-domain-grid button.active,
+.page-builder .runtime-language-switch button.active,
+.page-builder .reservation-mode-switch button.active,
+.page-builder .reservation-date-picker-grid button.active,
+.page-builder .reservation-time-slots button.active,
+.page-builder .runtime-choice.active,
+.page-builder .choice-pills button.active,
+.page-builder .scale-choice button.active,
+.page-builder .rating-choice button.active {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .page-primary-action,
+.page-builder .upload-image-button,
+.page-builder .primary-action,
+.page-builder .full-width-action,
+.page-builder .runtime-submit,
+.page-builder .workspace-header button {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.page-builder .page-primary-action:hover,
+.page-builder .upload-image-button:hover,
+.page-builder .primary-action:hover,
+.page-builder .full-width-action:hover,
+.page-builder .runtime-submit:hover,
+.page-builder .workspace-header button:hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22) !important;
+}
+
+.builder-live-site-link,
+.builder-toast,
+.daw-primary,
+.reservation-submit,
+.quiz-drawer-save,
+.add-question-wide,
+.admin-access-submit {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.daw-secondary,
+.page-preview-action,
+.form-command-button,
+.page-delete-modal-secondary,
+.madar-website-name-actions button:not(.madar-website-name-primary) {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.daw-secondary:hover,
+.page-preview-action:hover,
+.form-command-button:hover,
+.page-delete-modal-secondary:hover {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+}
+
+.page-delete-modal,
+.madar-website-name-modal,
+.subscription-modal,
+.builder-modal {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 28px 80px rgba(4, 8, 16, 0.26) !important;
+}
+
+.page-delete-modal-backdrop,
+.builder-modal-backdrop,
+.madar-website-name-overlay,
+.subscription-modal-backdrop,
+.quiz-drawer-backdrop {
+  background: rgba(15, 22, 38, 0.58) !important;
+}
+
+.page-delete-modal-danger,
+.daw-report-block-actions .is-danger {
+  background: var(--theme-danger) !important;
+  border-color: var(--theme-danger) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.daw-data-grid th,
+.daw-compact-table th,
+.daw-report-generated-table th,
+.results-table-card th {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.daw-data-grid td,
+.daw-compact-table td,
+.daw-report-generated-table td,
+.results-table-card td {
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text-soft) !important;
+}
+
+.daw-report-page {
+  background: var(--theme-paper-surface) !important;
+  color: var(--theme-paper-text) !important;
+}
+
+.daw-report-page input,
+.daw-report-page textarea,
+.daw-report-page .daw-report-page-block {
+  background: var(--theme-paper-surface) !important;
+  color: var(--theme-paper-text) !important;
+}
+
+/* Form preview and tenant runtime */
+.builder-form-preview-page,
+.tenant-site-runtime,
+.tenant-login-runtime,
+.tenant-runtime-main {
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-text) !important;
+}
+
+.builder-form-preview-shell,
+.builder-form-preview-topbar,
+.builder-form-preview-question,
+.builder-form-preview-section,
+.builder-form-preview-success,
+.builder-form-preview-quiz-state,
+.tenant-runtime-card,
+.tenant-site-header,
+.tenant-site-footer {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: var(--route-card-shadow) !important;
+}
+
+.tenant-site-footer {
+  background: var(--theme-surface) !important;
+}
+
+.tenant-footer-logo-row h3,
+.tenant-runtime-card h1,
+.tenant-footer-column h4,
+.tenant-footer-contact h4,
+.tenant-language-pill strong {
+  color: var(--theme-text) !important;
+}
+
+.tenant-footer-brand p,
+.tenant-runtime-card p,
+.tenant-footer-contact p,
+.tenant-footer-bottom,
+.builder-form-preview-header p,
+.builder-form-preview-question p {
+  color: var(--theme-text-soft) !important;
+}
+
+.tenant-footer-links-grid button,
+.tenant-footer-bottom button,
+.tenant-social-row button {
+  color: var(--theme-text) !important;
+}
+
+.tenant-footer-links-grid button:hover,
+.tenant-footer-bottom button:hover,
+.tenant-social-row button:hover {
+  color: var(--theme-primary) !important;
+}
+
+.tenant-language-pill,
+.tenant-social-row button {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.runtime-form,
+.runtime-question,
+.quiz-start-panel,
+.runtime-form-section,
+.empty-connected,
+.builder-auth-component {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.runtime-question-title,
+.builder-form-preview-question label,
+.runtime-form-header h1 {
+  color: var(--theme-text) !important;
+}
+
+.runtime-form-header p,
+.runtime-form-page-count,
+.builder-note {
+  color: var(--theme-text-soft) !important;
+}
+
+/* Dark theme page-level adjustments */
+:root[data-theme="dark"] .hero-visual,
+:root[data-theme="dark"] .features-demo-panel,
+:root[data-theme="dark"] .feature-card,
+:root[data-theme="dark"] .pricing-choice-card,
+:root[data-theme="dark"] .pricing-plan-card,
+:root[data-theme="dark"] .pricing-module-card,
+:root[data-theme="dark"] .pricing-custom-summary,
+:root[data-theme="dark"] .team-profile-card,
+:root[data-theme="dark"] .contact-form,
+:root[data-theme="dark"] .contact-info-card,
+:root[data-theme="dark"] .login-card,
+:root[data-theme="dark"] .register-card,
+:root[data-theme="dark"] .overview-card,
+:root[data-theme="dark"] .dashboard-panel,
+:root[data-theme="dark"] .user-dashboard-panel,
+:root[data-theme="dark"] .settings-card,
+:root[data-theme="dark"] .my-plan-current-card,
+:root[data-theme="dark"] .my-plan-module-card,
+:root[data-theme="dark"] .user-management-row,
+:root[data-theme="dark"] .builder-sidebar,
+:root[data-theme="dark"] .builder-inspector,
+:root[data-theme="dark"] .builder-canvas-shell,
+:root[data-theme="dark"] .form-editor,
+:root[data-theme="dark"] .object-list,
+:root[data-theme="dark"] .daw-card,
+:root[data-theme="dark"] .builder-form-preview-shell,
+:root[data-theme="dark"] .tenant-runtime-card,
+body.theme-dark .hero-visual,
+body.theme-dark .features-demo-panel,
+body.theme-dark .feature-card,
+body.theme-dark .pricing-choice-card,
+body.theme-dark .pricing-plan-card,
+body.theme-dark .pricing-module-card,
+body.theme-dark .pricing-custom-summary,
+body.theme-dark .team-profile-card,
+body.theme-dark .contact-form,
+body.theme-dark .contact-info-card,
+body.theme-dark .login-card,
+body.theme-dark .register-card,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .user-dashboard-panel,
+body.theme-dark .settings-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-module-card,
+body.theme-dark .user-management-row,
+body.theme-dark .builder-sidebar,
+body.theme-dark .builder-inspector,
+body.theme-dark .builder-canvas-shell,
+body.theme-dark .form-editor,
+body.theme-dark .object-list,
+body.theme-dark .daw-card,
+body.theme-dark .builder-form-preview-shell,
+body.theme-dark .tenant-runtime-card {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+}
+
+/* Page builder output preview isolation.
+   These rules intentionally live after global route/theme refinements so the
+   rendered website preview can keep its own website/form theme. */
+.page-builder .builder-canvas {
+  background: var(--theme-bg) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: var(--madar-shadow-md) !important;
+}
+
+.tenant-runtime-page,
+.tenant-runtime-main {
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+.tenant-runtime-page .builder-canvas {
+  background: var(--theme-bg) !important;
+  border: 0 !important;
+  color: var(--theme-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder.preview-mode .builder-canvas-shell {
+  background: var(--madar-bg) !important;
+}
+
+.page-builder .builder-canvas .site-section,
+.page-builder .builder-canvas .direct-layout-section,
+.page-builder .builder-canvas .site-column,
+.page-builder .builder-canvas .direct-element-frame,
+.tenant-runtime-page .site-section,
+.tenant-runtime-page .direct-layout-section,
+.tenant-runtime-page .site-column,
+.tenant-runtime-page .direct-element-frame {
+  border-color: transparent;
+  color: var(--theme-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-canvas .built-site-header,
+.page-builder .builder-canvas .built-site-footer,
+.tenant-runtime-page .built-site-header,
+.tenant-runtime-page .built-site-footer {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.tenant-runtime-page .builder-element-heading,
+.tenant-runtime-page .builder-element-card strong,
+.tenant-runtime-page .metric-value {
+  color: var(--theme-text) !important;
+}
+
+.tenant-runtime-page .builder-element-text,
+.tenant-runtime-page .builder-element-list,
+.tenant-runtime-page .builder-element-card span,
+.tenant-runtime-page .builder-element-embed {
+  color: var(--theme-text-muted) !important;
+}
+
+.tenant-runtime-page .builder-element-card,
+.tenant-runtime-page .builder-element-metric,
+.tenant-runtime-page .builder-element-reservationBlock,
+.tenant-runtime-page .builder-element-responsesTable,
+.tenant-runtime-page .builder-element-embed,
+.tenant-runtime-page .responses-preview {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 18px 44px rgba(var(--theme-shadow-rgb), 0.1) !important;
+}
+
+.tenant-runtime-page .builder-element-button,
+.tenant-runtime-page .reservation-submit {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.page-builder .builder-canvas .builder-element-formBlock,
+.tenant-runtime-page .builder-element-formBlock {
+  background: var(--form-theme-surface) !important;
+  border-color: var(--form-theme-border) !important;
+  color: var(--form-theme-text) !important;
+  box-shadow: 0 22px 60px rgba(var(--theme-shadow-rgb), 0.1) !important;
+}
+
+.page-builder .builder-canvas .runtime-form,
+.tenant-runtime-page .runtime-form {
+  background: var(--form-theme-surface) !important;
+  border-color: var(--form-theme-border) !important;
+  color: var(--form-theme-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-canvas .runtime-form-section,
+.page-builder .builder-canvas .runtime-question,
+.tenant-runtime-page .runtime-form-section,
+.tenant-runtime-page .runtime-question {
+  background: transparent !important;
+  border-color: var(--form-theme-border) !important;
+  color: var(--form-theme-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-canvas .runtime-form-header h3,
+.page-builder .builder-canvas .runtime-form-section-header h4,
+.page-builder .builder-canvas .runtime-question-title,
+.tenant-runtime-page .runtime-form-header h3,
+.tenant-runtime-page .runtime-form-section-header h4,
+.tenant-runtime-page .runtime-question-title {
+  color: var(--form-theme-text) !important;
+}
+
+.page-builder .builder-canvas .runtime-form-header p,
+.page-builder .builder-canvas .runtime-form-section-header p,
+.page-builder .builder-canvas .runtime-question small,
+.page-builder .builder-canvas .runtime-form-page-count,
+.tenant-runtime-page .runtime-form-header p,
+.tenant-runtime-page .runtime-form-section-header p,
+.tenant-runtime-page .runtime-question small,
+.tenant-runtime-page .runtime-form-page-count {
+  color: var(--form-theme-muted) !important;
+}
+
+.page-builder .builder-canvas .runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.page-builder .builder-canvas .runtime-question textarea,
+.page-builder .builder-canvas .runtime-question select,
+.tenant-runtime-page .runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.tenant-runtime-page .runtime-question textarea,
+.tenant-runtime-page .runtime-question select {
+  background: var(--form-theme-input) !important;
+  border-color: var(--form-theme-border) !important;
+  color: var(--form-theme-text) !important;
+  box-shadow: 0 1px 0 rgba(var(--theme-shadow-rgb), 0.03), inset 0 0 0 1px transparent !important;
+}
+
+.page-builder .builder-canvas .runtime-question input::placeholder,
+.page-builder .builder-canvas .runtime-question textarea::placeholder,
+.tenant-runtime-page .runtime-question input::placeholder,
+.tenant-runtime-page .runtime-question textarea::placeholder {
+  color: var(--form-theme-muted) !important;
+  opacity: 0.72;
+}
+
+.page-builder .builder-canvas .runtime-submit,
+.page-builder .builder-canvas .runtime-form-pagination button.runtime-submit,
+.tenant-runtime-page .runtime-submit,
+.tenant-runtime-page .runtime-form-pagination button.runtime-submit {
+  background: var(--form-theme-accent) !important;
+  border-color: var(--form-theme-accent) !important;
+  color: var(--form-theme-button-text) !important;
+}
+
+:root[data-theme="dark"] .contact-form,
+:root[data-theme="dark"] .contact-info-card,
+body.theme-dark .contact-form,
+body.theme-dark .contact-info-card {
+  background: color-mix(in srgb, var(--theme-surface) 84%, transparent) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 86%, transparent) !important;
+  box-shadow:
+    0 18px 42px rgba(var(--theme-black-rgb), 0.22),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.06) !important;
+}
+
+:root[data-theme="dark"] .contact-info-card,
+body.theme-dark .contact-info-card {
+  background: color-mix(in srgb, var(--theme-surface) 82%, var(--theme-surface-2)) !important;
+}
+
+:root[data-theme="dark"] .contact-form input,
+:root[data-theme="dark"] .contact-form textarea,
+body.theme-dark .contact-form input,
+body.theme-dark .contact-form textarea {
+  background: color-mix(in srgb, var(--theme-surface-2) 78%, var(--theme-surface)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 90%, transparent) !important;
+  box-shadow: inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.04) !important;
+}
+
+:root[data-theme="dark"] .user-dashboard-stat,
+:root[data-theme="dark"] .user-dashboard-panel,
+:root[data-theme="dark"] .user-dashboard-form-data-card,
+body.theme-dark .user-dashboard-stat,
+body.theme-dark .user-dashboard-panel,
+body.theme-dark .user-dashboard-form-data-card {
+  background: color-mix(in srgb, var(--theme-surface) 82%, var(--theme-surface-2)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 86%, transparent) !important;
+  box-shadow:
+    0 18px 42px rgba(var(--theme-black-rgb), 0.24),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.055) !important;
+}
+
+:root[data-theme="dark"] .user-dashboard-builder-grid button,
+body.theme-dark .user-dashboard-builder-grid button {
+  background: color-mix(in srgb, var(--theme-surface-2) 76%, var(--theme-surface)) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
+}
+
+:root[data-theme="dark"] .hero-visual,
+body.theme-dark .hero-visual {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .site-header,
+:root[data-theme="dark"] .mobile-menu,
+:root[data-theme="dark"] .admin-sidebar,
+:root[data-theme="dark"] .tenant-site-header,
+body.theme-dark .site-header,
+body.theme-dark .mobile-menu,
+body.theme-dark .admin-sidebar,
+body.theme-dark .tenant-site-header {
+  background: rgba(22, 31, 51, 0.94) !important;
+  border-color: var(--theme-border) !important;
+}
+
+@media (max-width: 900px) {
+  .hero-section,
+  .about-section,
+  .features-page,
+  .pricing-page,
+  .team-page,
+  .contact-page,
+  .settings-page,
+  .my-plan-page,
+  .user-management-page,
+  .admin-account-access-page,
+  .workspace-page {
+    padding-inline: clamp(16px, 5vw, 28px) !important;
+  }
+
+  .pricing-custom-layout,
+  .admin-access-grid,
+  .my-plan-overview,
+  .my-plan-module-layout,
+  .settings-grid,
+  .results-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-dashboard-hero,
+  .user-dashboard-header,
+  .workspace-header,
+  .my-plan-header,
+  .settings-header {
+    gap: 18px !important;
+  }
+}

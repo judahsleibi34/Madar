@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Report canvas
    ============================================================ */
 
@@ -79,7 +79,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
   padding: 14px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-review-summary-grid article.tone-good {
@@ -124,7 +124,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
   padding: 14px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-report-summary span,
@@ -186,7 +186,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 14px;
   padding: 14px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-qualitative-card header {
@@ -242,7 +242,7 @@
   min-width: 0;
   border-radius: 10px;
   padding: 9px 10px;
-  background: rgba(26, 39, 68, 0.045);
+  background: rgba(var(--theme-shadow-rgb), 0.045);
 }
 
 .page-builder .daw-qualitative-card dt {
@@ -341,7 +341,7 @@
 }
 
 .page-builder .daw-compact-table th {
-  background: rgba(26, 39, 68, 0.045);
+  background: rgba(var(--theme-shadow-rgb), 0.045);
   color: var(--daw-muted);
   font-weight: 950;
   white-space: nowrap;
@@ -370,7 +370,7 @@
 .page-builder .daw-compact-table td.daw-compact-cell-sample > span {
   border-radius: 10px;
   padding: 8px 10px;
-  background: rgba(26, 39, 68, 0.045);
+  background: rgba(var(--theme-shadow-rgb), 0.045);
   line-height: 1.45;
   text-align: center;
   white-space: normal;
@@ -404,7 +404,7 @@
   border: 1px solid var(--daw-card-border);
   border-radius: 10px;
   padding: 0 12px;
-  background: #ffffff;
+  background: var(--theme-surface);
   color: var(--daw-text);
   font-size: 12px;
   font-weight: 900;
@@ -441,7 +441,7 @@
 .page-builder .daw-chart-list article {
   border-radius: 14px;
   padding: 12px;
-  background: rgba(26, 39, 68, 0.055);
+  background: rgba(var(--theme-shadow-rgb), 0.055);
 }
 
 .page-builder .daw-chart-list strong {
@@ -469,7 +469,7 @@
   margin-top: 10px;
   border: 1px solid var(--daw-card-border);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-pygwalker-frame {
@@ -479,5 +479,5 @@
   margin-top: 12px;
   border: 1px solid var(--daw-card-border);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
