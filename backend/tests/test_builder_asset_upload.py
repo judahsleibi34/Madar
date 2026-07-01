@@ -118,6 +118,34 @@ class BuilderAssetUploadTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_tenant_without_write_access_is_rejected(self):
+        with patch.object(
+            builder_routes,
+            "require_builder_write_access",
+            side_effect=HTTPException(status_code=403, detail="Write access required"),
+        ):
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Write access required")
+
+    def test_empty_file_is_rejected(self):
+        response = self.post_asset(b"", "empty.png", "image/png")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Image file is required")
+
+    def test_upload_rate_limit_is_applied(self):
+        with patch.object(
+            builder_routes,
+            "enforce_builder_asset_upload_rate_limit",
+            side_effect=HTTPException(status_code=429, detail="Too many asset uploads"),
+        ):
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["detail"], "Too many asset uploads")
+
     def test_accepts_png_jpeg_and_webp(self):
         cases = [
             (PNG_BYTES, "asset.png", "image/png", ".png"),

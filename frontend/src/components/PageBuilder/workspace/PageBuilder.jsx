@@ -275,6 +275,24 @@ const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
   carouselElementTypes,
 });
 
+const stripAutosaveMetadata = (project = {}) => {
+  const nextProject = {
+    ...project,
+    publish: {
+      ...(project.publish || {}),
+    },
+  };
+
+  delete nextProject.publish.lastSavedAt;
+  delete nextProject.publish.lastPublishedAt;
+
+  return nextProject;
+};
+
+const getAutosaveSnapshot = (project = {}) => JSON.stringify(stripAutosaveMetadata(project));
+
+const resolveLiveSitePath = (subdomain) => `/site/${encodeURIComponent(String(subdomain || "").trim())}/`;
+
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
@@ -321,12 +339,16 @@ export default function PageBuilder({
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
   const [liveSitePath, setLiveSitePath] = useState("");
+  const [websiteSettings, setWebsiteSettings] = useState(null);
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
   const [textSelection, setTextSelection] = useState(null);
   const pendingTabNavigationRef = useRef("");
+  const backendAutosaveTimerRef = useRef(null);
+  const backendProjectSnapshotRef = useRef("");
+  const pendingBackendProjectSnapshotRef = useRef("");
 
   const showToast = useCallback((message) => {
     setToast(message);
@@ -489,6 +511,7 @@ export default function PageBuilder({
         if (!fullRecord) {
           if (!cancelled) {
             setBuilderProjectRecord(null);
+            backendProjectSnapshotRef.current = getAutosaveSnapshot(project);
           }
           return;
         }
@@ -527,6 +550,78 @@ export default function PageBuilder({
       cancelled = true;
     };
   }, [demoMode, persistProjectNow, showToast, user?.id]);
+
+  useEffect(() => {
+    if (demoMode) {
+      setWebsiteSettings(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadWebsiteSettings = async () => {
+      try {
+        const settings = await fetchWebsiteSettings(user?.id);
+
+        if (!cancelled) {
+          setWebsiteSettings(settings || null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Could not load website settings for live site URL:", error);
+        }
+      }
+    };
+
+    loadWebsiteSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [demoMode, user?.id]);
+
+  useEffect(() => {
+    if (demoMode) return;
+
+    const subdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
+
+    if (!subdomain) return;
+
+    setLiveSitePath((current) => current || resolveLiveSitePath(subdomain));
+  }, [demoMode, websiteSettings?.subdomain]);
+
+  useEffect(() => {
+    if (demoMode) return;
+    if (!project) return;
+
+    persistProjectNow(project);
+  }, [demoMode, persistProjectNow, project]);
+
+  useEffect(() => {
+    if (demoMode || builderProjectLoading) return;
+    if (!project) return;
+
+    const currentSnapshot = getAutosaveSnapshot(project);
+    if (!currentSnapshot) return;
+    if (
+      currentSnapshot === backendProjectSnapshotRef.current ||
+      currentSnapshot === pendingBackendProjectSnapshotRef.current
+    ) {
+      return;
+    }
+
+    window.clearTimeout(backendAutosaveTimerRef.current);
+    backendAutosaveTimerRef.current = window.setTimeout(() => {
+      pendingBackendProjectSnapshotRef.current = currentSnapshot;
+      saveProject().finally(() => {
+        pendingBackendProjectSnapshotRef.current = "";
+      });
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(backendAutosaveTimerRef.current);
+    };
+  }, [builderProjectLoading, demoMode, project]);
 
   const safeProjectPages = useMemo(
     () => (Array.isArray(project.pages) ? project.pages : []),
@@ -1621,6 +1716,8 @@ export default function PageBuilder({
         : await createBuilderProject(payload, user?.id);
 
       setBuilderProjectRecord(savedRecord);
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
+      pendingBackendProjectSnapshotRef.current = "";
       showToast("Saved to backend.");
     } catch (error) {
       console.error("Could not save builder project:", error);
@@ -1695,6 +1792,8 @@ export default function PageBuilder({
           setProject(loadedProject);
           setSelected({ type: "page", id: loadedProject.activePageId });
           persistProjectNow(loadedProject);
+          backendProjectSnapshotRef.current = getAutosaveSnapshot(loadedProject);
+
           showToast("Loaded backend project.");
           return;
         }
@@ -1714,16 +1813,17 @@ export default function PageBuilder({
       setProject(loaded);
       setSelected({ type: "page", id: loaded.activePageId });
       showToast("Loaded local draft cache.");
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(loaded);
     } catch {
       alert("Saved project is not valid JSON.");
     }
   };
 
-  const resolveLiveSitePath = (subdomain) => `/site/${encodeURIComponent(String(subdomain || "").trim())}/`;
+  const publicSiteSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
+  const canonicalLiveSitePath = liveSitePath || (publicSiteSubdomain ? resolveLiveSitePath(publicSiteSubdomain) : "");
 
   const publishProject = async () => {
     setActiveTopbarAction("publish");
-    setLiveSitePath("");
     setToast("");
 
     const publishedProject = {
@@ -1781,8 +1881,9 @@ Go live anyway?`
     persistProject(publishedProject, "Publishing to backend...");
 
     try {
-      const websiteSettings = await fetchWebsiteSettings(user?.id);
-      const publicSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
+      const websiteSettingsResponse = await fetchWebsiteSettings(user?.id);
+      setWebsiteSettings(websiteSettingsResponse || null);
+      const publicSubdomain = sanitizeSubdomain(websiteSettingsResponse?.subdomain || "");
 
       if (!publicSubdomain) {
         throw new Error("Configure a website subdomain before going live.");
@@ -1813,6 +1914,8 @@ Go live anyway?`
 
       setBuilderProjectRecord(publishedRecord);
       setLiveSitePath(resolvedLiveSitePath);
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
+      pendingBackendProjectSnapshotRef.current = "";
       showToast("Site published successfully.");
     } catch (error) {
       console.error("Could not publish builder project:", error);
@@ -3734,7 +3837,8 @@ Go live anyway?`
       loadProject={loadProject}
       exportProject={exportProject}
       publishProject={publishProject}
-      openPreviewPage={openPreviewPage}
+      persistProjectNow={persistProjectNow}
+      liveSitePath={canonicalLiveSitePath}
       openFormPreviewPage={openFormPreviewPage}
     />
   );
@@ -4011,10 +4115,10 @@ Go live anyway?`
           </span>
         </div>
       )}
-      {liveSitePath && (
+      {canonicalLiveSitePath && (
         <a
           className="builder-live-site-link"
-          href={liveSitePath}
+          href={canonicalLiveSitePath}
           target="_blank"
           rel="noreferrer"
         >

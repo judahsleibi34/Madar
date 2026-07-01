@@ -253,7 +253,7 @@ const getCleanSubdomain = (value = "") =>
     .replace(/-{2,}/g, "-")
     .replace(/^-+|-+$/g, "") || runtimeFallbackCopy.runtime.subdomain;
 
-const loadPublishedProject = () => {
+const loadDraftPreviewProject = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -294,27 +294,45 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const navigate = useNavigate();
 
   const cleanSubdomain = getCleanSubdomain(subdomain);
+  const isPublicRuntime = !draftPreview;
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
-  const [project, setProject] = useState(() => loadPublishedProject());
+  const [project, setProject] = useState(() => (draftPreview ? loadDraftPreviewProject() : null));
+  const [publicSiteState, setPublicSiteState] = useState(() => (draftPreview ? "ready" : "loading"));
   const [formAnswers, setFormAnswers] = useState({});
   const [formStatus, setFormStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
 
   useEffect(() => {
-    if (draftPreview) return;
+    if (draftPreview) {
+      setProject(loadDraftPreviewProject());
+      setPublicSiteState("ready");
+      return;
+    }
 
     let cancelled = false;
+    setProject(null);
+    setPublicSiteState("loading");
 
     const loadBackendPublishedSite = async () => {
       try {
         const publicSite = await fetchPublicSite(cleanSubdomain);
         const publishedProject = publicSite?.project?.published_schema;
 
-        if (!cancelled && publishedProject && typeof publishedProject === "object") {
+        if (cancelled) return;
+
+        if (publishedProject && typeof publishedProject === "object") {
           setProject(publishedProject);
+          setPublicSiteState("ready");
+          return;
         }
+
+        setProject(null);
+        setPublicSiteState("unavailable");
       } catch (error) {
+        if (cancelled) return;
+        setProject(null);
+        setPublicSiteState("unavailable");
         console.warn("Could not load published site from backend:", error);
       }
     };
@@ -1118,16 +1136,28 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     return <div key={element.id} {...props}>{element.content}</div>;
   };
 
+  const renderUnavailableState = (title, body) => (
+    <main className="tenant-runtime-main">
+      <section className="tenant-runtime-card">
+        <p className="tenant-eyebrow">{cleanSubdomain}.madar.app</p>
+        <h1>{title}</h1>
+        <p>{body}</p>
+      </section>
+    </main>
+  );
+
   const renderPublishedPage = () => {
+    if (isPublicRuntime && publicSiteState === "loading") {
+      return renderUnavailableState(
+        runtimeCopy.runtime.loadingTitle,
+        runtimeCopy.runtime.loadingBody
+      );
+    }
+
     if (!project || !activePage) {
-      return (
-        <main className="tenant-runtime-main">
-          <section className="tenant-runtime-card">
-            <p className="tenant-eyebrow">{cleanSubdomain}.madar.app</p>
-            <h1>{runtimeCopy.runtime.noPublishedTitle}</h1>
-            <p>{runtimeCopy.runtime.noPublishedBody}</p>
-          </section>
-        </main>
+      return renderUnavailableState(
+        runtimeCopy.runtime.noPublishedTitle,
+        runtimeCopy.runtime.noPublishedBody
       );
     }
 
@@ -1329,9 +1359,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           </button>
         </div>
       )}
-      {renderHeader()}
+      {(draftPreview || publicSiteState === "ready") && renderHeader()}
       {renderMainContent()}
-      {renderFooter()}
+      {(draftPreview || publicSiteState === "ready") && renderFooter()}
     </div>
   );
 }

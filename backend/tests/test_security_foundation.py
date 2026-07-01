@@ -478,14 +478,21 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertNotIn("for insert", submissions_sql.split("create policy", 1)[-1])
         self.assertNotIn("for update", submissions_sql.split("create policy", 1)[-1])
 
-    def test_website_settings_rls_keeps_documented_user_id_compatibility(self):
+    def test_website_settings_rls_cleanup_removes_user_id_compatibility(self):
         migrations_dir = self.get_migrations_dir()
-        website_settings_sql = (migrations_dir / "024_harden_website_settings_rls.sql").read_text().lower()
+        website_settings_sql = (
+            migrations_dir / "032_harden_website_settings_rls_tenant_only.sql"
+        ).read_text().lower()
 
         self.assertIn("alter table public.website_settings enable row level security", website_settings_sql)
+        self.assertIn("create policy website_settings_select_member", website_settings_sql)
+        self.assertIn("create policy website_settings_insert_member", website_settings_sql)
+        self.assertIn("create policy website_settings_update_member", website_settings_sql)
         self.assertIn("tenant_memberships", website_settings_sql)
         self.assertIn("auth.uid()", website_settings_sql)
-        self.assertIn("where u.id = website_settings.user_id", website_settings_sql)
+        self.assertIn("website_settings.tenant_id is not null", website_settings_sql)
+        self.assertNotIn("where u.id = website_settings.user_id", website_settings_sql)
+        self.assertNotIn("tenant_id is null", website_settings_sql)
 
 
 

@@ -270,30 +270,10 @@ def resolve_website_settings(subdomain: str):
 def resolve_tenant_id(settings: dict):
     tenant_id = settings.get("tenant_id")
 
-    if tenant_id is not None:
-        return tenant_id
-
-    user_id = settings.get("user_id")
-
-    if user_id is None:
-        raise HTTPException(status_code=404, detail="Published site not found")
-
-    user_response = (
-        service_supabase.table("users")
-        .select("tenant_id")
-        .eq("id", user_id)
-        .limit(1)
-        .execute()
-    )
-
-    user_rows = getattr(user_response, "data", None) or []
-    tenant_id = (user_rows[0] if user_rows else {}).get("tenant_id")
-
     if tenant_id is None:
         raise HTTPException(status_code=404, detail="Published site not found")
 
     return tenant_id
-
 
 @router.get("/sites/{subdomain}")
 def get_public_site(subdomain: str, request: Request):
@@ -308,7 +288,6 @@ def get_public_site(subdomain: str, request: Request):
         "success": True,
         "site": {
             "subdomain": clean_subdomain,
-            "tenant_id": tenant_id,
             "brand": settings.get("brand"),
             "footer_store_name": settings.get("footer_store_name"),
             "logo_url": settings.get("logo_url"),
@@ -317,12 +296,6 @@ def get_public_site(subdomain: str, request: Request):
             "description": settings.get("description"),
         },
         "project": {
-            "id": project.get("id"),
-            "name": project.get("name"),
-            "slug": project.get("slug"),
-            "status": project.get("status"),
-            "published_version": project.get("published_version"),
-            "last_published_at": project.get("last_published_at"),
             "published_schema": project.get("published_schema") or {},
         },
     }

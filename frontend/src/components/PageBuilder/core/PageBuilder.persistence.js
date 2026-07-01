@@ -1,17 +1,21 @@
 export const persistBuilderProject = ({
   nextProject,
-  message,
+  message = "",
   demoMode,
   storageKey,
   setProject,
   showToast,
+  silent = false,
 }) => {
   if (!demoMode) {
     localStorage.setItem(storageKey, JSON.stringify(nextProject));
   }
 
   setProject(nextProject);
-  showToast(message);
+
+  if (!silent && message) {
+    showToast(message);
+  }
 
   return nextProject;
 };

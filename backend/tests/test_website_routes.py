@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import public_site_routes, website_routes
+from services import website_settings_service
 
 
 def build_website_client():
@@ -531,6 +532,58 @@ class WebsiteRoutesTests(unittest.TestCase):
         self.assertEqual(body["site"]["brand"], "Fresh Brand")
         self.assertEqual(body["project"]["published_schema"], {"pages": [], "forms": []})
 
+
+
+class TestWebsiteSettingsServiceLegacyFallback(unittest.TestCase):
+    def test_get_settings_for_tenant_does_not_fallback_to_user_id(self):
+        class LegacyFallbackQuery:
+            def __init__(self, rows):
+                self.rows = rows
+                self.filters = []
+                self.update_payload = None
+
+            def select(self, *_args):
+                return self
+
+            def eq(self, column, value):
+                self.filters.append((column, value))
+                return self
+
+            def limit(self, *_args):
+                return self
+
+            def update(self, payload):
+                self.update_payload = payload
+                return self
+
+            def execute(self):
+                rows = list(self.rows)
+                for column, value in self.filters:
+                    rows = [row for row in rows if row.get(column) == value]
+
+                if self.update_payload is not None:
+                    updated_rows = [dict(row, **self.update_payload) for row in rows]
+                    return FakeResponse(updated_rows)
+
+                return FakeResponse(rows)
+
+        class LegacyFallbackSupabase:
+            def __init__(self):
+                self.tables = {
+                    'website_settings': [
+                        {'id': 1, 'tenant_id': None, 'user_id': 99, 'subdomain': 'legacy-site'},
+                    ]
+                }
+
+            def table(self, table_name):
+                return LegacyFallbackQuery(self.tables.get(table_name, []))
+
+        fake_supabase = LegacyFallbackSupabase()
+
+        with patch.object(website_settings_service, 'service_supabase', fake_supabase):
+            settings = website_settings_service.get_settings_for_tenant(tenant_id=7, user_id=99)
+
+        self.assertIsNone(settings)
 
 if __name__ == "__main__":
     unittest.main()

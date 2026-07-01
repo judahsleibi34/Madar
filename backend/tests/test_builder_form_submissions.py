@@ -1,3 +1,4 @@
+import copy
 import unittest
 from unittest.mock import patch
 
@@ -366,6 +367,89 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             public_site_routes.MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES,
         )
 
+
+    def test_public_submission_rejects_form_only_in_draft_schema(self):
+        fake_supabase = FakeSupabase()
+        project = fake_supabase.tables["builder_projects"][0]
+        project["draft_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
+        project["draft_schema"]["forms"][0]["title"] = "Draft-only contact form"
+        project["published_schema"] = {
+            "forms": [],
+            "pages": [],
+        }
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Form not found")
+
+    def test_public_submission_rejects_form_without_published_block(self):
+        fake_supabase = FakeSupabase()
+        project = fake_supabase.tables["builder_projects"][0]
+        project["published_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
+        project["published_schema"]["pages"] = []
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Form not found")
+
+    def test_public_submission_rejects_archived_project(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"][0]["status"] = "archived"
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")
+
+    def test_public_submission_rejects_invalid_answers_shape(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": ["not", "an", "object"]},
+            )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_public_submission_field_snapshot_is_based_on_published_form(self):
+        fake_supabase = FakeSupabase()
+        project = fake_supabase.tables["builder_projects"][0]
+        project["draft_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada", "field_email": "ada@example.com"}},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        saved = fake_supabase.tables["builder_form_submissions"][-1]
+        expected_snapshot = copy.deepcopy(PUBLISHED_SCHEMA["forms"][0]["sections"][0]["fields"])
+        self.assertEqual(saved["field_snapshot"], expected_snapshot)
+
+        project["draft_schema"]["forms"][0]["sections"][0]["fields"][0]["label"] = "Changed in draft"
+        self.assertEqual(saved["field_snapshot"], expected_snapshot)
+        self.assertEqual(saved["field_snapshot"][0]["label"], "Full name")
     def test_unknown_form_id_fails(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
@@ -513,6 +597,15 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(over_limit.status_code, 422)
         self.assertEqual(negative_offset.status_code, 422)
 
+
+    def test_project_form_submissions_list_requires_auth(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase):
+            response = client.get(f"/builder/projects/{PROJECT_ID}/form-submissions?form_id={FORM_ID}")
+
+        self.assertEqual(response.status_code, 401)
     def test_form_submissions_custom_pagination(self):
         fake_supabase = FakeSupabase()
         for index in range(3):
@@ -816,9 +909,10 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "User id does not match session")
 
-    def test_public_site_response_does_not_expose_draft_schema(self):
+    def test_public_site_response_exposes_only_render_safe_fields(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"][0]["draft_schema"] = {"secret": True}
+        fake_supabase.tables["builder_projects"][0]["owner_user_id"] = 77
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
@@ -827,8 +921,26 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertIn("published_schema", body["project"])
+        self.assertEqual(
+            body["site"],
+            {
+                "subdomain": "tenant-site",
+                "brand": None,
+                "footer_store_name": None,
+                "logo_url": None,
+                "contact_email": None,
+                "phone": None,
+                "description": None,
+            },
+        )
+        self.assertEqual(body["project"], {"published_schema": PUBLISHED_SCHEMA})
+        self.assertNotIn("tenant_id", body["site"])
+        self.assertNotIn("id", body["project"])
+        self.assertNotIn("owner_user_id", body["project"])
         self.assertNotIn("draft_schema", body["project"])
+        self.assertNotIn("status", body["project"])
+        self.assertNotIn("published_version", body["project"])
+        self.assertNotIn("last_published_at", body["project"])
         self.assertNotIn("draft_schema", str(body))
 
     def test_public_submission_rejects_unpublished_project(self):
@@ -846,6 +958,67 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Published site not found")
 
+
+
+class PublicSiteTenantResolutionTests(unittest.TestCase):
+    def test_public_resolve_tenant_id_prefers_website_settings_tenant_id(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["website_settings"] = [
+            {"id": 1, "tenant_id": 11, "user_id": 2, "subdomain": "tenant-site"}
+        ]
+        fake_supabase.tables["users"] = [{"id": 2, "tenant_id": 22}]
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            tenant_id = public_site_routes.resolve_tenant_id(fake_supabase.tables["website_settings"][0])
+
+        self.assertEqual(tenant_id, 11)
+
+    def test_public_resolve_tenant_id_rejects_missing_tenant_even_with_legacy_user_mapping(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["website_settings"] = [
+            {"id": 1, "tenant_id": None, "user_id": 2, "subdomain": "legacy-site"}
+        ]
+        fake_supabase.tables["users"] = [{"id": 2, "tenant_id": 22}]
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            with self.assertRaises(HTTPException) as exc:
+                public_site_routes.resolve_tenant_id(fake_supabase.tables["website_settings"][0])
+
+        self.assertEqual(exc.exception.status_code, 404)
+        self.assertEqual(exc.exception.detail, "Published site not found")
+
+    def test_public_resolve_tenant_id_rejects_missing_tenant_and_user(self):
+        fake_supabase = FakeSupabase()
+        settings = {"id": 1, "tenant_id": None, "subdomain": "broken-site"}
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            with self.assertRaises(HTTPException) as exc:
+                public_site_routes.resolve_tenant_id(settings)
+
+        self.assertEqual(exc.exception.status_code, 404)
+        self.assertEqual(exc.exception.detail, "Published site not found")
+
+    def test_public_resolve_tenant_id_rejects_user_without_tenant(self):
+        fake_supabase = FakeSupabase()
+        settings = {"id": 1, "tenant_id": None, "user_id": 99, "subdomain": "broken-site"}
+        fake_supabase.tables["users"] = [{"id": 99, "tenant_id": None}]
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            with self.assertRaises(HTTPException) as exc:
+                public_site_routes.resolve_tenant_id(settings)
+
+        self.assertEqual(exc.exception.status_code, 404)
+        self.assertEqual(exc.exception.detail, "Published site not found")
+
+    def test_public_resolve_tenant_id_prefers_tenant_id_over_disagreeing_user_fallback(self):
+        fake_supabase = FakeSupabase()
+        settings = {"id": 1, "tenant_id": 11, "user_id": 2, "subdomain": "tenant-site"}
+        fake_supabase.tables["users"] = [{"id": 2, "tenant_id": 22}]
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            tenant_id = public_site_routes.resolve_tenant_id(settings)
+
+        self.assertEqual(tenant_id, 11)
 
 if __name__ == "__main__":
     unittest.main()

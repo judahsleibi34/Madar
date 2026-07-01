@@ -45,6 +45,7 @@ export default function App() {
 
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
+  const isRegularUser = !isAdminUser;
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
 
@@ -511,19 +512,53 @@ export default function App() {
     [isLoggedIn, normalizeUser]
   );
 
-  const shellProps = {
-    closeMenuLabel: t("common:navigation.closeMenu"),
-    lang,
-    onLanguageChange: handleLanguageChange,
-    onLogout: handleLogout,
-    onNavigate: () => setDashboardSidebarOpen(false),
-    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
-    onThemeModeChange: handleThemeModeChange,
-    open: dashboardSidebarOpen,
-    openMenuLabel: t("common:navigation.openMenu"),
-    themeMode,
-    user,
-  };
+  const renderDashboardSkeleton = () => (
+    <DashboardLoadingElement
+      pathname={location.pathname}
+      labels={dashboardLoadingLabels}
+      lang={lang}
+    />
+  );
+
+  const renderFormPreviewSkeleton = () => (
+    <DashboardLoadingElement
+      pathname="/page-builder/form-preview"
+      lang={lang}
+    />
+  );
+
+  const renderFormBuilderSkeleton = () => (
+    <DashboardLoadingElement pathname="/page-builder/forms" lang={lang} />
+  );
+
+  const renderRestrictedPage = (message) => (
+    <RestrictedAccessWindow
+      message={message}
+      onAction={() => navigate("/dashboard", { replace: true })}
+    />
+  );
+
+  const renderDashboardShell = (children, isPageBuilderShell = false, options = {}) => (
+    <DashboardShell
+      closeMenuLabel={t("common:navigation.closeMenu")}
+      compactSidebar={options.compactSidebar}
+      hideLanguage={options.hideLanguage}
+      isPageBuilderShell={isPageBuilderShell}
+      lang={lang}
+      onLanguageChange={handleLanguageChange}
+      onLogout={handleLogout}
+      onNavigate={() => setDashboardSidebarOpen(false)}
+      onSidebarToggle={() => setDashboardSidebarOpen((open) => !open)}
+      onThemeModeChange={handleThemeModeChange}
+      open={dashboardSidebarOpen}
+      openMenuLabel={t("common:navigation.openMenu")}
+      shellLang={options.lang}
+      themeMode={themeMode}
+      user={user}
+    >
+      {children}
+    </DashboardShell>
+  );
 
   const dashboardLoadingLabels = {
     dashboard: t("dashboard:loading.dashboard"),
