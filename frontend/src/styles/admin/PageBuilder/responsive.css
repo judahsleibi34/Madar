@@ -38,6 +38,15 @@
   .page-builder .theme-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .page-builder .theme-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-builder .theme-section-actions {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 1240px) {

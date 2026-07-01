@@ -21,7 +21,7 @@ export const getPageBuilderThemeClassName = ({ mode = "light", preview = false }
   return `page-builder theme-${mode || "light"} ${preview ? "preview-mode" : ""}`;
 };
 
-const defaultWebsiteTheme = {
+export const defaultWebsiteTheme = {
   background: "#fafaf7",
   softSurface: "#f7f5ef",
   surface: "#ffffff",
@@ -32,6 +32,19 @@ const defaultWebsiteTheme = {
   accentDark: "#6f241b",
   buttonText: "#ffffff",
   border: "rgba(27, 42, 74, 0.12)",
+};
+
+export const defaultFormTheme = {
+  background: "#ffffff",
+  surface: "#ffffff",
+  inputBackground: "#ffffff",
+  text: "#1b2a4a",
+  muted: "#6f7787",
+  border: "#d8dde6",
+  accent: "#852c21",
+  buttonText: "#ffffff",
+  radius: 8,
+  fieldRadius: 14,
 };
 
 const isHexColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || ""));
@@ -70,16 +83,7 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     buttonText: resolveThemeColor(safeTheme.buttonText, defaultWebsiteTheme.buttonText),
   };
   const formTheme = {
-    background: websiteTheme.background,
-    surface: websiteTheme.surface,
-    inputBackground: websiteTheme.surface,
-    text: websiteTheme.text,
-    muted: websiteTheme.muted,
-    border: "rgba(var(--theme-shadow-rgb), 0.12)",
-    accent: websiteTheme.accent,
-    buttonText: websiteTheme.buttonText,
-    radius: 8,
-    fieldRadius: 14,
+    ...defaultFormTheme,
     ...(safeTheme.form || {}),
   };
   const isDarkMode = safeTheme.mode === "dark";
@@ -131,14 +135,14 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     "--madar-gradient": websiteTheme.accent,
     "--madar-gradient-hover": websiteTheme.accentDark,
     "--madar-radius": `${safeTheme.radius}px`,
-    "--form-theme-bg": resolveThemeColor(formTheme.background, websiteTheme.background),
-    "--form-theme-surface": resolveThemeColor(formTheme.surface, websiteTheme.surface),
-    "--form-theme-input": resolveThemeColor(formTheme.inputBackground, websiteTheme.surface),
-    "--form-theme-text": resolveThemeColor(formTheme.text, websiteTheme.text),
-    "--form-theme-muted": resolveThemeColor(formTheme.muted, websiteTheme.muted),
-    "--form-theme-border": isHexColor(formTheme.border) ? formTheme.border : borderColor,
-    "--form-theme-accent": resolveThemeColor(formTheme.accent, websiteTheme.accent),
-    "--form-theme-button-text": resolveThemeColor(formTheme.buttonText, websiteTheme.buttonText),
+    "--form-theme-bg": resolveThemeColor(formTheme.background, defaultFormTheme.background),
+    "--form-theme-surface": resolveThemeColor(formTheme.surface, defaultFormTheme.surface),
+    "--form-theme-input": resolveThemeColor(formTheme.inputBackground, defaultFormTheme.inputBackground),
+    "--form-theme-text": resolveThemeColor(formTheme.text, defaultFormTheme.text),
+    "--form-theme-muted": resolveThemeColor(formTheme.muted, defaultFormTheme.muted),
+    "--form-theme-border": resolveThemeColor(formTheme.border, defaultFormTheme.border),
+    "--form-theme-accent": resolveThemeColor(formTheme.accent, defaultFormTheme.accent),
+    "--form-theme-button-text": resolveThemeColor(formTheme.buttonText, defaultFormTheme.buttonText),
     "--form-theme-radius": `${formTheme.radius}px`,
     "--form-theme-field-radius": `${formTheme.fieldRadius}px`,
     fontFamily: safeTheme.fontFamily,

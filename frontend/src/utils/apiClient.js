@@ -86,11 +86,11 @@ export const apiFetch = async (input, init = {}) => {
     }
   }
 
-  const runFetch = () => fetch(input, {
+  const runFetch = (requestHeaders = headers) => fetch(input, {
     ...fetchInit,
     method,
     credentials: fetchInit.credentials || "include",
-    headers,
+    headers: requestHeaders,
   });
 
   const inputUrl = typeof input === "string" ? input : input?.url || "";
@@ -105,10 +105,10 @@ export const apiFetch = async (input, init = {}) => {
     (method === "GET" && inputUrl.includes("/auth/user_status")) ||
     (method === "POST" && isAuthRefresh);
 
-  const runSerializedFetch = async () =>
+  const runSerializedFetch = async (requestHeaders = headers) =>
     serializesAuthSession && typeof navigator !== "undefined" && navigator.locks?.request
-      ? await navigator.locks.request("madar-auth-session", runFetch)
-      : await runFetch();
+      ? await navigator.locks.request("madar-auth-session", () => runFetch(requestHeaders))
+      : await runFetch(requestHeaders);
 
   const response = await runSerializedFetch();
 
@@ -140,6 +140,45 @@ export const apiFetch = async (input, init = {}) => {
         ...fetchInit,
         skipAuthRefresh: true,
       });
+    }
+  }
+
+  if (
+    response.status === 403 &&
+    UNSAFE_METHODS.has(method) &&
+    !isAuthEndpoint &&
+    !skipAuthRefresh
+  ) {
+    const errorData = await response.clone().json().catch(() => null);
+    const csrfRejected = errorData?.detail === "Invalid CSRF token";
+
+    if (csrfRejected) {
+      if (!refreshSessionPromise) {
+        refreshSessionPromise = apiFetch(getApiUrl("/auth/refresh"), {
+          method: "POST",
+          cache: "no-store",
+          skipAuthRefresh: true,
+        }).finally(() => {
+          refreshSessionPromise = null;
+        });
+      }
+
+      const refreshResponse = await refreshSessionPromise;
+
+      if (refreshResponse.ok) {
+        const retryHeaders = new Headers(fetchInit.headers || {});
+        const token = getCsrfToken();
+
+        if (token) {
+          retryHeaders.set(CSRF_HEADER_NAME, token);
+        }
+
+        return apiFetch(input, {
+          ...fetchInit,
+          headers: retryHeaders,
+          skipAuthRefresh: true,
+        });
+      }
     }
   }
 
