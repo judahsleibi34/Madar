@@ -160,15 +160,12 @@ export default function LoginPage({
     }));
 
     try {
-      const challengeResponse = await fetch(`${API_URL}/auth/mfa/login/challenge`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ factor_id: mfaStep.factorId }),
+      const {
+        response: challengeResponse,
+        data: challengeData,
+      } = await postAuthJson("/auth/mfa/login/challenge", {
+        factor_id: mfaStep.factorId,
       });
-      const challengeData = await challengeResponse.json();
 
       if (!challengeResponse.ok) {
         setStatusMessage(
@@ -179,20 +176,14 @@ export default function LoginPage({
         return;
       }
 
-      const verifyResponse = await fetch(`${API_URL}/auth/mfa/login/verify`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          factor_id: mfaStep.factorId,
-          challenge_id: challengeData.challenge_id,
-          code: mfaCode.trim(),
-        }),
+      const {
+        response: verifyResponse,
+        data: verifyData,
+      } = await postAuthJson("/auth/mfa/login/verify", {
+        factor_id: mfaStep.factorId,
+        challenge_id: challengeData.challenge_id,
+        code: mfaCode.trim(),
       });
-      const verifyData = await verifyResponse.json();
-      syncCsrfTokenFromResponseData(verifyData);
 
       if (!verifyResponse.ok) {
         setStatusMessage(

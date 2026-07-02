@@ -592,13 +592,13 @@
 .security-mfa-status-grid span,
 .security-mfa-factor span,
 .security-mfa-factor-counts {
-  color: var(--text-muted, #64748b);
+  color: var(--theme-text-muted);
 }
 
 .security-mfa-header h1,
 .security-mfa-panel h2 {
   margin: 0;
-  color: var(--text-primary, #0f172a);
+  color: var(--theme-text);
 }
 
 .security-mfa-grid {
@@ -608,11 +608,11 @@
 }
 
 .security-mfa-panel {
-  background: var(--surface-primary, #ffffff);
-  border: 1px solid var(--border-subtle, #e2e8f0);
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
   padding: 22px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
 }
 
 .security-mfa-enroll-panel {
@@ -627,7 +627,7 @@
 }
 
 .security-mfa-panel-heading svg {
-  color: #2563eb;
+  color: var(--theme-info);
   flex: 0 0 auto;
   margin-top: 3px;
 }
@@ -640,10 +640,10 @@
 
 .security-mfa-status-grid div,
 .security-mfa-factor {
-  border: 1px solid var(--border-subtle, #e2e8f0);
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
   padding: 14px;
-  background: var(--surface-secondary, #f8fafc);
+  background: var(--theme-surface-2);
 }
 
 .security-mfa-status-grid div,
@@ -687,7 +687,7 @@
 .security-mfa-enroll-form input,
 .security-mfa-verify-flow input {
   min-height: 44px;
-  border: 1px solid var(--border-subtle, #e2e8f0);
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
   padding: 0 12px;
 }
@@ -702,9 +702,9 @@
 }
 
 .security-mfa-danger {
-  border: 1px solid #fecaca;
-  color: #b91c1c;
-  background: #fff5f5;
+  border: 1px solid rgba(var(--theme-danger-rgb), 0.24);
+  color: var(--theme-danger);
+  background: rgba(var(--theme-danger-rgb), 0.08);
   border-radius: 8px;
   min-height: 40px;
   padding: 0 12px;
@@ -718,21 +718,21 @@
 .security-mfa-qr {
   width: min(240px, 100%);
   aspect-ratio: 1;
-  border: 1px solid var(--border-subtle, #e2e8f0);
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
   padding: 10px;
-  background: #ffffff;
+  background: var(--theme-surface);
 }
 
 .security-mfa-uri {
   display: block;
   max-width: 100%;
   overflow-wrap: anywhere;
-  border: 1px solid var(--border-subtle, #e2e8f0);
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
   padding: 12px;
-  background: var(--surface-secondary, #f8fafc);
-  color: var(--text-primary, #0f172a);
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
 }
 
 .security-mfa-success,
@@ -744,19 +744,19 @@
 }
 
 .security-mfa-success {
-  background: #ecfdf5;
-  color: #047857;
+  background: rgba(var(--theme-success-rgb), 0.1);
+  color: var(--theme-success);
 }
 
 .security-mfa-error {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: rgba(var(--theme-danger-rgb), 0.08);
+  color: var(--theme-danger);
 }
 
 .security-mfa-empty,
 .security-mfa-loading {
-  background: var(--surface-secondary, #f8fafc);
-  color: var(--text-muted, #64748b);
+  background: var(--theme-surface-2);
+  color: var(--theme-text-muted);
 }
 
 .security-mfa-loading {

@@ -40,8 +40,8 @@ export default function ReportPropertiesPanel({
   return (
     <aside className="daw-report-panel daw-report-properties">
       <div className="daw-report-panel-heading">
-        <span>Properties</span>
-        <h3>{selectedBlock ? "Selected block" : "Report details"}</h3>
+        <span>Details</span>
+        <h3>{selectedBlock ? "Selected block" : "Report settings"}</h3>
       </div>
 
       {selectedBlock ? (

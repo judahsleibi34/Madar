@@ -14,6 +14,7 @@ import {
   ListOrdered,
   PaintBucket,
   Redo2,
+  Trash2,
   Underline,
   Undo2,
 } from "lucide-react";
@@ -39,6 +40,8 @@ export default function DocumentToolbar({
   textColor = "var(--theme-text)",
   onTextColor,
   onContentFormatted,
+  onDelete,
+  deleteLabel = "Delete",
 }) {
   const imageInputRef = useRef(null);
   const selectionRangeRef = useRef(null);
@@ -231,6 +234,20 @@ export default function DocumentToolbar({
             </label>
             <button type="button" title="Clear block background" aria-label="Clear block background" onClick={() => onBlockColor("")}><Eraser size={16} /></button>
           </>
+        ) : null}
+        {onDelete ? (
+          <button
+            type="button"
+            className="daw-toolbar-danger"
+            title={deleteLabel}
+            aria-label={deleteLabel}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onDelete();
+            }}
+          >
+            <Trash2 size={16} />
+          </button>
         ) : null}
       </div>
       <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleImage} hidden />

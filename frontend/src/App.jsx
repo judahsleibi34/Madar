@@ -45,7 +45,6 @@ export default function App() {
 
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
-  const isRegularUser = !isAdminUser;
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
 

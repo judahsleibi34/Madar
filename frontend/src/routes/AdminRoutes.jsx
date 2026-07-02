@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import Dashboard from "../components/DashboardBuilder/Dashboard";
 import AdminAccountAccessPage from "../components/DashboardBuilder/AdminAccountAccessPage";
+import NotificationsPage from "../components/DashboardBuilder/NotificationsPage";
 import UserManagementPage from "../components/DashboardBuilder/UserManagementPage";
 import { appShellContent } from "../content";
 import { DashboardShell, RestrictedAccessWindow } from "./shared";
@@ -65,6 +66,11 @@ export default function AdminRoutes({
             currentUser={user}
           />
         )}
+      />
+
+      <Route
+        path="/notifications/*"
+        element={renderShell(<NotificationsPage />)}
       />
 
       <Route

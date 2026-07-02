@@ -1,0 +1,221 @@
+/* Align the data workspace with the global admin theme. */
+
+.page-builder .daw-page {
+  padding: 26px 34px 28px;
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-text);
+}
+
+.page-builder .daw-header {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.page-builder .daw-kicker,
+.page-builder .daw-section-heading > span,
+.page-builder .daw-report-header span {
+  margin-bottom: 6px;
+  color: var(--theme-primary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.page-builder .daw-header h2 {
+  color: var(--theme-text);
+  font-size: clamp(24px, 2.2vw, 32px);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.page-builder .daw-header p {
+  max-width: 720px;
+  margin-top: 6px;
+  color: var(--theme-text-soft);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.page-builder .daw-card,
+.page-builder .daw-section-card,
+.page-builder .daw-assistant-card,
+.page-builder .daw-report-canvas,
+.page-builder .daw-inspection-box,
+.page-builder .daw-review-sidebar button,
+.page-builder .daw-stepper button {
+  border-radius: 8px !important;
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .daw-section-card,
+.page-builder .daw-assistant-card,
+.page-builder .daw-report-canvas {
+  padding: 20px;
+}
+
+.page-builder .daw-section-heading {
+  margin-bottom: 16px;
+}
+
+.page-builder .daw-section-heading h3,
+.page-builder .daw-report-header h3 {
+  color: var(--theme-text);
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.page-builder .daw-section-heading p,
+.page-builder .daw-report-header p,
+.page-builder .daw-source-body p {
+  color: var(--theme-text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.page-builder .daw-stepper {
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.page-builder .daw-stepper button {
+  min-height: 46px;
+  padding: 0 14px;
+  color: var(--theme-text);
+}
+
+.page-builder .daw-stepper button.active {
+  background: var(--theme-primary-soft) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.22) !important;
+  color: var(--theme-primary) !important;
+}
+
+.page-builder .daw-stepper button span {
+  border-radius: 7px;
+  background: var(--theme-surface-2);
+  color: var(--theme-text-soft);
+}
+
+.page-builder .daw-stepper button.active span {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .daw-review-shell {
+  gap: 20px;
+}
+
+.page-builder .daw-review-sidebar {
+  gap: 8px;
+}
+
+.page-builder .daw-review-sidebar button {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text);
+}
+
+.page-builder .daw-review-sidebar button.active,
+.page-builder .daw-review-sidebar button:hover {
+  background: var(--theme-surface) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.18) !important;
+  color: var(--theme-text);
+}
+
+.page-builder .daw-inspection-box {
+  background: var(--theme-surface) !important;
+}
+
+.page-builder .daw-primary,
+.page-builder .daw-page button.daw-primary,
+.page-builder .daw-assistant-card .daw-primary {
+  min-height: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
+  box-shadow: none;
+}
+
+.page-builder .daw-primary:hover,
+.page-builder .daw-page button.daw-primary:hover,
+.page-builder .daw-assistant-card .daw-primary:hover {
+  background: var(--theme-primary-hover);
+  transform: none;
+  box-shadow: none;
+}
+
+.page-builder .daw-secondary:hover,
+.page-builder .daw-confirm-button:hover,
+.page-builder .daw-pagination button:hover,
+.page-builder .daw-column-menu summary:hover,
+.page-builder .daw-column-menu-panel button:hover,
+.page-builder .daw-analysis-domain-grid button:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.page-builder .daw-secondary,
+.page-builder .daw-button-row button:not(.daw-primary),
+.page-builder .daw-section-actions button:not(.daw-primary),
+.page-builder .daw-flow-actions button:not(.daw-primary) {
+  border-radius: 8px;
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+}
+
+.page-builder .daw-assistant-card textarea {
+  min-height: 104px;
+}
+
+.page-builder .daw-flow-actions {
+  border-radius: 8px;
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .daw-cleaning-stack details,
+.page-builder .daw-column-picker {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .daw-cleaning-option,
+.page-builder .daw-cleaning-tool,
+.page-builder .daw-save-dataframe-row,
+.page-builder .daw-generate-metrics-row,
+.page-builder .daw-generate-metrics-row.is-ready,
+.page-builder .daw-report-customize,
+.page-builder .daw-analysis-generator,
+.page-builder .daw-analysis-domain-grid button {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.page-builder .daw-analysis-domain-grid button.active,
+.page-builder .daw-stepper button.active {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary) !important;
+}
+
+.page-builder .daw-analysis-generator-heading em {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text-soft) !important;
+}
+
+@media (max-width: 900px) {
+  .page-builder .daw-page {
+    padding: 20px 16px 24px;
+  }
+}

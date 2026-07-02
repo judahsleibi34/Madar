@@ -95,7 +95,13 @@ export default function SecurityMfaPage({ lang = "en" }) {
   }, [readResponse, t]);
 
   useEffect(() => {
-    loadStatus({ showSpinner: true });
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) loadStatus({ showSpinner: true });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadStatus]);
 
   const startEnrollment = async () => {

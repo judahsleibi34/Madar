@@ -203,13 +203,253 @@ export function FormPreviewSkeleton({ lang }) {
   );
 }
 
+const builderSkeletonTabs = [
+  { id: "design", label: "Pages" },
+  { id: "forms", label: "Forms" },
+  { id: "reservations", label: "Reservations" },
+  { id: "chrome", label: "Header & Footer" },
+  { id: "users", label: "Users" },
+  { id: "theme", label: "Themes" },
+  { id: "publish", label: "Publish" },
+];
+
+const builderSkeletonPathTabs = {
+  pages: "design",
+  design: "design",
+  forms: "forms",
+  reservations: "reservations",
+  chrome: "chrome",
+  "header-footer": "chrome",
+  users: "users",
+  theme: "theme",
+  themes: "theme",
+  "website-theme": "theme",
+  publish: "publish",
+  responses: "responses",
+  data: "data",
+};
+
+const getBuilderSkeletonTab = (pathname = "") => {
+  if (pathname.startsWith("/builder-responses")) return "responses";
+  if (pathname.startsWith("/builder-data")) return "data";
+
+  const match = pathname.match(/^\/page-builder\/([^/?#]+)/);
+  if (!match) return "design";
+
+  return builderSkeletonPathTabs[match[1]] || "design";
+};
+
+function BuilderSkeletonPanel({ variant }) {
+  if (variant === "design") {
+    return (
+      <div className="builder-skeleton-design">
+        <aside className="builder-skeleton-side-panel">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <span className="builder-skeleton-line" key={index} />
+          ))}
+        </aside>
+        <section className="builder-skeleton-canvas">
+          <span className="builder-skeleton-hero" />
+          <div className="builder-skeleton-section-grid">
+            <span />
+            <span />
+            <span />
+          </div>
+        </section>
+        <aside className="builder-skeleton-inspector">
+          {Array.from({ length: 7 }).map((_, index) => (
+            <span className="builder-skeleton-line" key={index} />
+          ))}
+        </aside>
+      </div>
+    );
+  }
+
+  if (variant === "forms") {
+    return (
+      <div className="builder-skeleton-forms">
+        <aside className="builder-skeleton-side-panel">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <span className="builder-skeleton-pill" key={index} />
+          ))}
+        </aside>
+        <section className="builder-skeleton-document">
+          <span className="builder-skeleton-wide-line" />
+          {Array.from({ length: 3 }).map((_, index) => (
+            <article className="builder-skeleton-question" key={index}>
+              <span />
+              <span />
+            </article>
+          ))}
+        </section>
+      </div>
+    );
+  }
+
+  if (variant === "reservations") {
+    return (
+      <div className="builder-skeleton-reservations">
+        <section className="builder-skeleton-calendar">
+          {Array.from({ length: 35 }).map((_, index) => (
+            <span key={index} />
+          ))}
+        </section>
+        <aside className="builder-skeleton-side-panel">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <span className="builder-skeleton-line" key={index} />
+          ))}
+        </aside>
+      </div>
+    );
+  }
+
+  if (variant === "chrome") {
+    return (
+      <div className="builder-skeleton-chrome">
+        <section className="builder-skeleton-site-preview">
+          <span className="builder-skeleton-site-header" />
+          <span className="builder-skeleton-site-body" />
+          <span className="builder-skeleton-site-footer" />
+        </section>
+        <aside className="builder-skeleton-side-panel">
+          {Array.from({ length: 7 }).map((_, index) => (
+            <span className="builder-skeleton-line" key={index} />
+          ))}
+        </aside>
+      </div>
+    );
+  }
+
+  if (variant === "users") {
+    return (
+      <div className="builder-skeleton-users">
+        <div className="builder-skeleton-stats">
+          <span />
+          <span />
+          <span />
+        </div>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <article className="builder-skeleton-user-row" key={index}>
+            <span />
+            <span />
+            <span />
+          </article>
+        ))}
+      </div>
+    );
+  }
+
+  if (variant === "theme") {
+    return (
+      <div className="builder-skeleton-theme">
+        <section className="builder-skeleton-swatches">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <span key={index} />
+          ))}
+        </section>
+        <section className="builder-skeleton-theme-preview">
+          <span />
+          <span />
+          <span />
+        </section>
+      </div>
+    );
+  }
+
+  if (variant === "publish") {
+    return (
+      <div className="builder-skeleton-publish">
+        <section className="builder-skeleton-status-grid">
+          <span />
+          <span />
+          <span />
+          <span />
+        </section>
+        <section className="builder-skeleton-share-grid">
+          <span />
+          <span />
+        </section>
+      </div>
+    );
+  }
+
+  if (variant === "responses" || variant === "data") {
+    return (
+      <div className="builder-skeleton-data">
+        <aside className="builder-skeleton-side-panel">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <span className="builder-skeleton-line" key={index} />
+          ))}
+        </aside>
+        <section className="builder-skeleton-table">
+          {Array.from({ length: 7 }).map((_, index) => (
+            <span key={index} />
+          ))}
+        </section>
+      </div>
+    );
+  }
+
+  return <BuilderSkeletonPanel variant="design" />;
+}
+
+export function PageBuilderSkeleton({ lang, pathname = "/page-builder" }) {
+  const activeTab = getBuilderSkeletonTab(pathname);
+  const isSinglePage = activeTab === "responses" || activeTab === "data";
+  const titleByTab = {
+    design: "Loading pages",
+    forms: "Loading forms",
+    reservations: "Loading reservations",
+    chrome: "Loading header and footer",
+    users: "Loading users",
+    theme: "Loading themes",
+    publish: "Loading publish tools",
+    responses: "Loading responses",
+    data: "Loading data workspace",
+  };
+
+  return (
+    <section
+      className="builder-skeleton-workspace"
+      aria-label={titleByTab[activeTab] || "Loading builder"}
+      dir={lang === "ar" ? "rtl" : "ltr"}
+    >
+      <header className="builder-skeleton-header">
+        <div>
+          <span className="builder-skeleton-title" />
+          <span className="builder-skeleton-subtitle" />
+        </div>
+      </header>
+
+      {!isSinglePage && (
+        <nav className="builder-skeleton-tabs" aria-hidden="true">
+          {builderSkeletonTabs.map((tab) => (
+            <span
+              className={tab.id === activeTab ? "is-active" : ""}
+              key={tab.id}
+            >
+              {tab.label}
+            </span>
+          ))}
+        </nav>
+      )}
+
+      <BuilderSkeletonPanel variant={activeTab} />
+    </section>
+  );
+}
+
 export function DashboardLoadingElement({ pathname, labels, lang }) {
   if (pathname.startsWith("/page-builder/form-preview")) {
     return <FormPreviewSkeleton lang={lang} />;
   }
 
-  if (pathname.startsWith("/page-builder/forms")) {
-    return <FormBuilderSkeleton lang={lang} />;
+  if (
+    pathname.startsWith("/page-builder") ||
+    pathname.startsWith("/builder-responses") ||
+    pathname.startsWith("/builder-data")
+  ) {
+    return <PageBuilderSkeleton lang={lang} pathname={pathname} />;
   }
 
   const safeLabels = labels || appShellContent.loading || {};
@@ -289,6 +529,7 @@ export function DashboardShell({
         onThemeModeChange={onThemeModeChange}
         compact={useCompactBuilderSidebar}
         onNavigate={onNavigate}
+        showNotifications
       />
 
       <main

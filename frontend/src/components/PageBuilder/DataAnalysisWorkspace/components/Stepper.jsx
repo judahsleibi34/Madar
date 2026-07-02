@@ -27,7 +27,7 @@ export default function Stepper({
           aria-disabled={step.requiresMetrics && !metricsReady}
           title={
             step.requiresMetrics && !metricsReady
-              ? "Generate metrics in Prepare before opening this step"
+              ? "Create metrics in Prepare before opening this step"
               : undefined
           }
           onClick={() => {

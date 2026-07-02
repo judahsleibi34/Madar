@@ -1,10 +1,11 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import ChangePasswordPage from "../components/DashboardBuilder/ChangePasswordPage";
 import SettingsPage from "../components/DashboardBuilder/SettingsPage";
 import UserDashboard from "../components/DashboardBuilder/UserDashboard";
 import MyPlanPage from "../components/DashboardBuilder/MyPlanPage";
+import NotificationsPage from "../components/DashboardBuilder/NotificationsPage";
 import BuilderFormPreviewPage from "../components/PageBuilder/preview/BuilderFormPreviewPage";
 import TenantSiteRuntime from "../components/PageBuilder/runtime/TenantSiteRuntime";
 import { appShellContent } from "../content";
@@ -20,6 +21,12 @@ export default function UserWorkspaceRoutes({
   themeMode,
   user,
 }) {
+  const location = useLocation();
+  const isBuilderLoadingPath =
+    location.pathname.startsWith("/page-builder") ||
+    location.pathname.startsWith("/builder-responses") ||
+    location.pathname.startsWith("/builder-data");
+
   const renderShell = (children, options = {}) => (
     <DashboardShell
       {...shellProps}
@@ -45,7 +52,18 @@ export default function UserWorkspaceRoutes({
   return (
     <Suspense
       fallback={
-        <DashboardLoadingElement pathname="/page-builder" lang={lang} />
+        isBuilderLoadingPath
+          ? renderShell(
+              <DashboardLoadingElement pathname={location.pathname} lang={lang} />,
+              {
+                compactSidebar:
+                  location.pathname.startsWith("/builder-responses") ||
+                  location.pathname.startsWith("/builder-data"),
+                isPageBuilderShell: location.pathname.startsWith("/page-builder"),
+                lang: location.pathname.startsWith("/page-builder") ? "en" : lang,
+              }
+            )
+          : <DashboardLoadingElement pathname={location.pathname} lang={lang} />
       }
     >
       <Routes>
@@ -124,6 +142,11 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/my-plan/*"
         element={renderShell(<MyPlanPage lang={lang} user={user} />)}
+      />
+
+      <Route
+        path="/notifications/*"
+        element={renderShell(<NotificationsPage />)}
       />
 
       <Route

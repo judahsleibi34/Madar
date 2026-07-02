@@ -831,7 +831,7 @@ img.admin-sidebar-avatar {
 [data-theme="dark"] .admin-sidebar-brand-text > span,
 .theme-dark .admin-sidebar-user-info span,
 [data-theme="dark"] .admin-sidebar-user-info span {
-  color: rgba(248, 250, 252, 0.7);
+  color: rgba(var(--theme-text-inverse-rgb), 0.7);
 }
 
 .theme-dark .admin-sidebar-admin-badge,
@@ -844,7 +844,7 @@ img.admin-sidebar-avatar {
 .theme-dark .admin-sidebar-nav button,
 [data-theme="dark"] .admin-sidebar-nav a,
 [data-theme="dark"] .admin-sidebar-nav button {
-  color: rgba(248, 250, 252, 0.86);
+  color: rgba(var(--theme-text-inverse-rgb), 0.86);
 }
 
 .theme-dark .admin-sidebar-nav a:hover,
@@ -861,7 +861,7 @@ img.admin-sidebar-avatar {
 
 .theme-dark .admin-sidebar-theme-row,
 [data-theme="dark"] .admin-sidebar-theme-row {
-  color: rgba(248, 250, 252, 0.86) !important;
+  color: rgba(var(--theme-text-inverse-rgb), 0.86) !important;
 }
 
 .theme-dark .admin-sidebar-theme-row:hover,
@@ -872,7 +872,7 @@ img.admin-sidebar-avatar {
 
 .theme-dark .admin-sidebar-theme-row .theme-toggle-label,
 [data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-label {
-  color: rgba(248, 250, 252, 0.86) !important;
+  color: rgba(var(--theme-text-inverse-rgb), 0.86) !important;
 }
 
 .theme-dark .admin-sidebar-theme-row:hover .theme-toggle-label,
@@ -895,12 +895,12 @@ img.admin-sidebar-avatar {
 
 .theme-dark .admin-sidebar-logout,
 [data-theme="dark"] .admin-sidebar-logout {
-  color: rgba(248, 250, 252, 0.86);
+  color: rgba(var(--theme-text-inverse-rgb), 0.86);
 }
 
 .theme-dark .admin-sidebar-logout svg,
 [data-theme="dark"] .admin-sidebar-logout svg {
-  color: rgba(248, 250, 252, 0.86);
+  color: rgba(var(--theme-text-inverse-rgb), 0.86);
 }
 
 .theme-dark .admin-sidebar-logout:hover,

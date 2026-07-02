@@ -242,7 +242,7 @@ body.theme-dark .already-signed-page {
   background:
     radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.16), transparent 34%),
     radial-gradient(circle at top right, rgba(var(--theme-secondary-rgb), 0.12), transparent 36%),
-    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 56%, #151018 100%);
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 56%, var(--theme-surface) 100%);
   color: var(--theme-text);
 }
 
@@ -311,9 +311,9 @@ body.theme-dark .auth-skeleton-line,
 body.theme-dark .auth-skeleton-button {
   background: linear-gradient(
     90deg,
-    rgba(244, 240, 232, 0.1),
+    rgba(var(--theme-text-inverse-rgb), 0.1),
     rgba(var(--theme-primary-rgb), 0.16),
-    rgba(244, 240, 232, 0.1)
+    rgba(var(--theme-text-inverse-rgb), 0.1)
   );
   background-size: 220% 100%;
 }

@@ -1,11 +1,6 @@
 import { Languages } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
-import {
-  SUPPORTED_LANGUAGES,
-  getCurrentLanguage,
-  setAppLanguage,
-} from "../i18n/language";
+import { useLanguage } from "../i18n";
 import "./LanguageSwitcher/LanguageSwitcher.css";
 
 export default function LanguageSwitcher({
@@ -14,31 +9,21 @@ export default function LanguageSwitcher({
   compact = false,
   className = "",
 }) {
-  const { t, i18n } = useTranslation("common");
+  const { language, setLanguage, supportedLanguages, t } = useLanguage();
 
-  const activeLanguage =
-    current || i18n.language?.split("-")?.[0] || getCurrentLanguage();
-
-  const safeLanguage = activeLanguage === "ar" ? "ar" : "en";
+  const safeLanguage = supportedLanguages[current] ? current : language;
   const nextLanguage = safeLanguage === "ar" ? "en" : "ar";
 
-  const selected = SUPPORTED_LANGUAGES[safeLanguage] || SUPPORTED_LANGUAGES.en;
-  const next = SUPPORTED_LANGUAGES[nextLanguage] || SUPPORTED_LANGUAGES.en;
-  const selectedLabel = t(`language.${safeLanguage}`, {
-    defaultValue: selected.label,
-  });
-  const nextLabel = t(`language.${nextLanguage}`, {
-    defaultValue: next.label,
-  });
+  const selected = supportedLanguages[safeLanguage] || supportedLanguages.en;
+  const next = supportedLanguages[nextLanguage] || supportedLanguages.en;
+  const selectedLabel = t(`language.${safeLanguage}`, selected.label);
+  const nextLabel = t(`language.${nextLanguage}`, next.label);
   const switchLabel = t("language.switchTo", {
     language: nextLabel,
   });
 
   const handleToggle = () => {
-    const selectedLanguage = setAppLanguage(nextLanguage);
-
-    document.documentElement.dir = selectedLanguage === "ar" ? "rtl" : "ltr";
-    document.documentElement.lang = selectedLanguage === "ar" ? "ar" : "en";
+    const selectedLanguage = setLanguage(nextLanguage);
 
     if (typeof onChange === "function") {
       onChange(selectedLanguage);

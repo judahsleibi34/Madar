@@ -13,10 +13,12 @@ import {
   LogOut,
   UsersRound,
   KeyRound,
+  Search,
 } from "lucide-react";
 
 import LanguageSwitcher from "../LanguageSwitcher";
 import ThemeToggle from "../ThemeChanger/ThemeToggle";
+import NotificationBell from "./NotificationBell";
 import {
   applyThemeMode,
   readStoredThemeMode,
@@ -83,6 +85,7 @@ export default function DashboardSidebar({
   compact = false,
   themeMode,
   onThemeModeChange,
+  showNotifications = false,
 }) {
   const { t } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -98,6 +101,7 @@ export default function DashboardSidebar({
 
     return readStoredThemeMode();
   });
+  const [navSearch, setNavSearch] = useState("");
 
   const activeThemeMode =
     themeMode === "dark" || themeMode === "light"
@@ -171,6 +175,12 @@ export default function DashboardSidebar({
   ];
 
   const visibleNavItemsTop = isAdminUser ? adminNavItemsTop : userNavItemsTop;
+  const normalizedNavSearch = navSearch.trim().toLowerCase();
+  const filteredNavItemsTop = normalizedNavSearch
+    ? visibleNavItemsTop.filter((item) =>
+        item.label.toLowerCase().includes(normalizedNavSearch),
+      )
+    : visibleNavItemsTop;
   const showSettingsLink = !isAdminUser;
 
   useEffect(() => {
@@ -270,8 +280,31 @@ export default function DashboardSidebar({
           </span>
         </button>
 
+        <label className="admin-sidebar-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            value={navSearch}
+            onChange={(event) => setNavSearch(event.target.value)}
+            placeholder={t("sidebar.search", {
+              defaultValue: "Search...",
+            })}
+            aria-label={t("sidebar.search", {
+              defaultValue: "Search",
+            })}
+          />
+        </label>
+
+        {showNotifications && (
+          <NotificationBell
+            compact={compact}
+            className="admin-sidebar-notifications"
+            onNavigate={onNavigate}
+          />
+        )}
+
         <nav className="admin-sidebar-nav" aria-label={t("sidebar.navigation")}>
-          {visibleNavItemsTop.map((item) => {
+          {filteredNavItemsTop.map((item) => {
             const Icon = item.icon;
 
             return (
@@ -288,16 +321,6 @@ export default function DashboardSidebar({
             );
           })}
 
-          <ThemeToggle
-            mode={activeThemeMode}
-            onChange={handleThemeChange}
-            label={t("sidebar.themeMode")}
-            compact={compact}
-            showLabel
-            showSwitch={false}
-            className="admin-sidebar-theme-row"
-          />
-
           <button
             type="button"
             className={isActive("/settings/security") ? "active" : ""}
@@ -307,18 +330,6 @@ export default function DashboardSidebar({
             <ShieldCheck size={18} aria-hidden="true" />
             <span>{t("sidebar.security")}</span>
           </button>
-
-          {showSettingsLink && (
-            <button
-              type="button"
-              className={isActive("/settings") ? "active" : ""}
-              onClick={() => goTo("/settings")}
-              title={t("sidebar.settings")}
-            >
-              <Settings size={18} aria-hidden="true" />
-              <span>{t("sidebar.settings")}</span>
-            </button>
-          )}
         </nav>
       </div>
 
@@ -341,6 +352,30 @@ export default function DashboardSidebar({
           <LogOut size={18} aria-hidden="true" />
           <span>{t("sidebar.logout")}</span>
         </button>
+
+        {showSettingsLink && (
+          <button
+            type="button"
+            className={`admin-sidebar-utility ${
+              isActive("/settings") ? "active" : ""
+            }`}
+            onClick={() => goTo("/settings")}
+            title={t("sidebar.settings")}
+          >
+            <Settings size={18} aria-hidden="true" />
+            <span>{t("sidebar.settings")}</span>
+          </button>
+        )}
+
+        <ThemeToggle
+          mode={activeThemeMode}
+          onChange={handleThemeChange}
+          label={t("sidebar.themeMode")}
+          compact={compact}
+          showLabel
+          showSwitch={!compact}
+          className="admin-sidebar-theme-row"
+        />
 
         <div className="admin-sidebar-user" title={displayName}>
           {user?.avatar ? (

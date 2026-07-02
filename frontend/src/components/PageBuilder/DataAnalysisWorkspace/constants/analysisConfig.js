@@ -21,8 +21,8 @@ export const reportGroupText = {
       description: "Completion, distributions, ratings, and multi-select answers.",
     },
     assisted: {
-      label: "Assisted",
-      description: "Offline questions and custom indicators.",
+      label: "Custom",
+      description: "Saved questions and custom indicators.",
     },
   },
   ar: {

@@ -7,33 +7,11 @@
   gap: 14px;
 }
 
-.page-builder .daw-cleaning-intro {
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
-  border-radius: 16px;
-  padding: 16px;
-  background: rgba(var(--theme-primary-rgb), 0.07);
-}
-
-.page-builder .daw-cleaning-intro strong {
-  display: block;
-  color: var(--daw-text);
-  font-size: 16px;
-  font-weight: 950;
-}
-
-.page-builder .daw-cleaning-intro p {
-  margin: 6px 0 0;
-  color: var(--daw-muted);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.5;
-}
-
 .page-builder .daw-cleaning-stack details {
-  border: 1px solid var(--daw-card-border);
-  border-radius: 16px;
-  padding: 14px;
-  background: var(--daw-soft-bg);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .page-builder .daw-cleaning-stack summary {
@@ -63,14 +41,14 @@
 .page-builder .daw-cleaning-option,
 .page-builder .daw-cleaning-tool {
   min-width: 0;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 14px;
-  padding: 12px;
-  background: rgba(var(--theme-text-inverse-rgb), 0.58);
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-cleaning-option {
-  padding: 8px 10px;
+  padding: 12px 14px;
 }
 
 .page-builder .daw-cleaning-option .daw-toggle {
@@ -135,10 +113,10 @@
 .page-builder .daw-soft-action {
   flex: 0 0 auto;
   min-height: 36px;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.34);
-  border-radius: 10px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 0 12px;
-  background: rgba(var(--theme-primary-rgb), 0.1);
+  background: var(--theme-surface);
   color: var(--daw-text);
   font-size: 12px;
   font-weight: 950;
@@ -147,8 +125,8 @@
 
 .page-builder .daw-soft-action:hover,
 .page-builder .daw-soft-action.is-active {
-  border-color: rgba(var(--theme-primary-rgb), 0.56);
-  background: rgba(var(--theme-primary-rgb), 0.16);
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
+  background: var(--theme-surface-2);
 }
 
 .page-builder .daw-advanced-cleaning-grid {
@@ -202,10 +180,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
-  border-radius: 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 12px 14px;
-  background: rgba(var(--theme-primary-rgb), 0.07);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-save-dataframe-row > div {
@@ -240,15 +218,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.32);
-  border-radius: 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 16px;
-  background: rgba(var(--theme-primary-rgb), 0.1);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-generate-metrics-row.is-ready {
-  border-color: rgba(31, 157, 112, 0.42);
-  background: rgba(31, 157, 112, 0.1);
+  border-color: var(--theme-border);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-generate-metrics-row > div {
@@ -283,7 +261,7 @@
   gap: 16px;
   margin-top: 16px;
   border: 1px solid var(--daw-card-border);
-  border-radius: 18px;
+  border-radius: 8px;
   padding: 18px;
   background: var(--daw-card-bg);
 }
@@ -316,10 +294,10 @@
 }
 
 .page-builder .daw-analysis-generator-heading em {
-  border-radius: 999px;
+  border-radius: 7px;
   padding: 7px 10px;
-  background: rgba(31, 157, 112, 0.12);
-  color: #17845d;
+  background: var(--theme-surface-2);
+  color: var(--theme-text-soft);
   font-size: 11px;
   font-style: normal;
   font-weight: 950;
@@ -335,9 +313,9 @@
 .page-builder .daw-analysis-domain-grid button {
   min-height: 74px;
   border: 1px solid var(--daw-card-border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 10px;
-  background: var(--daw-secondary-bg);
+  background: var(--theme-surface);
   color: var(--daw-text);
   text-align: start;
   cursor: pointer;
@@ -345,7 +323,8 @@
 
 .page-builder .daw-analysis-domain-grid button.active {
   border-color: var(--theme-primary);
-  background: rgba(var(--theme-primary-rgb), 0.12);
+  background: var(--theme-surface);
+  color: var(--theme-primary);
 }
 
 .page-builder .daw-analysis-domain-grid strong,
@@ -372,17 +351,35 @@
 }
 
 .page-builder .daw-cleaning-confirm {
-  display: grid;
-  justify-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
   margin-top: 12px;
   border-top: 1px solid var(--daw-card-border);
   padding-top: 12px;
 }
 
+.page-builder .daw-cleaning-confirm-copy {
+  min-width: 0;
+}
+
+.page-builder .daw-cleaning-confirm-copy strong {
+  display: block;
+  color: var(--daw-text);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.page-builder .daw-cleaning-confirm-copy p {
+  margin: 4px 0 0;
+}
+
 .page-builder .daw-confirm-button {
+  flex: 0 0 auto;
   min-height: 42px;
   border: 1px solid var(--daw-secondary-border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 0 16px;
   background: var(--daw-secondary-bg);
   color: var(--daw-secondary-text);
@@ -390,31 +387,29 @@
   font-weight: 950;
   cursor: pointer;
   transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
     border-color 160ms ease;
 }
 
 .page-builder .daw-confirm-button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(var(--theme-primary-rgb), 0.38);
-  background: var(--daw-secondary-bg-hover);
-  color: var(--daw-red);
-  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.18);
+  border-color: var(--theme-primary);
+  background: var(--theme-surface);
+  color: var(--theme-primary);
 }
 
 .page-builder .daw-confirm-button.is-confirmed {
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-hover));
-  border-color: rgba(var(--theme-primary-rgb), 0.72);
+  background: var(--theme-primary);
+  border-color: var(--theme-primary);
   color: var(--theme-text-inverse);
 }
 
 .page-builder .daw-report-customize {
   margin-top: 16px;
   border: 1px solid var(--daw-card-border);
-  border-radius: 18px;
+  border-radius: 8px;
   padding: 16px;
-  background: rgba(var(--theme-shadow-rgb), 0.035);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-section-heading.compact {
@@ -470,10 +465,10 @@
   align-items: stretch;
   gap: 8px;
   min-height: 44px;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 16px;
-  padding: 10px;
-  background: var(--theme-surface);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .page-builder .daw-column-picker label {
@@ -486,7 +481,7 @@
   max-width: 100%;
   border-radius: 10px;
   padding: 7px 11px;
-  background: rgba(var(--theme-shadow-rgb), 0.07);
+  background: transparent;
   color: var(--daw-text);
   font-size: 12px;
   font-weight: 900;

@@ -24,41 +24,6 @@
   background: rgba(var(--theme-text-inverse-rgb), 0.72);
 }
 
-.page-builder .daw-local-dataset-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
-  border-radius: 14px;
-  padding: 11px 13px;
-  background: rgba(var(--theme-primary-rgb), 0.07);
-}
-
-.page-builder .daw-local-dataset-notice strong,
-.page-builder .daw-local-dataset-notice span {
-  display: block;
-}
-
-.page-builder .daw-local-dataset-notice strong {
-  color: var(--daw-text);
-  font-size: 13px;
-  font-weight: 950;
-}
-
-.page-builder .daw-local-dataset-notice span {
-  margin-top: 3px;
-  color: var(--daw-muted);
-  font-size: 11px;
-  font-weight: 750;
-  line-height: 1.4;
-}
-
-.page-builder .daw-local-dataset-notice .daw-secondary {
-  flex: 0 0 auto;
-}
-
 .page-builder .daw-flow-actions button {
   min-width: 96px;
   gap: 8px;

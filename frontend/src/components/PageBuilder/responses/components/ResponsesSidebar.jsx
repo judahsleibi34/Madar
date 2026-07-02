@@ -12,14 +12,14 @@ export default function ResponsesSidebar({
   fields,
   selectedFieldSet,
   toggleSelectedField,
-  clearSelectedFields,
   dynamicStatusOptions,
   selectedStatusSet,
   toggleSelectedStatus,
-  clearSelectedStatuses,
   clearFilters,
   hasFilters,
 }) {
+  const hasSearchQuery = searchQuery.trim().length > 0;
+
   return (
     <aside className="results-form-list">
       <div className="results-panel-title">
@@ -73,20 +73,29 @@ export default function ResponsesSidebar({
 
           <label className="responses-search-field">
             <span>{t.search}</span>
-            <input
-              type="search"
-              value={searchQuery}
-              placeholder={t.searchPlaceholder}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
+            <div className="responses-search-input-wrap">
+              <input
+                type="search"
+                value={searchQuery}
+                placeholder={t.searchPlaceholder}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              {hasSearchQuery ? (
+                <button
+                  type="button"
+                  className="responses-search-reset"
+                  onClick={() => setSearchQuery("")}
+                  aria-label={t.clearSearch}
+                >
+                  x
+                </button>
+              ) : null}
+            </div>
           </label>
 
           <div className="responses-checkbox-filter">
             <div className="responses-filter-heading">
               <span>{t.searchIn}</span>
-              <button type="button" onClick={clearSelectedFields}>
-                {t.allFields}
-              </button>
             </div>
             <div className="responses-checkbox-list">
               {fields.map((field) => (
@@ -105,9 +114,6 @@ export default function ResponsesSidebar({
           <div className="responses-checkbox-filter">
             <div className="responses-filter-heading">
               <span>{t.statusFilter}</span>
-              <button type="button" onClick={clearSelectedStatuses}>
-                {t.allStatuses}
-              </button>
             </div>
             <div className="responses-checkbox-list compact">
               {dynamicStatusOptions.map((status) => (

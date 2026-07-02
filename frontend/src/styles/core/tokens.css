@@ -60,6 +60,49 @@
   --theme-footer-text: #fff7ef;
   --theme-footer-text-soft: #ead9ce;
   --theme-footer-text-muted: #bcada4;
+
+  /* Semantic app color aliases. Keep --theme-* as the compatibility layer. */
+  --color-bg: var(--theme-bg);
+  --color-bg-soft: var(--theme-bg-soft);
+  --color-surface: var(--theme-surface);
+  --color-surface-soft: var(--theme-surface-2);
+  --color-surface-muted: var(--theme-surface-3);
+  --color-border: var(--theme-border);
+  --color-border-strong: var(--theme-border-strong);
+  --color-text: var(--theme-text);
+  --color-text-soft: var(--theme-text-soft);
+  --color-text-muted: var(--theme-text-muted);
+  --color-text-inverse: var(--theme-text-inverse);
+  --color-primary: var(--theme-primary);
+  --color-primary-hover: var(--theme-primary-hover);
+  --color-primary-soft: var(--theme-primary-soft);
+  --color-secondary: var(--theme-secondary);
+  --color-secondary-soft: var(--theme-secondary-soft);
+  --color-info: var(--theme-info);
+  --color-success: var(--theme-success);
+  --color-warning: var(--theme-warning);
+  --color-danger: var(--theme-danger);
+  --color-focus: rgba(var(--theme-primary-rgb), 0.16);
+  --app-surface-alpha: color-mix(in srgb, var(--theme-surface) 84%, transparent);
+  --app-focus-ring: 0 0 0 4px var(--color-focus);
+  --app-shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.06);
+  --app-shadow-md: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
+  --app-primary-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.18);
+  --app-card-shadow: 0 18px 46px rgba(var(--theme-shadow-rgb), 0.09);
+  --app-card-shadow-hover: 0 22px 52px rgba(var(--theme-shadow-rgb), 0.12);
+  --app-header-shadow: 0 10px 28px rgba(var(--theme-shadow-rgb), 0.06);
+  --app-panel-shadow: 0 22px 56px rgba(var(--theme-shadow-rgb), 0.08);
+  --app-modal-shadow: 0 28px 80px rgba(var(--theme-shadow-rgb), 0.18);
+  --app-backdrop: rgba(var(--theme-shadow-rgb), 0.58);
+  --app-chrome-translucent: color-mix(in srgb, var(--theme-surface) 92%, transparent);
+  --app-success-strong: #4ade80;
+  --app-success-strong-rgb: 74, 222, 128;
+  --builder-chrome-bg: color-mix(in srgb, var(--theme-surface) 88%, var(--theme-bg-soft));
+  --builder-chrome-surface: color-mix(in srgb, var(--theme-surface) 92%, var(--theme-bg-soft));
+  --builder-chrome-surface-raised: color-mix(in srgb, var(--theme-surface) 96%, var(--theme-bg-soft));
+  --builder-chrome-surface-muted: color-mix(in srgb, var(--theme-surface) 84%, var(--theme-bg-soft));
+  --builder-chrome-border: color-mix(in srgb, var(--theme-border) 62%, transparent);
+  --builder-chrome-shadow: 0 8px 18px rgba(var(--theme-shadow-rgb), 0.035);
 }
 
 :root[data-theme="dark"],
@@ -119,6 +162,48 @@ body.theme-dark {
   --theme-footer-text: #fff7ef;
   --theme-footer-text-soft: #ead9ce;
   --theme-footer-text-muted: #bcada4;
+
+  --color-bg: var(--theme-bg);
+  --color-bg-soft: var(--theme-bg-soft);
+  --color-surface: var(--theme-surface);
+  --color-surface-soft: var(--theme-surface-2);
+  --color-surface-muted: var(--theme-surface-3);
+  --color-border: var(--theme-border);
+  --color-border-strong: var(--theme-border-strong);
+  --color-text: var(--theme-text);
+  --color-text-soft: var(--theme-text-soft);
+  --color-text-muted: var(--theme-text-muted);
+  --color-text-inverse: var(--theme-text-inverse);
+  --color-primary: var(--theme-primary);
+  --color-primary-hover: var(--theme-primary-hover);
+  --color-primary-soft: var(--theme-primary-soft);
+  --color-secondary: var(--theme-secondary);
+  --color-secondary-soft: var(--theme-secondary-soft);
+  --color-info: var(--theme-info);
+  --color-success: var(--theme-success);
+  --color-warning: var(--theme-warning);
+  --color-danger: var(--theme-danger);
+  --color-focus: rgba(var(--theme-primary-rgb), 0.22);
+  --app-surface-alpha: color-mix(in srgb, var(--theme-surface) 86%, transparent);
+  --app-focus-ring: 0 0 0 4px var(--color-focus);
+  --app-shadow-sm: 0 14px 34px rgba(var(--theme-shadow-rgb), 0.24);
+  --app-shadow-md: 0 22px 56px rgba(var(--theme-shadow-rgb), 0.3);
+  --app-primary-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.2);
+  --app-card-shadow: 0 22px 58px rgba(var(--theme-shadow-rgb), 0.34);
+  --app-card-shadow-hover: 0 26px 68px rgba(var(--theme-shadow-rgb), 0.42);
+  --app-header-shadow: 0 14px 36px rgba(var(--theme-shadow-rgb), 0.28);
+  --app-panel-shadow: 0 22px 56px rgba(var(--theme-shadow-rgb), 0.28);
+  --app-modal-shadow: 0 28px 80px rgba(var(--theme-shadow-rgb), 0.26);
+  --app-backdrop: rgba(var(--theme-shadow-rgb), 0.58);
+  --app-chrome-translucent: color-mix(in srgb, var(--theme-surface) 90%, transparent);
+  --app-success-strong: #4ade80;
+  --app-success-strong-rgb: 74, 222, 128;
+  --builder-chrome-bg: color-mix(in srgb, var(--theme-bg) 72%, var(--theme-surface));
+  --builder-chrome-surface: color-mix(in srgb, var(--theme-surface) 86%, var(--theme-bg));
+  --builder-chrome-surface-raised: color-mix(in srgb, var(--theme-surface) 92%, var(--theme-bg));
+  --builder-chrome-surface-muted: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-bg));
+  --builder-chrome-border: color-mix(in srgb, var(--theme-border) 72%, transparent);
+  --builder-chrome-shadow: 0 10px 22px rgba(var(--theme-black-rgb), 0.14);
 }
 
 /* ============================================================
@@ -143,4 +228,7 @@ body.theme-dark {
   --admin-danger: var(--theme-danger);
   --admin-gradient: var(--theme-gradient);
   --admin-shadow: var(--theme-shadow);
+  --admin-focus-ring: var(--app-focus-ring);
+  --admin-surface-alpha: var(--app-surface-alpha);
+  --admin-success-strong: var(--app-success-strong);
 }

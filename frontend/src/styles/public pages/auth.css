@@ -439,10 +439,10 @@ body.theme-dark .register-card input:focus,
 .mfa-factor-select {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid rgba(26, 39, 68, 0.2);
+  border: 1px solid var(--theme-border);
   border-radius: 12px;
-  background: #ffffff;
-  color: #1a2744;
+  background: var(--theme-surface);
+  color: var(--theme-text);
   font-size: 15px;
   font-weight: 650;
   font-family: inherit;
@@ -451,7 +451,7 @@ body.theme-dark .register-card input:focus,
 
 .mfa-factor-select:focus {
   border-color: var(--theme-primary);
-  background: #fffdfb;
+  background: var(--theme-surface);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
