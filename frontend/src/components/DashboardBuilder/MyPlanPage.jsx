@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreditCard, ExternalLink, Lock, Settings, Unlock } from "lucide-react";
-import { getMyPlanContent } from "../../content";
+import { useLanguage } from "../../i18n";
 
 const MODULE_PATHS = {
   website: "/page-builder",
@@ -65,11 +65,21 @@ function getActiveBuilderIds(user) {
   return new Set(["website", "forms", "requests"]);
 }
 
-function getPlanName(user, fallback) {
-  if (user?.subscription_type === "full_platform") return "Full platform";
+function getPlanName(user, content) {
+  if (user?.subscription_type === "full_platform") {
+    return content.plans.fullPlatform;
+  }
+
   if (user?.plan) return titleCase(user.plan);
-  if (user?.builder_type) return `${titleCase(user.builder_type)} builder`;
-  return fallback;
+
+  if (user?.builder_type) {
+    return content.plans.builder.replace(
+      "{{builder}}",
+      titleCase(user.builder_type),
+    );
+  }
+
+  return content.plan.name;
 }
 
 function getUsage(content, user) {
@@ -94,12 +104,12 @@ function getUsageTone(percent) {
   return "";
 }
 
-export default function MyPlanPage({ lang = "en", user }) {
-  const activeLang = lang === "ar" ? "ar" : "en";
-  const isArabic = activeLang === "ar";
-  const content = getMyPlanContent(activeLang);
+export default function MyPlanPage({ user }) {
+  const { direction, language, t } = useLanguage();
+  const content = t("myPlan");
   const navigate = useNavigate();
   const enabledModuleIds = useMemo(() => getActiveBuilderIds(user), [user]);
+  const numberLocale = language === "ar" ? "ar" : "en";
 
   const modules = useMemo(
     () =>
@@ -123,8 +133,10 @@ export default function MyPlanPage({ lang = "en", user }) {
 
   const plan = {
     ...content.plan,
-    name: getPlanName(user, content.plan.name),
-    status: user?.payment_status ? titleCase(user.payment_status) : content.plan.status,
+    name: getPlanName(user, content),
+    status: user?.payment_status
+      ? t(`common.${user.payment_status}`, titleCase(user.payment_status))
+      : content.plan.status,
     price:
       PLAN_PRICES[
         user?.subscription_type === "full_platform"
@@ -136,11 +148,15 @@ export default function MyPlanPage({ lang = "en", user }) {
 
   const openSelectedModule = () => {
     if (!selectedModule) return;
-    navigate(selectedModule.enabled ? MODULE_PATHS[selectedModule.id] || "/dashboard" : "/pricing");
+    navigate(
+      selectedModule.enabled
+        ? MODULE_PATHS[selectedModule.id] || "/dashboard"
+        : "/pricing",
+    );
   };
 
   return (
-    <section className="my-plan-page" dir={isArabic ? "rtl" : "ltr"}>
+    <section className="my-plan-page" dir={direction}>
       <header className="my-plan-header">
         <div>
           <span className="my-plan-eyebrow">{content.eyebrow}</span>
@@ -247,7 +263,8 @@ export default function MyPlanPage({ lang = "en", user }) {
                   <div>
                     <span>{item.label}</span>
                     <strong>
-                      {item.value.toLocaleString()} / {item.max.toLocaleString()}
+                      {item.value.toLocaleString(numberLocale)} /{" "}
+                      {item.max.toLocaleString(numberLocale)}
                     </strong>
                   </div>
                   <em>{percent}%</em>
@@ -284,7 +301,9 @@ export default function MyPlanPage({ lang = "en", user }) {
               >
                 <div>
                   <span>
-                    {module.enabled ? content.enabled : content.locked}
+                    {module.enabled
+                      ? t("common.enabled")
+                      : t("common.locked")}
                   </span>
                   <strong>{module.name}</strong>
                   <p>{module.description}</p>

@@ -5,8 +5,8 @@
   --brand-navy: var(--theme-text);
   --brand-red: var(--theme-primary);
   --brand-olive: var(--theme-secondary);
-  --surface-alpha: color-mix(in srgb, var(--theme-surface) 84%, transparent);
-  --focus-ring: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.16);
+  --surface-alpha: var(--app-surface-alpha);
+  --focus-ring: var(--app-focus-ring);
 }
 
 :root[data-theme="dark"],
@@ -15,8 +15,8 @@ body.theme-dark {
   --brand-navy: var(--theme-text);
   --brand-red: var(--theme-primary);
   --brand-olive: var(--theme-secondary);
-  --surface-alpha: rgba(22, 31, 51, 0.86);
-  --focus-ring: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.22);
+  --surface-alpha: var(--app-surface-alpha);
+  --focus-ring: var(--app-focus-ring);
 }
 
 body {
@@ -39,9 +39,9 @@ body {
   --madar-border-strong: var(--theme-border-strong);
   --madar-gradient: var(--theme-gradient);
   --madar-gradient-hover: var(--theme-gradient-hover);
-  --madar-shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.06);
-  --madar-shadow-md: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
-  --madar-red-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.18);
+  --madar-shadow-sm: var(--app-shadow-sm);
+  --madar-shadow-md: var(--app-shadow-md);
+  --madar-red-shadow: var(--app-primary-shadow);
 }
 
 :root[data-theme="dark"] .page-builder,
@@ -56,9 +56,9 @@ body.theme-dark .page-builder {
   --madar-red-dark: var(--theme-primary-hover);
   --madar-border: var(--theme-border);
   --madar-border-strong: var(--theme-border-strong);
-  --madar-shadow-sm: 0 14px 34px rgba(4, 8, 16, 0.24);
-  --madar-shadow-md: 0 22px 56px rgba(4, 8, 16, 0.3);
-  --madar-red-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.2);
+  --madar-shadow-sm: var(--app-shadow-sm);
+  --madar-shadow-md: var(--app-shadow-md);
+  --madar-red-shadow: var(--app-primary-shadow);
 }
 
 :root[data-theme="dark"] body,
@@ -158,9 +158,9 @@ textarea:focus {
 .builder-topbar,
 .builder-subbar,
 .preview-device-toolbar {
-  background: color-mix(in srgb, var(--theme-surface) 92%, transparent) !important;
+  background: var(--app-chrome-translucent) !important;
   border-color: var(--theme-border) !important;
-  box-shadow: 0 10px 28px rgba(var(--theme-shadow-rgb), 0.06) !important;
+  box-shadow: var(--app-header-shadow) !important;
 }
 
 :root[data-theme="dark"] .site-header,
@@ -173,8 +173,8 @@ body.theme-dark .tenant-site-header,
 body.theme-dark .builder-topbar,
 body.theme-dark .builder-subbar,
 body.theme-dark .preview-device-toolbar {
-  background: rgba(22, 31, 51, 0.9) !important;
-  box-shadow: 0 14px 36px rgba(4, 8, 16, 0.28) !important;
+  background: var(--app-chrome-translucent) !important;
+  box-shadow: var(--app-header-shadow) !important;
 }
 
 .brand-name,
@@ -235,8 +235,6 @@ body.theme-dark .preview-device-toolbar {
 
 .btn-login,
 .lang-toggle,
-.header-theme-toggle,
-.mobile-theme-toggle,
 .workspace-tabs,
 .workspace-tabs button,
 .form-command-button,
@@ -249,11 +247,18 @@ body.theme-dark .preview-device-toolbar {
 
 .btn-login:hover,
 .lang-toggle:hover,
-.header-theme-toggle:hover,
-.mobile-theme-toggle:hover,
 .workspace-tabs button:hover {
   background: var(--theme-primary-soft) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+}
+
+.header-theme-toggle,
+.mobile-theme-toggle,
+.header-theme-toggle:hover,
+.mobile-theme-toggle:hover {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .workspace-tabs button.active,
@@ -399,7 +404,7 @@ body.theme-dark .reservation-settings-section,
 body.theme-dark .reservation-editor-preview-block {
   background: var(--theme-surface) !important;
   border-color: var(--theme-border) !important;
-  box-shadow: 0 22px 56px rgba(4, 8, 16, 0.28) !important;
+  box-shadow: var(--app-panel-shadow) !important;
 }
 
 .features-hero h1,

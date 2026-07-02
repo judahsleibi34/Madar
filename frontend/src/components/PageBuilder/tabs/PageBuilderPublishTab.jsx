@@ -2,12 +2,35 @@ import {
   AlertTriangle,
   Copy,
   Eye,
-  Globe2,
   MessageCircle,
   RefreshCw,
 } from "lucide-react";
 import { useState } from "react";
 import { getPublishContent } from "../../../content/pageBuilder";
+
+const qrPresets = [
+  { color: "111827", qzone: 1, ecc: "M" },
+  { color: "7F1D1D", qzone: 2, ecc: "Q" },
+  { color: "1F2937", qzone: 3, ecc: "H" },
+  { color: "0F3D3E", qzone: 2, ecc: "M" },
+];
+
+const buildQrUrl = (data, version) => {
+  if (!data) return "";
+
+  const preset = qrPresets[version % qrPresets.length];
+  const params = new URLSearchParams({
+    size: "180x180",
+    data,
+    color: preset.color,
+    bgcolor: "FFFFFF",
+    qzone: String(preset.qzone),
+    ecc: preset.ecc,
+    cache: String(version),
+  });
+
+  return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`;
+};
 
 export default function PageBuilderPublishTab({
   project,
@@ -38,9 +61,9 @@ export default function PageBuilderPublishTab({
   };
 
   const whatsAppUrl = publicLink ? `https://wa.me/?text=${encodeURIComponent(publicLink)}` : "";
-  const qrUrl = publicLink ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(publicLink)}&v=${publicQrVersion}` : "";
+  const qrUrl = buildQrUrl(publicLink, publicQrVersion);
   const formWhatsAppUrl = `https://wa.me/?text=${encodeURIComponent(formPreviewLink)}`;
-  const formQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(formPreviewLink)}&v=${formQrVersion}`;
+  const formQrUrl = buildQrUrl(formPreviewLink, formQrVersion);
 
   const copyQrImage = async (qrImageUrl) => {
     if (!qrImageUrl) return;
@@ -68,12 +91,6 @@ export default function PageBuilderPublishTab({
         <div>
           <h2>{content.title}</h2>
           <p>{content.description}</p>
-        </div>
-        <div className="publish-header-summary" aria-label="Publish summary">
-          <span>
-            <Globe2 size={15} aria-hidden="true" />
-            {content.scope}
-          </span>
         </div>
       </div>
 
@@ -139,7 +156,7 @@ export default function PageBuilderPublishTab({
                 </div>
               </div>
               <div className="publish-qr-preview">
-                <img src={qrUrl} alt={content.publicQrAlt} />
+                <img key={qrUrl} src={qrUrl} alt={content.publicQrAlt} />
                 <span>{content.qrPreview}</span>
                 <div className="publish-qr-actions">
                   <button type="button" onClick={() => setPublicQrVersion((value) => value + 1)}>
@@ -186,7 +203,7 @@ export default function PageBuilderPublishTab({
                 </div>
               </div>
                 <div className="publish-qr-preview">
-                  <img src={formQrUrl} alt={content.formQrAlt} />
+                  <img key={formQrUrl} src={formQrUrl} alt={content.formQrAlt} />
                   <span>{content.formQrPreview}</span>
                   <div className="publish-qr-actions">
                     <button type="button" onClick={() => setFormQrVersion((value) => value + 1)}>

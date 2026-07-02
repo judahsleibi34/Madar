@@ -287,14 +287,14 @@
 }
 
 .reservation-editor-card .editor-card-header .reservation-delete-block {
-  border-color: rgba(185, 28, 28, 0.2);
-  color: #b91c1c;
+  border-color: rgba(var(--theme-danger-rgb), 0.2);
+  color: var(--theme-danger);
 }
 
 .reservation-editor-card .editor-card-header .reservation-delete-block:hover {
-  background: rgba(185, 28, 28, 0.08);
-  border-color: rgba(185, 28, 28, 0.32);
-  color: #991b1b;
+  background: rgba(var(--theme-danger-rgb), 0.08);
+  border-color: rgba(var(--theme-danger-rgb), 0.32);
+  color: var(--theme-danger);
 }
 
 .reservation-settings-section {
@@ -435,8 +435,8 @@
   height: 36px;
   border-radius: 11px;
   padding: 0;
-  color: #b91c1c;
-  background: rgba(185, 28, 28, 0.08);
+  color: var(--theme-danger);
+  background: rgba(var(--theme-danger-rgb), 0.08);
 }
 
 .reservation-bullet-row button:disabled {

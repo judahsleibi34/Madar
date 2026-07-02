@@ -138,7 +138,10 @@ body.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-n
   min-height: 52px !important;
   padding: 0 !important;
   justify-content: center !important;
+  border: 0 !important;
   border-radius: 16px !important;
+  background: transparent !important;
+  box-shadow: none !important;
   margin-inline: auto !important;
   gap: 0 !important;
 }
@@ -324,7 +327,9 @@ body.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-n
 .theme-dark
   .admin-dashboard-layout:has(.page-builder)
   .admin-sidebar-theme-row:hover {
-  background: rgba(var(--theme-text-inverse-rgb), 0.08) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
   color: var(--theme-text-inverse) !important;
 }
 

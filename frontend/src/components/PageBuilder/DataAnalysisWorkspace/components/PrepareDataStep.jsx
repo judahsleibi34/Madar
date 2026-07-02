@@ -35,14 +35,6 @@ export default function PrepareDataStep({
         <EmptyState title={t.noDataset}>{t.noDatasetHint}</EmptyState>
       ) : (
         <div className="daw-cleaning-stack">
-          <div className="daw-cleaning-intro">
-            <strong>{t.cleaningIntroTitle || "Start with the safe fixes"}</strong>
-            <p>
-              {t.cleaningIntroText ||
-                "These changes help tidy the data without changing its meaning. You can leave everything as-is and continue."}
-            </p>
-          </div>
-
           <details open>
             <summary>
               <span>{t.basicCleaning}</span>
@@ -91,7 +83,7 @@ export default function PrepareDataStep({
             </div>
           </details>
 
-          <details>
+          <details open>
             <summary>
               <span>{t.advancedCleaning}</span>
             </summary>
@@ -218,6 +210,15 @@ export default function PrepareDataStep({
 
                 {cleaning.dropColumns?.length ? (
                   <div className="daw-cleaning-confirm">
+                    <div className="daw-cleaning-confirm-copy">
+                      <strong>
+                        {cleaning.dropColumns.length} selected column{cleaning.dropColumns.length === 1 ? "" : "s"}
+                      </strong>
+                      <p>
+                        {t.confirmDropColumnsHint ||
+                          "This only changes the cleaned copy used for analysis. Your original upload stays the same."}
+                      </p>
+                    </div>
                     <button
                       type="button"
                       className={`daw-confirm-button ${
@@ -229,10 +230,6 @@ export default function PrepareDataStep({
                         ? t.dropColumnsConfirmed || "Columns will be removed"
                         : t.confirmDropColumns || "Remove selected columns"}
                     </button>
-                    <p>
-                      {t.confirmDropColumnsHint ||
-                        "This only changes the cleaned copy used for analysis. Your original upload stays the same."}
-                    </p>
                   </div>
                 ) : null}
               </section>
@@ -288,12 +285,12 @@ export default function PrepareDataStep({
               <strong>
                 {metricsReady
                   ? `${metricCount} report metric${metricCount === 1 ? " is" : "s are"} ready`
-                  : "Generate report metrics"}
+                  : "Create report metrics"}
               </strong>
               <span>
                 {metricsReady
-                  ? "Your cleaned data has been analyzed. Metrics and tables are now available in the report builder."
-                  : "After choosing your cleaning options, generate the KPIs and summary table used by the report builder."}
+                  ? "Metrics and tables are ready for the report builder."
+                  : "After choosing your cleaning options, create the KPIs and summary table used by the report builder."}
               </span>
             </div>
             <button
@@ -305,8 +302,8 @@ export default function PrepareDataStep({
               {isGeneratingMetrics
                 ? t.working
                 : metricsReady
-                ? "Regenerate metrics"
-                : "Generate metrics"}
+                ? "Refresh metrics"
+                : "Create metrics"}
             </button>
           </div>
         </div>

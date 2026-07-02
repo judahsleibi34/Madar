@@ -174,7 +174,7 @@
 .page-builder .daw-plot-summary-grid,
 .page-builder .daw-visualization-settings-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -183,13 +183,13 @@
   min-width: 0;
   border: 1px solid var(--daw-card-border);
   border-radius: 12px;
-  padding: 12px;
-  background: rgba(var(--theme-shadow-rgb), 0.035);
+  padding: 14px;
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-plot-summary-grid article.active {
-  border-color: rgba(var(--theme-primary-rgb), 0.42);
-  background: rgba(var(--theme-primary-rgb), 0.08);
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-plot-summary-grid span,
@@ -222,40 +222,70 @@
 }
 
 .page-builder .daw-plot-summary-grid article {
+  display: grid;
+  gap: 12px;
+}
+
+.page-builder .daw-plot-card-header,
+.page-builder .daw-plot-meta-row,
+.page-builder .daw-plot-output-row {
+  min-width: 0;
+}
+
+.page-builder .daw-plot-card-header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.page-builder .daw-plot-card-header > div {
+  min-width: 0;
+}
+
+.page-builder .daw-plot-card-header .daw-secondary {
+  flex: 0 0 auto;
+}
+
+.page-builder .daw-plot-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 0 10px;
 }
 
-.page-builder .daw-plot-summary-grid article > span,
-.page-builder .daw-plot-summary-grid article > strong,
-.page-builder .daw-plot-summary-grid article > p,
-.page-builder .daw-plot-summary-grid article > .daw-plot-output-list {
-  flex: 0 0 100%;
-}
-
-.page-builder .daw-plot-summary-grid article > button {
-  margin-top: auto;
+.page-builder .daw-plot-meta-row span {
+  max-width: 100%;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--theme-border);
+  border-radius: 7px;
+  padding: 0 9px;
+  background: transparent;
+  color: var(--theme-text-soft);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: none;
 }
 
 .page-builder .daw-plot-output-list {
   display: grid;
   gap: 10px;
   min-width: 0;
-  margin: 0 0 12px;
+  margin: 0;
 }
 
 .page-builder .daw-plot-output-row {
   display: grid;
-  grid-template-columns: minmax(180px, 0.45fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1fr) auto;
   align-items: center;
   gap: 12px;
   min-width: 0;
   border: 1px solid var(--daw-card-border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 10px 12px;
-  background: rgba(var(--theme-shadow-rgb), 0.035);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-plot-output-copy {
@@ -267,13 +297,21 @@
   max-width: 100%;
 }
 
-.page-builder .daw-plot-output-note {
-  min-width: 0;
-  margin: 0;
+.page-builder .daw-plot-empty-output {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  border: 1px dashed var(--theme-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: transparent;
   color: var(--daw-muted);
   font-size: 12px;
   font-weight: 800;
-  line-height: 1.4;
+}
+
+.page-builder .daw-add-chart-button {
+  gap: 7px;
 }
 
 .page-builder .daw-visualization-preview-modal {
@@ -352,11 +390,11 @@
   max-height: calc(100vh - 28px);
   overflow: auto;
   overflow-x: hidden;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 18px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 20px;
-  background: var(--theme-surface-2);
-  box-shadow: 0 28px 90px rgba(var(--theme-black-rgb), 0.32);
+  background: var(--theme-surface);
+  box-shadow: none;
 }
 
 .page-builder .daw-visualization-settings-modal {
@@ -374,9 +412,9 @@
   min-width: 36px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 10px;
-  background: var(--daw-tab-bg);
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  background: var(--theme-surface);
   color: var(--daw-text);
   cursor: pointer;
 }
@@ -407,46 +445,15 @@
   height: 44px;
 }
 
-.page-builder .daw-comparison-hint {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.16);
-  border-radius: 14px;
-  padding: 11px 13px;
-  background: rgba(var(--theme-primary-rgb), 0.045);
-}
-
-.page-builder .daw-comparison-hint span {
-  display: inline-grid;
-  min-width: 48px;
-  min-height: 30px;
-  place-items: center;
-  border-radius: 999px;
-  background: rgba(var(--theme-primary-rgb), 0.12);
-  color: var(--daw-text);
-  font-size: 12px;
-  font-weight: 950;
-}
-
-.page-builder .daw-comparison-hint p {
-  margin: 0;
-  color: var(--daw-muted);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
 .page-builder .daw-axis-select-row {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.14);
-  border-radius: 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 16px;
-  background: rgba(15, 23, 38, 0.045);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-axis-select-row .daw-field {
@@ -476,8 +483,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 0 13px;
   background: var(--theme-surface);
   color: var(--daw-text);
@@ -489,8 +496,8 @@
 }
 
 .page-builder .daw-multi-select-trigger[aria-expanded="true"] {
-  border-color: rgba(var(--theme-primary-rgb), 0.45);
-  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1);
+  border-color: var(--theme-primary);
+  box-shadow: none;
 }
 
 .page-builder .daw-multi-select-trigger span {
@@ -513,11 +520,11 @@
   gap: 4px;
   max-height: 230px;
   overflow: auto;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 8px;
-  background: var(--daw-card-bg);
-  box-shadow: 0 18px 45px rgba(var(--theme-black-rgb), 0.18);
+  background: var(--theme-surface);
+  box-shadow: none;
 }
 
 .page-builder .daw-multi-select-menu button {
@@ -541,7 +548,7 @@
 
 .page-builder .daw-multi-select-menu button:hover,
 .page-builder .daw-multi-select-menu button.selected {
-  background: rgba(var(--theme-primary-rgb), 0.12);
+  background: var(--theme-surface-2);
 }
 
 .page-builder .daw-multi-select-menu button.selected {
@@ -578,15 +585,15 @@
 .page-builder .daw-plot-editor-card {
   display: grid;
   gap: 20px;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
-  border-radius: 18px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 18px;
-  background: rgba(var(--theme-shadow-rgb), 0.025);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-plot-editor-card.active {
-  border-color: rgba(var(--theme-primary-rgb), 0.5);
-  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.1);
+  border-color: var(--theme-border);
+  box-shadow: none;
 }
 
 .page-builder .daw-plot-editor-card-header {
@@ -625,10 +632,10 @@
   gap: 10px;
   min-width: 0;
   min-height: 44px;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 0 13px;
-  background: rgba(15, 23, 38, 0.045);
+  background: var(--theme-surface);
   color: var(--daw-text);
   font-size: 12px;
   font-weight: 900;
@@ -684,10 +691,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 8px;
-  border: 1px solid var(--daw-card-border);
-  border-radius: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
   padding: 10px;
-  background: rgba(15, 23, 38, 0.08);
+  background: var(--theme-surface);
 }
 
 .page-builder .daw-series-color-row {
@@ -699,7 +706,7 @@
   gap: 8px;
   border-radius: 10px;
   padding: 5px 8px;
-  background: rgba(var(--theme-text-inverse-rgb), 0.055);
+  background: transparent;
 }
 
 .page-builder .daw-series-color-row input[type="color"] {
@@ -757,38 +764,36 @@
 [data-theme="dark"] .page-builder .daw-modal,
 .theme-dark .page-builder .daw-icon-button,
 [data-theme="dark"] .page-builder .daw-icon-button {
-  background: rgba(var(--theme-text-inverse-rgb), 0.055);
-  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
 }
 
 .theme-dark .page-builder .daw-multi-select-trigger,
 [data-theme="dark"] .page-builder .daw-multi-select-trigger,
 .theme-dark .page-builder .daw-multi-select-menu,
 [data-theme="dark"] .page-builder .daw-multi-select-menu {
-  background: rgba(15, 23, 38, 0.92);
-  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
 }
 
 .theme-dark .page-builder .daw-series-colors,
 [data-theme="dark"] .page-builder .daw-series-colors {
-  background: rgba(15, 23, 38, 0.35);
-  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
 }
 
 .theme-dark .page-builder .daw-axis-select-row,
 [data-theme="dark"] .page-builder .daw-axis-select-row,
 .theme-dark .page-builder .daw-color-mode-toggle,
-[data-theme="dark"] .page-builder .daw-color-mode-toggle,
-.theme-dark .page-builder .daw-comparison-hint,
-[data-theme="dark"] .page-builder .daw-comparison-hint {
-  background: rgba(var(--theme-text-inverse-rgb), 0.035);
-  border-color: rgba(var(--theme-text-inverse-rgb), 0.1);
+[data-theme="dark"] .page-builder .daw-color-mode-toggle {
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
 }
 
 .theme-dark .page-builder .daw-modal,
 [data-theme="dark"] .page-builder .daw-modal {
-  background: #1f2530;
-  border-color: rgba(var(--theme-text-inverse-rgb), 0.14);
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
 }
 
 /* Responsive */

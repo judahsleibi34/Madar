@@ -349,8 +349,20 @@ export default function PageBuilder({
   const backendAutosaveTimerRef = useRef(null);
   const backendProjectSnapshotRef = useRef("");
   const pendingBackendProjectSnapshotRef = useRef("");
+  const urlValidationToastShownRef = useRef(false);
 
   const showToast = useCallback((message) => {
+    const isUrlValidationMessage =
+      typeof message === "string" &&
+      (message.includes("must be an HTTPS URL") ||
+        message.includes("must use an HTTPS URL") ||
+        message.includes("must be a valid HTTPS URL"));
+
+    if (isUrlValidationMessage) {
+      if (urlValidationToastShownRef.current) return;
+      urlValidationToastShownRef.current = true;
+    }
+
     setToast(message);
     window.setTimeout(() => setToast(""), 2200);
   }, []);
@@ -553,8 +565,9 @@ export default function PageBuilder({
 
   useEffect(() => {
     if (demoMode) {
-      setWebsiteSettings(null);
-      return;
+      return deferEffectStateUpdate(() => {
+        setWebsiteSettings(null);
+      });
     }
 
     let cancelled = false;
@@ -587,7 +600,9 @@ export default function PageBuilder({
 
     if (!subdomain) return;
 
-    setLiveSitePath((current) => current || resolveLiveSitePath(subdomain));
+    return deferEffectStateUpdate(() => {
+      setLiveSitePath((current) => current || resolveLiveSitePath(subdomain));
+    });
   }, [demoMode, websiteSettings?.subdomain]);
 
   useEffect(() => {
@@ -596,32 +611,6 @@ export default function PageBuilder({
 
     persistProjectNow(project);
   }, [demoMode, persistProjectNow, project]);
-
-  useEffect(() => {
-    if (demoMode || builderProjectLoading) return;
-    if (!project) return;
-
-    const currentSnapshot = getAutosaveSnapshot(project);
-    if (!currentSnapshot) return;
-    if (
-      currentSnapshot === backendProjectSnapshotRef.current ||
-      currentSnapshot === pendingBackendProjectSnapshotRef.current
-    ) {
-      return;
-    }
-
-    window.clearTimeout(backendAutosaveTimerRef.current);
-    backendAutosaveTimerRef.current = window.setTimeout(() => {
-      pendingBackendProjectSnapshotRef.current = currentSnapshot;
-      saveProject().finally(() => {
-        pendingBackendProjectSnapshotRef.current = "";
-      });
-    }, 1200);
-
-    return () => {
-      window.clearTimeout(backendAutosaveTimerRef.current);
-    };
-  }, [builderProjectLoading, demoMode, project]);
 
   const safeProjectPages = useMemo(
     () => (Array.isArray(project.pages) ? project.pages : []),
@@ -1490,8 +1479,10 @@ export default function PageBuilder({
     showToast("User deleted.");
   };
 
-  const findElementLocation = (elementId) =>
-    findElementLocationInPage(activePage, elementId);
+  const findElementLocation = useCallback(
+    (elementId) => findElementLocationInPage(activePage, elementId),
+    [activePage]
+  );
 
   const {
     addUser,
@@ -1499,16 +1490,20 @@ export default function PageBuilder({
     deleteUser,
     addRole,
     updateRole,
-  } = createUserHandlers({
-    project,
-    updateProject,
-    setSelected,
-    showToast,
-    createRole,
-    createUser,
-    requestDeleteUser: setUserPendingDelete,
-  });
-  const setAnswer = (formId, fieldId, value) => {
+  } = useMemo(
+    // eslint-disable-next-line react-hooks/refs
+    () => createUserHandlers({
+      project,
+      updateProject,
+      setSelected,
+      showToast,
+      createRole,
+      createUser,
+      requestDeleteUser: setUserPendingDelete,
+    }),
+    [project, updateProject, showToast]
+  );
+  const setAnswer = useCallback((formId, fieldId, value) => {
     setRuntimeAnswers((prev) => ({
       ...prev,
       [formId]: {
@@ -1522,7 +1517,7 @@ export default function PageBuilder({
       delete next[fieldId];
       return next;
     });
-  };
+  }, []);
 
   const resetQuizSession = (formId) => {
     setQuizSessions((prev) => {
@@ -1656,13 +1651,15 @@ export default function PageBuilder({
     }
   }, [runtimeAnswers, showToast]);
 
-  const runElementAction = (element) =>
-    runElementActionWithHandlers({
+  const runElementAction = useCallback(
+    (element) => runElementActionWithHandlers({
       element,
       selectPage,
       getStoredUrlError,
       showToast,
-    });
+    }),
+    [getStoredUrlError, selectPage, showToast]
+  );
 
   const persistProject = (nextProject, message) =>
     persistBuilderProject({
@@ -1725,6 +1722,32 @@ export default function PageBuilder({
       showToast(`Saved local draft cache. Backend save failed${statusLabel}.`);
     }
   };
+
+  useEffect(() => {
+    if (demoMode || builderProjectLoading) return;
+    if (!project) return;
+
+    const currentSnapshot = getAutosaveSnapshot(project);
+    if (!currentSnapshot) return;
+    if (
+      currentSnapshot === backendProjectSnapshotRef.current ||
+      currentSnapshot === pendingBackendProjectSnapshotRef.current
+    ) {
+      return;
+    }
+
+    window.clearTimeout(backendAutosaveTimerRef.current);
+    backendAutosaveTimerRef.current = window.setTimeout(() => {
+      pendingBackendProjectSnapshotRef.current = currentSnapshot;
+      saveProject().finally(() => {
+        pendingBackendProjectSnapshotRef.current = "";
+      });
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(backendAutosaveTimerRef.current);
+    };
+  }, [builderProjectLoading, demoMode, project]);
 
   const saveThemeProject = async () => {
     setActiveTopbarAction("theme");
@@ -2126,21 +2149,25 @@ Go live anyway?`
     handleSelectedElementImageUpload,
     handleSiteLogoUpload,
     handleCarouselSlideImageUpload,
-  } = createUploadHandlers({
-    selectedElement,
-    carouselElementTypes,
-    defaultSiteChrome,
-    builderAssetMimeTypes,
-    builderAssetMaxBytes,
-    uploadBuilderAsset,
-    user,
-    setAssetUploadBusy,
-    updateSelectedElement,
-    updateProject,
-    showToast,
-    parseCarouselSlides,
-    serializeCarouselSlides,
-  });
+  } = useMemo(
+    // eslint-disable-next-line react-hooks/refs
+    () => createUploadHandlers({
+      selectedElement,
+      carouselElementTypes,
+      defaultSiteChrome,
+      builderAssetMimeTypes,
+      builderAssetMaxBytes,
+      uploadBuilderAsset,
+      user,
+      setAssetUploadBusy,
+      updateSelectedElement,
+      updateProject,
+      showToast,
+      parseCarouselSlides,
+      serializeCarouselSlides,
+    }),
+    [selectedElement, user, updateSelectedElement, updateProject, showToast]
+  );
   const getElementSection = (elementId) =>
     getElementSectionFromPage({
       page: activePage,
@@ -2430,23 +2457,40 @@ Go live anyway?`
 
   const {
     renderConnectedForm,
-  } = createRuntimeFormRenderers({
-    project,
-    preview,
-    lang,
-    runtimeAnswers,
-    runtimeErrors,
-    runtimeFormPages,
-    setRuntimeFormPages,
-    runtimeFormLanguages,
-    setRuntimeFormLanguages,
-    quizSessions,
-    getFieldType,
-    setAnswer,
-    submitRuntimeForm,
-    startQuizSession,
-    moveQuizQuestion,
-  });
+  } = useMemo(
+    // eslint-disable-next-line react-hooks/refs
+    () => createRuntimeFormRenderers({
+      project,
+      preview,
+      lang,
+      runtimeAnswers,
+      runtimeErrors,
+      runtimeFormPages,
+      setRuntimeFormPages,
+      runtimeFormLanguages,
+      setRuntimeFormLanguages,
+      quizSessions,
+      getFieldType,
+      setAnswer,
+      submitRuntimeForm,
+      startQuizSession,
+      moveQuizQuestion,
+    }),
+    [
+      project,
+      preview,
+      lang,
+      runtimeAnswers,
+      runtimeErrors,
+      runtimeFormPages,
+      runtimeFormLanguages,
+      quizSessions,
+      setAnswer,
+      submitRuntimeForm,
+      startQuizSession,
+      moveQuizQuestion,
+    ]
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -2534,21 +2578,36 @@ Go live anyway?`
     };
   }, [lockFocusedQuizAttempt, quizSessions, project.forms]);
 
-  const renderElement = createElementRenderer({
-    carouselElementTypes,
-    selected,
-    preview,
-    getFreeElementStyle,
-    getElementStyle,
-    startDrag,
-    findElementLocation,
-    setInsertTarget,
-    setSelected,
-    captureCanvasTextSelection,
-    runElementAction,
-    renderConnectedForm,
-    getReservationBlockValue,
-  });
+  const renderElement = useMemo(
+    // eslint-disable-next-line react-hooks/refs
+    () => createElementRenderer({
+      carouselElementTypes,
+      selected,
+      preview,
+      getFreeElementStyle,
+      getElementStyle,
+      startDrag,
+      findElementLocation,
+      setInsertTarget,
+      setSelected,
+      captureCanvasTextSelection,
+      runElementAction,
+      renderConnectedForm,
+      getReservationBlockValue,
+    }),
+    [
+      selected,
+      preview,
+      getFreeElementStyle,
+      getElementStyle,
+      startDrag,
+      findElementLocation,
+      captureCanvasTextSelection,
+      runElementAction,
+      renderConnectedForm,
+      getReservationBlockValue,
+    ]
+  );
 
   const {
     renderSiteHeader,
@@ -2562,7 +2621,10 @@ Go live anyway?`
     setSelected,
   });
 
-  const siteChrome = { ...defaultSiteChrome, ...(project.siteChrome || {}) };
+  const siteChrome = useMemo(
+    () => ({ ...defaultSiteChrome, ...(project.siteChrome || {}) }),
+    [project.siteChrome]
+  );
   const updateSiteChrome = useCallback((updates) => {
     updateProject((prev) => ({
       ...prev,
@@ -2575,7 +2637,9 @@ Go live anyway?`
   }, [updateProject]);
 
   useEffect(() => {
-    setLogoUrlDraft(siteChrome.logoUrl || "");
+    return deferEffectStateUpdate(() => {
+      setLogoUrlDraft(siteChrome.logoUrl || "");
+    });
   }, [siteChrome.logoUrl]);
 
   const applyLogoUrl = useCallback(() => {

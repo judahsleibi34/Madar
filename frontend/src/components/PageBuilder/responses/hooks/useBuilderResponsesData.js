@@ -187,6 +187,21 @@ export function useBuilderResponsesData({
     setRefreshKey((current) => current + 1);
   };
 
+  const resetFilteredView = () => {
+    setSelectedResponseId("");
+    if (selectedFormId) {
+      setResponsePageByForm((current) => ({
+        ...current,
+        [selectedFormId]: 0,
+      }));
+    }
+  };
+
+  const updateSearchQuery = (query) => {
+    setSearchQuery(query);
+    resetFilteredView();
+  };
+
   const setSelectedPage = (page) => {
     if (!builderProjectId || !selectedFormId || responsesLoading) return;
     setResponsePageByForm((current) => ({
@@ -196,6 +211,7 @@ export function useBuilderResponsesData({
   };
 
   const toggleSelectedField = (fieldId) => {
+    resetFilteredView();
     setSelectedFieldIds((current) =>
       current.includes(fieldId) ? current.filter((id) => id !== fieldId) : [...current, fieldId]
     );
@@ -203,19 +219,12 @@ export function useBuilderResponsesData({
 
   const toggleSelectedStatus = (status) => {
     const normalized = normalizeStatus(status);
+    resetFilteredView();
     setSelectedStatuses((current) =>
       current.some((item) => normalizeStatus(item) === normalized)
         ? current.filter((item) => normalizeStatus(item) !== normalized)
         : [...current, status]
     );
-  };
-
-  const clearSelectedFields = () => {
-    setSelectedFieldIds([]);
-  };
-
-  const clearSelectedStatuses = () => {
-    setSelectedStatuses([]);
   };
 
   const updateSubmissionStatus = async (submissionId, status) => {
@@ -246,6 +255,7 @@ export function useBuilderResponsesData({
   };
 
   const clearFilters = () => {
+    resetFilteredView();
     setSearchQuery("");
     setSelectedFieldIds([]);
     setSelectedStatuses([]);
@@ -279,16 +289,14 @@ export function useBuilderResponsesData({
     responsesLoading,
     responsesError,
     searchQuery,
-    setSearchQuery,
+    setSearchQuery: updateSearchQuery,
     selectedFieldIds,
     selectedFieldSet,
     toggleSelectedField,
-    clearSelectedFields,
     selectedStatuses,
     selectedStatusSet,
     dynamicStatusOptions,
     toggleSelectedStatus,
-    clearSelectedStatuses,
     clearFilters,
     hasFilters: Boolean(searchQuery || selectedFieldIds.length > 0 || selectedStatuses.length > 0),
     statusUpdatingById,

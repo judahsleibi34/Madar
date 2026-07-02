@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, GripVertical, LayoutDashboard, Pencil } from "lucide-react";
+import { GripVertical, LayoutDashboard, Pencil } from "lucide-react";
 import { REPORT_BLOCK_DRAG_TYPE, reportBlockTypes } from "./reportBuilderConfig";
 import InlineEditable from "./InlineEditable";
 import DocumentToolbar from "./DocumentToolbar";
@@ -63,12 +63,14 @@ export default function ReportPageCanvas({
 
   return (
     <div className={`daw-report-canvas-shell ${isPreviewMode ? "is-preview" : ""}`}>
-      <div className="daw-report-preview-actions">
-        <button type="button" className="daw-secondary" onClick={onTogglePreview}>
-          {isPreviewMode ? <Pencil size={16} /> : <Eye size={16} />}
-          {isPreviewMode ? "Back to editing" : "Preview report"}
-        </button>
-      </div>
+      {isPreviewMode ? (
+        <div className="daw-report-preview-actions">
+          <button type="button" className="daw-secondary" onClick={onTogglePreview}>
+            <Pencil size={16} />
+            Back to editing
+          </button>
+        </div>
+      ) : null}
       <div className="daw-report-page">
         <div className="daw-report-header-shell">
           {isHeaderEditing && !isPreviewMode ? (
@@ -80,6 +82,12 @@ export default function ReportPageCanvas({
                 onUpdateReport("title", getEditablePlainText(editable));
                 onUpdateReport("titleDirection", editable.dir);
               }}
+              onDelete={() => {
+                onUpdateReport("title", "");
+                onUpdateReport("titleDirection", "auto");
+                setIsHeaderEditing(false);
+              }}
+              deleteLabel="Clear heading"
             />
           ) : null}
           <header
@@ -181,7 +189,7 @@ export default function ReportPageCanvas({
                       className="daw-report-spacer-block"
                       style={{ height: `${block.spacerHeight || 40}px` }}
                     >
-                      {!isPreviewMode ? <span>Blank space · {block.spacerHeight || 40}px</span> : null}
+                      {!isPreviewMode ? <span>Space · {block.spacerHeight || 40}px</span> : null}
                     </div>
                   ) : block.type === "chart" && block.src ? (
                     <>
@@ -300,8 +308,8 @@ export default function ReportPageCanvas({
               onDrop={(event) => handleDrop(event, 0)}
             >
               <LayoutDashboard size={28} />
-              <strong>Your report is empty</strong>
-              <span>Click a library item or drag it here to begin.</span>
+              <strong>No blocks yet</strong>
+              <span>Choose a block from the library to start.</span>
             </div>
           )}
         </div>

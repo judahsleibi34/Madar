@@ -6,7 +6,7 @@
   width: min(980px, calc(100% - 40px));
   margin: 0 auto;
   padding: 64px 0 88px;
-  color: #1a2744;
+  color: var(--theme-text);
 }
 
 .privacy-policy-hero {
@@ -24,7 +24,7 @@
 
 .privacy-policy-hero h1 {
   margin: 0 0 16px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: clamp(34px, 6vw, 58px);
   line-height: 1.05;
   font-weight: 900;
@@ -33,7 +33,7 @@
 .privacy-policy-hero span {
   display: block;
   max-width: 760px;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 18px;
   line-height: 1.8;
 }
@@ -44,13 +44,13 @@
 }
 
 .privacy-policy-section {
-  border-top: 1px solid rgba(26, 39, 68, 0.14);
+  border-top: 1px solid var(--theme-border);
   padding-top: 24px;
 }
 
 .privacy-policy-section h2 {
   margin: 0 0 10px;
-  color: #1a2744;
+  color: var(--theme-text);
   font-size: 22px;
   line-height: 1.25;
   font-weight: 850;
@@ -58,7 +58,7 @@
 
 .privacy-policy-section p {
   margin: 0;
-  color: #3a3530;
+  color: var(--theme-text-soft);
   font-size: 16px;
   line-height: 1.75;
 }

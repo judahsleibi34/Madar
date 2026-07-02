@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { getResponsesContent } from "../../../content/pageBuilder";
 import ResponsesDataBrowser from "./components/ResponsesDataBrowser";
 import ResponsesHeader from "./components/ResponsesHeader";
@@ -17,6 +18,8 @@ export default function BuilderResponsesPage({
   formatSavedValue,
   showToast,
 }) {
+  const [assistantQuestion, setAssistantQuestion] = useState("");
+  const [assistantReply, setAssistantReply] = useState("");
   const activeLang = lang === "ar" ? "ar" : "en";
   const isArabic = activeLang === "ar";
   const t = getResponsesContent(activeLang);
@@ -36,6 +39,31 @@ export default function BuilderResponsesPage({
         (collection) => collection.id === data.selectedForm.connectedCollectionId
       )
     : null;
+  const activeFieldFilters = data.selectedFieldIds?.length || 0;
+  const activeStatusFilters = data.selectedStatuses?.length || 0;
+
+  const runResponseAssistant = () => {
+    if (!data.selectedForm) {
+      setAssistantReply(t.assistantEmpty);
+      return;
+    }
+
+    if (data.responses.length === 0) {
+      setAssistantReply(t.assistantNoResponses);
+      return;
+    }
+
+    const newestAnswer = data.latestResponse?.createdAt
+      ? new Date(data.latestResponse.createdAt).toLocaleDateString()
+      : t.none;
+    const filterSummary = data.hasFilters
+      ? `${activeFieldFilters} field filters, ${activeStatusFilters} status filters`
+      : t.none;
+
+    setAssistantReply(
+      `${data.selectedForm.title}: ${data.displayedResponses.length} ${t.matches} from ${data.responses.length} ${t.submissionsLower}. ${t.completion}: ${data.completionRate}%. ${t.latest}: ${newestAnswer}. ${t.searchIn}: ${filterSummary}.`
+    );
+  };
 
   return (
     <div className="workspace-page responses-results-page" dir={isArabic ? "rtl" : "ltr"}>
@@ -62,11 +90,9 @@ export default function BuilderResponsesPage({
           fields={data.fields}
           selectedFieldSet={data.selectedFieldSet}
           toggleSelectedField={data.toggleSelectedField}
-          clearSelectedFields={data.clearSelectedFields}
           dynamicStatusOptions={data.dynamicStatusOptions}
           selectedStatusSet={data.selectedStatusSet}
           toggleSelectedStatus={data.toggleSelectedStatus}
-          clearSelectedStatuses={data.clearSelectedStatuses}
           clearFilters={data.clearFilters}
           hasFilters={data.hasFilters}
         />
@@ -177,6 +203,45 @@ export default function BuilderResponsesPage({
                 formatSavedValue={formatSavedValue}
                 isQuiz={isQuiz}
               />
+
+              <section className="responses-assistant-panel daw-card daw-assistant-card">
+                <div className="daw-section-heading">
+                  <span>{t.assistantKicker}</span>
+                  <h4>{t.assistantTitle}</h4>
+                  <p>{t.assistantText}</p>
+                </div>
+
+                <div className="responses-assistant-chat">
+                  <label>
+                    <span>{t.assistantKicker}</span>
+                    <textarea
+                      rows={3}
+                      value={assistantQuestion}
+                      placeholder={t.assistantPlaceholder}
+                      onChange={(event) => setAssistantQuestion(event.target.value)}
+                      onKeyDown={(event) => {
+                        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                          runResponseAssistant();
+                        }
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="daw-primary"
+                    onClick={runResponseAssistant}
+                    disabled={!data.selectedForm}
+                  >
+                    {t.assistantAsk}
+                  </button>
+                </div>
+
+                {assistantReply ? (
+                  <div className="responses-assistant-reply" aria-live="polite">
+                    {assistantReply}
+                  </div>
+                ) : null}
+              </section>
             </>
           ) : (
             <div className="results-empty-state large">

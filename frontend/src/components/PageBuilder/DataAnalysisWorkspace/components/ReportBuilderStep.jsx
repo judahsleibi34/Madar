@@ -187,6 +187,11 @@ export default function ReportBuilderStep({
         }}
         onGenerateMetrics={onGenerateMetrics}
         isGeneratingMetrics={isGeneratingMetrics}
+        isPreviewMode={isPreviewMode}
+        onTogglePreview={() => {
+          setIsPreviewMode((current) => !current);
+          setSelectedBlockId("");
+        }}
       />
       <ReportPageCanvas
         report={report}

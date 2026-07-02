@@ -1,22 +1,25 @@
 .my-plan-page {
-  width: min(1180px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 48px 0 72px;
+  width: 100%;
+  max-width: 1340px;
+  margin: 0;
+  padding: 28px 32px 56px;
   color: var(--theme-text);
 }
 
 .my-plan-page[dir="rtl"] {
   direction: rtl;
-  text-align: right;
+  text-align: start;
 }
 
 .my-plan-header {
   display: flex;
   justify-content: space-between;
-  gap: 28px;
-  margin-bottom: 28px;
-  padding-bottom: 26px;
-  border-bottom: 1px solid var(--theme-border, rgba(var(--theme-shadow-rgb), 0.1));
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--theme-border);
+  background: transparent;
+  box-shadow: none;
 }
 
 .my-plan-header > div:first-child {
@@ -40,14 +43,14 @@
 .my-plan-header h1 {
   margin: 0;
   color: var(--theme-text);
-  font-size: clamp(34px, 5vw, 50px);
-  line-height: 1.05;
+  font-size: 32px;
+  line-height: 1.12;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
 }
 
 .my-plan-page[dir="rtl"] .my-plan-header h1 {
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 
 .my-plan-header p,
@@ -64,8 +67,9 @@
 
 .my-plan-header p {
   max-width: 720px;
-  margin: 14px 0 0;
-  font-size: 16px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .my-plan-actions {
@@ -76,29 +80,27 @@
 }
 
 .my-plan-button {
-  min-height: 44px;
-  border-radius: 12px;
-  padding: 12px 16px;
+  min-height: 38px;
+  border-radius: 8px;
+  padding: 9px 14px;
   cursor: pointer;
   font: inherit;
   font-size: 14px;
   font-weight: 900;
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
     border-color 0.18s ease,
     background 0.18s ease;
 }
 
 .my-plan-button:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .my-plan-button.primary {
-  border: 0;
+  border: 1px solid var(--theme-primary);
   background: var(--theme-primary);
   color: var(--theme-text-inverse);
-  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb, 37, 99, 235), 0.18);
+  box-shadow: none;
 }
 
 .my-plan-button.secondary {
@@ -109,9 +111,9 @@
 
 .my-plan-overview {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
-  gap: 18px;
-  margin-bottom: 30px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.72fr);
+  gap: 14px;
+  margin-bottom: 24px;
 }
 
 .my-plan-current-card,
@@ -120,14 +122,14 @@
 .my-plan-module-card,
 .my-plan-module-detail {
   background: var(--theme-surface);
-  border: 1px solid var(--theme-border, rgba(var(--theme-shadow-rgb), 0.1));
-  box-shadow: 0 14px 34px rgba(var(--theme-shadow-rgb), 0.06);
+  border: 1px solid var(--theme-border);
+  box-shadow: none;
 }
 
 .my-plan-current-card,
 .my-plan-recommendation-card {
-  border-radius: 20px;
-  padding: 24px;
+  border-radius: 8px;
+  padding: 20px;
 }
 
 .my-plan-card-top {
@@ -158,11 +160,11 @@
   margin: 0;
   color: var(--theme-text);
   font-weight: 900;
-  letter-spacing: -0.035em;
+  letter-spacing: 0;
 }
 
 .my-plan-card-top h2 {
-  font-size: 32px;
+  font-size: 28px;
 }
 
 .my-plan-card-top > strong {
@@ -184,7 +186,7 @@
 
 .my-plan-price-row strong {
   color: var(--theme-text);
-  font-size: 42px;
+  font-size: 38px;
   line-height: 1;
   font-weight: 950;
 }
@@ -202,8 +204,8 @@
 }
 
 .my-plan-meta-grid div {
-  padding: 14px;
-  border-radius: 14px;
+  padding: 12px;
+  border-radius: 8px;
   background: var(--theme-surface-2);
   border: 1px solid var(--theme-border, rgba(var(--theme-shadow-rgb), 0.08));
 }
@@ -243,18 +245,19 @@
 }
 
 .my-plan-section {
-  margin-top: 32px;
+  margin-top: 24px;
 }
 
 .my-plan-section-header {
   display: flex;
   justify-content: space-between;
   gap: 22px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .my-plan-section-header h2 {
-  font-size: 28px;
+  font-size: 22px;
+  letter-spacing: 0;
 }
 
 .my-plan-section-header p {
@@ -266,12 +269,12 @@
 .my-plan-usage-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .my-plan-usage-card {
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 8px;
+  padding: 14px;
 }
 
 .my-plan-usage-top {
@@ -335,8 +338,8 @@
 
 .my-plan-module-card {
   width: 100%;
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 8px;
+  padding: 14px;
   cursor: pointer;
   text-align: start;
   font: inherit;
@@ -344,16 +347,15 @@
   justify-content: space-between;
   gap: 18px;
   transition:
-    transform 0.18s ease,
     border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    background 0.18s ease;
 }
 
 .my-plan-module-card:hover,
 .my-plan-module-card.selected {
-  transform: translateY(-1px);
+  transform: none;
   border-color: rgba(var(--theme-primary-rgb, 37, 99, 235), 0.42);
-  box-shadow: 0 16px 34px rgba(var(--theme-primary-rgb, 37, 99, 235), 0.1);
+  box-shadow: none;
 }
 
 .my-plan-module-card strong {
@@ -382,8 +384,8 @@
 .my-plan-module-detail {
   position: sticky;
   top: 92px;
-  border-radius: 20px;
-  padding: 22px;
+  border-radius: 8px;
+  padding: 18px;
   border-color: rgba(var(--theme-primary-rgb, 37, 99, 235), 0.24);
 }
 
@@ -392,8 +394,8 @@
 }
 
 .my-plan-module-price {
-  padding: 16px;
-  border-radius: 16px;
+  padding: 14px;
+  border-radius: 8px;
   background: var(--theme-surface-2);
   border: 1px solid var(--theme-border, rgba(var(--theme-shadow-rgb), 0.08));
   margin: 18px 0;
@@ -423,8 +425,8 @@
 
 @media (max-width: 760px) {
   .my-plan-page {
-    width: min(100% - 22px, 1180px);
-    padding: 36px 0 60px;
+    width: 100%;
+    padding: 24px 16px 48px;
   }
 
   .my-plan-header,

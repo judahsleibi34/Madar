@@ -1,50 +1,27 @@
-import i18n from "i18next";
+import i18n, {
+  DEFAULT_LANGUAGE,
+  LANGUAGE_STORAGE_KEY,
+  SUPPORTED_LANGUAGES,
+  applyDocumentLanguage,
+  getStoredLanguage,
+  normalizeLanguage,
+} from "./index";
 
-export const SUPPORTED_LANGUAGES = {
-  en: {
-    label: "English",
-    direction: "ltr",
-  },
-  ar: {
-    label: "العربية",
-    direction: "rtl",
-  },
-};
+export { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, SUPPORTED_LANGUAGES };
 
 export function getCurrentLanguage() {
-  const activeLanguage = i18n.language?.split("-")[0];
-
-  if (activeLanguage && SUPPORTED_LANGUAGES[activeLanguage]) {
-    return activeLanguage;
-  }
-
-  const savedLanguage = localStorage.getItem("appLanguage");
-
-  if (savedLanguage && SUPPORTED_LANGUAGES[savedLanguage]) {
-    return savedLanguage;
-  }
-
-  return "en";
+  return normalizeLanguage(i18n.language || getStoredLanguage());
 }
 
-export function setAppLanguage(lang) {
-  if (!SUPPORTED_LANGUAGES[lang]) {
-    return getCurrentLanguage();
+export function setAppLanguage(language) {
+  const safeLanguage = normalizeLanguage(language);
+
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, safeLanguage);
   }
 
-  const { direction } = SUPPORTED_LANGUAGES[lang];
+  i18n.changeLanguage(safeLanguage);
+  applyDocumentLanguage(safeLanguage);
 
-  i18n.changeLanguage(lang);
-  localStorage.setItem("appLanguage", lang);
-
-  document.documentElement.lang = lang;
-  document.documentElement.dir = direction;
-
-  Object.keys(SUPPORTED_LANGUAGES).forEach((code) => {
-    document.body.classList.remove(`lang-${code}`);
-  });
-
-  document.body.classList.add(`lang-${lang}`);
-
-  return lang;
+  return safeLanguage;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, Plus, Trash2, X } from "lucide-react";
 
 import { uiText } from "../constants/uiText";
 import { analysisGroups } from "../constants/analysisConfig";
@@ -7,7 +7,6 @@ import { API_URL, getFriendlyExternalError, readApiResponse } from "../utils/api
 import { cleanObject, escapeCsvValue } from "../utils/formatters";
 import { getMissingRequiredParams } from "../utils/validation";
 import {
-  clearDataset as clearSavedDataset,
   loadDataset as loadSavedDataset,
   saveDataset as saveDatasetLocally,
 } from "../utils/datasetStorage";
@@ -212,8 +211,8 @@ const chartRelationshipOptions = {
   histogram: [
     {
       value: "1:1",
-      label: "One column",
-      hint: "Pick one column to show how its values are distributed.",
+      label: "Single field",
+      hint: "Select one field to show its distribution.",
     },
   ],
   box: [
@@ -238,8 +237,8 @@ const chartRelationshipOptions = {
   count: [
     {
       value: "1:1",
-      label: "One column",
-      hint: "Pick one column to count how often each answer appears.",
+      label: "Single field",
+      hint: "Select one field to count each value.",
     },
   ],
   pie: [
@@ -354,10 +353,6 @@ const shouldUseTrendGradient = (plot, xValue) => {
   return toArray(xValue || plot.xColumns || plot.xColumn).some(isTrendColumn);
 };
 
-const getComparisonHint = (plot) => {
-  return getRelationshipOption(plot.chartType, plot.comparisonMode)?.hint || "";
-};
-
 const validateVisualizationPlot = (plot, numericColumns = []) => {
   const chartType = plot?.chartType;
   const xColumns = toArray(plot?.xColumns).filter(Boolean);
@@ -464,7 +459,7 @@ const getFriendlyVisualizationError = (message) => {
 
 const createVisualizationPlot = (index, columns = [], numericColumns = []) => ({
   id: `plot-${index}`,
-  name: `Plot ${index}`,
+  name: `Chart ${index}`,
   comparisonMode: "1:1",
   chartType: "bar",
   barOrientation: "vertical",
@@ -478,7 +473,7 @@ const createVisualizationPlot = (index, columns = [], numericColumns = []) => ({
   categoryColorColumn: "",
   categoryColorValues: [],
   hueColumn: "",
-  header: `Plot ${index}`,
+  header: `Chart ${index}`,
   title: "",
   xLabel: "",
   yLabel: "",
@@ -494,6 +489,12 @@ const createVisualizationPlot = (index, columns = [], numericColumns = []) => ({
   width: 10,
   height: 6,
 });
+
+const normalizeChartLabel = (value, fallback = "Chart") => {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  return text.replace(/^Plot(\s+\d+)?$/i, (match, numberPart = "") => `Chart${numberPart}`);
+};
 
 const DATA_WORKSPACE_CACHE_VERSION = 1;
 const DATA_WORKSPACE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -618,7 +619,7 @@ const friendlyAnalysisTitle = (title) => {
   const titles = {
     "Form response overview": "Dataset overview",
     "Numeric question summary": "Column statistics",
-    "Assisted analysis": "AI suggestions",
+    "Assisted analysis": "Question results",
   };
   return titles[title] || title || "Report calculations";
 };
@@ -695,7 +696,11 @@ export default function DataAnalysisWorkspace({
   const [visualizationPlots, setVisualizationPlots] = useState(() =>
     Array.isArray(cachedWorkspace?.visualizationPlots) &&
     cachedWorkspace.visualizationPlots.length
-      ? cachedWorkspace.visualizationPlots
+      ? cachedWorkspace.visualizationPlots.map((plot, index) => ({
+          ...plot,
+          name: normalizeChartLabel(plot.name, `Chart ${index + 1}`),
+          header: normalizeChartLabel(plot.header, `Chart ${index + 1}`),
+        }))
       : [createVisualizationPlot(1)]
   );
   const [visualizationResultsByPlot, setVisualizationResultsByPlot] = useState({});
@@ -1026,7 +1031,7 @@ export default function DataAnalysisWorkspace({
           <div className="daw-modal-header">
             <div>
               <span className="daw-kicker">PREVIEW</span>
-              <h3>{visualizationPreview.title || "Generated visualization"}</h3>
+              <h3>{visualizationPreview.title || "Chart preview"}</h3>
             </div>
             <button
               type="button"
@@ -1041,7 +1046,7 @@ export default function DataAnalysisWorkspace({
           <div className="daw-visualization-preview-stage">
             <img
               src={visualizationPreview.url}
-              alt={visualizationPreview.title || "Generated visualization preview"}
+              alt={visualizationPreview.title || "Chart preview"}
             />
           </div>
 
@@ -1148,6 +1153,22 @@ export default function DataAnalysisWorkspace({
         plot.id === plotId ? { ...plot, [key]: value } : plot
       )
     );
+  };
+
+  const addVisualizationPlot = () => {
+    const nextIndex =
+      Math.max(
+        0,
+        ...visualizationPlots.map((plot) => {
+          const match = String(plot.id || "").match(/plot-(\d+)/);
+          return match ? Number(match[1]) : 0;
+        })
+      ) + 1;
+    const nextPlot = createVisualizationPlot(nextIndex, columns, numericColumns);
+
+    setVisualizationPlots((currentPlots) => [...currentPlots, nextPlot]);
+    setActiveVisualizationPlotId(nextPlot.id);
+    setIsVisualizationSettingsOpen(true);
   };
 
   const updateVisualizationPlotChartType = (plotId, chartType) => {
@@ -1955,24 +1976,6 @@ export default function DataAnalysisWorkspace({
     });
   };
 
-  const clearLocalDataset = async () => {
-    try {
-      await clearSavedDataset({ scope: dataWorkspaceCacheKey });
-      setDataset(null);
-      setSelectedFile(null);
-      setInspection(null);
-      setInspectionCache({});
-      setAnalysisResult(null);
-      setAssistResult(null);
-      setVisualizationResultsByPlot({});
-      setVisualizationPreview(null);
-      setCurrentStep("source");
-      setFlowToast("");
-    } catch {
-      showFlowError("The saved browser copy could not be cleared.");
-    }
-  };
-
   const runInspection = async (type) => {
     if (!dataset?.file_path) {
       showFlowError(t.loadDataBeforeReview);
@@ -2230,8 +2233,8 @@ export default function DataAnalysisWorkspace({
       setVisualizationError("");
       setVisualizationSuccess(
         results.length === 1
-          ? "Visualization generated successfully."
-          : `${results.length} visualizations generated successfully.`
+          ? "Chart created successfully."
+          : `${results.length} charts created successfully.`
       );
       setVisualizationNotice(colorNotice);
       setIsVisualizationSettingsOpen(false);
@@ -2355,7 +2358,7 @@ export default function DataAnalysisWorkspace({
       ...assistedMetrics.map((metric, index) => ({
         ...metric,
         id: `assisted-metric-${index}`,
-        sourceGroup: "AI suggestions",
+        sourceGroup: "Question results",
         displayLabel: metric.label,
       })),
     ].map((metric) => {
@@ -2388,7 +2391,7 @@ export default function DataAnalysisWorkspace({
       ...assistedTables.map((table, index) => ({
         ...table,
         id: `assisted-table-${index}`,
-        sourceGroup: "AI suggestions",
+        sourceGroup: "Question results",
         displayLabel: table.title,
       })),
     ];
@@ -2402,9 +2405,9 @@ export default function DataAnalysisWorkspace({
           id: result.chart_path || `generated-plot-${index + 1}`,
           title:
             result.chart_path?.split(/[\\/]/).pop() ||
-            `Generated plot ${index + 1}`,
+            `Chart ${index + 1}`,
           src: getVisualizationUrl(result, "chart_url"),
-          sourceGroup: "Generated charts",
+          sourceGroup: "Charts",
           displayLabel:
             result.chart_path?.split(/[\\/]/).pop() ||
             `Chart ${index + 1}`,
@@ -2425,7 +2428,7 @@ export default function DataAnalysisWorkspace({
   const showMetricsRequiredWarning = () => {
     showFlowError(
       t.generateMetricsFirst ||
-        "Generate metrics after cleaning your data before opening Visualization or Report."
+        "Create metrics after cleaning your data before opening Charts or Report."
     );
     setCurrentStep("prepare");
   };
@@ -2444,6 +2447,13 @@ export default function DataAnalysisWorkspace({
   const renderVisualizationSettingsModal = () => {
     if (!isVisualizationSettingsOpen) return null;
 
+    const plot = activeVisualizationPlot || visualizationPlots[0];
+    const index = Math.max(
+      0,
+      visualizationPlots.findIndex((currentPlot) => currentPlot.id === plot?.id)
+    );
+    if (!plot) return null;
+
     return (
       <div className="daw-modal-backdrop" role="presentation">
         <section
@@ -2454,14 +2464,11 @@ export default function DataAnalysisWorkspace({
         >
           <div className="daw-modal-header">
             <div>
-              <span className="daw-kicker">CHART SETTINGS</span>
+              <span className="daw-kicker">Charts</span>
               <h3 id="daw-visualization-settings-title">
-                Configure plots
+                Chart setup
               </h3>
-              <p>
-                Edit each plot separately: type, variables, headers, titles,
-                colors, and fonts.
-              </p>
+              <p>Chart details for this report.</p>
             </div>
             <button
               type="button"
@@ -2474,16 +2481,12 @@ export default function DataAnalysisWorkspace({
           </div>
 
           <div className="daw-plot-editor-list">
-            {visualizationPlots.map((plot, index) => {
+            {(() => {
               const chartType = plot.chartType;
               const relationshipOptions = getRelationshipOptions(chartType);
               const activeComparisonMode = normalizeComparisonMode(
                 chartType,
                 plot.comparisonMode
-              );
-              const activeRelationship = getRelationshipOption(
-                chartType,
-                activeComparisonMode
               );
               const seriesCount = getSeriesCount(plot);
               const usesSeriesPalette =
@@ -2502,13 +2505,13 @@ export default function DataAnalysisWorkspace({
                 >
                   <div className="daw-plot-editor-card-header">
                     <div>
-                      <span>Plot {index + 1}</span>
+                      <span>Chart {index + 1}</span>
                       <h4>{plot.header || plot.name}</h4>
                     </div>
                   </div>
 
                   <div className="daw-modal-grid">
-                    <Field label="Plot name">
+                    <Field label="Chart name">
                       <input
                         value={plot.name}
                         onChange={(event) =>
@@ -2536,11 +2539,6 @@ export default function DataAnalysisWorkspace({
                         ))}
                       </select>
                     </Field>
-
-                    <div className="daw-comparison-hint">
-                      <span>{activeRelationship?.label}</span>
-                      <p>{getComparisonHint({ ...plot, comparisonMode: activeComparisonMode })}</p>
-                    </div>
 
                     <Field label="Plot type">
                       <select
@@ -2581,7 +2579,7 @@ export default function DataAnalysisWorkspace({
                     <Field label="Header">
                       <input
                         value={plot.header}
-                        placeholder={`Plot ${index + 1}`}
+                        placeholder={`Chart ${index + 1}`}
                         onChange={(event) =>
                           updateVisualizationPlot(
                             plot.id,
@@ -2748,7 +2746,7 @@ export default function DataAnalysisWorkspace({
                     <Field label="Chart title" wide>
                       <input
                         value={plot.title}
-                        placeholder={`${selectedChartLabel} visualization`}
+                        placeholder={`${selectedChartLabel} chart`}
                         onChange={(event) =>
                           updateVisualizationPlot(plot.id, "title", event.target.value)
                         }
@@ -2817,7 +2815,7 @@ export default function DataAnalysisWorkspace({
                         <span>Use gradient</span>
                       </label>
                       <small>
-                        Uses the selected palette or category colors as a gradient for this plot.
+                        Apply the selected palette as a gradient.
                       </small>
                     </Field>
 
@@ -2931,7 +2929,7 @@ export default function DataAnalysisWorkspace({
                           />
                         </div>
                         <small>
-                          Turn off base color to let the selected palette use multiple colors.
+                          Turn off to use the selected palette.
                         </small>
                       </Field>
                     )}
@@ -3080,7 +3078,7 @@ export default function DataAnalysisWorkspace({
 
                 </article>
               );
-            })}
+            })()}
           </div>
 
           {renderVisualizationStatusMessage()}
@@ -3102,7 +3100,7 @@ export default function DataAnalysisWorkspace({
                   runVisualization(activeVisualizationPlot);
                 }}
               >
-                {isLoading ? t.working : "Generate visualization"}
+                {isLoading ? t.working : "Create chart"}
               </button>
             )}
           </div>
@@ -3188,13 +3186,19 @@ export default function DataAnalysisWorkspace({
         <div className="daw-section-card daw-visualization-builder">
           <div className="daw-visualization-builder-header">
             <div>
-              <span className="daw-kicker">VISUALIZATION</span>
-              <h3>Create a visualization</h3>
-              <p>
-                Configure the plot, titles, colors, and font sizing before creating
-                the full report.
-              </p>
+              <span className="daw-kicker">Charts</span>
+              <h3>Create chart</h3>
+              <p>Charts prepared for this report.</p>
             </div>
+            <button
+              type="button"
+              className="daw-secondary daw-add-chart-button"
+              onClick={addVisualizationPlot}
+              disabled={!dataset}
+            >
+              <Plus size={16} />
+              Add chart
+            </button>
           </div>
 
           <div className="daw-plot-summary-grid">
@@ -3214,22 +3218,33 @@ export default function DataAnalysisWorkspace({
                   key={plot.id}
                   className={activeVisualizationPlotId === plot.id ? "active" : ""}
                 >
-                  <span>Plot {index + 1}</span>
-                  <strong>{plot.header || plot.name}</strong>
-                  <p>
-                    {chartTypeLabel}
-                    {relationshipLabel ? ` / ${relationshipLabel}` : ""}
-                    {needsXColumn(plot.chartType)
-                      ? ` / X: ${
-                          toArray(plot.xColumns).join(", ") || "Not selected"
-                        }`
-                      : ""}
-                    {needsYColumn(plot.chartType)
-                      ? ` / Y: ${
-                          toArray(plot.yColumns).join(", ") || "Not selected"
-                        }`
-                      : ""}
-                  </p>
+                  <div className="daw-plot-card-header">
+                    <div>
+                      <span>Chart {index + 1}</span>
+                      <strong>{plot.header || plot.name}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="daw-secondary"
+                      onClick={() => {
+                        setActiveVisualizationPlotId(plot.id);
+                        setIsVisualizationSettingsOpen(true);
+                      }}
+                    >
+                      Edit chart
+                    </button>
+                  </div>
+
+                  <div className="daw-plot-meta-row">
+                    <span>{chartTypeLabel}</span>
+                    {relationshipLabel ? <span>{relationshipLabel}</span> : null}
+                    {needsXColumn(plot.chartType) ? (
+                      <span>X: {toArray(plot.xColumns).join(", ") || "Not selected"}</span>
+                    ) : null}
+                    {needsYColumn(plot.chartType) ? (
+                      <span>Y: {toArray(plot.yColumns).join(", ") || "Not selected"}</span>
+                    ) : null}
+                  </div>
                   {outputPlots.length ? (
                     <div className="daw-plot-output-list">
                       {outputPlots.map((output, outputIndex) => {
@@ -3243,7 +3258,7 @@ export default function DataAnalysisWorkspace({
                             ? output.chart_path.split(/[\\/]/).pop()
                             : output?.explorer_path
                             ? output.explorer_path.split(/[\\/]/).pop()
-                            : `Generated visualization ${outputIndex + 1}`;
+                            : `Chart ${outputIndex + 1}`;
 
                         return (
                           <div
@@ -3255,19 +3270,16 @@ export default function DataAnalysisWorkspace({
                             }
                           >
                             <div className="daw-plot-output-copy">
-                              <span>Generated plot</span>
+                              <span>Chart</span>
                               <strong>{outputLabel}</strong>
                             </div>
-                            <p className="daw-plot-output-note">
-                              Preview the chart, download it, or inspect the data explorer.
-                            </p>
                             <div className="daw-plot-output-actions">
                               {downloadUrl ? (
                                 <a
                                   className="daw-icon-button"
                                   href={downloadUrl}
                                   download
-                                  title="Download visualization"
+                                  title="Download chart"
                                   aria-label={`Download ${plot.header || plot.name}`}
                                 >
                                   <Download size={17} />
@@ -3277,7 +3289,7 @@ export default function DataAnalysisWorkspace({
                                 <button
                                   type="button"
                                   className="daw-icon-button"
-                                  title="Inspect visualization"
+                                  title="Inspect chart"
                                   aria-label={`Inspect ${plot.header || plot.name}`}
                                   onClick={() =>
                                     setVisualizationPreview({
@@ -3294,7 +3306,7 @@ export default function DataAnalysisWorkspace({
                               <button
                                 type="button"
                                 className="daw-icon-button daw-danger-icon-button"
-                                title="Delete generated plot"
+                                title="Delete chart"
                                 aria-label={`Delete ${outputLabel}`}
                                 onClick={() =>
                                   deleteVisualizationOutput(plot.id, outputIndex)
@@ -3307,23 +3319,26 @@ export default function DataAnalysisWorkspace({
                         );
                       })}
                     </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="daw-secondary"
-                    onClick={() => {
-                      setActiveVisualizationPlotId(plot.id);
-                      setIsVisualizationSettingsOpen(true);
-                    }}
-                  >
-                    Edit this plot
-                  </button>
+                  ) : (
+                    <div className="daw-plot-empty-output">
+                      Create this chart to generate a preview file.
+                    </div>
+                  )}
                 </article>
               );
             })}
           </div>
 
           <div className="daw-visualization-actions">
+            <button
+              type="button"
+              className="daw-secondary daw-add-chart-button"
+              onClick={addVisualizationPlot}
+              disabled={!dataset}
+            >
+              <Plus size={16} />
+              Add chart
+            </button>
             <button
               type="button"
               className="daw-secondary"
@@ -3339,7 +3354,7 @@ export default function DataAnalysisWorkspace({
                 onClick={() => runVisualization(activeVisualizationPlot)}
                 disabled={isLoading || !dataset}
               >
-                {isLoading ? t.working : "Generate visualization"}
+                {isLoading ? t.working : "Create chart"}
               </button>
             )}
           </div>
@@ -3378,20 +3393,6 @@ export default function DataAnalysisWorkspace({
         t={t}
       />
 
-      {dataset ? (
-        <div className="daw-local-dataset-notice" role="status">
-          <div>
-            <strong>Saved in this browser</strong>
-            <span>
-              A local copy of this dataset is stored in IndexedDB so it can be restored after a refresh.
-            </span>
-          </div>
-          <button type="button" className="daw-secondary" onClick={clearLocalDataset}>
-            Clear saved dataset
-          </button>
-        </div>
-      ) : null}
-
       {flowToast ? (
         <div className="daw-flow-toast" role="alert" aria-live="assertive">
           <span>
@@ -3421,7 +3422,7 @@ export default function DataAnalysisWorkspace({
 
           </div>
 
-          {currentStep !== "report" ? (
+          {currentStep !== "report" && currentStep !== "visualization" ? (
             <div id="daw-assistant">
               <AssistantPanel
                 dataset={dataset}

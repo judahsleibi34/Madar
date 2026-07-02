@@ -12,6 +12,7 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith("/page-builder") ||
     pathname.startsWith("/builder-responses") ||
     pathname.startsWith("/builder-data") ||
+    pathname.startsWith("/notifications") ||
     pathname.startsWith("/my-plan") ||
     pathname.startsWith("/admin/users") ||
     pathname.startsWith("/admin/account-access") ||
