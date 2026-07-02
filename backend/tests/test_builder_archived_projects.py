@@ -477,6 +477,91 @@ class PublicSiteContractTests(unittest.TestCase):
         )
         self.assertNotIn("draft_schema", body["project"])
 
+    def test_public_site_returns_updated_schema_after_republish(self):
+        fake_supabase = FakeSupabase()
+        draft_v1 = {
+            "pages": [
+                {"id": "page-1"},
+                {"id": "page-2"},
+                {"id": "page-3"},
+                {"id": "page-4"},
+                {"id": "page-5", "title": "Page 5"},
+            ],
+            "forms": [],
+        }
+        draft_v2 = {
+            "pages": [
+                {"id": "page-1"},
+                {"id": "page-2"},
+                {"id": "page-3"},
+                {"id": "page-4"},
+                {"id": "page-5", "title": "Page 5"},
+                {"id": "page-6", "title": "Page 6", "body": "FINAL PUBLISH TEST 003"},
+            ],
+            "forms": [],
+        }
+        fake_supabase.tables["builder_projects"] = [
+            {
+                "id": "project-live",
+                "tenant_id": 1,
+                "name": "Published Site",
+                "slug": "published-site",
+                "status": "published",
+                "draft_schema": draft_v1,
+                "published_schema": {"pages": [{"id": "page-1"}, {"id": "page-2"}, {"id": "page-3"}, {"id": "page-4"}]},
+                "published_version": 4,
+                "last_published_at": "2026-06-03T13:00:00+00:00",
+                "updated_at": "2026-06-03T13:00:00+00:00",
+            }
+        ]
+        client = build_public_client(fake_supabase)
+        publish_client = build_builder_client(fake_supabase)
+
+        publish_side_effect = [
+            {
+                "id": "project-live",
+                "tenant_id": 1,
+                "name": "Published Site",
+                "slug": "published-site",
+                "draft_schema": draft_v1,
+                "published_version": 4,
+                "status": "draft",
+            },
+            {
+                "id": "project-live",
+                "tenant_id": 1,
+                "name": "Published Site",
+                "slug": "published-site",
+                "draft_schema": draft_v2,
+                "published_version": 5,
+                "status": "published",
+            },
+        ]
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(builder_routes, "get_project_for_tenant", side_effect=publish_side_effect), \
+             patch.object(builder_routes, "require_public_subdomain", return_value={"subdomain": "tenant-site", "tenant_id": 1}), \
+             patch.object(builder_routes, "record_audit_event"):
+            first_response = publish_client.post("/builder/projects/project-live/publish")
+            second_response = publish_client.post("/builder/projects/project-live/publish")
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(first_response.json()["project"]["published_version"], 5)
+        self.assertEqual(second_response.json()["project"]["published_version"], 6)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(set(body["project"].keys()), {"published_schema"})
+        self.assertEqual(len(body["project"]["published_schema"]["pages"]), 6)
+        self.assertIn("FINAL PUBLISH TEST 003", str(body["project"]["published_schema"]))
+        self.assertNotIn("draft_schema", body["project"])
+
     def test_public_site_without_published_project_returns_not_found(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"] = [
