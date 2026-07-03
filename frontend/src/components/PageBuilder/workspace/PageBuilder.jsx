@@ -293,6 +293,19 @@ const getAutosaveSnapshot = (project = {}) => JSON.stringify(stripAutosaveMetada
 
 const resolveLiveSitePath = (subdomain) => `/site/${encodeURIComponent(String(subdomain || "").trim())}/`;
 
+const getBackendFailureDetail = (error) =>
+  String(error?.data?.detail || error?.message || "");
+
+const isLikelySessionFailure = (error) => {
+  if (error?.status === 401) return true;
+
+  if (error?.status !== 403) return false;
+
+  return /invalid csrf token|not authenticated|unauthorized|session/i.test(
+    getBackendFailureDetail(error)
+  );
+};
+
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
@@ -601,7 +614,8 @@ export default function PageBuilder({
     if (!subdomain) return;
 
     return deferEffectStateUpdate(() => {
-      setLiveSitePath((current) => current || resolveLiveSitePath(subdomain));
+      const nextPath = resolveLiveSitePath(subdomain);
+      setLiveSitePath((current) => (current === nextPath ? current : nextPath));
     });
   }, [demoMode, websiteSettings?.subdomain]);
 
@@ -1719,6 +1733,12 @@ export default function PageBuilder({
     } catch (error) {
       console.error("Could not save builder project:", error);
       const statusLabel = error?.status ? ` (${error.status})` : "";
+
+      if (isLikelySessionFailure(error)) {
+        showToast("Session expired. Please sign in again to save your changes.");
+        return;
+      }
+
       showToast(`Saved local draft cache. Backend save failed${statusLabel}.`);
     }
   };
@@ -1789,6 +1809,12 @@ export default function PageBuilder({
     } catch (error) {
       console.error("Could not save website theme:", error);
       const statusLabel = error?.status ? ` (${error.status})` : "";
+
+      if (isLikelySessionFailure(error)) {
+        showToast("Session expired. Please sign in again to save your theme changes.");
+        return;
+      }
+
       showToast(`Saved local theme draft. Backend save failed${statusLabel}.`);
     }
   };
@@ -1842,8 +1868,12 @@ export default function PageBuilder({
     }
   };
 
-  const publicSiteSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
-  const canonicalLiveSitePath = liveSitePath || (publicSiteSubdomain ? resolveLiveSitePath(publicSiteSubdomain) : "");
+  const publicSiteSubdomain = sanitizeSubdomain(
+    websiteSettings?.subdomain || project?.publish?.subdomain || ""
+  );
+  const canonicalLiveSitePath = publicSiteSubdomain
+    ? resolveLiveSitePath(publicSiteSubdomain)
+    : liveSitePath;
 
   const publishProject = async () => {
     setActiveTopbarAction("publish");
@@ -1901,17 +1931,9 @@ Go live anyway?`
       return;
     }
 
-    persistProject(publishedProject, "Publishing to backend...");
+    persistProject(project, "Publishing to backend...");
 
     try {
-      const websiteSettingsResponse = await fetchWebsiteSettings(user?.id);
-      setWebsiteSettings(websiteSettingsResponse || null);
-      const publicSubdomain = sanitizeSubdomain(websiteSettingsResponse?.subdomain || "");
-
-      if (!publicSubdomain) {
-        throw new Error("Configure a website subdomain before going live.");
-      }
-
       const payload = createBuilderProjectPayload({
         project: publishedProject,
         builderProjectRecord,
@@ -1926,23 +1948,37 @@ Go live anyway?`
       const publishResponse = await publishBuilderProject(savedRecord.id, user?.id);
       const publishedRecord = publishResponse?.project || savedRecord;
       const publishedSite = publishResponse?.site || {};
-      const resolvedLiveSitePath = resolveLiveSitePath(
-        sanitizeSubdomain(publishedSite?.subdomain || publicSubdomain) || publicSubdomain
+      const resolvedPublicSubdomain = sanitizeSubdomain(
+        publishedSite?.subdomain || websiteSettings?.subdomain || project?.publish?.subdomain || ""
       );
+      const resolvedLiveSitePath = resolvedPublicSubdomain
+        ? resolveLiveSitePath(resolvedPublicSubdomain)
+        : "";
 
       if (import.meta.env.DEV) {
         console.debug("builder.publish.response", publishResponse);
         console.debug("builder.publish.live_url", resolvedLiveSitePath);
       }
 
+      if (!resolvedLiveSitePath) {
+        throw new Error("Published site subdomain was not returned by the backend.");
+      }
+
       setBuilderProjectRecord(publishedRecord);
+      persistProject(publishedProject, "");
       setLiveSitePath(resolvedLiveSitePath);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
       pendingBackendProjectSnapshotRef.current = "";
       showToast("Site published successfully.");
     } catch (error) {
       console.error("Could not publish builder project:", error);
-      showToast(error?.message || "Publish failed. Local draft cache was updated.");
+
+      if (isLikelySessionFailure(error)) {
+        showToast("Session expired. Please sign in again to publish.");
+        return;
+      }
+
+      showToast(error?.message || "Publish failed. Your draft was not published.");
     }
   };
 

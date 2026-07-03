@@ -100,6 +100,23 @@ def get_allowed_origins(frontend_urls: list[str] | None = None) -> set[str]:
     return origins
 
 
+def add_cors_headers_for_allowed_origin(
+    response: Response,
+    request: Request,
+    allowed_origins: set[str],
+) -> Response:
+    origin = normalize_origin(request.headers.get("origin"))
+
+    if not origin or origin not in allowed_origins:
+        return response
+
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Expose-Headers"] = CSRF_HEADER_NAME
+    response.headers.add_vary_header("Origin")
+    return response
+
+
 def request_has_auth_cookie(request: Request) -> bool:
     return any(request.cookies.get(cookie_name) for cookie_name in AUTH_COOKIE_NAMES)
 

@@ -73,13 +73,50 @@ export const readApiError = (data, fallback = "Request failed") => {
   return fallback;
 };
 
+const refreshCsrfToken = async () => {
+  const response = await fetch(getApiUrl("/auth/user_status"), {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) return "";
+
+  const responseToken = response.headers.get(CSRF_HEADER_NAME);
+
+  if (responseToken) {
+    return setCsrfToken(responseToken);
+  }
+
+  const data = await response.json().catch(() => null);
+  syncCsrfTokenFromResponseData(data);
+  return getCsrfToken();
+};
+
+const isInvalidCsrfResponse = async (response) => {
+  if (response.status !== 403) return false;
+
+  const data = await response.clone().json().catch(() => null);
+  return data?.detail === "Invalid CSRF token";
+};
+
 export const apiFetch = async (input, init = {}) => {
   const { skipAuthRefresh = false, ...fetchInit } = init;
   const method = String(fetchInit.method || "GET").toUpperCase();
   const headers = new Headers(fetchInit.headers || {});
+  const inputUrl = typeof input === "string" ? input : input?.url || "";
+  const isAuthRefresh = inputUrl.includes("/auth/refresh");
+  const isAuthEndpoint =
+    inputUrl.includes("/auth/login") ||
+    inputUrl.includes("/auth/signup") ||
+    inputUrl.includes("/auth/log_out") ||
+    inputUrl.includes("/auth/user_status") ||
+    isAuthRefresh;
 
   if (UNSAFE_METHODS.has(method) && !headers.has(CSRF_HEADER_NAME)) {
-    const token = getCsrfToken();
+    const token = getCsrfToken() || (!isAuthEndpoint && !skipAuthRefresh
+      ? await refreshCsrfToken()
+      : "");
 
     if (token) {
       headers.set(CSRF_HEADER_NAME, token);
@@ -93,14 +130,6 @@ export const apiFetch = async (input, init = {}) => {
     headers: requestHeaders,
   });
 
-  const inputUrl = typeof input === "string" ? input : input?.url || "";
-  const isAuthRefresh = inputUrl.includes("/auth/refresh");
-  const isAuthEndpoint =
-    inputUrl.includes("/auth/login") ||
-    inputUrl.includes("/auth/signup") ||
-    inputUrl.includes("/auth/log_out") ||
-    inputUrl.includes("/auth/user_status") ||
-    isAuthRefresh;
   const serializesAuthSession =
     (method === "GET" && inputUrl.includes("/auth/user_status")) ||
     (method === "POST" && isAuthRefresh);
@@ -116,6 +145,22 @@ export const apiFetch = async (input, init = {}) => {
 
   if (responseToken) {
     setCsrfToken(responseToken);
+  }
+
+  if (
+    UNSAFE_METHODS.has(method) &&
+    !isAuthEndpoint &&
+    !skipAuthRefresh &&
+    await isInvalidCsrfResponse(response)
+  ) {
+    const refreshedToken = await refreshCsrfToken();
+
+    if (refreshedToken) {
+      return apiFetch(input, {
+        ...fetchInit,
+        skipAuthRefresh: true,
+      });
+    }
   }
 
   if (
