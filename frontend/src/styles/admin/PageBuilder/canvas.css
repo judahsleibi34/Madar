@@ -3,6 +3,7 @@
    ============================================================ */
 
 .builder-canvas-shell {
+  position: relative;
   min-width: 0;
   padding: 18px;
   overflow: auto;
@@ -401,18 +402,22 @@
 
 .builder-canvas .builder-element-formBlock,
 .tenant-runtime-page .builder-element-formBlock {
-  border: 1px solid var(--form-theme-border);
-  border-radius: calc(var(--form-theme-radius) + 6px);
-  background: var(--builder-element-bg, var(--form-theme-surface));
-  box-shadow: 0 18px 44px rgba(var(--theme-shadow-rgb), 0.08);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
   white-space: normal;
 }
 
 .builder-canvas .builder-element-formBlock .runtime-form,
 .tenant-runtime-page .builder-element-formBlock .runtime-form {
   width: 100%;
-  padding: 2px;
+  padding: 20px;
+  border: 1px solid var(--form-theme-border);
+  border-radius: var(--form-theme-radius);
   background: var(--form-theme-surface);
+  box-sizing: border-box;
 }
 
 .preview-mode .builder-canvas .builder-element-formBlock,
@@ -1015,6 +1020,7 @@
   z-index: 1;
   border: 1px solid transparent;
   border-radius: 8px;
+  container-type: size;
   cursor: move;
   touch-action: none;
   user-select: none;
@@ -1055,6 +1061,45 @@
   overflow: auto;
 }
 
+.direct-element-frame-heading .direct-element-content,
+.direct-element-frame-text .direct-element-content,
+.direct-element-frame-button .direct-element-content {
+  overflow: hidden;
+}
+
+.direct-element-frame-heading .builder-element-heading,
+.direct-element-frame-text .builder-element-text,
+.direct-element-frame-button .builder-element-button {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.direct-element-frame-heading .builder-element-heading {
+  display: block;
+  font-size: clamp(18px, min(10cqw, 30cqh), 52px) !important;
+  line-height: 1.08 !important;
+  text-wrap: balance;
+}
+
+.direct-element-frame-text .builder-element-text {
+  display: block;
+  font-size: clamp(12px, min(4.4cqw, 12cqh), 18px) !important;
+  line-height: clamp(1.32, 1.5, 1.68) !important;
+}
+
+.direct-element-frame-button .builder-element-button {
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-height: 0;
+  padding: clamp(7px, min(2.4cqw, 5cqh), 13px) clamp(10px, min(4cqw, 7cqh), 20px);
+  font-size: clamp(11px, min(3.3cqw, 10cqh), 16px) !important;
+  line-height: 1.2 !important;
+  white-space: normal;
+}
+
 .direct-element-content:has(> .builder-element-metric) {
   overflow: hidden;
 }
@@ -1076,17 +1121,19 @@
 }
 
 .direct-element-frame-formBlock .builder-element-formBlock {
-  padding: 10px;
-  border-radius: calc(var(--form-theme-radius) + 4px);
-  background: var(--form-theme-surface);
-  box-shadow: 0 14px 36px rgba(var(--theme-shadow-rgb), 0.07);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .direct-element-frame-formBlock .runtime-form {
+  padding: 20px;
   overflow: hidden;
   border: 1px solid var(--form-theme-border);
   border-radius: var(--form-theme-radius);
   background: var(--form-theme-surface);
+  box-sizing: border-box;
 }
 
 .direct-element-frame-formBlock .runtime-form-header,

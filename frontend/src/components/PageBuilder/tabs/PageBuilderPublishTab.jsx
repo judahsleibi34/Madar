@@ -78,8 +78,10 @@ export default function PageBuilderPublishTab({
         ]);
         return;
       }
-    } catch (error) {
-      console.warn("Could not copy QR image, copying QR URL instead.", error);
+    } catch {
+      if (import.meta.env.DEV) {
+        console.warn("Could not copy QR image, copying QR URL instead.");
+      }
     }
 
     await navigator.clipboard?.writeText(qrImageUrl);

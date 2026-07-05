@@ -55,6 +55,10 @@ export const readApiResponse = async (response) => {
 };
 
 export const readApiError = (data, fallback = "Request failed") => {
+  if (typeof data?.detail?.message === "string" && data.detail.message.trim()) {
+    return data.detail.message;
+  }
+
   if (typeof data?.detail === "string" && data.detail.trim()) {
     return data.detail;
   }
@@ -71,6 +75,22 @@ export const readApiError = (data, fallback = "Request failed") => {
   }
 
   return fallback;
+};
+
+export const readApiErrorCode = (data) => {
+  if (typeof data?.code === "string" && data.code.trim()) {
+    return data.code;
+  }
+
+  if (typeof data?.detail?.code === "string" && data.detail.code.trim()) {
+    return data.detail.code;
+  }
+
+  if (typeof data?.error?.code === "string" && data.error.code.trim()) {
+    return data.error.code;
+  }
+
+  return "";
 };
 
 export const apiFetch = async (input, init = {}) => {

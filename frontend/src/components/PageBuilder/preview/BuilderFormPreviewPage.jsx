@@ -34,6 +34,17 @@ const loadDraftProject = () => {
   }
 };
 
+const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
+
+const parseDraftProject = (serializedProject) => {
+  if (!serializedProject) return null;
+  try {
+    return cleanBuilderProject(JSON.parse(serializedProject));
+  } catch {
+    return null;
+  }
+};
+
 const getFieldOptions = (field = {}, lang = "en") =>
   getLocalizedOptions(field, lang).filter((option) =>
     String(option || "").trim()
@@ -65,7 +76,7 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
 export default function BuilderFormPreviewPage() {
   const { formId = "" } = useParams();
   const navigate = useNavigate();
-  const [project] = useState(loadDraftProject);
+  const [project, setProject] = useState(loadDraftProject);
   const form = useMemo(
     () => project?.forms?.find((item) => item.id === formId) || project?.forms?.[0] || null,
     [formId, project?.forms]
@@ -86,6 +97,42 @@ export default function BuilderFormPreviewPage() {
   const currentSection = sections[Math.min(pageIndex, Math.max(sections.length - 1, 0))];
   const isQuiz = form?.mode === "quiz";
   const quizSettings = useMemo(() => getQuizSettings(form), [form]);
+
+  useEffect(() => {
+    const syncSerializedProject = (serializedProject) => {
+      setProject(parseDraftProject(serializedProject));
+    };
+
+    const syncDraftFromStorage = () => {
+      syncSerializedProject(localStorage.getItem(STORAGE_KEY));
+    };
+
+    const handleDraftStorageUpdate = (event) => {
+      if (event.key !== STORAGE_KEY) return;
+      syncSerializedProject(event.newValue);
+    };
+
+    const draftSyncChannel =
+      typeof BroadcastChannel === "undefined"
+        ? null
+        : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
+
+    const handleBroadcastDraftUpdate = (event) => {
+      if (event.data?.storageKey !== STORAGE_KEY) return;
+      syncSerializedProject(event.data.serializedProject);
+    };
+
+    draftSyncChannel?.addEventListener("message", handleBroadcastDraftUpdate);
+    window.addEventListener("storage", handleDraftStorageUpdate);
+    window.addEventListener("focus", syncDraftFromStorage);
+
+    return () => {
+      draftSyncChannel?.removeEventListener("message", handleBroadcastDraftUpdate);
+      draftSyncChannel?.close();
+      window.removeEventListener("storage", handleDraftStorageUpdate);
+      window.removeEventListener("focus", syncDraftFromStorage);
+    };
+  }, []);
 
   useEffect(() => {
     quizCompleteRef.current = false;

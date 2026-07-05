@@ -32,7 +32,7 @@ const builderWorkspaceCopyEn = {
     },
     theme: {
       label: "Themes",
-      helper: "Control the published website colors, typography, buttons, and form styling.",
+      helper: "Control builder canvas colors, typography, buttons, and theme styling.",
     },
     publish: {
       label: "Publish",
@@ -142,7 +142,7 @@ const starterTextEn = {
   },
 };
 
-export const mainBuilderHiddenTabs = ["data", "responses"];
+export const mainBuilderHiddenTabs = ["data", "responses", "theme"];
 
 export const pageBuilderContent = {
   en: {

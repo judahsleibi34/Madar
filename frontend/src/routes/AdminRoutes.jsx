@@ -1,11 +1,20 @@
+import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import Dashboard from "../components/DashboardBuilder/Dashboard";
-import AdminAccountAccessPage from "../components/DashboardBuilder/AdminAccountAccessPage";
-import NotificationsPage from "../components/DashboardBuilder/NotificationsPage";
-import UserManagementPage from "../components/DashboardBuilder/UserManagementPage";
+import RouteSuspense from "../components/common/RouteSuspense";
 import { appShellContent } from "../content";
-import { DashboardShell, RestrictedAccessWindow } from "./shared";
+import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
+
+const Dashboard = lazy(() => import("../components/DashboardBuilder/Dashboard"));
+const AdminAccountAccessPage = lazy(() =>
+  import("../components/DashboardBuilder/AdminAccountAccessPage")
+);
+const NotificationsPage = lazy(() =>
+  import("../components/DashboardBuilder/NotificationsPage")
+);
+const UserManagementPage = lazy(() =>
+  import("../components/DashboardBuilder/UserManagementPage")
+);
 
 export default function AdminRoutes({
   lang,
@@ -37,78 +46,84 @@ export default function AdminRoutes({
     );
 
   return (
-    <Routes>
-      <Route
-        path="/dashboard/*"
-        element={renderShell(
-          <Dashboard
-            lang={lang}
-            user={user}
-            themeMode={themeMode}
-            onThemeModeChange={shellProps.onThemeModeChange}
-          />
-        )}
-      />
+    <RouteSuspense
+      fallback={<DashboardLoadingElement pathname="/dashboard" lang={lang} />}
+      lang={lang}
+      variant="dashboard"
+    >
+      <Routes>
+        <Route
+          path="/dashboard/*"
+          element={renderShell(
+            <Dashboard
+              lang={lang}
+              user={user}
+              themeMode={themeMode}
+              onThemeModeChange={shellProps.onThemeModeChange}
+            />
+          )}
+        />
 
-      <Route
-        path="/admin/users/*"
-        element={renderShell(
-          <UserManagementPage lang={lang} currentUser={user} />
-        )}
-      />
+        <Route
+          path="/admin/users/*"
+          element={renderShell(
+            <UserManagementPage lang={lang} currentUser={user} />
+          )}
+        />
 
-      <Route
-        path="/admin/account-access/*"
-        element={renderShell(
-          <AdminAccountAccessPage
-            lang={lang}
-            themeMode={themeMode}
-            currentUser={user}
-          />
-        )}
-      />
+        <Route
+          path="/admin/account-access/*"
+          element={renderShell(
+            <AdminAccountAccessPage
+              lang={lang}
+              themeMode={themeMode}
+              currentUser={user}
+            />
+          )}
+        />
 
-      <Route
-        path="/notifications/*"
-        element={renderShell(<NotificationsPage />)}
-      />
+        <Route
+          path="/notifications/*"
+          element={renderShell(<NotificationsPage />)}
+        />
 
-      <Route
-        path="/page-builder/*"
-        element={renderRestrictedPage(
-          appShellContent.restrictedAccess.workspaceOnly
-        )}
-      />
+        <Route
+          path="/page-builder/*"
+          element={renderRestrictedPage(
+            appShellContent.restrictedAccess.workspaceOnly
+          )}
+        />
 
-      <Route
-        path="/builder-responses/*"
-        element={renderRestrictedPage(
-          appShellContent.restrictedAccess.workspaceOnly
-        )}
-      />
+        <Route
+          path="/builder-responses/*"
+          element={renderRestrictedPage(
+            appShellContent.restrictedAccess.workspaceOnly
+          )}
+        />
 
-      <Route
-        path="/builder-data/*"
-        element={renderRestrictedPage(
-          appShellContent.restrictedAccess.workspaceOnly
-        )}
-      />
+        <Route
+          path="/builder-data/*"
+          element={renderRestrictedPage(
+            appShellContent.restrictedAccess.workspaceOnly
+          )}
+        />
 
-      <Route
-        path="/my-plan/*"
-        element={renderRestrictedPage(
-          appShellContent.restrictedAccess.workspaceOnly
-        )}
-      />
+        <Route
+          path="/my-plan/*"
+          element={renderRestrictedPage(
+            appShellContent.restrictedAccess.workspaceOnly
+          )}
+        />
 
-      <Route
-        path="/settings/*"
-        element={renderRestrictedPage(
-          appShellContent.restrictedAccess.workspaceOnly
-        )}
-      />
+        <Route
+          path="/settings/*"
+          element={renderRestrictedPage(
+            appShellContent.restrictedAccess.workspaceOnly
+          )}
+        />
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </RouteSuspense>
   );
 }

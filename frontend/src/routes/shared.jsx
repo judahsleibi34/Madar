@@ -209,7 +209,6 @@ const builderSkeletonTabs = [
   { id: "reservations", label: "Reservations" },
   { id: "chrome", label: "Header & Footer" },
   { id: "users", label: "Users" },
-  { id: "theme", label: "Themes" },
   { id: "publish", label: "Publish" },
 ];
 
@@ -221,9 +220,9 @@ const builderSkeletonPathTabs = {
   chrome: "chrome",
   "header-footer": "chrome",
   users: "users",
-  theme: "theme",
-  themes: "theme",
-  "website-theme": "theme",
+  theme: "design",
+  themes: "design",
+  "website-theme": "design",
   publish: "publish",
   responses: "responses",
   data: "data",

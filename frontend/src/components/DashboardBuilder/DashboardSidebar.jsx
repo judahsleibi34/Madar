@@ -24,6 +24,7 @@ import {
   readStoredThemeMode,
   normalizeThemeMode,
 } from "../../utils/themeMode";
+import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
 
 function normalizeRoleValue(value) {
   return String(value || "").trim().toLowerCase();
@@ -119,24 +120,24 @@ export default function DashboardSidebar({
   const adminNavItemsTop = [
     {
       label: t("sidebar.home"),
-      path: "/",
+      path: PUBLIC_ROUTES.home,
       icon: Home,
     },
     {
       label: t("sidebar.dashboard"),
-      path: "/dashboard",
+      path: DASHBOARD_ROUTES.dashboard,
       icon: LayoutDashboard,
     },
     {
       label: t("sidebar.userManagement"),
-      path: "/admin/users",
+      path: DASHBOARD_ROUTES.adminUsers,
       icon: UsersRound,
     },
     {
       label: t("sidebar.accountAccess", {
         defaultValue: "Account Access",
       }),
-      path: "/admin/account-access",
+      path: DASHBOARD_ROUTES.adminAccountAccess,
       icon: KeyRound,
     },
   ];
@@ -144,32 +145,32 @@ export default function DashboardSidebar({
   const userNavItemsTop = [
     {
       label: t("sidebar.home"),
-      path: "/",
+      path: PUBLIC_ROUTES.home,
       icon: Home,
     },
     {
       label: t("sidebar.dashboard"),
-      path: "/dashboard",
+      path: DASHBOARD_ROUTES.dashboard,
       icon: LayoutDashboard,
     },
     {
       label: t("sidebar.pageBuilder"),
-      path: "/page-builder",
+      path: DASHBOARD_ROUTES.pageBuilder,
       icon: Grid2X2,
     },
     {
       label: t("sidebar.submissions"),
-      path: "/builder-responses",
+      path: DASHBOARD_ROUTES.builderResponses,
       icon: ClipboardList,
     },
     {
       label: t("sidebar.dataLogs"),
-      path: "/builder-data",
+      path: DASHBOARD_ROUTES.builderData,
       icon: Database,
     },
     {
       label: t("sidebar.myPlan"),
-      path: "/my-plan",
+      path: DASHBOARD_ROUTES.myPlan,
       icon: CreditCard,
     },
   ];
@@ -240,8 +241,8 @@ export default function DashboardSidebar({
   };
 
   const isActive = (path) => {
-    if (path === "/") {
-      return location.pathname === "/";
+    if (path === PUBLIC_ROUTES.home) {
+      return location.pathname === PUBLIC_ROUTES.home;
     }
 
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -261,7 +262,7 @@ export default function DashboardSidebar({
         <button
           type="button"
           className="admin-sidebar-brand"
-          onClick={() => goTo("/dashboard")}
+          onClick={() => goTo(DASHBOARD_ROUTES.dashboard)}
           title={t("sidebar.brand")}
         >
           <span className="admin-sidebar-icon" aria-hidden="true">
@@ -270,13 +271,6 @@ export default function DashboardSidebar({
 
           <span className="admin-sidebar-brand-text">
             <strong>{t("sidebar.brand")}</strong>
-            <span>
-              {isAdminUser
-                ? t("sidebar.subtitle")
-                : t("sidebar.userSubtitle", {
-                    defaultValue: "Workspace",
-                  })}
-            </span>
           </span>
         </button>
 
@@ -323,8 +317,8 @@ export default function DashboardSidebar({
 
           <button
             type="button"
-            className={isActive("/settings/security") ? "active" : ""}
-            onClick={() => goTo("/settings/security")}
+            className={isActive(DASHBOARD_ROUTES.settingsSecurity) ? "active" : ""}
+            onClick={() => goTo(DASHBOARD_ROUTES.settingsSecurity)}
             title={t("sidebar.security")}
           >
             <ShieldCheck size={18} aria-hidden="true" />
@@ -357,9 +351,9 @@ export default function DashboardSidebar({
           <button
             type="button"
             className={`admin-sidebar-utility ${
-              isActive("/settings") ? "active" : ""
+              isActive(DASHBOARD_ROUTES.settings) ? "active" : ""
             }`}
-            onClick={() => goTo("/settings")}
+            onClick={() => goTo(DASHBOARD_ROUTES.settings)}
             title={t("sidebar.settings")}
           >
             <Settings size={18} aria-hidden="true" />

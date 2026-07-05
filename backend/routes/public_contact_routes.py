@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from classes import ContactMessage
 from database import service_supabase
+from services import error_codes
 from services.rate_limit_service import enforce_public_contact_rate_limit, get_client_ip
 
 
@@ -17,10 +18,22 @@ def clean_contact_payload(payload: ContactMessage) -> dict:
     message = payload.message.strip()
 
     if not name:
-        raise HTTPException(status_code=400, detail="Name is required")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": error_codes.CONTACT_NAME_REQUIRED,
+                "message": "Name is required",
+            },
+        )
 
     if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": error_codes.CONTACT_MESSAGE_REQUIRED,
+                "message": "Message is required",
+            },
+        )
 
     if phone == "":
         phone = None
@@ -59,7 +72,13 @@ def submit_public_contact(payload: ContactMessage, request: Request):
             "contact.message_failed",
             extra={"client_ip": client_ip, "error_type": type(error).__name__},
         )
-        raise HTTPException(status_code=500, detail="Could not submit contact message")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": error_codes.CONTACT_SUBMIT_FAILED,
+                "message": "Could not submit contact message",
+            },
+        )
 
     logger.info(
         "contact.message_received",
@@ -72,5 +91,6 @@ def submit_public_contact(payload: ContactMessage, request: Request):
 
     return {
         "success": True,
+        "code": error_codes.CONTACT_RECEIVED,
         "message": "Contact message received",
     }

@@ -10,13 +10,13 @@ import {
   ChevronUp,
   Copy,
   Eye,
-  FilePlus2,
   Italic,
   List,
   ListOrdered,
   ListPlus,
   Plus,
   Redo2,
+  RotateCcw,
   Send,
   Settings,
   Save,
@@ -35,8 +35,12 @@ import {
   setLocalizedOptions,
   setLocalizedValue,
 } from "../core/PageBuilder.localization";
+import { defaultFormTheme, getFormThemeVars } from "../core/PageBuilder.theme";
 import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
 import { getFormsTabContent } from "../../../content/pageBuilder";
+import FormButton from "./FormsTab/FormButton";
+import FormsEmptyState from "./FormsTab/FormsEmptyState";
+import FormPreview from "./FormsTab/FormPreview";
 
 const defaultFormsCopy = getFormsTabContent("en");
 
@@ -75,37 +79,24 @@ const textToolbarButtons = [
   { action: "align-justify", label: defaultFormsCopy.toolbar.justify, icon: AlignJustify },
 ];
 
-function FormButton({
-  children,
-  ariaLabel,
-  className = "",
-  disabled = false,
-  icon: Icon,
-  onClick,
-  title,
-  variant = "default",
-}) {
-  const classes = ["form-command-button", `form-command-button-${variant}`, className]
-    .filter(Boolean)
-    .join(" ");
+const formThemeColorControls = [
+  ["surface", "Card"],
+  ["inputBackground", "Field"],
+  ["text", "Text"],
+  ["muted", "Helper"],
+  ["border", "Border"],
+  ["accent", "Action"],
+  ["buttonText", "Button text"],
+];
 
-  return (
-    <button
-      type="button"
-      className={classes}
-      disabled={disabled}
-      onClick={onClick}
-      aria-label={ariaLabel || (typeof children === "string" ? children : title)}
-      title={title}
-    >
-      {Icon && <Icon size={16} aria-hidden="true" />}
-      {children}
-    </button>
-  );
-}
+const isHexColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || ""));
+const getColorValue = (value, fallback = "#000000") =>
+  isHexColor(value) ? value : fallback;
+const formatColorValue = (value) => String(value || "").toUpperCase();
 
 export default function FormsTab({
   project,
+  updateProject,
   activeForm,
   fieldTypes,
   selected,
@@ -136,6 +127,7 @@ export default function FormsTab({
   getQuizSettings,
   getFormPlacements,
   addConnectedFormSectionToPage,
+  renderConnectedForm,
   openFormPreviewPage,
   saveProject,
 
@@ -149,6 +141,7 @@ export default function FormsTab({
   const [deleteFormCandidate, setDeleteFormCandidate] = useState(null);
   const [deleteFormPageCandidate, setDeleteFormPageCandidate] = useState(null);
   const activeTextTargetRef = useRef(null);
+  const formTheme = project.theme?.form || {};
   const formLanguageMode = normalizeLanguageMode(activeForm?.languageMode || lang);
   const primaryLanguage =
     formLanguageMode === "bilingual"
@@ -570,23 +563,69 @@ export default function FormsTab({
     setQuizOptionsOpen(false);
   };
 
+  const updateFormThemeValue = (key, value) => {
+    updateProject?.((prev) => ({
+      ...prev,
+      theme: {
+        ...prev.theme,
+        form: {
+          ...(prev.theme?.form || {}),
+          [key]: value,
+        },
+      },
+    }));
+  };
+
+  const resetFormTheme = () => {
+    updateProject?.((prev) => ({
+      ...prev,
+      theme: {
+        ...prev.theme,
+        form: { ...defaultFormTheme },
+      },
+    }));
+  };
+
+  const renderFormThemeColorControl = ([key, label]) => {
+    const currentValue = getColorValue(formTheme[key], defaultFormTheme[key]);
+
+    return (
+      <label className="forms-theme-token" key={key}>
+        <span>{label}</span>
+        <span className="forms-theme-color-input">
+          <span
+            className="forms-theme-swatch"
+            style={{ "--forms-theme-token": currentValue }}
+            aria-hidden="true"
+          />
+          <strong>{formatColorValue(currentValue)}</strong>
+          <input
+            aria-label={label}
+            type="color"
+            value={currentValue}
+            onChange={(event) => updateFormThemeValue(key, event.target.value)}
+          />
+        </span>
+      </label>
+    );
+  };
+
   if (!activeForm) {
     return (
-      <div className="workspace-page forms-workbench forms-simple-workbench">
-        <section className="forms-empty-state">
-          <FilePlus2 size={34} aria-hidden="true" />
-          <h2>{copy.messages.createFirstFormTitle}</h2>
-          <p>{copy.messages.createFirstFormBody}</p>
-          <FormButton variant="primary" icon={Plus} onClick={addForm}>
-            {copy.messages.newForm}
-          </FormButton>
-        </section>
-      </div>
+      <FormsEmptyState
+        addForm={addForm}
+        copy={copy}
+        project={project}
+      />
     );
   }
 
   return (
-    <div className="workspace-page forms-workbench forms-simple-workbench" dir={formDirection}>
+    <div
+      className="workspace-page forms-workbench forms-simple-workbench"
+      dir={formDirection}
+      style={getFormThemeVars(project.theme)}
+    >
       <div className="forms-simple-shell">
         <aside className="simple-add-question" aria-label={copy.labels.formControls}>
           <div className="forms-panel-heading">
@@ -667,6 +706,36 @@ export default function FormsTab({
               {formatCopy(copy.messages.addTranslations, { language: getLanguageName(translationLanguage) })}
             </label>
           </div>
+
+          <section className="simple-action-group forms-theme-action-group">
+            <span className="simple-action-group-title">Form colors</span>
+            <div className="forms-theme-grid">
+              {formThemeColorControls.map(renderFormThemeColorControl)}
+            </div>
+            <div className="forms-theme-shape-grid">
+              <label>
+                Form corners
+                <input
+                  type="number"
+                  min="0"
+                  value={formTheme.radius ?? defaultFormTheme.radius}
+                  onChange={(event) => updateFormThemeValue("radius", Number(event.target.value))}
+                />
+              </label>
+              <label>
+                Field corners
+                <input
+                  type="number"
+                  min="0"
+                  value={formTheme.fieldRadius ?? defaultFormTheme.fieldRadius}
+                  onChange={(event) => updateFormThemeValue("fieldRadius", Number(event.target.value))}
+                />
+              </label>
+            </div>
+            <FormButton icon={RotateCcw} onClick={resetFormTheme}>
+              Reset form colors
+            </FormButton>
+          </section>
 
           <label>
             {copy.labels.addQuestion}
@@ -1387,6 +1456,13 @@ export default function FormsTab({
           ))}
         </div>
         </main>
+
+        <FormPreview
+          activeForm={activeForm}
+          copy={copy}
+          placements={placements}
+          renderConnectedForm={renderConnectedForm}
+        />
       </div>
 
       {quizOptionsOpen && (

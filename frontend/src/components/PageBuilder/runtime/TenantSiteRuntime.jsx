@@ -262,6 +262,17 @@ const loadDraftPreviewProject = () => {
   }
 };
 
+const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
+
+const parseDraftPreviewProject = (serializedProject) => {
+  if (!serializedProject) return null;
+  try {
+    return JSON.parse(serializedProject);
+  } catch {
+    return null;
+  }
+};
+
 const getScreenViewport = () => {
   if (typeof window === "undefined") return "desktop";
   if (window.innerWidth <= viewports.mobile) return "mobile";
@@ -305,9 +316,42 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   useEffect(() => {
     if (draftPreview) {
-      setProject(loadDraftPreviewProject());
+      const syncSerializedProject = (serializedProject) => {
+        setProject(parseDraftPreviewProject(serializedProject));
+        setPublicSiteState("ready");
+      };
+
+      const syncDraftFromStorage = () => {
+        syncSerializedProject(localStorage.getItem(STORAGE_KEY));
+      };
+
+      const handleDraftStorageUpdate = (event) => {
+        if (event.key !== STORAGE_KEY) return;
+        syncSerializedProject(event.newValue);
+      };
+
+      const draftSyncChannel =
+        typeof BroadcastChannel === "undefined"
+          ? null
+          : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
+
+      const handleBroadcastDraftUpdate = (event) => {
+        if (event.data?.storageKey !== STORAGE_KEY) return;
+        syncSerializedProject(event.data.serializedProject);
+      };
+
+      syncDraftFromStorage();
       setPublicSiteState("ready");
-      return;
+      draftSyncChannel?.addEventListener("message", handleBroadcastDraftUpdate);
+      window.addEventListener("storage", handleDraftStorageUpdate);
+      window.addEventListener("focus", syncDraftFromStorage);
+
+      return () => {
+        draftSyncChannel?.removeEventListener("message", handleBroadcastDraftUpdate);
+        draftSyncChannel?.close();
+        window.removeEventListener("storage", handleDraftStorageUpdate);
+        window.removeEventListener("focus", syncDraftFromStorage);
+      };
     }
 
     let cancelled = false;
@@ -329,11 +373,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
         setProject(null);
         setPublicSiteState("unavailable");
-      } catch (error) {
+      } catch {
         if (cancelled) return;
         setProject(null);
         setPublicSiteState("unavailable");
-        console.warn("Could not load published site from backend:", error);
+        if (import.meta.env.DEV) {
+          console.warn("Could not load published site from backend.");
+        }
       }
     };
 
@@ -540,6 +586,25 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       maxWidth: "100%",
       alignSelf: normalizeElementAlignSelf(element.styles?.alignSelf),
       ...placementMargins,
+    };
+  };
+
+  const getDirectElementFrameStyle = (element, section) => {
+    const position = element.position?.[runtimeViewport] || element.position?.desktop || {};
+    const viewportWidth = viewports[runtimeViewport] || viewports.desktop;
+    const sectionHeight = getSectionCanvasHeight(section, runtimeViewport);
+    const left = `${((Number(position.x) || 0) / viewportWidth) * 100}%`;
+    const top = `${((Number(position.y) || 0) / sectionHeight) * 100}%`;
+    const width = `${((Number(position.width) || 240) / viewportWidth) * 100}%`;
+    const height = `${((Number(position.height) || 80) / sectionHeight) * 100}%`;
+
+    return {
+      position: "absolute",
+      left,
+      top,
+      width,
+      height,
+      maxWidth: `calc(100% - ${left})`,
     };
   };
 
@@ -1106,18 +1171,29 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
       return (
         <div key={element.id} {...props}>
-          <form className="builder-auth-component" onSubmit={(event) => event.preventDefault()}>
+          <form className="builder-auth-component" autoComplete="off" onSubmit={(event) => event.preventDefault()}>
             <div className="builder-auth-heading">
               <h3>{auth.title || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}</h3>
               <p>{auth.subtitle || (isRegistration ? runtimeCopy.runtime.createAccountSubtitle : runtimeCopy.runtime.loginSubtitle)}</p>
             </div>
-            {isRegistration && <label>{runtimeCopy.runtime.fullName}<input type="text" placeholder={runtimeCopy.runtime.yourName} /></label>}
-            <label>{runtimeCopy.runtime.emailAddress}<input type="email" placeholder={runtimeCopy.runtime.emailPlaceholder} /></label>
-            <label>{runtimeCopy.runtime.password}<input type="password" placeholder={runtimeCopy.runtime.passwordPlaceholder} /></label>
+            {isRegistration && (
+              <label>
+                {runtimeCopy.runtime.fullName}
+                <input type="text" name={`builder-demo-name-${element.id}`} autoComplete="off" placeholder={runtimeCopy.runtime.yourName} />
+              </label>
+            )}
+            <label>
+              {runtimeCopy.runtime.emailAddress}
+              <input type="email" name={`builder-demo-email-${element.id}`} autoComplete="off" placeholder={runtimeCopy.runtime.emailPlaceholder} />
+            </label>
+            <label>
+              {runtimeCopy.runtime.password}
+              <input type="password" name={`builder-demo-password-${element.id}`} autoComplete="new-password" placeholder={runtimeCopy.runtime.passwordPlaceholder} />
+            </label>
             {isRegistration && (
               <label>
                 {runtimeCopy.runtime.confirmPassword}
-                <input type="password" placeholder={runtimeCopy.runtime.confirmPasswordPlaceholder} />
+                <input type="password" name={`builder-demo-confirm-${element.id}`} autoComplete="new-password" placeholder={runtimeCopy.runtime.confirmPasswordPlaceholder} />
               </label>
             )}
             <button type="submit" className="runtime-submit">
@@ -1179,7 +1255,17 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                       minHeight: `${getSectionCanvasHeight(section, runtimeViewport)}px`,
                     }}
                   >
-                    {(section.freeElements || []).map((element) => renderElement(element, true, section))}
+                    {(section.freeElements || []).map((element) => (
+                      <div
+                        key={element.id}
+                        className={`direct-element-frame direct-element-frame-${element.type}`}
+                        style={getDirectElementFrameStyle(element, section)}
+                      >
+                        <div className="direct-element-content">
+                          {renderElement(element, false)}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </section>
               );

@@ -50,7 +50,14 @@ export default function TeamPage({ lang = "en" }) {
 
               <div className="profile-avatar">
                 {member.image ? (
-                  <img src={member.image} alt={member.name} />
+                  <img
+                    src={member.image}
+                    alt={member.name}
+                    width={member.imageWidth}
+                    height={member.imageHeight}
+                    loading="lazy"
+                    decoding="async"
+                  />
                 ) : (
                   <span>{member.initials}</span>
                 )}

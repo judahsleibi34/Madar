@@ -181,10 +181,10 @@ export const createElementRenderer = ({
               <h3>{auth.title || (isRegistration ? "Create account" : "Log in")}</h3>
               <p>{auth.subtitle || (isRegistration ? "Create your account." : "Access your account.")}</p>
             </div>
-            {isRegistration && <label>Full name<input type="text" placeholder="Your name" disabled={!preview} /></label>}
-            <label>Email address<input type="email" placeholder="name@example.com" disabled={!preview} /></label>
-            <label>Password<input type="password" placeholder="Enter password" disabled={!preview} /></label>
-            {isRegistration && <label>Confirm password<input type="password" placeholder="Confirm password" disabled={!preview} /></label>}
+            {isRegistration && <label>Full name<input type="text" name={`builder-demo-name-${element.id}`} autoComplete="off" placeholder="Your name" disabled={!preview} /></label>}
+            <label>Email address<input type="email" name={`builder-demo-email-${element.id}`} autoComplete="off" placeholder="name@example.com" disabled={!preview} /></label>
+            <label>Password<input type="password" name={`builder-demo-password-${element.id}`} autoComplete="new-password" placeholder="Enter password" disabled={!preview} /></label>
+            {isRegistration && <label>Confirm password<input type="password" name={`builder-demo-confirm-${element.id}`} autoComplete="new-password" placeholder="Confirm password" disabled={!preview} /></label>}
             <button type="button" className="runtime-submit">
               {auth.buttonText || (isRegistration ? "Create account" : "Log in")}
             </button>

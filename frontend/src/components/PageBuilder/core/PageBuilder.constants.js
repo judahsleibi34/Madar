@@ -53,7 +53,7 @@ export const builderTabs = [
   {
     id: "theme",
     label: "Themes",
-    helper: "Control the published website colors, typography, buttons, and form styling.",
+    helper: "Control builder canvas colors, typography, buttons, and theme styling.",
   },
   {
     id: "publish",

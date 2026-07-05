@@ -1,6 +1,7 @@
 import {
   Files,
   LayoutPanelTop,
+  Palette,
 } from "lucide-react";
 
 import {
@@ -10,6 +11,7 @@ import {
 export const designPanelOptions = [
   { id: "Pages", icon: Files, hint: "Manage pages" },
   { id: "Sections", icon: LayoutPanelTop, hint: "Build with components" },
+  { id: "Themes", icon: Palette, hint: "Builder themes only" },
 ];
 
 export const elementGroups = [...new Set(elementTypes.map((item) => item.group))];

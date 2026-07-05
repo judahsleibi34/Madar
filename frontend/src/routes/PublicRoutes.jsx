@@ -1,27 +1,33 @@
-import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { lazy, useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import RouteSuspense from "../components/common/RouteSuspense";
 import MainLayout from "../components/MainPages/MainLayout";
 
-const HomePage = lazy(() => import("../components/MainPages/HeroSection"));
-const ProductTourPage = lazy(() => import("../components/MainPages/FeaturesPage"));
-const PricingPage = lazy(() => import("../components/MainPages/PricingPage"));
-const BasePlansPage = lazy(() => import("../components/MainPages/BasePlansPage"));
-const CustomPlanPage = lazy(() => import("../components/MainPages/CustomPlanPage"));
+const loadHomePage = () => import("../components/MainPages/HeroSection");
+const loadProductTourPage = () => import("../components/MainPages/FeaturesPage");
+const loadBasePlansPage = () => import("../components/MainPages/BasePlansPage");
+
+const HomePage = lazy(loadHomePage);
+const ProductTourPage = lazy(loadProductTourPage);
+const BasePlansPage = lazy(loadBasePlansPage);
 const TeamPage = lazy(() => import("../components/MainPages/TeamPage"));
 const AboutSection = lazy(() => import("../components/MainPages/AboutSection"));
 const ContactPage = lazy(() => import("../components/MainPages/ContactPage"));
+const PageBuilder = lazy(() => import("../components/PageBuilder"));
 
 const LoginPage = lazy(() => import("../components/AuthPages/LoginPage"));
 const SignUpPage = lazy(() => import("../components/AuthPages/SignUpPage"));
 const ForgotPasswordPage = lazy(() => import("../components/AuthPages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../components/AuthPages/ResetPasswordPage"));
 
-const publicFallback = (
-  <div className="route-loading" role="status" aria-live="polite">
-    Loading...
-  </div>
-);
+const canPrefetchRoutes = () => {
+  if (typeof navigator === "undefined") return true;
+  const connection = navigator.connection;
+  if (!connection) return true;
+  if (connection.saveData) return false;
+  return !["slow-2g", "2g"].includes(connection.effectiveType);
+};
 
 export default function PublicRoutes({
   authChecked,
@@ -34,8 +40,40 @@ export default function PublicRoutes({
   themeMode,
   user,
 }) {
+  const location = useLocation();
+  const isAuthPath =
+    location.pathname.startsWith("/login") ||
+    location.pathname.startsWith("/signup") ||
+    location.pathname.startsWith("/forgot-password") ||
+    location.pathname.startsWith("/reset-password");
+  const isDemoPath = location.pathname.startsWith("/demo");
+  const skeletonVariant = isAuthPath ? "auth" : isDemoPath ? "public-page" : "public-page";
+
+  useEffect(() => {
+    if (location.pathname !== "/" || !canPrefetchRoutes()) return undefined;
+
+    const prefetchLikelyPublicRoutes = () => {
+      loadProductTourPage();
+      loadBasePlansPage();
+    };
+
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(prefetchLikelyPublicRoutes, {
+        timeout: 2500,
+      });
+      return () => window.cancelIdleCallback(id);
+    }
+
+    const timeoutId = window.setTimeout(prefetchLikelyPublicRoutes, 1600);
+    return () => window.clearTimeout(timeoutId);
+  }, [location.pathname]);
+
   return (
-    <Suspense fallback={publicFallback}>
+    <RouteSuspense
+      label={isAuthPath ? "Loading account page" : "Loading page"}
+      lang={lang}
+      variant={skeletonVariant}
+    >
       <Routes>
         <Route
           element={
@@ -59,8 +97,24 @@ export default function PublicRoutes({
         />
 
         <Route
+          path="demo"
+          element={
+            <main className="builder-demo-main">
+              <PageBuilder
+                key={`builder-demo-${lang}`}
+                demoMode
+                user={user}
+                templateLang={lang}
+                appThemeMode={themeMode}
+                onAppThemeModeChange={onThemeModeChange}
+              />
+            </main>
+          }
+        />
+
+        <Route
           path="pricing"
-          element={<PricingPage key={`pricing-${lang}`} lang={lang} />}
+          element={<BasePlansPage key={`pricing-${lang}`} lang={lang} />}
         />
 
         <Route
@@ -70,7 +124,7 @@ export default function PublicRoutes({
 
         <Route
           path="pricing/custom-plan"
-          element={<CustomPlanPage key={`custom-plan-${lang}`} lang={lang} />}
+          element={<Navigate to="/pricing" replace />}
         />
 
         <Route
@@ -125,6 +179,6 @@ export default function PublicRoutes({
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Suspense>
+    </RouteSuspense>
   );
 }

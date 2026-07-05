@@ -156,6 +156,6 @@ describe("useDebouncedProjectStorage", () => {
       });
     }).not.toThrow();
 
-    expect(warnSpy).toHaveBeenCalledWith("Could not persist builder draft:", storageError);
+    expect(warnSpy).toHaveBeenCalledWith("Could not persist builder draft.");
   });
 });

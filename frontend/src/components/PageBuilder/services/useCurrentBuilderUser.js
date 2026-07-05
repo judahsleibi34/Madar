@@ -39,8 +39,10 @@ export const useCurrentBuilderUser = (setProject) => {
             users: [currentUser, ...otherUsers],
           };
         });
-      } catch (error) {
-        console.warn("Could not sync current builder user:", error);
+      } catch {
+        if (import.meta.env.DEV) {
+          console.warn("Could not sync current builder user.");
+        }
       }
     };
 

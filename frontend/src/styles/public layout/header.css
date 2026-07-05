@@ -390,8 +390,7 @@
 .mobile-menu {
   position: fixed;
   top: 8px;
-  left: 8px;
-  right: 8px;
+  width: min(392px, calc(100vw - 32px));
   z-index: 5900;
   display: flex;
   flex-direction: column;
@@ -406,6 +405,16 @@
     0 28px 70px rgba(var(--theme-shadow-rgb), 0.22),
     0 12px 30px rgba(var(--theme-black-rgb), 0.12);
   animation: mobileMenuIn 0.2s ease;
+}
+
+.mobile-menu[dir="ltr"] {
+  left: 38px;
+  right: auto;
+}
+
+.mobile-menu[dir="rtl"] {
+  right: 38px;
+  left: auto;
 }
 
 @keyframes mobileMenuIn {
@@ -504,10 +513,10 @@
 }
 
 .mobile-menu-close:hover {
-  background: var(--theme-gradient-hover);
+  background: var(--theme-gradient);
   box-shadow:
-    0 18px 38px rgba(var(--theme-primary-rgb), 0.34),
-    0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
+    0 16px 34px rgba(var(--theme-primary-rgb), 0.26),
+    inset 0 1px 0 var(--theme-border);
 }
 
 .mobile-menu-close:focus-visible {
@@ -529,7 +538,9 @@
 
 .mobile-menu-body {
   padding: 18px;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .mobile-menu-title {
@@ -569,13 +580,19 @@
     box-shadow 0.2s ease;
 }
 
-.mobile-menu-links a:hover,
 .mobile-menu-links a.active {
   color: var(--theme-text-inverse);
   background: var(--theme-gradient);
   box-shadow:
     0 14px 26px var(--theme-primary-soft),
     inset 0 1px 0 var(--theme-border-strong);
+}
+
+.mobile-menu-links a:hover:not(.active) {
+  color: var(--theme-text);
+  background: var(--theme-surface-2);
+  box-shadow: none;
+  transform: none;
 }
 
 .mobile-menu-links a svg {
@@ -638,9 +655,51 @@
 }
 
 .mobile-menu-lang {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  grid-template-columns: 38px minmax(0, 1fr) 8px !important;
+  column-gap: 12px !important;
+  padding: 7px 14px !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 16px !important;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  box-shadow: none !important;
+}
+
+.mobile-menu-lang:hover,
+.mobile-menu-lang:focus-visible {
+  transform: none !important;
+  border-color: var(--theme-border) !important;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  box-shadow: none !important;
+}
+
+.mobile-menu-lang .language-toggle-animation {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  border-radius: 12px !important;
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.mobile-menu-lang .language-toggle-current {
+  color: var(--theme-text) !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+}
+
+.mobile-menu-lang .language-toggle-dot {
+  display: block !important;
+  background: var(--theme-primary) !important;
+  box-shadow: 0 0 0 4px var(--theme-primary-soft) !important;
 }
 
 .lang-mobile-btn {
@@ -825,6 +884,7 @@ html[data-darkreader-scheme] .hamburger span {
     top: 8px;
     left: 8px;
     right: 8px;
+    width: auto;
     max-height: calc(100vh - 16px);
     border-radius: 22px;
   }
@@ -888,6 +948,7 @@ html[data-darkreader-scheme] .hamburger span {
     top: 6px;
     left: 6px;
     right: 6px;
+    width: auto;
     max-height: calc(100vh - 12px);
     border-radius: 20px;
   }
@@ -917,6 +978,44 @@ html[data-darkreader-scheme] .hamburger span {
   .mobile-menu-links a {
     min-height: 50px;
     font-size: 15px;
+  }
+
+  .mobile-menu-body {
+    padding: 14px;
+  }
+
+  .mobile-menu-lang {
+    height: 50px !important;
+    min-height: 50px !important;
+  }
+}
+
+@media (max-height: 720px) {
+  .mobile-menu-head {
+    min-height: 68px;
+    padding-block: 12px;
+  }
+
+  .mobile-menu-body {
+    padding-block: 14px;
+  }
+
+  .mobile-menu-links {
+    gap: 7px;
+  }
+
+  .mobile-menu-links a {
+    min-height: 46px;
+    padding-block: 9px;
+  }
+
+  .mobile-menu-auth {
+    margin-top: 12px;
+  }
+
+  .mobile-menu-lang-wrap {
+    margin-top: 14px;
+    padding-top: 14px;
   }
 }
 
@@ -1032,9 +1131,9 @@ body.theme-dark .lang-dropdown button.active {
   min-height: 52px;
   margin-bottom: 10px;
   padding: 12px 14px;
-  border: 0;
+  border: 1px solid var(--theme-border);
   border-radius: 16px;
-  background: transparent;
+  background: var(--theme-surface-2);
   color: var(--theme-text);
   display: flex;
   align-items: center;
@@ -1042,6 +1141,14 @@ body.theme-dark .lang-dropdown button.active {
   gap: 14px;
   font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
   cursor: pointer;
+}
+
+.mobile-theme-toggle:hover {
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+  box-shadow: none;
+  transform: none;
 }
 
 .mobile-theme-toggle span {
@@ -1085,9 +1192,9 @@ body.theme-dark .mobile-menu-lang-wrap > span {
 [data-theme="dark"] .mobile-theme-toggle,
 body.theme-dark .mobile-menu-links a,
 body.theme-dark .mobile-theme-toggle {
-  background: transparent;
+  background: color-mix(in srgb, var(--theme-surface) 72%, transparent);
   color: var(--theme-text);
-  border-color: transparent;
+  border-color: var(--theme-border);
 }
 
 [data-theme="dark"] .mobile-theme-toggle strong,
@@ -1180,17 +1287,11 @@ html[data-darkreader-scheme] .mobile-menu-close {
     inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.06) !important;
 }
 
-:root[data-theme="dark"] .hamburger:hover,
 :root[data-theme="dark"] .hamburger.open,
-:root[data-theme="dark"] .mobile-menu-close:hover,
 :root[data-theme="dark"] .mobile-menu-close:focus-visible,
-html.theme-dark .hamburger:hover,
 html.theme-dark .hamburger.open,
-html.theme-dark .mobile-menu-close:hover,
 html.theme-dark .mobile-menu-close:focus-visible,
-body.theme-dark .hamburger:hover,
 body.theme-dark .hamburger.open,
-body.theme-dark .mobile-menu-close:hover,
 body.theme-dark .mobile-menu-close:focus-visible {
   background: var(--theme-primary-soft) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.34) !important;
@@ -1198,6 +1299,21 @@ body.theme-dark .mobile-menu-close:focus-visible {
   box-shadow:
     0 14px 30px rgba(var(--theme-black-rgb), 0.3),
     0 0 0 4px rgba(var(--theme-primary-rgb), 0.1) !important;
+}
+
+:root[data-theme="dark"] .hamburger:hover,
+:root[data-theme="dark"] .mobile-menu-close:hover,
+html.theme-dark .hamburger:hover,
+html.theme-dark .mobile-menu-close:hover,
+body.theme-dark .hamburger:hover,
+body.theme-dark .mobile-menu-close:hover {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--theme-surface) 98%, transparent), color-mix(in srgb, var(--theme-surface-2) 96%, transparent)) !important;
+  border-color: var(--theme-border-strong) !important;
+  color: var(--theme-text-soft) !important;
+  box-shadow:
+    0 14px 30px rgba(var(--theme-black-rgb), 0.28),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.06) !important;
 }
 
 :root[data-theme="dark"] .hamburger span,
@@ -1225,9 +1341,9 @@ html.theme-dark .header-theme-toggle:hover,
 html.theme-dark .mobile-theme-toggle:hover,
 body.theme-dark .header-theme-toggle:hover,
 body.theme-dark .mobile-theme-toggle:hover {
-  background: transparent !important;
-  border-color: transparent !important;
-  color: var(--theme-primary-hover) !important;
+  background: color-mix(in srgb, var(--theme-surface) 72%, transparent) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
 }
 
 :root[data-theme="dark"] .mobile-menu,
@@ -1254,15 +1370,21 @@ body.theme-dark .mobile-menu-links a {
   color: var(--theme-text) !important;
 }
 
-:root[data-theme="dark"] .mobile-menu-links a:hover,
 :root[data-theme="dark"] .mobile-menu-links a.active,
-html.theme-dark .mobile-menu-links a:hover,
 html.theme-dark .mobile-menu-links a.active,
-body.theme-dark .mobile-menu-links a:hover,
 body.theme-dark .mobile-menu-links a.active {
   background: var(--theme-primary-soft) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.34) !important;
   color: var(--theme-text-inverse) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .mobile-menu-links a:hover:not(.active),
+html.theme-dark .mobile-menu-links a:hover:not(.active),
+body.theme-dark .mobile-menu-links a:hover:not(.active) {
+  background: color-mix(in srgb, var(--theme-surface) 72%, transparent) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
   box-shadow: none !important;
 }
 
@@ -1288,25 +1410,99 @@ body.theme-dark .lang-dropdown button.active {
   color: var(--theme-text-soft) !important;
 }
 
+:root[data-theme="dark"] .mobile-menu-lang,
+html.theme-dark .mobile-menu-lang,
+body.theme-dark .mobile-menu-lang,
+:root[data-theme="dark"] .mobile-menu-lang:hover,
+html.theme-dark .mobile-menu-lang:hover,
+body.theme-dark .mobile-menu-lang:hover {
+  background: color-mix(in srgb, var(--theme-surface) 72%, transparent) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .mobile-menu-lang .language-toggle-animation,
+html.theme-dark .mobile-menu-lang .language-toggle-animation,
+body.theme-dark .mobile-menu-lang .language-toggle-animation {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary-hover) !important;
+}
+
+:root[data-theme="dark"] .mobile-menu-lang .language-toggle-current,
+html.theme-dark .mobile-menu-lang .language-toggle-current,
+body.theme-dark .mobile-menu-lang .language-toggle-current {
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .mobile-menu-lang .language-toggle-dot,
+html.theme-dark .mobile-menu-lang .language-toggle-dot,
+body.theme-dark .mobile-menu-lang .language-toggle-dot {
+  background: var(--theme-primary-hover) !important;
+  box-shadow: 0 0 0 4px var(--theme-primary-soft) !important;
+}
+
 .header-language-switcher.language-toggle-button,
 .header-language-switcher.language-toggle-button:hover,
+:root[data-theme="light"] .header-language-switcher.language-toggle-button,
+:root[data-theme="light"] .header-language-switcher.language-toggle-button:hover,
 :root[data-theme="dark"] .header-language-switcher.language-toggle-button,
 :root[data-theme="dark"] .header-language-switcher.language-toggle-button:hover,
 html.theme-dark .header-language-switcher.language-toggle-button,
 html.theme-dark .header-language-switcher.language-toggle-button:hover,
 body.theme-dark .header-language-switcher.language-toggle-button,
 body.theme-dark .header-language-switcher.language-toggle-button:hover {
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  grid-template-columns: 18px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  border-radius: 12px !important;
   border-color: transparent !important;
+  background: transparent !important;
   box-shadow: none !important;
+  transform: none !important;
+  color: var(--theme-text) !important;
+}
+
+.header-language-switcher.language-toggle-button:hover,
+.header-language-switcher.language-toggle-button:focus-visible,
+:root[data-theme="dark"] .header-language-switcher.language-toggle-button:hover,
+:root[data-theme="dark"] .header-language-switcher.language-toggle-button:focus-visible,
+html.theme-dark .header-language-switcher.language-toggle-button:hover,
+html.theme-dark .header-language-switcher.language-toggle-button:focus-visible,
+body.theme-dark .header-language-switcher.language-toggle-button:hover,
+body.theme-dark .header-language-switcher.language-toggle-button:focus-visible {
+  background: transparent !important;
+  color: var(--theme-primary-hover) !important;
 }
 
 .header-language-switcher .language-toggle-animation,
 :root[data-theme="dark"] .header-language-switcher .language-toggle-animation,
 html.theme-dark .header-language-switcher .language-toggle-animation,
 body.theme-dark .header-language-switcher .language-toggle-animation {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
   background: transparent !important;
   border: 0 !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
+  color: currentColor !important;
+}
+
+.header-language-switcher .language-toggle-animation svg {
+  width: 18px !important;
+  height: 18px !important;
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
+.header-language-switcher .language-toggle-current,
+.header-language-switcher .language-toggle-dot {
+  display: none !important;
 }
 
 :root[data-theme="dark"] .header-theme-toggle,
@@ -1316,4 +1512,77 @@ html.theme-dark .header-theme-toggle:hover,
 body.theme-dark .header-theme-toggle,
 body.theme-dark .header-theme-toggle:hover {
   border-color: transparent !important;
+}
+
+/* Public header: hover should not change visuals. */
+.site-header .brand,
+.site-header .nav-menu a,
+.site-header .nav-menu a::after,
+.site-header .btn-login,
+.site-header .btn-signup,
+.site-header .header-theme-toggle,
+.site-header .header-language-switcher.language-toggle-button,
+.site-header .header-language-switcher .language-toggle-animation,
+.site-header .hamburger {
+  transition: none !important;
+}
+
+.site-header .brand:hover,
+.site-header .nav-menu a:hover,
+.site-header .btn-login:hover,
+.site-header .btn-signup:hover,
+.site-header .header-theme-toggle:hover,
+.site-header .header-language-switcher.language-toggle-button:hover,
+.site-header .hamburger:hover,
+:root[data-theme="dark"] .site-header .nav-menu a:hover,
+html.theme-dark .site-header .nav-menu a:hover,
+body.theme-dark .site-header .nav-menu a:hover,
+:root[data-theme="dark"] .site-header .header-theme-toggle:hover,
+html.theme-dark .site-header .header-theme-toggle:hover,
+body.theme-dark .site-header .header-theme-toggle:hover,
+:root[data-theme="dark"] .site-header .header-language-switcher.language-toggle-button:hover,
+html.theme-dark .site-header .header-language-switcher.language-toggle-button:hover,
+body.theme-dark .site-header .header-language-switcher.language-toggle-button:hover {
+  transform: none !important;
+  background: inherit !important;
+  box-shadow: inherit !important;
+}
+
+.site-header .nav-menu a:hover:not(.active),
+:root[data-theme="dark"] .site-header .nav-menu a:hover:not(.active),
+html.theme-dark .site-header .nav-menu a:hover:not(.active),
+body.theme-dark .site-header .nav-menu a:hover:not(.active) {
+  color: var(--theme-text) !important;
+}
+
+.site-header .nav-menu a:hover:not(.active)::after {
+  width: 0 !important;
+}
+
+.site-header .btn-login:hover {
+  color: var(--theme-text) !important;
+  background: color-mix(in srgb, var(--theme-surface) 80%, transparent) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.site-header .btn-signup:hover {
+  color: var(--theme-text-inverse) !important;
+  background: var(--theme-gradient) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.32) !important;
+  box-shadow:
+    0 14px 28px rgba(var(--theme-primary-rgb), 0.24),
+    inset 0 1px 0 color-mix(in srgb, var(--theme-text-inverse) 16%, transparent) !important;
+}
+
+.site-header .header-theme-toggle:hover,
+.site-header .header-language-switcher.language-toggle-button:hover,
+:root[data-theme="dark"] .site-header .header-theme-toggle:hover,
+html.theme-dark .site-header .header-theme-toggle:hover,
+body.theme-dark .site-header .header-theme-toggle:hover,
+:root[data-theme="dark"] .site-header .header-language-switcher.language-toggle-button:hover,
+html.theme-dark .site-header .header-language-switcher.language-toggle-button:hover,
+body.theme-dark .site-header .header-language-switcher.language-toggle-button:hover {
+  color: var(--theme-text) !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }

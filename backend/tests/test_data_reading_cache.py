@@ -291,11 +291,54 @@ class DataReadingExcelSafetyTests(unittest.TestCase):
         temp_dir, _upload_root, xlsx_path = self._scoped_path("backslash.xlsx")
         with temp_dir:
             with zipfile.ZipFile(xlsx_path, "w") as archive:
-                archive.writestr("xl\\evil.xml", "bad")
+                archive.writestr("xl/evil.xml", "bad")
+            xlsx_path.write_bytes(xlsx_path.read_bytes().replace(b"xl/evil.xml", b"xl\\evil.xml"))
 
             reader = DataReadingNormal("uploads/fake.csv")
             with self.assertRaisesRegex(ValueError, "unsafe ZIP entry path"):
                 reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_with_absolute_entry_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("absolute.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w") as archive:
+                archive.writestr("/xl/evil.xml", "bad")
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with self.assertRaisesRegex(ValueError, "unsafe ZIP entry path"):
+                reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_with_windows_drive_entry_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("drive.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w") as archive:
+                archive.writestr("C:/evil.xml", "bad")
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with self.assertRaisesRegex(ValueError, "unsafe ZIP entry path"):
+                reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_with_long_zip_entry_name_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("long-name.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w") as archive:
+                archive.writestr(f"xl/{'a' * 64}.xml", "bad")
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with patch.object(DataReadingNormal, "MAX_EXCEL_ZIP_ENTRY_NAME_CHARS", 20):
+                with self.assertRaisesRegex(ValueError, "unsafe ZIP entry path"):
+                    reader._validate_xlsx_file(xlsx_path)
+
+    def test_xlsx_zip_bomb_ratio_is_rejected(self):
+        temp_dir, _upload_root, xlsx_path = self._scoped_path("ratio.xlsx")
+        with temp_dir:
+            with zipfile.ZipFile(xlsx_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("xl/worksheets/sheet1.xml", "x" * (1024 * 1024 + 1))
+
+            reader = DataReadingNormal("uploads/fake.csv")
+            with patch.object(DataReadingNormal, "MAX_EXCEL_ZIP_COMPRESSION_RATIO", 2):
+                with self.assertRaisesRegex(ValueError, "suspicious compression ratio"):
+                    reader._validate_xlsx_file(xlsx_path)
 
     def test_workbook_with_too_many_sheets_is_rejected(self):
         temp_dir, _upload_root, xlsx_path = self._scoped_path("sheets.xlsx")
@@ -341,6 +384,88 @@ class DataReadingExcelSafetyTests(unittest.TestCase):
 
         self.assertIsInstance(context.exception.__cause__, ValueError)
         self.assertIn("Excel cell text is too large", str(context.exception.__cause__))
+
+    def test_valid_small_csv_is_accepted(self):
+        temp_dir, upload_root, csv_path = self._scoped_path("small.csv")
+        with temp_dir:
+            csv_path.write_text("name,value\nA,1\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"DATA_UPLOAD_DIR": str(upload_root)}, clear=False):
+                reader = DataReadingNormal(str(csv_path), tenant_id=1, user_id=2)
+                df = reader.read()
+
+        self.assertEqual(df.to_dict("records"), [{"name": "A", "value": 1}])
+
+    def test_empty_csv_is_rejected(self):
+        reader = DataReadingNormal("uploads/fake.csv")
+
+        with self.assertRaisesRegex(ValueError, "CSV file is empty"):
+            reader._read_csv_bytes(b"")
+
+    def test_oversized_csv_is_rejected(self):
+        reader = DataReadingNormal("uploads/fake.csv")
+
+        with patch.object(DataReadingNormal, "MAX_CSV_BYTES", 8):
+            with self.assertRaisesRegex(ValueError, "CSV file is too large"):
+                reader._read_csv_bytes(b"name,value\nA,1\n")
+
+    def test_binary_csv_is_rejected(self):
+        reader = DataReadingNormal("uploads/fake.csv")
+
+        with self.assertRaisesRegex(ValueError, "binary"):
+            reader._read_csv_bytes(b"name,value\nA,\x00\x01\x02\n")
+
+    def test_csv_cell_text_limit_is_enforced(self):
+        reader = DataReadingNormal("uploads/fake.csv")
+
+        with patch.object(DataReadingNormal, "MAX_CELL_CHARS", 4):
+            with self.assertRaisesRegex(ValueError, "cell text is too large"):
+                reader._read_csv_bytes(b"name\nabcdef\n")
+
+    def test_parser_workspace_is_cleaned_after_success(self):
+        temp_dir, upload_root, csv_path = self._scoped_path("workspace-success.csv")
+        workspace_root = Path(tempfile.mkdtemp())
+        try:
+            with temp_dir:
+                csv_path.write_text("name,value\nA,1\n", encoding="utf-8")
+
+                with patch.dict(
+                    "os.environ",
+                    {
+                        "DATA_UPLOAD_DIR": str(upload_root),
+                        "MADAR_UPLOAD_WORKSPACE_DIR": str(workspace_root),
+                    },
+                    clear=False,
+                ), patch.object(DataReadingNormal, "PARSER_WORKSPACE_BASE", str(workspace_root)):
+                    reader = DataReadingNormal(str(csv_path), tenant_id=1, user_id=2)
+                    reader.read()
+
+            self.assertEqual(list(workspace_root.iterdir()), [])
+        finally:
+            workspace_root.rmdir()
+
+    def test_parser_workspace_is_cleaned_after_failure(self):
+        temp_dir, upload_root, csv_path = self._scoped_path("workspace-failure.csv")
+        workspace_root = Path(tempfile.mkdtemp())
+        try:
+            with temp_dir:
+                csv_path.write_bytes(b"\x00\x01not-csv")
+
+                with patch.dict(
+                    "os.environ",
+                    {
+                        "DATA_UPLOAD_DIR": str(upload_root),
+                        "MADAR_UPLOAD_WORKSPACE_DIR": str(workspace_root),
+                    },
+                    clear=False,
+                ), patch.object(DataReadingNormal, "PARSER_WORKSPACE_BASE", str(workspace_root)):
+                    reader = DataReadingNormal(str(csv_path), tenant_id=1, user_id=2)
+                    with self.assertRaisesRegex(RuntimeError, "Failed to read data"):
+                        reader.read()
+
+            self.assertEqual(list(workspace_root.iterdir()), [])
+        finally:
+            workspace_root.rmdir()
 
 
 if __name__ == "__main__":

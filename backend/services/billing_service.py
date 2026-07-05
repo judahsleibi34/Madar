@@ -11,7 +11,15 @@ from database import service_supabase
 logger = logging.getLogger(__name__)
 
 
-FULL_PLATFORM_PLANS = {"starter", "pro", "business"}
+FULL_PLATFORM_PLANS = {
+    "starter",
+    "pro",
+    "business",
+    "cms",
+    "forms_data",
+    "cms_plus",
+    "complete",
+}
 BUILDER_PLANS = {"basic", "premium"}
 BUILDER_TYPES = {"website", "forms", "quiz", "reservation", "reports", "data"}
 PAYMENT_STATUSES = {"pending", "active", "past_due", "canceled"}

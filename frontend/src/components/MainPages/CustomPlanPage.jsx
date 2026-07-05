@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPricingContent } from "../../content";
+import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
 import SubscriptionStatusModal from "./SubscriptionStatusModal";
 
 export default function CustomPlanPage({ lang = "en" }) {
@@ -59,8 +60,8 @@ export default function CustomPlanPage({ lang = "en" }) {
       message: "",
     });
 
-    if (type === "success") navigate("/my-plan");
-    if (type === "login") navigate("/login");
+    if (type === "success") navigate(DASHBOARD_ROUTES.myPlan);
+    if (type === "login") navigate(PUBLIC_ROUTES.login);
   };
 
   return (
@@ -69,9 +70,9 @@ export default function CustomPlanPage({ lang = "en" }) {
         <button
           type="button"
           className="pricing-back-button"
-          onClick={() => navigate("/pricing")}
+          onClick={() => navigate(PUBLIC_ROUTES.pricing)}
         >
-          ← {isArabic ? "رجوع" : "Back"}
+          {"<- "}{isArabic ? "ط±ط¬ظˆط¹" : "Back"}
         </button>
 
         <div className="pricing-section-heading">

@@ -1,8 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, useCallback, useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
+import PageSkeleton from "./components/common/PageSkeleton";
+import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
 import { DashboardLoadingElement } from "./routes/shared";
@@ -545,10 +547,14 @@ export default function App() {
       labels={dashboardLoadingLabels}
       lang={lang}
     />
+  ) : isTenantSiteRoute ? (
+    <PageSkeleton
+      label="Loading site"
+      lang={lang}
+      variant="tenant-runtime"
+    />
   ) : (
-    <div className="route-loading" role="status" aria-live="polite">
-      Loading...
-    </div>
+    <PageSkeleton label={t("common:actions.loading")} lang={lang} variant="public-page" />
   );
 
   let routeContent;
@@ -609,7 +615,9 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
-      <Suspense fallback={routeFallback}>{routeContent}</Suspense>
+      <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page">
+        {routeContent}
+      </RouteSuspense>
     </>
   );
 }

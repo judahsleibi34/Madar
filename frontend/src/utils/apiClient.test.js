@@ -6,6 +6,7 @@ import {
   postAuthJson,
   postPublicJson,
   readApiError,
+  readApiErrorCode,
   readApiResponse,
   setCsrfToken,
 } from "./apiClient";
@@ -49,6 +50,7 @@ describe("apiClient response readers", () => {
 
   it("readApiError extracts useful messages from JSON-like error payloads", () => {
     expect(readApiError({ detail: "Invalid email" })).toBe("Invalid email");
+    expect(readApiError({ detail: { code: "CONTACT_NAME_REQUIRED", message: "Name is required" } })).toBe("Name is required");
     expect(readApiError({ message: "Server unavailable" })).toBe("Server unavailable");
     expect(
       readApiError({
@@ -151,6 +153,13 @@ describe("apiFetch session refresh", () => {
     expect(await response.text()).toBe("expired");
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetchCall(1)[0]).toBe("/api/auth/refresh");
+  });
+
+  it("readApiErrorCode extracts stable backend error codes", () => {
+    expect(readApiErrorCode({ code: "CONTACT_RECEIVED" })).toBe("CONTACT_RECEIVED");
+    expect(readApiErrorCode({ detail: { code: "CONTACT_NAME_REQUIRED" } })).toBe("CONTACT_NAME_REQUIRED");
+    expect(readApiErrorCode({ error: { code: "CONTACT_SUBMIT_FAILED" } })).toBe("CONTACT_SUBMIT_FAILED");
+    expect(readApiErrorCode({ detail: "Name is required" })).toBe("");
   });
 
   it("retries an unsafe request once after refreshing an invalid CSRF token", async () => {
