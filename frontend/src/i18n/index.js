@@ -36,7 +36,7 @@ export const SUPPORTED_LANGUAGES = {
   },
   ar: {
     code: "ar",
-    label: "العربية",
+    label: "\u0627\u0644\u0639\u0631\u0628\u064a\u0629",
     dir: "rtl",
   },
 };

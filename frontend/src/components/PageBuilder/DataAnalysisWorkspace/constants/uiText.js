@@ -227,6 +227,7 @@ export const uiText = {
     reportWaiting: "Create a report to display results here.",
     loadDataBeforeReview: "Load data before reviewing it.",
     loadDataBeforeAnalysis: "Load data before creating a report.",
+    loadDataFailed: "The data could not be loaded.",
     generateMetricsFirst: "Create metrics after cleaning your data before opening Charts or Report.",
     missingRequiredFields: (fields) => `Please choose the required fields first: ${fields.join(", ")}.`,
     chooseFileFirst: "Choose a file first.",

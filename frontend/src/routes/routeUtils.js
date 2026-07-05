@@ -1,3 +1,5 @@
+import { DASHBOARD_ROUTES, POST_LOGIN_FALLBACK_ROUTE } from "../config/routes";
+
 export function normalizeUserType(value) {
   return String(value || "user").trim().toLowerCase();
 }
@@ -8,15 +10,15 @@ export function isTenantSiteRoutePath(pathname) {
 
 export function isDashboardRoutePath(pathname) {
   return (
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/page-builder") ||
-    pathname.startsWith("/builder-responses") ||
-    pathname.startsWith("/builder-data") ||
-    pathname.startsWith("/notifications") ||
-    pathname.startsWith("/my-plan") ||
-    pathname.startsWith("/admin/users") ||
-    pathname.startsWith("/admin/account-access") ||
-    pathname.startsWith("/settings")
+    pathname.startsWith(DASHBOARD_ROUTES.dashboard) ||
+    pathname.startsWith(DASHBOARD_ROUTES.pageBuilder) ||
+    pathname.startsWith(DASHBOARD_ROUTES.builderResponses) ||
+    pathname.startsWith(DASHBOARD_ROUTES.builderData) ||
+    pathname.startsWith(DASHBOARD_ROUTES.notifications) ||
+    pathname.startsWith(DASHBOARD_ROUTES.myPlan) ||
+    pathname.startsWith(DASHBOARD_ROUTES.adminUsers) ||
+    pathname.startsWith(DASHBOARD_ROUTES.adminAccountAccess) ||
+    pathname.startsWith(DASHBOARD_ROUTES.settings)
   );
 }
 
@@ -27,16 +29,19 @@ export function getSafePostLoginPath(userInfo, returnTo) {
   let nextPath =
     returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
       ? returnTo
-      : "/dashboard";
+      : POST_LOGIN_FALLBACK_ROUTE;
 
-  const adminOnlyPaths = ["/admin/users", "/admin/account-access"];
+  const adminOnlyPaths = [
+    DASHBOARD_ROUTES.adminUsers,
+    DASHBOARD_ROUTES.adminAccountAccess,
+  ];
 
   const userOnlyPaths = [
-    "/page-builder",
-    "/builder-responses",
-    "/builder-data",
-    "/my-plan",
-    "/settings",
+    DASHBOARD_ROUTES.pageBuilder,
+    DASHBOARD_ROUTES.builderResponses,
+    DASHBOARD_ROUTES.builderData,
+    DASHBOARD_ROUTES.myPlan,
+    DASHBOARD_ROUTES.settings,
   ];
 
   const isAdminOnlyPath = adminOnlyPaths.some((path) =>
@@ -48,11 +53,11 @@ export function getSafePostLoginPath(userInfo, returnTo) {
   );
 
   if (nextUserIsAdmin && isUserOnlyPath) {
-    nextPath = "/dashboard";
+    nextPath = POST_LOGIN_FALLBACK_ROUTE;
   }
 
   if (!nextUserIsAdmin && isAdminOnlyPath) {
-    nextPath = "/dashboard";
+    nextPath = POST_LOGIN_FALLBACK_ROUTE;
   }
 
   return nextPath;

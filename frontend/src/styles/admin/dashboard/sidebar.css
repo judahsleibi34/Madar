@@ -1104,3 +1104,22 @@ img.admin-sidebar-avatar {
 .admin-sidebar .admin-sidebar-avatar {
   flex: 0 0 auto !important;
 }
+
+/* Final brand cleanup: keep only the logo and name, with no card background. */
+.admin-sidebar .admin-sidebar-brand,
+.admin-sidebar .admin-sidebar-brand:hover,
+.admin-sidebar .admin-sidebar-brand:focus-visible,
+.admin-sidebar .admin-sidebar-brand.active,
+.theme-dark .admin-sidebar .admin-sidebar-brand,
+.theme-dark .admin-sidebar .admin-sidebar-brand:hover,
+[data-theme="dark"] .admin-sidebar .admin-sidebar-brand,
+[data-theme="dark"] .admin-sidebar .admin-sidebar-brand:hover {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.admin-sidebar .admin-sidebar-brand:hover,
+.admin-sidebar .admin-sidebar-brand:focus-visible {
+  transform: none !important;
+}

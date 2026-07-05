@@ -2,12 +2,17 @@ import math
 import ipaddress
 import os
 import re
+import shutil
 import socket
+import struct
+import tempfile
 import time
 import zipfile
+from contextlib import contextmanager
 from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
+from typing import Iterator
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import openpyxl
@@ -32,15 +37,21 @@ class DataReadingNormal:
     SHARED_CACHE_MAX_ITEMS = int(os.getenv("DATAFRAME_CACHE_MAX_ITEMS", "16"))
     URL_CACHE_SECONDS = int(os.getenv("DATAFRAME_URL_CACHE_SECONDS", "60"))
     MAX_REMOTE_BYTES = int(os.getenv("MAX_REMOTE_DATA_BYTES", str(10 * 1024 * 1024)))
+    MAX_CSV_BYTES = int(os.getenv("MAX_CSV_BYTES", str(10 * 1024 * 1024)))
     MAX_ROWS = int(os.getenv("DATAFRAME_MAX_ROWS", "100000"))
     MAX_COLUMNS = int(os.getenv("DATAFRAME_MAX_COLUMNS", "500"))
+    MAX_CELL_CHARS = int(os.getenv("DATAFRAME_MAX_CELL_CHARS", "10000"))
+    MAX_TOTAL_CELL_CHARS = int(os.getenv("DATAFRAME_MAX_TOTAL_CELL_CHARS", str(10 * 1024 * 1024)))
     MAX_EXCEL_FILE_BYTES = int(os.getenv("MAX_EXCEL_FILE_BYTES", str(10 * 1024 * 1024)))
     MAX_EXCEL_UNCOMPRESSED_BYTES = int(os.getenv("MAX_EXCEL_UNCOMPRESSED_BYTES", str(50 * 1024 * 1024)))
     MAX_EXCEL_ZIP_ENTRIES = int(os.getenv("MAX_EXCEL_ZIP_ENTRIES", "200"))
+    MAX_EXCEL_ZIP_ENTRY_NAME_CHARS = int(os.getenv("MAX_EXCEL_ZIP_ENTRY_NAME_CHARS", "240"))
+    MAX_EXCEL_ZIP_COMPRESSION_RATIO = float(os.getenv("MAX_EXCEL_ZIP_COMPRESSION_RATIO", "100"))
     MAX_EXCEL_SHEETS = int(os.getenv("MAX_EXCEL_SHEETS", "20"))
     MAX_EXCEL_ROWS = int(os.getenv("MAX_EXCEL_ROWS", "100000"))
     MAX_EXCEL_COLUMNS = int(os.getenv("MAX_EXCEL_COLUMNS", "1000"))
     MAX_EXCEL_CELL_CHARS = int(os.getenv("MAX_EXCEL_CELL_CHARS", "10000"))
+    PARSER_WORKSPACE_BASE = os.getenv("MADAR_UPLOAD_WORKSPACE_DIR", os.path.join(tempfile.gettempdir(), "madar_uploads"))
     REMOTE_DATASET_URLS_DISABLED_MESSAGE = (
         "Remote dataset URLs are disabled. Upload a CSV/XLS/XLSX file instead."
     )
@@ -128,22 +139,23 @@ class DataReadingNormal:
         safe_path = self._resolve_uploaded_file(file_path)
         extension = self._get_extension(str(safe_path))
 
-        if extension == ".csv":
-            with open(safe_path, "rb") as file:
-                return self._read_csv_bytes(file.read())
+        with self._isolated_parser_workspace(safe_path) as workspace_path:
+            if extension == ".csv":
+                with open(workspace_path, "rb") as file:
+                    return self._read_csv_bytes(file.read())
 
-        if extension == ".xlsx":
-            self._validate_xlsx_file(safe_path)
-            self._validate_xlsx_workbook(safe_path)
-            df = pd.read_excel(safe_path, engine="openpyxl")
-            self._validate_excel_dataframe(df)
-            return self._normalize_dataframe(df)
+            if extension == ".xlsx":
+                self._validate_xlsx_file(workspace_path)
+                self._validate_xlsx_workbook(workspace_path)
+                df = pd.read_excel(workspace_path, engine="openpyxl")
+                self._validate_excel_dataframe(df)
+                return self._normalize_dataframe(df)
 
-        if extension == ".xls":
-            self._validate_excel_file_size(safe_path.stat().st_size)
-            df = pd.read_excel(safe_path)
-            self._validate_excel_dataframe(df)
-            return self._normalize_dataframe(df)
+            if extension == ".xls":
+                self._validate_excel_file_size(workspace_path.stat().st_size)
+                df = pd.read_excel(workspace_path)
+                self._validate_excel_dataframe(df)
+                return self._normalize_dataframe(df)
 
         raise ValueError(
             f"Unsupported file format: {extension}. "
@@ -218,7 +230,35 @@ class DataReadingNormal:
             return BytesIO(source)
         return source
 
+    def _zip_source_bytes(self, source) -> bytes:
+        if isinstance(source, (bytes, bytearray)):
+            return bytes(source)
+
+        with open(source, "rb") as file:
+            return file.read()
+
+    @contextmanager
+    def _isolated_parser_workspace(self, source_path: Path) -> Iterator[Path]:
+        # TODO: move parsing into a no-network, resource-limited worker/container.
+        # This workspace provides application-level file isolation until then.
+        base_dir = Path(self.PARSER_WORKSPACE_BASE).resolve()
+        base_dir.mkdir(parents=True, exist_ok=True)
+        workspace = Path(
+            tempfile.mkdtemp(prefix="parse_", suffix="_job", dir=str(base_dir))
+        ).resolve()
+
+        try:
+            workspace_file = workspace / f"dataset{source_path.suffix.lower()}"
+            shutil.copy2(source_path, workspace_file)
+            yield workspace_file
+        finally:
+            shutil.rmtree(workspace, ignore_errors=True)
+
     def _validate_xlsx_file(self, source) -> None:
+        if not isinstance(source, (bytes, bytearray)):
+            self._validate_excel_file_size(Path(source).stat().st_size)
+        self._validate_raw_zip_entry_names(source)
+
         try:
             with zipfile.ZipFile(self._zip_source(source)) as workbook_zip:
                 entries = workbook_zip.infolist()
@@ -239,19 +279,96 @@ class DataReadingNormal:
             raise ValueError("Invalid or corrupt Excel workbook") from error
 
     def _validate_xlsx_zip_entry(self, entry: zipfile.ZipInfo) -> None:
-        filename = entry.filename or ""
+        raw_filename = str(getattr(entry, "orig_filename", "") or entry.filename or "")
+        filename = str(entry.filename or "")
 
         if entry.flag_bits & 0x1:
             raise ValueError("Encrypted Excel workbooks are not supported")
+
+        external_file_type = (entry.external_attr >> 16) & 0o170000
+        if external_file_type in {0o120000, 0o020000, 0o060000}:
+            raise ValueError("Excel workbook contains an unsafe ZIP entry type")
+
+        compressed_size = int(entry.compress_size or 0)
+        uncompressed_size = int(entry.file_size or 0)
+
+        if (
+            compressed_size > 0
+            and uncompressed_size / compressed_size > self.MAX_EXCEL_ZIP_COMPRESSION_RATIO
+            and uncompressed_size > 1024 * 1024
+        ):
+            raise ValueError("Excel workbook has a suspicious compression ratio")
+
+        if uncompressed_size > self.MAX_EXCEL_UNCOMPRESSED_BYTES:
+            raise ValueError("Excel workbook is too large after decompression")
+
+        self._validate_xlsx_zip_entry_name(raw_filename)
+        self._validate_xlsx_zip_entry_name(filename)
+
+    def _validate_xlsx_zip_entry_name(self, filename: str) -> None:
+        if len(filename) > self.MAX_EXCEL_ZIP_ENTRY_NAME_CHARS:
+            raise ValueError("Excel workbook contains an unsafe ZIP entry path")
 
         if (
             not filename
             or filename.startswith(("/", "\\"))
             or "\\" in filename
             or "//" in filename
+            or re.match(r"^[A-Za-z]:", filename)
+            or ":" in filename.split("/", 1)[0]
+            or any(part == "" for part in filename.split("/"))
             or any(part in {".", ".."} for part in filename.split("/"))
         ):
             raise ValueError("Excel workbook contains an unsafe ZIP entry path")
+
+    def _validate_raw_zip_entry_names(self, source) -> None:
+        data = self._zip_source_bytes(source)
+        for raw_name in self._iter_raw_zip_entry_names(data):
+            try:
+                filename = raw_name.decode("utf-8")
+            except UnicodeDecodeError:
+                filename = raw_name.decode("cp437", errors="replace")
+            self._validate_xlsx_zip_entry_name(filename)
+
+    def _iter_raw_zip_entry_names(self, data: bytes):
+        signatures = (b"PK\x03\x04", b"PK\x01\x02")
+        index = 0
+
+        while index < len(data):
+            positions = [data.find(signature, index) for signature in signatures]
+            positions = [position for position in positions if position >= 0]
+            if not positions:
+                break
+
+            position = min(positions)
+            signature = data[position:position + 4]
+
+            try:
+                if signature == b"PK\x03\x04":
+                    if position + 30 > len(data):
+                        break
+                    name_length, extra_length = struct.unpack_from("<HH", data, position + 26)
+                    name_start = position + 30
+                    next_index = name_start + name_length + extra_length
+                elif signature == b"PK\x01\x02":
+                    if position + 46 > len(data):
+                        break
+                    name_length, extra_length, comment_length = struct.unpack_from(
+                        "<HHH", data, position + 28
+                    )
+                    name_start = position + 46
+                    next_index = name_start + name_length + extra_length + comment_length
+                else:
+                    index = position + 1
+                    continue
+
+                name_end = name_start + name_length
+                if name_length and name_end <= len(data):
+                    yield data[name_start:name_end]
+
+                index = max(next_index, position + 4)
+            except struct.error:
+                break
 
     def _validate_xlsx_workbook(self, source) -> None:
         try:
@@ -294,6 +411,11 @@ class DataReadingNormal:
         if not content:
             raise ValueError("CSV file is empty.")
 
+        if len(content) > self.MAX_CSV_BYTES:
+            raise ValueError("CSV file is too large.")
+
+        self._reject_binary_csv(content)
+
         last_error = None
 
         for encoding in self.CSV_ENCODINGS:
@@ -302,10 +424,24 @@ class DataReadingNormal:
                 return self._normalize_dataframe(df)
             except UnicodeDecodeError as error:
                 last_error = error
+            except ValueError:
+                raise
             except Exception as error:
                 last_error = error
 
         raise ValueError(f"Could not read CSV with supported encodings: {last_error}")
+
+    def _reject_binary_csv(self, content: bytes) -> None:
+        sample = content[:4096]
+        if b"\x00" in sample:
+            raise ValueError("CSV file appears to be binary.")
+
+        if sample:
+            control_bytes = sum(
+                1 for byte in sample if byte < 32 and byte not in {9, 10, 13}
+            )
+            if control_bytes / len(sample) > 0.05:
+                raise ValueError("CSV file appears to be binary.")
 
     def _normalize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
@@ -318,6 +454,16 @@ class DataReadingNormal:
 
         if len(df.columns) > self.MAX_COLUMNS:
             raise ValueError("Dataset has too many columns")
+
+        total_cell_chars = 0
+        for value in df.to_numpy(dtype=object).flat:
+            if isinstance(value, str):
+                value_length = len(value)
+                if value_length > self.MAX_CELL_CHARS:
+                    raise ValueError("Dataset cell text is too large")
+                total_cell_chars += value_length
+                if total_cell_chars > self.MAX_TOTAL_CELL_CHARS:
+                    raise ValueError("Dataset text is too large")
 
         cleaned_columns = []
         seen = {}

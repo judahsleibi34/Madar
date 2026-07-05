@@ -1,20 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Baseline,
+  Bold,
   Copy,
   FilePlus2,
+  Highlighter,
+  Italic,
   LayoutTemplate,
+  List,
+  ListOrdered,
   Move,
-  Trash2,
+  Redo2,
+  Underline,
+  Undo2,
 } from "lucide-react";
 import "../../../styles/admin/PageBuilder/index.css";
+import {
+  deferEffectStateUpdate,
+  normalizeRuntimeAnswerValue,
+} from "./pageBuilderWorkspace.helpers";
 import {
   STORAGE_KEY,
   viewports,
   builderTabs,
-  sectionWidths,
-  spacingOptions,
-  columnOptions,
   alignmentOptions,
   elementTypes,
   fieldTypes,
@@ -30,8 +43,6 @@ import {
   getFormSections,
   getFormFields,
   createElement,
-  createColumn,
-  createRow,
   createSection,
   createPage,
   createRole,
@@ -40,28 +51,6 @@ import {
   cloneWithNewIds,
   createPosition,
 } from "../core/PageBuilder.factories";
-
-function normalizeRuntimeAnswerValue(value) {
-  if (Array.isArray(value)) {
-    return value.map(normalizeRuntimeAnswerValue);
-  }
-
-  if (value && typeof value === "object" && "value" in value) {
-    return value.value;
-  }
-
-  return value;
-}
-
-const deferEffectStateUpdate = (callback) => {
-  let cancelled = false;
-  queueMicrotask(() => {
-    if (!cancelled) callback();
-  });
-  return () => {
-    cancelled = true;
-  };
-};
 import {
   heroSection,
   formSection,
@@ -70,8 +59,9 @@ import {
 } from "../core/PageBuilder.starters";
 import { sanitizeSubdomain } from "../core/PageBuilder.routing";
 import { parseCarouselSlides, serializeCarouselSlides } from "../ui/PageBuilderCarousel.utils";
-import PageBuilderTopbar from "../ui/PageBuilderTopbar";
-import PageBuilderSubbar from "../ui/PageBuilderSubbar";
+import PageBuilderModals from "./PageBuilderModals";
+import PageBuilderStatusBar from "./PageBuilderStatusBar";
+import PageBuilderWorkspaceHeader from "./PageBuilderWorkspaceHeader";
 import {
   FormsTab,
   ReservationsTab,
@@ -82,7 +72,6 @@ import {
   PublishTab,
   WorkflowsTab,
 } from "../tabs";
-import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
 import {
   createBuilderProject,
   fetchBuilderProject,
@@ -222,6 +211,12 @@ const builderTabPathById = {
   workflows: "/page-builder/workflows",
 };
 
+const builderDesignPanelPathById = {
+  Pages: "/page-builder/pages",
+  Sections: "/page-builder/pages/sections",
+  Themes: "/page-builder/pages/themes",
+};
+
 const builderTabIdByPathSegment = {
   pages: "design",
   design: "design",
@@ -232,10 +227,10 @@ const builderTabIdByPathSegment = {
   header: "chrome",
   footer: "chrome",
   users: "users",
-  theme: "theme",
-  themes: "theme",
-  "website-theme": "theme",
-  "site-theme": "theme",
+  theme: "design",
+  themes: "design",
+  "website-theme": "design",
+  "site-theme": "design",
   publish: "publish",
   data: "data",
   responses: "responses",
@@ -243,11 +238,38 @@ const builderTabIdByPathSegment = {
 };
 
 const STARTER_MODAL_DISMISSED_KEY = `${STORAGE_KEY}:starter-template-selected`;
+const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
+
+const inlineTextElementTypes = new Set(["heading", "text", "button", "list"]);
+
+const inlineTextToolbarButtons = [
+  { id: "undo", icon: Undo2, label: "Undo" },
+  { id: "redo", icon: Redo2, label: "Redo" },
+  { id: "bold", icon: Bold, label: "Bold" },
+  { id: "italic", icon: Italic, label: "Italic" },
+  { id: "underline", icon: Underline, label: "Underline" },
+  { id: "bullets", icon: List, label: "Bullets" },
+  { id: "numbers", icon: ListOrdered, label: "Numbers" },
+  { id: "align-left", icon: AlignLeft, label: "Align left" },
+  { id: "align-center", icon: AlignCenter, label: "Align center" },
+  { id: "align-right", icon: AlignRight, label: "Align right" },
+  { id: "align-justify", icon: AlignJustify, label: "Justify" },
+];
 
 const getBuilderTabFromPath = (pathname = "") => {
   const match = pathname.match(/^\/page-builder\/([^/?#]+)/);
   if (!match) return null;
   return builderTabIdByPathSegment[match[1]] || null;
+};
+
+const getBuilderDesignPanelFromPath = (pathname = "") => {
+  if (/^\/page-builder\/(?:theme|themes|website-theme|site-theme)(?:[/?#]|$)/.test(pathname)) {
+    return "Themes";
+  }
+  const match = pathname.match(/^\/page-builder\/(?:pages|design)\/([^/?#]+)/);
+  if (match?.[1] === "themes") return "Themes";
+  if (match?.[1] === "sections") return "Sections";
+  return "Pages";
 };
 
 const hasStoredStarterChoice = () => {
@@ -319,10 +341,12 @@ export default function PageBuilder({
   const location = useLocation();
   const navigate = useNavigate();
   const routeTab = getBuilderTabFromPath(location.pathname);
+  const routeDesignPanel = getBuilderDesignPanelFromPath(location.pathname);
   const [project, setProject] = useState(() =>
     demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
   );
   const persistProjectNow = useDebouncedProjectStorage({
+    delay: 120,
     disabled: demoMode,
     project,
     storageKey: STORAGE_KEY,
@@ -340,10 +364,9 @@ export default function PageBuilder({
   const [dragState, setDragState] = useState(null);
   const [paletteDropSectionId, setPaletteDropSectionId] = useState("");
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
-  const [sectionPendingDelete, setSectionPendingDelete] = useState(null);
-  const [pagePendingDelete, setPagePendingDelete] = useState(null);
   const [userPendingDelete, setUserPendingDelete] = useState(null);
   const [previewOverlapWarnings, setPreviewOverlapWarnings] = useState([]);
+  const [isPhoneDevice, setIsPhoneDevice] = useState(isPhysicalPhoneDevice);
   const [, setInsertTarget] = useState(null);
   const [runtimeAnswers, setRuntimeAnswers] = useState({});
   const [runtimeErrors, setRuntimeErrors] = useState({});
@@ -357,6 +380,8 @@ export default function PageBuilder({
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
+  const projectRef = useRef(project);
+  const userId = user?.id;
   const [textSelection, setTextSelection] = useState(null);
   const pendingTabNavigationRef = useRef("");
   const backendAutosaveTimerRef = useRef(null);
@@ -396,17 +421,39 @@ export default function PageBuilder({
   );
 
   useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+
+  useEffect(() => {
+    const syncPhoneDevice = () => {
+      setIsPhoneDevice(isPhysicalPhoneDevice());
+    };
+
+    syncPhoneDevice();
+    window.addEventListener("resize", syncPhoneDevice);
+    window.addEventListener("orientationchange", syncPhoneDevice);
+
+    return () => {
+      window.removeEventListener("resize", syncPhoneDevice);
+      window.removeEventListener("orientationchange", syncPhoneDevice);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!routeTab) return;
     if (pendingTabNavigationRef.current) return;
 
     return deferEffectStateUpdate(() => {
       setActiveTabState(routeTab);
+      if (routeTab === "design") {
+        setDesignPanel(routeDesignPanel);
+      }
       if (routeTab !== "design" && modal === "starter") {
         setModal(null);
         setActiveTopbarAction("");
       }
     });
-  }, [modal, routeTab]);
+  }, [modal, routeDesignPanel, routeTab]);
 
   useEffect(() => {
     if (hideWorkspaceTabs || routeTab) return;
@@ -434,11 +481,14 @@ export default function PageBuilder({
 
     if (routeTab && routeTab !== activeTab) return;
 
-    const nextPath = builderTabPathById[activeTab];
+    const nextPath =
+      activeTab === "design"
+        ? builderDesignPanelPathById[designPanel] || builderTabPathById.design
+        : builderTabPathById[activeTab];
     if (nextPath && location.pathname !== nextPath) {
       navigate(nextPath, { replace: true });
     }
-  }, [activeTab, hideWorkspaceTabs, location.pathname, navigate, routeTab]);
+  }, [activeTab, designPanel, hideWorkspaceTabs, location.pathname, navigate, routeTab]);
 
   useEffect(() => {
     const requiresLayoutNormalization =
@@ -472,8 +522,10 @@ export default function PageBuilder({
 
           return currentSerialized === nextSerialized ? currentProject : nextProject;
         });
-      } catch (error) {
-        console.warn("Could not sync builder draft from another tab:", error);
+      } catch {
+        if (import.meta.env.DEV) {
+          console.warn("Could not sync builder draft from another tab.");
+        }
       }
     };
 
@@ -490,10 +542,23 @@ export default function PageBuilder({
       if (document.visibilityState === "visible") syncDraftFromStorage();
     };
 
+    const draftSyncChannel =
+      typeof BroadcastChannel === "undefined"
+        ? null
+        : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
+
+    const handleBroadcastDraftUpdate = (event) => {
+      if (event.data?.storageKey !== STORAGE_KEY) return;
+      syncSerializedProject(event.data.serializedProject);
+    };
+
+    draftSyncChannel?.addEventListener("message", handleBroadcastDraftUpdate);
     window.addEventListener("storage", handleDraftStorageUpdate);
     window.addEventListener("focus", syncDraftFromStorage);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
+      draftSyncChannel?.removeEventListener("message", handleBroadcastDraftUpdate);
+      draftSyncChannel?.close();
       window.removeEventListener("storage", handleDraftStorageUpdate);
       window.removeEventListener("focus", syncDraftFromStorage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -536,7 +601,7 @@ export default function PageBuilder({
         if (!fullRecord) {
           if (!cancelled) {
             setBuilderProjectRecord(null);
-            backendProjectSnapshotRef.current = getAutosaveSnapshot(project);
+            backendProjectSnapshotRef.current = getAutosaveSnapshot(projectRef.current);
           }
           return;
         }
@@ -557,8 +622,10 @@ export default function PageBuilder({
             return null;
           });
         }
-      } catch (error) {
-        console.warn("Could not load builder project from backend:", error);
+      } catch {
+        if (import.meta.env.DEV) {
+          console.warn("Could not load builder project from backend.");
+        }
         if (!cancelled) {
           showToast("Using local draft cache. Save again when the backend is reachable.");
         }
@@ -592,9 +659,11 @@ export default function PageBuilder({
         if (!cancelled) {
           setWebsiteSettings(settings || null);
         }
-      } catch (error) {
+      } catch {
         if (!cancelled) {
-          console.warn("Could not load website settings for live site URL:", error);
+          if (import.meta.env.DEV) {
+            console.warn("Could not load website settings for live site URL.");
+          }
         }
       }
     };
@@ -815,18 +884,18 @@ export default function PageBuilder({
     updateProject((prev) => applyThemeModeToProject(prev, mode));
   };
 
-  const updateActivePage = (updater) => {
+  const updateActivePage = useCallback((updater) => {
     updateProject((prev) => ({
       ...prev,
       pages: prev.pages.map((page) =>
         page.id === prev.activePageId ? updater(page) : page
       ),
     }));
-  };
+  }, [updateProject]);
 
-  const updateSections = (updater) => {
+  const updateSections = useCallback((updater) => {
     updateActivePage((page) => ({ ...page, sections: updater(page.sections) }));
-  };
+  }, [updateActivePage]);
 
   const updateActiveForm = (updater) => {
     updateProject((prev) => ({
@@ -846,10 +915,10 @@ export default function PageBuilder({
     }));
   };
 
-  const selectPage = (pageId) => {
+  const selectPage = useCallback((pageId) => {
     updateProject((prev) => ({ ...prev, activePageId: pageId }));
     setSelected({ type: "page", id: pageId });
-  };
+  }, [updateProject]);
 
   const selectForm = (formId) => {
     updateProject((prev) => ({ ...prev, activeFormId: formId }));
@@ -934,43 +1003,6 @@ export default function PageBuilder({
     setSelected({ type: "page", id: copy.id });
   };
 
-  const deleteActivePage = () => {
-    if (!activePage) return;
-    setPagePendingDelete(activePage);
-  };
-
-  const deleteSelectedSection = () => {
-    if (!selectedSection) return;
-    setSectionPendingDelete({
-      id: selectedSection.id,
-      name: selectedSection.name || "Section",
-    });
-  };
-
-  const confirmDeleteActivePage = () => {
-    if (!pagePendingDelete) return;
-    const nextPage = project.pages.find((page) => page.id !== pagePendingDelete.id) || null;
-    updateProject((prev) => ({
-      ...prev,
-      pages: (prev.pages || []).filter((page) => page.id !== pagePendingDelete.id),
-      activePageId: nextPage?.id || "",
-    }));
-    setSelected({ type: "page", id: nextPage?.id || "" });
-    setPagePendingDelete(null);
-  };
-
-  const confirmDeleteSelectedSection = () => {
-    if (!sectionPendingDelete?.id || !activePage) return;
-    const sectionId = sectionPendingDelete.id;
-
-    updateSections((sections) =>
-      (sections || []).filter((section) => section.id !== sectionId)
-    );
-    setSelected({ type: "page", id: activePage.id });
-    setSectionPendingDelete(null);
-    showToast("Section deleted.");
-  };
-
   const {
     addForm,
     deleteActiveForm,
@@ -998,122 +1030,6 @@ export default function PageBuilder({
     getQuizSettings,
     cloneWithNewIds,
   });
-
-  const updateSelectedSection = (updates) => {
-    if (!selectedSection) return;
-
-    updateSections((sections) =>
-      sections.map((section) =>
-        section.id === selectedSection.id
-          ? {
-              ...section,
-              ...updates,
-              layout: { ...section.layout, ...(updates.layout || {}) },
-            }
-          : section
-      )
-    );
-  };
-
-  const addRowToSelectedSection = () => {
-    if (!selectedSection || selectedSection.mode !== "auto") return;
-
-    const row = createRow([createColumn()]);
-    updateSections((sections) =>
-      sections.map((section) =>
-        section.id === selectedSection.id
-          ? { ...section, rows: [...(section.rows || []), row] }
-          : section
-      )
-    );
-  };
-
-  const updateSectionRow = (rowId, updates) => {
-    if (!selectedSection) return;
-
-    updateSections((sections) =>
-      sections.map((section) =>
-        section.id === selectedSection.id
-          ? {
-              ...section,
-              rows: section.rows.map((row) =>
-                row.id === rowId
-                  ? { ...row, ...updates, layout: { ...row.layout, ...(updates.layout || {}) } }
-                  : row
-              ),
-            }
-          : section
-      )
-    );
-  };
-
-  const setRowColumnCount = (rowId, count) => {
-    if (!selectedSection) return;
-
-    updateSections((sections) =>
-      sections.map((section) => {
-        if (section.id !== selectedSection.id) return section;
-
-        return {
-          ...section,
-          rows: section.rows.map((row) => {
-            if (row.id !== rowId) return row;
-
-            const nextColumns = [...row.columns];
-            while (nextColumns.length < count) nextColumns.push(createColumn());
-            const trimmedColumns = nextColumns.slice(0, count);
-            const overflowColumns = nextColumns.slice(count);
-            const overflowElements = overflowColumns.flatMap((column) => column.elements || []);
-
-            if (overflowElements.length > 0 && trimmedColumns.length > 0) {
-              trimmedColumns[trimmedColumns.length - 1] = {
-                ...trimmedColumns[trimmedColumns.length - 1],
-                elements: [
-                  ...(trimmedColumns[trimmedColumns.length - 1].elements || []),
-                  ...overflowElements,
-                ],
-              };
-            }
-
-            return {
-              ...row,
-              layout: { ...row.layout, columns: String(count) },
-              columns: trimmedColumns,
-            };
-          }),
-        };
-      })
-    );
-  };
-
-  const duplicateSectionRow = (rowId) => {
-    if (!selectedSection) return;
-    const sourceRow = selectedSection.rows.find((row) => row.id === rowId);
-    if (!sourceRow) return;
-
-    const copy = cloneWithNewIds(sourceRow);
-    updateSections((sections) =>
-      sections.map((section) => {
-        if (section.id !== selectedSection.id) return section;
-        const index = section.rows.findIndex((row) => row.id === rowId);
-        const rows = [...section.rows];
-        rows.splice(index + 1, 0, copy);
-        return { ...section, rows };
-      })
-    );
-  };
-
-  const deleteSectionRow = (rowId) => {
-    if (!selectedSection || selectedSection.rows.length <= 1) return;
-
-    updateSections((sections) =>
-      sections.map((section) =>
-        section.id === selectedSection.id
-          ? { ...section, rows: section.rows.filter((row) => row.id !== rowId) }
-          : section
-      )
-    );
-  };
 
   const updateSelectedColumn = (updates) => {
     if (!selectedColumn) return;
@@ -1226,7 +1142,7 @@ export default function PageBuilder({
     });
   };
 
-  const updateSelectedElement = (updates) => {
+  const updateSelectedElement = useCallback((updates) => {
     if (!selectedElement) return;
 
     const merge = (element) => ({
@@ -1261,7 +1177,7 @@ export default function PageBuilder({
         };
       })
     );
-  };
+  }, [selectedElement, updateSections]);
 
   const updateReservationBlock = (elementId, updates) => {
     const merge = (element) => ({
@@ -1560,7 +1476,7 @@ export default function PageBuilder({
     showToast("Focus mode was interrupted. This quiz cannot be retaken.");
   }, [showToast]);
 
-  const startQuizSession = (form) => {
+  const startQuizSession = useCallback((form) => {
     const settings = getQuizSettings(form);
     if (quizSessions[form.id]?.locked) {
       showToast("Focus mode was interrupted. This quiz cannot be retaken.");
@@ -1586,7 +1502,7 @@ export default function PageBuilder({
     if (settings.lockScreen) {
       document.documentElement.requestFullscreen?.().catch(() => undefined);
     }
-  };
+  }, [quizSessions, showToast]);
 
   const moveQuizQuestion = useCallback((form, direction) => {
     const fields = getFormFields(form);
@@ -1672,10 +1588,10 @@ export default function PageBuilder({
       getStoredUrlError,
       showToast,
     }),
-    [getStoredUrlError, selectPage, showToast]
+    [selectPage, showToast]
   );
 
-  const persistProject = (nextProject, message) =>
+  const persistProject = useCallback((nextProject, message) =>
     persistBuilderProject({
       nextProject,
       message,
@@ -1683,9 +1599,9 @@ export default function PageBuilder({
       storageKey: STORAGE_KEY,
       setProject,
       showToast,
-    });
+    }), [demoMode, showToast]);
 
-  const saveProject = async () => {
+  const saveProject = useCallback(async () => {
     setActiveTopbarAction("save");
 
     const nextProject = {
@@ -1723,15 +1639,17 @@ export default function PageBuilder({
       });
 
       const savedRecord = builderProjectRecord?.id
-        ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
-        : await createBuilderProject(payload, user?.id);
+        ? await updateBuilderProject(builderProjectRecord.id, payload, userId)
+        : await createBuilderProject(payload, userId);
 
       setBuilderProjectRecord(savedRecord);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
       pendingBackendProjectSnapshotRef.current = "";
       showToast("Saved to backend.");
     } catch (error) {
-      console.error("Could not save builder project:", error);
+      if (import.meta.env.DEV) {
+        console.error("Could not save builder project.");
+      }
       const statusLabel = error?.status ? ` (${error.status})` : "";
 
       if (isLikelySessionFailure(error)) {
@@ -1741,7 +1659,15 @@ export default function PageBuilder({
 
       showToast(`Saved local draft cache. Backend save failed${statusLabel}.`);
     }
-  };
+  }, [
+    builderProjectLoading,
+    builderProjectRecord,
+    demoMode,
+    persistProject,
+    project,
+    showToast,
+    userId,
+  ]);
 
   useEffect(() => {
     if (demoMode || builderProjectLoading) return;
@@ -1767,7 +1693,7 @@ export default function PageBuilder({
     return () => {
       window.clearTimeout(backendAutosaveTimerRef.current);
     };
-  }, [builderProjectLoading, demoMode, project]);
+  }, [builderProjectLoading, demoMode, project, saveProject]);
 
   const saveThemeProject = async () => {
     setActiveTopbarAction("theme");
@@ -1807,7 +1733,9 @@ export default function PageBuilder({
       setBuilderProjectRecord(savedRecord);
       showToast("Website theme saved.");
     } catch (error) {
-      console.error("Could not save website theme:", error);
+      if (import.meta.env.DEV) {
+        console.error("Could not save website theme.");
+      }
       const statusLabel = error?.status ? ` (${error.status})` : "";
 
       if (isLikelySessionFailure(error)) {
@@ -1847,8 +1775,10 @@ export default function PageBuilder({
           return;
         }
       }
-    } catch (error) {
-      console.warn("Could not load backend builder project:", error);
+    } catch {
+      if (import.meta.env.DEV) {
+        console.warn("Could not load backend builder project.");
+      }
     }
 
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1956,8 +1886,7 @@ Go live anyway?`
         : "";
 
       if (import.meta.env.DEV) {
-        console.debug("builder.publish.response", publishResponse);
-        console.debug("builder.publish.live_url", resolvedLiveSitePath);
+        console.debug("Builder publish completed.");
       }
 
       if (!resolvedLiveSitePath) {
@@ -2052,7 +1981,7 @@ Go live anyway?`
     showToast("Form added to the selected page.");
   };
 
-  const getElementStyle = (element) =>
+  const getElementStyle = useCallback((element) =>
     getBuilderElementStyle({
       element,
       selected,
@@ -2060,9 +1989,9 @@ Go live anyway?`
       getElementPlacementMargins,
       getElementLayoutWidth,
       normalizeElementAlignSelf,
-    });
+    }), [selected]);
 
-  const getFreeElementStyle = (element) =>
+  const getFreeElementStyle = useCallback((element) =>
     getBuilderFreeElementStyle({
       element,
       viewport,
@@ -2073,7 +2002,7 @@ Go live anyway?`
       getSectionCanvasHeight,
       getMetricMinimumHeight,
       getDirectElementMinimumSize,
-    });
+    }), [activePage, findElementLocation, viewport]);
 
   const getDirectElementFrameStyle = (element) => {
     const style = getFreeElementStyle(element);
@@ -2237,7 +2166,7 @@ Go live anyway?`
     showToast("Preview mode on.");
   };
 
-  const startDrag = (event, element, interaction = "move", forceInteraction = false) => {
+  const startDrag = useCallback((event, element, interaction = "move", forceInteraction = false) => {
     if (preview || element.mode !== "direct") return;
 
     const tagName = event.target?.tagName?.toLowerCase();
@@ -2268,7 +2197,7 @@ Go live anyway?`
       startHeight: current.height || 80,
       interaction,
     });
-  };
+  }, [preview, viewport]);
 
   const captureTextSelection = (event, field, itemIndex = null) => {
     setTextSelection(
@@ -2282,7 +2211,7 @@ Go live anyway?`
     );
   };
 
-  const captureCanvasTextSelection = (event, field, itemIndex = null, elementId = selectedElement?.id) => {
+  const captureCanvasTextSelection = useCallback((event, field, itemIndex = null, elementId = selectedElement?.id) => {
     const range = getCanvasTextSelectionRange(event);
 
     if (!range) return;
@@ -2299,7 +2228,7 @@ Go live anyway?`
       start: range.start,
       end: range.end,
     });
-  };
+  }, [selectedElement?.id]);
 
   const applyTextColor = (color) => {
     if (
@@ -2320,6 +2249,186 @@ Go live anyway?`
       styles: { selectedTextColor: color },
     });
     window.getSelection()?.removeAllRanges();
+  };
+
+  const selectedElementSupportsInlineTextToolbar = Boolean(
+    selected.type === "element" &&
+      selectedElement &&
+      inlineTextElementTypes.has(selectedElement.type)
+  );
+
+  const getInlineTextFormatValue = () => {
+    if (!selectedElement) return "text";
+    if (selectedElement.type === "heading") return "heading";
+    if (selectedElement.type === "button") return "button";
+    if (selectedElement.type === "list") {
+      return selectedElement.listStyle === "decimal" ? "numbers" : "bullets";
+    }
+    return "text";
+  };
+
+  const updateSelectedElementTextFormat = (format) => {
+    if (!selectedElement) return;
+
+    if (format === "bullets" || format === "numbers") {
+      const listItems =
+        selectedElement.type === "list"
+          ? getListItems(selectedElement)
+          : splitLines(selectedElement.content || "List item");
+      updateSelectedElement({
+        type: "list",
+        listStyle: format === "numbers" ? "decimal" : "disc",
+        listItems,
+        content: listItems.join("\n"),
+      });
+      return;
+    }
+
+    const content =
+      selectedElement.type === "list"
+        ? getListItems(selectedElement).join("\n")
+        : selectedElement.content;
+    updateSelectedElement({
+      type: format,
+      content,
+    });
+  };
+
+  const applyInlineTextToolbarAction = (action) => {
+    if (!selectedElement) return;
+
+    if (action === "undo" || action === "redo") {
+      document.execCommand?.(action);
+      return;
+    }
+
+    if (action === "bold") {
+      updateSelectedElement({
+        styles: {
+          fontWeight:
+            String(selectedElement.styles?.fontWeight || "").includes("700") ||
+            String(selectedElement.styles?.fontWeight || "").includes("bold")
+              ? ""
+              : "700",
+        },
+      });
+      return;
+    }
+
+    if (action === "italic") {
+      updateSelectedElement({
+        styles: {
+          fontStyle: selectedElement.styles?.fontStyle === "italic" ? "" : "italic",
+        },
+      });
+      return;
+    }
+
+    if (action === "underline") {
+      updateSelectedElement({
+        styles: {
+          textDecoration:
+            selectedElement.styles?.textDecoration === "underline" ? "" : "underline",
+        },
+      });
+      return;
+    }
+
+    if (action === "bullets" || action === "numbers") {
+      updateSelectedElementTextFormat(action);
+      return;
+    }
+
+    if (action.startsWith("align-")) {
+      const textAlign = action.replace("align-", "");
+      updateSelectedElement({ styles: { textAlign } });
+    }
+  };
+
+  const renderInlineTextToolbar = () => {
+    if (!selectedElementSupportsInlineTextToolbar) return null;
+
+    return (
+      <div
+        className="builder-inline-text-toolbar"
+        role="toolbar"
+        aria-label="Text formatting"
+        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <select
+          aria-label="Text style"
+          value={getInlineTextFormatValue()}
+          onChange={(event) => updateSelectedElementTextFormat(event.target.value)}
+        >
+          <option value="text">Text</option>
+          <option value="heading">Heading</option>
+          <option value="button">Button</option>
+          <option value="bullets">Bullets</option>
+          <option value="numbers">Numbers</option>
+        </select>
+        {inlineTextToolbarButtons.map((item) => {
+          const Icon = item.icon;
+          const isActive =
+            (item.id === "bold" &&
+              (String(selectedElement.styles?.fontWeight || "").includes("700") ||
+                String(selectedElement.styles?.fontWeight || "").includes("bold"))) ||
+            (item.id === "italic" && selectedElement.styles?.fontStyle === "italic") ||
+            (item.id === "underline" && selectedElement.styles?.textDecoration === "underline") ||
+            (item.id === "bullets" &&
+              selectedElement.type === "list" &&
+              selectedElement.listStyle !== "decimal") ||
+            (item.id === "numbers" &&
+              selectedElement.type === "list" &&
+              selectedElement.listStyle === "decimal") ||
+            (item.id.startsWith("align-") &&
+              (selectedElement.styles?.textAlign || "left") === item.id.replace("align-", ""));
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={isActive ? "is-active" : ""}
+              aria-label={item.label}
+              title={item.label}
+              onClick={() => applyInlineTextToolbarAction(item.id)}
+            >
+              <Icon size={16} aria-hidden="true" />
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className={selectedElement.styles?.direction === "ltr" ? "is-active" : ""}
+          onClick={() => updateSelectedElement({ styles: { direction: "ltr" } })}
+        >
+          LTR
+        </button>
+        <button
+          type="button"
+          className={selectedElement.styles?.direction === "rtl" ? "is-active" : ""}
+          onClick={() => updateSelectedElement({ styles: { direction: "rtl" } })}
+        >
+          RTL
+        </button>
+        <label className="builder-inline-toolbar-color" title="Text color">
+          <Baseline size={16} aria-hidden="true" />
+          <input
+            type="color"
+            value={selectedElement.styles?.selectedTextColor || selectedElement.styles?.color || "#1b2a4a"}
+            onChange={(event) => applyTextColor(event.target.value)}
+          />
+        </label>
+        <label className="builder-inline-toolbar-color" title="Background color">
+          <Highlighter size={16} aria-hidden="true" />
+          <input
+            type="color"
+            value={selectedElement.styles?.backgroundColor || "#ffffff"}
+            onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })}
+          />
+        </label>
+      </div>
+    );
   };
 
   const handleMouseMove = (event) => {
@@ -2918,28 +3027,6 @@ Go live anyway?`
                   </button>
                 </div>
 
-                <div className="page-danger-zone">
-                  <div>
-                    <strong>Remove this page</strong>
-                    <small>{`Delete ${activePage?.name || "the selected page"} from this project.`}</small>
-                  </div>
-                  <button
-                    type="button"
-                    className="page-delete-action"
-                    onClick={deleteActivePage}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                    <span>Delete page</span>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  className="page-preview-action"
-                  onClick={handlePreviewClick}
-                >
-                  {builderCopy.topbar.preview}
-                </button>
               </section>
             )}
 
@@ -2970,33 +3057,12 @@ Go live anyway?`
                 ))}
               </div>
 
-              <div className="page-danger-zone">
-                <div>
-                  <strong>Remove selected section</strong>
-                  <small>
-                    {selectedSection
-                      ? `Delete ${selectedSection.name || "the selected section"} from this page.`
-                      : "Select a section on the canvas first."}
-                  </small>
-                </div>
-                <button
-                  type="button"
-                  className="page-delete-action"
-                  onClick={deleteSelectedSection}
-                  disabled={!selectedSection}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                  <span>Delete section</span>
-                </button>
-              </div>
+            </section>
+          )}
 
-              <button
-                type="button"
-                className="page-preview-action"
-                onClick={handlePreviewClick}
-              >
-                {builderCopy.topbar.preview}
-              </button>
+          {designPanel === "Themes" && (
+            <section className="builder-panel builder-themes-panel">
+              {renderThemeTab({ variant: "sidebar" })}
             </section>
           )}
 
@@ -3010,6 +3076,7 @@ Go live anyway?`
           if (!preview) setSelected({ type: "page", id: activePage?.id });
         }}
       >
+        {!preview && renderInlineTextToolbar()}
         <div
           className={`builder-canvas viewport-${viewport}`}
           style={{
@@ -3212,60 +3279,6 @@ Go live anyway?`
         </div>
       )}
 
-      {selected.type === "section" && selectedSection && (
-        <div className="inspector-group">
-          <h3>Section</h3>
-          <label>Name<input value={selectedSection.name} onChange={(event) => updateSelectedSection({ name: event.target.value })} /></label>
-          <label>Background<input type="color" value={selectedSection.layout.background === "transparent" ? "var(--theme-surface)" : selectedSection.layout.background} onChange={(event) => updateSelectedSection({ layout: { background: event.target.value } })} /></label>
-          <label>Width<select value={selectedSection.layout.width} onChange={(event) => updateSelectedSection({ layout: { width: event.target.value } })}>{sectionWidths.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-          <label>Padding<select value={selectedSection.layout.paddingY} onChange={(event) => updateSelectedSection({ layout: { paddingY: event.target.value } })}>{spacingOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-          {selectedSection.mode === "direct" && (
-            <label>
-              Canvas height ({viewport})
-              <input
-                type="number"
-                min="240"
-                value={getSectionCanvasHeight(selectedSection, viewport)}
-                onChange={(event) => {
-                  const minHeight = Math.max(240, Number(event.target.value));
-                  updateSelectedSection({
-                    layout: {
-                      minHeight: viewport === "desktop" ? minHeight : selectedSection.layout.minHeight,
-                      minHeightByViewport: {
-                        ...(selectedSection.layout.minHeightByViewport || {}),
-                        [viewport]: minHeight,
-                      },
-                    },
-                  });
-                }}
-              />
-            </label>
-          )}
-          {selectedSection.mode === "auto" && (
-            <details open>
-              <summary>Rows and columns</summary>
-              <button type="button" className="full-width-action" onClick={addRowToSelectedSection}>+ Add Row</button>
-              <div className="row-editor-list">
-                {(selectedSection.rows || []).map((row, index) => (
-                  <div className="row-editor-card" key={row.id}>
-                    <div className="row-editor-header">
-                      <strong>Row {index + 1}</strong>
-                      <div>
-                        <button type="button" onClick={() => duplicateSectionRow(row.id)}>Duplicate</button>
-                        <button type="button" className="danger-lite" onClick={() => deleteSectionRow(row.id)}>Delete</button>
-                      </div>
-                    </div>
-                    <label>Columns<select value={row.layout.columns} onChange={(event) => setRowColumnCount(row.id, Number(event.target.value))}>{columnOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-                    <label>Alignment<select value={row.layout.align} onChange={(event) => updateSectionRow(row.id, { layout: { align: event.target.value } })}>{["start", "center", "stretch"].map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-                    <label>Gap<select value={row.layout.gap} onChange={(event) => updateSectionRow(row.id, { layout: { gap: event.target.value } })}>{spacingOptions.filter((item) => item.value !== "none").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-      )}
-
       {selected.type === "column" && selectedColumn && (
         <div className="inspector-group">
           <h3>Column</h3>
@@ -3381,15 +3394,6 @@ Go live anyway?`
               ))}
               <button type="button" onClick={() => updateSelectedElement({ metrics: [...getMetricItems(selectedElement), { label: `Metric ${getMetricItems(selectedElement).length + 1}`, value: "0", description: "Description" }] })}>+ Add metric</button>
             </details>
-          )}
-          {selectedElement.type !== "reservationBlock" && (
-            <>
-              <label>Text color<input type="color" value={selectedElement.styles.selectedTextColor || selectedElement.styles.color || "var(--theme-text)"} onChange={(event) => applyTextColor(event.target.value)} /></label>
-              <label>Background<input type="color" value={selectedElement.styles.backgroundColor || "var(--theme-surface)"} onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })} /></label>
-              <label>Font size<input value={selectedElement.styles.fontSize || ""} placeholder="Example: 18px" onChange={(event) => updateSelectedElement({ styles: { fontSize: event.target.value } })} /></label>
-              <label>Border radius<input value={selectedElement.styles.borderRadius || ""} placeholder="Example: 16px" onChange={(event) => updateSelectedElement({ styles: { borderRadius: event.target.value } })} /></label>
-              <label>Text alignment<select value={selectedElement.styles.textAlign || "left"} onChange={(event) => updateSelectedElement({ styles: { textAlign: event.target.value } })}>{alignmentOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-            </>
           )}
           {selectedElement.mode !== "direct" && (
             <>
@@ -3822,6 +3826,7 @@ Go live anyway?`
   const renderFormsTab = () => (
     <FormsTab
       project={project}
+      updateProject={updateProject}
       activeForm={activeForm}
       fieldTypes={fieldTypes}
       selected={selected}
@@ -3906,12 +3911,13 @@ Go live anyway?`
     />
   );
 
-  const renderThemeTab = () => (
+  const renderThemeTab = (themeTabProps = {}) => (
     <ThemeTab
       project={project}
       updateProject={updateProject}
       setThemeMode={setThemeMode}
       saveProject={saveThemeProject}
+      {...themeTabProps}
     />
   );
 
@@ -3991,6 +3997,14 @@ Go live anyway?`
   const mobileCopy =
     (mobileBlockerCopy[lang] || mobileBlockerCopy.en)[activeTab] ||
     (mobileBlockerCopy[lang] || mobileBlockerCopy.en).default;
+  const pageBuilderClassName =
+    getPageBuilderThemeClassName({
+      mode: appThemeMode || "light",
+      preview,
+    }) +
+    (activeTab === "forms" ? " forms-workspace-active" : "") +
+    (activeTab === "responses" ? " responses-workspace-active" : "") +
+    (isPhoneDevice ? " builder-phone-blocked" : "");
   const getStarterDisplay = (starter) => {
     if (templateLang !== "ar") return starter;
     const translated = starterArabicText[starter.id] || {};
@@ -4003,43 +4017,33 @@ Go live anyway?`
 
   return (
     <div
-      className={getPageBuilderThemeClassName({
-        mode: appThemeMode || "light",
-        preview,
-      }) + (activeTab === "forms" ? " forms-workspace-active" : "") + (activeTab === "responses" ? " responses-workspace-active" : "")}
+      className={pageBuilderClassName}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={() => setDragState(null)}
     >
       <div className="builder-desktop-shell">
-        <PageBuilderTopbar
-          project={project}
-          displayName={projectDisplayName}
+        <PageBuilderWorkspaceHeader
           activeHelper={activeHelper}
-          hideWorkspaceTabs={hideWorkspaceTabs}
-          hideActions
           activeTab={activeTab}
-          preview={preview}
-          demoMode={demoMode}
-          copy={builderCopy.topbar}
           activeTopbarAction={activeTopbarAction}
+          builderCopy={builderCopy}
+          demoMode={demoMode}
+          displayName={projectDisplayName}
+          handlePreviewClick={handlePreviewClick}
+          hideWorkspaceTabs={hideWorkspaceTabs}
+          openPreviewPage={openPreviewPage}
+          preview={preview}
+          project={project}
+          publishProject={publishProject}
+          renderWorkspaceNavigator={renderWorkspaceNavigator}
+          saveProject={saveProject}
           setActiveTopbarAction={setActiveTopbarAction}
           setModal={setModal}
-          openPreviewPage={openPreviewPage}
           setPreview={setPreview}
-          saveProject={saveProject}
-          publishProject={publishProject}
-        />
-
-        <PageBuilderSubbar
-          preview={preview}
-          hideWorkspaceTabs={hideWorkspaceTabs}
-          viewports={viewports}
-          viewport={viewport}
           setViewport={setViewport}
-          copy={builderCopy.topbar}
-          onPreviewClick={handlePreviewClick}
-          renderWorkspaceNavigator={renderWorkspaceNavigator}
+          viewport={viewport}
+          viewports={viewports}
         />
 
         {renderActiveTab()}
@@ -4052,179 +4056,29 @@ Go live anyway?`
         </div>
       </div>
 
-      {elementPendingDelete && (
-        <PageDeleteConfirmModal
-          title="Delete this element?"
-          message={
-            <>
-              <strong>"{elementPendingDelete.name}"</strong> will be removed from the page. This cannot be undone.
-            </>
-          }
-          cancelLabel="Keep element"
-          confirmLabel="Delete element"
-          onCancel={() => setElementPendingDelete(null)}
-          onConfirm={confirmDeleteSelectedElement}
-        />
-      )}
+      <PageBuilderModals
+        activeTab={activeTab}
+        applyStarter={applyStarter}
+        closeStarterModal={() => setModal(null)}
+        confirmDeletePendingUser={confirmDeletePendingUser}
+        confirmDeleteSelectedElement={confirmDeleteSelectedElement}
+        elementPendingDelete={elementPendingDelete}
+        getStarterDisplay={getStarterDisplay}
+        modal={modal}
+        previewOverlapWarnings={previewOverlapWarnings}
+        setElementPendingDelete={setElementPendingDelete}
+        setPreviewOverlapWarnings={setPreviewOverlapWarnings}
+        setUserPendingDelete={setUserPendingDelete}
+        starterSystems={starterSystems}
+        templateCopy={templateCopy}
+        templateLang={templateLang}
+        userPendingDelete={userPendingDelete}
+      />
 
-      {sectionPendingDelete && (
-        <PageDeleteConfirmModal
-          title="Delete this section?"
-          message={
-            <>
-              <strong>"{sectionPendingDelete.name}"</strong> and all components inside it will be removed from the page. This cannot be undone.
-            </>
-          }
-          cancelLabel="Keep section"
-          confirmLabel="Delete section"
-          onCancel={() => setSectionPendingDelete(null)}
-          onConfirm={confirmDeleteSelectedSection}
-        />
-      )}
-
-      {pagePendingDelete && (
-        <PageDeleteConfirmModal
-          page={pagePendingDelete}
-          cancelLabel="Keep page"
-          confirmLabel="Delete page"
-          onCancel={() => setPagePendingDelete(null)}
-          onConfirm={confirmDeleteActivePage}
-        />
-      )}
-
-      {userPendingDelete && (
-        <PageDeleteConfirmModal
-          title="Delete this user?"
-          message={
-            <>
-              <strong>"{userPendingDelete.name || userPendingDelete.email}"</strong> will be removed from this builder project. This cannot be undone.
-            </>
-          }
-          cancelLabel="Keep user"
-          confirmLabel="Delete user"
-          onCancel={() => setUserPendingDelete(null)}
-          onConfirm={confirmDeletePendingUser}
-        />
-      )}
-
-      {previewOverlapWarnings.length > 0 && (
-        <div
-          className="builder-modal-backdrop"
-          onClick={() => setPreviewOverlapWarnings([])}
-        >
-          <section
-            className="builder-modal overlap-warning-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="overlap-warning-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div>
-                <span className="modal-eyebrow">Layout check</span>
-                <h2 id="overlap-warning-title">
-                  Almost ready to preview
-                </h2>
-                <p>
-                  I found {previewOverlapWarnings.length} place
-                  {previewOverlapWarnings.length === 1 ? "" : "s"} where elements are sitting on top of each other. Move one of them a little, then preview again.
-                </p>
-              </div>
-              <button type="button" onClick={() => setPreviewOverlapWarnings([])}>
-                Close
-              </button>
-            </div>
-
-            <div className="overlap-warning-list">
-              {previewOverlapWarnings.slice(0, 5).map((warning, index) => (
-                <article
-                  className="overlap-warning-item"
-                  key={`${warning.page}_${warning.section}_${warning.viewport}_${warning.first}_${warning.second}_${index}`}
-                >
-                  <div className="overlap-warning-item-top">
-                    <span>{warning.viewport}</span>
-                    <small>{warning.page} / {warning.section}</small>
-                  </div>
-                  <strong>{warning.first} is covering {warning.second}</strong>
-                  <p>Move or resize one of these components so both are readable.</p>
-                </article>
-              ))}
-            </div>
-
-            {previewOverlapWarnings.length > 5 && (
-              <p className="overlap-warning-more">
-                Plus {previewOverlapWarnings.length - 5} more overlap
-                {previewOverlapWarnings.length - 5 === 1 ? "" : "s"}.
-              </p>
-            )}
-
-            <div className="overlap-warning-actions">
-              <button type="button" onClick={() => setPreviewOverlapWarnings([])}>
-                Fix layout
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {modal === "starter" && activeTab === "design" && (
-        <div className="builder-modal-backdrop" onClick={() => setModal(null)}>
-          <div
-            className="builder-modal wide template-picker-modal"
-            dir={templateLang === "ar" ? "rtl" : "ltr"}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div>
-                <span className="modal-eyebrow">{templateCopy.eyebrow}</span>
-                <h2>{templateCopy.title}</h2>
-                <p>{templateCopy.description}</p>
-              </div>
-              <button type="button" onClick={() => setModal(null)}>{templateCopy.close}</button>
-            </div>
-            <div className="starter-grid">
-              {starterSystems.map((starter) => {
-                const displayStarter = getStarterDisplay(starter);
-
-                return (
-                <button type="button" className="starter-card" key={starter.id} onClick={() => applyStarter(starter.id)}>
-                  {displayStarter.category && <span>{displayStarter.category}</span>}
-                  <strong>{displayStarter.title}</strong>
-                  <p>{displayStarter.subtitle}</p>
-                  {Array.isArray(displayStarter.tags) && displayStarter.tags.length > 0 && (
-                    <em>
-                      {displayStarter.tags.map((tag) => (
-                        <i key={tag}>{tag}</i>
-                      ))}
-                    </em>
-                  )}
-                </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && (
-        <div className="builder-toast" role="status" aria-live="polite">
-          <span className="builder-toast-icon" aria-hidden="true">✓</span>
-          <span className="builder-toast-message">
-            <strong>Builder update</strong>
-            <span>{toast}</span>
-          </span>
-        </div>
-      )}
-      {canonicalLiveSitePath && (
-        <a
-          className="builder-live-site-link"
-          href={canonicalLiveSitePath}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open live site
-        </a>
-      )}
+      <PageBuilderStatusBar
+        canonicalLiveSitePath={canonicalLiveSitePath}
+        toast={toast}
+      />
     </div>
   );
 }

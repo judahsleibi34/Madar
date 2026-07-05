@@ -14,6 +14,51 @@ export const featuresContent = {
     titleParts: ["Tour the", "builder", "then try it", "live"],
     subtitle:
       "Open the demo to edit the default template in the browser. Refreshing the demo restores the original showcase, so every visitor starts clean.",
+    builderDemoKicker: "Builder preview",
+    builderDemoTitle: "Build a simple website right here",
+    builderDemoDescription:
+      "Add sections, move them around, and see how Madar turns pages, forms, and records into one organized digital workspace.",
+    builderDemoComponentsLabel: "Builder components",
+    builderDemoComponentsTitle: "Components",
+    builderDemoPreviewLabel: "Website preview",
+    builderDemoPreviewTitle: "Live website preview",
+    builderDemoSectionsLabel: "sections",
+    builderDemoSelectedLabel: "Selected component",
+    builderDemoSelectedTitle: "Selected section",
+    builderDemoSelectedDescription:
+      "Move it around, add another component, then open the full demo to edit real pages, forms, records, users, and workflows.",
+    builderDemoMoveUp: "Move section up",
+    builderDemoMoveDown: "Move section down",
+    builderDemoBlocks: [
+      {
+        id: "hero",
+        label: "Hero",
+        title: "Welcome section",
+        previewTitle: "Bright Dental Clinic",
+        previewText: "Book visits, manage patient requests, and keep clinic work organized.",
+      },
+      {
+        id: "services",
+        label: "Services",
+        title: "Service cards",
+        previewTitle: "Popular services",
+        previewText: "Cleaning, checkups, emergency visits, and follow-up care in one page.",
+      },
+      {
+        id: "form",
+        label: "Form",
+        title: "Request form",
+        previewTitle: "New appointment request",
+        previewText: "Name, phone, preferred date, and notes collected directly into your workspace.",
+      },
+      {
+        id: "records",
+        label: "Records",
+        title: "Record list",
+        previewTitle: "Recent requests",
+        previewText: "Track submitted forms, status, owner, and next action without paper files.",
+      },
+    ],
     demoTitle: "Try the interactive builder demo",
     demoDescription:
       "Explore the same default template we use to show pages, forms, data, workflows, users, roles, theme controls, and preview behavior.",
@@ -68,6 +113,51 @@ export const featuresContent = {
     title: "\u062a\u0639\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0645\u0646\u0634\u0626 \u062b\u0645 \u062c\u0631\u0628\u0647 \u0645\u0628\u0627\u0634\u0631\u0629",
     subtitle:
       "\u0627\u0641\u062a\u062d \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0644\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0642\u0627\u0644\u0628 \u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a \u0645\u0646 \u0627\u0644\u0645\u062a\u0635\u0641\u062d. \u0639\u0646\u062f \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0635\u0641\u062d\u0629 \u064a\u0639\u0648\u062f \u0627\u0644\u0642\u0627\u0644\u0628 \u0627\u0644\u0623\u0635\u0644\u064a.",
+    builderDemoKicker: "Builder preview",
+    builderDemoTitle: "Build a simple website right here",
+    builderDemoDescription:
+      "Add sections, move them around, and see how Madar turns pages, forms, and records into one organized digital workspace.",
+    builderDemoComponentsLabel: "Builder components",
+    builderDemoComponentsTitle: "Components",
+    builderDemoPreviewLabel: "Website preview",
+    builderDemoPreviewTitle: "Live website preview",
+    builderDemoSectionsLabel: "sections",
+    builderDemoSelectedLabel: "Selected component",
+    builderDemoSelectedTitle: "Selected section",
+    builderDemoSelectedDescription:
+      "Move it around, add another component, then open the full demo to edit real pages, forms, records, users, and workflows.",
+    builderDemoMoveUp: "Move section up",
+    builderDemoMoveDown: "Move section down",
+    builderDemoBlocks: [
+      {
+        id: "hero",
+        label: "Hero",
+        title: "Welcome section",
+        previewTitle: "Bright Dental Clinic",
+        previewText: "Book visits, manage patient requests, and keep clinic work organized.",
+      },
+      {
+        id: "services",
+        label: "Services",
+        title: "Service cards",
+        previewTitle: "Popular services",
+        previewText: "Cleaning, checkups, emergency visits, and follow-up care in one page.",
+      },
+      {
+        id: "form",
+        label: "Form",
+        title: "Request form",
+        previewTitle: "New appointment request",
+        previewText: "Name, phone, preferred date, and notes collected directly into your workspace.",
+      },
+      {
+        id: "records",
+        label: "Records",
+        title: "Record list",
+        previewTitle: "Recent requests",
+        previewText: "Track submitted forms, status, owner, and next action without paper files.",
+      },
+    ],
     demoTitle: "\u062c\u0631\u0628 \u0645\u0646\u0634\u0626 \u0627\u0644\u0635\u0641\u062d\u0627\u062a",
     demoDescription:
       "\u0627\u0633\u062a\u0643\u0634\u0641 \u0642\u0627\u0644\u0628\u0627 \u064a\u0639\u0631\u0636 \u0627\u0644\u0635\u0641\u062d\u0627\u062a \u0648\u0627\u0644\u0646\u0645\u0627\u0630\u062c \u0648\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0648\u0633\u064a\u0631 \u0627\u0644\u0639\u0645\u0644 \u0648\u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u064a\u0646 \u0648\u0627\u0644\u0623\u062f\u0648\u0627\u0631 \u0648\u0627\u0644\u0645\u0639\u0627\u064a\u0646\u0629.",

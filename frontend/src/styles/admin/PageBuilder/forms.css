@@ -76,7 +76,9 @@
 }
 
 .runtime-form-pagination button:hover:not(:disabled) {
-  background: rgba(var(--theme-shadow-rgb), 0.1);
+  border-color: var(--form-theme-accent);
+  background: color-mix(in srgb, var(--form-theme-accent) 8%, var(--form-theme-input));
+  color: var(--form-theme-text);
 }
 
 .runtime-form-pagination button.runtime-submit {
@@ -1257,14 +1259,14 @@ body.theme-dark .forms-loading-shimmer,
   height: 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(var(--theme-shadow-rgb), 0.1);
+  background: color-mix(in srgb, var(--form-theme-border) 70%, transparent);
 }
 
 .runtime-form-progress span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--theme-primary);
+  background: var(--form-theme-accent);
   transition: width 0.2s ease;
 }
 
@@ -2999,7 +3001,7 @@ body.theme-dark .forms-loading-shimmer,
   width: min(100%, 1720px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr) minmax(300px, 420px);
   gap: 18px;
   align-items: start;
   direction: ltr;
@@ -3127,6 +3129,62 @@ body.theme-dark .forms-loading-shimmer,
   justify-self: center;
 }
 
+.forms-live-preview-panel {
+  position: sticky;
+  top: 0;
+  grid-column: 3;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  max-height: calc(100vh - 170px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--forms-border);
+  border-radius: 8px;
+  background: var(--theme-surface);
+  box-shadow: 0 12px 28px rgba(var(--theme-shadow-rgb), 0.07);
+}
+
+.forms-live-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.forms-live-preview-header strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--madar-text);
+  font-size: 13px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forms-live-preview-page {
+  min-width: 0;
+  display: grid;
+  padding: 18px;
+  border: 1px solid var(--form-theme-border);
+  border-radius: calc(var(--form-theme-radius) + 6px);
+  background: var(--form-theme-bg);
+}
+
+.forms-live-preview-page.is-embedded {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.forms-live-preview-page .runtime-form {
+  padding: 18px;
+  border: 1px solid var(--form-theme-border);
+  border-radius: var(--form-theme-radius);
+  background: var(--form-theme-surface);
+}
+
 .forms-simple-layout {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -3198,6 +3256,10 @@ body.theme-dark .forms-loading-shimmer,
   border-radius: 22px;
   background: var(--madar-surface);
   box-shadow: var(--madar-shadow-sm);
+  max-height: calc(100vh - 170px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .simple-add-question label,
@@ -3329,6 +3391,97 @@ body.theme-dark .forms-loading-shimmer,
 .forms-builder-actions .form-command-button {
   min-height: 42px;
   border-radius: 12px;
+}
+
+.forms-theme-action-group {
+  gap: 12px;
+  margin-top: 2px;
+  padding-top: 14px;
+  border-top: 1px solid var(--madar-border);
+}
+
+.forms-theme-grid,
+.forms-theme-shape-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.forms-theme-shape-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.forms-theme-token,
+.forms-theme-shape-grid label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--madar-text);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.forms-theme-token > span:first-child,
+.forms-theme-shape-grid label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forms-theme-color-input {
+  position: relative;
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 7px 9px 7px 7px;
+  border: 1px solid var(--madar-border);
+  border-radius: 10px;
+  background: var(--madar-surface);
+}
+
+.forms-theme-swatch {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.16);
+  border-radius: 8px;
+  background: var(--forms-theme-token);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-text-inverse-rgb), 0.42);
+}
+
+.forms-theme-color-input strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--madar-muted);
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forms-theme-color-input input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.forms-theme-shape-grid input {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 12px;
+  background: var(--madar-surface);
+}
+
+.forms-theme-action-group > .form-command-button {
+  margin-top: 2px;
 }
 
 .simple-add-question .form-command-button-primary,
@@ -3691,6 +3844,7 @@ body.theme-dark .simple-action-group-title::after,
   .forms-simple-header,
   .forms-simple-shell,
   .forms-simple-layout,
+  .forms-live-preview-panel,
   .simple-add-question,
   .simple-panel-grid,
   .simple-question-main {
@@ -3707,6 +3861,8 @@ body.theme-dark .simple-action-group-title::after,
     grid-row: auto;
     justify-self: stretch;
     width: 100%;
+    max-height: none;
+    overflow: visible;
   }
 
   .forms-simple-header {
@@ -3716,6 +3872,12 @@ body.theme-dark .simple-action-group-title::after,
   .forms-simple-document {
     grid-column: auto;
     width: 100%;
+  }
+
+  .forms-live-preview-panel {
+    position: static;
+    grid-column: auto;
+    max-height: none;
   }
 }
 
@@ -4809,4 +4971,90 @@ body.theme-dark .publish-empty-note,
   .publish-link-box {
     grid-template-columns: 1fr;
   }
+}
+
+/* Forms tab final theme boundary:
+   Builder/editor controls stay on the Madar admin theme.
+   Form colors are reflected in the live form preview and published/runtime form. */
+.forms-simple-workbench .simple-add-question .form-command-button-primary,
+.forms-simple-workbench .simple-action-group .form-command-button-primary,
+.forms-simple-workbench .forms-primary-action {
+  border-color: transparent !important;
+  background: var(--madar-red) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+.forms-simple-workbench .simple-add-question .form-command-button-primary:hover:not(:disabled),
+.forms-simple-workbench .simple-action-group .form-command-button-primary:hover:not(:disabled),
+.forms-simple-workbench .forms-primary-action:hover:not(:disabled) {
+  border-color: transparent !important;
+  background: var(--madar-red-dark, var(--madar-red)) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: none !important;
+}
+
+/* Forms sidebar actions match the general builder sidebar theme. */
+.forms-simple-workbench .simple-add-question .form-command-button {
+  min-height: 42px !important;
+  border: 1px solid var(--madar-border) !important;
+  border-radius: 12px !important;
+  padding: 0 12px !important;
+  background: var(--madar-surface-soft) !important;
+  color: var(--madar-text) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.forms-simple-workbench .simple-add-question .form-command-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(var(--theme-primary-rgb), 0.3) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
+  color: var(--madar-red) !important;
+  box-shadow: none !important;
+}
+
+.forms-simple-workbench .simple-add-question .form-command-button-primary,
+.forms-simple-workbench .simple-add-question .forms-primary-action {
+  border-color: transparent !important;
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+.forms-simple-workbench .simple-add-question .form-command-button-primary:hover:not(:disabled),
+.forms-simple-workbench .simple-add-question .forms-primary-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: transparent !important;
+  background: var(--madar-gradient-hover) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 26px rgba(var(--theme-primary-rgb), 0.26) !important;
+}
+
+.forms-simple-workbench .forms-builder-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.forms-simple-workbench .forms-builder-actions .form-command-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.forms-simple-workbench .simple-action-group .form-command-button {
+  width: 100%;
+}
+
+.forms-simple-workbench .simple-action-group .form-command-button-danger {
+  border-color: var(--madar-border) !important;
+  background: var(--madar-surface-soft) !important;
+  color: var(--madar-text) !important;
+}
+
+.forms-simple-workbench .simple-action-group .form-command-button-danger:hover:not(:disabled) {
+  border-color: rgba(var(--theme-primary-rgb), 0.3) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
+  color: var(--madar-red) !important;
 }

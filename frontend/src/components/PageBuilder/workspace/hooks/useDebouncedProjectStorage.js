@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
+const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
+
 export default function useDebouncedProjectStorage({
   delay = 600,
   disabled = false,
@@ -9,6 +11,18 @@ export default function useDebouncedProjectStorage({
   const timerRef = useRef(null);
   const latestProjectRef = useRef(project);
   const lastSerializedRef = useRef("");
+  const channelRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return undefined;
+
+    channelRef.current = new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
+
+    return () => {
+      channelRef.current?.close();
+      channelRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     latestProjectRef.current = project;
@@ -30,9 +44,15 @@ export default function useDebouncedProjectStorage({
         if (serializedProject === lastSerializedRef.current) return;
 
         localStorage.setItem(storageKey, serializedProject);
+        channelRef.current?.postMessage({
+          storageKey,
+          serializedProject,
+        });
         lastSerializedRef.current = serializedProject;
-      } catch (error) {
-        console.warn("Could not persist builder draft:", error);
+      } catch {
+        if (import.meta.env.DEV) {
+          console.warn("Could not persist builder draft.");
+        }
       }
     },
     [disabled, storageKey]

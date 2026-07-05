@@ -3,6 +3,29 @@
   display: none;
 }
 
+.page-builder.builder-phone-blocked .builder-desktop-shell {
+  display: none;
+}
+
+.page-builder.builder-phone-blocked .builder-mobile-blocker {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--theme-bg-soft);
+  color: var(--theme-text);
+  text-align: center;
+}
+
+.page-builder.builder-phone-blocked .builder-mobile-blocker div {
+  max-width: 520px;
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
+}
+
 .page-builder {
   min-height: 100vh;
   background: var(--theme-bg-soft);

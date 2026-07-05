@@ -1,63 +1,53 @@
-export const aboutContent = {
-  en: {
-    hero: {
-      title: "About Madar",
-      titlePrefix: "About",
-      titleHighlight: "Madar",
-      name: "Madar",
-      description:
-        "helps organizations move beyond manual paperwork by turning daily operations into reliable digital workflows. From records and users to approvals and processes, Madar gives teams one organized platform to manage work with more clarity, speed, and control.",
-      secondDescription:
-        "Built for businesses that want to modernize without complexity, Madar adapts to different sectors such as stores, clinics, supermarkets, warehouses, schools, and service centers. It brings everything together in one simple experience, helping teams save time, reduce operational errors, and keep work moving smoothly.",
-    },
-    sections: [
-      {
-        title: "Our Purpose",
-        body:
-          "Our purpose is to make digital transformation practical and accessible for small and medium organizations. Madar gives each business the flexibility to build a system around the way it actually works, instead of forcing teams into rigid tools that do not match their operations.",
-      },
-      {
-        title: "What Makes Madar Different?",
-        body:
-          "Madar is designed to be flexible from the start. Organizations can customize modules, fields, records, permissions, users, and workflows while keeping a clean, professional, and easy-to-use experience. It is not just software; it is a foundation for better business control.",
-      },
-      {
-        title: "Our Vision",
-        body:
-          "Our vision is to become a trusted digital transformation platform for organizations that want to work smarter, grow faster, and operate with confidence. Madar aims to help businesses replace scattered paperwork with a modern system built for clarity, efficiency, and long-term growth.",
-      },
-    ],
+const digitalizationAboutContent = {
+  hero: {
+    eyebrow: "About Madar",
+    title: "About Madar",
+    titlePrefix: "About",
+    titleHighlight: "Madar",
+    name: "Madar",
+    description:
+      "helps organizations replace paper forms, scattered files, and manual follow-ups with clear digital workflows that teams can manage from one place.",
+    secondDescription:
+      "It is built for teams that want to modernize daily operations without losing the way they already work. Madar turns requests, approvals, records, users, and internal processes into organized digital systems that are easier to track, update, and grow.",
   },
+  metrics: [
+    {
+      value: "Paperless",
+      label: "Move forms, records, and approvals into one digital workspace.",
+    },
+    {
+      value: "Connected",
+      label: "Keep teams, requests, files, and decisions linked together.",
+    },
+    {
+      value: "Flexible",
+      label: "Shape pages, workflows, and data around how your organization works.",
+    },
+  ],
+  sections: [
+    {
+      title: "Digitize the Work You Already Do",
+      body:
+        "Madar helps your organization turn printed forms, notebooks, spreadsheets, and repeated manual steps into structured digital workflows. Your team can collect information, follow requests, manage approvals, and keep important records in a cleaner, more reliable workspace.",
+    },
+    {
+      title: "Built for Real Operations",
+      body:
+        "Every organization has its own departments, services, forms, and approval paths. Madar gives you the flexibility to shape the system around those needs, so your digital workspace feels practical for your team instead of forcing everyone into a rigid process.",
+    },
+    {
+      title: "A Smarter Way to Manage Growth",
+      body:
+        "By keeping information connected, searchable, and easier to update, Madar helps teams save time, reduce mistakes, respond faster, and make better decisions. It gives your organization a strong digital foundation for smoother work today and more scalable operations tomorrow.",
+    },
+  ],
+  closing:
+    "Madar is not just about replacing paper with screens. It is about giving your organization a clearer way to work, communicate, and manage information with confidence.",
+};
 
-  ar: {
-    hero: {
-      title: "عن مدار",
-      titlePrefix: "",
-      titleHighlight: "عن مدار",
-      name: "مدار",
-      description:
-        "يساعد المؤسسات على تجاوز العمل الورقي اليدوي من خلال تحويل العمليات اليومية إلى تدفقات عمل رقمية موثوقة. من السجلات والمستخدمين إلى الموافقات والإجراءات، يمنح مدار الفرق منصة واحدة منظمة لإدارة العمل بوضوح وسرعة وتحكم أفضل.",
-      secondDescription:
-        "صُمم مدار للأعمال التي ترغب في التطور الرقمي دون تعقيد، ويتناسب مع قطاعات مختلفة مثل المتاجر والعيادات والسوبرماركت والمستودعات والمدارس ومراكز الخدمات. يجمع مدار كل ما تحتاجه المؤسسة في تجربة بسيطة تساعد الفرق على توفير الوقت، وتقليل الأخطاء التشغيلية، والحفاظ على سير العمل بسلاسة.",
-    },
-    sections: [
-      {
-        title: "هدفنا",
-        body:
-          "هدفنا هو جعل التحول الرقمي عملياً ومتاحاً للمؤسسات الصغيرة والمتوسطة. يمنح مدار كل مؤسسة المرونة لبناء نظام يناسب طريقة عملها الفعلية، بدلاً من الاعتماد على أدوات جامدة لا تعكس احتياجاتها اليومية.",
-      },
-      {
-        title: "ما الذي يجعل مدار مختلفاً؟",
-        body:
-          "تم تصميم مدار ليكون مرناً من البداية. تستطيع المؤسسات تخصيص الوحدات والحقول والسجلات والصلاحيات والمستخدمين وسير العمل مع الحفاظ على تجربة استخدام واضحة واحترافية وسهلة. مدار ليس مجرد برنامج، بل أساس يمنح الأعمال تحكماً أفضل.",
-      },
-      {
-        title: "رؤيتنا",
-        body:
-          "رؤيتنا هي أن يصبح مدار منصة موثوقة للتحول الرقمي للمؤسسات التي تريد العمل بذكاء أكبر، والنمو بسرعة، والإدارة بثقة. نهدف إلى مساعدة الأعمال على استبدال الأوراق والأدوات المتفرقة بنظام حديث مصمم للوضوح والكفاءة والنمو طويل المدى.",
-      },
-    ],
-  },
+export const aboutContent = {
+  en: digitalizationAboutContent,
+  ar: digitalizationAboutContent,
 };
 
 export const getAboutContent = (lang = "en") =>

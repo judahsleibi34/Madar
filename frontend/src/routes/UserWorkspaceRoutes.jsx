@@ -1,16 +1,21 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-import ChangePasswordPage from "../components/DashboardBuilder/ChangePasswordPage";
-import SettingsPage from "../components/DashboardBuilder/SettingsPage";
-import UserDashboard from "../components/DashboardBuilder/UserDashboard";
-import MyPlanPage from "../components/DashboardBuilder/MyPlanPage";
-import NotificationsPage from "../components/DashboardBuilder/NotificationsPage";
-import BuilderFormPreviewPage from "../components/PageBuilder/preview/BuilderFormPreviewPage";
-import TenantSiteRuntime from "../components/PageBuilder/runtime/TenantSiteRuntime";
+import RouteSuspense from "../components/common/RouteSuspense";
 import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
+const ChangePasswordPage = lazy(() => import("../components/DashboardBuilder/ChangePasswordPage"));
+const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
+const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDashboard"));
+const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
+const NotificationsPage = lazy(() => import("../components/DashboardBuilder/NotificationsPage"));
+const BuilderFormPreviewPage = lazy(() =>
+  import("../components/PageBuilder/preview/BuilderFormPreviewPage")
+);
+const TenantSiteRuntime = lazy(() =>
+  import("../components/PageBuilder/runtime/TenantSiteRuntime")
+);
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
 
 export default function UserWorkspaceRoutes({
@@ -50,7 +55,7 @@ export default function UserWorkspaceRoutes({
     );
 
   return (
-    <Suspense
+    <RouteSuspense
       fallback={
         isBuilderLoadingPath
           ? renderShell(
@@ -65,6 +70,8 @@ export default function UserWorkspaceRoutes({
             )
           : <DashboardLoadingElement pathname={location.pathname} lang={lang} />
       }
+      lang={lang}
+      variant={isBuilderLoadingPath ? "builder" : "dashboard"}
     >
       <Routes>
       <Route
@@ -172,6 +179,6 @@ export default function UserWorkspaceRoutes({
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </Suspense>
+    </RouteSuspense>
   );
 }

@@ -1031,3 +1031,486 @@ body.theme-dark .pricing-plan-button.secondary {
   }
 }
 
+/* ============================================================
+   PRICING CONFIGURATOR
+   ============================================================ */
+
+.pricing-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.pricing-tool-panel,
+.pricing-recommendation,
+.pricing-mini-plan {
+  border: 1px solid var(--theme-border, rgba(var(--theme-shadow-rgb), 0.11));
+  background: var(--theme-surface);
+  box-shadow: 0 14px 34px rgba(var(--theme-shadow-rgb), 0.06);
+}
+
+.pricing-tool-panel,
+.pricing-recommendation {
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.pricing-panel-heading h3,
+.pricing-recommendation h3 {
+  margin: 0;
+  color: var(--theme-text);
+  font-size: clamp(24px, 3vw, 32px);
+  line-height: 1.08;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+}
+
+.pricing-panel-heading p {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: var(--theme-text-muted);
+  font-size: 14px;
+  line-height: 1.65;
+  font-weight: 650;
+}
+
+.pricing-tool-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.pricing-tool-toggle {
+  width: 100%;
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--theme-border, rgba(var(--theme-shadow-rgb), 0.1));
+  border-radius: 16px;
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.pricing-page[dir="rtl"] .pricing-tool-toggle {
+  grid-template-columns: 58px minmax(0, 1fr) 44px;
+}
+
+.pricing-tool-toggle:hover,
+.pricing-tool-toggle.is-on {
+  border-color: rgba(var(--theme-primary-rgb), 0.38);
+  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.08);
+}
+
+.pricing-tool-toggle.is-on {
+  background:
+    linear-gradient(180deg, rgba(var(--theme-primary-rgb), 0.07), transparent),
+    var(--theme-surface);
+}
+
+.pricing-tool-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--theme-surface);
+  color: var(--theme-primary);
+}
+
+.pricing-page[dir="rtl"] .pricing-tool-icon {
+  grid-column: 3;
+}
+
+.pricing-tool-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.pricing-tool-copy strong {
+  color: var(--theme-text);
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.pricing-tool-copy small {
+  color: var(--theme-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 650;
+}
+
+.pricing-switch {
+  width: 56px;
+  height: 30px;
+  padding: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-text-muted) 18%, transparent);
+  transition: background 0.18s ease;
+}
+
+.pricing-switch span {
+  width: 24px;
+  height: 24px;
+  display: block;
+  border-radius: 999px;
+  background: var(--theme-surface);
+  box-shadow: 0 4px 10px rgba(var(--theme-shadow-rgb), 0.18);
+  transition: transform 0.18s ease;
+}
+
+.pricing-tool-toggle.is-on .pricing-switch {
+  background: var(--theme-primary);
+}
+
+.pricing-tool-toggle.is-on .pricing-switch span {
+  transform: translateX(26px);
+}
+
+.pricing-page[dir="rtl"] .pricing-tool-toggle.is-on .pricing-switch span {
+  transform: translateX(-26px);
+}
+
+.pricing-tool-note {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(var(--theme-primary-rgb), 0.08);
+  color: var(--theme-text);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 750;
+}
+
+.pricing-recommendation {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
+  background:
+    linear-gradient(180deg, rgba(var(--theme-primary-rgb), 0.07), transparent 36%),
+    var(--theme-surface);
+}
+
+.pricing-recommendation .pricing-plan-description {
+  min-height: auto;
+}
+
+.pricing-recommendation .pricing-plan-button {
+  margin-top: 16px;
+}
+
+.pricing-limit-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pricing-limit-list li svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--theme-primary);
+}
+
+.pricing-storage-callout {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
+}
+
+.pricing-storage-callout svg {
+  color: var(--theme-primary);
+}
+
+.pricing-storage-callout p {
+  margin: 0;
+  color: var(--theme-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 700;
+}
+
+.pricing-compare {
+  margin-top: 18px;
+}
+
+.pricing-plan-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pricing-mini-plan {
+  min-height: 146px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 16px;
+  color: var(--theme-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.pricing-mini-plan:hover,
+.pricing-mini-plan.is-selected {
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  background:
+    linear-gradient(180deg, rgba(var(--theme-primary-rgb), 0.06), transparent),
+    var(--theme-surface);
+}
+
+.pricing-mini-plan span {
+  color: var(--theme-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.pricing-mini-plan strong {
+  color: var(--theme-primary);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.pricing-mini-plan small {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 650;
+}
+
+[data-theme="dark"] .pricing-tool-panel,
+[data-theme="dark"] .pricing-recommendation,
+[data-theme="dark"] .pricing-mini-plan,
+body.theme-dark .pricing-tool-panel,
+body.theme-dark .pricing-recommendation,
+body.theme-dark .pricing-mini-plan {
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
+  box-shadow: 0 18px 44px rgba(var(--theme-black-rgb), 0.22);
+}
+
+[data-theme="dark"] .pricing-tool-toggle,
+[data-theme="dark"] .pricing-tool-icon,
+[data-theme="dark"] .pricing-storage-callout,
+body.theme-dark .pricing-tool-toggle,
+body.theme-dark .pricing-tool-icon,
+body.theme-dark .pricing-storage-callout {
+  background: var(--theme-surface-2);
+  border-color: var(--theme-border);
+}
+
+@media (max-width: 980px) {
+  .pricing-builder,
+  .pricing-plan-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-recommendation {
+    position: static;
+  }
+}
+
+@media (max-width: 560px) {
+  .pricing-tool-panel,
+  .pricing-recommendation {
+    padding: 16px;
+  }
+
+  .pricing-tool-toggle {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .pricing-page[dir="rtl"] .pricing-tool-toggle {
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+
+  .pricing-switch {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+/* ============================================================
+   PRICING CONFIGURATOR - QUIET MADAR THEME PASS
+   ============================================================ */
+
+.pricing-page {
+  padding-top: 56px;
+}
+
+.pricing-inner-header {
+  align-items: flex-end;
+  margin-bottom: 22px;
+  padding-bottom: 20px;
+}
+
+.pricing-inner-header::after {
+  width: 92px;
+  background: var(--theme-primary);
+}
+
+.pricing-section-heading h2 {
+  font-size: clamp(28px, 3vw, 34px);
+  letter-spacing: 0;
+}
+
+.pricing-section-heading p {
+  max-width: 680px;
+  margin-top: 10px;
+  line-height: 1.6;
+}
+
+.pricing-tool-panel,
+.pricing-recommendation,
+.pricing-mini-plan {
+  border-color: var(--theme-border) !important;
+  background: var(--theme-surface) !important;
+  box-shadow: var(--app-shadow-sm) !important;
+}
+
+.pricing-tool-panel,
+.pricing-recommendation,
+.pricing-mini-plan,
+.pricing-tool-toggle,
+.pricing-tool-icon,
+.pricing-tool-note,
+.pricing-storage-callout,
+.pricing-plan-meta div,
+.pricing-limit-list,
+.pricing-plan-button {
+  border-radius: 8px !important;
+}
+
+.pricing-builder {
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 400px);
+  gap: 14px;
+}
+
+.pricing-tool-panel,
+.pricing-recommendation {
+  padding: 20px;
+}
+
+.pricing-panel-heading h3,
+.pricing-recommendation h3 {
+  font-size: clamp(22px, 2.4vw, 28px);
+  letter-spacing: 0;
+}
+
+.pricing-tool-list {
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pricing-tool-toggle {
+  min-height: 76px;
+  border-color: var(--theme-border);
+  background: var(--theme-surface-2);
+  box-shadow: none !important;
+}
+
+.pricing-tool-toggle:hover,
+.pricing-tool-toggle.is-on {
+  border-color: var(--theme-border-strong);
+  box-shadow: none !important;
+}
+
+.pricing-tool-toggle.is-on {
+  background: var(--theme-surface);
+}
+
+.pricing-tool-icon {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+}
+
+.pricing-switch {
+  background: color-mix(in srgb, var(--theme-text-muted) 24%, transparent);
+}
+
+.pricing-tool-toggle.is-on .pricing-switch {
+  background: var(--theme-primary);
+}
+
+.pricing-tool-note {
+  background: var(--theme-primary-soft);
+  color: var(--theme-text-soft);
+}
+
+.pricing-recommendation {
+  position: static;
+  border-color: var(--theme-border-strong) !important;
+}
+
+.pricing-price-row {
+  margin-bottom: 16px;
+}
+
+.pricing-price-row strong {
+  font-size: 38px;
+  letter-spacing: 0;
+}
+
+.pricing-plan-meta {
+  gap: 8px;
+}
+
+.pricing-plan-meta div,
+.pricing-limit-list,
+.pricing-storage-callout {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.pricing-storage-callout {
+  border: 1px solid var(--theme-border);
+}
+
+.pricing-plan-button.primary {
+  background: var(--theme-primary) !important;
+  box-shadow: none !important;
+}
+
+.pricing-plan-button.primary:hover:not(:disabled) {
+  background: var(--theme-primary-hover) !important;
+  box-shadow: none !important;
+}
+
+.pricing-compare {
+  margin-top: 16px;
+}
+
+.pricing-plan-strip {
+  gap: 10px;
+}
+
+.pricing-mini-plan {
+  min-height: 132px;
+  padding: 14px;
+}
+
+.pricing-mini-plan:hover,
+.pricing-mini-plan.is-selected {
+  border-color: var(--theme-border-strong) !important;
+  background: var(--theme-surface-2) !important;
+}
+

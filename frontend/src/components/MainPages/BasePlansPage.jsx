@@ -1,10 +1,24 @@
-﻿import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Database,
+  FileText,
+  Globe2,
+  HardDrive,
+} from "lucide-react";
 import { getPricingContent } from "../../content";
-import { apiFetch } from "../../utils/apiClient";
+import { PUBLIC_ROUTES, DASHBOARD_ROUTES } from "../../config/routes";
+import { BILLING_API_ROUTES } from "../../services/apiRoutes";
+import { apiFetch, getApiUrl } from "../../utils/apiClient";
 import SubscriptionStatusModal from "./SubscriptionStatusModal";
 
-const API_URL = import.meta.env.VITE_API_URL || "/api";
+const MODULE_ICONS = {
+  cms: Globe2,
+  forms: FileText,
+  reservations: CalendarDays,
+};
 
 function getFriendlySubscriptionError(errorDetail, lang = "en") {
   const text =
@@ -16,19 +30,43 @@ function getFriendlySubscriptionError(errorDetail, lang = "en") {
 
   if (text.includes("duplicate key value") || text.includes("already exists")) {
     return isArabic
-      ? "هذا الاشتراك موجود بالفعل في حسابك."
+      ? "ظ‡ط°ط§ ط§ظ„ط§ط´طھط±ط§ظƒ ظ…ظˆط¬ظˆط¯ ط¨ط§ظ„ظپط¹ظ„ ظپظٹ ط­ط³ط§ط¨ظƒ."
       : "This subscription is already active on your account.";
   }
 
   if (text.includes("User does not have a tenant_id")) {
     return isArabic
-      ? "لا يمكن العثور على مساحة العمل الخاصة بحسابك. يرجى تسجيل الدخول مرة أخرى."
+      ? "ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ط¹ط«ظˆط± ط¹ظ„ظ‰ ظ…ط³ط§ط­ط© ط§ظ„ط¹ظ…ظ„ ط§ظ„ط®ط§طµط© ط¨ط­ط³ط§ط¨ظƒ. ظٹط±ط¬ظ‰ طھط³ط¬ظٹظ„ ط§ظ„ط¯ط®ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰."
       : "We could not find your workspace. Please log in again.";
   }
 
   return isArabic
-    ? "تعذر حفظ الاشتراك. يرجى المحاولة مرة أخرى."
+    ? "طھط¹ط°ط± ط­ظپط¸ ط§ظ„ط§ط´طھط±ط§ظƒ. ظٹط±ط¬ظ‰ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰."
     : "Could not save your subscription. Please try again.";
+}
+
+function getPlanForTools(tools) {
+  if (tools.cms && tools.forms && tools.reservations) return "complete";
+  if (tools.cms && (tools.forms || tools.reservations)) return "cms-plus";
+  if (tools.cms) return "cms";
+  if (tools.forms) return "forms-data";
+  return "cms";
+}
+
+function getToolsForPlan(planId) {
+  if (planId === "forms-data") {
+    return { cms: false, forms: true, reservations: false };
+  }
+
+  if (planId === "cms-plus") {
+    return { cms: true, forms: true, reservations: false };
+  }
+
+  if (planId === "complete") {
+    return { cms: true, forms: true, reservations: true };
+  }
+
+  return { cms: true, forms: false, reservations: false };
 }
 
 export default function BasePlansPage({ lang = "en" }) {
@@ -36,7 +74,14 @@ export default function BasePlansPage({ lang = "en" }) {
   const isArabic = activeLang === "ar";
   const t = getPricingContent(activeLang);
   const navigate = useNavigate();
+  const location = useLocation();
+  const showBackButton = location.pathname !== PUBLIC_ROUTES.pricing;
 
+  const [selectedTools, setSelectedTools] = useState({
+    cms: true,
+    forms: true,
+    reservations: false,
+  });
   const [submittingId, setSubmittingId] = useState(null);
   const [modalState, setModalState] = useState({
     open: false,
@@ -44,11 +89,38 @@ export default function BasePlansPage({ lang = "en" }) {
     message: "",
   });
 
+  const selectedPlanId = getPlanForTools(selectedTools);
+  const selectedPlan =
+    t.basePlans.find((plan) => plan.id === selectedPlanId) || t.basePlans[0];
+
+  const toggleTool = (toolId) => {
+    setSelectedTools((current) => {
+      const next = {
+        ...current,
+        [toolId]: !current[toolId],
+      };
+
+      if (toolId === "reservations" && next.reservations) {
+        next.cms = true;
+      }
+
+      if (toolId === "cms" && !next.cms) {
+        next.reservations = false;
+      }
+
+      if (!next.cms && !next.forms && !next.reservations) {
+        next[toolId] = true;
+      }
+
+      return next;
+    });
+  };
+
   const handleSubscribe = async (plan) => {
     setSubmittingId(plan.id);
 
     try {
-      const response = await apiFetch(`${API_URL}/billing/checkout`, {
+      const response = await apiFetch(getApiUrl(BILLING_API_ROUTES.checkout), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,101 +173,151 @@ export default function BasePlansPage({ lang = "en" }) {
       message: "",
     });
 
-    if (type === "success") navigate("/my-plan");
-    if (type === "login") navigate("/login");
+    if (type === "success") navigate(DASHBOARD_ROUTES.myPlan);
+    if (type === "login") navigate(PUBLIC_ROUTES.login);
   };
 
   return (
     <main className="pricing-page" dir={isArabic ? "rtl" : "ltr"}>
       <section className="pricing-inner-header">
-        <button
-          type="button"
-          className="pricing-back-button"
-          onClick={() => navigate("/pricing")}
-        >
-          ← {isArabic ? "رجوع" : "Back"}
-        </button>
+        {showBackButton && (
+          <button
+            type="button"
+            className="pricing-back-button"
+            onClick={() => navigate(PUBLIC_ROUTES.pricing)}
+          >
+            {"<- "}{isArabic ? "ط±ط¬ظˆط¹" : "Back"}
+          </button>
+        )}
 
         <div className="pricing-section-heading">
-          <span>{t.basePlansLabel}</span>
           <h2>{t.basePlansTitle}</h2>
           <p>{t.basePlansSubtitle}</p>
         </div>
       </section>
 
       <section className="pricing-base-section">
-        <div className="pricing-plan-grid">
-          {t.basePlans.map((plan) => (
-            <article
-              key={plan.id}
-              className={`pricing-plan-card ${
-                plan.recommended ? "recommended" : ""
-              }`}
-            >
-              <div className="pricing-plan-content">
-                <div className="pricing-plan-top">
-                  <span>{plan.badge}</span>
-                  {plan.recommended && <strong>{t.recommended}</strong>}
-                </div>
+        <div className="pricing-builder">
+          <section
+            className="pricing-tool-panel"
+            aria-labelledby="pricing-tool-title"
+          >
+            <div className="pricing-panel-heading">
+              <h3 id="pricing-tool-title">{t.chooserTitle}</h3>
+              <p>{t.chooserSubtitle}</p>
+            </div>
 
-                <h3>{plan.name}</h3>
-                <p className="pricing-plan-description">
-                  {plan.description}
+            <div className="pricing-tool-list">
+              {t.modules.map((module) => {
+                const Icon = MODULE_ICONS[module.id] || Database;
+                const checked = selectedTools[module.id];
+
+                return (
+                  <button
+                    key={module.id}
+                    type="button"
+                    className={`pricing-tool-toggle ${checked ? "is-on" : ""}`}
+                    onClick={() => toggleTool(module.id)}
+                    aria-pressed={checked}
+                  >
+                    <span className="pricing-tool-icon" aria-hidden="true">
+                      <Icon size={20} />
+                    </span>
+
+                    <span className="pricing-tool-copy">
+                      <strong>{module.name}</strong>
+                      <small>{module.description}</small>
+                    </span>
+
+                    <span className="pricing-switch" aria-hidden="true">
+                      <span />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedTools.reservations && (
+              <p className="pricing-tool-note">{t.reservationNeedsCms}</p>
+            )}
+          </section>
+
+          <aside className="pricing-recommendation" aria-label={t.yourPlan}>
+            <h3>{selectedPlan.name}</h3>
+            <p className="pricing-plan-description">
+              {selectedPlan.description}
+            </p>
+
+            <div className="pricing-price-row">
+              <strong>{selectedPlan.price}</strong>
+              <span>{t.perMonth}</span>
+            </div>
+
+            <div className="pricing-plan-meta">
+              <div>
+                <span>{t.bestFor}</span>
+                <p>{selectedPlan.bestFor}</p>
+              </div>
+
+              <div>
+                <span>{t.workflow}</span>
+                <p>{selectedPlan.workflow}</p>
+              </div>
+            </div>
+
+            <div className="pricing-limit-list">
+              <span>{t.includedInPlan}</span>
+              <ul>
+                {selectedPlan.includes.map((item) => (
+                  <li key={item}>
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {selectedPlan.id === "complete" && (
+              <div className="pricing-storage-callout">
+                <HardDrive size={18} aria-hidden="true" />
+                <p>
+                  Save files on your device when you want local copies, or keep
+                  them on the server so your team can access them from the
+                  workspace.
                 </p>
-
-                <div className="pricing-price-row">
-                  <strong>{plan.price}</strong>
-                  <span>{t.perMonth}</span>
-                </div>
-
-                <div className="pricing-plan-meta">
-                  <div>
-                    <span>{t.bestFor}</span>
-                    <p>{plan.bestFor}</p>
-                  </div>
-
-                  <div>
-                    <span>{t.workflow}</span>
-                    <p>{plan.workflow}</p>
-                  </div>
-                </div>
-
-                <div className="pricing-limit-list">
-                  <span>{t.includes}</span>
-                  <ul>
-                    {plan.includes.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <ul className="pricing-feature-list">
-                  {plan.features.map((feature) => (
-                    <li
-                      key={feature.text}
-                      className={feature.included ? "included" : "muted"}
-                    >
-                      <span>{feature.included ? "✓" : "—"}</span>
-                      {feature.text}
-                    </li>
-                  ))}
-                </ul>
               </div>
+            )}
 
-              <div className="pricing-plan-footer">
-                <button
-                  type="button"
-                  className={`pricing-plan-button ${
-                    plan.recommended ? "primary" : "secondary"
-                  }`}
-                  disabled={submittingId === plan.id}
-                  onClick={() => handleSubscribe(plan)}
-                >
-                  {submittingId === plan.id ? t.saving : plan.cta}
-                </button>
-              </div>
-            </article>
-          ))}
+            <button
+              type="button"
+              className="pricing-plan-button primary"
+              disabled={submittingId === selectedPlan.id}
+              onClick={() => handleSubscribe(selectedPlan)}
+            >
+              {submittingId === selectedPlan.id ? t.saving : selectedPlan.cta}
+            </button>
+          </aside>
+        </div>
+
+        <div className="pricing-compare">
+          <span className="pricing-eyebrow">{t.comparePlans}</span>
+
+          <div className="pricing-plan-strip">
+            {t.basePlans.map((plan) => (
+              <button
+                key={plan.id}
+                type="button"
+                className={`pricing-mini-plan ${
+                  plan.id === selectedPlan.id ? "is-selected" : ""
+                }`}
+                onClick={() => setSelectedTools(getToolsForPlan(plan.id))}
+              >
+                <span>{plan.name}</span>
+                <strong>{plan.price}</strong>
+                <small>{plan.description}</small>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 

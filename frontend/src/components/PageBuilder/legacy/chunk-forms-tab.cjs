@@ -62,4 +62,3 @@ const replacement = `  const renderFormsTab = () => (
 source = source.slice(0, start) + replacement + source.slice(end);
 
 fs.writeFileSync(path, source);
-console.log("Chunked FormsTab out of PageBuilder.jsx");

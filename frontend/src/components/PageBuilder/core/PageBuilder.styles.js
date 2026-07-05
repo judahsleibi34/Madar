@@ -11,14 +11,22 @@ export const getBuilderElementStyle = ({
   const layoutWidth =
     getElementLayoutWidth(element.styles.width, element.styles.alignSelf) ||
     (carouselElementTypes.has(element.type) ? "100%" : undefined);
+  const elementStyles =
+    element.type === "formBlock"
+      ? Object.fromEntries(
+          Object.entries(element.styles || {}).filter(
+            ([key]) => key !== "backgroundColor" && key !== "borderRadius"
+          )
+        )
+      : element.styles;
 
   return {
-    ...element.styles,
+    ...elementStyles,
     "--builder-element-width": layoutWidth || "auto",
     "--builder-element-align": normalizeElementAlignSelf(element.styles.alignSelf) || "auto",
     "--builder-element-color": element.styles.color || "inherit",
-    "--builder-element-bg": element.styles.backgroundColor || "transparent",
-    "--builder-element-radius": element.styles.borderRadius || "0",
+    "--builder-element-bg": element.type === "formBlock" ? "transparent" : element.styles.backgroundColor || "transparent",
+    "--builder-element-radius": element.type === "formBlock" ? "0" : element.styles.borderRadius || "0",
     "--builder-element-font-size": element.styles.fontSize || "inherit",
     "--builder-element-text-align": element.styles.textAlign || "inherit",
     position: "relative",

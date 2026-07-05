@@ -6,10 +6,11 @@ import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "../LanguageSwitcher";
 import logo from "../../assets/MadarTemplates/madar_header.svg";
 import { getNavigationContent, primaryNavigationItems } from "../../content";
+import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
 
 const publicNavItems = [
   ...primaryNavigationItems,
-  { id: "privacy", labelKey: "privacy", path: "/privacy-policy" },
+  { id: "privacy", labelKey: "privacy", path: PUBLIC_ROUTES.privacyPolicy },
 ];
 
 export default function Header({
@@ -30,7 +31,7 @@ export default function Header({
   const finalNavItems = isLoggedIn
     ? [
         ...publicNavItems,
-        { id: "dashboard", labelKey: "dashboard", path: "/dashboard" },
+        { id: "dashboard", labelKey: "dashboard", path: DASHBOARD_ROUTES.dashboard },
       ]
     : publicNavItems;
 
@@ -99,8 +100,15 @@ export default function Header({
   return (
     <>
       <header className="site-header" dir={isRTL ? "rtl" : "ltr"}>
-        <Link to="/" className="brand" onClick={closeMenu}>
-          <img className="logo" src={logo} alt={t("common:app.logoAlt")} />
+        <Link to={PUBLIC_ROUTES.home} className="brand" onClick={closeMenu}>
+          <img
+            className="logo"
+            src={logo}
+            alt={t("common:app.logoAlt")}
+            width="813"
+            height="828"
+            decoding="async"
+          />
           <h1 className="brand-name">{t("common:app.brand")}</h1>
         </Link>
 
@@ -151,11 +159,11 @@ export default function Header({
             </button>
           ) : (
             <>
-              <Link to="/login" className="btn-login">
+              <Link to={PUBLIC_ROUTES.login} className="btn-login">
                 {navigation.login}
               </Link>
 
-              <Link to="/signup" className="btn-signup">
+              <Link to={PUBLIC_ROUTES.signup} className="btn-signup">
                 {navigation.signup}
               </Link>
 
@@ -203,8 +211,15 @@ export default function Header({
             dir={isRTL ? "rtl" : "ltr"}
           >
             <div className="mobile-menu-head">
-              <Link to="/" className="mobile-menu-brand" onClick={closeMenu}>
-                <img src={logo} alt={t("common:app.logoAlt")} />
+              <Link to={PUBLIC_ROUTES.home} className="mobile-menu-brand" onClick={closeMenu}>
+                <img
+                  src={logo}
+                  alt={t("common:app.logoAlt")}
+                  width="813"
+                  height="828"
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span>{t("common:app.brand")}</span>
               </Link>
 
@@ -293,7 +308,7 @@ export default function Header({
                 ) : (
                   <>
                     <Link
-                      to="/login"
+                      to={PUBLIC_ROUTES.login}
                       className="btn-login"
                       onClick={closeMenu}
                     >
@@ -301,7 +316,7 @@ export default function Header({
                     </Link>
 
                     <Link
-                      to="/signup"
+                      to={PUBLIC_ROUTES.signup}
                       className="btn-signup"
                       onClick={closeMenu}
                     >

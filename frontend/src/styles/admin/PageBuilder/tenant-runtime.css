@@ -338,3 +338,353 @@ body.theme-dark .tenant-footer-bottom button:hover {
   background: rgba(var(--theme-primary-rgb), 0.14) !important;
   color: var(--tenant-dark-accent-strong) !important;
 }
+
+/* Runtime pages must render the saved builder theme, even inside a dark dashboard shell. */
+:root[data-theme="dark"] .tenant-site-runtime,
+html.theme-dark .tenant-site-runtime,
+body.theme-dark .tenant-site-runtime,
+.tenant-site-runtime {
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page,
+.tenant-site-runtime .tenant-runtime-page {
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .builder-canvas,
+html.theme-dark .tenant-site-runtime .builder-canvas,
+body.theme-dark .tenant-site-runtime .builder-canvas,
+.tenant-site-runtime .builder-canvas {
+  background: var(--theme-bg) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .site-section,
+html.theme-dark .tenant-site-runtime .site-section,
+body.theme-dark .tenant-site-runtime .site-section,
+.tenant-site-runtime .site-section {
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-site-header,
+html.theme-dark .tenant-site-runtime .tenant-site-header,
+body.theme-dark .tenant-site-runtime .tenant-site-header,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-site-footer,
+html.theme-dark .tenant-site-runtime .tenant-site-footer,
+body.theme-dark .tenant-site-runtime .tenant-site-footer,
+.tenant-site-runtime .tenant-site-header,
+.tenant-site-runtime .tenant-site-footer {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-site-brand,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-site-nav button,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-logo-row h3,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-column h4,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-contact h4,
+html.theme-dark .tenant-site-runtime .tenant-site-brand,
+html.theme-dark .tenant-site-runtime .tenant-site-nav button,
+html.theme-dark .tenant-site-runtime .tenant-footer-logo-row h3,
+html.theme-dark .tenant-site-runtime .tenant-footer-column h4,
+html.theme-dark .tenant-site-runtime .tenant-footer-contact h4,
+body.theme-dark .tenant-site-runtime .tenant-site-brand,
+body.theme-dark .tenant-site-runtime .tenant-site-nav button,
+body.theme-dark .tenant-site-runtime .tenant-footer-logo-row h3,
+body.theme-dark .tenant-site-runtime .tenant-footer-column h4,
+body.theme-dark .tenant-site-runtime .tenant-footer-contact h4,
+.tenant-site-runtime .tenant-site-brand,
+.tenant-site-runtime .tenant-site-nav button,
+.tenant-site-runtime .tenant-footer-logo-row h3,
+.tenant-site-runtime .tenant-footer-column h4,
+.tenant-site-runtime .tenant-footer-contact h4 {
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-brand p,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-contact p,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-bottom p,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-column button,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-bottom button,
+html.theme-dark .tenant-site-runtime .tenant-footer-brand p,
+html.theme-dark .tenant-site-runtime .tenant-footer-contact p,
+html.theme-dark .tenant-site-runtime .tenant-footer-bottom p,
+html.theme-dark .tenant-site-runtime .tenant-footer-column button,
+html.theme-dark .tenant-site-runtime .tenant-footer-bottom button,
+body.theme-dark .tenant-site-runtime .tenant-footer-brand p,
+body.theme-dark .tenant-site-runtime .tenant-footer-contact p,
+body.theme-dark .tenant-site-runtime .tenant-footer-bottom p,
+body.theme-dark .tenant-site-runtime .tenant-footer-column button,
+body.theme-dark .tenant-site-runtime .tenant-footer-bottom button,
+.tenant-site-runtime .tenant-footer-brand p,
+.tenant-site-runtime .tenant-footer-contact p,
+.tenant-site-runtime .tenant-footer-bottom p,
+.tenant-site-runtime .tenant-footer-column button,
+.tenant-site-runtime .tenant-footer-bottom button {
+  color: var(--theme-text-soft) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-site-nav button:hover,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-site-nav button.active,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-column button:hover,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-footer-bottom button:hover,
+html.theme-dark .tenant-site-runtime .tenant-site-nav button:hover,
+html.theme-dark .tenant-site-runtime .tenant-site-nav button.active,
+html.theme-dark .tenant-site-runtime .tenant-footer-column button:hover,
+html.theme-dark .tenant-site-runtime .tenant-footer-bottom button:hover,
+body.theme-dark .tenant-site-runtime .tenant-site-nav button:hover,
+body.theme-dark .tenant-site-runtime .tenant-site-nav button.active,
+body.theme-dark .tenant-site-runtime .tenant-footer-column button:hover,
+body.theme-dark .tenant-site-runtime .tenant-footer-bottom button:hover,
+.tenant-site-runtime .tenant-site-nav button:hover,
+.tenant-site-runtime .tenant-site-nav button.active,
+.tenant-site-runtime .tenant-footer-column button:hover,
+.tenant-site-runtime .tenant-footer-bottom button:hover {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary-hover) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-site-cta,
+html.theme-dark .tenant-site-runtime .tenant-site-cta,
+body.theme-dark .tenant-site-runtime .tenant-site-cta,
+.tenant-site-runtime .tenant-site-cta,
+:root[data-theme="dark"] .tenant-site-runtime .builder-element-button,
+html.theme-dark .tenant-site-runtime .builder-element-button,
+body.theme-dark .tenant-site-runtime .builder-element-button,
+.tenant-site-runtime .builder-element-button {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+/* Component-level color boundary for tenant pages embedded in the dark builder shell. */
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element,
+.tenant-site-runtime .tenant-runtime-page .builder-element {
+  border-color: transparent !important;
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-heading,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-card strong,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-auth-heading h3,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-form-header h3,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-form-section-header h4,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-question-title,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .metric-value,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-heading,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-card strong,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-heading h3,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-header h3,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-section-header h4,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-question-title,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .metric-value,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-heading,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-card strong,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-heading h3,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-header h3,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-section-header h4,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-question-title,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .metric-value,
+.tenant-site-runtime .tenant-runtime-page .builder-element-heading,
+.tenant-site-runtime .tenant-runtime-page .builder-element-card strong,
+.tenant-site-runtime .tenant-runtime-page .builder-auth-heading h3,
+.tenant-site-runtime .tenant-runtime-page .runtime-form-header h3,
+.tenant-site-runtime .tenant-runtime-page .runtime-form-section-header h4,
+.tenant-site-runtime .tenant-runtime-page .runtime-question-title,
+.tenant-site-runtime .tenant-runtime-page .metric-value {
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-text,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-list,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-card span,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-auth-heading p,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-auth-switch,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-form-header p,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-form-section-header p,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-question small,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .metric-label,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .metric-description,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-text,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-list,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-card span,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-heading p,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-switch,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-header p,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-section-header p,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-question small,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .metric-label,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .metric-description,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-text,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-list,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-card span,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-heading p,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-switch,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-header p,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-section-header p,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-question small,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .metric-label,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .metric-description,
+.tenant-site-runtime .tenant-runtime-page .builder-element-text,
+.tenant-site-runtime .tenant-runtime-page .builder-element-list,
+.tenant-site-runtime .tenant-runtime-page .builder-element-card span,
+.tenant-site-runtime .tenant-runtime-page .builder-auth-heading p,
+.tenant-site-runtime .tenant-runtime-page .builder-auth-switch,
+.tenant-site-runtime .tenant-runtime-page .runtime-form-header p,
+.tenant-site-runtime .tenant-runtime-page .runtime-form-section-header p,
+.tenant-site-runtime .tenant-runtime-page .runtime-question small,
+.tenant-site-runtime .tenant-runtime-page .metric-label,
+.tenant-site-runtime .tenant-runtime-page .metric-description {
+  color: var(--theme-text-soft) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-card,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-metric,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-loginBlock,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-registrationBlock,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-reservationBlock,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-responsesTable,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-embed,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-auth-component,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-form,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .responses-preview,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-card,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-metric,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-loginBlock,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-registrationBlock,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-reservationBlock,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-responsesTable,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-embed,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-component,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .responses-preview,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-card,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-metric,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-loginBlock,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-registrationBlock,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-reservationBlock,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-responsesTable,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element-embed,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-auth-component,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .responses-preview,
+.tenant-site-runtime .tenant-runtime-page .builder-element-card,
+.tenant-site-runtime .tenant-runtime-page .builder-element-metric,
+.tenant-site-runtime .tenant-runtime-page .builder-element-loginBlock,
+.tenant-site-runtime .tenant-runtime-page .builder-element-registrationBlock,
+.tenant-site-runtime .tenant-runtime-page .builder-element-reservationBlock,
+.tenant-site-runtime .tenant-runtime-page .builder-element-responsesTable,
+.tenant-site-runtime .tenant-runtime-page .builder-element-embed,
+.tenant-site-runtime .tenant-runtime-page .builder-auth-component,
+.tenant-site-runtime .tenant-runtime-page .runtime-form,
+.tenant-site-runtime .tenant-runtime-page .responses-preview {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 18px 44px rgba(var(--theme-shadow-rgb), 0.1) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-form-section,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-question,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .mock-table-row,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .reservation-calendar,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .reservation-form-preview,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-section,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-question,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .mock-table-row,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .reservation-calendar,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .reservation-form-preview,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-section,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-question,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .mock-table-row,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .reservation-calendar,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .reservation-form-preview,
+.tenant-site-runtime .tenant-runtime-page .runtime-form-section,
+.tenant-site-runtime .tenant-runtime-page .runtime-question,
+.tenant-site-runtime .tenant-runtime-page .mock-table-row,
+.tenant-site-runtime .tenant-runtime-page .reservation-calendar,
+.tenant-site-runtime .tenant-runtime-page .reservation-form-preview {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page input,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page select,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page textarea,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page input,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page select,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page textarea,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page input,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page select,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page textarea,
+.tenant-site-runtime .tenant-runtime-page input,
+.tenant-site-runtime .tenant-runtime-page select,
+.tenant-site-runtime .tenant-runtime-page textarea {
+  background: var(--form-theme-input, var(--theme-surface)) !important;
+  border-color: var(--form-theme-border, var(--theme-border)) !important;
+  color: var(--form-theme-text, var(--theme-text)) !important;
+  caret-color: var(--form-theme-text, var(--theme-text)) !important;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:hover,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:focus,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:active,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:hover,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:focus,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:active,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:hover,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:focus,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:active,
+.tenant-site-runtime .tenant-runtime-page input:-webkit-autofill,
+.tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:hover,
+.tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:focus,
+.tenant-site-runtime .tenant-runtime-page input:-webkit-autofill:active {
+  border-color: var(--form-theme-border, var(--theme-border)) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--form-theme-input, var(--theme-surface)) inset !important;
+  box-shadow: 0 0 0 1000px var(--form-theme-input, var(--theme-surface)) inset !important;
+  -webkit-text-fill-color: var(--form-theme-text, var(--theme-text)) !important;
+  caret-color: var(--form-theme-text, var(--theme-text)) !important;
+  transition: background-color 999999s ease-out, color 999999s ease-out;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page input::placeholder,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page textarea::placeholder,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page input::placeholder,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page textarea::placeholder,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page input::placeholder,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page textarea::placeholder,
+.tenant-site-runtime .tenant-runtime-page input::placeholder,
+.tenant-site-runtime .tenant-runtime-page textarea::placeholder {
+  color: var(--form-theme-muted, var(--theme-text-soft)) !important;
+  opacity: 0.72 !important;
+}
+
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-submit,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .reservation-submit,
+:root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .runtime-form-pagination button.runtime-submit,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-submit,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .reservation-submit,
+html.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-pagination button.runtime-submit,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-submit,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .reservation-submit,
+body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-pagination button.runtime-submit,
+.tenant-site-runtime .tenant-runtime-page .runtime-submit,
+.tenant-site-runtime .tenant-runtime-page .reservation-submit,
+.tenant-site-runtime .tenant-runtime-page .runtime-form-pagination button.runtime-submit {
+  background: var(--form-theme-accent, var(--theme-primary)) !important;
+  border-color: transparent !important;
+  color: var(--form-theme-button-text, var(--theme-text-inverse)) !important;
+}

@@ -3,7 +3,8 @@ import { useState } from "react";
 import GradientText from "../Animations/GradientText";
 import { getContactContent } from "../../content";
 import { FormBlock, HeroBlock, SectionBlock } from "../../blocks";
-import { postPublicJson, readApiError } from "../../utils/apiClient";
+import { PUBLIC_API_ROUTES } from "../../services/apiRoutes";
+import { postPublicJson, readApiErrorCode } from "../../utils/apiClient";
 
 export default function ContactPage({ lang = "en" }) {
   const t = getContactContent(lang);
@@ -23,7 +24,7 @@ export default function ContactPage({ lang = "en" }) {
 
     try {
       const { response, data } = await postPublicJson(
-        "/public/contact",
+        PUBLIC_API_ROUTES.contact,
         {
           name: form.name,
           phone: form.phone || null,
@@ -32,13 +33,14 @@ export default function ContactPage({ lang = "en" }) {
       );
 
       if (!response.ok) {
-        throw new Error(readApiError(data, "Contact request failed"));
+        const errorCode = readApiErrorCode(data);
+        throw new Error(t.form.errors?.[errorCode] || t.form.error);
       }
 
       setForm({ name: "", phone: "", message: "" });
       setStatus({ type: "success", message: t.form.success });
-    } catch {
-      setStatus({ type: "error", message: t.form.error });
+    } catch (error) {
+      setStatus({ type: "error", message: error.message || t.form.error });
     } finally {
       setIsSubmitting(false);
     }

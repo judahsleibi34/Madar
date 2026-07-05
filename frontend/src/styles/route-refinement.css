@@ -3088,3 +3088,19 @@ body.theme-dark .page-builder .builder-toast,
     padding: 24px 16px 48px !important;
   }
 }
+
+/* Dashboard sidebar brand: no subtitle card/background. */
+.admin-sidebar.dashboard-sidebar .admin-sidebar-brand,
+.admin-sidebar.dashboard-sidebar .admin-sidebar-brand:hover,
+.admin-sidebar.dashboard-sidebar .admin-sidebar-brand:focus-visible,
+:root[data-theme="dark"] .admin-sidebar.dashboard-sidebar .admin-sidebar-brand,
+:root[data-theme="dark"] .admin-sidebar.dashboard-sidebar .admin-sidebar-brand:hover,
+body.theme-dark .admin-sidebar.dashboard-sidebar .admin-sidebar-brand,
+body.theme-dark .admin-sidebar.dashboard-sidebar .admin-sidebar-brand:hover,
+.theme-dark .admin-sidebar.dashboard-sidebar .admin-sidebar-brand,
+.theme-dark .admin-sidebar.dashboard-sidebar .admin-sidebar-brand:hover {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}

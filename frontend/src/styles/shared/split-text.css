@@ -7,6 +7,7 @@
   letter-spacing: 0;
   line-height: inherit;
   white-space: nowrap;
+  transition: transform 0.2s ease;
 }
 
 .split-text-character {
@@ -17,8 +18,8 @@
   animation-delay: calc(var(--split-text-index) * var(--split-text-delay, 0.035s));
 }
 
-.split-text:hover .split-text-character {
-  animation-name: splitTextLift;
+.split-text:hover {
+  transform: translateY(-0.04em);
 }
 
 @keyframes splitTextReveal {

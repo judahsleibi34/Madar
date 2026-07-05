@@ -1,5 +1,6 @@
-﻿import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getPricingContent } from "../../content";
+import { PUBLIC_ROUTES } from "../../config/routes";
 
 export default function PricingPage({ lang = "en" }) {
   const activeLang = lang === "ar" ? "ar" : "en";
@@ -20,7 +21,7 @@ export default function PricingPage({ lang = "en" }) {
           <button
             type="button"
             className="pricing-choice-card active"
-            onClick={() => navigate("/pricing/base-plans")}
+            onClick={() => navigate(PUBLIC_ROUTES.pricingBasePlans)}
           >
             <span>{t.basePlansTab}</span>
             <strong>{t.basePlansTitle}</strong>
@@ -31,7 +32,7 @@ export default function PricingPage({ lang = "en" }) {
           <button
             type="button"
             className="pricing-choice-card"
-            onClick={() => navigate("/pricing/custom-plan")}
+            onClick={() => navigate(PUBLIC_ROUTES.pricingCustomPlan)}
           >
             <span>{t.customPlansTab}</span>
             <strong>{t.customPlans.title}</strong>

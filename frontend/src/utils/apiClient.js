@@ -55,6 +55,10 @@ export const readApiResponse = async (response) => {
 };
 
 export const readApiError = (data, fallback = "Request failed") => {
+  if (typeof data?.detail?.message === "string" && data.detail.message.trim()) {
+    return data.detail.message;
+  }
+
   if (typeof data?.detail === "string" && data.detail.trim()) {
     return data.detail;
   }

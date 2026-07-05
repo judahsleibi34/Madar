@@ -1,17 +1,13 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
+
+import RouteSuspense from "../../common/RouteSuspense";
 
 const DataAnalysisWorkspace = lazy(() => import("../DataAnalysisWorkspace"));
 
 export default function DataTab(props) {
   return (
-    <Suspense
-      fallback={
-        <div className="builder-panel-loading" role="status" aria-live="polite">
-          Loading data workspace...
-        </div>
-      }
-    >
+    <RouteSuspense label="Loading data workspace" variant="data-analysis">
       <DataAnalysisWorkspace {...props} />
-    </Suspense>
+    </RouteSuspense>
   );
 }

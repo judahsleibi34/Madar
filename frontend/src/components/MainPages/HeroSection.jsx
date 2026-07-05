@@ -1,11 +1,55 @@
-import { lazy, Suspense } from "react";
-import { motion } from "framer-motion";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Trans, useTranslation } from "react-i18next";
 
 import GradientText from "../Animations/GradientText";
 import SplitText from "../Animations/SplitText";
 
 const OrbitVisual = lazy(() => import("./OrbitVisual"));
+
+function OrbitVisualPlaceholder() {
+  return (
+    <div className="hero-visual-placeholder" aria-hidden="true">
+      <span className="hero-visual-placeholder-core" />
+      <span className="hero-visual-placeholder-ring hero-visual-placeholder-ring-one" />
+      <span className="hero-visual-placeholder-ring hero-visual-placeholder-ring-two" />
+      <span className="hero-visual-placeholder-ring hero-visual-placeholder-ring-three" />
+    </div>
+  );
+}
+
+function LazyOrbitVisual({ lang }) {
+  const prefersReducedMotion = useReducedMotion();
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      return undefined;
+    }
+
+    const load = () => setShouldLoad(true);
+
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(load, { timeout: 1500 });
+      return () => window.cancelIdleCallback(id);
+    }
+
+    const id = window.setTimeout(load, 800);
+    return () => window.clearTimeout(id);
+  }, [prefersReducedMotion]);
+
+  if (prefersReducedMotion || !shouldLoad) {
+    return <OrbitVisualPlaceholder />;
+  }
+
+  return (
+    <Suspense fallback={<OrbitVisualPlaceholder />}>
+      <div className="hero-visual-ready">
+        <OrbitVisual lang={lang} />
+      </div>
+    </Suspense>
+  );
+}
 
 export default function HeroSection({ lang }) {
   const { t } = useTranslation("public");
@@ -43,9 +87,7 @@ export default function HeroSection({ lang }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
       >
-        <Suspense fallback={<div className="hero-visual-fallback" aria-hidden="true" />}>
-          <OrbitVisual lang={lang} />
-        </Suspense>
+        <LazyOrbitVisual lang={lang} />
       </motion.div>
     </section>
   );

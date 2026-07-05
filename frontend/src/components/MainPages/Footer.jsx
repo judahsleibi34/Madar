@@ -31,7 +31,15 @@ export default function Footer({ lang = "en" }) {
         <div className="footer-main">
           <section className="footer-brand" aria-label={content.brandAria}>
             <NavLink to="/" className="footer-logo-link" aria-label={content.homeAria}>
-              <img className="footer-logo" src={logo} alt={t("common:app.logoAlt")} />
+              <img
+                className="footer-logo"
+                src={logo}
+                alt={t("common:app.logoAlt")}
+                width="813"
+                height="828"
+                loading="lazy"
+                decoding="async"
+              />
               <span>{brand}</span>
             </NavLink>
 

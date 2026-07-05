@@ -1,8 +1,9 @@
+import { Database, FileText, ShieldCheck, Workflow } from "lucide-react";
 import FadeIn from "../Animations/FadeIn";
-import GradientText from "../Animations/GradientText";
-import SplitText from "../Animations/SplitText";
 import { getAboutContent } from "../../content";
-import { HeroBlock, SectionBlock } from "../../blocks";
+import { SectionBlock } from "../../blocks";
+
+const aboutIcons = [FileText, Workflow, Database];
 
 export default function AboutSection({ lang }) {
   const t = getAboutContent(lang);
@@ -10,39 +11,62 @@ export default function AboutSection({ lang }) {
   return (
     <SectionBlock id="about" className="about-section">
       <FadeIn delay={0}>
-        <h1 className="hero-title">
-          {lang === "en" ? (
-            <>
-              {t.hero.titlePrefix}{" "}
-              <GradientText pauseOnHover>{t.hero.titleHighlight}</GradientText>
-            </>
-          ) : (
-            <GradientText pauseOnHover>{t.hero.title}</GradientText>
-          )}
-        </h1>
+        <div className="about-hero">
+          <div className="about-hero-copy">
+            <span className="about-eyebrow">{t.hero.eyebrow}</span>
+            <h1>
+              {t.hero.titlePrefix} <span>{t.hero.titleHighlight}</span>
+            </h1>
+            <p>
+              <strong>{t.hero.name}</strong> {t.hero.description}
+            </p>
+            <p>{t.hero.secondDescription}</p>
+          </div>
+
+          <div className="about-hero-panel" aria-label="Madar digitalization focus">
+            <div className="about-panel-icon">
+              <ShieldCheck size={26} />
+            </div>
+            <h2>Digital operations, without the clutter</h2>
+            <p>
+              Replace scattered paperwork with structured pages, forms, records,
+              and workflows your team can actually use every day.
+            </p>
+          </div>
+        </div>
       </FadeIn>
 
-      <FadeIn delay={0.15}>
-        <p className="hero-description">
-          <SplitText className="arabic-name">{t.hero.name}</SplitText>{" "}
-          {t.hero.description}
-        </p>
-      </FadeIn>
+      <div className="about-metrics" aria-label="Madar platform strengths">
+        {t.metrics.map((metric, index) => {
+          const Icon = aboutIcons[index] || FileText;
 
-      <FadeIn delay={0.25}>
-        <p className="hero-description">{t.hero.secondDescription}</p>
-      </FadeIn>
+          return (
+            <FadeIn delay={0.12 + index * 0.08} key={metric.value}>
+              <article className="about-metric">
+                <Icon size={20} />
+                <strong>{metric.value}</strong>
+                <span>{metric.label}</span>
+              </article>
+            </FadeIn>
+          );
+        })}
+      </div>
 
-      {t.sections.map((section, index) => (
-        <FadeIn delay={0.35 + index * 0.1} key={section.title}>
-          <HeroBlock as="div">
-            <h2 className="hero-subtitle">
-              <GradientText pauseOnHover>{section.title}</GradientText>
-            </h2>
-            <p className="hero-description">{section.body}</p>
-          </HeroBlock>
-        </FadeIn>
-      ))}
+      <div className="about-grid">
+        {t.sections.map((section, index) => (
+          <FadeIn delay={0.25 + index * 0.08} key={section.title}>
+            <article className="about-card">
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <h2>{section.title}</h2>
+              <p>{section.body}</p>
+            </article>
+          </FadeIn>
+        ))}
+      </div>
+
+      <FadeIn delay={0.55}>
+        <p className="about-closing">{t.closing}</p>
+      </FadeIn>
     </SectionBlock>
   );
 }

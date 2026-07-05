@@ -13,6 +13,11 @@ export const contactContent = {
       sending: "Sending...",
       success: "Thanks. Your message has been received.",
       error: "Could not send your message. Please check the form and try again.",
+      errors: {
+        CONTACT_NAME_REQUIRED: "Name is required.",
+        CONTACT_MESSAGE_REQUIRED: "Message is required.",
+        CONTACT_SUBMIT_FAILED: "Could not send your message. Please try again.",
+      },
     },
     info: {
       title: "Contact Information",

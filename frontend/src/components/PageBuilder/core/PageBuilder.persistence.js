@@ -31,14 +31,39 @@ export const createBuilderProjectPayload = ({
   draft_schema: project,
 });
 
+const downloadBuilderProjectJson = (payload) => {
+  if (typeof document === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
+    throw new Error("Project export download is unavailable.");
+  }
+
+  const blob = new Blob([payload], { type: "application/json" });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  try {
+    link.href = objectUrl;
+    link.download = "madar-builder-project.json";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
 export const exportBuilderProjectJson = async ({ project, showToast }) => {
   const payload = JSON.stringify(project, null, 2);
-  console.log(payload);
 
   try {
     await navigator.clipboard.writeText(payload);
     showToast("Exported JSON copied to clipboard.");
   } catch {
-    showToast("Exported JSON printed to console.");
+    try {
+      downloadBuilderProjectJson(payload);
+      showToast("Exported JSON downloaded.");
+    } catch {
+      showToast("Export is unavailable. Please try again.");
+    }
   }
 };

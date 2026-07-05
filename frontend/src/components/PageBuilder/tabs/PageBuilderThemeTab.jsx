@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { RotateCcw, Save, Wand2 } from "lucide-react";
 import { defaultTheme } from "../core/PageBuilder.constants";
-import { defaultFormTheme } from "../core/PageBuilder.theme";
 
 const websiteColorControls = [
   ["background", "Site background"],
@@ -11,17 +10,6 @@ const websiteColorControls = [
   ["muted", "Supporting text"],
   ["accent", "Main brand color"],
   ["accentDark", "Button hover"],
-  ["buttonText", "Button text"],
-];
-
-const formColorControls = [
-  ["background", "Form page"],
-  ["surface", "Form card"],
-  ["inputBackground", "Field background"],
-  ["text", "Text"],
-  ["muted", "Helper text"],
-  ["border", "Border"],
-  ["accent", "Main action"],
   ["buttonText", "Button text"],
 ];
 
@@ -130,10 +118,11 @@ export default function PageBuilderThemeTab({
   project,
   updateProject,
   saveProject,
+  variant = "page",
 }) {
   const [savingTheme, setSavingTheme] = useState(false);
   const websiteTheme = project.theme || {};
-  const formTheme = websiteTheme.form || {};
+  const isSidebar = variant === "sidebar";
 
   const saveTheme = async () => {
     if (!saveProject || savingTheme) return;
@@ -156,16 +145,6 @@ export default function PageBuilderThemeTab({
     }));
   };
 
-  const resetFormTheme = () => {
-    updateProject((prev) => ({
-      ...prev,
-      theme: {
-        ...prev.theme,
-        form: { ...defaultFormTheme },
-      },
-    }));
-  };
-
   const applyThemeToPageBlocks = () => {
     updateProject((prev) => ({
       ...prev,
@@ -182,19 +161,6 @@ export default function PageBuilderThemeTab({
       theme: {
         ...prev.theme,
         [key]: value,
-      },
-    }));
-  };
-
-  const updateFormThemeValue = (key, value) => {
-    updateProject((prev) => ({
-      ...prev,
-      theme: {
-        ...prev.theme,
-        form: {
-          ...(prev.theme?.form || {}),
-          [key]: value,
-        },
       },
     }));
   };
@@ -229,14 +195,90 @@ export default function PageBuilderThemeTab({
     );
   };
 
+  if (isSidebar) {
+    return (
+      <div className="theme-sidebar-editor">
+        <h2>Themes</h2>
+        <p className="panel-help">Tune the builder canvas and preview changes beside this panel.</p>
+
+        <div className="page-utility-actions theme-sidebar-actions">
+          <button type="button" onClick={resetWebsiteTheme}>
+            <RotateCcw size={16} aria-hidden="true" />
+            <span>Reset</span>
+          </button>
+          <button type="button" onClick={applyThemeToPageBlocks}>
+            <Wand2 size={16} aria-hidden="true" />
+            <span>Apply</span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className="page-primary-action"
+          onClick={saveTheme}
+          disabled={savingTheme || !saveProject}
+        >
+          <Save size={16} aria-hidden="true" />
+          <span>{savingTheme ? "Saving..." : "Save changes"}</span>
+        </button>
+
+        <div className="section-component-palette theme-sidebar-palette">
+          <span>Theme colors</span>
+          <div className="theme-sidebar-grid">
+            {websiteColorControls.map(([key, label]) =>
+              renderColorControl({
+                fallback: colorFallbacks[key],
+                keyName: key,
+                label,
+                onChange: updateThemeValue,
+                value: websiteTheme[key],
+              })
+            )}
+          </div>
+
+          <span>Shape & typography</span>
+          <div className="theme-sidebar-grid">
+            <label className="theme-number-control">
+              <span className="theme-token-label">Round corners</span>
+              <input
+                type="number"
+                min="0"
+                value={websiteTheme.radius || 18}
+                onChange={(event) => updateThemeValue("radius", Number(event.target.value))}
+              />
+            </label>
+
+            <label className="theme-select-control">
+              <span className="theme-token-label">Font family</span>
+              <select
+                value={websiteTheme.fontFamily || "Inter"}
+                onChange={(event) => updateThemeValue("fontFamily", event.target.value)}
+              >
+                {fontFamilyOptions.map((fontFamily) => (
+                  <option key={fontFamily} value={fontFamily}>
+                    {fontFamily}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="workspace-page theme-workspace-page">
       <section className="theme-section">
         <div className="theme-section-heading">
           <div>
-            <span className="workspace-kicker">Website style</span>
-            <h3>Website look</h3>
-            <p>Choose the colors, font, buttons, header, footer, and page background visitors will see.</p>
+            <span className="workspace-kicker">{isSidebar ? "Builder themes" : "Builder style"}</span>
+            <h3>Canvas look</h3>
+            <p>
+              {isSidebar
+                ? "Edit the builder page theme while keeping the canvas visible."
+                : "Choose the colors, font, buttons, and page background used by the builder canvas."}
+            </p>
           </div>
           <div className="theme-section-actions">
             <button type="button" className="theme-action-button" onClick={resetWebsiteTheme}>
@@ -291,53 +333,6 @@ export default function PageBuilderThemeTab({
         </div>
       </section>
 
-      <section className="theme-section">
-        <div className="theme-section-heading">
-          <div>
-            <span className="workspace-kicker">Forms</span>
-            <h3>Form style</h3>
-            <p>Choose how forms look when they are shown on your published website.</p>
-          </div>
-          <div className="theme-section-actions">
-            <button type="button" className="theme-action-button" onClick={resetFormTheme}>
-              <RotateCcw size={16} />
-              <span>Reset form</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="theme-grid">
-          {formColorControls.map(([key, label]) =>
-            renderColorControl({
-              fallback: defaultFormTheme[key],
-              keyName: key,
-              label,
-              onChange: updateFormThemeValue,
-              value: formTheme[key],
-            })
-          )}
-
-          <label className="theme-number-control">
-            <span className="theme-token-label">Form corners</span>
-            <input
-              type="number"
-              min="0"
-              value={formTheme.radius ?? 8}
-              onChange={(event) => updateFormThemeValue("radius", Number(event.target.value))}
-            />
-          </label>
-
-          <label className="theme-number-control">
-            <span className="theme-token-label">Field corners</span>
-            <input
-              type="number"
-              min="0"
-              value={formTheme.fieldRadius ?? 14}
-              onChange={(event) => updateFormThemeValue("fieldRadius", Number(event.target.value))}
-            />
-          </label>
-        </div>
-      </section>
     </div>
   );
 }

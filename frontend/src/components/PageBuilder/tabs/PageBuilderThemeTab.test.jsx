@@ -6,8 +6,8 @@ afterEach(() => {
   cleanup();
 });
 
-describe("PageBuilderThemeTab form theme controls", () => {
-  it("shows form color defaults instead of inheriting website colors", () => {
+describe("PageBuilderThemeTab builder theme controls", () => {
+  it("shows builder colors without rendering form color controls", () => {
     render(
       <PageBuilderThemeTab
         project={{ theme: { background: "#123456", surface: "#234567", form: {} } }}
@@ -17,17 +17,18 @@ describe("PageBuilderThemeTab form theme controls", () => {
     );
 
     expect(screen.getByLabelText("Site background").value).toBe("#123456");
-    expect(screen.getByLabelText("Form page").value).toBe("#ffffff");
-    expect(screen.getByLabelText("Form card").value).toBe("#ffffff");
+    expect(screen.getByLabelText("Content area").value).toBe("#234567");
+    expect(screen.queryByLabelText("Form page")).toBeNull();
+    expect(screen.queryByLabelText("Form card")).toBeNull();
   });
 
-  it("updates form colors without changing website colors", () => {
+  it("updates builder colors without changing saved form colors", () => {
     const updateProject = vi.fn();
     const project = {
       theme: {
         background: "#123456",
         surface: "#234567",
-        form: { background: "#ffffff" },
+        form: { surface: "#ffffff" },
       },
     };
 
@@ -39,14 +40,15 @@ describe("PageBuilderThemeTab form theme controls", () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText("Form page"), {
+    fireEvent.change(screen.getByLabelText("Site background"), {
       target: { value: "#abcdef" },
     });
 
     const updater = updateProject.mock.calls[0][0];
     const nextProject = updater(project);
 
-    expect(nextProject.theme.background).toBe("#123456");
-    expect(nextProject.theme.form.background).toBe("#abcdef");
+    expect(nextProject.theme.background).toBe("#abcdef");
+    expect(nextProject.theme.surface).toBe("#234567");
+    expect(nextProject.theme.form.surface).toBe("#ffffff");
   });
 });

@@ -5,6 +5,7 @@ from fastapi import HTTPException, FastAPI
 from fastapi.testclient import TestClient
 
 from routes import public_contact_routes
+from services import error_codes
 
 
 class FakeResponse:
@@ -60,7 +61,11 @@ class PublicContactRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
-            {"success": True, "message": "Contact message received"},
+            {
+                "success": True,
+                "code": error_codes.CONTACT_RECEIVED,
+                "message": "Contact message received",
+            },
         )
         self.assertEqual(fake_supabase.queries[0].table_name, "contacts")
         self.assertEqual(
@@ -96,7 +101,8 @@ class PublicContactRouteTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Name is required")
+        self.assertEqual(response.json()["detail"]["code"], error_codes.CONTACT_NAME_REQUIRED)
+        self.assertEqual(response.json()["detail"]["message"], "Name is required")
 
     def test_empty_message_is_rejected(self):
         client = build_client()
@@ -108,7 +114,8 @@ class PublicContactRouteTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Message is required")
+        self.assertEqual(response.json()["detail"]["code"], error_codes.CONTACT_MESSAGE_REQUIRED)
+        self.assertEqual(response.json()["detail"]["message"], "Message is required")
 
     def test_overlong_message_is_rejected_by_schema(self):
         client = build_client()

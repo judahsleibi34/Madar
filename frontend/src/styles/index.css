@@ -28,6 +28,7 @@
 
 @import "./shared/buttons.css";
 @import "./shared/gradient-text.css";
+@import "./shared/page-skeleton.css";
 @import "./shared/split-text.css";
 
 @import "./admin/dashboard/index.css";

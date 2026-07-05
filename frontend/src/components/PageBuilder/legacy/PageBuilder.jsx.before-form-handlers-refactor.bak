@@ -299,8 +299,10 @@ export default function PageBuilder({
           setSelected({ type: "page", id: loadedProject.activePageId });
           localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedProject));
         }
-      } catch (error) {
-        console.warn("Could not load builder project from backend:", error);
+      } catch {
+        if (import.meta.env.DEV) {
+          console.warn("Could not load builder project from backend.");
+        }
         if (!cancelled) {
           showToast("Using local draft cache. Save again when the backend is reachable.");
         }
@@ -1401,8 +1403,10 @@ export default function PageBuilder({
 
       setBuilderProjectRecord(savedRecord);
       showToast("Saved to backend.");
-    } catch (error) {
-      console.error("Could not save builder project:", error);
+    } catch {
+      if (import.meta.env.DEV) {
+        console.error("Could not save builder project.");
+      }
       showToast("Saved local draft cache. Backend save failed.");
     }
   };
@@ -1433,8 +1437,10 @@ export default function PageBuilder({
           return;
         }
       }
-    } catch (error) {
-      console.warn("Could not load backend builder project:", error);
+    } catch {
+      if (import.meta.env.DEV) {
+        console.warn("Could not load backend builder project.");
+      }
     }
 
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1548,7 +1554,9 @@ export default function PageBuilder({
       if (liveWindow && !liveWindow.closed) {
         liveWindow.close();
       }
-      console.error("Could not publish builder project:", error);
+      if (import.meta.env.DEV) {
+        console.error("Could not publish builder project.");
+      }
       showToast(error?.message || "Publish failed. Local draft cache was updated.");
     }
   };

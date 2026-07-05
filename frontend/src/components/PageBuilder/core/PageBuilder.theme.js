@@ -63,14 +63,21 @@ const hexToRgb = (hex, fallback = "27, 42, 74") => {
   return `${r}, ${g}, ${b}`;
 };
 
-export const getPageBuilderThemeVars = (theme = {}) => {
-  const safeTheme = {
-    mode: "light",
-    ...defaultWebsiteTheme,
-    radius: 18,
-    fontFamily: "Inter",
-    ...theme,
-  };
+const getSafeWebsiteTheme = (theme = {}) => ({
+  mode: "light",
+  ...defaultWebsiteTheme,
+  radius: 18,
+  fontFamily: "Inter",
+  ...theme,
+});
+
+const getSafeFormTheme = (theme = {}) => ({
+  ...defaultFormTheme,
+  ...((theme || {}).form || {}),
+});
+
+export const getWebsiteThemeVars = (theme = {}) => {
+  const safeTheme = getSafeWebsiteTheme(theme);
   const websiteTheme = {
     background: resolveThemeColor(safeTheme.background, defaultWebsiteTheme.background),
     softSurface: resolveThemeColor(safeTheme.softSurface, defaultWebsiteTheme.softSurface),
@@ -81,10 +88,6 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     accent: resolveThemeColor(safeTheme.accent, defaultWebsiteTheme.accent),
     accentDark: resolveThemeColor(safeTheme.accentDark, defaultWebsiteTheme.accentDark),
     buttonText: resolveThemeColor(safeTheme.buttonText, defaultWebsiteTheme.buttonText),
-  };
-  const formTheme = {
-    ...defaultFormTheme,
-    ...(safeTheme.form || {}),
   };
   const isDarkMode = safeTheme.mode === "dark";
   const shadowRgb = isDarkMode ? "4, 8, 16" : hexToRgb(websiteTheme.primary);
@@ -135,6 +138,14 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     "--madar-gradient": websiteTheme.accent,
     "--madar-gradient-hover": websiteTheme.accentDark,
     "--madar-radius": `${safeTheme.radius}px`,
+    fontFamily: safeTheme.fontFamily,
+  };
+};
+
+export const getFormThemeVars = (theme = {}) => {
+  const formTheme = getSafeFormTheme(theme);
+
+  return {
     "--form-theme-bg": resolveThemeColor(formTheme.background, defaultFormTheme.background),
     "--form-theme-surface": resolveThemeColor(formTheme.surface, defaultFormTheme.surface),
     "--form-theme-input": resolveThemeColor(formTheme.inputBackground, defaultFormTheme.inputBackground),
@@ -145,6 +156,10 @@ export const getPageBuilderThemeVars = (theme = {}) => {
     "--form-theme-button-text": resolveThemeColor(formTheme.buttonText, defaultFormTheme.buttonText),
     "--form-theme-radius": `${formTheme.radius}px`,
     "--form-theme-field-radius": `${formTheme.fieldRadius}px`,
-    fontFamily: safeTheme.fontFamily,
   };
 };
+
+export const getPageBuilderThemeVars = (theme = {}) => ({
+  ...getWebsiteThemeVars(theme),
+  ...getFormThemeVars(theme),
+});

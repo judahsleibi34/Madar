@@ -51,12 +51,14 @@ export const createUploadHandlers = ({
         "";
 
       if (!url) {
-        throw new Error(`Upload did not return a URL. Response: ${JSON.stringify(uploaded)}`);
+        throw new Error("Upload did not return a URL.");
       }
 
       return url;
-    } catch (error) {
-      console.error("Could not upload builder image:", error);
+    } catch {
+      if (import.meta.env.DEV) {
+        console.error("Could not upload builder image.");
+      }
       showToast("Image upload failed.");
       return "";
     } finally {
