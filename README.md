@@ -229,17 +229,48 @@ There is no real payment provider integration yet, so this branch should be trea
 
 ## Testing Commands
 
-Use Docker-based validation from the repository root:
+Use Docker-based validation from the repository root. For backend unit tests, include the test override and `--no-deps` so the test container does not try to create the fixed-name Redis containers used by the running production/dev stacks:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps backend python -m unittest tests.test_security_foundation -v
+```
+
+For the broader backend stabilization suite:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps backend python -m unittest \
+  tests.test_security_foundation \
+  tests.test_website_routes \
+  tests.test_builder_backend_hardening \
+  tests.test_builder_form_submissions \
+  tests.test_builder_archived_projects \
+  tests.test_builder_asset_upload \
+  -v
+```
+
+The test override uses a separate Compose project name, removes fixed `container_name` values for test services, avoids publishing backend/frontend ports, and keeps the read-only migration mounts available at `/app/database` and `/app/supabase`.
+
+For full image validation, still run:
 
 ```bash
 docker compose build backend frontend
-docker compose run --rm backend python -m unittest tests.test_onboarding_routes -v
-docker compose run --rm backend python -m unittest tests.test_website_routes tests.test_billing_routes tests.test_user_profile_url_validation tests.test_security_foundation tests.test_builder_backend_hardening tests.test_builder_form_submissions -v
 docker compose build frontend
 git diff --check
 ```
 
 If you are working on a smaller change, run the most relevant backend test module(s) first and expand from there.
+
+## Backend Smoke Tests
+
+Run the backend smoke script after deploys or container rebuilds to verify safe read-only endpoints, expected unauthenticated failures, and CORS preflight behavior. The script does not use credentials and does not send mutating requests.
+
+```bash
+./scripts/backend_smoke.sh prod-local
+./scripts/backend_smoke.sh dev-local
+./scripts/backend_smoke.sh prod-public
+```
+
+Use `prod-local` for the production backend bound to `127.0.0.1:8001`, `dev-local` for the development backend bound to `127.0.0.1:8002`, and `prod-public` for `https://api.madarportal.com`.
 
 ## Deployment Checklist
 

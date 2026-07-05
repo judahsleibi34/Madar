@@ -49,6 +49,7 @@ services:
       CSRF_ORIGIN_CHECK_ENABLED: ${CSRF_ORIGIN_CHECK_ENABLED:-true}
       CSRF_ALLOW_MISSING_ORIGIN: ${CSRF_ALLOW_MISSING_ORIGIN:-false}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+      MADAR_MIGRATIONS_DIR: ${MADAR_MIGRATIONS_DIR:-/app/database/migrations}
     depends_on:
       - redis
     ports:
@@ -56,6 +57,8 @@ services:
     volumes:
       - ./backend/avatar_uploads:/app/avatar_uploads
       - ./backend/uploads:/app/uploads
+      - ./database:/app/database:ro
+      - ./supabase:/app/supabase:ro
 
   frontend:
     build:

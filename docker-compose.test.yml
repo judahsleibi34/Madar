@@ -1,0 +1,22 @@
+name: madar-test
+
+services:
+  redis:
+    container_name: !reset null
+    restart: "no"
+
+  backend:
+    container_name: !reset null
+    depends_on: !override []
+    restart: "no"
+    ports: !override []
+    environment:
+      MADAR_MIGRATIONS_DIR: /app/database/migrations
+    volumes:
+      - ./database:/app/database:ro
+      - ./supabase:/app/supabase:ro
+
+  frontend:
+    container_name: !reset null
+    restart: "no"
+    ports: !override []
