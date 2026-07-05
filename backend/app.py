@@ -29,6 +29,7 @@ from services.auth_service import get_authenticated_user_row, require_regular_us
 from services.request_body_limits import RequestBodyLimitMiddleware
 from services.request_security import (
     CSRF_HEADER_NAME,
+    add_cors_headers_for_allowed_origin,
     get_allowed_origins,
     validate_cookie_write_origin,
     validate_csrf_token,
@@ -79,12 +80,20 @@ async def csrf_origin_middleware(request: Request, call_next):
     blocked_response = validate_cookie_write_origin(request, ALLOWED_CSRF_ORIGINS)
 
     if blocked_response is not None:
-        return blocked_response
+        return add_cors_headers_for_allowed_origin(
+            blocked_response,
+            request,
+            ALLOWED_CSRF_ORIGINS,
+        )
 
     blocked_response = validate_csrf_token(request)
 
     if blocked_response is not None:
-        return blocked_response
+        return add_cors_headers_for_allowed_origin(
+            blocked_response,
+            request,
+            ALLOWED_CSRF_ORIGINS,
+        )
 
     return await call_next(request)
 

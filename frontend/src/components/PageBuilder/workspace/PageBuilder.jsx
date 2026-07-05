@@ -315,41 +315,17 @@ const getAutosaveSnapshot = (project = {}) => JSON.stringify(stripAutosaveMetada
 
 const resolveLiveSitePath = (subdomain) => `/site/${encodeURIComponent(String(subdomain || "").trim())}/`;
 
-const isPhysicalPhoneDevice = () => {
-  if (typeof window === "undefined" || typeof navigator === "undefined") {
-    return false;
-  }
+const getBackendFailureDetail = (error) =>
+  String(error?.data?.detail || error?.message || "");
 
-  const userAgent = navigator.userAgent || "";
-  const platform = navigator.platform || "";
-  const touchPoints = Number(navigator.maxTouchPoints || 0);
-  const screenWidth = Number(window.screen?.width || window.innerWidth || 0);
-  const screenHeight = Number(window.screen?.height || window.innerHeight || 0);
-  const compactScreen =
-    Math.min(screenWidth, screenHeight) <= 600 &&
-    Math.max(screenWidth, screenHeight) <= 1200;
-  const coarsePointer =
-    window.matchMedia?.("(pointer: coarse)")?.matches === true;
-  const noHover =
-    window.matchMedia?.("(hover: none)")?.matches === true;
+const isLikelySessionFailure = (error) => {
+  if (error?.status === 401) return true;
 
-  if (/iphone|ipod|windows phone|iemobile|opera mini/i.test(userAgent)) {
-    return true;
-  }
+  if (error?.status !== 403) return false;
 
-  if (/android/i.test(userAgent) && (/mobile/i.test(userAgent) || compactScreen)) {
-    return true;
-  }
-
-  if (/mobi/i.test(userAgent)) {
-    return true;
-  }
-
-  if (platform === "MacIntel" && touchPoints > 1 && compactScreen) {
-    return true;
-  }
-
-  return touchPoints > 1 && compactScreen && coarsePointer && noHover;
+  return /invalid csrf token|not authenticated|unauthorized|session/i.test(
+    getBackendFailureDetail(error)
+  );
 };
 
 export default function PageBuilder({
@@ -707,7 +683,8 @@ export default function PageBuilder({
     if (!subdomain) return;
 
     return deferEffectStateUpdate(() => {
-      setLiveSitePath((current) => current || resolveLiveSitePath(subdomain));
+      const nextPath = resolveLiveSitePath(subdomain);
+      setLiveSitePath((current) => (current === nextPath ? current : nextPath));
     });
   }, [demoMode, websiteSettings?.subdomain]);
 
@@ -1674,6 +1651,12 @@ export default function PageBuilder({
         console.error("Could not save builder project.");
       }
       const statusLabel = error?.status ? ` (${error.status})` : "";
+
+      if (isLikelySessionFailure(error)) {
+        showToast("Session expired. Please sign in again to save your changes.");
+        return;
+      }
+
       showToast(`Saved local draft cache. Backend save failed${statusLabel}.`);
     }
   }, [
@@ -1754,6 +1737,12 @@ export default function PageBuilder({
         console.error("Could not save website theme.");
       }
       const statusLabel = error?.status ? ` (${error.status})` : "";
+
+      if (isLikelySessionFailure(error)) {
+        showToast("Session expired. Please sign in again to save your theme changes.");
+        return;
+      }
+
       showToast(`Saved local theme draft. Backend save failed${statusLabel}.`);
     }
   };
@@ -1809,8 +1798,12 @@ export default function PageBuilder({
     }
   };
 
-  const publicSiteSubdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
-  const canonicalLiveSitePath = liveSitePath || (publicSiteSubdomain ? resolveLiveSitePath(publicSiteSubdomain) : "");
+  const publicSiteSubdomain = sanitizeSubdomain(
+    websiteSettings?.subdomain || project?.publish?.subdomain || ""
+  );
+  const canonicalLiveSitePath = publicSiteSubdomain
+    ? resolveLiveSitePath(publicSiteSubdomain)
+    : liveSitePath;
 
   const publishProject = async () => {
     setActiveTopbarAction("publish");
@@ -1868,17 +1861,9 @@ Go live anyway?`
       return;
     }
 
-    persistProject(publishedProject, "Publishing to backend...");
+    persistProject(project, "Publishing to backend...");
 
     try {
-      const websiteSettingsResponse = await fetchWebsiteSettings(user?.id);
-      setWebsiteSettings(websiteSettingsResponse || null);
-      const publicSubdomain = sanitizeSubdomain(websiteSettingsResponse?.subdomain || "");
-
-      if (!publicSubdomain) {
-        throw new Error("Configure a website subdomain before going live.");
-      }
-
       const payload = createBuilderProjectPayload({
         project: publishedProject,
         builderProjectRecord,
@@ -1893,24 +1878,36 @@ Go live anyway?`
       const publishResponse = await publishBuilderProject(savedRecord.id, user?.id);
       const publishedRecord = publishResponse?.project || savedRecord;
       const publishedSite = publishResponse?.site || {};
-      const resolvedLiveSitePath = resolveLiveSitePath(
-        sanitizeSubdomain(publishedSite?.subdomain || publicSubdomain) || publicSubdomain
+      const resolvedPublicSubdomain = sanitizeSubdomain(
+        publishedSite?.subdomain || websiteSettings?.subdomain || project?.publish?.subdomain || ""
       );
+      const resolvedLiveSitePath = resolvedPublicSubdomain
+        ? resolveLiveSitePath(resolvedPublicSubdomain)
+        : "";
 
       if (import.meta.env.DEV) {
         console.debug("Builder publish completed.");
       }
 
+      if (!resolvedLiveSitePath) {
+        throw new Error("Published site subdomain was not returned by the backend.");
+      }
+
       setBuilderProjectRecord(publishedRecord);
+      persistProject(publishedProject, "");
       setLiveSitePath(resolvedLiveSitePath);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
       pendingBackendProjectSnapshotRef.current = "";
       showToast("Site published successfully.");
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Could not publish builder project.");
+      console.error("Could not publish builder project:", error);
+
+      if (isLikelySessionFailure(error)) {
+        showToast("Session expired. Please sign in again to publish.");
+        return;
       }
-      showToast(error?.message || "Publish failed. Local draft cache was updated.");
+
+      showToast(error?.message || "Publish failed. Your draft was not published.");
     }
   };
 

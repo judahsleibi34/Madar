@@ -86,6 +86,34 @@ describe("apiClient JSON POST helpers", () => {
 });
 
 describe("apiFetch session refresh", () => {
+  it("fetches and sends a CSRF token before unsafe authenticated requests", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ csrf_token: "fresh-csrf" }))
+        .mockResolvedValueOnce(jsonResponse({ ok: true }))
+    );
+
+    const response = await apiFetch("/api/builder/projects/project-1", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ draft_schema: {} }),
+    });
+    const data = await response.json();
+
+    expect(data).toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetchCall(0)[0]).toBe("/api/auth/user_status");
+    expect(fetchCall(0)[1].credentials).toBe("include");
+    expect(fetchCall(1)[0]).toBe("/api/builder/projects/project-1");
+    expect(fetchCall(1)[1].method).toBe("PUT");
+    expect(fetchCall(1)[1].credentials).toBe("include");
+    expect(fetchCall(1)[1].headers.get("X-CSRF-Token")).toBe("fresh-csrf");
+  });
+
   it("retries an authenticated request once after a successful refresh", async () => {
     vi.stubGlobal(
       "fetch",
@@ -187,7 +215,7 @@ describe("apiFetch session refresh", () => {
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(fetchCall(0)[0]).toBe("/api/builder/projects/123");
     expect(fetchCall(0)[1].headers.get("X-CSRF-Token")).toBe("old-token");
-    expect(fetchCall(1)[0]).toBe("/api/auth/refresh");
+    expect(fetchCall(1)[0]).toBe("/api/auth/user_status");
     expect(fetchCall(2)[0]).toBe("/api/builder/projects/123");
     expect(fetchCall(2)[1].headers.get("X-CSRF-Token")).toBe("new-token");
     expect(fetchCall(2)[1].headers.get("Content-Type")).toBe("application/json");

@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -5,6 +6,7 @@ from unittest.mock import patch
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
+from fastapi.middleware.cors import CORSMiddleware
 
 from routes import auth_routes
 from services import rate_limit_service
@@ -19,6 +21,7 @@ from services.auth_service import (
 from services.request_security import (
     CSRF_COOKIE_NAME,
     CSRF_HEADER_NAME,
+    add_cors_headers_for_allowed_origin,
     create_csrf_token,
     get_allowed_origins,
     validate_cookie_write_origin,
@@ -37,21 +40,43 @@ class SecurityFoundationTests(unittest.TestCase):
 
     def build_origin_client(self):
         app = FastAPI()
-        allowed_origins = get_allowed_origins(["https://app.example.com"])
+        frontend_urls = ["https://app.example.com"]
+        allowed_origins = get_allowed_origins(frontend_urls)
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=frontend_urls,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=[CSRF_HEADER_NAME],
+        )
 
         @app.middleware("http")
         async def csrf_middleware(request: Request, call_next):
             blocked_response = validate_cookie_write_origin(request, allowed_origins)
             if blocked_response is not None:
-                return blocked_response
+                return add_cors_headers_for_allowed_origin(
+                    blocked_response,
+                    request,
+                    allowed_origins,
+                )
             blocked_response = validate_csrf_token(request)
             if blocked_response is not None:
-                return blocked_response
+                return add_cors_headers_for_allowed_origin(
+                    blocked_response,
+                    request,
+                    allowed_origins,
+                )
             return await call_next(request)
 
         @app.post("/protected-write")
         def protected_write():
             return {"ok": True}
+
+        @app.put("/builder/projects/{project_id}")
+        def update_builder_project(project_id: str):
+            return {"ok": True, "project_id": project_id}
 
         @app.get("/safe-read")
         def safe_read():
@@ -106,6 +131,68 @@ class SecurityFoundationTests(unittest.TestCase):
                 CSRF_COOKIE_NAME: csrf_token,
             },
         }
+
+    def test_builder_put_preflight_allows_frontend_origin_and_csrf_header(self):
+        client = self.build_origin_client()
+
+        response = client.options(
+            "/builder/projects/project-1",
+            headers={
+                "Origin": "https://app.example.com",
+                "Access-Control-Request-Method": "PUT",
+                "Access-Control-Request-Headers": "content-type,x-csrf-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get("access-control-allow-origin"),
+            "https://app.example.com",
+        )
+        self.assertEqual(response.headers.get("access-control-allow-credentials"), "true")
+        self.assertIn("PUT", response.headers.get("access-control-allow-methods", ""))
+        self.assertIn("x-csrf-token", response.headers.get("access-control-allow-headers", "").lower())
+
+    def test_builder_put_missing_csrf_rejects_with_cors_headers(self):
+        client = self.build_origin_client()
+
+        response = client.put(
+            "/builder/projects/project-1",
+            headers={
+                "Origin": "https://app.example.com",
+                "Content-Type": "application/json",
+            },
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+            },
+            json={"draft_schema": {}},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Invalid CSRF token")
+        self.assertEqual(
+            response.headers.get("access-control-allow-origin"),
+            "https://app.example.com",
+        )
+        self.assertEqual(response.headers.get("access-control-allow-credentials"), "true")
+
+    def test_builder_put_valid_csrf_reaches_route_logic(self):
+        client = self.build_origin_client()
+        request_parts = self.build_csrf_request_parts()
+
+        response = client.put(
+            "/builder/projects/project-1",
+            headers={
+                **request_parts["headers"],
+                "Content-Type": "application/json",
+            },
+            cookies=request_parts["cookies"],
+            json={"draft_schema": {}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True, "project_id": "project-1"})
 
     def test_invalid_origin_rejected_for_cookie_authenticated_write(self):
         client = self.build_origin_client()
@@ -452,16 +539,35 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "Too many requests. Please try again later.")
 
     def get_migrations_dir(self):
-        candidates = [
-            Path(__file__).resolve().parents[2] / "database" / "migrations",
-            Path(__file__).resolve().parents[1] / "database" / "migrations",
-        ]
+        candidates = []
+        configured_dir = os.getenv("MADAR_MIGRATIONS_DIR")
+        if configured_dir:
+            candidates.append(Path(configured_dir))
 
+        test_path = Path(__file__).resolve()
+        for parent in test_path.parents:
+            candidates.append(parent / "database" / "migrations")
+
+        cwd = Path.cwd().resolve()
+        candidates.append(cwd / "database" / "migrations")
+        for parent in cwd.parents:
+            candidates.append(parent / "database" / "migrations")
+
+        checked = []
+        seen = set()
         for candidate in candidates:
-            if candidate.exists():
-                return candidate
+            resolved = candidate.resolve(strict=False)
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            checked.append(str(resolved))
+            if resolved.is_dir():
+                return resolved
 
-        self.skipTest("database migrations are not available in this test environment")
+        self.fail(
+            "database migrations are required for security tests; checked: "
+            + ", ".join(checked)
+        )
 
     def test_builder_rls_migrations_are_tenant_scoped(self):
         migrations_dir = self.get_migrations_dir()

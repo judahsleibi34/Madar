@@ -10,6 +10,9 @@ const publishContentEn = {
   lastPublishedLabel: "Last published",
   notSaved: "Not saved yet",
   notPublished: "Not published yet",
+  noPublicLink: "Configure a website subdomain before sharing the live site.",
+  publishSite: "Publish site",
+  publishingSite: "Publishing...",
   checklistTitle: "Site publish checklist",
   bilingualOptional: " (only for bilingual forms)",
   checklist: {

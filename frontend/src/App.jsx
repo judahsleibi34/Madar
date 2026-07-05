@@ -7,7 +7,7 @@ import PageSkeleton from "./components/common/PageSkeleton";
 import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
-import { DashboardLoadingElement } from "./routes/shared";
+import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./routes/shared";
 import {
   getSafePostLoginPath,
   isDashboardRoutePath,
@@ -513,19 +513,6 @@ export default function App() {
     [isLoggedIn, normalizeUser]
   );
 
-  const shellProps = {
-    closeMenuLabel: t("common:navigation.closeMenu"),
-    lang,
-    onLanguageChange: handleLanguageChange,
-    onLogout: handleLogout,
-    onNavigate: () => setDashboardSidebarOpen(false),
-    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
-    onThemeModeChange: handleThemeModeChange,
-    open: dashboardSidebarOpen,
-    openMenuLabel: t("common:navigation.openMenu"),
-    themeMode,
-    user,
-  };
 
   const dashboardLoadingLabels = {
     dashboard: t("dashboard:loading.dashboard"),
@@ -556,6 +543,20 @@ export default function App() {
   ) : (
     <PageSkeleton label={t("common:actions.loading")} lang={lang} variant="public-page" />
   );
+
+  const shellProps = {
+    closeMenuLabel: t("common:navigation.closeMenu"),
+    lang,
+    onLanguageChange: handleLanguageChange,
+    onLogout: handleLogout,
+    onNavigate: () => setDashboardSidebarOpen(false),
+    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
+    onThemeModeChange: handleThemeModeChange,
+    open: dashboardSidebarOpen,
+    openMenuLabel: t("common:navigation.openMenu"),
+    themeMode,
+    user,
+  };
 
   let routeContent;
 

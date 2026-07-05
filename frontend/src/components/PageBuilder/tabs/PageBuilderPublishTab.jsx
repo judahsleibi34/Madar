@@ -2,11 +2,13 @@ import {
   AlertTriangle,
   Copy,
   Eye,
+  Globe2,
   MessageCircle,
   RefreshCw,
 } from "lucide-react";
 import { useState } from "react";
 import { getPublishContent } from "../../../content/pageBuilder";
+import { sanitizeSubdomain } from "../core/PageBuilder.routing";
 
 const qrPresets = [
   { color: "111827", qzone: 1, ecc: "M" },
@@ -35,17 +37,22 @@ const buildQrUrl = (data, version) => {
 export default function PageBuilderPublishTab({
   project,
   persistProjectNow,
+  publishProject,
   liveSitePath = "",
   openFormPreviewPage,
   lang = "en",
 }) {
   const [publicQrVersion, setPublicQrVersion] = useState(1);
   const [formQrVersion, setFormQrVersion] = useState(1);
+  const [isPublishing, setIsPublishing] = useState(false);
   const content = getPublishContent(lang);
   const activeForm = project.forms?.find((form) => form.id === project.activeFormId) || project.forms?.[0];
-  const publicLink = liveSitePath
-    ? `${window.location.origin}${liveSitePath}`
-    : `${window.location.origin}/page-builder/preview`;
+  const publishSubdomain = sanitizeSubdomain(project?.publish?.subdomain || "");
+  const configuredLiveSitePath = publishSubdomain ? `/site/${publishSubdomain}/` : "";
+  const resolvedLiveSitePath = liveSitePath || configuredLiveSitePath;
+  const publicLink = resolvedLiveSitePath
+    ? `${window.location.origin}${resolvedLiveSitePath}`
+    : "";
   const formPreviewLink = activeForm
     ? `${window.location.origin}/page-builder/form-preview/${activeForm.id}`
     : "";
@@ -58,6 +65,18 @@ export default function PageBuilderPublishTab({
   const copyFormPreviewLink = async () => {
     if (!formPreviewLink) return;
     await navigator.clipboard?.writeText(formPreviewLink);
+  };
+
+  const handlePublish = async () => {
+    if (!publishProject || isPublishing) return;
+
+    setIsPublishing(true);
+
+    try {
+      await publishProject();
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const whatsAppUrl = publicLink ? `https://wa.me/?text=${encodeURIComponent(publicLink)}` : "";
@@ -102,6 +121,17 @@ export default function PageBuilderPublishTab({
             <span>01</span>
             <h3>{content.statusTitle}</h3>
           </div>
+          <div className="publish-actions">
+            <button
+              type="button"
+              className="primary-action"
+              onClick={handlePublish}
+              disabled={!publishProject || isPublishing}
+            >
+              <Globe2 size={15} aria-hidden="true" />
+              {isPublishing ? content.publishingSite : content.publishSite}
+            </button>
+          </div>
           <dl className="publish-status-list">
             <div>
               <dt>{content.projectLabel}</dt>
@@ -131,7 +161,7 @@ export default function PageBuilderPublishTab({
           <div className="publish-link-card-body">
             <div className="publish-link-main">
                 <div className="publish-link-box">
-                  <input value={publicLink} readOnly placeholder={content.notPublished} />
+                  <input value={publicLink} readOnly placeholder={content.noPublicLink} />
                   <button type="button" onClick={copyPublicLink} disabled={!publicLink}>
                   <Copy size={15} aria-hidden="true" />
                     {content.copyLink}
@@ -158,7 +188,11 @@ export default function PageBuilderPublishTab({
                 </div>
               </div>
               <div className="publish-qr-preview">
-                <img key={qrUrl} src={qrUrl} alt={content.publicQrAlt} />
+                {qrUrl ? (
+                  <img key={qrUrl} src={qrUrl} alt={content.publicQrAlt} />
+                ) : (
+                  <div className="publish-empty-note">{content.noPublicLink}</div>
+                )}
                 <span>{content.qrPreview}</span>
                 <div className="publish-qr-actions">
                   <button type="button" onClick={() => setPublicQrVersion((value) => value + 1)}>
