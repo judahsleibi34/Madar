@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -538,16 +539,35 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "Too many requests. Please try again later.")
 
     def get_migrations_dir(self):
-        candidates = [
-            Path(__file__).resolve().parents[2] / "database" / "migrations",
-            Path(__file__).resolve().parents[1] / "database" / "migrations",
-        ]
+        candidates = []
+        configured_dir = os.getenv("MADAR_MIGRATIONS_DIR")
+        if configured_dir:
+            candidates.append(Path(configured_dir))
 
+        test_path = Path(__file__).resolve()
+        for parent in test_path.parents:
+            candidates.append(parent / "database" / "migrations")
+
+        cwd = Path.cwd().resolve()
+        candidates.append(cwd / "database" / "migrations")
+        for parent in cwd.parents:
+            candidates.append(parent / "database" / "migrations")
+
+        checked = []
+        seen = set()
         for candidate in candidates:
-            if candidate.exists():
-                return candidate
+            resolved = candidate.resolve(strict=False)
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            checked.append(str(resolved))
+            if resolved.is_dir():
+                return resolved
 
-        self.skipTest("database migrations are not available in this test environment")
+        self.fail(
+            "database migrations are required for security tests; checked: "
+            + ", ".join(checked)
+        )
 
     def test_builder_rls_migrations_are_tenant_scoped(self):
         migrations_dir = self.get_migrations_dir()
