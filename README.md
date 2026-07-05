@@ -260,6 +260,18 @@ git diff --check
 
 If you are working on a smaller change, run the most relevant backend test module(s) first and expand from there.
 
+## Backend Smoke Tests
+
+Run the backend smoke script after deploys or container rebuilds to verify safe read-only endpoints, expected unauthenticated failures, and CORS preflight behavior. The script does not use credentials and does not send mutating requests.
+
+```bash
+./scripts/backend_smoke.sh prod-local
+./scripts/backend_smoke.sh dev-local
+./scripts/backend_smoke.sh prod-public
+```
+
+Use `prod-local` for the production backend bound to `127.0.0.1:8001`, `dev-local` for the development backend bound to `127.0.0.1:8002`, and `prod-public` for `https://api.madarportal.com`.
+
 ## Deployment Checklist
 
 Before merging or deploying:
