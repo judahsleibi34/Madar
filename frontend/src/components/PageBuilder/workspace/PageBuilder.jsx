@@ -283,6 +283,22 @@ const hasStoredStarterChoice = () => {
   }
 };
 
+const isPhysicalPhoneDevice = () => {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent || "";
+  const isPhoneUserAgent = /(?:iPhone|iPod|Mobile|Windows Phone)/i.test(userAgent);
+  const isPhoneViewport = window.matchMedia?.("(max-width: 767px)")?.matches ?? window.innerWidth <= 767;
+  const hasTouchInput =
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia?.("(pointer: coarse)")?.matches ||
+    "ontouchstart" in window;
+
+  return isPhoneUserAgent || (hasTouchInput && isPhoneViewport);
+};
+
 const rememberStarterChoice = () => {
   try {
     localStorage.setItem(STARTER_MODAL_DISMISSED_KEY, "true");
