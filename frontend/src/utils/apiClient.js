@@ -77,6 +77,22 @@ export const readApiError = (data, fallback = "Request failed") => {
   return fallback;
 };
 
+export const readApiErrorCode = (data) => {
+  if (typeof data?.code === "string" && data.code.trim()) {
+    return data.code;
+  }
+
+  if (typeof data?.detail?.code === "string" && data.detail.code.trim()) {
+    return data.detail.code;
+  }
+
+  if (typeof data?.error?.code === "string" && data.error.code.trim()) {
+    return data.error.code;
+  }
+
+  return "";
+};
+
 const refreshCsrfToken = async () => {
   const response = await fetch(getApiUrl("/auth/user_status"), {
     method: "GET",
