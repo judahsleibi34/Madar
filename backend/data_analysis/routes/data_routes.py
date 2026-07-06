@@ -65,6 +65,38 @@ def read_data(
         )
 
 
+@router.post("/export")
+def export_data(
+    user_id: int,
+    request: ReadDataRequest,
+    fastapi_request: Request,
+    response: Response,
+):
+    try:
+        tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "data_export",
+            tenant_id=tenant_id,
+        )
+        return data_services.export_dataset(
+            request.input_path,
+            tenant_id=tenant_id,
+            user_id=scoped_user_id,
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        logger.warning("data.export.failed", extra={"user_id": user_id, "error_type": type(error).__name__})
+        raise HTTPException(
+            status_code=400,
+            detail="Could not export data file.",
+        )
+
+
 @router.post("/upload")
 async def upload_data(
     user_id: int,

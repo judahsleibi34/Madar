@@ -18,6 +18,7 @@ export const DASHBOARD_ROUTES = {
   pageBuilder: "/page-builder",
   builderResponses: "/builder-responses",
   builderData: "/builder-data",
+  archive: "/archive",
   notifications: "/notifications",
   myPlan: "/my-plan",
   settings: "/settings",

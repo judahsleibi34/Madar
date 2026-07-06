@@ -2,7 +2,7 @@ import Field from "./Field";
 import ColumnSelect from "./ColumnSelect";
 import MultiColumnSelect from "./MultiColumnSelect";
 import { analysisGroups, reportGroupText } from "../constants/analysisConfig";
-import { toLabel } from "../utils/formatters";
+import { columnLabel, toLabel, valueDir } from "../utils/formatters";
 
 const isOptionalField = (key) =>
   key.includes("group") ||
@@ -15,32 +15,9 @@ const isOptionalField = (key) =>
   key === "max_rating" ||
   key === "separator";
 
-const needsNumericColumns = (key) =>
-  [
-    "amount",
-    "cost",
-    "revenue",
-    "actual",
-    "target",
-    "price",
-    "quantity",
-    "budget",
-    "baseline",
-    "endline",
-    "value",
-    "salary",
-    "payroll",
-    "attended",
-    "working_days",
-    "numerator",
-    "denominator",
-    "rating",
-  ].some((hint) => key.includes(hint));
-
 export default function AnalysisGeneratorPanel({
   activeLang,
   analysisDomain,
-  setDomain,
   methods,
   analysisMethod,
   setMethod,
@@ -48,13 +25,105 @@ export default function AnalysisGeneratorPanel({
   params,
   updateParams,
   columns,
-  numericColumns,
+  numericColumns = [],
   runAnalysis,
   isLoading,
   generatedCount,
   t,
 }) {
   const groups = reportGroupText[activeLang] || reportGroupText.en;
+  const availableNumericColumns = numericColumns;
+  const activeTemplate = activeMethod?.template || {};
+  const allRecipes = Object.entries(analysisGroups).flatMap(([domain, group]) =>
+    group.methods.map((method) => ({
+      ...method,
+      domain,
+      domainLabel: groups[domain]?.label || domain,
+    }))
+  );
+  const currentRecipe = allRecipes.find(
+    (recipe) => recipe.domain === analysisDomain && recipe.id === analysisMethod
+  );
+  const measurableRecipe =
+    allRecipes.find((recipe) => recipe.id === "numeric_question_summary") ||
+    allRecipes.find((recipe) => Array.isArray(recipe.template?.numeric_columns));
+  const selectedColumnCount = Object.values(params || {}).reduce((count, value) => {
+    if (Array.isArray(value)) return count + value.length;
+    return value ? count + 1 : count;
+  }, 0);
+
+  const chooseRecipe = (domain, methodId) => {
+    if (domain !== analysisDomain) {
+      setMethod(methodId, domain);
+      return;
+    }
+
+    setMethod(methodId);
+  };
+
+  const measureAllVariables = () => {
+    if (!measurableRecipe) return;
+    chooseRecipe(measurableRecipe.domain, measurableRecipe.id);
+    updateParams("numeric_columns", availableNumericColumns);
+  };
+
+  const assignColumnToActiveRecipe = (column) => {
+    const entries = Object.entries(activeTemplate);
+    const multiField = entries.find(([, defaultValue]) => Array.isArray(defaultValue));
+
+    if (multiField) {
+      const [key] = multiField;
+      const selected = Array.isArray(params?.[key]) ? params[key] : [];
+      updateParams(
+        key,
+        selected.includes(column)
+          ? selected.filter((item) => item !== column)
+          : [...selected, column]
+      );
+      return;
+    }
+
+    const emptyColumnField = entries.find(([key, defaultValue]) => {
+      if (!(key.endsWith("_column") || key === "column")) return false;
+      const value = Object.prototype.hasOwnProperty.call(params || {}, key)
+        ? params[key]
+        : defaultValue;
+      return !value || isOptionalField(key);
+    });
+
+    if (emptyColumnField) {
+      updateParams(emptyColumnField[0], column);
+    }
+  };
+
+  const isColumnSelected = (column) =>
+    Object.values(params || {}).some((value) =>
+      Array.isArray(value) ? value.includes(column) : value === column
+    );
+
+  const getColumnsForField = (key) => {
+    if (
+      key.includes("numeric") ||
+      key.includes("value") ||
+      key.includes("amount") ||
+      key.includes("cost") ||
+      key.includes("revenue") ||
+      key.includes("price") ||
+      key.includes("quantity") ||
+      key.includes("budget") ||
+      key.includes("actual") ||
+      key.includes("target") ||
+      key.includes("baseline") ||
+      key.includes("endline") ||
+      key.includes("completed") ||
+      key.includes("planned") ||
+      key === "columns"
+    ) {
+      return availableNumericColumns;
+    }
+
+    return columns;
+  };
 
   const renderField = (key, defaultValue) => {
     const value = Object.prototype.hasOwnProperty.call(params || {}, key)
@@ -68,7 +137,8 @@ export default function AnalysisGeneratorPanel({
           key={key}
           label={label}
           value={Array.isArray(value) ? value : []}
-          columns={needsNumericColumns(key) ? numericColumns : columns}
+          columns={getColumnsForField(key)}
+          activeLang={activeLang}
           onChange={(nextValue) => updateParams(key, nextValue)}
           t={t}
         />
@@ -114,9 +184,10 @@ export default function AnalysisGeneratorPanel({
           key={key}
           label={label}
           value={value || ""}
-          columns={needsNumericColumns(key) ? numericColumns : columns}
+          columns={getColumnsForField(key)}
           optional={isOptionalField(key)}
           onChange={(nextValue) => updateParams(key, nextValue)}
+          activeLang={activeLang}
           t={t}
         />
       );
@@ -133,28 +204,73 @@ export default function AnalysisGeneratorPanel({
     <section className="daw-analysis-generator">
       <div className="daw-analysis-generator-heading">
         <div>
-          <strong>Create report calculations</strong>
-          <span>Choose the kind of report, then tell us which columns contain the needed information.</span>
+          <strong>Build measurable variables</strong>
+          <span>Choose a calculation, then map the dataset fields it should measure.</span>
         </div>
-        {generatedCount ? <em>{generatedCount} outputs ready</em> : null}
+        <div className="daw-analysis-generator-badges">
+          <em>{selectedColumnCount} mapped</em>
+          {generatedCount ? <em>{generatedCount} ready</em> : null}
+        </div>
       </div>
 
-      <div className="daw-analysis-domain-grid">
-        {Object.keys(analysisGroups).map((domain) => (
+      <div className="daw-variable-builder">
+        <aside className="daw-variable-recipes" aria-label="Variable recipes">
+          <div className="daw-variable-panel-heading">
+            <strong>Calculation</strong>
+            <span>{currentRecipe?.domainLabel || groups[analysisDomain]?.label}</span>
+          </div>
           <button
-            key={domain}
             type="button"
-            className={analysisDomain === domain ? "active" : ""}
-            onClick={() => setDomain(domain)}
+            className="daw-variable-auto"
+            onClick={measureAllVariables}
+            disabled={!availableNumericColumns.length || !measurableRecipe}
           >
-            <strong>{groups[domain]?.label || domain}</strong>
-            <span>{groups[domain]?.description}</span>
+            <strong>Measure all numeric variables</strong>
+            <span>{availableNumericColumns.length} measurable columns detected</span>
           </button>
-        ))}
+          <div className="daw-variable-recipe-list">
+            {allRecipes.map((recipe) => (
+              <button
+                key={`${recipe.domain}_${recipe.id}`}
+                type="button"
+                className={recipe.domain === analysisDomain && recipe.id === analysisMethod ? "active" : ""}
+                onClick={() => chooseRecipe(recipe.domain, recipe.id)}
+              >
+                <strong>{recipe.label}</strong>
+                <span>{recipe.domainLabel}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div className="daw-variable-workspace">
+          <div className="daw-variable-panel-heading">
+            <strong>Available variables</strong>
+            <span>{columns.length ? `${columns.length} columns in this dataset` : t.loadDataToChooseColumns}</span>
+          </div>
+          <div className="daw-variable-column-grid">
+            {columns.length ? (
+              columns.map((column) => (
+                <button
+                  key={column}
+                  type="button"
+                  className={isColumnSelected(column) ? "selected" : ""}
+                  title={column}
+                  dir={activeLang === "ar" ? "rtl" : valueDir(column)}
+                  onClick={() => assignColumnToActiveRecipe(column)}
+                >
+                  {columnLabel(column, activeLang)}
+                </button>
+              ))
+            ) : (
+              <em>{t.loadDataToChooseColumns}</em>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="daw-form-grid">
-        <Field label="What would you like to calculate?" wide>
+        <Field label="Selected calculation" wide>
           <select value={analysisMethod} onChange={(event) => setMethod(event.target.value)}>
             {methods.map((method) => (
               <option key={method.id} value={method.id}>{method.label}</option>
@@ -165,9 +281,9 @@ export default function AnalysisGeneratorPanel({
       </div>
 
       <div className="daw-analysis-generator-action">
-        <span>The new numbers and tables will be added to your report choices. You can run more than one calculation.</span>
+        <span>Created variables appear in the report builder library and source picker.</span>
         <button type="button" className="daw-primary" onClick={runAnalysis} disabled={isLoading}>
-          {isLoading ? t.working : "Create this calculation"}
+          {isLoading ? t.working : "Create variables"}
         </button>
       </div>
     </section>

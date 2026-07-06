@@ -19,7 +19,7 @@ export default function DataSourceStep({
   t,
 }) {
   return (
-    <section className="daw-card daw-section-card">
+    <section className="daw-card daw-section-card daw-source-card">
       <div className="daw-section-heading">
         <span>{t.source}</span>
         <h3>{t.sourceTitle}</h3>

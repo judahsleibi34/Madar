@@ -1,6 +1,7 @@
 const DATABASE_NAME = "madar-sensitive-data";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const STORE_NAME = "datasets";
+const ARCHIVE_STORE_NAME = "archive_items";
 const DEFAULT_SCOPE = "current-dataset";
 
 const openDatabase = () =>
@@ -16,17 +17,20 @@ const openDatabase = () =>
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         database.createObjectStore(STORE_NAME);
       }
+      if (!database.objectStoreNames.contains(ARCHIVE_STORE_NAME)) {
+        database.createObjectStore(ARCHIVE_STORE_NAME, { keyPath: "id" });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("Could not open local dataset storage."));
   });
 
-const runRequest = async (mode, operation) => {
+const runRequest = async (mode, operation, storeName = STORE_NAME) => {
   const database = await openDatabase();
   try {
     return await new Promise((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, mode);
-      const store = transaction.objectStore(STORE_NAME);
+      const transaction = database.transaction(storeName, mode);
+      const store = transaction.objectStore(storeName);
       const request = operation(store);
       let result;
       request.onsuccess = () => {
@@ -168,4 +172,42 @@ export async function loadDataset(options = {}) {
 export async function clearDataset(options = {}) {
   const scope = options.scope || DEFAULT_SCOPE;
   await runRequest("readwrite", (store) => store.delete(scope));
+}
+
+export async function archiveItem(item) {
+  const now = Date.now();
+  const id =
+    item.id ||
+    `archive-${item.type || "item"}-${now}-${Math.random().toString(36).slice(2, 8)}`;
+
+  await runRequest("readwrite", (store) =>
+    store.put(
+      {
+        ...item,
+        id,
+        createdAt: item.createdAt || now,
+        updatedAt: now,
+      }
+    ),
+    ARCHIVE_STORE_NAME
+  );
+
+  return id;
+}
+
+export async function listArchiveItems(options = {}) {
+  const items = await runRequest(
+    "readonly",
+    (store) => store.getAll(),
+    ARCHIVE_STORE_NAME
+  );
+  const scope = options.scope || "";
+
+  return (Array.isArray(items) ? items : [])
+    .filter((item) => !scope || item.scope === scope)
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+}
+
+export async function deleteArchiveItem(id) {
+  await runRequest("readwrite", (store) => store.delete(id), ARCHIVE_STORE_NAME);
 }

@@ -2813,7 +2813,7 @@ body.theme-dark .admin-sidebar.is-compact .admin-sidebar-bottom .admin-sidebar-l
 [data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
 body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
 .theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation {
-  background: rgba(var(--theme-text-inverse-rgb), 0.06) !important;
+  background: transparent !important;
   box-shadow: none !important;
 }
 

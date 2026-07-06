@@ -14,6 +14,7 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith(DASHBOARD_ROUTES.pageBuilder) ||
     pathname.startsWith(DASHBOARD_ROUTES.builderResponses) ||
     pathname.startsWith(DASHBOARD_ROUTES.builderData) ||
+    pathname.startsWith(DASHBOARD_ROUTES.archive) ||
     pathname.startsWith(DASHBOARD_ROUTES.notifications) ||
     pathname.startsWith(DASHBOARD_ROUTES.myPlan) ||
     pathname.startsWith(DASHBOARD_ROUTES.adminUsers) ||
@@ -40,8 +41,8 @@ export function getSafePostLoginPath(userInfo, returnTo) {
     DASHBOARD_ROUTES.pageBuilder,
     DASHBOARD_ROUTES.builderResponses,
     DASHBOARD_ROUTES.builderData,
+    DASHBOARD_ROUTES.archive,
     DASHBOARD_ROUTES.myPlan,
-    DASHBOARD_ROUTES.settings,
   ];
 
   const isAdminOnlyPath = adminOnlyPaths.some((path) =>

@@ -311,6 +311,65 @@
   cursor: pointer;
 }
 
+.page-builder .daw-report-export-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.page-builder .daw-report-save-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--daw-report-soft);
+}
+
+.page-builder .daw-report-save-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.page-builder .daw-report-save-panel label > span {
+  color: var(--daw-report-muted);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-report-save-panel input,
+.page-builder .daw-report-save-panel select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--daw-report-surface);
+  color: var(--daw-report-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.page-builder .daw-report-save-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.page-builder .daw-report-save-panel p {
+  margin: 0;
+  color: var(--daw-report-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.page-builder .daw-report-preview-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .page-builder .daw-report-block-library > button,
 .page-builder .daw-report-page-block {
   position: relative;
@@ -423,6 +482,89 @@
 
 .page-builder .daw-report-block-library button strong {
   color: var(--daw-report-ink) !important;
+}
+
+.page-builder .daw-report-variable-library {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--daw-report-border);
+  padding-top: 12px;
+}
+
+.page-builder .daw-report-variable-library .daw-report-library-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.page-builder .daw-report-variable-library .daw-report-library-heading span {
+  color: var(--daw-report-muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.page-builder .daw-report-variable-library section {
+  display: grid;
+  gap: 6px;
+}
+
+.page-builder .daw-report-variable-library section > strong {
+  color: var(--daw-report-muted) !important;
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-report-variable-library button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--daw-report-border);
+  border-radius: 10px;
+  padding: 9px;
+  background: var(--daw-report-soft);
+  color: var(--daw-report-ink);
+  text-align: start;
+  cursor: pointer;
+}
+
+.page-builder .daw-report-variable-library button:hover {
+  border-color: var(--theme-primary);
+  background: rgba(var(--theme-primary-rgb), 0.1);
+}
+
+.page-builder .daw-report-variable-library button > svg {
+  flex: 0 0 auto;
+  color: var(--theme-primary);
+}
+
+.page-builder .daw-report-variable-library button > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.page-builder .daw-report-variable-library button strong,
+.page-builder .daw-report-variable-library button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-builder .daw-report-variable-library button strong {
+  color: var(--daw-report-ink) !important;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.page-builder .daw-report-variable-library button small {
+  color: var(--daw-report-muted) !important;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .page-builder .daw-report-canvas-shell {
@@ -1105,6 +1247,8 @@
 .page-builder .daw-report-logo-control input,
 .page-builder .daw-report-file-button,
 .page-builder .daw-report-source-trigger,
+.page-builder .daw-report-save-panel input,
+.page-builder .daw-report-save-panel select,
 .page-builder .daw-report-builder .daw-report-properties input,
 .page-builder .daw-report-builder .daw-report-properties textarea,
 .page-builder .daw-report-builder .daw-report-properties select {

@@ -186,7 +186,13 @@ function SettingsNotification({ notification, isArabic, label, onClose }) {
   );
 }
 
-export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
+export default function SettingsPage({
+  lang = "en",
+  user,
+  onUserUpdated,
+  accountOnly = false,
+  accountApiBasePath = "",
+}) {
   const [accountForm, setAccountForm] = useState(() =>
     getInitialAccountForm(user)
   );
@@ -203,13 +209,31 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
   const isArabic = lang === "ar";
   const t = getSettingsContent(lang);
+  const pageCopy = accountOnly
+    ? {
+        ...t,
+        eyebrow: "Admin settings",
+        title: "Admin account settings",
+        subtitle: "Update the name, photo, and contact details for your admin account.",
+        profileTitle: "Admin profile",
+        profileDescription: "These details are used for the admin dashboard and your account identity.",
+      }
+    : t;
   const userApiPath = useCallback((path) => {
+    if (accountApiBasePath) {
+      const basePath = accountApiBasePath.startsWith("http")
+        ? accountApiBasePath
+        : `${API_URL}${accountApiBasePath.startsWith("/") ? "" : "/"}${accountApiBasePath}`;
+
+      return `${basePath}${path}`;
+    }
+
     if (!user?.id) {
       throw new Error(t.sessionExpired);
     }
 
     return `${API_URL}/users/${encodeURIComponent(user.id)}${path}`;
-  }, [t.sessionExpired, user]);
+  }, [accountApiBasePath, t.sessionExpired, user]);
 
   const avatarUrl = resolveMediaUrl(accountForm.avatar);
   const shouldShowAvatarImage = Boolean(avatarUrl) && !avatarLoadFailed;
@@ -417,6 +441,10 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     let cancelled = false;
 
     const loadWebsiteSettings = async () => {
+      if (accountOnly) {
+        return;
+      }
+
       try {
         const response = await apiFetch(`${API_URL}/website/settings`, {
           method: "GET",
@@ -461,7 +489,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [accountOnly]);
 
   const uploadWebsiteLogo = async (event) => {
     const file = event.target.files?.[0];
@@ -683,9 +711,9 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
 
       <header className="settings-header">
         <div>
-          <p>{t.eyebrow}</p>
-          <h1>{t.title}</h1>
-          <span>{t.subtitle}</span>
+          <p>{pageCopy.eyebrow}</p>
+          <h1>{pageCopy.title}</h1>
+          <span>{pageCopy.subtitle}</span>
         </div>
       </header>
 
@@ -697,7 +725,7 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
         >
           <div className="settings-profile-cover">
             <div>
-              <span>{t.eyebrow}</span>
+              <span>{pageCopy.eyebrow}</span>
               <strong>
                 {accountForm.first_name || accountForm.email || t.userAlt}
               </strong>
@@ -718,8 +746,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
             </div>
 
             <div>
-              <h2>{t.profileTitle}</h2>
-              <p>{t.profileDescription}</p>
+              <h2>{pageCopy.profileTitle}</h2>
+              <p>{pageCopy.profileDescription}</p>
             </div>
 
             <label className="settings-file-button settings-profile-upload">
@@ -799,13 +827,15 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
           </div>
 
           <div className="settings-profile-actions">
-            <SmartLink
-              to="/settings/change-password"
-              className="settings-reset-password-button"
-            >
-              <KeyRound size={18} />
-              {t.changePassword}
-            </SmartLink>
+            {!accountOnly && (
+              <SmartLink
+                to="/settings/change-password"
+                className="settings-reset-password-button"
+              >
+                <KeyRound size={18} />
+                {t.changePassword}
+              </SmartLink>
+            )}
 
             <button
               className="settings-save-button"
@@ -818,11 +848,12 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
           </div>
         </form>
 
-        <form
-          className="settings-card settings-profile-card settings-website-card"
-          onSubmit={saveSiteSettings}
-          noValidate
-        >
+        {!accountOnly && (
+          <form
+            className="settings-card settings-profile-card settings-website-card"
+            onSubmit={saveSiteSettings}
+            noValidate
+          >
           <div className="settings-profile-cover">
             <div>
               <span>{t.websiteTitle}</span>
@@ -986,7 +1017,8 @@ export default function SettingsPage({ lang = "en", user, onUserUpdated }) {
               {isSavingSite ? t.saving : t.saveWebsite}
             </button>
           </div>
-        </form>
+          </form>
+        )}
       </div>
     </section>
   );

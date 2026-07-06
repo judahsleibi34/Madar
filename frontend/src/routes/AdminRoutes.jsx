@@ -9,6 +9,7 @@ const Dashboard = lazy(() => import("../components/DashboardBuilder/Dashboard"))
 const AdminAccountAccessPage = lazy(() =>
   import("../components/DashboardBuilder/AdminAccountAccessPage")
 );
+const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
 const NotificationsPage = lazy(() =>
   import("../components/DashboardBuilder/NotificationsPage")
 );
@@ -19,6 +20,7 @@ const UserManagementPage = lazy(() =>
 export default function AdminRoutes({
   lang,
   onGoToDashboard,
+  onUserUpdated,
   shellProps,
   themeMode,
   user,
@@ -109,6 +111,13 @@ export default function AdminRoutes({
         />
 
         <Route
+          path="/archive/*"
+          element={renderRestrictedPage(
+            appShellContent.restrictedAccess.workspaceOnly
+          )}
+        />
+
+        <Route
           path="/my-plan/*"
           element={renderRestrictedPage(
             appShellContent.restrictedAccess.workspaceOnly
@@ -117,8 +126,14 @@ export default function AdminRoutes({
 
         <Route
           path="/settings/*"
-          element={renderRestrictedPage(
-            appShellContent.restrictedAccess.workspaceOnly
+          element={renderShell(
+            <SettingsPage
+              lang={lang}
+              user={user}
+              onUserUpdated={onUserUpdated}
+              accountOnly
+              accountApiBasePath="/admin/profile"
+            />
           )}
         />
 

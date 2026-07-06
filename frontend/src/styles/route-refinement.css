@@ -1491,6 +1491,494 @@ body.theme-dark .tenant-site-header {
   }
 }
 
+/* Admin overview final pass.
+   route-refinement.css is imported after the dashboard modules, so keep the
+   dashboard-specific corrections here instead of fighting the cascade elsewhere. */
+.admin-dashboard-shell {
+  width: min(1280px, 100%) !important;
+  display: grid !important;
+  gap: 22px !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-hero {
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end !important;
+  gap: 22px !important;
+  padding: 24px !important;
+  margin: 0 !important;
+  background: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-bg-soft)) !important;
+  border: 1px solid color-mix(in srgb, var(--theme-border) 86%, transparent) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 16px 38px rgba(var(--theme-shadow-rgb), 0.07),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.55) !important;
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-eyebrow {
+  display: block !important;
+  width: fit-content !important;
+  margin: 0 0 10px !important;
+  color: var(--theme-primary) !important;
+  font-size: 0.76rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.08em !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-hero h1 {
+  margin: 0 !important;
+  max-width: 760px !important;
+  color: var(--theme-text) !important;
+  font-size: clamp(1.85rem, 3vw, 2.75rem) !important;
+  font-weight: 950 !important;
+  line-height: 1.02 !important;
+  letter-spacing: 0 !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-hero p {
+  max-width: 720px !important;
+  margin: 12px 0 0 !important;
+  color: var(--theme-text-soft) !important;
+  font-size: 1rem !important;
+  font-weight: 650 !important;
+  line-height: 1.65 !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-hero-meta,
+.admin-dashboard-shell .admin-dashboard-header-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  margin-top: 14px !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-hero-meta span,
+.admin-dashboard-shell .admin-dashboard-header-meta span,
+.admin-dashboard-shell .dashboard-panel-meta {
+  min-height: 30px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 10px !important;
+  border: 1px solid color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--theme-surface) 70%, var(--theme-bg-soft)) !important;
+  color: var(--theme-text-soft) !important;
+  font-size: 0.78rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header {
+  display: block !important;
+  padding: 4px 0 2px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header h1 {
+  margin: 0 0 10px !important;
+  color: var(--theme-text) !important;
+  font-size: clamp(2.1rem, 4vw, 3.2rem) !important;
+  font-weight: 950 !important;
+  line-height: 0.98 !important;
+  letter-spacing: 0 !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header p {
+  margin: 0 !important;
+  max-width: 760px !important;
+  color: var(--theme-text-muted) !important;
+  font-size: 1rem !important;
+  font-weight: 650 !important;
+  line-height: 1.7 !important;
+}
+
+.admin-dashboard-shell .overview-grid,
+.admin-dashboard-shell .admin-dashboard-grid,
+.admin-dashboard-shell .admin-monitor-grid {
+  margin: 0 !important;
+}
+
+.admin-dashboard-shell .overview-grid {
+  gap: 18px !important;
+}
+
+.admin-dashboard-shell .overview-card,
+.admin-dashboard-shell .dashboard-panel,
+.admin-dashboard-shell .admin-signal-card {
+  border: 1px solid color-mix(in srgb, var(--theme-border) 84%, transparent) !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-bg-soft)) !important;
+  box-shadow:
+    0 16px 38px rgba(var(--theme-shadow-rgb), 0.07),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.55) !important;
+}
+
+.admin-dashboard-shell .overview-card {
+  min-height: 146px !important;
+  padding: 22px !important;
+}
+
+.admin-dashboard-shell .overview-card::after {
+  display: none !important;
+}
+
+.admin-dashboard-shell .overview-card p {
+  margin: 0 0 10px !important;
+  color: var(--theme-text-muted) !important;
+  font-size: 0.78rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.07em !important;
+}
+
+.admin-dashboard-shell .overview-card h2 {
+  color: var(--theme-text) !important;
+  font-size: clamp(1.9rem, 2.8vw, 2.45rem) !important;
+  font-weight: 950 !important;
+  line-height: 0.98 !important;
+  letter-spacing: 0 !important;
+}
+
+.admin-dashboard-shell .overview-sub {
+  margin-top: 14px !important;
+  color: var(--theme-primary-hover) !important;
+  font-size: 0.82rem !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell .overview-icon,
+.admin-dashboard-shell .panel-icon {
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 14px !important;
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary) !important;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18) !important;
+  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+.admin-dashboard-shell .dashboard-panel {
+  padding: 24px !important;
+}
+
+.admin-dashboard-shell .dashboard-panel-header {
+  margin-bottom: 22px !important;
+}
+
+.admin-dashboard-shell .dashboard-panel h2 {
+  margin: 0 0 8px !important;
+  color: var(--theme-text) !important;
+  font-size: 1.38rem !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  letter-spacing: 0 !important;
+}
+
+.admin-dashboard-shell .dashboard-panel p {
+  color: var(--theme-text-muted) !important;
+  font-size: 0.94rem !important;
+  font-weight: 650 !important;
+  line-height: 1.6 !important;
+}
+
+.admin-dashboard-shell .admin-monitor-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr) !important;
+  gap: 22px !important;
+}
+
+.admin-dashboard-shell .admin-signal-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.admin-dashboard-shell .admin-signal-card {
+  min-width: 0 !important;
+  padding: 16px !important;
+}
+
+.admin-dashboard-shell .admin-signal-card div:first-child {
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.admin-dashboard-shell .admin-signal-card span {
+  color: var(--theme-text-muted) !important;
+  font-size: 0.8rem !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell .admin-signal-card strong {
+  color: var(--theme-text) !important;
+  font-size: 1.18rem !important;
+  font-weight: 950 !important;
+}
+
+.admin-dashboard-shell .admin-signal-card em {
+  display: block !important;
+  margin-top: 8px !important;
+  color: var(--theme-success) !important;
+  font-size: 0.82rem !important;
+  font-style: normal !important;
+  font-weight: 950 !important;
+}
+
+.admin-dashboard-shell .admin-signal-track,
+.admin-dashboard-shell .metric-track {
+  height: 10px !important;
+  margin-top: 10px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  overflow: hidden !important;
+  background: color-mix(in srgb, var(--theme-surface-2) 86%, var(--theme-bg-soft)) !important;
+}
+
+.admin-dashboard-shell .admin-signal-track span,
+.admin-dashboard-shell .metric-track div {
+  display: block !important;
+  height: 100% !important;
+  border-radius: inherit !important;
+  background: var(--theme-primary) !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell .dashboard-panel-meta {
+  justify-content: space-between !important;
+  width: 100% !important;
+  margin: 0 0 8px !important;
+  border-radius: 14px !important;
+}
+
+.admin-dashboard-shell .dashboard-panel-meta strong {
+  color: var(--theme-primary-hover) !important;
+}
+
+.admin-dashboard-shell .server-info-list div {
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--theme-surface) 62%, var(--theme-bg-soft)) !important;
+}
+
+.admin-dashboard-shell .server-status-healthy {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  color: var(--theme-success) !important;
+}
+
+.admin-dashboard-shell .server-status-healthy::before {
+  content: "" !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 999px !important;
+  background: var(--theme-success) !important;
+}
+
+.admin-dashboard-shell .uptime-panel {
+  background: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-bg-soft)) !important;
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-shell .uptime-panel h2,
+.admin-dashboard-shell .uptime-circle strong {
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-shell .uptime-panel p,
+.admin-dashboard-shell .uptime-circle span {
+  color: var(--theme-text-muted) !important;
+}
+
+.admin-dashboard-shell .uptime-circle {
+  background: var(--theme-surface) !important;
+  border: 10px solid rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+@media (max-width: 1180px) {
+  .admin-dashboard-shell .admin-monitor-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-dashboard-shell .admin-dashboard-hero {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+    padding: 20px !important;
+  }
+
+  .admin-dashboard-shell .admin-dashboard-hero-action {
+    width: 100% !important;
+  }
+
+  .admin-dashboard-shell .admin-signal-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Admin overview restraint pass: remove the presentation feel. */
+.admin-dashboard-shell {
+  gap: 20px !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header {
+  padding: 0 0 4px !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-eyebrow {
+  margin-bottom: 12px !important;
+  font-size: 0.72rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.06em !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header h1 {
+  margin-bottom: 8px !important;
+  font-size: clamp(1.9rem, 3vw, 2.55rem) !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header p {
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  line-height: 1.55 !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header-meta {
+  gap: 7px !important;
+  margin-top: 12px !important;
+}
+
+.admin-dashboard-shell .admin-dashboard-header-meta span,
+.admin-dashboard-shell .dashboard-panel-meta {
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  font-size: 0.76rem !important;
+  font-weight: 800 !important;
+}
+
+.admin-dashboard-shell .overview-card,
+.admin-dashboard-shell .dashboard-panel,
+.admin-dashboard-shell .admin-signal-card {
+  border-color: var(--theme-border) !important;
+  border-radius: 12px !important;
+  background: var(--theme-surface) !important;
+  box-shadow: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.045) !important;
+}
+
+.admin-dashboard-shell .overview-card {
+  min-height: 126px !important;
+  padding: 18px !important;
+}
+
+.admin-dashboard-shell .overview-card p {
+  margin-bottom: 9px !important;
+  font-size: 0.72rem !important;
+  font-weight: 850 !important;
+  letter-spacing: 0.05em !important;
+}
+
+.admin-dashboard-shell .overview-card h2 {
+  font-size: clamp(1.7rem, 2.4vw, 2.1rem) !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+.admin-dashboard-shell .overview-sub {
+  margin-top: 12px !important;
+  font-size: 0.78rem !important;
+  font-weight: 850 !important;
+}
+
+.admin-dashboard-shell .overview-icon,
+.admin-dashboard-shell .panel-icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell .dashboard-panel {
+  padding: 20px !important;
+}
+
+.admin-dashboard-shell .dashboard-panel-header {
+  margin-bottom: 18px !important;
+}
+
+.admin-dashboard-shell .dashboard-panel h2 {
+  margin-bottom: 6px !important;
+  font-size: 1.08rem !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+}
+
+.admin-dashboard-shell .dashboard-panel p {
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  line-height: 1.45 !important;
+}
+
+.admin-dashboard-shell .admin-signal-card {
+  padding: 14px !important;
+}
+
+.admin-dashboard-shell .admin-signal-card span {
+  font-size: 0.78rem !important;
+  font-weight: 850 !important;
+}
+
+.admin-dashboard-shell .admin-signal-card strong {
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell .admin-signal-card em {
+  margin-top: 7px !important;
+  font-size: 0.76rem !important;
+  font-weight: 850 !important;
+}
+
+.admin-dashboard-shell .admin-signal-track,
+.admin-dashboard-shell .metric-track {
+  height: 7px !important;
+  background: var(--theme-surface-2) !important;
+}
+
+.admin-dashboard-shell .server-info-list div {
+  border-radius: 10px !important;
+  background: var(--theme-surface-2) !important;
+}
+
+.admin-dashboard-shell .uptime-circle {
+  width: 150px !important;
+  height: 150px !important;
+  border-width: 8px !important;
+}
+
+.admin-dashboard-shell .uptime-circle strong {
+  font-size: 1.7rem !important;
+}
+
 /* Dashboard sidebar final pass.
    This lives at the end of route refinements so compact builder pages and
    dark mode stop inheriting conflicting sidebar treatments. */
@@ -1951,6 +2439,18 @@ body.theme-dark .admin-sidebar-utility.active,
   color: currentColor !important;
   background: transparent !important;
   border: 0 !important;
+  box-shadow: none !important;
+}
+
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover .language-toggle-animation,
+.admin-sidebar.is-compact .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-sidebar.is-compact .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-lang-switcher .language-toggle-animation {
+  background: transparent !important;
   box-shadow: none !important;
 }
 
@@ -2745,6 +3245,125 @@ body.theme-dark .page-builder .builder-toast,
   box-shadow: none !important;
 }
 
+.page-builder .daw-source-card {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  padding: 16px 18px !important;
+}
+
+.theme-dark .page-builder .daw-source-card,
+[data-theme="dark"] .page-builder .daw-source-card,
+body.theme-dark .page-builder .daw-source-card {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.page-builder .daw-source-card .daw-section-heading {
+  margin-bottom: 12px !important;
+}
+
+.page-builder .daw-source-tabs button {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: none !important;
+}
+
+.theme-dark .page-builder .daw-source-tabs button,
+[data-theme="dark"] .page-builder .daw-source-tabs button,
+body.theme-dark .page-builder .daw-source-tabs button {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.page-builder .daw-source-tabs button.active {
+  background: var(--theme-primary-soft) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary) !important;
+}
+
+.theme-dark .page-builder .daw-source-tabs button.active,
+[data-theme="dark"] .page-builder .daw-source-tabs button.active,
+body.theme-dark .page-builder .daw-source-tabs button.active {
+  background: var(--theme-primary-soft) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary) !important;
+}
+
+.page-builder .daw-source-body {
+  display: grid !important;
+  gap: 12px !important;
+  padding: 14px !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px !important;
+  background: var(--theme-surface-2) !important;
+}
+
+.theme-dark .page-builder .daw-source-body,
+[data-theme="dark"] .page-builder .daw-source-body,
+body.theme-dark .page-builder .daw-source-body {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.page-builder .daw-source-body h4 {
+  color: var(--theme-text) !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+}
+
+.page-builder .daw-source-body p {
+  color: var(--theme-text-soft) !important;
+}
+
+.page-builder .daw-source-body select,
+.page-builder .daw-source-body input,
+.page-builder .daw-source-body textarea {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.theme-dark .page-builder .daw-source-body select,
+.theme-dark .page-builder .daw-source-body input,
+.theme-dark .page-builder .daw-source-body textarea,
+[data-theme="dark"] .page-builder .daw-source-body select,
+[data-theme="dark"] .page-builder .daw-source-body input,
+[data-theme="dark"] .page-builder .daw-source-body textarea,
+body.theme-dark .page-builder .daw-source-body select,
+body.theme-dark .page-builder .daw-source-body input,
+body.theme-dark .page-builder .daw-source-body textarea {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.page-builder .daw-source-body .daw-file-dropzone {
+  border: 1px dashed var(--theme-border) !important;
+  border-radius: 8px !important;
+  background: var(--theme-surface) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .daw-source-body .daw-file-dropzone:hover {
+  border-color: rgba(var(--theme-primary-rgb), 0.36) !important;
+  background: var(--theme-primary-soft) !important;
+}
+
+.page-builder .daw-source-body .daw-file-dropzone strong {
+  color: var(--theme-text) !important;
+}
+
+.page-builder .daw-source-body .daw-file-dropzone span {
+  color: var(--theme-text-soft) !important;
+}
+
 .page-builder .daw-section-heading h3,
 .page-builder .daw-report-header h3 {
   color: var(--theme-text) !important;
@@ -2783,6 +3402,24 @@ body.theme-dark .page-builder .builder-toast,
   box-shadow: none !important;
 }
 
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool {
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary {
+  padding: 16px 18px !important;
+}
+
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool[open] > summary {
+  border-bottom: 1px solid var(--theme-border);
+  background: transparent !important;
+}
+
 .page-builder .daw-analysis-domain-grid button:hover,
 .page-builder .daw-analysis-domain-grid button.active {
   background: var(--theme-surface) !important;
@@ -2799,6 +3436,30 @@ body.theme-dark .page-builder .builder-toast,
 .page-builder .daw-confirm-button:hover {
   transform: none !important;
   box-shadow: none !important;
+}
+
+.page-builder .daw-cleaning-stack:hover,
+.page-builder .daw-cleaning-stack details:hover,
+.page-builder .daw-cleaning-stack summary:hover,
+.page-builder .daw-advanced-cleaning-grid:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.page-builder .daw-cleaning-option:hover,
+.page-builder .daw-cleaning-tool:hover {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool:hover,
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 .page-builder .daw-confirm-button:hover {

@@ -580,6 +580,7 @@ export default function App() {
         <AdminRoutes
           lang={lang}
           onGoToDashboard={() => navigate("/dashboard", { replace: true })}
+          onUserUpdated={handleUserUpdated}
           shellProps={shellProps}
           themeMode={themeMode}
           user={user}

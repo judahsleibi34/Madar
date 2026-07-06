@@ -228,6 +228,15 @@ def delete_auth_cookies(response: Response):
     )
     delete_csrf_cookie(response)
     delete_session_activity_cookie(response)
+    try:
+        from services.admin_account_access_service import delete_admin_account_access_cookie
+
+        delete_admin_account_access_cookie(response)
+    except Exception as error:
+        logger.warning(
+            "auth.admin_access_cookie_delete_failed",
+            extra={"error_type": type(error).__name__},
+        )
 
 
 def build_user_payload(user_data):
@@ -258,6 +267,7 @@ def get_authenticated_user_row(
     response: Response | None = None,
     *,
     allow_refresh: bool = True,
+    allow_admin_account_access: bool = True,
 ):
     access_token = request.cookies.get("madar_access_token")
     refresh_token = request.cookies.get("madar_refresh_token")
@@ -333,11 +343,39 @@ def get_authenticated_user_row(
     if not user_response.data:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return auth_user, user_response.data
+    user_data = user_response.data
+
+    if (
+        allow_admin_account_access
+        and normalize_user_type(user_data.get("user_type")) == "admin"
+    ):
+        try:
+            from services.admin_account_access_service import resolve_admin_account_access_user
+
+            target_user = resolve_admin_account_access_user(
+                request=request,
+                response=response,
+                admin_user=user_data,
+            )
+
+            if target_user:
+                return auth_user, target_user
+
+        except Exception as error:
+            logger.warning(
+                "auth.admin_access_session_resolve_failed",
+                extra={"admin_user_id": user_data.get("id"), "error_type": type(error).__name__},
+            )
+
+    return auth_user, user_data
 
 
 def require_system_admin(request: Request, response: Response | None = None):
-    auth_user, user_data = get_authenticated_user_row(request, response)
+    auth_user, user_data = get_authenticated_user_row(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
     user_type = normalize_user_type(user_data.get("user_type"))
 
     if user_type != "admin":

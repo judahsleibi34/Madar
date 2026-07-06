@@ -14,6 +14,15 @@
   background: transparent;
 }
 
+.page-builder .daw-cleaning-stack,
+.page-builder .daw-cleaning-stack:hover,
+.page-builder .daw-cleaning-stack details:hover,
+.page-builder .daw-cleaning-stack summary:hover,
+.page-builder .daw-advanced-cleaning-grid,
+.page-builder .daw-advanced-cleaning-grid:hover {
+  background: transparent;
+}
+
 .page-builder .daw-cleaning-stack summary {
   display: flex;
   align-items: center;
@@ -45,6 +54,16 @@
   border-radius: 8px;
   padding: 14px;
   background: var(--theme-surface);
+  transition: none;
+}
+
+.page-builder .daw-cleaning-option:hover,
+.page-builder .daw-cleaning-tool:hover,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool:hover,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary:hover {
+  background: var(--theme-surface);
+  box-shadow: none;
+  transform: none;
 }
 
 .page-builder .daw-cleaning-option {
@@ -131,10 +150,81 @@
 
 .page-builder .daw-advanced-cleaning-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   align-items: start;
   gap: 12px;
   margin-top: 14px;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool {
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary {
+  display: flex;
+  align-items: center;
+  min-height: 64px;
+  padding: 16px 18px;
+  list-style: none;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary::after {
+  content: "+";
+  margin-inline-start: auto;
+  color: var(--theme-primary);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool[open] > summary {
+  border-bottom: 1px solid var(--theme-border);
+  background: transparent;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool[open] > summary::after {
+  content: "-";
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary > div {
+  min-width: 0;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary strong {
+  display: block;
+  color: var(--daw-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary p {
+  margin: 6px 0 0;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-form-grid,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-column-picker,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-cleaning-confirm,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-cleaning-note {
+  margin-inline: 18px;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-form-grid:first-of-type,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-column-picker:first-of-type {
+  margin-top: 16px;
+}
+
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-form-grid:last-child,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-column-picker:last-child,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-cleaning-note:last-child,
+.page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > .daw-cleaning-confirm:last-child {
+  margin-bottom: 18px;
 }
 
 .page-builder .daw-cleaning-tool-wide {
@@ -302,6 +392,170 @@
   font-style: normal;
   font-weight: 950;
   white-space: nowrap;
+}
+
+.page-builder .daw-analysis-generator-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-builder .daw-variable-builder {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.34fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.page-builder .daw-variable-recipes,
+.page-builder .daw-variable-workspace {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--theme-surface);
+}
+
+.page-builder .daw-variable-recipes {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.page-builder .daw-variable-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.page-builder .daw-variable-panel-heading strong,
+.page-builder .daw-variable-panel-heading span {
+  display: block;
+}
+
+.page-builder .daw-variable-panel-heading strong {
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .daw-variable-panel-heading span {
+  color: var(--daw-muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-align: end;
+}
+
+.page-builder .daw-variable-auto,
+.page-builder .daw-variable-recipe-list button,
+.page-builder .daw-variable-column-grid button {
+  border: 1px solid var(--daw-card-border);
+  border-radius: 8px;
+  background: var(--daw-card-bg);
+  color: var(--daw-text);
+  cursor: pointer;
+}
+
+.page-builder .daw-variable-auto {
+  width: 100%;
+  padding: 11px;
+  text-align: start;
+}
+
+.page-builder .daw-variable-auto:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.page-builder .daw-variable-auto strong,
+.page-builder .daw-variable-auto span,
+.page-builder .daw-variable-recipe-list strong,
+.page-builder .daw-variable-recipe-list span {
+  display: block;
+}
+
+.page-builder .daw-variable-auto strong {
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .daw-variable-auto span {
+  margin-top: 4px;
+  color: var(--daw-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.page-builder .daw-variable-recipe-list {
+  display: grid;
+  gap: 7px;
+  max-height: 310px;
+  overflow: auto;
+  padding-inline-end: 4px;
+}
+
+.page-builder .daw-variable-recipe-list button {
+  padding: 9px 10px;
+  text-align: start;
+}
+
+.page-builder .daw-variable-recipe-list button.active,
+.page-builder .daw-variable-column-grid button.selected {
+  border-color: var(--theme-primary);
+  color: var(--theme-primary);
+}
+
+.page-builder .daw-variable-recipe-list strong {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .daw-variable-recipe-list span {
+  margin-top: 3px;
+  color: var(--daw-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.page-builder .daw-variable-workspace {
+  display: grid;
+  gap: 10px;
+}
+
+.page-builder .daw-variable-column-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  max-height: 310px;
+  overflow: auto;
+  padding-inline-end: 4px;
+}
+
+.page-builder .daw-variable-column-grid button {
+  min-height: 38px;
+  padding: 8px 10px;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-variable-column-grid button:hover,
+.page-builder .daw-variable-recipe-list button:hover,
+.page-builder .daw-variable-auto:hover:not(:disabled) {
+  border-color: var(--theme-primary);
+}
+
+.page-builder .daw-variable-column-grid em {
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .page-builder .daw-analysis-domain-grid {

@@ -344,6 +344,31 @@ const isLikelySessionFailure = (error) => {
   );
 };
 
+const isPhysicalPhoneDevice = () => {
+  if (typeof window === "undefined") return false;
+
+  const hasCoarsePointer =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+  return hasCoarsePointer && window.innerWidth <= viewports.mobile;
+};
+
+const getDefaultBuilderPageId = (project = {}) =>
+  Array.isArray(project.pages) ? project.pages[0]?.id || "" : "";
+
+const withDefaultLandingPage = (project = {}) => {
+  if (!project) return project;
+
+  const defaultPageId = getDefaultBuilderPageId(project);
+  if (!defaultPageId || project.activePageId === defaultPageId) return project;
+
+  return {
+    ...project,
+    activePageId: defaultPageId,
+  };
+};
+
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
@@ -359,7 +384,9 @@ export default function PageBuilder({
   const routeTab = getBuilderTabFromPath(location.pathname);
   const routeDesignPanel = getBuilderDesignPanelFromPath(location.pathname);
   const [project, setProject] = useState(() =>
-    demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
+    withDefaultLandingPage(
+      demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
+    )
   );
   const persistProjectNow = useDebouncedProjectStorage({
     delay: 120,
@@ -373,7 +400,10 @@ export default function PageBuilder({
   const [designPanel, setDesignPanel] = useState("Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
-  const [selected, setSelected] = useState({ type: "page", id: null });
+  const [selected, setSelected] = useState(() => ({
+    type: "page",
+    id: getDefaultBuilderPageId(project) || null,
+  }));
   const [modal, setModal] = useState(() =>
     hideWorkspaceTabs || hasStoredStarterChoice() ? null : "starter"
   );
@@ -622,7 +652,7 @@ export default function PageBuilder({
           return;
         }
 
-        const loadedProject = getDraftProjectFromRecord(fullRecord);
+        const loadedProject = withDefaultLandingPage(getDraftProjectFromRecord(fullRecord));
 
         if (!loadedProject) return;
 

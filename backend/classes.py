@@ -67,6 +67,20 @@ class BillingWebhookUpdateRequest(AdminBillingUpdateRequest):
 
 class AdminUserTypeUpdateRequest(BaseModel):
     user_type: Literal["admin", "user"]
+
+
+class AdminAccountAccessGenerateRequest(BaseModel):
+    email: EmailStr
+
+
+class AdminAccountAccessVerifyRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(
+        ...,
+        min_length=6,
+        max_length=6,
+        pattern=r"^[A-Za-z0-9!@#$%&*?]{6}$",
+    )
     
 class UpdatePassword(BaseModel):
     current_password: str = Field(..., min_length=1)

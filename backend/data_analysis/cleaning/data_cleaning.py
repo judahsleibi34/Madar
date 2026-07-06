@@ -372,6 +372,13 @@ class DataCleaning(DataReadingNormal):
             elif action_type == "rename_column":
                 rename_map = params["rename_map"]
                 self._validate_dict(rename_map, "rename_map")
+                rename_map = {
+                    column: next_column
+                    for column, next_column in rename_map.items()
+                    if column in df.columns
+                }
+                if not rename_map:
+                    continue
                 df = df.rename(columns=rename_map)
 
             elif action_type == "rename_value":
@@ -380,7 +387,7 @@ class DataCleaning(DataReadingNormal):
 
                 for column, values_map in rename_map.items():
                     if column not in df.columns:
-                        raise ValueError(f"Column '{column}' was not found")
+                        continue
                     self._validate_dict(values_map, f"values_map for column '{column}'")
                     df[column] = df[column].replace(values_map)
 
@@ -405,21 +412,40 @@ class DataCleaning(DataReadingNormal):
             elif action_type == "fill_missing":
                 fill_map = params["fill_map"]
                 self._validate_dict(fill_map, "fill_map")
+                fill_map = {
+                    column: config
+                    for column, config in fill_map.items()
+                    if column in df.columns
+                }
+                if not fill_map:
+                    continue
                 df = self._fill_missing_on_dataframe(df, fill_map)
 
             elif action_type == "convert_column_types":
                 type_map = params["type_map"]
                 self._validate_dict(type_map, "type_map")
+                type_map = {
+                    column: target_type
+                    for column, target_type in type_map.items()
+                    if column in df.columns
+                }
+                if not type_map:
+                    continue
                 df = self._convert_types_on_dataframe(df, type_map)
 
             elif action_type == "clean_text_columns":
-                columns = params["columns"]
+                columns = [
+                    column
+                    for column in params["columns"]
+                    if column in df.columns
+                ]
                 lower = params.get("lower", True)
                 strip = params.get("strip", True)
                 collapse_spaces = params.get("collapse_spaces", True)
                 normalize_unicode = params.get("normalize_unicode", True)
 
-                self._validate_columns_exist(df, columns)
+                if not columns:
+                    continue
 
                 df = self._clean_text_on_dataframe(
                     df=df,
@@ -431,21 +457,37 @@ class DataCleaning(DataReadingNormal):
                 )
 
             elif action_type == "normalize_multi_select":
-                columns = params["columns"]
+                columns = [
+                    column
+                    for column in params["columns"]
+                    if column in df.columns
+                ]
                 separator = params.get("separator", ",")
-                self._validate_columns_exist(df, columns)
+                if not columns:
+                    continue
                 df = self._normalize_multi_select_on_dataframe(df, columns, separator=separator)
 
             elif action_type == "drop_columns":
-                columns = params["columns"]
-                self._validate_columns_exist(df, columns)
+                columns = [
+                    column
+                    for column in params["columns"]
+                    if column in df.columns
+                ]
+                if not columns:
+                    continue
                 df = df.drop(columns=columns)
 
             elif action_type == "encode_columns":
-                columns = params["columns"]
+                columns = [
+                    column
+                    for column in params["columns"]
+                    if column in df.columns
+                ]
                 method = params.get("method", "one_hot")
                 keep_original = bool(params.get("keep_original", False))
                 max_unique_values = int(params.get("max_unique_values", 50))
+                if not columns:
+                    continue
                 df = self._encode_columns_on_dataframe(
                     df,
                     columns,

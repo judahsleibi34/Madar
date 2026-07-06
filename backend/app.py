@@ -12,6 +12,8 @@ from data_analysis.routes.data_routes import router as data_router
 from data_analysis.routes.visualization_routes import router as visualization_router
 
 from routes.admin_billing_routes import router as admin_billing_router
+from routes.admin_account_access_routes import router as admin_account_access_router
+from routes.admin_profile_routes import router as admin_profile_router
 from routes.admin_user_routes import router as admin_user_router
 from routes.auth_routes import router as auth_router
 from routes.billing_routes import router as billing_router
@@ -111,7 +113,9 @@ app.include_router(password_router)
 app.include_router(mfa_router)
 app.include_router(server_status_router)
 app.include_router(billing_router)
+app.include_router(admin_account_access_router)
 app.include_router(admin_billing_router)
+app.include_router(admin_profile_router)
 app.include_router(admin_user_router)
 app.include_router(builder_router)
 app.include_router(public_contact_router)

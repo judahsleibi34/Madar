@@ -10,6 +10,7 @@ const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsP
 const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDashboard"));
 const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
 const NotificationsPage = lazy(() => import("../components/DashboardBuilder/NotificationsPage"));
+const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
 const BuilderFormPreviewPage = lazy(() =>
   import("../components/PageBuilder/preview/BuilderFormPreviewPage")
 );
@@ -30,7 +31,8 @@ export default function UserWorkspaceRoutes({
   const isBuilderLoadingPath =
     location.pathname.startsWith("/page-builder") ||
     location.pathname.startsWith("/builder-responses") ||
-    location.pathname.startsWith("/builder-data");
+    location.pathname.startsWith("/builder-data") ||
+    location.pathname.startsWith("/archive");
 
   const renderShell = (children, options = {}) => (
     <DashboardShell
@@ -63,7 +65,8 @@ export default function UserWorkspaceRoutes({
               {
                 compactSidebar:
                   location.pathname.startsWith("/builder-responses") ||
-                  location.pathname.startsWith("/builder-data"),
+                  location.pathname.startsWith("/builder-data") ||
+                  location.pathname.startsWith("/archive"),
                 isPageBuilderShell: location.pathname.startsWith("/page-builder"),
                 lang: location.pathname.startsWith("/page-builder") ? "en" : lang,
               }
@@ -144,6 +147,11 @@ export default function UserWorkspaceRoutes({
           />,
           { compactSidebar: true }
         )}
+      />
+
+      <Route
+        path="/archive/*"
+        element={renderShell(<ArchivePage user={user} />, { compactSidebar: true })}
       />
 
       <Route

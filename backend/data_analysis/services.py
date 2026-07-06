@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from io import StringIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -174,6 +175,21 @@ def process_read(input_path: str, *, tenant_id: str, user_id: str):
     )
 
 
+def export_dataset(input_path: str, *, tenant_id: str, user_id: str):
+    df = read_dataset(input_path, tenant_id=tenant_id, user_id=user_id)
+    output = StringIO()
+    df.to_csv(output, index=False)
+
+    return sanitize_for_json(
+        {
+            "rows": int(len(df)),
+            "columns": list(df.columns),
+            "preview": dataframe_preview(df, 20),
+            "csv": output.getvalue(),
+        }
+    )
+
+
 def inspect_dataset(input_path: str, *, tenant_id: str, user_id: str):
     cleaner = DataCleaning(input_path, tenant_id=tenant_id, user_id=user_id)
     return sanitize_for_json(cleaner.data_inspection())
@@ -213,6 +229,22 @@ def apply_cleaning(input_path: str, actions: list[dict], *, tenant_id: str, user
         "columns": list(df.columns),
         "preview": dataframe_preview(df, 20),
     }
+
+
+def export_cleaned_dataframe(input_path: str, actions: list[dict], *, tenant_id: str, user_id: str):
+    cleaner = DataCleaning(input_path, tenant_id=tenant_id, user_id=user_id)
+    df = cleaner.apply_pipeline(actions)
+    output = StringIO()
+    df.to_csv(output, index=False)
+
+    return sanitize_for_json(
+        {
+            "rows": int(len(df)),
+            "columns": list(df.columns),
+            "preview": dataframe_preview(df, 20),
+            "csv": output.getvalue(),
+        }
+    )
 
 
 def get_analysis_catalog(language: str = "en"):

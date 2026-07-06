@@ -457,6 +457,7 @@ export function DashboardLoadingElement({ pathname, labels, lang }) {
   if (pathname.startsWith("/page-builder")) label = safeLabels.pageBuilder || label;
   if (pathname.startsWith("/builder-responses")) label = safeLabels.submissions || label;
   if (pathname.startsWith("/builder-data")) label = safeLabels.dataLogs || label;
+  if (pathname.startsWith("/archive")) label = safeLabels.archive || "Loading archive";
   if (pathname.startsWith("/my-plan")) label = safeLabels.myPlan || label;
   if (pathname.startsWith("/admin/users")) label = safeLabels.userManagement || label;
   if (pathname.startsWith("/settings/change-password")) label = safeLabels.passwordSettings || label;

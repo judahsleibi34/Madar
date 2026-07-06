@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Home,
+  Archive,
   LayoutDashboard,
   Grid2X2,
   ClipboardList,
@@ -169,6 +170,13 @@ export default function DashboardSidebar({
       icon: Database,
     },
     {
+      label: t("sidebar.archive", {
+        defaultValue: "Archive",
+      }),
+      path: DASHBOARD_ROUTES.archive,
+      icon: Archive,
+    },
+    {
       label: t("sidebar.myPlan"),
       path: DASHBOARD_ROUTES.myPlan,
       icon: CreditCard,
@@ -182,7 +190,7 @@ export default function DashboardSidebar({
         item.label.toLowerCase().includes(normalizedNavSearch),
       )
     : visibleNavItemsTop;
-  const showSettingsLink = !isAdminUser;
+  const showSettingsLink = true;
 
   useEffect(() => {
     applyThemeMode(activeThemeMode);

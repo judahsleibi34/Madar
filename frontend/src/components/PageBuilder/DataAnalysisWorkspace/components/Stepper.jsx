@@ -2,7 +2,7 @@ export default function Stepper({
   currentStep,
   setCurrentStep,
   dataset,
-  metricsReady = false,
+  dataframesSaved = false,
   onLockedStep,
   t,
 }) {
@@ -10,8 +10,8 @@ export default function Stepper({
     { id: "source", label: t.source, enabled: true },
     { id: "review", label: t.review, enabled: Boolean(dataset) },
     { id: "prepare", label: t.prepare, enabled: Boolean(dataset) },
-    { id: "visualization", label: t.visualization, enabled: Boolean(dataset), requiresMetrics: true },
-    { id: "report", label: t.report, enabled: Boolean(dataset), requiresMetrics: true },
+    { id: "visualization", label: t.visualization, enabled: Boolean(dataset), requiresSavedData: true },
+    { id: "report", label: t.report, enabled: Boolean(dataset), requiresSavedData: true },
   ];
 
   return (
@@ -21,17 +21,17 @@ export default function Stepper({
           key={step.id}
           type="button"
           className={`${currentStep === step.id ? "active" : ""} ${
-            step.requiresMetrics && !metricsReady ? "locked" : ""
+            step.requiresSavedData && !dataframesSaved ? "locked" : ""
           }`.trim()}
           disabled={!step.enabled}
-          aria-disabled={step.requiresMetrics && !metricsReady}
+          aria-disabled={step.requiresSavedData && !dataframesSaved}
           title={
-            step.requiresMetrics && !metricsReady
-              ? "Create metrics in Prepare before opening this step"
+            step.requiresSavedData && !dataframesSaved
+              ? t.saveDataframesFirst || "Save dataframes in Prepare before opening this step"
               : undefined
           }
           onClick={() => {
-            if (step.requiresMetrics && !metricsReady) {
+            if (step.requiresSavedData && !dataframesSaved) {
               onLockedStep?.(step.id);
               return;
             }
