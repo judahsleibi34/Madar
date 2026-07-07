@@ -344,16 +344,6 @@ const isLikelySessionFailure = (error) => {
   );
 };
 
-const isPhysicalPhoneDevice = () => {
-  if (typeof window === "undefined") return false;
-
-  const hasCoarsePointer =
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-
-  return hasCoarsePointer && window.innerWidth <= viewports.mobile;
-};
-
 const getDefaultBuilderPageId = (project = {}) =>
   Array.isArray(project.pages) ? project.pages[0]?.id || "" : "";
 
