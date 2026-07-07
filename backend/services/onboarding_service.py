@@ -30,6 +30,8 @@ RESERVED_SUBDOMAINS = {
     "support",
     "www",
 }
+NAME_PUNCTUATION = {" ", "-", "'", "’", "."}
+BUSINESS_TEXT_PUNCTUATION = NAME_PUNCTUATION | {"&", "/", ",", "(", ")"}
 
 
 def normalize_email(email: str | None) -> str:
@@ -38,6 +40,54 @@ def normalize_email(email: str | None) -> str:
 
 def normalize_subdomain(subdomain: str | None) -> str:
     return str(subdomain or "").strip().lower()
+
+
+def validate_text_value(
+    value: str | None,
+    *,
+    field_label: str,
+    allowed_punctuation: set[str],
+    required: bool = True,
+) -> str:
+    clean_value = str(value or "").strip()
+
+    if not clean_value:
+        if required:
+            raise HTTPException(status_code=400, detail=f"{field_label} is required")
+        return ""
+
+    if any(character.isdigit() for character in clean_value):
+        raise HTTPException(status_code=400, detail=f"{field_label} can only contain letters")
+
+    if not any(character.isalpha() for character in clean_value):
+        raise HTTPException(status_code=400, detail=f"{field_label} must include letters")
+
+    if any(
+        not character.isalpha()
+        and not character.isspace()
+        and character not in allowed_punctuation
+        for character in clean_value
+    ):
+        raise HTTPException(status_code=400, detail=f"{field_label} contains invalid characters")
+
+    return clean_value
+
+
+def validate_person_name(value: str | None, field_label: str) -> str:
+    return validate_text_value(
+        value,
+        field_label=field_label,
+        allowed_punctuation=NAME_PUNCTUATION,
+    )
+
+
+def validate_optional_business_text(value: str | None, field_label: str) -> str:
+    return validate_text_value(
+        value,
+        field_label=field_label,
+        allowed_punctuation=BUSINESS_TEXT_PUNCTUATION,
+        required=False,
+    )
 
 
 def validate_onboarding_subdomain(subdomain: str | None) -> str:
@@ -263,25 +313,22 @@ def create_onboarded_tenant(*, supabase_client: Any, payload: Any) -> dict[str, 
     onboarding_complete = False
 
     clean_email = normalize_email(payload.email)
-    first_name = payload.first_name.strip()
-    last_name = payload.last_name.strip()
-    business_name = payload.business_name.strip()
-    business_type = payload.business_type.strip()
-    subdomain = validate_onboarding_subdomain(payload.subdomain)
+    first_name = validate_person_name(payload.first_name, "First name")
+    last_name = validate_person_name(payload.last_name, "Last name")
+    business_name = validate_optional_business_text(payload.business_name, "Business name")
+    business_type = validate_optional_business_text(payload.business_type, "Business type")
+    requested_subdomain = normalize_subdomain(payload.subdomain)
+    subdomain = validate_onboarding_subdomain(requested_subdomain) if requested_subdomain else ""
     owner_name = split_owner_name(first_name, last_name)
+    display_business_name = business_name or owner_name or clean_email.split("@")[0] or "New Business"
 
     if not clean_email:
         raise HTTPException(status_code=400, detail="Email is required")
-    if not first_name or not last_name:
-        raise HTTPException(status_code=400, detail="First name and last name are required")
-    if not business_name:
-        raise HTTPException(status_code=400, detail="Business name is required")
-    if not business_type:
-        raise HTTPException(status_code=400, detail="Business type is required")
     if not payload.password or len(payload.password.strip()) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
-    ensure_subdomain_available(supabase_client, subdomain)
+    if subdomain:
+        ensure_subdomain_available(supabase_client, subdomain)
 
     try:
         auth_response = supabase_client.auth.admin.create_user(
@@ -305,7 +352,7 @@ def create_onboarded_tenant(*, supabase_client: Any, payload: Any) -> dict[str, 
             supabase_client.table("tenants")
             .insert(
                 {
-                    "brand_name": business_name,
+                    "brand_name": display_business_name,
                     "business_type": business_type,
                     "owner_name": owner_name,
                 }
@@ -347,9 +394,9 @@ def create_onboarded_tenant(*, supabase_client: Any, payload: Any) -> dict[str, 
             {
                 "tenant_id": tenant_id,
                 "user_id": local_user["id"],
-                "subdomain": subdomain,
-                "brand": business_name,
-                "footer_store_name": business_name,
+                "subdomain": subdomain or None,
+                "brand": display_business_name,
+                "footer_store_name": display_business_name,
                 "contact_email": clean_email,
             }
         ).execute()
@@ -360,10 +407,10 @@ def create_onboarded_tenant(*, supabase_client: Any, payload: Any) -> dict[str, 
                 {
                     "tenant_id": tenant_id,
                     "owner_user_id": local_user["id"],
-                    "name": f"{business_name} Website",
-                    "slug": subdomain,
+                    "name": f"{display_business_name} Website",
+                    "slug": subdomain or f"site-{tenant_id}",
                     "status": "draft",
-                    "draft_schema": default_builder_schema(business_name),
+                    "draft_schema": default_builder_schema(display_business_name),
                     "published_schema": None,
                     "published_version": 0,
                 }
@@ -383,7 +430,7 @@ def create_onboarded_tenant(*, supabase_client: Any, payload: Any) -> dict[str, 
         return {
             "user_id": local_user["id"],
             "tenant_id": tenant_id,
-            "subdomain": subdomain,
+            "subdomain": subdomain or None,
             "requires_login": True,
         }
 

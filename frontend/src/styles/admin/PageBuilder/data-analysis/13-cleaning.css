@@ -346,6 +346,30 @@
   flex: 0 0 auto;
 }
 
+.page-builder .daw-dataframe-download-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-builder .daw-dataframe-download-actions .daw-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.page-builder .daw-dataframe-download-actions .daw-secondary span {
+  margin: 0;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .page-builder .daw-analysis-generator {
   display: grid;
   gap: 16px;

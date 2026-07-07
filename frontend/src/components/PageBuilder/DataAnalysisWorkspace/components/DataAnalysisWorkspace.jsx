@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, Plus, Trash2,
 import { uiText } from "../constants/uiText";
 import { analysisGroups } from "../constants/analysisConfig";
 import { API_URL, getFriendlyExternalError, readApiResponse } from "../utils/api";
+import { downloadCsv, downloadXlsxFromCsv } from "../utils/dataframeExport";
 import { cleanObject, escapeCsvValue } from "../utils/formatters";
 import { getMissingRequiredParams } from "../utils/validation";
 import {
@@ -148,6 +149,7 @@ export default function DataAnalysisWorkspace({
   const [dataframesSaved, setDataframesSaved] = useState(
     () => Boolean(cachedWorkspace?.dataframesSaved)
   );
+  const [savedDataframeExport, setSavedDataframeExport] = useState(null);
 
   const [reportOptions] = useState(() => ({
     title: "",
@@ -285,6 +287,7 @@ export default function DataAnalysisWorkspace({
         const restoredStep = getRestorableDataWorkspaceStep(cachedWorkspace?.currentStep);
         setDataset(saved.dataset);
         setDataframesSaved(restoredDataframesSaved);
+        setSavedDataframeExport(saved.cleanedDataframe || null);
         setSelectedFile(saved.file instanceof File ? saved.file : null);
         setCurrentStep(
           !restoredDataframesSaved && ["visualization", "report"].includes(restoredStep)
@@ -1253,6 +1256,7 @@ export default function DataAnalysisWorkspace({
     setAssistResult(null);
     setCleaning(createDefaultCleaning());
     setDataframesSaved(false);
+    setSavedDataframeExport(null);
     setCurrentStep("review");
   };
 
@@ -1355,12 +1359,32 @@ export default function DataAnalysisWorkspace({
         },
       });
       setDataframesSaved(true);
+      setSavedDataframeExport(cleanedDataframe);
       setFlowToast("");
     } catch (error) {
       showFlowError(error.message || "The dataframes could not be saved.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getDataframeExportName = () =>
+    getDatasetArchiveTitle(dataset, "madar-dataset");
+
+  const downloadSavedDataframe = (format) => {
+    const csv = savedDataframeExport?.csv;
+
+    if (!dataframesSaved || !csv) {
+      showFlowError(t.saveDataframesFirst || "Save your data before downloading it.");
+      return;
+    }
+
+    if (format === "xlsx") {
+      downloadXlsxFromCsv(csv, getDataframeExportName());
+      return;
+    }
+
+    downloadCsv(csv, getDataframeExportName());
   };
 
   const archiveVisualizationOutput = useCallback(
@@ -2735,8 +2759,10 @@ export default function DataAnalysisWorkspace({
             cleaning={cleaning}
             updateCleaning={updateCleaning}
             onSaveDataframes={saveDataframes}
+            onDownloadDataframe={downloadSavedDataframe}
             isSavingDataframes={isLoading}
             dataframesSaved={dataframesSaved}
+            canDownloadDataframes={Boolean(savedDataframeExport?.csv)}
             t={t}
           />
         </>

@@ -244,6 +244,64 @@ class OnboardingRoutesTests(unittest.TestCase):
             self.assertEqual(feature["tenant_id"], tenants[0]["tenant_id"])
             self.assertEqual(feature["payment_status"], "pending")
 
+    def test_onboarding_allows_optional_business_details_and_subdomain(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+
+        with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
+            auth_routes,
+            "enforce_auth_rate_limit",
+        ):
+            response = client.post(
+                ONBOARDING_PATH,
+                json=onboarding_payload(
+                    business_name="",
+                    business_type="",
+                    subdomain="",
+                ),
+            )
+
+        self.assertIn(response.status_code, (200, 201))
+        body = response.json()
+        self.assertIsNone(body["subdomain"])
+
+        tenants = fake_supabase.tables["tenants"]
+        self.assertEqual(tenants[0]["brand_name"], "Madar Owner")
+        self.assertEqual(tenants[0]["business_type"], "")
+
+        settings = fake_supabase.tables["website_settings"]
+        self.assertIsNone(settings[0]["subdomain"])
+        self.assertEqual(settings[0]["brand"], "Madar Owner")
+
+        projects = fake_supabase.tables["builder_projects"]
+        self.assertEqual(projects[0]["name"], "Madar Owner Website")
+        self.assertEqual(projects[0]["slug"], "site-1")
+
+    def test_onboarding_rejects_numeric_names_and_business_text(self):
+        client = build_client()
+        invalid_cases = [
+            {"first_name": "123"},
+            {"last_name": "456"},
+            {"business_name": "Cafe 123"},
+            {"business_type": "123"},
+        ]
+
+        for payload_overrides in invalid_cases:
+            with self.subTest(payload_overrides=payload_overrides):
+                fake_supabase = FakeSupabase()
+                with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
+                    auth_routes,
+                    "enforce_auth_rate_limit",
+                ):
+                    response = client.post(
+                        ONBOARDING_PATH,
+                        json=onboarding_payload(**payload_overrides),
+                    )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(fake_supabase.auth.admin.created_users, [])
+                self.assertEqual(fake_supabase.tables["tenants"], [])
+
     def test_onboarding_response_is_safe_and_requires_login(self):
         client = build_client()
         fake_supabase = FakeSupabase()
@@ -377,6 +435,30 @@ class OnboardingRoutesTests(unittest.TestCase):
         self.assertEqual(fake_supabase.tables["tenants"][0]["brand_name"], "")
         self.assertEqual(fake_supabase.tables["website_settings"], [])
         self.assertEqual(fake_supabase.tables["builder_projects"], [])
+
+    def test_existing_signup_rejects_numeric_names(self):
+        client = build_client()
+
+        for payload_overrides in ({"first_name": "123"}, {"last_name": "456"}):
+            with self.subTest(payload_overrides=payload_overrides):
+                fake_supabase = FakeSupabase()
+                payload = {
+                    "first_name": "Existing",
+                    "last_name": "Signup",
+                    "email": "Existing@Example.COM",
+                    "password": "super-secret-password",
+                }
+                payload.update(payload_overrides)
+
+                with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
+                    auth_routes,
+                    "enforce_auth_rate_limit",
+                ):
+                    response = client.post("/auth/signup", json=payload)
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(fake_supabase.auth.admin.created_users, [])
+                self.assertEqual(fake_supabase.tables["tenants"], [])
 
 
 if __name__ == "__main__":

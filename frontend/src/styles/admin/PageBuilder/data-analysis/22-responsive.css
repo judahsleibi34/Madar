@@ -49,6 +49,15 @@
     width: 100%;
   }
 
+  .page-builder .daw-dataframe-download-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .page-builder .daw-dataframe-download-actions .daw-secondary {
+    width: 100%;
+  }
+
   .page-builder .daw-header {
     flex-direction: column;
   }

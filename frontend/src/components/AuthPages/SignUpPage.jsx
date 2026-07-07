@@ -3,10 +3,17 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { postAuthJson, readApiError } from "../../utils/apiClient";
+import AuthToast from "./AuthToast";
+import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
 
 const PUBLIC_SITE_DOMAIN = import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
+const PERSON_NAME_PATTERN = /^[\p{L}\s.'’-]+$/u;
+const BUSINESS_TEXT_PATTERN = /^[\p{L}\s.'’&/(),-]+$/u;
+const DIGIT_PATTERN = /\p{N}/u;
+const SAFE_PERSON_NAME_PATTERN = /^[\p{L}\s.'\u2019-]+$/u;
+const SAFE_BUSINESS_TEXT_PATTERN = /^[\p{L}\s.'\u2019&/(),-]+$/u;
 
 export default function SignUpPage({
   lang = "en",
@@ -32,6 +39,7 @@ export default function SignUpPage({
 
   const [errors, setErrors] = useState({});
   const [statusMessage, setStatusMessage] = useState("");
+  const [authToast, setAuthToast] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -48,75 +56,227 @@ export default function SignUpPage({
   const publicUrlPreviewLabel = PUBLIC_SITE_DOMAIN
     ? t("signup.publicUrlAfterPublishing")
     : t("signup.subdomainPreview");
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    const nextValue = name === "subdomain" ? value.toLowerCase() : value;
-
-    setFormData((prev) => ({ ...prev, [name]: nextValue }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
-    setStatusMessage("");
+  const errorFieldLabels = {
+    firstName: t("signup.firstName"),
+    lastName: t("signup.lastName"),
+    email: t("signup.email"),
+    password: t("signup.password"),
+    confirmPassword: t("signup.confirmPassword"),
+    businessName: t("signup.businessName"),
+    businessType: t("signup.businessType"),
+    subdomain: t("signup.subdomain"),
+  };
+  const showAuthToast = ({ type = "error", title, message, kind = "status" }) => {
+    setAuthToast({
+      id: Date.now(),
+      type,
+      title,
+      message,
+      kind,
+    });
   };
 
-  const validateSubdomain = (newErrors) => {
-    if (!isTenantOnboarding) return;
+  const showValidationToast = (validationErrors) => {
+    showAuthToast({
+      type: "error",
+      title: t("signup.checkFields", { defaultValue: "Please check these fields" }),
+      message: formatAuthValidationToastMessage(validationErrors, errorFieldLabels),
+      kind: "validation",
+    });
+  };
 
-    if (!normalizedSubdomain) {
-      newErrors.subdomain = t("validation.required");
+  const validateSubdomain = (newErrors, values = formData) => {
+    if (!isTenantOnboarding) return;
+    const cleanSubdomain = values.subdomain.trim().toLowerCase();
+
+    if (!cleanSubdomain) {
       return;
     }
 
-    if (normalizedSubdomain.length < 3) {
+    if (cleanSubdomain.length < 3) {
       newErrors.subdomain = t("signup.subdomainTooShort");
       return;
     }
 
-    if (!SUBDOMAIN_PATTERN.test(normalizedSubdomain)) {
+    if (!SUBDOMAIN_PATTERN.test(cleanSubdomain)) {
       newErrors.subdomain = t("signup.subdomainInvalid");
     }
   };
 
-  const validateForm = () => {
+  const getTextOnlyMessage = (fieldLabel) =>
+    t("validation.textOnly", {
+      defaultValue: `${fieldLabel} can only contain letters and normal punctuation.`,
+    });
+
+  const validateTextValue = (
+    newErrors,
+    value,
+    fieldName,
+    fieldLabel,
+    pattern,
+    { required = true } = {}
+  ) => {
+    const cleanValue = value.trim();
+
+    if (!cleanValue) {
+      if (required) newErrors[fieldName] = t("validation.required");
+      return;
+    }
+
+    if (
+      DIGIT_PATTERN.test(cleanValue) ||
+      !/\p{L}/u.test(cleanValue) ||
+      !pattern.test(cleanValue)
+    ) {
+      newErrors[fieldName] = getTextOnlyMessage(fieldLabel);
+    }
+  };
+
+  const applyFriendlyDetailError = (detail) => {
+    const safeDetail = String(detail || "").toLowerCase();
+    const nextErrors = {};
+
+    if (safeDetail.includes("already registered")) {
+      setStatusMessage(t("signup.alreadyRegistered"));
+      showAuthToast({
+        type: "error",
+        title: t("signup.signupFailed"),
+        message: t("signup.alreadyRegistered"),
+      });
+      return true;
+    }
+
+    if (safeDetail.includes("first name")) {
+      nextErrors.firstName = safeDetail.includes("required")
+        ? t("validation.required")
+        : getTextOnlyMessage(t("signup.firstName"));
+    }
+
+    if (safeDetail.includes("last name")) {
+      nextErrors.lastName = safeDetail.includes("required")
+        ? t("validation.required")
+        : getTextOnlyMessage(t("signup.lastName"));
+    }
+
+    if (safeDetail.includes("business name")) {
+      nextErrors.businessName = getTextOnlyMessage(t("signup.businessName"));
+    }
+
+    if (safeDetail.includes("business type")) {
+      nextErrors.businessType = getTextOnlyMessage(t("signup.businessType"));
+    }
+
+    if (safeDetail.includes("password")) {
+      nextErrors.password = safeDetail.includes("8 characters")
+        ? t("signup.passwordInvalid")
+        : t("validation.required");
+    }
+
+    if (safeDetail.includes("email")) {
+      nextErrors.email = safeDetail.includes("registered")
+        ? ""
+        : t("validation.invalidEmail");
+    }
+
+    if (safeDetail.includes("subdomain") && safeDetail.includes("taken")) {
+      nextErrors.subdomain = t("signup.subdomainTaken");
+    } else if (safeDetail.includes("reserved")) {
+      nextErrors.subdomain = t("signup.subdomainReserved");
+    } else if (safeDetail.includes("subdomain") || safeDetail.includes("invalid subdomain")) {
+      nextErrors.subdomain = t("signup.subdomainInvalid");
+    }
+
+    const cleanErrors = Object.fromEntries(
+      Object.entries(nextErrors).filter(([, message]) => message)
+    );
+
+    if (Object.keys(cleanErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...cleanErrors }));
+      setStatusMessage("");
+      showValidationToast(cleanErrors);
+      return true;
+    }
+
+    return false;
+  };
+
+  const getValidationErrors = (values = formData) => {
     const newErrors = {};
 
-    if (!formData.firstName.trim()) newErrors.firstName = t("validation.required");
-    if (!formData.lastName.trim()) newErrors.lastName = t("validation.required");
-    if (!formData.email.trim()) newErrors.email = t("validation.required");
-    if (!formData.password.trim()) newErrors.password = t("validation.required");
-    if (!formData.confirmPassword.trim()) {
+    validateTextValue(
+      newErrors,
+      values.firstName,
+      "firstName",
+      t("signup.firstName"),
+      SAFE_PERSON_NAME_PATTERN
+    );
+    validateTextValue(
+      newErrors,
+      values.lastName,
+      "lastName",
+      t("signup.lastName"),
+      SAFE_PERSON_NAME_PATTERN
+    );
+    if (!values.email.trim()) newErrors.email = t("validation.required");
+    if (!values.password.trim()) newErrors.password = t("validation.required");
+    if (!values.confirmPassword.trim()) {
       newErrors.confirmPassword = t("validation.required");
     }
 
     if (isTenantOnboarding) {
-      if (!formData.businessName.trim()) {
-        newErrors.businessName = t("validation.required");
-      }
-      if (!formData.businessType.trim()) {
-        newErrors.businessType = t("validation.required");
-      }
-      validateSubdomain(newErrors);
+      validateTextValue(
+        newErrors,
+        values.businessName,
+        "businessName",
+        t("signup.businessName"),
+        SAFE_BUSINESS_TEXT_PATTERN,
+        { required: false }
+      );
+      validateTextValue(
+        newErrors,
+        values.businessType,
+        "businessType",
+        t("signup.businessType"),
+        SAFE_BUSINESS_TEXT_PATTERN,
+        { required: false }
+      );
+      validateSubdomain(newErrors, values);
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
       newErrors.email = t("validation.invalidEmail");
     }
 
     const passwordRegex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
-    if (formData.password && !passwordRegex.test(formData.password)) {
+    if (values.password && !passwordRegex.test(values.password)) {
       newErrors.password = t("signup.passwordInvalid");
     }
 
     if (
-      formData.password &&
-      formData.confirmPassword &&
-      formData.password !== formData.confirmPassword
+      values.password &&
+      values.confirmPassword &&
+      values.password !== values.confirmPassword
     ) {
       newErrors.confirmPassword = t("signup.passwordMismatch");
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
+  };
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    const nextValue = name === "subdomain" ? value.toLowerCase() : value;
+    const nextFormData = { ...formData, [name]: nextValue };
+
+    setFormData(nextFormData);
+    const nextErrors = getValidationErrors(nextFormData);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) setAuthToast(null);
+    else if (authToast?.kind === "validation") {
+      showValidationToast(nextErrors);
+    }
+    setStatusMessage("");
   };
 
   const getRequestPayload = () => {
@@ -131,9 +291,9 @@ export default function SignUpPage({
 
     return {
       ...basePayload,
-      business_name: formData.businessName.trim(),
-      business_type: formData.businessType.trim(),
-      subdomain: normalizedSubdomain,
+      business_name: formData.businessName.trim() || null,
+      business_type: formData.businessType.trim() || null,
+      subdomain: normalizedSubdomain || null,
     };
   };
 
@@ -147,41 +307,21 @@ export default function SignUpPage({
         if (field === "email") newErrors.email = t("validation.invalidEmail");
         if (field === "first_name") newErrors.firstName = t("validation.required");
         if (field === "last_name") newErrors.lastName = t("validation.required");
-        if (field === "business_name") newErrors.businessName = t("validation.required");
-        if (field === "business_type") newErrors.businessType = t("validation.required");
-        if (field === "subdomain") newErrors.subdomain = error.msg || t("signup.subdomainInvalid");
+        if (field === "business_name") newErrors.businessName = getTextOnlyMessage(t("signup.businessName"));
+        if (field === "business_type") newErrors.businessType = getTextOnlyMessage(t("signup.businessType"));
+        if (field === "subdomain") newErrors.subdomain = t("signup.subdomainInvalid");
         if (field === "password") newErrors.password = error.msg || t("validation.required");
       });
 
       setErrors((prev) => ({ ...prev, ...newErrors }));
       setStatusMessage("");
+      showValidationToast(newErrors);
       return true;
     }
 
     const detail = readApiError(data, "").toLowerCase();
 
-    if (detail.includes("already registered")) {
-      setStatusMessage(t("signup.alreadyRegistered"));
-      return true;
-    }
-
-    if (detail.includes("subdomain") && detail.includes("taken")) {
-      setErrors((prev) => ({ ...prev, subdomain: t("signup.subdomainTaken") }));
-      setStatusMessage("");
-      return true;
-    }
-
-    if (detail.includes("reserved")) {
-      setErrors((prev) => ({ ...prev, subdomain: t("signup.subdomainReserved") }));
-      setStatusMessage("");
-      return true;
-    }
-
-    if (detail.includes("subdomain") || detail.includes("invalid")) {
-      setErrors((prev) => ({ ...prev, subdomain: t("signup.subdomainInvalid") }));
-      setStatusMessage("");
-      return true;
-    }
+    if (applyFriendlyDetailError(detail)) return true;
 
     return false;
   };
@@ -189,7 +329,13 @@ export default function SignUpPage({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    const newErrors = getValidationErrors(formData);
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      showValidationToast(newErrors);
+      return;
+    }
 
     setIsSubmitting(true);
     setStatusMessage("");
@@ -203,15 +349,23 @@ export default function SignUpPage({
       if (!response.ok) {
         if (applyApiErrors(response, data)) return;
 
-        setStatusMessage(
-          readApiError(data, t("signup.signupFailed"))
-        );
+        const message = normalizeAuthMessage(readApiError(data, ""), t("signup.signupFailed"));
+        setStatusMessage(message);
+        showAuthToast({
+          type: "error",
+          title: t("signup.signupFailed"),
+          message,
+        });
         return;
       }
 
-      setStatusMessage(
-        isTenantOnboarding ? t("signup.onboardingSuccess") : t("signup.success")
-      );
+      const message = isTenantOnboarding ? t("signup.onboardingSuccess") : t("signup.success");
+      setStatusMessage(message);
+      showAuthToast({
+        type: "success",
+        title: t("signup.success"),
+        message,
+      });
       setTimeout(() => {
         if (onSignupSuccess) {
           onSignupSuccess();
@@ -227,6 +381,11 @@ export default function SignUpPage({
     } catch (error) {
       console.error(error);
       setStatusMessage(t("login.serverError"));
+      showAuthToast({
+        type: "error",
+        title: t("signup.signupFailed"),
+        message: t("login.serverError"),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -239,10 +398,6 @@ export default function SignUpPage({
           <h1>{t("signup.title")}</h1>
           <p>{t("signup.subtitle")}</p>
         </div>
-
-        {statusMessage && (
-          <p className="form-status-message">{statusMessage}</p>
-        )}
 
         {isTenantOnboarding && (
           <div className="auth-section-title">{t("signup.accountSection")}</div>
@@ -258,7 +413,6 @@ export default function SignUpPage({
               value={formData.firstName}
               onChange={handleChange}
             />
-            {errors.firstName && <span>{errors.firstName}</span>}
           </label>
 
           <label>
@@ -270,7 +424,6 @@ export default function SignUpPage({
               value={formData.lastName}
               onChange={handleChange}
             />
-            {errors.lastName && <span>{errors.lastName}</span>}
           </label>
         </div>
 
@@ -284,7 +437,6 @@ export default function SignUpPage({
             onChange={handleChange}
             dir="ltr"
           />
-          {errors.email && <span>{errors.email}</span>}
         </label>
 
         <label>
@@ -306,7 +458,6 @@ export default function SignUpPage({
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-          {errors.password && <span>{errors.password}</span>}
         </label>
 
         <label>
@@ -328,7 +479,6 @@ export default function SignUpPage({
               {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-          {errors.confirmPassword && <span>{errors.confirmPassword}</span>}
         </label>
 
         {isTenantOnboarding && (
@@ -344,7 +494,6 @@ export default function SignUpPage({
                 value={formData.businessName}
                 onChange={handleChange}
               />
-              {errors.businessName && <span>{errors.businessName}</span>}
             </label>
 
             <label>
@@ -356,7 +505,6 @@ export default function SignUpPage({
                 value={formData.businessType}
                 onChange={handleChange}
               />
-              {errors.businessType && <span>{errors.businessType}</span>}
             </label>
 
             <label>
@@ -374,7 +522,6 @@ export default function SignUpPage({
               <small className="subdomain-preview">
                 {publicUrlPreviewLabel}: {publicUrlPreview}
               </small>
-              {errors.subdomain && <span>{errors.subdomain}</span>}
             </label>
           </>
         )}
@@ -391,6 +538,15 @@ export default function SignUpPage({
           {t("signup.hasAccount")} <Link to={loginPath}>{t("signup.login")}</Link>
         </p>
       </form>
+
+      <AuthToast
+        key={authToast?.id}
+        type={authToast?.type}
+        title={authToast?.title}
+        message={authToast?.message}
+        dir={pageDir}
+        onDismiss={() => setAuthToast(null)}
+      />
     </main>
   );
 }
