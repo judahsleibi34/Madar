@@ -320,10 +320,10 @@
 .page-builder .daw-report-save-panel {
   display: grid;
   gap: 10px;
-  border: 1px solid var(--daw-report-border);
+  border: 0;
   border-radius: 8px;
   padding: 10px;
-  background: var(--daw-report-soft);
+  background: transparent;
 }
 
 .page-builder .daw-report-save-panel label {
@@ -1210,21 +1210,47 @@
 
 /* Final theme pass for the report workspace. */
 .page-builder .daw-report-builder {
-  grid-template-columns: 250px minmax(480px, 1fr) 260px;
+  grid-template-columns: minmax(340px, 360px) minmax(0, 1fr);
   gap: 14px;
+}
+
+.page-builder .daw-report-builder > .daw-report-properties {
+  display: none !important;
 }
 
 .page-builder .daw-report-panel,
 .page-builder .daw-report-canvas-shell {
   border: 1px solid var(--theme-border) !important;
   border-radius: 8px !important;
-  background: var(--theme-surface) !important;
   box-shadow: none !important;
 }
 
 .page-builder .daw-report-panel {
   gap: 14px;
   padding: 14px;
+  min-width: 0;
+  background: transparent !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--theme-primary-rgb), 0.52) transparent;
+}
+
+.page-builder .daw-report-canvas-shell {
+  background: var(--theme-bg-soft) !important;
+}
+
+.page-builder .daw-report-panel::-webkit-scrollbar {
+  width: 9px;
+}
+
+.page-builder .daw-report-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page-builder .daw-report-panel::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(var(--theme-primary-rgb), 0.52);
+  background-clip: padding-box;
 }
 
 .page-builder .daw-report-panel-heading span {
@@ -1254,7 +1280,7 @@
 .page-builder .daw-report-builder .daw-report-properties select {
   border: 1px solid var(--theme-border) !important;
   border-radius: 8px !important;
-  background: var(--theme-surface) !important;
+  background: var(--theme-bg-soft) !important;
   color: var(--theme-text) !important;
   box-shadow: none !important;
 }
@@ -1263,6 +1289,7 @@
 .page-builder .daw-report-preview-button:hover {
   border-color: var(--theme-primary) !important;
   color: var(--theme-primary) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
   box-shadow: none !important;
 }
 
@@ -1270,7 +1297,7 @@
   min-height: 58px;
   border: 1px solid var(--theme-border) !important;
   border-radius: 8px !important;
-  background: var(--theme-surface) !important;
+  background: transparent !important;
   color: var(--theme-text) !important;
   box-shadow: none !important;
   transform: none !important;
@@ -1279,7 +1306,7 @@
 
 .page-builder .daw-report-block-library > button:hover {
   border-color: var(--theme-primary) !important;
-  background: var(--theme-surface) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
   color: var(--theme-primary) !important;
   box-shadow: none !important;
   transform: none !important;
@@ -1287,7 +1314,7 @@
 
 .page-builder .daw-report-block-library > button:disabled {
   border-color: var(--theme-border) !important;
-  background: var(--theme-surface) !important;
+  background: transparent !important;
   color: var(--theme-text-muted) !important;
   opacity: 0.58;
 }
@@ -1300,13 +1327,17 @@
 }
 
 .page-builder .daw-report-canvas-shell {
+  display: grid;
+  justify-items: end;
   padding: 18px;
   background: var(--theme-bg-soft) !important;
   position: sticky;
   top: 14px;
-  height: calc(100vh - 34px);
-  max-height: calc(100vh - 34px);
-  overflow-y: auto;
+  min-width: 0;
+  height: auto;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: visible;
   overscroll-behavior: contain;
 }
 
@@ -1324,15 +1355,48 @@
   border: 1px solid var(--theme-border) !important;
   border-radius: 8px;
   padding: 0 12px;
-  background: var(--theme-surface) !important;
+  background: var(--theme-bg-soft) !important;
   color: var(--theme-text) !important;
   font-size: 12px;
   font-weight: 900;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: none !important;
 }
 
+.page-builder .daw-report-save-actions .daw-report-preview-button,
+.page-builder .daw-report-export-actions .daw-report-preview-button {
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+
+.page-builder .daw-report-save-actions,
+.page-builder .daw-report-export-actions {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.page-builder .daw-report-file-button {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.page-builder .daw-report-file-button strong,
+.page-builder .daw-report-file-button em,
+.page-builder .daw-report-block-library button strong,
+.page-builder .daw-report-block-library button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-builder .daw-report-file-button strong {
+  white-space: nowrap;
+}
+
 .page-builder .daw-report-page {
+  width: min(100%, 1120px);
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: clamp(28px, 3vw, 44px);
   border: 1px solid var(--theme-border) !important;
   border-radius: 2px !important;
   background: var(--theme-paper-surface) !important;
@@ -1379,13 +1443,15 @@
   color: var(--theme-text-soft) !important;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1500px) {
   .page-builder .daw-report-builder {
-    grid-template-columns: 220px minmax(380px, 1fr);
+    grid-template-columns: minmax(320px, 340px) minmax(0, 1fr);
   }
+}
 
-  .page-builder .daw-report-properties {
-    grid-column: 1 / -1;
+@media (max-width: 1180px) {
+  .page-builder .daw-report-builder {
+    grid-template-columns: minmax(300px, 320px) minmax(0, 1fr);
   }
 }
 
@@ -1395,7 +1461,7 @@
   }
 
   .page-builder .daw-report-properties {
-    grid-column: auto;
+    display: none !important;
   }
 
   .page-builder .daw-report-panel,

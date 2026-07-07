@@ -4,7 +4,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { postAuthJson } from "../../utils/apiClient";
-import { normalizeAuthMessage } from "./authMessages";
+import AuthToast from "./AuthToast";
+import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
 
 export default function LoginPage({
   lang = "en",
@@ -25,49 +26,90 @@ export default function LoginPage({
   const [statusMessage, setStatusMessage] = useState(() =>
     typeof location.state?.message === "string" ? location.state.message : ""
   );
+  const [authToast, setAuthToast] = useState(() =>
+    typeof location.state?.message === "string"
+      ? {
+          id: Date.now(),
+          type: "success",
+          title: t("login.success"),
+          message: location.state.message,
+        }
+      : null
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mfaStep, setMfaStep] = useState(null);
   const [mfaCode, setMfaCode] = useState("");
   const [isMfaSubmitting, setIsMfaSubmitting] = useState(false);
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    setErrors((prev) => ({
-      ...prev,
-      [name]: "",
-    }));
-
-    setStatusMessage("");
-  };
-
-  const validateForm = () => {
+  const getValidationErrors = (values) => {
     const newErrors = {};
 
-    if (!formData.email.trim()) {
+    if (!values.email.trim()) {
       newErrors.email = t("validation.required");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
       newErrors.email = t("validation.invalidEmail");
     }
 
-    if (!formData.password.trim()) {
+    if (!values.password.trim()) {
       newErrors.password = t("validation.required");
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
+  };
+
+  const errorFieldLabels = {
+    email: t("login.email"),
+    password: t("login.password"),
+    mfaCode: t("login.mfaCode"),
+  };
+  const showAuthToast = ({ type = "error", title, message, kind = "status" }) => {
+    setAuthToast({
+      id: Date.now(),
+      type,
+      title,
+      message,
+      kind,
+    });
+  };
+
+  const showValidationToast = (validationErrors, title = t("signup.checkFields", { defaultValue: "Please check these fields" })) => {
+    showAuthToast({
+      type: "error",
+      title,
+      message: formatAuthValidationToastMessage(validationErrors, errorFieldLabels),
+      kind: "validation",
+    });
+  };
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    const nextFormData = {
+      ...formData,
+      [name]: value,
+    };
+
+    setFormData(nextFormData);
+    const nextErrors = getValidationErrors(nextFormData);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) setAuthToast(null);
+    else if (authToast?.kind === "validation") {
+      showValidationToast(nextErrors, authToast.title);
+    }
+
+    setStatusMessage("");
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    const newErrors = getValidationErrors(formData);
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      showValidationToast(newErrors, t("login.loginFailed"));
+      return;
+    }
 
     setIsSubmitting(true);
     setStatusMessage("");
@@ -94,16 +136,26 @@ export default function LoginPage({
               ...prev,
               email: t("validation.invalidEmail"),
             }));
+            showValidationToast({ email: t("validation.invalidEmail") }, t("login.loginFailed"));
             return;
           }
 
           setStatusMessage(t("login.loginFailed"));
+          showAuthToast({
+            type: "error",
+            title: t("login.loginFailed"),
+            message: t("login.loginFailed"),
+          });
           return;
         }
 
-        setStatusMessage(
-          normalizeAuthMessage(data.detail, t("login.loginFailed"))
-        );
+        const message = normalizeAuthMessage(data.detail, t("login.loginFailed"));
+        setStatusMessage(message);
+        showAuthToast({
+          type: "error",
+          title: t("login.loginFailed"),
+          message,
+        });
         return;
       }
 
@@ -116,14 +168,23 @@ export default function LoginPage({
           factorId: firstFactorId,
         });
         setStatusMessage(t("login.mfaRequired"));
+        showAuthToast({
+          type: "error",
+          title: t("login.mfaTitle"),
+          message: t("login.mfaRequired"),
+        });
         return;
       }
 
-      setStatusMessage(
-        data.mfa_enrollment_recommended
-          ? t("login.mfaRecommended")
-          : t("login.success")
-      );
+      const message = data.mfa_enrollment_recommended
+        ? t("login.mfaRecommended")
+        : t("login.success");
+      setStatusMessage(message);
+      showAuthToast({
+        type: "success",
+        title: t("login.success"),
+        message,
+      });
 
       if (onLoginSuccess) {
         onLoginSuccess(data.user);
@@ -131,6 +192,11 @@ export default function LoginPage({
     } catch (error) {
       console.error(error);
       setStatusMessage(t("login.serverError"));
+      showAuthToast({
+        type: "error",
+        title: t("login.loginFailed"),
+        message: t("login.serverError"),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -141,14 +207,24 @@ export default function LoginPage({
 
     if (!mfaStep?.factorId) {
       setStatusMessage(t("login.mfaFailed"));
+      showAuthToast({
+        type: "error",
+        title: t("login.mfaFailed"),
+        message: t("login.mfaFailed"),
+      });
       return;
     }
 
     if (!mfaCode.trim()) {
+      const nextErrors = {
+        ...errors,
+        mfaCode: t("login.mfaCodeRequired"),
+      };
       setErrors((prev) => ({
         ...prev,
         mfaCode: t("login.mfaCodeRequired"),
       }));
+      showValidationToast(nextErrors, t("login.mfaFailed"));
       return;
     }
 
@@ -168,11 +244,15 @@ export default function LoginPage({
       });
 
       if (!challengeResponse.ok) {
-        setStatusMessage(
-          typeof challengeData.detail === "string"
-            ? challengeData.detail
-            : t("login.mfaFailed")
-        );
+        const message = typeof challengeData.detail === "string"
+          ? challengeData.detail
+          : t("login.mfaFailed");
+        setStatusMessage(message);
+        showAuthToast({
+          type: "error",
+          title: t("login.mfaFailed"),
+          message,
+        });
         return;
       }
 
@@ -186,15 +266,24 @@ export default function LoginPage({
       });
 
       if (!verifyResponse.ok) {
-        setStatusMessage(
-          typeof verifyData.detail === "string"
-            ? verifyData.detail
-            : t("login.mfaFailed")
-        );
+        const message = typeof verifyData.detail === "string"
+          ? verifyData.detail
+          : t("login.mfaFailed");
+        setStatusMessage(message);
+        showAuthToast({
+          type: "error",
+          title: t("login.mfaFailed"),
+          message,
+        });
         return;
       }
 
       setStatusMessage(t("login.success"));
+      showAuthToast({
+        type: "success",
+        title: t("login.success"),
+        message: t("login.success"),
+      });
 
       if (onLoginSuccess) {
         onLoginSuccess(verifyData.user);
@@ -202,6 +291,11 @@ export default function LoginPage({
     } catch (error) {
       console.error(error);
       setStatusMessage(t("login.serverError"));
+      showAuthToast({
+        type: "error",
+        title: t("login.mfaFailed"),
+        message: t("login.serverError"),
+      });
     } finally {
       setIsMfaSubmitting(false);
     }
@@ -215,6 +309,7 @@ export default function LoginPage({
       mfaCode: "",
     }));
     setStatusMessage("");
+    setAuthToast(null);
   };
 
   return (
@@ -228,10 +323,6 @@ export default function LoginPage({
           <h1>{mfaStep ? t("login.mfaTitle") : t("login.title")}</h1>
           <p>{mfaStep ? t("login.mfaSubtitle") : t("login.subtitle")}</p>
         </div>
-
-        {statusMessage && (
-          <p className="form-status-message">{statusMessage}</p>
-        )}
 
         {mfaStep ? (
           <>
@@ -273,12 +364,12 @@ export default function LoginPage({
                     ...prev,
                     mfaCode: "",
                   }));
+                  setAuthToast(null);
                   setStatusMessage("");
                 }}
                 dir="ltr"
               />
 
-              {errors.mfaCode && <span>{errors.mfaCode}</span>}
             </label>
 
             <button
@@ -311,8 +402,6 @@ export default function LoginPage({
                 onChange={handleChange}
                 dir="ltr"
               />
-
-              {errors.email && <span>{errors.email}</span>}
             </label>
 
             <label>
@@ -336,8 +425,6 @@ export default function LoginPage({
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-
-              {errors.password && <span>{errors.password}</span>}
             </label>
 
             <div className="login-options">
@@ -354,6 +441,14 @@ export default function LoginPage({
           </>
         )}
       </form>
+      <AuthToast
+        key={authToast?.id}
+        type={authToast?.type}
+        title={authToast?.title}
+        message={authToast?.message}
+        dir={pageDir}
+        onDismiss={() => setAuthToast(null)}
+      />
     </main>
   );
 }

@@ -21,9 +21,9 @@ class OnboardingSignupRequest(BaseModel):
     last_name: str
     email: EmailStr
     password: str
-    business_name: str
-    business_type: str
-    subdomain: str
+    business_name: Optional[str] = None
+    business_type: Optional[str] = None
+    subdomain: Optional[str] = None
     selected_plan: Optional[dict[str, Any]] = None
     selected_base_plan: Optional[dict[str, Any]] = None
     selected_features: Optional[list[dict[str, Any]]] = None

@@ -13,7 +13,7 @@ from services.auth_service import (
     normalize_user_type,
 )
 from services.billing_service import get_billing_summary_for_tenant
-from services.onboarding_service import create_onboarded_tenant
+from services.onboarding_service import create_onboarded_tenant, validate_person_name
 from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
 from services.mfa_login_service import (
     create_pending_mfa_client,
@@ -136,20 +136,14 @@ def signup(user: SignUpRequest, request: Request):
 
     try:
         clean_email = normalize_email(user.email)
-        first_name = user.first_name.strip()
-        last_name = user.last_name.strip()
+        first_name = validate_person_name(user.first_name, "First name")
+        last_name = validate_person_name(user.last_name, "Last name")
         owner_name = f"{first_name} {last_name}".strip()
 
         if not clean_email:
             raise HTTPException(status_code=400, detail="Email is required")
 
         enforce_auth_rate_limit(request, "signup", clean_email)
-
-        if not first_name or not last_name:
-            raise HTTPException(
-                status_code=400,
-                detail="First name and last name are required",
-            )
 
         if not user.password or len(user.password.strip()) < 8:
             raise HTTPException(

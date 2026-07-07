@@ -340,11 +340,16 @@ body.theme-dark {
   background: rgba(var(--theme-primary-rgb), 0.08) !important;
 }
 
-.auth-section-title,
-.subdomain-preview,
 .form-status-message {
   border-color: var(--theme-border) !important;
   background: var(--theme-surface-2) !important;
+  color: var(--theme-text-soft) !important;
+}
+
+.auth-section-title,
+.subdomain-preview {
+  border-color: transparent !important;
+  background: transparent !important;
   color: var(--theme-text-soft) !important;
 }
 

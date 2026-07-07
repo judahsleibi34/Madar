@@ -1,3 +1,4 @@
+import { Download } from 'lucide-react';
 import EmptyState from './EmptyState';
 import Field from './Field';
 import Toggle from './Toggle';
@@ -10,7 +11,9 @@ export default function PrepareDataStep({
   cleaning,
   updateCleaning,
   onSaveDataframes,
+  onDownloadDataframe,
   dataframesSaved = false,
+  canDownloadDataframes = false,
   isSavingDataframes = false,
   t,
 }) {
@@ -313,6 +316,28 @@ export default function PrepareDataStep({
               <div>
                 <strong>{t.dataframesSaved || "Dataframes saved"}</strong>
                 <span>{t.dataframesSavedHint || "Charts and Report are ready to use this saved data."}</span>
+              </div>
+              <div className="daw-dataframe-download-actions" aria-label={t.downloadDataframes || "Download saved dataset"}>
+                <button
+                  type="button"
+                  className="daw-secondary"
+                  onClick={() => onDownloadDataframe?.("csv")}
+                  disabled={!canDownloadDataframes}
+                  title={t.downloadCsv || "Download CSV"}
+                >
+                  <Download size={16} />
+                  <span>{t.csv || "CSV"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="daw-secondary"
+                  onClick={() => onDownloadDataframe?.("xlsx")}
+                  disabled={!canDownloadDataframes}
+                  title={t.downloadXlsx || "Download XLSX"}
+                >
+                  <Download size={16} />
+                  <span>{t.xlsx || "XLSX"}</span>
+                </button>
               </div>
             </div>
           ) : null}
