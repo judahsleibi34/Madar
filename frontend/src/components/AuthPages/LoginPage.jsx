@@ -23,7 +23,7 @@ export default function LoginPage({
   });
 
   const [errors, setErrors] = useState({});
-  const [statusMessage, setStatusMessage] = useState(() =>
+  const [, setStatusMessage] = useState(() =>
     typeof location.state?.message === "string" ? location.state.message : ""
   );
   const [authToast, setAuthToast] = useState(() =>
@@ -149,7 +149,10 @@ export default function LoginPage({
           return;
         }
 
-        const message = normalizeAuthMessage(data.detail, t("login.loginFailed"));
+        const rawDetail = typeof data.detail === "string" ? data.detail : "";
+        const message = rawDetail.toLowerCase().includes("verify your email")
+          ? t("login.emailNotVerified")
+          : normalizeAuthMessage(data.detail, t("login.loginFailed"));
         setStatusMessage(message);
         showAuthToast({
           type: "error",

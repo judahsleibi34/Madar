@@ -192,4 +192,4 @@ def export_cleaned_dataframe(user_id: int, request: CleaningApplyRequest, fastap
 
     except Exception as error:
         logger.warning("data.cleaning.export_failed", extra={"user_id": user_id, "error_type": type(error).__name__})
-        raise HTTPException(status_code=400, detail=str(error) or "Could not export cleaned data.")
+        raise HTTPException(status_code=400, detail="Could not export cleaned data.")

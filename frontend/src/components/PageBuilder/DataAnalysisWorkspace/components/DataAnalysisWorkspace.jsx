@@ -2,11 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, Plus, Trash2, X } from "lucide-react";
 
 import { uiText } from "../constants/uiText";
-import { analysisGroups } from "../constants/analysisConfig";
 import { API_URL, getFriendlyExternalError, readApiResponse } from "../utils/api";
-import { downloadCsv, downloadXlsxFromCsv } from "../utils/dataframeExport";
+import { downloadCsv, downloadXlsxFromCsv, sanitizeSpreadsheetCell } from "../utils/dataframeExport";
 import { cleanObject, escapeCsvValue } from "../utils/formatters";
-import { getMissingRequiredParams } from "../utils/validation";
 import {
   archiveItem,
   loadDataset as loadSavedDataset,
@@ -48,7 +46,6 @@ import {
   getVisualizationPlots,
   getVisualizationUrl,
   hasColumnValue,
-  mergeAnalysisResponses,
   multiSeriesCharts,
   needsXColumn,
   needsYColumn,
@@ -197,39 +194,11 @@ export default function DataAnalysisWorkspace({
     ...(cachedWorkspace?.cleaning || {}),
   }));
 
-  const [analysisDomain, setAnalysisDomain] = useState(
-    () => cachedWorkspace?.analysisDomain || "finance"
-  );
-  const [analysisMethod, setAnalysisMethod] = useState(() => {
-    const cachedDomain = cachedWorkspace?.analysisDomain || "finance";
-    const domainMethods =
-      analysisGroups[cachedDomain]?.methods || analysisGroups.finance.methods;
-    return cachedWorkspace?.analysisMethod || domainMethods[0].id;
-  });
-  const [params, setParams] = useState(() => {
-    const cachedDomain = cachedWorkspace?.analysisDomain || "finance";
-    const domainMethods =
-      analysisGroups[cachedDomain]?.methods || analysisGroups.finance.methods;
-    const cachedMethod =
-      domainMethods.find((method) => method.id === cachedWorkspace?.analysisMethod) ||
-      domainMethods[0];
-
-    return {
-      ...cachedMethod.template,
-      ...(cachedWorkspace?.params || {}),
-    };
-  });
-
   const selectedForm =
     availableForms.find((form) => form.id === selectedFormId) ||
     firstFormWithResponses;
 
   const formFields = selectedForm ? getFormFields(selectedForm) : [];
-  const methods =
-    analysisGroups[analysisDomain]?.methods || analysisGroups.finance.methods;
-  const activeMethod =
-    methods.find((method) => method.id === analysisMethod) || methods[0];
-
   const columns = useMemo(() => dataset?.columns || [], [dataset]);
   const columnSet = useMemo(() => new Set(columns), [columns]);
   const columnProfiles = useMemo(
@@ -305,7 +274,7 @@ export default function DataAnalysisWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [cachedWorkspace?.currentStep, dataWorkspaceCacheKey]);
+  }, [cachedWorkspace?.currentStep, cachedWorkspace?.dataframesSaved, dataWorkspaceCacheKey]);
 
   useEffect(() => {
     if (!isDatasetStorageReady) return;
@@ -318,22 +287,16 @@ export default function DataAnalysisWorkspace({
       cleaning,
       dataframesSaved,
       reportOptions,
-      analysisDomain,
-      analysisMethod,
-      params,
       visualizationPlots,
       activeVisualizationPlotId,
     });
   }, [
     activeVisualizationPlotId,
-    analysisDomain,
-    analysisMethod,
     cleaning,
     currentStep,
     dataframesSaved,
     dataWorkspaceCacheKey,
     externalUrl,
-    params,
     reportOptions,
     selectedFormId,
     sourceMode,
@@ -558,10 +521,6 @@ export default function DataAnalysisWorkspace({
     setCleaning((current) => ({ ...current, [key]: value }));
     setDataframesSaved(false);
     setAnalysisResult(null);
-  };
-
-  const updateParams = (key, value) => {
-    setParams((current) => ({ ...current, [key]: value }));
   };
 
   const updateVisualizationPlot = (plotId, key, value) => {
@@ -1216,25 +1175,6 @@ export default function DataAnalysisWorkspace({
     }
   }
 
-  const setDomain = (domain) => {
-    const nextMethod = analysisGroups[domain].methods[0];
-
-    setAnalysisDomain(domain);
-    setAnalysisMethod(nextMethod.id);
-    setParams({ ...nextMethod.template });
-  };
-
-  const setMethod = (methodId, domain = analysisDomain) => {
-    const domainMethods =
-      analysisGroups[domain]?.methods || analysisGroups.finance.methods;
-    const nextMethod =
-      domainMethods.find((method) => method.id === methodId) || domainMethods[0];
-
-    setAnalysisDomain(domain);
-    setAnalysisMethod(nextMethod.id);
-    setParams({ ...nextMethod.template });
-  };
-
   const setLoadedDataset = (data, sourceContext = {}) => {
     autoOverviewInspectionPathRef.current = "";
     setDataset(data);
@@ -1549,7 +1489,7 @@ export default function DataAnalysisWorkspace({
     ]);
 
     const csv = [headers, ...rows]
-      .map((row) => row.map(escapeCsvValue).join(","))
+      .map((row) => row.map((value) => escapeCsvValue(sanitizeSpreadsheetCell(value))).join(","))
       .join("\n");
 
     const file = new File(
@@ -1622,69 +1562,9 @@ export default function DataAnalysisWorkspace({
     autoOverviewInspectionPathRef.current = filePath;
     setCurrentStep("review");
     runInspection("overview");
-  }, [dataset?.file_path, runInspection]);
-
-  const runAnalysis = async () => {
-    if (!dataset?.file_path) {
-      showFlowError(t.loadDataBeforeAnalysis);
-      return;
-    }
-
-    const missingRequiredParams = getMissingRequiredParams(
-      activeMethod.template,
-      params,
-      activeLang,
-      activeMethod.optionalFields || []
-    );
-
-    if (missingRequiredParams.length) {
-      showFlowError(t.missingRequiredFields(missingRequiredParams));
-      setCurrentStep("report");
-      return;
-    }
-
-    setIsLoading(true);
-    setAnalysisError("");
-
-    try {
-      const response = await apiFetch(userApiPath("/analysis/run"), {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input_path: dataset.file_path,
-          cleaning_actions: cleaningActions,
-          language: activeLang,
-          symbols: {
-            currency: activeLang === "ar" ? "د.إ" : "$",
-            percent: activeLang === "ar" ? "٪" : "%",
-            decimal_separator: activeLang === "ar" ? "," : ".",
-            thousands_separator: activeLang === "ar" ? "." : ",",
-          },
-          analysis_requests: [
-            {
-              domain: analysisDomain,
-              method: analysisMethod,
-              key: activeMethod.label,
-              params: cleanObject(params),
-            },
-          ],
-        }),
-      });
-
-      const data = await readApiResponse(response);
-
-      if (!response.ok) {
-        throw new Error(data.detail || "The analysis could not be completed.");
-      }
-
-      setAnalysisResult((current) => mergeAnalysisResponses(current, data));
-    } catch (error) {
-      showFlowError(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    // Auto-inspection should run once per dataset file; runInspection also depends on mutable cache state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset?.file_path]);
 
   const runVisualization = async (plot = activeVisualizationPlot) => {
     if (isVisualizationChecking) {

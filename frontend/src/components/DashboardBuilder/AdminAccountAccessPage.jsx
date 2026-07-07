@@ -190,24 +190,30 @@ export default function AdminAccountAccessPage({
     const query = emailSearchTerm.toLowerCase();
 
     if (query.length < 1 || isValidEmail(query)) {
-      setUserResults([]);
-      setUserSearchStatus("idle");
-      return undefined;
+      const resetTimer = window.setTimeout(() => {
+        setUserResults([]);
+        setUserSearchStatus("idle");
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
     const cached = userSearchCacheRef.current.get(query);
     const now = Date.now();
 
     if (cached && now - cached.loadedAt < USER_SEARCH_CACHE_TTL_MS) {
-      setUserResults(cached.users);
-      setUserSearchStatus("success");
-      return undefined;
+      const cacheTimer = window.setTimeout(() => {
+        setUserResults(cached.users);
+        setUserSearchStatus("success");
+      }, 0);
+      return () => window.clearTimeout(cacheTimer);
     }
 
     let cancelled = false;
     const controller = new AbortController();
 
-    setUserSearchStatus("loading");
+    const loadingTimer = window.setTimeout(() => {
+      if (!cancelled) setUserSearchStatus("loading");
+    }, 0);
 
     const timer = window.setTimeout(async () => {
       try {
@@ -251,6 +257,7 @@ export default function AdminAccountAccessPage({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(loadingTimer);
       window.clearTimeout(timer);
       controller.abort();
     };

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
-import { fetchPublicSite, submitPublicFormSubmission } from "../services/PageBuilder.api";
+import { fetchPublicSite, submitPublicBuilderEvent, submitPublicFormSubmission } from "../services/PageBuilder.api";
 import { getFormSections } from "../core/PageBuilder.factories";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import {
@@ -15,6 +15,7 @@ import {
 import "../../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import CountUpText from "../ui/CountUpText";
+import ReservationBlock from "../blocks/ReservationBlock";
 import { resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
 
@@ -311,6 +312,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [publicSiteState, setPublicSiteState] = useState(() => (draftPreview ? "ready" : "loading"));
   const [formAnswers, setFormAnswers] = useState({});
   const [formStatus, setFormStatus] = useState({});
+  const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
 
@@ -764,6 +766,59 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     }
   };
 
+  const submitRuntimeReservation = async (element, values) => {
+    const instanceKey = element.id || "reservation";
+    const reservation = element.reservation || {};
+
+    setReservationStatus((prev) => ({
+      ...prev,
+      [instanceKey]: { submitting: true, success: "", error: "" },
+    }));
+
+    if (draftPreview) {
+      setReservationStatus((prev) => ({
+        ...prev,
+        [instanceKey]: {
+          submitting: false,
+          success: "Reservation request captured in preview.",
+          error: "",
+        },
+      }));
+      return;
+    }
+
+    try {
+      await submitPublicBuilderEvent(cleanSubdomain, {
+        block_type: "reservationBlock",
+        block_id: element.id,
+        event_type: "builder.reservation_requested",
+        title: "New reservation request",
+        payload: {
+          ...values,
+          reservation_title: reservation.title || "",
+        },
+      });
+
+      setReservationStatus((prev) => ({
+        ...prev,
+        [instanceKey]: {
+          submitting: false,
+          success: "Reservation request sent.",
+          error: "",
+        },
+      }));
+    } catch {
+      setReservationStatus((prev) => ({
+        ...prev,
+        [instanceKey]: {
+          submitting: false,
+          success: "",
+          error: "Could not send this reservation request. Please try again.",
+        },
+      }));
+    }
+  };
+
   const renderRuntimeField = (field, form, instanceKey, disabled, formLang = "en") => {
     const formCopy = getTenantRuntimeContent(formLang);
     const meta = getFieldType(field.type);
@@ -1207,6 +1262,26 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       );
     }
     if (element.type === "formBlock") return <div key={element.id} {...props}>{renderConnectedForm(element.connectedFormId, element.id)}</div>;
+    if (element.type === "reservationBlock") {
+      const reservation = element.reservation || {};
+      const status = reservationStatus[element.id] || {};
+
+      return (
+        <div key={element.id} {...props}>
+          <ReservationBlock
+            title={reservation.title}
+            description={reservation.description}
+            services={reservation.services}
+            fields={reservation.fields}
+            submitLabel={reservation.submitLabel}
+            disabled={Boolean(status.submitting)}
+            onSubmit={(values) => submitRuntimeReservation(element, values)}
+          />
+          {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
+          {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}
+        </div>
+      );
+    }
     if (element.type === "responsesTable") return null;
 
     return <div key={element.id} {...props}>{element.content}</div>;

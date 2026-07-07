@@ -12,6 +12,7 @@ from services.rate_limit_service import (
     enforce_public_rate_limit,
     get_client_ip,
 )
+from services.notification_service import create_builder_block_event_notification
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -20,6 +21,10 @@ SUBDOMAIN_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 MAX_PUBLIC_FORM_ANSWER_FIELDS = 100
 MAX_PUBLIC_FORM_ANSWER_STRING_LENGTH = 5000
 MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES = 64 * 1024
+MAX_PUBLIC_BLOCK_EVENT_FIELDS = 100
+MAX_PUBLIC_BLOCK_EVENT_STRING_LENGTH = 5000
+MAX_PUBLIC_BLOCK_EVENT_JSON_BYTES = 64 * 1024
+BLOCK_TYPE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 
 
 class PublicFormSubmissionCreate(BaseModel):
@@ -33,6 +38,23 @@ class PublicFormSubmissionCreate(BaseModel):
             return {}
         if not isinstance(value, dict):
             raise ValueError("answers must be a JSON object")
+        return value
+
+
+class PublicBuilderBlockEventCreate(BaseModel):
+    block_type: str = Field(..., max_length=80)
+    block_id: Optional[str] = Field(default=None, max_length=200)
+    event_type: Optional[str] = Field(default=None, max_length=120)
+    title: Optional[str] = Field(default=None, max_length=200)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("payload")
+    @classmethod
+    def validate_payload(cls, value):
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("payload must be a JSON object")
         return value
 
 
@@ -132,12 +154,72 @@ def published_page_contains_form_block(published_schema: dict, form_id: str) -> 
     return False
 
 
+def find_published_block(
+    published_schema: dict,
+    block_id: Optional[str],
+    block_type: str,
+) -> Optional[dict]:
+    pages = published_schema.get("pages")
+
+    if not isinstance(pages, list):
+        return None
+
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+        for section in page.get("sections") or []:
+            if not isinstance(section, dict):
+                continue
+            for element in iter_section_elements(section):
+                if element.get("type") != block_type:
+                    continue
+                if block_id and str(element.get("id") or "") != block_id:
+                    continue
+                return element
+
+    return None
+
+
+def normalize_public_block_type(value: str) -> str:
+    block_type = (value or "").strip()
+
+    if not block_type or not BLOCK_TYPE_PATTERN.match(block_type):
+        raise HTTPException(status_code=400, detail="Invalid block type")
+
+    return block_type
+
+
+def normalize_public_event_type(value: Optional[str], block_type: str) -> str:
+    event_type = (value or "").strip()
+
+    if not event_type:
+        return "builder.reservation_requested" if block_type == "reservationBlock" else f"builder.{block_type}.event"
+
+    if not re.match(r"^[A-Za-z0-9_.:-]{1,120}$", event_type):
+        raise HTTPException(status_code=400, detail="Invalid event type")
+
+    return event_type
+
+
 def normalize_answer_value(value):
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, list):
         return [item for item in value if item is None or isinstance(item, (str, int, float, bool))]
     return value
+
+
+def normalize_event_value(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return [normalize_event_value(item) for item in value[:MAX_PUBLIC_BLOCK_EVENT_FIELDS]]
+    if isinstance(value, dict):
+        return {
+            str(key)[:120]: normalize_event_value(item)
+            for key, item in list(value.items())[:MAX_PUBLIC_BLOCK_EVENT_FIELDS]
+        }
+    return str(value)
 
 
 def iter_answer_strings(value):
@@ -149,6 +231,21 @@ def iter_answer_strings(value):
         for item in value:
             if isinstance(item, str):
                 yield item
+
+
+def iter_payload_strings(value):
+    if isinstance(value, str):
+        yield value
+        return
+
+    if isinstance(value, list):
+        for item in value:
+            yield from iter_payload_strings(item)
+        return
+
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from iter_payload_strings(item)
 
 
 def validate_public_answer_payload_limits(answers: dict[str, Any]):
@@ -184,6 +281,43 @@ def validate_public_answer_payload_limits(answers: dict[str, Any]):
             detail={
                 "message": "Submission answers payload is too large",
                 "max_bytes": MAX_PUBLIC_FORM_ANSWERS_JSON_BYTES,
+            },
+        )
+
+
+def validate_public_event_payload_limits(payload: dict[str, Any]):
+    if len(payload) > MAX_PUBLIC_BLOCK_EVENT_FIELDS:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "message": "Event contains too many payload fields",
+                "max_fields": MAX_PUBLIC_BLOCK_EVENT_FIELDS,
+            },
+        )
+
+    for field_id, value in payload.items():
+        for payload_text in iter_payload_strings(value):
+            if len(payload_text) > MAX_PUBLIC_BLOCK_EVENT_STRING_LENGTH:
+                raise HTTPException(
+                    status_code=413,
+                    detail={
+                        "message": "Event payload field is too large",
+                        "field_id": str(field_id),
+                        "max_length": MAX_PUBLIC_BLOCK_EVENT_STRING_LENGTH,
+                    },
+                )
+
+    try:
+        serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="payload must be JSON serializable")
+
+    if len(serialized.encode("utf-8")) > MAX_PUBLIC_BLOCK_EVENT_JSON_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "message": "Event payload is too large",
+                "max_bytes": MAX_PUBLIC_BLOCK_EVENT_JSON_BYTES,
             },
         )
 
@@ -379,4 +513,103 @@ def submit_public_builder_form(
         },
     )
 
+    create_builder_block_event_notification(
+        tenant_id=tenant_id,
+        event_type="builder.form_submitted",
+        block_type="form",
+        source_id=str(saved_submission.get("id") or clean_form_id),
+        title="New form submission",
+        body=f"{form.get('title') or 'A published form'} received a new response.",
+        data={
+            "project_id": project.get("id"),
+            "form_id": clean_form_id,
+            "form_title": form.get("title"),
+            "submission_id": saved_submission.get("id"),
+            "subdomain": clean_subdomain,
+        },
+    )
+
     return format_submission(saved_submission)
+
+
+@router.post("/sites/{subdomain}/events")
+def submit_public_builder_block_event(
+    subdomain: str,
+    event: PublicBuilderBlockEventCreate,
+    request: Request,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    block_type = normalize_public_block_type(event.block_type)
+    block_id = (event.block_id or "").strip() or None
+    event_type = normalize_public_event_type(event.event_type, block_type)
+
+    enforce_public_form_submission_rate_limit(
+        request,
+        "event",
+        f"{clean_subdomain}:{block_type}:{block_id or 'unknown'}",
+    )
+
+    settings = resolve_website_settings(clean_subdomain)
+    tenant_id = resolve_tenant_id(settings)
+    project = get_latest_published_project_for_tenant(tenant_id)
+
+    if project.get("status") != "published":
+        raise HTTPException(status_code=404, detail="Published site not found")
+
+    published_schema = project.get("published_schema") or {}
+
+    if not isinstance(published_schema, dict):
+        raise HTTPException(status_code=404, detail="Published site not found")
+
+    block = find_published_block(published_schema, block_id, block_type)
+
+    if not block:
+        raise HTTPException(status_code=404, detail="Block not found")
+
+    payload = event.payload or {}
+    validate_public_event_payload_limits(payload)
+    cleaned_payload = {
+        str(key)[:120]: normalize_event_value(value)
+        for key, value in payload.items()
+    }
+
+    if block_type == "reservationBlock":
+        reservation = block.get("reservation") or {}
+        title = event.title or "New reservation request"
+        service = cleaned_payload.get("service")
+        date = cleaned_payload.get("date")
+        time = cleaned_payload.get("time")
+        details = " ".join(str(item) for item in [service, date, time] if item)
+        body = details or f"{reservation.get('title') or 'A reservation block'} received a new request."
+    else:
+        title = event.title or "New site event"
+        body = f"{block_type} triggered an event on the published site."
+
+    create_builder_block_event_notification(
+        tenant_id=tenant_id,
+        event_type=event_type,
+        block_type=block_type,
+        source_id=block_id or str(block.get("id") or block_type),
+        title=title,
+        body=body,
+        data={
+            "project_id": project.get("id"),
+            "block_id": block.get("id"),
+            "block_type": block_type,
+            "subdomain": clean_subdomain,
+            "payload": cleaned_payload,
+        },
+    )
+
+    logger.info(
+        "public.builder_block_event_created",
+        extra={
+            "tenant_id": tenant_id,
+            "project_id": project.get("id"),
+            "block_id": block.get("id"),
+            "block_type": block_type,
+            "event_type": event_type,
+        },
+    )
+
+    return {"success": True}

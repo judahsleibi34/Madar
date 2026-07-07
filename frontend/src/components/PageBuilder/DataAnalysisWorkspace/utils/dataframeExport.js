@@ -1,4 +1,19 @@
 const textEncoder = new TextEncoder();
+const DANGEROUS_SPREADSHEET_PREFIXES = new Set(["=", "+", "-", "@", "\t", "\r"]);
+
+export const sanitizeSpreadsheetCell = (value) => {
+  if (typeof value !== "string") return value;
+
+  const firstContentCharacter = value.replace(/^ +/, "").charAt(0);
+  if (DANGEROUS_SPREADSHEET_PREFIXES.has(firstContentCharacter)) {
+    return `'${value}`;
+  }
+
+  return value;
+};
+
+export const sanitizeSpreadsheetRows = (rows) =>
+  rows.map((row) => row.map((value) => sanitizeSpreadsheetCell(value)));
 
 const sanitizeExportName = (value, fallback = "madar-dataset") => {
   const name = String(value || fallback)
@@ -21,8 +36,26 @@ const downloadBlob = (blob, filename) => {
   URL.revokeObjectURL(url);
 };
 
-export const downloadCsv = (csv, filenameBase) => {
+const escapeCsvCell = (value) => {
+  const text = String(value ?? "");
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const buildCsv = (rows) =>
+  rows.map((row) => row.map((value) => escapeCsvCell(value)).join(",")).join("\n");
+
+export const sanitizeCsvForSpreadsheetExport = (csv) => {
   const contents = String(csv || "");
+  const withoutBom = contents.charCodeAt(0) === 0xfeff ? contents.slice(1) : contents;
+  const rows = parseCsv(withoutBom);
+
+  if (!rows.length) return withoutBom;
+
+  return buildCsv(sanitizeSpreadsheetRows(rows));
+};
+
+export const downloadCsv = (csv, filenameBase) => {
+  const contents = sanitizeCsvForSpreadsheetExport(csv);
   const prefixedContents = contents.charCodeAt(0) === 0xfeff ? contents : `\uFEFF${contents}`;
   downloadBlob(
     new Blob([prefixedContents], { type: "text/csv;charset=utf-8" }),
@@ -201,7 +234,7 @@ const createZip = (files) => {
 };
 
 export const downloadXlsxFromCsv = (csv, filenameBase) => {
-  const rows = parseCsv(String(csv || ""));
+  const rows = sanitizeSpreadsheetRows(parseCsv(String(csv || "")));
   const workbook = createZip([
     {
       name: "[Content_Types].xml",

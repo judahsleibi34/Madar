@@ -609,9 +609,14 @@ class DataVisualization(
                 "PyGWalker is not installed in the backend environment."
             )
 
-        output_root = Path(os.getenv("CHART_OUTPUT_DIR", "generated_charts")).resolve()
+        output_root = Path(
+            os.getenv(
+                "PRIVATE_CHARTS_DIR",
+                os.getenv("GENERATED_CHARTS_DIR", "private_generated_charts"),
+            )
+        ).resolve()
         requested = Path(save_path or f"pygwalker-{pd.Timestamp.utcnow().timestamp():.0f}.html")
-        path = (output_root / requested.name).resolve()
+        path = requested.resolve() if requested.is_absolute() else (output_root / requested.name).resolve()
 
         if path.suffix.lower() != ".html":
             path = path.with_suffix(".html")

@@ -1,10 +1,12 @@
 import os
+import re
+
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from data_analysis.routes.analysis_routes import router as analysis_router
 from data_analysis.routes.cleaning_routes import router as cleaning_router
@@ -20,6 +22,7 @@ from routes.billing_routes import router as billing_router
 from routes.builder_routes import router as builder_router
 from routes.health_routes import router as health_router
 from routes.mfa_routes import router as mfa_router
+from routes.notification_routes import router as notification_router
 from routes.password_routes import router as password_router
 from routes.public_contact_routes import router as public_contact_router
 from routes.public_site_routes import router as public_site_router
@@ -36,18 +39,40 @@ from services.request_security import (
     validate_cookie_write_origin,
     validate_csrf_token,
 )
+from services.upload_config import (
+    get_data_upload_dir,
+    get_private_charts_dir,
+    get_public_uploads_dir,
+    assert_path_within_root,
+    validate_safe_filename,
+    validate_private_charts_not_publicly_mounted,
+    validate_private_uploads_not_publicly_mounted,
+)
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestBodyLimitMiddleware)
 
-CHART_OUTPUT_DIR = Path(os.getenv("CHART_OUTPUT_DIR", "generated_charts")).resolve()
-CHART_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/generated_charts", StaticFiles(directory=str(CHART_OUTPUT_DIR)), name="generated_charts")
+PUBLIC_UPLOADS_DIR = get_public_uploads_dir()
+DATA_UPLOAD_DIR = get_data_upload_dir()
+PRIVATE_CHARTS_DIR = get_private_charts_dir()
+validate_private_uploads_not_publicly_mounted(
+    public_uploads_dir=PUBLIC_UPLOADS_DIR,
+    data_upload_dir=DATA_UPLOAD_DIR,
+)
+validate_private_charts_not_publicly_mounted(
+    public_uploads_dir=PUBLIC_UPLOADS_DIR,
+    private_charts_dir=PRIVATE_CHARTS_DIR,
+)
+PUBLIC_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+PRIVATE_CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
-UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", "uploads")).resolve()
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+PUBLIC_UPLOAD_MEDIA_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
 
 FRONTEND_URLS = os.getenv(
     "FRONTEND_URLS",
@@ -105,12 +130,48 @@ def madar_status():
     return {"message": "All working"}
 
 
+@app.get("/uploads/tenant_{tenant_id}/builder_assets/{filename}")
+def get_public_builder_asset(tenant_id: int, filename: str):
+    if tenant_id <= 0:
+        raise HTTPException(status_code=404, detail="Asset was not found.")
+
+    try:
+        safe_filename = validate_safe_filename(
+            filename,
+            allowed_extensions=set(PUBLIC_UPLOAD_MEDIA_TYPES),
+            error_type=ValueError,
+            error_message="Invalid public asset path",
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail="Asset was not found.") from error
+
+    if not re.fullmatch(r"[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)", safe_filename):
+        raise HTTPException(status_code=404, detail="Asset was not found.")
+
+    public_root = PUBLIC_UPLOADS_DIR.resolve()
+    asset_path = assert_path_within_root(
+        public_root / f"tenant_{tenant_id}" / "builder_assets" / safe_filename,
+        public_root,
+        error=HTTPException(status_code=404, detail="Asset was not found."),
+    )
+
+    if not asset_path.is_file():
+        raise HTTPException(status_code=404, detail="Asset was not found.")
+
+    return FileResponse(
+        path=str(asset_path),
+        media_type=PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()],
+        filename=Path(asset_path).name,
+    )
+
+
 app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(user_router)
 app.include_router(website_router)
 app.include_router(password_router)
 app.include_router(mfa_router)
+app.include_router(notification_router)
 app.include_router(server_status_router)
 app.include_router(billing_router)
 app.include_router(admin_account_access_router)

@@ -7,6 +7,7 @@ from classes import UserProfileUpdate
 from database import service_supabase
 from services.audit_service import record_security_event
 from services.auth_service import build_user_payload, require_system_admin
+from services.rate_limit_service import enforce_avatar_upload_rate_limit
 from services.url_validation import validate_public_url
 from routes.user_routes import (
     AVATAR_BUCKET,
@@ -172,6 +173,11 @@ async def upload_admin_avatar(
 ):
     try:
         _, admin_user = require_system_admin(request, response)
+        enforce_avatar_upload_rate_limit(
+            request,
+            admin_user.get("id"),
+            admin_user.get("tenant_id"),
+        )
 
         auth_id = str(admin_user.get("auth_id") or "").strip()
 

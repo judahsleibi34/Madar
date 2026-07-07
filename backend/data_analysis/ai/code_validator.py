@@ -50,6 +50,11 @@ FORBIDDEN_IMPORT_ROOTS = {
     "imaplib",
     "poplib",
     "webbrowser",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "altair",
+    "bokeh",
 }
 
 FORBIDDEN_CALL_NAMES = {
@@ -155,6 +160,26 @@ FORBIDDEN_EXPENSIVE_METHODS = {
     "merge",
     "join",
     "applymap",
+}
+
+FORBIDDEN_PLOTTING_CALLS = {
+    "plot",
+    "chart",
+    "graph",
+    "hist",
+    "scatter",
+    "bar",
+    "barh",
+    "pie",
+    "line",
+    "box",
+    "boxplot",
+    "imshow",
+    "heatmap",
+    "savefig",
+    "show",
+    "figure",
+    "subplots",
 }
 
 FORBIDDEN_DF_ATTRIBUTES = {
@@ -319,6 +344,9 @@ def _validate_calls(node: ast.AST) -> None:
             f"Potentially expensive method is not allowed: {call_name}"
         )
 
+    if call_name in FORBIDDEN_PLOTTING_CALLS:
+        raise CodeValidationError(f"Plotting calls are not allowed: {call_name}")
+
     if qualified_name:
         if qualified_name.startswith("pd.") and call_name in FORBIDDEN_PANDAS_IO_FUNCTIONS:
             raise CodeValidationError(f"Forbidden pandas I/O call: {qualified_name}")
@@ -362,6 +390,9 @@ def _validate_attributes(node: ast.AST) -> None:
 
     if node.attr in FORBIDDEN_FULL_DATA_ATTRIBUTES:
         raise CodeValidationError(f"Forbidden full-data attribute: {node.attr}")
+
+    if node.attr in FORBIDDEN_PLOTTING_CALLS:
+        raise CodeValidationError(f"Plotting attributes are not allowed: {node.attr}")
 
 
 def _validate_names(node: ast.AST) -> None:

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
   BarChart3,
@@ -14,6 +14,7 @@ import {
   deleteArchiveItem,
   listArchiveItems,
 } from "../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage";
+import { downloadCsv } from "../PageBuilder/DataAnalysisWorkspace/utils/dataframeExport";
 
 const FILTERS = [
   { id: "all", label: "All", icon: Archive },
@@ -93,20 +94,24 @@ function exportJson(item) {
   const datasetCsv =
     item.payload?.cleanedDataframe?.csv || item.payload?.loadedDataframe?.csv;
   const isDatasetCsv = DATASET_TYPES.has(item.type) && datasetCsv;
-  const contents = isDatasetCsv
-    ? datasetCsv
-    : JSON.stringify(item, null, 2);
-  const blob = new Blob([contents], {
-    type: isDatasetCsv ? "text/csv;charset=utf-8" : "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
   const extension = isDatasetCsv ? "csv" : "json";
   const baseName = `${item.title || item.type || "archive-item"}`
     .replace(/[^\w.-]+/g, "-")
     .replace(/-+/g, "-")
     .replace(new RegExp(`\\.${extension}$`, "i"), "");
+
+  if (isDatasetCsv) {
+    downloadCsv(datasetCsv, baseName);
+    return;
+  }
+
+  const contents = JSON.stringify(item, null, 2);
+  const blob = new Blob([contents], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
   link.download = `${baseName}.${extension}`;
   link.click();
   URL.revokeObjectURL(url);
@@ -116,23 +121,28 @@ export default function ArchivePage({ user }) {
   const [items, setItems] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
   const [status, setStatus] = useState("loading");
+  const archiveScope = user?.id ? `user-${user.id}` : "";
 
-  const loadArchive = async () => {
+  const loadArchive = useCallback(async () => {
     setStatus("loading");
     try {
       const archiveItems = await listArchiveItems({
-        scope: user?.id ? `user-${user.id}` : "",
+        scope: archiveScope,
       });
       setItems(archiveItems);
       setStatus("ready");
     } catch {
       setStatus("error");
     }
-  };
+  }, [archiveScope]);
 
   useEffect(() => {
-    loadArchive();
-  }, [user?.id]);
+    const timer = window.setTimeout(() => {
+      loadArchive();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadArchive]);
 
   const filteredItems = useMemo(
     () =>
