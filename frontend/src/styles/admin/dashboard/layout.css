@@ -363,6 +363,40 @@
   font-weight: 900;
 }
 
+.notifications-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.notifications-actions button {
+  min-height: 40px;
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  font-weight: 900;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.notifications-actions button:hover:not(:disabled) {
+  border-color: var(--theme-primary);
+  color: var(--theme-primary);
+}
+
+.notifications-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.notifications-actions span {
+  color: var(--theme-text-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .notifications-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

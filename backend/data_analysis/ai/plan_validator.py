@@ -29,7 +29,6 @@ ALLOWED_ACTIONS = {
     "top_n",
     "correlation",
     "distribution",
-    "chart",
 }
 
 ALLOWED_AGGREGATIONS = {
@@ -274,9 +273,6 @@ def _normalize_predefined_plan(
 
     if action == "distribution":
         return _normalize_distribution_plan(raw_plan, columns_used, allowed_columns)
-
-    if action == "chart":
-        return _normalize_chart_plan(raw_plan, columns_used, allowed_columns)
 
     raise PlanValidationError(f"Unsupported action: {action}")
 
@@ -554,33 +550,6 @@ def _normalize_distribution_plan(
 
     return {
         "column": column,
-    }
-
-
-def _normalize_chart_plan(
-    raw_plan: dict[str, Any],
-    columns_used: list[str],
-    allowed_columns: set[str],
-) -> dict[str, Any]:
-    chart_type = str(raw_plan.get("type") or raw_plan.get("chart_type") or "bar").lower()
-
-    if chart_type not in {"bar", "line", "pie", "scatter", "histogram"}:
-        chart_type = "bar"
-
-    x = _pick_column(raw_plan.get("x") or raw_plan.get("x_axis"), columns_used)
-
-    y = raw_plan.get("y") or raw_plan.get("y_axis")
-
-    if y:
-        y = _pick_column(y, columns_used)
-        _ensure_columns_allowed([x, y], allowed_columns)
-    else:
-        _ensure_columns_allowed([x], allowed_columns)
-
-    return {
-        "type": chart_type,
-        "x": x,
-        "y": y,
     }
 
 

@@ -4,7 +4,29 @@ import { Bell } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useLanguage } from "../../i18n";
+import { fetchNotifications } from "../../services/notificationsApi";
 import { getDummyNotifications } from "./notificationsData";
+
+const formatNotificationTime = (value) => {
+  if (!value) return "";
+
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return String(value);
+  }
+};
+
+const normalizeNotification = (item, t) => ({
+  id: item.id,
+  title: item.title || t("notifications.fallbackTitle"),
+  detail: item.body || item.detail || "",
+  time: item.time || formatNotificationTime(item.created_at),
+  unread: item.unread !== false,
+});
 
 export default function NotificationBell({
   className = "",
@@ -20,10 +42,38 @@ export default function NotificationBell({
   const panelRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState(null);
-  const dummyNotifications = getDummyNotifications(t);
-  const unreadCount = dummyNotifications.filter((item) => item.unread).length;
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const active = location.pathname.startsWith("/notifications");
   const resolvedLabel = label || t("notifications.title");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadNotifications = async () => {
+      try {
+        const data = await fetchNotifications({ limit: 4 });
+        const items = (data.notifications || data.items || []).map((item) =>
+          normalizeNotification(item, t)
+        );
+
+        if (cancelled) return;
+        setNotifications(items);
+        setUnreadCount(Number(data.unread_count || 0));
+      } catch {
+        if (cancelled) return;
+        const fallback = getDummyNotifications(t);
+        setNotifications(fallback.slice(0, 4));
+        setUnreadCount(fallback.filter((item) => item.unread).length);
+      }
+    };
+
+    loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
 
   const getPanelPosition = useCallback((rect) => {
     const viewportWidth = window.innerWidth;
@@ -191,7 +241,7 @@ export default function NotificationBell({
           </div>
 
           <div className="notification-popover-list">
-            {dummyNotifications.slice(0, 4).map((item) => (
+            {notifications.slice(0, 4).map((item) => (
               <article
                 className={item.unread ? "is-unread" : ""}
                 key={item.id}

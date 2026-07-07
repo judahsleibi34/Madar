@@ -66,6 +66,7 @@ python-multipart
 redis==5.0.8
 google-genai
 openai
+pywebpush
 numpy
 scipy
 scikit-learn

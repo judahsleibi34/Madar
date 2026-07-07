@@ -102,7 +102,7 @@ Rate limiting and request-size controls:
 
 Builder and public-site settings:
 
-- `UPLOADS_DIR`
+- `PUBLIC_UPLOADS_DIR`
 - `AVATAR_UPLOAD_DIR`
 - `BUILDER_ASSET_MAX_BYTES`
 - `MAX_BUILDER_SCHEMA_BYTES`
@@ -115,9 +115,19 @@ Billing and deployment helpers:
 
 Data-analysis and remote dataset controls:
 
-- `CHART_OUTPUT_DIR`
 - `DATA_UPLOAD_DIR`
+- `PRIVATE_CHARTS_DIR` / `GENERATED_CHARTS_DIR`
+- `AI_FREE_DAILY_MESSAGES`
+- `AI_PRO_DAILY_MESSAGES`
+- `AI_ENTERPRISE_DAILY_MESSAGES`
 - `MAX_UPLOAD_BYTES`
+- `MAX_DATASET_UPLOAD_BYTES`
+- `LARGE_DATASET_THRESHOLD_BYTES`
+- `MAX_FULL_DATAFRAME_BYTES`
+- `CSV_CHUNK_SIZE_ROWS`
+- `MAX_PREVIEW_ROWS`
+- `CSV_DUPLICATE_TRACK_ROWS`
+- `MAX_EXCEL_UPLOAD_BYTES`
 - `ALLOW_REMOTE_DATASET_URLS`
 - `ALLOW_INSECURE_REMOTE_DATASET_HTTP`
 - `DATAFRAME_CACHE_MAX_ITEMS`
@@ -132,6 +142,31 @@ Data-analysis and remote dataset controls:
 - `MAX_EXCEL_ROWS`
 - `MAX_EXCEL_COLUMNS`
 - `MAX_EXCEL_CELL_CHARS`
+
+Upload storage is intentionally split by trust level:
+
+- `PUBLIC_UPLOADS_DIR` backs managed public `/uploads/tenant_{id}/builder_assets/...` routes. It is for intentionally public files such as builder image assets.
+- `DATA_UPLOAD_DIR` backs private CSV/XLS/XLSX data-analysis uploads and exported/user dataset files. It defaults to `private_uploads` and must never be mounted as static files in production.
+- `PRIVATE_CHARTS_DIR` backs private dataset-derived generated charts. It defaults to `private_generated_charts` and is served only through authenticated `/users/{user_id}/visualization/charts/{chart_id}` routes.
+
+The backend fails startup if `DATA_UPLOAD_DIR` or `PRIVATE_CHARTS_DIR` is configured inside the public upload tree, because filename secrecy is not a security boundary.
+
+Large CSV uploads are streamed to private storage and summarized with chunked
+metadata extraction instead of full in-memory DataFrames. Defaults are
+`MAX_DATASET_UPLOAD_BYTES=209715200`, `LARGE_DATASET_THRESHOLD_BYTES=52428800`,
+`MAX_FULL_DATAFRAME_BYTES=52428800`, `CSV_CHUNK_SIZE_ROWS=3000`, and
+`MAX_PREVIEW_ROWS=120`. Duplicate tracking defaults to
+`CSV_DUPLICATE_TRACK_ROWS=100000` row signatures. Excel files above
+`MAX_EXCEL_UPLOAD_BYTES=52428800` are
+rejected with guidance to convert to CSV because Excel parsing is not chunked.
+
+AI provider usage is enforced at `POST /users/{user_id}/analysis/ai` in
+`backend/data_analysis/routes/analysis_routes.py` before provider calls are
+made. Free users default to `AI_FREE_DAILY_MESSAGES=5`; pro and enterprise
+limits default to 100 and 1000. Unsafe prompts and unauthenticated or
+tenant-mismatched requests are rejected before usage is incremented. Accepted
+requests reserve one daily message before the planner provider call, so provider
+failures after that point still count as attempted usage.
 
 ## Docker Setup
 
@@ -277,6 +312,8 @@ Use `prod-local` for the production backend bound to `127.0.0.1:8001`, `dev-loca
 Before merging or deploying:
 
 - confirm the branch is clean enough for release
+- complete the production launch checklist in `docs/production-launch-checklist.md`
+- confirm backup/restore readiness using `docs/production-backup-restore.md`
 - verify the Docker build succeeds for backend and frontend
 - run the backend test modules relevant to the change
 - confirm migrations are applied in the target environment

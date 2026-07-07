@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from database import service_supabase, supabase
-from classes import SignUpRequest, OnboardingSignupRequest, LogIn, UpdatePassword
+from classes import SignUpRequest, LogIn, UpdatePassword
 from services.rate_limit_service import enforce_auth_rate_limit
 from services.auth_service import (
     set_auth_cookies,
@@ -13,7 +13,7 @@ from services.auth_service import (
     normalize_user_type,
 )
 from services.billing_service import get_billing_summary_for_tenant
-from services.onboarding_service import create_onboarded_tenant, validate_person_name
+from services.onboarding_service import validate_person_name
 from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
 from services.mfa_login_service import (
     create_pending_mfa_client,
@@ -154,14 +154,15 @@ def signup(user: SignUpRequest, request: Request):
         assert_email_is_available(clean_email)
 
         try:
-            auth_response = service_supabase.auth.admin.create_user(
+            auth_response = supabase.auth.sign_up(
                 {
                     "email": clean_email,
                     "password": user.password,
-                    "email_confirm": True,
-                    "user_metadata": {
-                        "first_name": first_name,
-                        "last_name": last_name,
+                    "options": {
+                        "data": {
+                            "first_name": first_name,
+                            "last_name": last_name,
+                        },
                     },
                 }
             )
@@ -246,7 +247,8 @@ def signup(user: SignUpRequest, request: Request):
         signup_complete = True
 
         return {
-            "message": "Signup request sent successfully",
+            "message": "Account created. Please verify your email before logging in.",
+            "requires_email_verification": True,
             "user": {
                 "auth_id": auth_user_id,
                 "local_id": local_user["id"],
@@ -293,22 +295,6 @@ def signup(user: SignUpRequest, request: Request):
                 service_supabase.auth.admin.delete_user(auth_user_id)
             except Exception as cleanup_error:
                 logger.warning("auth.signup.auth_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
-
-
-@router.post("/signup/onboard")
-def signup_onboard(payload: OnboardingSignupRequest, request: Request):
-    clean_email = normalize_email(payload.email)
-
-    if not clean_email:
-        raise HTTPException(status_code=400, detail="Email is required")
-
-    enforce_auth_rate_limit(request, "signup", clean_email)
-    assert_email_is_available(clean_email)
-
-    return create_onboarded_tenant(
-        supabase_client=service_supabase,
-        payload=payload,
-    )
 
 
 @router.post("/login")
@@ -478,6 +464,26 @@ def login(user: LogIn, response: Response, request: Request):
     except Exception as e:
         audit_user = local_user or get_login_audit_user(clean_email)
         logger.warning("auth.login.failed", extra={"error_type": type(e).__name__})
+        raw_message = str(e).lower()
+        if "email" in raw_message and ("confirm" in raw_message or "verified" in raw_message):
+            record_security_event(
+                request=request,
+                tenant_id=(audit_user or {}).get("tenant_id"),
+                actor_user_id=(audit_user or {}).get("id"),
+                action="auth.login_failed",
+                target_type="user" if audit_user else "auth",
+                target_id=(audit_user or {}).get("id"),
+                metadata={
+                    "method": "password",
+                    "reason": "email_not_verified",
+                    "error_type": type(e).__name__,
+                },
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Please verify your email before logging in.",
+            )
+
         record_security_event(
             request=request,
             tenant_id=(audit_user or {}).get("tenant_id"),

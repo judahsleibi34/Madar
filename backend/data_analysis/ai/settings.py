@@ -21,6 +21,7 @@ SUPPORTED_PROVIDERS = {"mock", "gemini", "openai", "deepseek"}
 class AIModelConfig:
     provider: str
     model: str
+    max_output_tokens: int
 
 
 @dataclass(frozen=True)
@@ -159,7 +160,19 @@ def get_model_config_for_plan(plan_name: str | None) -> AIModelConfig:
     return AIModelConfig(
         provider=get_provider_for_plan(plan_name),
         model=get_model_for_plan(plan_name),
+        max_output_tokens=get_max_output_tokens_for_plan(plan_name),
     )
+
+
+def get_max_output_tokens_for_plan(plan_name: str | None) -> int:
+    plan = normalize_plan_name(plan_name)
+    defaults = {
+        "free": 900,
+        "pro": 1800,
+        "enterprise": 3000,
+    }
+
+    return get_int_env(f"AI_{plan.upper()}_MAX_OUTPUT_TOKENS", defaults[plan])
 
 
 def get_ai_limits_for_plan(plan_name: str | None) -> AILimits:
@@ -275,6 +288,7 @@ def get_ai_runtime_summary(plan_name: str | None) -> dict:
         "plan": plan,
         "provider": model_config.provider,
         "model": model_config.model,
+        "max_output_tokens": model_config.max_output_tokens,
         "limits": {
             "daily_messages": limits.daily_messages,
             "daily_code_generations": limits.daily_code_generations,

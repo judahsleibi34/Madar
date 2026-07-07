@@ -569,10 +569,27 @@ class SecurityFoundationTests(unittest.TestCase):
             + ", ".join(checked)
         )
 
+    def read_migration_by_suffix(self, migrations_dir: Path, suffix: str) -> str:
+        matches = sorted(migrations_dir.glob(f"*_{suffix}"))
+        if not matches:
+            self.fail(f"missing migration matching *_{suffix} in {migrations_dir}")
+        if len(matches) > 1:
+            self.fail(
+                f"multiple migrations match *_{suffix} in {migrations_dir}: "
+                + ", ".join(match.name for match in matches)
+            )
+        return matches[0].read_text().lower()
+
     def test_builder_rls_migrations_are_tenant_scoped(self):
         migrations_dir = self.get_migrations_dir()
-        builder_projects_sql = (migrations_dir / "023_create_builder_projects.sql").read_text().lower()
-        submissions_sql = (migrations_dir / "025_create_builder_form_submissions.sql").read_text().lower()
+        builder_projects_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "create_builder_projects.sql",
+        )
+        submissions_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "create_builder_form_submissions.sql",
+        )
 
         self.assertIn("alter table public.builder_projects enable row level security", builder_projects_sql)
         self.assertIn("alter table public.builder_form_submissions enable row level security", submissions_sql)
@@ -586,9 +603,10 @@ class SecurityFoundationTests(unittest.TestCase):
 
     def test_website_settings_rls_cleanup_removes_user_id_compatibility(self):
         migrations_dir = self.get_migrations_dir()
-        website_settings_sql = (
-            migrations_dir / "032_harden_website_settings_rls_tenant_only.sql"
-        ).read_text().lower()
+        website_settings_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "harden_website_settings_rls_tenant_only.sql",
+        )
 
         self.assertIn("alter table public.website_settings enable row level security", website_settings_sql)
         self.assertIn("create policy website_settings_select_member", website_settings_sql)
@@ -604,7 +622,7 @@ class SecurityFoundationTests(unittest.TestCase):
 
     def test_audit_logs_migration_is_backend_only(self):
         migrations_dir = self.get_migrations_dir()
-        audit_sql = (migrations_dir / "028_create_audit_logs.sql").read_text().lower()
+        audit_sql = self.read_migration_by_suffix(migrations_dir, "create_audit_logs.sql")
 
         self.assertIn("create table if not exists public.audit_logs", audit_sql)
         self.assertIn("tenant_id integer references public.tenants", audit_sql)
@@ -623,7 +641,10 @@ class SecurityFoundationTests(unittest.TestCase):
 
     def test_features_rls_migration_is_tenant_scoped_and_read_only(self):
         migrations_dir = self.get_migrations_dir()
-        features_sql = (migrations_dir / "027_harden_features_rls.sql").read_text().lower()
+        features_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "harden_features_rls.sql",
+        )
 
         self.assertIn("alter table public.features enable row level security", features_sql)
         self.assertIn("revoke all on table public.features from anon", features_sql)

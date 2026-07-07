@@ -14,10 +14,15 @@ const escapeHtml = (value = "") =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+const isUnsafeFileNameCharacter = (character) =>
+  '<>:"/\\|?*'.includes(character) || character.charCodeAt(0) < 32;
+
 const normalizeFileName = (value = "report") =>
   String(value || "report")
     .trim()
-    .replace(/[<>:"/\\|?*\x00-\x1F]+/g, "-")
+    .split("")
+    .map((character) => (isUnsafeFileNameCharacter(character) ? "-" : character))
+    .join("")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
@@ -179,7 +184,11 @@ export default function ReportBuilderStep({
   }, [archiveScope]);
 
   useEffect(() => {
-    loadSavedReports().catch(() => setSaveStatus("Saved reports could not be loaded."));
+    const timer = window.setTimeout(() => {
+      loadSavedReports().catch(() => setSaveStatus("Saved reports could not be loaded."));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadSavedReports]);
 
   useEffect(() => {

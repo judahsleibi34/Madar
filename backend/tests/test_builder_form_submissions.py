@@ -10,6 +10,7 @@ from services.tenant_service import TenantContext
 
 
 FORM_ID = "form_contact"
+RESERVATION_BLOCK_ID = "reservation_request"
 PROJECT_ID = "11111111-1111-4111-8111-111111111111"
 SUBMISSION_ID = "22222222-2222-4222-8222-222222222222"
 
@@ -258,7 +259,8 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada", "field_email": "ada@example.com"}},
@@ -279,6 +281,11 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(saved["form_version"], 4)
         self.assertEqual(saved["user_agent"], "test-agent")
         self.assertEqual(len(saved["field_snapshot"]), 2)
+        notify_event.assert_called_once()
+        self.assertEqual(notify_event.call_args.kwargs["tenant_id"], 1)
+        self.assertEqual(notify_event.call_args.kwargs["event_type"], "builder.form_submitted")
+        self.assertEqual(notify_event.call_args.kwargs["block_type"], "form")
+        self.assertEqual(notify_event.call_args.kwargs["data"]["submission_id"], SUBMISSION_ID)
 
     def test_missing_required_field_fails(self):
         fake_supabase = FakeSupabase()
@@ -957,6 +964,68 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Published site not found")
+
+    def test_public_reservation_event_creates_notification(self):
+        fake_supabase = FakeSupabase()
+        published_schema = copy.deepcopy(PUBLISHED_SCHEMA)
+        published_schema["pages"][0]["sections"][0]["rows"][0]["columns"][0]["elements"].append(
+            {
+                "id": RESERVATION_BLOCK_ID,
+                "type": "reservationBlock",
+                "reservation": {"title": "Book a table"},
+            }
+        )
+        fake_supabase.tables["builder_projects"][0]["published_schema"] = published_schema
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+            response = client.post(
+                "/public/sites/tenant-site/events",
+                json={
+                    "block_type": "reservationBlock",
+                    "block_id": RESERVATION_BLOCK_ID,
+                    "event_type": "builder.reservation_requested",
+                    "payload": {
+                        "name": "Ada",
+                        "contact": "ada@example.com",
+                        "service": "Dinner",
+                        "date": "2026-07-10",
+                        "time": "19:00",
+                        "guests": 2,
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"success": True})
+        notify_event.assert_called_once()
+        self.assertEqual(notify_event.call_args.kwargs["tenant_id"], 1)
+        self.assertEqual(notify_event.call_args.kwargs["event_type"], "builder.reservation_requested")
+        self.assertEqual(notify_event.call_args.kwargs["block_type"], "reservationBlock")
+        self.assertEqual(notify_event.call_args.kwargs["source_id"], RESERVATION_BLOCK_ID)
+        self.assertEqual(notify_event.call_args.kwargs["data"]["payload"]["service"], "Dinner")
+
+    def test_public_event_rejects_missing_published_block(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+            response = client.post(
+                "/public/sites/tenant-site/events",
+                json={
+                    "block_type": "reservationBlock",
+                    "block_id": "not-on-page",
+                    "payload": {"name": "Ada"},
+                },
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Block not found")
+        notify_event.assert_not_called()
 
 
 

@@ -9,8 +9,6 @@ import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMe
 const PUBLIC_SITE_DOMAIN = import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
-const PERSON_NAME_PATTERN = /^[\p{L}\s.'’-]+$/u;
-const BUSINESS_TEXT_PATTERN = /^[\p{L}\s.'’&/(),-]+$/u;
 const DIGIT_PATTERN = /\p{N}/u;
 const SAFE_PERSON_NAME_PATTERN = /^[\p{L}\s.'\u2019-]+$/u;
 const SAFE_BUSINESS_TEXT_PATTERN = /^[\p{L}\s.'\u2019&/(),-]+$/u;
@@ -19,7 +17,7 @@ export default function SignUpPage({
   lang = "en",
   loginPath = "/login",
   onSignupSuccess,
-  mode = "tenant",
+  mode = "account",
 }) {
   const { t } = useTranslation("auth");
   const navigate = useNavigate();
@@ -37,9 +35,10 @@ export default function SignUpPage({
     subdomain: "",
   });
 
-  const [errors, setErrors] = useState({});
-  const [statusMessage, setStatusMessage] = useState("");
+  const [, setErrors] = useState({});
+  const [, setStatusMessage] = useState("");
   const [authToast, setAuthToast] = useState(null);
+  const [emailVerificationDialog, setEmailVerificationDialog] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -82,6 +81,21 @@ export default function SignUpPage({
       title: t("signup.checkFields", { defaultValue: "Please check these fields" }),
       message: formatAuthValidationToastMessage(validationErrors, errorFieldLabels),
       kind: "validation",
+    });
+  };
+
+  const closeEmailVerificationDialog = () => {
+    const nextMessage = emailVerificationDialog?.message;
+
+    setEmailVerificationDialog(null);
+
+    if (onSignupSuccess) {
+      onSignupSuccess();
+      return;
+    }
+
+    navigate(loginPath, {
+      state: nextMessage ? { message: nextMessage } : undefined,
     });
   };
 
@@ -280,20 +294,11 @@ export default function SignUpPage({
   };
 
   const getRequestPayload = () => {
-    const basePayload = {
+    return {
       first_name: formData.firstName.trim(),
       last_name: formData.lastName.trim(),
       email: formData.email.trim(),
       password: formData.password,
-    };
-
-    if (!isTenantOnboarding) return basePayload;
-
-    return {
-      ...basePayload,
-      business_name: formData.businessName.trim() || null,
-      business_type: formData.businessType.trim() || null,
-      subdomain: normalizedSubdomain || null,
     };
   };
 
@@ -342,7 +347,7 @@ export default function SignUpPage({
 
     try {
       const { response, data } = await postAuthJson(
-        isTenantOnboarding ? "/auth/signup/onboard" : "/auth/signup",
+        "/auth/signup",
         getRequestPayload()
       );
 
@@ -359,25 +364,25 @@ export default function SignUpPage({
         return;
       }
 
-      const message = isTenantOnboarding ? t("signup.onboardingSuccess") : t("signup.success");
+      const message = data.requires_email_verification
+        ? t("signup.verifyEmail")
+        : t("signup.success");
       setStatusMessage(message);
+
+      if (data.requires_email_verification) {
+        setAuthToast(null);
+        setEmailVerificationDialog({
+          title: t("signup.verifyEmailTitle"),
+          message,
+        });
+        return;
+      }
+
       showAuthToast({
         type: "success",
         title: t("signup.success"),
         message,
       });
-      setTimeout(() => {
-        if (onSignupSuccess) {
-          onSignupSuccess();
-          return;
-        }
-
-        navigate(loginPath, {
-          state: isTenantOnboarding
-            ? { message: t("signup.onboardingSuccess") }
-            : undefined,
-        });
-      }, 1500);
     } catch (error) {
       console.error(error);
       setStatusMessage(t("login.serverError"));
@@ -547,6 +552,41 @@ export default function SignUpPage({
         dir={pageDir}
         onDismiss={() => setAuthToast(null)}
       />
+
+      {emailVerificationDialog && (
+        <div
+          className="subscription-modal-backdrop"
+          dir={pageDir}
+        >
+          <section
+            className="subscription-modal subscription-modal-success"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="signup-verification-title"
+          >
+            <div className="subscription-modal-icon" aria-hidden="true">
+              i
+            </div>
+
+            <div className="subscription-modal-copy">
+              <h2 id="signup-verification-title">
+                {emailVerificationDialog.title}
+              </h2>
+              <p>{emailVerificationDialog.message}</p>
+            </div>
+
+            <div className="subscription-modal-actions">
+              <button
+                type="button"
+                className="subscription-modal-primary"
+                onClick={closeEmailVerificationDialog}
+              >
+                {t("signup.continueToLogin")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

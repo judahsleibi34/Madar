@@ -7,7 +7,7 @@ import PageSkeleton from "./components/common/PageSkeleton";
 import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
-import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./routes/shared";
+import { DashboardLoadingElement } from "./routes/shared";
 import {
   getSafePostLoginPath,
   isDashboardRoutePath,

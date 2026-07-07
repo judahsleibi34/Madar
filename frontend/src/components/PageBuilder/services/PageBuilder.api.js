@@ -260,6 +260,19 @@ export const submitPublicFormSubmission = async (subdomain, formId, payload) => 
   return parseJsonResponse(response);
 };
 
+export const submitPublicBuilderEvent = async (subdomain, payload) => {
+  const response = await fetch(
+    getApiUrl(`/public/sites/${subdomain}/events`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return parseJsonResponse(response);
+};
+
 export const fetchPublicSite = async (subdomain) => {
   const response = await fetch(getApiUrl(`/public/sites/${subdomain}`), {
     method: "GET",

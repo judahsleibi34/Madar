@@ -22,6 +22,7 @@ from services.tenant_service import (
     require_builder_admin_access,
     require_builder_write_access,
 )
+from services.upload_config import get_public_uploads_dir
 
 router = APIRouter(tags=["Builder"])
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ SUBMISSION_STATUS_LABELS = {
 SUBMISSION_STATUS_VALUES = {label.lower(): value for value, label in SUBMISSION_STATUS_LABELS.items()}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
 BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
-BUILDER_ASSET_UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "uploads")).resolve()
+BUILDER_ASSET_UPLOAD_DIR = get_public_uploads_dir()
 BUILDER_ASSET_EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",

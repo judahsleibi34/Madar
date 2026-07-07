@@ -95,6 +95,7 @@ def _call_provider_json(
     if model_config.provider == "gemini":
         return _call_gemini_json(
             model=model_config.model,
+            max_output_tokens=model_config.max_output_tokens,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
         )
@@ -110,6 +111,7 @@ def _call_provider_json(
 
 def _call_gemini_json(
     model: str,
+    max_output_tokens: int,
     system_prompt: str,
     user_prompt: str,
 ) -> dict[str, Any]:
@@ -129,6 +131,7 @@ def _call_gemini_json(
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0,
+                max_output_tokens=max_output_tokens,
                 response_mime_type="application/json",
             ),
         )

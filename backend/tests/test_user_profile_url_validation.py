@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from routes import user_routes
+from routes import admin_profile_routes, user_routes
 
 
 class FakeResponse:
@@ -57,6 +57,13 @@ def build_client():
     return TestClient(app)
 
 
+def build_profile_client():
+    app = FastAPI()
+    app.include_router(user_routes.router)
+    app.include_router(admin_profile_routes.router)
+    return TestClient(app)
+
+
 def fake_user():
     return {
         "id": 3,
@@ -67,6 +74,19 @@ def fake_user():
         "email": "madar@example.com",
         "avatar": "",
         "user_type": "user",
+    }
+
+
+def fake_admin():
+    return {
+        "id": 9,
+        "auth_id": "admin-auth-1",
+        "tenant_id": 7,
+        "first_name": "Madar",
+        "last_name": "Admin",
+        "email": "admin@example.com",
+        "avatar": "",
+        "user_type": "admin",
     }
 
 
@@ -131,6 +151,44 @@ class UserProfileUrlValidationTests(unittest.TestCase):
         self.assertEqual(fake_supabase.users_query.payload, {"first_name": "Updated"})
         self.assertEqual(response.json()["user"]["tenant_id"], 7)
         self.assertEqual(response.json()["user"]["user_type"], "user")
+
+    def test_user_avatar_upload_rate_limit_is_applied(self):
+        client = build_profile_client()
+
+        with patch.object(user_routes, "require_regular_user_id", return_value=(object(), fake_user())), \
+             patch.object(
+                 user_routes,
+                 "enforce_avatar_upload_rate_limit",
+                 side_effect=HTTPException(status_code=429, detail="Too many avatar uploads"),
+             ) as enforce_limit:
+            response = client.post(
+                "/users/3/avatar",
+                files={"file": ("avatar.png", b"\x89PNG\r\n\x1a\nabc", "image/png")},
+            )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["detail"], "Too many avatar uploads")
+        enforce_limit.assert_called_once()
+        self.assertEqual(enforce_limit.call_args.args[1:], (3, 7))
+
+    def test_admin_avatar_upload_rate_limit_is_applied(self):
+        client = build_profile_client()
+
+        with patch.object(admin_profile_routes, "require_system_admin", return_value=(object(), fake_admin())), \
+             patch.object(
+                 admin_profile_routes,
+                 "enforce_avatar_upload_rate_limit",
+                 side_effect=HTTPException(status_code=429, detail="Too many avatar uploads"),
+             ) as enforce_limit:
+            response = client.post(
+                "/admin/profile/avatar",
+                files={"file": ("avatar.png", b"\x89PNG\r\n\x1a\nabc", "image/png")},
+            )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["detail"], "Too many avatar uploads")
+        enforce_limit.assert_called_once()
+        self.assertEqual(enforce_limit.call_args.args[1:], (9, 7))
 
 
 if __name__ == "__main__":

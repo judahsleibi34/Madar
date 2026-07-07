@@ -156,6 +156,31 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
             window_attr="DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS",
         )
 
+    def test_visualization_create_has_tenant_burst_bucket_across_users(self):
+        client = self.build_client()
+        payload = {
+            "input_path": "uploads/example.csv",
+            "cleaning_actions": [],
+            "chart_config": {"chart_type": "bar"},
+        }
+        store = InMemoryRateLimitStore()
+
+        with patch.object(rate_limit_service, "_store", store), \
+             patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
+             patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "127.0.0.1,::1"), \
+             patch.object(rate_limit_service, "DATA_VISUALIZATION_RATE_LIMIT_LIMIT", 10), \
+             patch.object(rate_limit_service, "DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS", 60), \
+             patch.object(rate_limit_service, "DATA_VISUALIZATION_TENANT_RATE_LIMIT_LIMIT", 2), \
+             patch.object(rate_limit_service, "DATA_VISUALIZATION_TENANT_RATE_LIMIT_WINDOW_SECONDS", 60), \
+             patch.object(data_services, "create_visualization", return_value={"ok": True}):
+            first = client.post("/users/1/visualization/create", json=payload)
+            second = client.post("/users/2/visualization/create", json=payload)
+            limited = client.post("/users/3/visualization/create", json=payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(limited.status_code, 429)
+
     def test_visualization_profile_returns_429_after_configured_limit(self):
         self.assert_json_route_is_limited(
             path="/users/1/visualization/columns/profile",
@@ -184,6 +209,47 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
         self.assertEqual(first.status_code, 200)
         self.assertEqual(limited.status_code, 429)
         self.assertEqual(other_user.status_code, 200)
+
+    def test_user_override_changes_only_that_users_limit(self):
+        client = self.build_client()
+        payload = {"input_path": "https://example.com/data.csv"}
+        overrides = '{"1":{"read":{"limit":2,"window_seconds":60}}}'
+
+        with self.rate_limit_config(
+            limit_attr="DATA_UPLOAD_RATE_LIMIT_LIMIT",
+            window_attr="DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS",
+            limit=10,
+        ), patch.dict("os.environ", {"DATA_WORKSPACE_RATE_LIMIT_USER_OVERRIDES": overrides}), \
+             patch.object(data_services, "process_read", return_value={"ok": True}):
+            first = client.post("/users/1/data/read", json=payload)
+            second = client.post("/users/1/data/read", json=payload)
+            limited = client.post("/users/1/data/read", json=payload)
+            other_user = client.post("/users/2/data/read", json=payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(limited.status_code, 429)
+        self.assertEqual(other_user.status_code, 200)
+
+    def test_tenant_user_override_takes_precedence(self):
+        client = self.build_client()
+        payload = {"input_path": "https://example.com/data.csv"}
+        overrides = (
+            '{"1":{"read":{"limit":5,"window_seconds":60}},'
+            '"tenant:tenant-a:user:1":{"read":{"limit":1,"window_seconds":60}}}'
+        )
+
+        with self.rate_limit_config(
+            limit_attr="DATA_UPLOAD_RATE_LIMIT_LIMIT",
+            window_attr="DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS",
+            limit=10,
+        ), patch.dict("os.environ", {"DATA_WORKSPACE_RATE_LIMIT_USER_OVERRIDES": overrides}), \
+             patch.object(data_services, "process_read", return_value={"ok": True}):
+            first = client.post("/users/1/data/read", json=payload)
+            limited = client.post("/users/1/data/read", json=payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(limited.status_code, 429)
 
     def test_untrusted_spoofed_forwarded_headers_do_not_bypass_workspace_limit(self):
         client = self.build_client()
