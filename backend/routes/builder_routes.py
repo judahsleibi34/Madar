@@ -37,6 +37,7 @@ SUBMISSION_STATUS_LABELS = {
     "archived": "Archived",
 }
 SUBMISSION_STATUS_VALUES = {label.lower(): value for value, label in SUBMISSION_STATUS_LABELS.items()}
+RESERVATION_STATUSES = {"new", "confirmed", "cancelled", "completed", "rejected"}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
 BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
 BUILDER_ASSET_UPLOAD_DIR = get_public_uploads_dir()
@@ -167,6 +168,10 @@ class BuilderFormSubmissionStatusUpdate(BaseModel):
     status: str = Field(..., min_length=1)
 
 
+class BuilderReservationStatusUpdate(BaseModel):
+    status: str = Field(..., min_length=1)
+
+
 def normalize_submission_status(value: str) -> str:
     status = (value or "").strip().lower()
     db_status = SUBMISSION_STATUS_VALUES.get(status) or (status if status in SUBMISSION_STATUS_LABELS else None)
@@ -180,6 +185,37 @@ def normalize_submission_status(value: str) -> str:
 def format_submission_status(value: str | None) -> str:
     status = (value or "new").strip().lower()
     return SUBMISSION_STATUS_LABELS.get(status, "New")
+
+
+def normalize_reservation_status(value: str) -> str:
+    status = (value or "").strip().lower()
+
+    if status in RESERVATION_STATUSES:
+        return status
+
+    raise HTTPException(status_code=400, detail="Invalid reservation status")
+
+
+def format_reservation(row: dict):
+    return {
+        "id": row.get("id"),
+        "project_id": row.get("project_id"),
+        "site_subdomain": row.get("site_subdomain"),
+        "block_id": row.get("block_id"),
+        "block_type": row.get("block_type"),
+        "reservation_title": row.get("reservation_title"),
+        "customer_name": row.get("customer_name"),
+        "customer_email": row.get("customer_email"),
+        "customer_phone": row.get("customer_phone"),
+        "starts_at": row.get("starts_at"),
+        "ends_at": row.get("ends_at"),
+        "timezone": row.get("timezone"),
+        "status": row.get("status") or "new",
+        "payload": row.get("payload") or {},
+        "field_snapshot": row.get("field_snapshot") or [],
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
 
 
 def get_project_for_tenant(project_id: str, tenant_id: int):
@@ -313,6 +349,93 @@ async def upload_builder_asset(
         "url": asset_url,
         "content_type": detected_content_type,
     }
+
+
+@router.get("/builder/reservations")
+def list_builder_reservations(
+    request: Request,
+    response: Response,
+    status: Optional[str] = Query(default=None),
+    project_id: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    query = (
+        service_supabase.table("builder_reservations")
+        .select("*")
+        .eq("tenant_id", context.tenant_id)
+    )
+
+    if status:
+        query = query.eq("status", normalize_reservation_status(status))
+
+    if project_id:
+        query = query.eq("project_id", project_id.strip())
+
+    reservations_response = (
+        query.order("created_at", desc=True)
+        .range(offset, offset + limit)
+        .execute()
+    )
+    reservations, pagination = pagination_response(
+        [format_reservation(row) for row in (reservations_response.data or [])],
+        limit,
+        offset,
+    )
+
+    return {
+        "success": True,
+        "items": reservations,
+        "reservations": reservations,
+        "pagination": pagination,
+    }
+
+
+@router.get("/builder/reservations/{reservation_id}")
+def get_builder_reservation(reservation_id: str, request: Request, response: Response):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    reservation_response = (
+        service_supabase.table("builder_reservations")
+        .select("*")
+        .eq("id", reservation_id)
+        .eq("tenant_id", context.tenant_id)
+        .limit(1)
+        .execute()
+    )
+    reservation_rows = getattr(reservation_response, "data", None) or []
+    reservation = reservation_rows[0] if reservation_rows else None
+
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    return {"success": True, "reservation": format_reservation(reservation)}
+
+
+@router.patch("/builder/reservations/{reservation_id}/status")
+def update_builder_reservation_status(
+    reservation_id: str,
+    status_update: BuilderReservationStatusUpdate,
+    request: Request,
+    response: Response,
+):
+    context = require_builder_context(request, response, require_builder_write_access)
+    status = normalize_reservation_status(status_update.status)
+
+    update_response = (
+        service_supabase.table("builder_reservations")
+        .update({"status": status, "updated_at": datetime.now(timezone.utc).isoformat()})
+        .eq("id", reservation_id)
+        .eq("tenant_id", context.tenant_id)
+        .execute()
+    )
+    reservation_rows = getattr(update_response, "data", None) or []
+    reservation = reservation_rows[0] if reservation_rows else None
+
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    return {"success": True, "reservation": format_reservation(reservation)}
 
 
 @router.get("/users/{user_id}/builder/projects", include_in_schema=False)
