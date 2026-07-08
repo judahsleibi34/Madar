@@ -152,7 +152,7 @@ export default function LoginPage({
         const rawDetail = typeof data.detail === "string" ? data.detail : "";
         const message = rawDetail.toLowerCase().includes("verify your email")
           ? t("login.emailNotVerified")
-          : normalizeAuthMessage(data.detail, t("login.loginFailed"));
+          : normalizeAuthMessage(data.detail, t("login.serverError"));
         setStatusMessage(message);
         showAuthToast({
           type: "error",
@@ -247,9 +247,7 @@ export default function LoginPage({
       });
 
       if (!challengeResponse.ok) {
-        const message = typeof challengeData.detail === "string"
-          ? challengeData.detail
-          : t("login.mfaFailed");
+        const message = normalizeAuthMessage(challengeData.detail, t("login.serverError"));
         setStatusMessage(message);
         showAuthToast({
           type: "error",
@@ -269,9 +267,7 @@ export default function LoginPage({
       });
 
       if (!verifyResponse.ok) {
-        const message = typeof verifyData.detail === "string"
-          ? verifyData.detail
-          : t("login.mfaFailed");
+        const message = normalizeAuthMessage(verifyData.detail, t("login.mfaFailed"));
         setStatusMessage(message);
         showAuthToast({
           type: "error",

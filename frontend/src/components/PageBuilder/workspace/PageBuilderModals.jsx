@@ -3,14 +3,17 @@ import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
 export default function PageBuilderModals({
   activeTab,
   applyStarter,
+  confirmDeletePendingPage,
   closeStarterModal,
   confirmDeletePendingUser,
   confirmDeleteSelectedElement,
   elementPendingDelete,
   getStarterDisplay,
   modal,
+  pagePendingDelete,
   previewOverlapWarnings,
   setElementPendingDelete,
+  setPagePendingDelete,
   setPreviewOverlapWarnings,
   setUserPendingDelete,
   starterSystems,
@@ -47,6 +50,21 @@ export default function PageBuilderModals({
           confirmLabel="Delete user"
           onCancel={() => setUserPendingDelete(null)}
           onConfirm={confirmDeletePendingUser}
+        />
+      )}
+
+      {pagePendingDelete && (
+        <PageDeleteConfirmModal
+          title="Delete this page?"
+          message={
+            <>
+              <strong>"{pagePendingDelete.name}"</strong> and its blocks will be removed from this builder project. Other pages will stay.
+            </>
+          }
+          cancelLabel="Keep page"
+          confirmLabel="Delete page"
+          onCancel={() => setPagePendingDelete(null)}
+          onConfirm={confirmDeletePendingPage}
         />
       )}
 

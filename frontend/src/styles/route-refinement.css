@@ -674,9 +674,7 @@ body.theme-dark {
 .page-builder .section-component-palette button {
   background: color-mix(in srgb, var(--theme-surface) 72%, var(--theme-bg-soft)) !important;
   border-color: color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
-  box-shadow:
-    0 8px 18px rgba(var(--theme-shadow-rgb), 0.045),
-    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.55) !important;
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-rgb), 0.045) !important;
 }
 
 .page-builder .section-component-palette button:hover {
@@ -692,9 +690,7 @@ body.theme-dark {
 .page-builder .builder-inspector .element-action-grid button {
   background: color-mix(in srgb, var(--theme-surface) 72%, var(--theme-bg-soft)) !important;
   border-color: color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
-  box-shadow:
-    0 8px 18px rgba(var(--theme-shadow-rgb), 0.045),
-    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.5) !important;
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-rgb), 0.045) !important;
 }
 
 .page-builder .builder-inspector input[type="color"] {
@@ -765,6 +761,11 @@ body.theme-dark .page-builder {
   background: var(--builder-bg) !important;
   border-color: var(--builder-border) !important;
   box-shadow: none !important;
+}
+
+.page-builder .builder-side-panel {
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .page-builder .builder-topbar,
@@ -1013,6 +1014,58 @@ body.theme-dark .page-builder {
   border-color: var(--theme-primary-hover) !important;
   color: var(--theme-text-inverse) !important;
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22) !important;
+}
+
+.page-builder .page-primary-action,
+.page-builder .page-primary-action *,
+.page-builder .page-delete-action,
+.page-builder .page-delete-action * {
+  color: #fff !important;
+}
+
+.page-builder .page-primary-action svg,
+.page-builder .page-utility-actions button svg,
+.page-builder .page-delete-action svg {
+  stroke: currentColor;
+}
+
+.page-builder .page-delete-action {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: #fff !important;
+}
+
+.page-builder .page-delete-action:not(:disabled):hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+  color: #fff !important;
+}
+
+.page-builder .page-delete-action:disabled,
+.page-builder .page-delete-action:disabled * {
+  color: var(--theme-text-muted) !important;
+}
+
+.page-builder .page-delete-action:disabled {
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.page-builder .page-utility-actions button,
+.page-builder .page-utility-actions button * {
+  color: var(--theme-text) !important;
+}
+
+.page-builder .page-utility-actions button:hover,
+.page-builder .page-utility-actions button:hover * {
+  color: var(--theme-primary) !important;
+}
+
+.page-builder.theme-dark .page-utility-actions button,
+.page-builder.theme-dark .page-utility-actions button *,
+.page-builder.theme-dark .page-delete-action:not(:disabled),
+.page-builder.theme-dark .page-delete-action:not(:disabled) * {
+  color: #fff !important;
 }
 
 .builder-live-site-link,
@@ -1270,10 +1323,6 @@ body.theme-dark .tenant-runtime-card {
   background: var(--madar-bg) !important;
 }
 
-.page-builder .builder-canvas .site-section,
-.page-builder .builder-canvas .direct-layout-section,
-.page-builder .builder-canvas .site-column,
-.page-builder .builder-canvas .direct-element-frame,
 .tenant-runtime-page .site-section,
 .tenant-runtime-page .direct-layout-section,
 .tenant-runtime-page .site-column,
@@ -1283,8 +1332,6 @@ body.theme-dark .tenant-runtime-card {
   box-shadow: none !important;
 }
 
-.page-builder .builder-canvas .built-site-header,
-.page-builder .builder-canvas .built-site-footer,
 .tenant-runtime-page .built-site-header,
 .tenant-runtime-page .built-site-footer {
   background: var(--theme-surface) !important;
@@ -1325,7 +1372,6 @@ body.theme-dark .tenant-runtime-card {
   box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18) !important;
 }
 
-.page-builder .builder-canvas .builder-element-formBlock,
 .tenant-runtime-page .builder-element-formBlock {
   background: var(--form-theme-surface) !important;
   border-color: var(--form-theme-border) !important;
@@ -1333,7 +1379,6 @@ body.theme-dark .tenant-runtime-card {
   box-shadow: 0 22px 60px rgba(var(--theme-shadow-rgb), 0.1) !important;
 }
 
-.page-builder .builder-canvas .runtime-form,
 .tenant-runtime-page .runtime-form {
   background: var(--form-theme-surface) !important;
   border-color: var(--form-theme-border) !important;
@@ -1341,8 +1386,6 @@ body.theme-dark .tenant-runtime-card {
   box-shadow: none !important;
 }
 
-.page-builder .builder-canvas .runtime-form-section,
-.page-builder .builder-canvas .runtime-question,
 .tenant-runtime-page .runtime-form-section,
 .tenant-runtime-page .runtime-question {
   background: transparent !important;
@@ -1351,19 +1394,12 @@ body.theme-dark .tenant-runtime-card {
   box-shadow: none !important;
 }
 
-.page-builder .builder-canvas .runtime-form-header h3,
-.page-builder .builder-canvas .runtime-form-section-header h4,
-.page-builder .builder-canvas .runtime-question-title,
 .tenant-runtime-page .runtime-form-header h3,
 .tenant-runtime-page .runtime-form-section-header h4,
 .tenant-runtime-page .runtime-question-title {
   color: var(--form-theme-text) !important;
 }
 
-.page-builder .builder-canvas .runtime-form-header p,
-.page-builder .builder-canvas .runtime-form-section-header p,
-.page-builder .builder-canvas .runtime-question small,
-.page-builder .builder-canvas .runtime-form-page-count,
 .tenant-runtime-page .runtime-form-header p,
 .tenant-runtime-page .runtime-form-section-header p,
 .tenant-runtime-page .runtime-question small,
@@ -1371,9 +1407,6 @@ body.theme-dark .tenant-runtime-card {
   color: var(--form-theme-muted) !important;
 }
 
-.page-builder .builder-canvas .runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-.page-builder .builder-canvas .runtime-question textarea,
-.page-builder .builder-canvas .runtime-question select,
 .tenant-runtime-page .runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .tenant-runtime-page .runtime-question textarea,
 .tenant-runtime-page .runtime-question select {
@@ -1383,16 +1416,12 @@ body.theme-dark .tenant-runtime-card {
   box-shadow: 0 1px 0 rgba(var(--theme-shadow-rgb), 0.03), inset 0 0 0 1px transparent !important;
 }
 
-.page-builder .builder-canvas .runtime-question input::placeholder,
-.page-builder .builder-canvas .runtime-question textarea::placeholder,
 .tenant-runtime-page .runtime-question input::placeholder,
 .tenant-runtime-page .runtime-question textarea::placeholder {
   color: var(--form-theme-muted) !important;
   opacity: 0.72;
 }
 
-.page-builder .builder-canvas .runtime-submit,
-.page-builder .builder-canvas .runtime-form-pagination button.runtime-submit,
 .tenant-runtime-page .runtime-submit,
 .tenant-runtime-page .runtime-form-pagination button.runtime-submit {
   background: var(--form-theme-accent) !important;
@@ -3769,4 +3798,85 @@ body.theme-dark .admin-sidebar.dashboard-sidebar .admin-sidebar-brand:hover,
   border: 0 !important;
   box-shadow: none !important;
   transform: none !important;
+}
+
+/* Page Builder sidebar: red action buttons must render true white labels/icons. */
+.page-builder .builder-sidebar-save-button,
+.page-builder .builder-sidebar-save-button *,
+.page-builder .page-action-stack > .page-primary-action,
+.page-builder .page-action-stack > .page-primary-action *,
+.page-builder .page-danger-actions .page-delete-action:not(:disabled),
+.page-builder .page-danger-actions .page-delete-action:not(:disabled) * {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  opacity: 1 !important;
+}
+
+.page-builder .builder-sidebar-save-button svg,
+.page-builder .page-action-stack > .page-primary-action svg,
+.page-builder .page-danger-actions .page-delete-action:not(:disabled) svg {
+  color: #fff !important;
+  stroke: #fff !important;
+  opacity: 1 !important;
+}
+
+/* Page Builder dark mode: remove bright/white edge highlights from cards/fields. */
+.page-builder.theme-dark .section-component-palette button,
+.page-builder.theme-dark .builder-inspector input,
+.page-builder.theme-dark .builder-inspector textarea,
+.page-builder.theme-dark .builder-inspector select,
+.page-builder.theme-dark .builder-inspector details,
+.page-builder.theme-dark .builder-inspector summary,
+.page-builder.theme-dark .builder-inspector .row-editor-card,
+.page-builder.theme-dark .builder-inspector .element-action-grid button {
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.14) !important;
+  box-shadow: none !important;
+}
+
+.page-builder.theme-dark .builder-inspector input:focus,
+.page-builder.theme-dark .builder-inspector textarea:focus,
+.page-builder.theme-dark .builder-inspector select:focus {
+  border-color: rgba(var(--theme-primary-rgb), 0.52) !important;
+  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+/* Page Builder workspace nav: remove wrapper and button backgrounds. */
+.page-builder .workspace-tabs,
+:root[data-theme="dark"] .page-builder .workspace-tabs,
+[data-theme="dark"] .page-builder .workspace-tabs,
+body.theme-dark .page-builder .workspace-tabs,
+.theme-dark .page-builder .workspace-tabs {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .workspace-tabs button,
+.page-builder .workspace-tabs button:hover,
+.page-builder .workspace-tabs button.active,
+:root[data-theme="dark"] .page-builder .workspace-tabs button,
+:root[data-theme="dark"] .page-builder .workspace-tabs button:hover,
+:root[data-theme="dark"] .page-builder .workspace-tabs button.active,
+[data-theme="dark"] .page-builder .workspace-tabs button,
+[data-theme="dark"] .page-builder .workspace-tabs button:hover,
+[data-theme="dark"] .page-builder .workspace-tabs button.active,
+body.theme-dark .page-builder .workspace-tabs button,
+body.theme-dark .page-builder .workspace-tabs button:hover,
+body.theme-dark .page-builder .workspace-tabs button.active,
+.theme-dark .page-builder .workspace-tabs button,
+.theme-dark .page-builder .workspace-tabs button:hover,
+.theme-dark .page-builder .workspace-tabs button.active {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .logo-fallback,
+.page-builder .logo-fallback * {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
 }

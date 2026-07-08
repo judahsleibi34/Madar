@@ -1,12 +1,12 @@
 import { STORAGE_KEY } from "./PageBuilder.constants";
-import { createInitialProject } from "./PageBuilder.starters";
+import { createBlankWorkspaceProject } from "./PageBuilder.starters";
 import { cleanBuilderProject } from "./PageBuilder.project";
 
 export const loadInitialProject = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return cleanBuilderProject(raw ? JSON.parse(raw) : createInitialProject());
+    return cleanBuilderProject(raw ? JSON.parse(raw) : createBlankWorkspaceProject());
   } catch {
-    return cleanBuilderProject(createInitialProject());
+    return cleanBuilderProject(createBlankWorkspaceProject());
   }
 };

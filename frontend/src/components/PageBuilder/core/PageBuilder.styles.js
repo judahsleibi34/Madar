@@ -56,24 +56,25 @@ export const getBuilderFreeElementStyle = ({
   const section = activePage?.sections.find((item) => item.id === location?.sectionId);
   const viewportWidth = viewports[viewport] || viewports.desktop;
   const sectionHeight = getSectionCanvasHeight(section, viewport);
-  const left = `${((Number(pos.x) || 0) / viewportWidth) * 100}%`;
-  const top = `${((Number(pos.y) || 0) / sectionHeight) * 100}%`;
-  const width = `${((Number(pos.width) || 240) / viewportWidth) * 100}%`;
-  const minHeight = `${((Number(pos.height) || 80) / sectionHeight) * 100}%`;
+  const x = Math.max(0, Math.min(Number(pos.x) || 0, viewportWidth));
+  const y = Math.max(0, Math.min(Number(pos.y) || 0, sectionHeight));
+  const width = Math.max(1, Math.min(Number(pos.width) || 240, viewportWidth - x));
+  const height = Math.max(1, Number(pos.height) || 80);
 
   return {
     position: "absolute",
-    left,
-    top,
-    width,
-    height: minHeight,
+    left: 0,
+    top: 0,
+    width: `${width}px`,
+    height: `${height}px`,
     minHeight:
       element.type === "metric" || element.type === "list"
-        ? `${(getMetricMinimumHeight(element) / sectionHeight) * 100}%`
+        ? `${getMetricMinimumHeight(element)}px`
         : element.type === "reservationBlock"
-          ? `${(getDirectElementMinimumSize(element).height / sectionHeight) * 100}%`
+          ? `${getDirectElementMinimumSize(element).height}px`
         : undefined,
-    maxWidth: `calc(100% - ${left})`,
+    maxWidth: `${Math.max(1, viewportWidth - x)}px`,
+    transform: `translate3d(${x}px, ${y}px, 0)`,
   };
 };
 

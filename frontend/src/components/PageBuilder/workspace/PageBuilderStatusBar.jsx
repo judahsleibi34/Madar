@@ -5,7 +5,7 @@ export default function PageBuilderStatusBar({ canonicalLiveSitePath, toast }) {
         <div className="builder-toast" role="status" aria-live="polite">
           <span className="builder-toast-icon" aria-hidden="true">✓</span>
           <span className="builder-toast-message">
-            <strong>Builder update</strong>
+            <strong>Madar Builder</strong>
             <span>{toast}</span>
           </span>
         </div>

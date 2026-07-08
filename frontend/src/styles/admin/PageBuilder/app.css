@@ -26,7 +26,7 @@
   --madar-red-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
 
   min-height: 100vh;
-  background: var(--madar-bg);
+  background: transparent;
   color: var(--madar-text);
 }
 
@@ -104,6 +104,13 @@
   font-weight: 900;
   white-space: nowrap;
   transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.builder-topbar-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
 
 .builder-topbar-actions > button:hover,
@@ -234,7 +241,7 @@
   min-height: calc(100vh - 126px);
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr) 310px;
-  background: var(--madar-bg);
+  background: transparent;
 }
 
 .preview-mode .builder-layout {
@@ -245,7 +252,7 @@
 .builder-sidebar,
 .builder-inspector {
   min-width: 0;
-  background: var(--madar-surface);
+  background: transparent;
   color: var(--madar-text);
   border-color: var(--madar-border);
   padding: 14px;
@@ -267,6 +274,20 @@
   border: 1px solid var(--madar-border);
   border-radius: 18px;
   background: var(--madar-surface-soft);
+}
+
+.builder-sidebar-save-control {
+  display: grid;
+  margin: 0 0 18px;
+}
+
+.builder-sidebar-save-button {
+  width: 100%;
+}
+
+.builder-sidebar-save-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .panel-mode-select label {
@@ -1199,7 +1220,7 @@ summary {
 .workspace-page {
   min-height: calc(100vh - 126px);
   padding: 28px;
-  background: var(--madar-bg);
+  background: transparent;
   overflow-y: auto;
   overflow-x: hidden;
   max-height: calc(100vh - 126px);
@@ -2760,7 +2781,7 @@ summary {
   --madar-shadow-md: var(--app-shadow-md);
   --madar-red-shadow: var(--app-primary-shadow);
 
-  background: var(--madar-bg);
+  background: transparent;
   color: var(--madar-text);
 }
 
@@ -2793,7 +2814,11 @@ summary {
 }
 
 .page-builder.theme-dark .builder-inspector {
-  background: var(--madar-bg) !important;
+  background: transparent !important;
+}
+
+.page-builder.theme-dark .builder-sidebar {
+  background: transparent !important;
 }
 
 .page-builder.theme-dark .builder-inspector .builder-side-panel,
@@ -2808,11 +2833,11 @@ summary {
 }
 
 .page-builder.theme-dark .workspace-page {
-  background: var(--madar-bg);
+  background: transparent;
 }
 
 .page-builder.theme-dark .builder-layout {
-  background: var(--madar-bg);
+  background: transparent;
 }
 
 .page-builder.theme-dark .panel-mode-select,
@@ -3008,7 +3033,7 @@ summary {
 
 /* Make the internal builder sidebar visually clear */
 .page-builder .builder-sidebar {
-  background: var(--madar-surface, var(--theme-surface));
+  background: transparent;
   border-right: 1px solid var(--madar-border, rgba(var(--theme-shadow-rgb), 0.12));
 }
 
