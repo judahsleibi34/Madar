@@ -7,7 +7,7 @@
   min-width: 0;
   padding: 18px;
   overflow: auto;
-  background: var(--madar-bg);
+  background: transparent;
 }
 
 .preview-mode .builder-canvas-shell {
@@ -1024,6 +1024,8 @@
   cursor: move;
   touch-action: none;
   user-select: none;
+  box-sizing: border-box;
+  will-change: transform, width, height;
 }
 
 .preview-mode .direct-element-frame,

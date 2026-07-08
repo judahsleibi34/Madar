@@ -27,10 +27,60 @@ export const createElementRenderer = ({
   setInsertTarget,
   setSelected,
   captureCanvasTextSelection,
+  updateElementInlineText,
   runElementAction,
   renderConnectedForm,
   getReservationBlockValue,
 }) => {
+  const getEditableTextProps = (element, field = "content", itemIndex = null) => {
+    if (preview) return {};
+
+    return {
+      contentEditable: true,
+      suppressContentEditableWarning: true,
+      role: "textbox",
+      tabIndex: 0,
+      onKeyDown: (event) => {
+        event.stopPropagation();
+      },
+      onBlur: (event) => {
+        const nextText = event.currentTarget.textContent || "";
+
+        if (field === "listTitle") {
+          if (nextText === (element.listTitle || "")) return;
+
+          updateElementInlineText?.(element.id, {
+            listTitle: nextText,
+            richTextColors: (element.richTextColors || []).filter((range) => range.field !== "listTitle"),
+          });
+          return;
+        }
+
+        if (field === "listItem") {
+          const listItems = getListItems(element);
+          if (nextText === (listItems[itemIndex] || "")) return;
+
+          const nextItems = listItems.map((item, index) => (index === itemIndex ? nextText : item));
+          updateElementInlineText?.(element.id, {
+            listItems: nextItems,
+            content: nextItems.join("\n"),
+            richTextColors: (element.richTextColors || []).filter(
+              (range) => !(range.field === "listItem" && range.itemIndex === itemIndex)
+            ),
+          });
+          return;
+        }
+
+        if (nextText === String(element.content || "")) return;
+
+        updateElementInlineText?.(element.id, {
+          content: nextText,
+          richTextColors: (element.richTextColors || []).filter((range) => range.field !== "content"),
+        });
+      },
+    };
+  };
+
   const renderElement = (element, isFree = false) => {
     const isSelected = selected.type === "element" && selected.id === element.id;
 
@@ -62,11 +112,11 @@ export const createElementRenderer = ({
     };
 
     if (element.type === "heading") {
-      return <h1 key={element.id} {...commonProps} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</h1>;
+      return <h1 key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</h1>;
     }
 
     if (element.type === "text") {
-      return <p key={element.id} {...commonProps} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</p>;
+      return <p key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</p>;
     }
 
     if (element.type === "button") {
@@ -79,6 +129,7 @@ export const createElementRenderer = ({
             commonProps.onClick(event);
             if (preview) runElementAction(element);
           }}
+          {...getEditableTextProps(element)}
         >
           {renderRichText(element.content, getRichTextRanges(element, "content"))}
         </button>
@@ -133,9 +184,9 @@ export const createElementRenderer = ({
     if (element.type === "list") {
       return (
         <div key={element.id} {...commonProps} className={`${commonProps.className} list-style-${element.listStyle || "disc"}`} style={{ ...commonProps.style, "--list-count": Math.max(1, getListItems(element).length) }}>
-          {element.listTitle && <h3 className="builder-list-title" onMouseUp={(event) => captureCanvasTextSelection(event, "listTitle", null, element.id)}>{renderRichText(element.listTitle, getRichTextRanges(element, "listTitle"))}</h3>}
+          {element.listTitle && <h3 className="builder-list-title" {...getEditableTextProps(element, "listTitle")} onMouseUp={(event) => captureCanvasTextSelection(event, "listTitle", null, element.id)}>{renderRichText(element.listTitle, getRichTextRanges(element, "listTitle"))}</h3>}
           <ul>
-            {getListItems(element).map((item, index) => <li key={`${item}_${index}`} style={{ "--list-index": index }} onMouseUp={(event) => captureCanvasTextSelection(event, "listItem", index, element.id)}>{renderRichText(item, getRichTextRanges(element, "listItem", index))}</li>)}
+            {getListItems(element).map((item, index) => <li key={`${item}_${index}`} style={{ "--list-index": index }} {...getEditableTextProps(element, "listItem", index)} onMouseUp={(event) => captureCanvasTextSelection(event, "listItem", index, element.id)}>{renderRichText(item, getRichTextRanges(element, "listItem", index))}</li>)}
           </ul>
         </div>
       );

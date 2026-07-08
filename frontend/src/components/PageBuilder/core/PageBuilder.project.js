@@ -1,4 +1,4 @@
-import { createInitialProject } from "./PageBuilder.starters";
+import { createBlankWorkspaceProject } from "./PageBuilder.starters";
 import { defaultSiteChrome } from "./PageBuilder.constants";
 import { internalPageNames } from "./PageBuilder.copy";
 import {
@@ -22,6 +22,28 @@ import {
 const normalizeBuilderElementShape = (element) => {
   if (!element || typeof element !== "object" || Array.isArray(element)) {
     return createElement("text");
+  }
+
+  const elementName = String(element.name || "").trim().toLowerCase();
+  const elementContent = String(element.content || "").trim().toLowerCase();
+  const isLegacyLoginCard =
+    element.type === "card" &&
+    elementName === "login form card" &&
+    /^email address\s+password\s+login$/i.test(elementContent);
+
+  if (isLegacyLoginCard) {
+    return createElement("loginBlock", {
+      ...element,
+      type: "loginBlock",
+      auth: {
+        title: "Login to your account",
+        subtitle: "Access your private dashboard, submissions, reports, and internal tools.",
+        buttonText: "Login",
+        switchText: "",
+        switchActionText: "",
+        ...(element.auth || {}),
+      },
+    });
   }
 
   return createElement(element.type || "text", element);
@@ -126,7 +148,7 @@ const normalizeBuilderPageShape = (page, fallbackPage) => {
 };
 
 export const normalizeBuilderProjectShape = (project) => {
-  const fallback = createInitialProject();
+  const fallback = createBlankWorkspaceProject();
   const source =
     project && typeof project === "object" && !Array.isArray(project)
       ? project

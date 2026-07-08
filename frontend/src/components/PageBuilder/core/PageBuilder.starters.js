@@ -106,9 +106,16 @@ export const loginSection = () =>
               alignSelf: "stretch",
             },
           }),
-          createElement("card", {
+          createElement("loginBlock", {
             name: "Login Form Card",
             content: starterText.defaults.loginCard,
+            auth: {
+              title: starterText.defaults.loginHeading,
+              subtitle: starterText.defaults.loginText,
+              buttonText: "Login",
+              switchText: "",
+              switchActionText: "",
+            },
             styles: {
               backgroundColor: "var(--theme-surface)",
               borderRadius: "24px",
@@ -118,6 +125,42 @@ export const loginSection = () =>
         ]),
       ]),
     ],
+  });
+
+export const createBlankCanvasSection = () => ({
+  ...createSection({
+    name: "Page Canvas",
+    mode: "direct",
+    layout: {
+      width: "full",
+      paddingY: "none",
+      background: "transparent",
+      minHeight: 720,
+      minHeightByViewport: {
+        desktop: 720,
+        tablet: 720,
+        mobile: 720,
+      },
+    },
+    rows: [],
+    freeElements: [],
+  }),
+  isPageCanvas: true,
+});
+
+export const createBlankWorkspaceProject = () =>
+  createProject({
+    name: "Untitled Site",
+    pages: [
+      createPage("Home", [createBlankCanvasSection()], {
+        canvasLayoutVersion: 1,
+      }),
+    ],
+    forms: [],
+    collections: [],
+    workflows: [],
+    roles: [],
+    users: [],
   });
 
 export const metricsSection = () =>

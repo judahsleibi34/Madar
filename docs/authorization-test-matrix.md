@@ -50,5 +50,5 @@ The matrix asserts:
 
 - The matrix uses route-level fakes for Supabase and service calls, so it proves backend authorization wiring and scoped parameters without calling external services. It does not replace end-to-end browser/session tests.
 - Admin avatar/profile storage side effects are mocked; deeper storage rollback tests can be added separately.
-- The inactive archive file `backend/data_analysis/visualization/archive/visualization_backup.py` contains historical `generated_charts` references. It is not imported by active routes and should not be reintroduced without a security review.
+- The inactive archive file `backend/data_analysis/visualization/archive/visualization_backup.py` was removed during the dead-code cleanup because it contained historical `generated_charts` behavior and was not imported by active routes.
 - Public route abuse controls are covered by separate rate-limit and payload-limit tests, not this authorization matrix.

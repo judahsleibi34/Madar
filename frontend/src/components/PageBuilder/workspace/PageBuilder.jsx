@@ -16,6 +16,8 @@ import {
   ListOrdered,
   Move,
   Redo2,
+  Save,
+  Trash2,
   Underline,
   Undo2,
 } from "lucide-react";
@@ -55,6 +57,7 @@ import {
   heroSection,
   formSection,
   buildStarterProject,
+  createBlankCanvasSection,
   createInitialProject,
 } from "../core/PageBuilder.starters";
 import { sanitizeSubdomain } from "../core/PageBuilder.routing";
@@ -359,6 +362,22 @@ const withDefaultLandingPage = (project = {}) => {
   };
 };
 
+function BuilderSidebarSaveControl({ isSavingProject, onSave }) {
+  return (
+    <div className="builder-sidebar-save-control">
+      <button
+        type="button"
+        className="page-primary-action builder-sidebar-save-button"
+        disabled={isSavingProject || !onSave}
+        onClick={() => onSave?.()}
+      >
+        <Save size={17} aria-hidden="true" />
+        <span>{isSavingProject ? "Saving..." : "Save changes"}</span>
+      </button>
+    </div>
+  );
+}
+
 export default function PageBuilder({
   initialTab = "design",
   visibleTabIds = null,
@@ -401,6 +420,7 @@ export default function PageBuilder({
   const [paletteDropSectionId, setPaletteDropSectionId] = useState("");
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
   const [userPendingDelete, setUserPendingDelete] = useState(null);
+  const [pagePendingDelete, setPagePendingDelete] = useState(null);
   const [previewOverlapWarnings, setPreviewOverlapWarnings] = useState([]);
   const [isPhoneDevice, setIsPhoneDevice] = useState(isPhysicalPhoneDevice);
   const [, setInsertTarget] = useState(null);
@@ -410,6 +430,7 @@ export default function PageBuilder({
   const [runtimeFormLanguages, setRuntimeFormLanguages] = useState({});
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
+  const [isSavingProject, setIsSavingProject] = useState(false);
   const [liveSitePath, setLiveSitePath] = useState("");
   const [websiteSettings, setWebsiteSettings] = useState(null);
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
@@ -1039,6 +1060,46 @@ export default function PageBuilder({
     setSelected({ type: "page", id: copy.id });
   };
 
+  const eraseActivePageBlocks = () => {
+    if (!activePage) return;
+
+    updateActivePage((page) => ({
+      ...page,
+      sections: [],
+    }));
+    setSelected({ type: "page", id: activePage.id });
+    showToast("Page blocks erased. Pages are kept.");
+  };
+
+  const requestDeleteActivePage = () => {
+    if (!activePage || safeProjectPages.length <= 1) return;
+
+    setPagePendingDelete({
+      id: activePage.id,
+      name: activePage.name || "Page",
+    });
+  };
+
+  const confirmDeletePendingPage = () => {
+    if (!pagePendingDelete?.id || safeProjectPages.length <= 1) {
+      setPagePendingDelete(null);
+      return;
+    }
+
+    const nextPage =
+      safeProjectPages.find((page) => page.id !== pagePendingDelete.id) ||
+      safeProjectPages[0];
+
+    updateProject((prev) => ({
+      ...prev,
+      pages: (prev.pages || []).filter((page) => page.id !== pagePendingDelete.id),
+      activePageId: nextPage.id,
+    }));
+    setSelected({ type: "page", id: nextPage.id });
+    setPagePendingDelete(null);
+    showToast("Page deleted.");
+  };
+
   const {
     addForm,
     deleteActiveForm,
@@ -1214,6 +1275,43 @@ export default function PageBuilder({
       })
     );
   }, [selectedElement, updateSections]);
+
+  const updateElementInlineText = useCallback((elementId, updates) => {
+    if (!elementId) return;
+
+    const merge = (element) => ({
+      ...element,
+      ...updates,
+      styles: { ...element.styles, ...(updates.styles || {}) },
+      action: { ...element.action, ...(updates.action || {}) },
+    });
+
+    updateSections((sections) =>
+      sections.map((section) => {
+        if (section.mode === "direct") {
+          return {
+            ...section,
+            freeElements: section.freeElements.map((element) =>
+              element.id === elementId ? merge(element) : element
+            ),
+          };
+        }
+
+        return {
+          ...section,
+          rows: section.rows.map((row) => ({
+            ...row,
+            columns: row.columns.map((column) => ({
+              ...column,
+              elements: column.elements.map((element) =>
+                element.id === elementId ? merge(element) : element
+              ),
+            })),
+          })),
+        };
+      })
+    );
+  }, [updateSections]);
 
   const updateReservationBlock = (elementId, updates) => {
     const merge = (element) => ({
@@ -1627,7 +1725,7 @@ export default function PageBuilder({
     [selectPage, showToast]
   );
 
-  const persistProject = useCallback((nextProject, message) =>
+  const persistProject = useCallback((nextProject, message, options = {}) =>
     persistBuilderProject({
       nextProject,
       message,
@@ -1635,10 +1733,14 @@ export default function PageBuilder({
       storageKey: STORAGE_KEY,
       setProject,
       showToast,
+      silent: Boolean(options.silent),
     }), [demoMode, showToast]);
 
-  const saveProject = useCallback(async () => {
-    setActiveTopbarAction("save");
+  const saveProject = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setActiveTopbarAction("save");
+    }
+    setIsSavingProject(true);
 
     const nextProject = {
       ...project,
@@ -1650,21 +1752,28 @@ export default function PageBuilder({
     const urlErrors = collectBuilderUrlErrors(nextProject);
 
     if (urlErrors.length > 0) {
-      showToast(urlErrors[0]);
+      setIsSavingProject(false);
+      if (!silent) {
+        showToast(urlErrors[0]);
+      }
       return;
     }
 
     if (demoMode) {
-      persistProject(nextProject, "Demo changes stay until refresh.");
+      persistProject(nextProject, "Demo changes stay until refresh.", { silent });
+      setIsSavingProject(false);
       return;
     }
 
     if (builderProjectLoading) {
-      showToast("Builder project is still loading. Try saving again in a moment.");
+      setIsSavingProject(false);
+      if (!silent) {
+        showToast("Still loading your site. Try saving again in a moment.");
+      }
       return;
     }
 
-    persistProject(nextProject, "Saving to backend...");
+    persistProject(nextProject, "Saving your changes...", { silent });
 
     try {
       const payload = createBuilderProjectPayload({
@@ -1681,7 +1790,9 @@ export default function PageBuilder({
       setBuilderProjectRecord(savedRecord);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
       pendingBackendProjectSnapshotRef.current = "";
-      showToast("Saved to backend.");
+      if (!silent) {
+        showToast("Your changes are saved.");
+      }
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("Could not save builder project.");
@@ -1689,11 +1800,17 @@ export default function PageBuilder({
       const statusLabel = error?.status ? ` (${error.status})` : "";
 
       if (isLikelySessionFailure(error)) {
-        showToast("Session expired. Please sign in again to save your changes.");
+        if (!silent) {
+          showToast("Your session expired. Sign in again to save changes.");
+        }
         return;
       }
 
-      showToast(`Saved local draft cache. Backend save failed${statusLabel}.`);
+      if (!silent) {
+        showToast(`Saved on this device. Cloud save did not finish${statusLabel}.`);
+      }
+    } finally {
+      setIsSavingProject(false);
     }
   }, [
     builderProjectLoading,
@@ -1721,10 +1838,10 @@ export default function PageBuilder({
     window.clearTimeout(backendAutosaveTimerRef.current);
     backendAutosaveTimerRef.current = window.setTimeout(() => {
       pendingBackendProjectSnapshotRef.current = currentSnapshot;
-      saveProject().finally(() => {
+      saveProject({ silent: true }).finally(() => {
         pendingBackendProjectSnapshotRef.current = "";
       });
-    }, 1200);
+    }, 6000);
 
     return () => {
       window.clearTimeout(backendAutosaveTimerRef.current);
@@ -1953,24 +2070,7 @@ Go live anyway?`
     rememberStarterChoice();
 
     if (starterId === "blankPage") {
-      const canvasSection = convertSectionToDirectLayout(
-        createSection({
-          name: "Page Canvas",
-          layout: {
-            width: "full",
-            paddingY: "none",
-            background: "transparent",
-            minHeight: 720,
-            minHeightByViewport: {
-              desktop: 720,
-              tablet: 720,
-              mobile: 720,
-            },
-          },
-          rows: [],
-        })
-      );
-      canvasSection.isPageCanvas = true;
+      const canvasSection = createBlankCanvasSection();
       const page = createPage(`Page ${project.pages.length + 1}`, [canvasSection], {
         canvasLayoutVersion: 1,
       });
@@ -2046,13 +2146,15 @@ Go live anyway?`
     if (element.type !== "formBlock") return style;
 
     const edge = viewport === "mobile" ? 12 : 24;
+    const position = element.position?.[viewport] || createPosition()[viewport];
+    const y = Math.max(0, Number(position.y) || 0);
 
     return {
       ...style,
-      left: `${edge}px`,
       width: `calc(100% - ${edge * 2}px)`,
       height: "auto",
       maxWidth: `calc(100% - ${edge * 2}px)`,
+      transform: `translate3d(${edge}px, ${y}px, 0)`,
     };
   };
 
@@ -2546,6 +2648,19 @@ Go live anyway?`
 
     const current = selectedElement.position?.[viewport] || createPosition()[viewport];
     const requiredSectionHeight = snapToGrid((Number(constrainedCandidate.y) || 0) + (Number(constrainedCandidate.height) || 0) + 48);
+    const nextPosition = {
+      ...current,
+      ...constrainedCandidate,
+    };
+
+    if (
+      Number(current.x) === Number(nextPosition.x) &&
+      Number(current.y) === Number(nextPosition.y) &&
+      Number(current.width) === Number(nextPosition.width) &&
+      Number(current.height) === Number(nextPosition.height)
+    ) {
+      return;
+    }
 
     if (dragState.interaction === "resize" && requiredSectionHeight > canvasHeight) {
       updateSections((sections) =>
@@ -2573,10 +2688,7 @@ Go live anyway?`
     updateSelectedElement({
       position: {
         ...selectedElement.position,
-        [viewport]: {
-          ...current,
-          ...constrainedCandidate,
-        },
+        [viewport]: nextPosition,
       },
     });
   };
@@ -2772,6 +2884,7 @@ Go live anyway?`
       setInsertTarget,
       setSelected,
       captureCanvasTextSelection,
+      updateElementInlineText,
       runElementAction,
       renderConnectedForm,
       getReservationBlockValue,
@@ -2784,6 +2897,7 @@ Go live anyway?`
       startDrag,
       findElementLocation,
       captureCanvasTextSelection,
+      updateElementInlineText,
       runElementAction,
       renderConnectedForm,
       getReservationBlockValue,
@@ -3027,6 +3141,11 @@ Go live anyway?`
                 </div>
               </div>
 
+              <BuilderSidebarSaveControl
+                isSavingProject={isSavingProject}
+                onSave={saveProject}
+              />
+
             {designPanel === "Pages" && (
               <section className="builder-panel pages-manager-panel">
                 <div className="pages-panel-heading">
@@ -3047,20 +3166,43 @@ Go live anyway?`
                   </select>
                 </label>
 
-                <button type="button" className="page-primary-action" onClick={addPage}>
-                  <FilePlus2 size={17} aria-hidden="true" />
-                  <span>New page</span>
-                </button>
+                <div className="page-action-stack">
+                  <button type="button" className="page-primary-action" onClick={addPage}>
+                    <FilePlus2 size={17} aria-hidden="true" />
+                    <span>New page</span>
+                  </button>
 
-                <div className="page-utility-actions">
-                  <button type="button" onClick={duplicatePage}>
-                    <Copy size={16} aria-hidden="true" />
-                    <span>Duplicate</span>
-                  </button>
-                  <button type="button" onClick={() => setModal("starter")}>
-                    <LayoutTemplate size={16} aria-hidden="true" />
-                    <span>Templates</span>
-                  </button>
+                  <div className="page-utility-actions">
+                    <button type="button" onClick={duplicatePage}>
+                      <Copy size={16} aria-hidden="true" />
+                      <span>Duplicate</span>
+                    </button>
+                    <button type="button" onClick={() => setModal("starter")}>
+                      <LayoutTemplate size={16} aria-hidden="true" />
+                      <span>Templates</span>
+                    </button>
+                  </div>
+
+                  <div className="page-danger-actions">
+                    <button
+                      type="button"
+                      className="page-delete-action page-clear-blocks-action"
+                      onClick={eraseActivePageBlocks}
+                      disabled={!activePage?.sections?.length}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                      <span>Erase blocks</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="page-delete-action"
+                      onClick={requestDeleteActivePage}
+                      disabled={safeProjectPages.length <= 1}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                      <span>Delete page</span>
+                    </button>
+                  </div>
                 </div>
 
               </section>
@@ -3616,6 +3758,7 @@ Go live anyway?`
           )}
 
           <button type="button" className="danger-button" onClick={deleteSelectedElement}>Delete Element</button>
+          <p className="builder-note">You can also select an element on the canvas and press Delete or Backspace.</p>
         </div>
       )}
       </div>
@@ -4097,13 +4240,16 @@ Go live anyway?`
         applyStarter={applyStarter}
         closeStarterModal={() => setModal(null)}
         confirmDeletePendingUser={confirmDeletePendingUser}
+        confirmDeletePendingPage={confirmDeletePendingPage}
         confirmDeleteSelectedElement={confirmDeleteSelectedElement}
         elementPendingDelete={elementPendingDelete}
         getStarterDisplay={getStarterDisplay}
         modal={modal}
         previewOverlapWarnings={previewOverlapWarnings}
         setElementPendingDelete={setElementPendingDelete}
+        pagePendingDelete={pagePendingDelete}
         setPreviewOverlapWarnings={setPreviewOverlapWarnings}
+        setPagePendingDelete={setPagePendingDelete}
         setUserPendingDelete={setUserPendingDelete}
         starterSystems={starterSystems}
         templateCopy={templateCopy}
