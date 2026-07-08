@@ -23,7 +23,7 @@ def list_users(
     offset: int | None = Query(default=None, ge=0),
     search: str = Query(default=""),
 ):
-    require_system_admin(request, response)
+    require_system_admin(request, response, require_aal2=True)
 
     result = list_users_with_features(
         page=page,
@@ -48,7 +48,7 @@ def change_user_type(
     request: Request,
     response: Response,
 ):
-    _, admin_user = require_system_admin(request, response)
+    _, admin_user = require_system_admin(request, response, require_aal2=True)
     updated_user = update_user_type(user_id=user_id, user_type=update.user_type)
 
     metadata = {
@@ -85,7 +85,7 @@ def delete_user(
     request: Request,
     response: Response,
 ):
-    _, admin_user = require_system_admin(request, response)
+    _, admin_user = require_system_admin(request, response, require_aal2=True)
 
     deleted_user = delete_user_account(
         user_id=user_id,

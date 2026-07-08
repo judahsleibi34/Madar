@@ -387,6 +387,7 @@ def require_system_admin(
     response: Response | None = None,
     *,
     reject_admin_account_access: bool = True,
+    require_aal2: bool = False,
 ):
     auth_user, user_data = get_authenticated_user_row(
         request,
@@ -399,7 +400,51 @@ def require_system_admin(
     if user_type != "admin":
         raise HTTPException(status_code=403, detail="Admin access is required")
 
+    if require_aal2:
+        require_current_session_aal2()
+
     return auth_user, user_data
+
+
+def get_current_aal() -> dict:
+    try:
+        get_aal = getattr(supabase.auth.mfa, "get_authenticator_assurance_level", None)
+
+        if not get_aal:
+            return {}
+
+        aal_response = get_aal()
+        data = _get_auth_value(aal_response, "data") or aal_response
+
+        return {
+            "current_level": _get_auth_value(data, "current_level")
+            or _get_auth_value(data, "currentLevel")
+            or _get_auth_value(data, "aal"),
+            "next_level": _get_auth_value(data, "next_level")
+            or _get_auth_value(data, "nextLevel"),
+        }
+
+    except Exception as error:
+        logger.warning(
+            "auth.admin_aal2.lookup_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return {}
+
+
+def require_current_session_aal2() -> dict:
+    aal = get_current_aal()
+
+    if aal.get("current_level") != "aal2":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "aal2_required",
+                "message": "MFA verification is required for this admin action",
+            },
+        )
+
+    return aal
 
 
 def get_admin_account_access_context(request: Request) -> dict | None:
