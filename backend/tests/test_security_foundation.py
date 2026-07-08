@@ -94,6 +94,14 @@ class SecurityFoundationTests(unittest.TestCase):
         def public_form_submission():
             return {"ok": True}
 
+        @app.post("/public/sites/example/events")
+        def public_site_event():
+            return {"ok": True}
+
+        @app.post("/public/sites/example/not-events")
+        def unrelated_public_site_post():
+            return {"ok": True}
+
         @app.post("/issue-cookies")
         def issue_cookies(response: Response):
             csrf_token = set_auth_cookies(response, "access-token", "refresh-token")
@@ -283,6 +291,7 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/contact",
             "/billing/webhook",
             "/public/sites/example/forms/form-1/submissions",
+            "/public/sites/example/events",
         ]:
             with self.subTest(path=path):
                 response = client.post(
@@ -295,6 +304,21 @@ class SecurityFoundationTests(unittest.TestCase):
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json(), {"ok": True})
+
+    def test_unrelated_public_site_post_is_not_csrf_exempt(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/public/sites/example/not-events",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Invalid CSRF token")
 
     def test_auth_cookies_issue_csrf_token(self):
         client = self.build_origin_client()
