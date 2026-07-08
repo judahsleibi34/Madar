@@ -268,6 +268,7 @@ def get_authenticated_user_row(
     *,
     allow_refresh: bool = True,
     allow_admin_account_access: bool = True,
+    reject_admin_account_access: bool = True,
 ):
     access_token = request.cookies.get("madar_access_token")
     refresh_token = request.cookies.get("madar_refresh_token")
@@ -345,10 +346,7 @@ def get_authenticated_user_row(
 
     user_data = user_response.data
 
-    if (
-        allow_admin_account_access
-        and normalize_user_type(user_data.get("user_type")) == "admin"
-    ):
+    if normalize_user_type(user_data.get("user_type")) == "admin":
         try:
             from services.admin_account_access_service import resolve_admin_account_access_user
 
@@ -359,8 +357,22 @@ def get_authenticated_user_row(
             )
 
             if target_user:
+                if not allow_admin_account_access:
+                    if reject_admin_account_access:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Admin account access is not allowed for this route",
+                        )
+
+                    return auth_user, user_data
+
+                if response is not None:
+                    response.headers["X-Madar-Admin-Account-Access"] = "true"
+
                 return auth_user, target_user
 
+        except HTTPException:
+            raise
         except Exception as error:
             logger.warning(
                 "auth.admin_access_session_resolve_failed",
@@ -370,11 +382,17 @@ def get_authenticated_user_row(
     return auth_user, user_data
 
 
-def require_system_admin(request: Request, response: Response | None = None):
+def require_system_admin(
+    request: Request,
+    response: Response | None = None,
+    *,
+    reject_admin_account_access: bool = True,
+):
     auth_user, user_data = get_authenticated_user_row(
         request,
         response,
         allow_admin_account_access=False,
+        reject_admin_account_access=reject_admin_account_access,
     )
     user_type = normalize_user_type(user_data.get("user_type"))
 
@@ -384,8 +402,21 @@ def require_system_admin(request: Request, response: Response | None = None):
     return auth_user, user_data
 
 
-def require_regular_user(request: Request, response: Response | None = None):
-    auth_user, user_data = get_authenticated_user_row(request, response)
+def get_admin_account_access_context(request: Request) -> dict | None:
+    return getattr(request.state, "admin_account_access_context", None)
+
+
+def require_regular_user(
+    request: Request,
+    response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
+):
+    auth_user, user_data = get_authenticated_user_row(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
     user_type = normalize_user_type(user_data.get("user_type"))
 
     if user_type == "admin":
@@ -398,8 +429,14 @@ def require_regular_user_id(
     user_id: int,
     request: Request,
     response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
 ):
-    auth_user, user_data = require_regular_user(request, response)
+    auth_user, user_data = require_regular_user(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
 
     try:
         path_user_id = int(user_id)

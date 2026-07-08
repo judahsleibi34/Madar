@@ -47,7 +47,11 @@ def end_account_access(
     request: Request,
     response: Response,
 ):
-    _, admin_user = require_system_admin(request, response)
+    _, admin_user = require_system_admin(
+        request,
+        response,
+        reject_admin_account_access=False,
+    )
     return end_admin_account_access_session(
         request=request,
         response=response,

@@ -282,6 +282,19 @@ def require_builder_context(request: Request, response: Response, access_checker
     return context
 
 
+def require_builder_context_without_admin_account_access(
+    request: Request,
+    response: Response,
+) -> TenantContext:
+    context = require_active_tenant_member(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
+    assert_context_user(context, request.path_params.get("user_id"))
+    return context
+
+
 def first_row(response):
     if not response.data:
         raise HTTPException(status_code=500, detail="Builder project was not saved")
@@ -693,7 +706,7 @@ def update_builder_form_submission_status(
     request: Request,
     response: Response,
 ):
-    context = require_builder_context(request, response, require_active_tenant_member)
+    context = require_builder_context_without_admin_account_access(request, response)
     get_project_for_tenant(project_id, context.tenant_id)
 
     status = normalize_submission_status(submission_update.status)
