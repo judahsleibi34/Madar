@@ -566,7 +566,11 @@ def change_password(
     response: Response,
 ):
     try:
-        auth_user, user_data = get_authenticated_user_row(request, response)
+        auth_user, user_data = get_authenticated_user_row(
+            request,
+            response,
+            allow_admin_account_access=False,
+        )
 
         clean_email = normalize_email(user_data.get("email"))
         current_password = payload.current_password.strip()

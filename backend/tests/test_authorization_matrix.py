@@ -57,7 +57,7 @@ def fake_auth_result(user_data):
 
 
 def fake_require_regular_user_id(current_user):
-    def _fake(user_id, request, response):
+    def _fake(user_id, request, response, **_kwargs):
         if current_user is None:
             raise HTTPException(status_code=401, detail="Not logged in")
 

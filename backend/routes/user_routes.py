@@ -145,7 +145,12 @@ def update_user_profile(
     response: Response,
 ):
     try:
-        _, user_data = require_regular_user_id(user_id, request, response)
+        _, user_data = require_regular_user_id(
+            user_id,
+            request,
+            response,
+            allow_admin_account_access=False,
+        )
 
         update_payload = {}
 
@@ -249,7 +254,12 @@ async def upload_user_avatar(
     file: UploadFile = File(...),
 ):
     try:
-        _, user_data = require_regular_user_id(user_id, request, response)
+        _, user_data = require_regular_user_id(
+            user_id,
+            request,
+            response,
+            allow_admin_account_access=False,
+        )
         enforce_avatar_upload_rate_limit(request, user_id, user_data.get("tenant_id"))
 
         auth_id = str(user_data.get("auth_id") or "").strip()

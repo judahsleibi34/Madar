@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -322,6 +323,118 @@ def validate_public_event_payload_limits(payload: dict[str, Any]):
         )
 
 
+def compact_public_text(value: Any, max_length: int = 500) -> str | None:
+    if value is None or isinstance(value, (dict, list)):
+        return None
+
+    text = str(value).strip()
+    return text[:max_length] if text else None
+
+
+def first_payload_text(payload: dict[str, Any], *keys: str, max_length: int = 500) -> str | None:
+    for key in keys:
+        value = compact_public_text(payload.get(key), max_length=max_length)
+        if value:
+            return value
+    return None
+
+
+def parse_public_datetime(value: Any) -> str | None:
+    text = compact_public_text(value, max_length=120)
+    if not text:
+        return None
+
+    candidate = text.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(candidate).isoformat()
+    except ValueError:
+        return None
+
+
+def reservation_datetime_from_payload(payload: dict[str, Any], *keys: str) -> str | None:
+    direct_value = first_payload_text(payload, *keys, max_length=120)
+    parsed = parse_public_datetime(direct_value)
+    if parsed:
+        return parsed
+
+    date_value = first_payload_text(payload, "date", "reservation_date", "reservationDate", max_length=40)
+    time_value = first_payload_text(payload, "time", "start_time", "startTime", max_length=40)
+
+    if date_value and time_value:
+        return parse_public_datetime(f"{date_value}T{time_value}")
+
+    return None
+
+
+def build_reservation_field_snapshot(block: dict, block_id: str | None, block_type: str) -> list[dict[str, Any]]:
+    snapshot = {
+        "block_id": block_id or block.get("id"),
+        "block_type": block_type,
+    }
+
+    reservation = block.get("reservation")
+    if isinstance(reservation, dict):
+        snapshot["reservation"] = reservation
+
+    return [snapshot]
+
+
+def build_builder_reservation_payload(
+    *,
+    tenant_id: int,
+    project: dict,
+    subdomain: str,
+    block: dict,
+    block_id: str | None,
+    block_type: str,
+    title: str,
+    payload: dict[str, Any],
+    request: Request,
+) -> dict[str, Any]:
+    return {
+        "tenant_id": tenant_id,
+        "project_id": project.get("id"),
+        "site_subdomain": subdomain,
+        "block_id": block_id or compact_public_text(block.get("id"), max_length=200),
+        "block_type": block_type,
+        "reservation_title": title,
+        "customer_name": first_payload_text(payload, "customer_name", "customerName", "name", "full_name", "fullName"),
+        "customer_email": first_payload_text(payload, "customer_email", "customerEmail", "email"),
+        "customer_phone": first_payload_text(payload, "customer_phone", "customerPhone", "phone", "contact"),
+        "starts_at": reservation_datetime_from_payload(payload, "starts_at", "startsAt", "start", "start_at", "startAt"),
+        "ends_at": reservation_datetime_from_payload(payload, "ends_at", "endsAt", "end", "end_at", "endAt"),
+        "timezone": first_payload_text(payload, "timezone", "time_zone", "timeZone", max_length=120),
+        "status": "new",
+        "payload": payload,
+        "field_snapshot": build_reservation_field_snapshot(block, block_id, block_type),
+        "submitter_ip": get_client_ip(request),
+        "user_agent": request.headers.get("user-agent", "")[:1000],
+    }
+
+
+def insert_builder_reservation(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        insert_response = service_supabase.table("builder_reservations").insert(payload).execute()
+    except Exception as error:
+        logger.warning(
+            "public.builder_reservation_failed",
+            extra={
+                "tenant_id": payload.get("tenant_id"),
+                "project_id": payload.get("project_id"),
+                "block_id": payload.get("block_id"),
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(status_code=500, detail="Could not submit reservation")
+
+    saved_reservation = first_row(insert_response)
+
+    if not saved_reservation:
+        raise HTTPException(status_code=500, detail="Could not submit reservation")
+
+    return saved_reservation
+
+
 def validate_form_answers(form: dict, answers: dict[str, Any]) -> dict[str, Any]:
     fields = get_form_fields(form)
     field_ids = {str(field.get("id") or "") for field in fields if field.get("id")}
@@ -575,7 +688,7 @@ def submit_public_builder_block_event(
 
     if block_type == "reservationBlock":
         reservation = block.get("reservation") or {}
-        title = event.title or "New reservation request"
+        title = event.title or reservation.get("title") or "New reservation request"
         service = cleaned_payload.get("service")
         date = cleaned_payload.get("date")
         time = cleaned_payload.get("time")
@@ -584,6 +697,21 @@ def submit_public_builder_block_event(
     else:
         title = event.title or "New site event"
         body = f"{block_type} triggered an event on the published site."
+
+    saved_reservation = insert_builder_reservation(
+        build_builder_reservation_payload(
+            tenant_id=tenant_id,
+            project=project,
+            subdomain=clean_subdomain,
+            block=block,
+            block_id=block_id,
+            block_type=block_type,
+            title=title,
+            payload=cleaned_payload,
+            request=request,
+        )
+    )
+    reservation_id = str(saved_reservation.get("id") or "")
 
     create_builder_block_event_notification(
         tenant_id=tenant_id,
@@ -596,6 +724,7 @@ def submit_public_builder_block_event(
             "project_id": project.get("id"),
             "block_id": block.get("id"),
             "block_type": block_type,
+            "reservation_id": reservation_id,
             "subdomain": clean_subdomain,
             "payload": cleaned_payload,
         },
@@ -606,10 +735,15 @@ def submit_public_builder_block_event(
         extra={
             "tenant_id": tenant_id,
             "project_id": project.get("id"),
+            "reservation_id": reservation_id,
             "block_id": block.get("id"),
             "block_type": block_type,
             "event_type": event_type,
         },
     )
 
-    return {"success": True}
+    return {
+        "success": True,
+        "reservation_id": reservation_id,
+        "message": "Reservation submitted successfully.",
+    }

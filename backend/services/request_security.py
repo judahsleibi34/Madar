@@ -28,6 +28,7 @@ CSRF_EXEMPT_PATHS = {
 }
 CSRF_EXEMPT_PATTERNS = (
     re.compile(r"^/public/sites/[^/]+/forms/[^/]+/submissions$"),
+    re.compile(r"^/public/sites/[^/]+/events$"),
 )
 
 

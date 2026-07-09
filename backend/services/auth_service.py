@@ -268,6 +268,7 @@ def get_authenticated_user_row(
     *,
     allow_refresh: bool = True,
     allow_admin_account_access: bool = True,
+    reject_admin_account_access: bool = True,
 ):
     access_token = request.cookies.get("madar_access_token")
     refresh_token = request.cookies.get("madar_refresh_token")
@@ -345,10 +346,7 @@ def get_authenticated_user_row(
 
     user_data = user_response.data
 
-    if (
-        allow_admin_account_access
-        and normalize_user_type(user_data.get("user_type")) == "admin"
-    ):
+    if normalize_user_type(user_data.get("user_type")) == "admin":
         try:
             from services.admin_account_access_service import resolve_admin_account_access_user
 
@@ -359,8 +357,22 @@ def get_authenticated_user_row(
             )
 
             if target_user:
+                if not allow_admin_account_access:
+                    if reject_admin_account_access:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Admin account access is not allowed for this route",
+                        )
+
+                    return auth_user, user_data
+
+                if response is not None:
+                    response.headers["X-Madar-Admin-Account-Access"] = "true"
+
                 return auth_user, target_user
 
+        except HTTPException:
+            raise
         except Exception as error:
             logger.warning(
                 "auth.admin_access_session_resolve_failed",
@@ -370,22 +382,86 @@ def get_authenticated_user_row(
     return auth_user, user_data
 
 
-def require_system_admin(request: Request, response: Response | None = None):
+def require_system_admin(
+    request: Request,
+    response: Response | None = None,
+    *,
+    reject_admin_account_access: bool = True,
+    require_aal2: bool = False,
+):
     auth_user, user_data = get_authenticated_user_row(
         request,
         response,
         allow_admin_account_access=False,
+        reject_admin_account_access=reject_admin_account_access,
     )
     user_type = normalize_user_type(user_data.get("user_type"))
 
     if user_type != "admin":
         raise HTTPException(status_code=403, detail="Admin access is required")
 
+    if require_aal2:
+        require_current_session_aal2()
+
     return auth_user, user_data
 
 
-def require_regular_user(request: Request, response: Response | None = None):
-    auth_user, user_data = get_authenticated_user_row(request, response)
+def get_current_aal() -> dict:
+    try:
+        get_aal = getattr(supabase.auth.mfa, "get_authenticator_assurance_level", None)
+
+        if not get_aal:
+            return {}
+
+        aal_response = get_aal()
+        data = _get_auth_value(aal_response, "data") or aal_response
+
+        return {
+            "current_level": _get_auth_value(data, "current_level")
+            or _get_auth_value(data, "currentLevel")
+            or _get_auth_value(data, "aal"),
+            "next_level": _get_auth_value(data, "next_level")
+            or _get_auth_value(data, "nextLevel"),
+        }
+
+    except Exception as error:
+        logger.warning(
+            "auth.admin_aal2.lookup_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return {}
+
+
+def require_current_session_aal2() -> dict:
+    aal = get_current_aal()
+
+    if aal.get("current_level") != "aal2":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "aal2_required",
+                "message": "MFA verification is required for this admin action",
+            },
+        )
+
+    return aal
+
+
+def get_admin_account_access_context(request: Request) -> dict | None:
+    return getattr(request.state, "admin_account_access_context", None)
+
+
+def require_regular_user(
+    request: Request,
+    response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
+):
+    auth_user, user_data = get_authenticated_user_row(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
     user_type = normalize_user_type(user_data.get("user_type"))
 
     if user_type == "admin":
@@ -398,8 +474,14 @@ def require_regular_user_id(
     user_id: int,
     request: Request,
     response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
 ):
-    auth_user, user_data = require_regular_user(request, response)
+    auth_user, user_data = require_regular_user(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
 
     try:
         path_user_id = int(user_id)

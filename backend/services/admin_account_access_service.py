@@ -599,6 +599,12 @@ def resolve_admin_account_access_user(
             delete_admin_account_access_cookie(response)
         return None
 
+    request.state.admin_account_access_context = {
+        "admin_actor_user_id": admin_user.get("id"),
+        "target_user_id": target_user.get("id"),
+        "session_id": session_id,
+    }
+
     return target_user
 
 

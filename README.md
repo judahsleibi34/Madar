@@ -79,6 +79,7 @@ Rate limiting and request-size controls:
 - `REDIS_URL`
 - `RATE_LIMIT_ENABLED`
 - `RATE_LIMIT_FAIL_OPEN`
+  - Production should use `false` so Redis/rate-limiter failures do not silently allow abusive traffic. Local development may override this to `true` if Redis is intentionally unavailable.
 - `AUTH_RATE_LIMIT_LIMIT`
 - `AUTH_RATE_LIMIT_WINDOW_SECONDS`
 - `PASSWORD_RATE_LIMIT_LIMIT`

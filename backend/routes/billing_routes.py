@@ -78,7 +78,11 @@ def create_canonical_checkout(
     request: Request,
     response: Response,
 ):
-    context = require_active_tenant_member(request, response)
+    context = require_active_tenant_member(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
     return build_checkout_response(checkout, context, request=request)
 
 
@@ -89,7 +93,11 @@ def create_checkout(
     request: Request,
     response: Response,
 ):
-    context = require_active_tenant_member(request, response)
+    context = require_active_tenant_member(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
     assert_context_user(context, user_id)
     return build_checkout_response(checkout, context, request=request)
 
