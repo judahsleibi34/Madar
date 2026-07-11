@@ -107,6 +107,397 @@
   box-shadow: none !important;
 }
 
+/* Builder chrome follows the application's global font. The tenant canvas is
+   deliberately excluded so website typography remains theme-controlled. */
+.page-builder :is(
+  .builder-topbar,
+  .builder-subbar,
+  .workspace-tabs,
+  .builder-sidebar,
+  .builder-inspector,
+  .builder-side-panel,
+  .workspace-header
+),
+.page-builder :is(
+  .builder-topbar,
+  .builder-subbar,
+  .workspace-tabs,
+  .builder-sidebar,
+  .builder-inspector,
+  .builder-side-panel,
+  .workspace-header
+) :is(button, input, select, textarea, label, span, small, strong, h1, h2, h3, h4, p) {
+  font-family: inherit !important;
+}
+
+/* Inspector component system */
+.page-builder .builder-inspector {
+  padding: 16px !important;
+  background: var(--pb-bg) !important;
+  color: var(--pb-text) !important;
+  border-inline-start: 1px solid var(--pb-border) !important;
+}
+
+.page-builder .builder-inspector > .builder-side-panel {
+  display: grid !important;
+  gap: 14px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.page-builder .builder-inspector .inspector-title {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 2px 2px 14px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pb-border) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .inspector-title h2 {
+  margin: 0 !important;
+  color: var(--pb-text) !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.page-builder .builder-inspector .inspector-title > span {
+  padding: 4px 8px !important;
+  background: var(--pb-surface-muted) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: 999px !important;
+  color: var(--pb-muted) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  text-transform: capitalize !important;
+}
+
+.page-builder .builder-inspector .inspector-group {
+  display: grid !important;
+  gap: 14px !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  background: var(--pb-surface) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .inspector-group > h3 {
+  margin: 0 0 2px !important;
+  padding: 0 0 10px !important;
+  border-bottom: 1px solid var(--pb-border) !important;
+  color: var(--pb-text) !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+}
+
+.page-builder .builder-inspector label {
+  display: grid !important;
+  gap: 7px !important;
+  margin: 0 !important;
+  color: var(--pb-text) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+}
+
+.page-builder .builder-inspector :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  width: 100% !important;
+  min-height: 42px !important;
+  padding: 9px 11px !important;
+  background: var(--pb-surface-raised) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  color: var(--pb-text) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector textarea {
+  min-height: 96px !important;
+  resize: vertical !important;
+}
+
+.page-builder .builder-inspector :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  outline: 0 !important;
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 3px var(--pb-accent-soft) !important;
+}
+
+.page-builder .builder-inspector .inspector-toggle-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 9px !important;
+  min-height: 32px !important;
+  padding: 2px 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+}
+
+.page-builder .builder-inspector .inspector-toggle-row input[type="checkbox"] {
+  flex: 0 0 17px !important;
+  width: 17px !important;
+  height: 17px !important;
+  margin: 0 !important;
+  accent-color: var(--pb-accent) !important;
+}
+
+.page-builder .builder-inspector :is(.auth-workflow-settings, .carousel-timing-controls, .row-editor-card, .metric-editor-item, .list-editor-item, .option-editor-stack) {
+  display: grid !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  background: var(--pb-surface-muted) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector :is(.builder-note, .inspector-help-text, .field-help) {
+  margin: 0 !important;
+  color: var(--pb-muted) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+}
+
+.page-builder .builder-inspector :is(.full-width-action, .element-action-grid button) {
+  min-height: 40px !important;
+  padding: 8px 11px !important;
+  background: var(--pb-surface-raised) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  color: var(--pb-text) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector :is(.full-width-action, .element-action-grid button):hover {
+  background: var(--pb-accent-soft) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 45%, var(--pb-border)) !important;
+  color: var(--pb-accent) !important;
+}
+
+.page-builder .builder-inspector .danger-button {
+  width: 100% !important;
+  min-height: 42px !important;
+  background: color-mix(in srgb, var(--pb-danger) 10%, var(--pb-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--pb-danger) 35%, var(--pb-border)) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  color: var(--pb-danger) !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .danger-button:hover {
+  background: var(--pb-danger) !important;
+  border-color: var(--pb-danger) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .reservation-editor-layout {
+  align-items: stretch !important;
+}
+
+.page-builder .reservation-editor-layout > :is(.reservation-block-list, .reservation-editor-card) {
+  align-self: stretch !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-editor {
+  display: grid !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  background: var(--pb-surface) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-editor > summary {
+  cursor: pointer !important;
+  color: var(--pb-text) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-list {
+  display: grid !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-card {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: var(--pb-surface-raised) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-card > summary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  min-height: 42px !important;
+  padding: 10px 12px !important;
+  cursor: pointer !important;
+  list-style-position: inside !important;
+  background: transparent !important;
+  color: var(--pb-text) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-edit-hint {
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-card[open] > summary {
+  border-bottom: 1px solid var(--pb-border) !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-card-body {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  padding: 12px !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-copy-fields {
+  display: grid !important;
+  align-content: start !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-image-control {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-image-preview {
+  width: 100% !important;
+  min-height: 120px !important;
+  max-height: 160px !important;
+  background: var(--pb-surface-muted) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-image-control .upload-image-button {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  background: var(--pb-accent) !important;
+  border: 1px solid var(--pb-accent) !important;
+  color: var(--theme-text-inverse) !important;
+  overflow-wrap: anywhere !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-image-actions {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+
+.page-builder .builder-inspector .carousel-remove-image {
+  width: 100% !important;
+  min-height: 38px !important;
+  background: color-mix(in srgb, var(--pb-danger) 9%, var(--pb-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--pb-danger) 32%, var(--pb-border)) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  color: var(--pb-danger) !important;
+  -webkit-text-fill-color: var(--pb-danger) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .carousel-image-url-control {
+  grid-column: 1 / -1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.page-builder .builder-inspector .carousel-image-url-control > summary {
+  cursor: pointer !important;
+  color: var(--pb-muted) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-editor > button {
+  width: 100% !important;
+  min-height: 40px !important;
+  background: var(--pb-surface-raised) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  color: var(--pb-text) !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-card-body > .danger-lite {
+  grid-column: 1 / -1 !important;
+}
+
+@media (min-width: 1381px) {
+  .page-builder:not(.preview-mode) .builder-layout {
+    grid-template-columns: 320px minmax(0, 1fr) 400px !important;
+  }
+}
+
+@media (min-width: 1241px) and (max-width: 1380px) {
+  .page-builder:not(.preview-mode) .builder-layout {
+    grid-template-columns: 300px minmax(0, 1fr) 340px !important;
+  }
+
+  .page-builder .builder-inspector .carousel-slide-card-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  .page-builder .builder-inspector .carousel-image-url-control,
+  .page-builder .builder-inspector .carousel-slide-card-body > .danger-lite {
+    grid-column: auto !important;
+  }
+}
+
 .page-builder :is(
   .builder-sidebar,
   .builder-inspector,
@@ -1017,4 +1408,184 @@ body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(button, a):hove
 body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(.active, [aria-current="page"]) {
   background: var(--builder-surface-3) !important;
   box-shadow: inset 2px 0 0 var(--theme-primary) !important;
+}
+
+/* Keep light-mode page danger actions legible. This file is loaded with the
+   builder chunk, after global route refinements, so resolve the child-color
+   collision at its source. */
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .page-danger-actions .page-delete-action:not(:disabled),
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .page-danger-actions .page-delete-action:not(:disabled) * {
+  color: var(--pb-danger) !important;
+  -webkit-text-fill-color: var(--pb-danger) !important;
+  opacity: 1 !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .page-danger-actions .page-delete-action:not(:disabled) svg {
+  color: var(--pb-danger) !important;
+  stroke: var(--pb-danger) !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .page-danger-actions .page-delete-action:disabled,
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .page-danger-actions .page-delete-action:disabled * {
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .page-danger-actions .page-delete-action:disabled svg {
+  color: var(--pb-muted) !important;
+  stroke: var(--pb-muted) !important;
+}
+
+/* The light editor follows the application theme, including the selected
+   Editing tools item and its icon. */
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-mode-select {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-navigator button {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-navigator button svg {
+  color: var(--theme-text) !important;
+  stroke: var(--theme-text) !important;
+  opacity: 1 !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-navigator button small {
+  color: var(--theme-text-muted) !important;
+  -webkit-text-fill-color: var(--theme-text-muted) !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-navigator button.active {
+  --tool-item-text: var(--theme-text);
+  --tool-item-muted: var(--theme-text-muted);
+  --tool-item-icon: var(--theme-text);
+  background: var(--theme-surface) !important;
+  border-color: color-mix(in srgb, var(--theme-primary) 42%, var(--theme-border)) !important;
+  color: var(--tool-item-text) !important;
+  -webkit-text-fill-color: var(--tool-item-text) !important;
+  box-shadow: inset 3px 0 0 var(--theme-primary) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-navigator button.active :is(svg, strong) {
+  color: var(--tool-item-icon) !important;
+  -webkit-text-fill-color: var(--tool-item-text) !important;
+  stroke: var(--tool-item-icon) !important;
+  fill: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+:root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-navigator button.active small {
+  color: var(--tool-item-muted) !important;
+  -webkit-text-fill-color: var(--tool-item-muted) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Selected editor tool stays readable in every theme. Selection is conveyed
+   by the accent border instead of inverting content against a mutable color. */
+.page-builder.theme-dark .panel-navigator button.active {
+  background: var(--pb-surface-raised) !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  box-shadow: inset 3px 0 0 var(--pb-accent) !important;
+  opacity: 1 !important;
+}
+
+.page-builder.theme-dark .panel-navigator button.active :is(svg, strong) {
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  stroke: var(--pb-text) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.page-builder.theme-dark .panel-navigator button.active small {
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Workspace navigation is text-only chrome: no enclosing sheet or pills. */
+.page-builder .workspace-tabs {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .workspace-tabs button,
+.page-builder .workspace-tabs button:hover,
+.page-builder .workspace-tabs button.active {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .workspace-tabs button.active {
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+}
+
+:root[data-theme="dark"] .page-builder .workspace-tabs button,
+:root[data-theme="dark"] .page-builder .workspace-tabs button:hover,
+:root[data-theme="dark"] .page-builder .workspace-tabs button.active,
+body.theme-dark .page-builder .workspace-tabs button,
+body.theme-dark .page-builder .workspace-tabs button:hover,
+body.theme-dark .page-builder .workspace-tabs button.active {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .page-builder .workspace-tabs button *,
+body.theme-dark .page-builder .workspace-tabs button *,
+:root[data-theme="dark"] .page-builder .workspace-tabs button::before,
+:root[data-theme="dark"] .page-builder .workspace-tabs button::after,
+body.theme-dark .page-builder .workspace-tabs button::before,
+body.theme-dark .page-builder .workspace-tabs button::after {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] body .page-builder nav.workspace-tabs > button,
+html[data-theme="dark"] body .page-builder nav.workspace-tabs > button:hover,
+html[data-theme="dark"] body .page-builder nav.workspace-tabs > button.active,
+html.theme-dark body .page-builder nav.workspace-tabs > button,
+html.theme-dark body .page-builder nav.workspace-tabs > button:hover,
+html.theme-dark body .page-builder nav.workspace-tabs > button.active {
+  appearance: none !important;
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.page-builder .inspector-toggle-row,
+.page-builder.theme-dark .inspector-toggle-row,
+:root[data-theme="dark"] .page-builder .inspector-toggle-row,
+body.theme-dark .page-builder .inspector-toggle-row {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }

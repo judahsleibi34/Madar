@@ -3850,17 +3850,26 @@ export default function PageBuilder({
             <details open className="carousel-slide-editor">
               <summary>Carousel slides</summary>
               <p className="builder-note">Edit every slide and choose or replace its image.</p>
-              {parseCarouselSlides(selectedElement.content).map((slide, index) => (
-                <div className="metric-editor-item" key={`${selectedElement.id}_slide_${index}`}>
-                  <strong>Slide {index + 1}</strong>
-                  <label>Title<input value={slide.title} onChange={(event) => {
-                    const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item);
-                    updateSelectedElement({ content: serializeCarouselSlides(slides) });
-                  }} /></label>
-                  <label>Description<textarea value={slide.description} onChange={(event) => {
-                    const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item);
-                    updateSelectedElement({ content: serializeCarouselSlides(slides) });
-                  }} /></label>
+              <div className="carousel-slide-list">
+                {parseCarouselSlides(selectedElement.content).map((slide, index) => (
+                  <details className="carousel-slide-card" defaultOpen={index === 0} key={`${selectedElement.id}_slide_${index}`}>
+                    <summary>
+                      <span>Slide {index + 1}</span>
+                      <span className="carousel-slide-edit-hint">
+                        {resolveMediaUrl(slide.image) ? "Edit image" : "Add image"}
+                      </span>
+                    </summary>
+                    <div className="carousel-slide-card-body">
+                  <div className="carousel-slide-copy-fields">
+                    <label>Title<input value={slide.title} onChange={(event) => {
+                      const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item);
+                      updateSelectedElement({ content: serializeCarouselSlides(slides) });
+                    }} /></label>
+                    <label>Description<textarea value={slide.description} onChange={(event) => {
+                      const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item);
+                      updateSelectedElement({ content: serializeCarouselSlides(slides) });
+                    }} /></label>
+                  </div>
                   <div className="carousel-slide-image-control">
                     <div className="carousel-slide-image-preview">
                       {resolveMediaUrl(slide.image) ? (
@@ -3869,10 +3878,18 @@ export default function PageBuilder({
                         <span>No image</span>
                       )}
                     </div>
-                    <label className="upload-image-button">
-                      {assetUploadBusy ? "Uploading..." : resolveMediaUrl(slide.image) ? "Replace image" : "Choose image"}
-                      <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={(event) => handleCarouselSlideImageUpload(event, index)} />
-                    </label>
+                    <div className="carousel-slide-image-actions">
+                      <label className="upload-image-button">
+                        {assetUploadBusy ? "Uploading..." : resolveMediaUrl(slide.image) ? "Replace image" : "Choose image"}
+                        <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={(event) => handleCarouselSlideImageUpload(event, index)} />
+                      </label>
+                      {resolveMediaUrl(slide.image) && (
+                        <button type="button" className="carousel-remove-image" onClick={() => {
+                          const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, image: "" } : item);
+                          updateSelectedElement({ content: serializeCarouselSlides(slides) });
+                        }}>Remove image</button>
+                      )}
+                    </div>
                   </div>
                   <details className="carousel-image-url-control">
                     <summary>Manual image URL</summary>
@@ -3882,8 +3899,10 @@ export default function PageBuilder({
                     }} /></label>
                   </details>
                   <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>Remove slide</button>
-                </div>
-              ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
               <button type="button" onClick={() => updateSelectedElement({ content: serializeCarouselSlides([...parseCarouselSlides(selectedElement.content), { title: "New story", description: "Add your story here.", image: "" }]) })}>+ Add slide</button>
             </details>
           )}

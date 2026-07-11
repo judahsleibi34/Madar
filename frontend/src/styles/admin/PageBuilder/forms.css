@@ -2005,7 +2005,7 @@ body.theme-dark .forms-loading-shimmer,
   align-items: stretch;
   justify-content: flex-end;
   padding: 0;
-  background: rgba(11, 18, 32, 0.28);
+  background: rgba(16, 19, 24, 0.28);
   direction: ltr;
   animation: quizBackdropIn 0.18s ease-out;
 }

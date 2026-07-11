@@ -114,7 +114,7 @@ export default function ReservationsTab({
       <header className="workspace-header reservations-header">
         <div>
           <span className="workspace-kicker">Reservation builder</span>
-          <h2>Reservations</h2>
+          <h1>Reservations</h1>
           <p>Set what visitors can book, when they can book it, and how the booking form appears.</p>
         </div>
       </header>
@@ -124,7 +124,7 @@ export default function ReservationsTab({
           <div className="reservation-panel-heading">
             <div>
               <span className="workspace-kicker">Library</span>
-              <strong>Reservation blocks</strong>
+              <h2>Reservation blocks</h2>
             </div>
             <span className="reservation-count">{reservationBlocks.length}</span>
           </div>
@@ -175,7 +175,7 @@ export default function ReservationsTab({
               <div className="editor-card-header">
                 <div>
                   <span className="workspace-kicker">Setup</span>
-                  <h3>Configure booking block</h3>
+                  <h2>Configure booking block</h2>
                 </div>
                 <div className="reservation-editor-actions">
                   <button type="button" onClick={() => onOpenReservationBlock(activeElement.id, activeItem.page.id)}>
@@ -376,7 +376,7 @@ export default function ReservationsTab({
               </div>
               <div className="reservation-empty-copy">
                 <span className="workspace-kicker">Start here</span>
-                <h3>Create your first reservation block</h3>
+                <h2>Create your first reservation block</h2>
                 <p>Pick the booking style that matches how you want to handle appointments.</p>
               </div>
               <div className="reservation-empty-actions">

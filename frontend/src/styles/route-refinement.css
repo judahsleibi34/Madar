@@ -3917,6 +3917,48 @@ body.theme-dark .page-builder .workspace-tabs button.active,
   box-shadow: none !important;
 }
 
+/* Light builder controls remain visible on the continuous beige shell. */
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .panel-navigator button,
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .page-utility-actions button {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: 0 6px 14px rgba(var(--theme-shadow-rgb), 0.045) !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .panel-navigator button.active {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: inset 3px 0 0 var(--theme-primary-hover) !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .panel-navigator button.active :is(svg, strong) {
+  color: var(--theme-text-inverse) !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .panel-navigator button.active small {
+  color: rgba(var(--theme-text-inverse-rgb), 0.82) !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .page-danger-actions .page-delete-action:disabled {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text-muted) !important;
+  -webkit-text-fill-color: var(--theme-text-muted) !important;
+  opacity: 0.72 !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .page-danger-actions .page-delete-action:disabled * {
+  color: var(--theme-text-muted) !important;
+  -webkit-text-fill-color: var(--theme-text-muted) !important;
+  opacity: 1 !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .page-danger-actions .page-delete-action:disabled svg {
+  color: var(--theme-text-muted) !important;
+  stroke: var(--theme-text-muted) !important;
+}
+
 /* Dark builder chrome uses the same shell token through the full sidebar.
    Editing tools, fields, buttons, and compact cards keep their elevated
    component surfaces. */
