@@ -10,7 +10,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(8, 12, 24, 0.58);
+  background: rgba(0, 0, 0, 0.58);
   backdrop-filter: blur(8px);
 }
 

@@ -75,7 +75,7 @@
 [data-theme="dark"] .restricted-access-card,
 .dark .restricted-access-card {
   border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
-  background: rgba(18, 24, 38, 0.92);
+  background: rgba(21, 25, 31, 0.92);
 }
 
 [data-theme="dark"] .restricted-access-card h1,

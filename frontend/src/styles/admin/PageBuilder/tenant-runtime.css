@@ -282,7 +282,7 @@ body.theme-dark .tenant-site-header,
 :root[data-theme="dark"] .tenant-site-footer,
 html.theme-dark .tenant-site-footer,
 body.theme-dark .tenant-site-footer {
-  background: rgba(8, 19, 33, 0.98) !important;
+  background: rgba(16, 19, 24, 0.98) !important;
   border-color: transparent !important;
   color: var(--tenant-dark-text) !important;
 }

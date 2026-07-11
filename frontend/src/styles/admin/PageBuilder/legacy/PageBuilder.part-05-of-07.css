@@ -585,7 +585,7 @@
 
 .page-builder {
   --madar-navy: var(--theme-text);
-  --madar-navy-soft: #233254;
+  --madar-navy-soft: var(--surface-3, var(--theme-surface-3));
   --madar-red: var(--theme-primary);
   --madar-red-soft: #a33a26;
   --madar-bg: #f6f3ef;
