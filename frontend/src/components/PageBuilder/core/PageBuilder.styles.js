@@ -28,6 +28,7 @@ export const getBuilderElementStyle = ({
     "--builder-element-bg": element.type === "formBlock" ? "transparent" : element.styles.backgroundColor || "transparent",
     "--builder-element-radius": element.type === "formBlock" ? "0" : element.styles.borderRadius || "0",
     "--builder-element-font-size": element.styles.fontSize || "inherit",
+    "--builder-element-line-height": element.styles.lineHeight || "inherit",
     "--builder-element-text-align": element.styles.textAlign || "inherit",
     position: "relative",
     transform: undefined,
@@ -56,10 +57,23 @@ export const getBuilderFreeElementStyle = ({
   const section = activePage?.sections.find((item) => item.id === location?.sectionId);
   const viewportWidth = viewports[viewport] || viewports.desktop;
   const sectionHeight = getSectionCanvasHeight(section, viewport);
-  const x = Math.max(0, Math.min(Number(pos.x) || 0, viewportWidth));
+  const minimumSize = getDirectElementMinimumSize(element);
+  const x = Math.max(
+    0,
+    Math.min(
+      Number(pos.x) || 0,
+      viewportWidth - Math.min(minimumSize.width, viewportWidth)
+    )
+  );
   const y = Math.max(0, Math.min(Number(pos.y) || 0, sectionHeight));
-  const width = Math.max(1, Math.min(Number(pos.width) || 240, viewportWidth - x));
-  const height = Math.max(1, Number(pos.height) || 80);
+  const width = Math.max(
+    1,
+    Math.min(
+      Math.max(Number(pos.width) || 240, minimumSize.width),
+      viewportWidth - x
+    )
+  );
+  const height = Math.max(minimumSize.height, Number(pos.height) || 80);
 
   return {
     position: "absolute",

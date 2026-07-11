@@ -66,6 +66,14 @@ export const getDirectElementMinimumSize = (element) => {
     return { width: 160, height: getMetricMinimumHeight(element) };
   }
 
+  if (element?.type === "loginBlock") {
+    return { width: 300, height: 390 };
+  }
+
+  if (element?.type === "registrationBlock") {
+    return { width: 340, height: 520 };
+  }
+
   return { width: 80, height: 48 };
 };
 
@@ -81,8 +89,8 @@ export const directElementHeight = (element) => {
     list: 170,
     formBlock: 460,
     reservationBlock: 770,
-    loginBlock: 420,
-    registrationBlock: 460,
+    loginBlock: 390,
+    registrationBlock: 520,
     carousel: 400,
     carouselCards: 360,
     carouselSplit: 380,
@@ -372,17 +380,18 @@ export const getDragCandidatePosition = ({
   snapToGrid,
 }) => {
   const minimumSize = getDirectElementMinimumSize(selectedElement);
+  const roundPixel = (value) => Math.round(Number(value) || 0);
 
   return dragState.interaction === "resize"
     ? (() => {
         const availableWidth = Math.max(0, canvasWidth - dragState.startX);
         const nextWidth = Math.max(
           Math.min(minimumSize.width, availableWidth),
-          snapToGrid(dragState.startWidth + dragState.deltaX)
+          roundPixel(dragState.startWidth + dragState.deltaX)
         );
         const nextHeight = Math.max(
           minimumSize.height,
-          snapToGrid(dragState.startHeight + dragState.deltaY)
+          roundPixel(dragState.startHeight + dragState.deltaY)
         );
 
         return {

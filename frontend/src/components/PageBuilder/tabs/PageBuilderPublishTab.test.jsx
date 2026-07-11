@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PageBuilderPublishTab from "./PageBuilderPublishTab";
 
@@ -20,7 +20,6 @@ describe("PageBuilderPublishTab", () => {
       <PageBuilderPublishTab
         project={project}
         liveSitePath="/site/disco2/"
-        publishProject={vi.fn()}
       />
     );
 
@@ -37,7 +36,6 @@ describe("PageBuilderPublishTab", () => {
             subdomain: "disco2",
           },
         }}
-        publishProject={vi.fn()}
       />
     );
 
@@ -46,45 +44,32 @@ describe("PageBuilderPublishTab", () => {
   });
 
   it("does not invent a public URL when no subdomain is available", () => {
-    render(<PageBuilderPublishTab project={project} publishProject={vi.fn()} />);
+    render(<PageBuilderPublishTab project={project} />);
 
     expect(screen.getByPlaceholderText("Configure a website subdomain before sharing the live site.")).toBeTruthy();
     expect(screen.getByRole("button", { name: /copy link/i }).disabled).toBe(true);
     expect(screen.getByRole("button", { name: /preview site/i }).disabled).toBe(true);
   });
 
-  it("calls publishProject from the publish action", async () => {
-    const publishProject = vi.fn().mockResolvedValue(undefined);
+  it("does not show a publish action in the Publish tab", () => {
+    render(<PageBuilderPublishTab project={project} liveSitePath="/site/disco2/" />);
 
-    render(
-      <PageBuilderPublishTab
-        project={project}
-        liveSitePath="/site/disco2/"
-        publishProject={publishProject}
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /publish site/i }));
-
-    await waitFor(() => expect(publishProject).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("button", { name: /publish site|go live/i })).toBeNull();
   });
 
-  it("preview site does not call publishProject", () => {
-    const publishProject = vi.fn();
+  it("preview site persists the project before opening", () => {
     const persistProjectNow = vi.fn();
 
     render(
       <PageBuilderPublishTab
         project={project}
         liveSitePath="/site/disco2/"
-        publishProject={publishProject}
         persistProjectNow={persistProjectNow}
       />
     );
 
     fireEvent.click(screen.getByRole("button", { name: /preview site/i }));
 
-    expect(publishProject).not.toHaveBeenCalled();
     expect(persistProjectNow).toHaveBeenCalledTimes(1);
   });
 });

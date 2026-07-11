@@ -9,6 +9,7 @@ import {
   Bold,
   Copy,
   FilePlus2,
+  Globe2,
   Highlighter,
   Italic,
   LayoutTemplate,
@@ -58,6 +59,7 @@ import {
   formSection,
   buildStarterProject,
   createBlankCanvasSection,
+  createBlankWorkspaceProject,
   createInitialProject,
 } from "../core/PageBuilder.starters";
 import { sanitizeSubdomain } from "../core/PageBuilder.routing";
@@ -89,6 +91,7 @@ import {
   getPageBuilderThemeClassName,
   getPageBuilderThemeVars,
 } from "../core/PageBuilder.theme";
+import { resolveMediaUrl } from "../../../utils/media";
 import {
   mainBuilderHiddenTabs,
   builderWorkspaceCopy,
@@ -275,15 +278,29 @@ const getBuilderDesignPanelFromPath = (pathname = "") => {
   return "Pages";
 };
 
-const hasStoredStarterChoice = () => {
-  try {
-    return (
-      localStorage.getItem(STARTER_MODAL_DISMISSED_KEY) === "true" ||
-      Boolean(localStorage.getItem(STORAGE_KEY))
-    );
-  } catch {
-    return false;
+const isDefaultShowcaseProject = (project = {}) => {
+  const pageNames = Array.isArray(project.pages)
+    ? project.pages.map((page) => String(page?.name || ""))
+    : [];
+
+  return (
+    project?.name === "Madar Builder Demo" ||
+    (pageNames.includes("Builder Demo") && pageNames.includes("Operations"))
+  );
+};
+
+const createCleanBlankProject = () => cleanBuilderProject(createBlankWorkspaceProject());
+
+const getInitialWorkspaceProject = ({ demoMode = false } = {}) => {
+  const initialProject = demoMode
+    ? cleanBuilderProject(createInitialProject())
+    : loadInitialProject();
+
+  if (!demoMode && isDefaultShowcaseProject(initialProject)) {
+    return createCleanBlankProject();
   }
+
+  return initialProject;
 };
 
 const isPhysicalPhoneDevice = () => {
@@ -308,6 +325,36 @@ const rememberStarterChoice = () => {
   } catch {
     // Local storage may be unavailable in private or restricted contexts.
   }
+};
+
+const isBuilderTextEditingTarget = (target) =>
+  target instanceof Element &&
+  Boolean(
+    target.closest(
+      "input:not([type='file']):not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable]:not([contenteditable='false'])"
+    )
+  );
+
+const insertSpaceIntoEditableTarget = (target) => {
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+    return false;
+  }
+
+  if (target.readOnly || target.disabled) return false;
+
+  const selectionStart = target.selectionStart ?? target.value.length;
+  const selectionEnd = target.selectionEnd ?? selectionStart;
+  target.setRangeText(" ", selectionStart, selectionEnd, "end");
+  target.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
+      cancelable: false,
+      data: " ",
+      inputType: "insertText",
+    })
+  );
+
+  return true;
 };
 
 const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
@@ -362,7 +409,23 @@ const withDefaultLandingPage = (project = {}) => {
   };
 };
 
-function BuilderSidebarSaveControl({ isSavingProject, onSave }) {
+const getColorInputValue = (value, fallback) =>
+  /^#[0-9a-f]{6}$/i.test(String(value || "")) ? value : fallback;
+
+function BuilderSidebarActions({ isSavingProject, onSave, onGoLive }) {
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handleGoLive = async () => {
+    if (!onGoLive || isPublishing) return;
+
+    setIsPublishing(true);
+    try {
+      await onGoLive();
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <div className="builder-sidebar-save-control">
       <button
@@ -373,6 +436,15 @@ function BuilderSidebarSaveControl({ isSavingProject, onSave }) {
       >
         <Save size={17} aria-hidden="true" />
         <span>{isSavingProject ? "Saving..." : "Save changes"}</span>
+      </button>
+      <button
+        type="button"
+        className="page-primary-action builder-sidebar-save-button"
+        disabled={isPublishing || !onGoLive}
+        onClick={handleGoLive}
+      >
+        <Globe2 size={17} aria-hidden="true" />
+        <span>{isPublishing ? "Publishing..." : "Go Live"}</span>
       </button>
     </div>
   );
@@ -393,9 +465,7 @@ export default function PageBuilder({
   const routeTab = getBuilderTabFromPath(location.pathname);
   const routeDesignPanel = getBuilderDesignPanelFromPath(location.pathname);
   const [project, setProject] = useState(() =>
-    withDefaultLandingPage(
-      demoMode ? cleanBuilderProject(createInitialProject()) : loadInitialProject()
-    )
+    withDefaultLandingPage(getInitialWorkspaceProject({ demoMode }))
   );
   const persistProjectNow = useDebouncedProjectStorage({
     delay: 120,
@@ -413,15 +483,14 @@ export default function PageBuilder({
     type: "page",
     id: getDefaultBuilderPageId(project) || null,
   }));
-  const [modal, setModal] = useState(() =>
-    hideWorkspaceTabs || hasStoredStarterChoice() ? null : "starter"
-  );
+  const [modal, setModal] = useState(null);
   const [dragState, setDragState] = useState(null);
   const [paletteDropSectionId, setPaletteDropSectionId] = useState("");
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
   const [userPendingDelete, setUserPendingDelete] = useState(null);
   const [pagePendingDelete, setPagePendingDelete] = useState(null);
   const [previewOverlapWarnings, setPreviewOverlapWarnings] = useState([]);
+  const [publishOverlapWarnings, setPublishOverlapWarnings] = useState([]);
   const [isPhoneDevice, setIsPhoneDevice] = useState(isPhysicalPhoneDevice);
   const [, setInsertTarget] = useState(null);
   const [runtimeAnswers, setRuntimeAnswers] = useState({});
@@ -438,8 +507,10 @@ export default function PageBuilder({
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
   const projectRef = useRef(project);
+  const recentMetricAddRef = useRef(null);
   const userId = user?.id;
   const [textSelection, setTextSelection] = useState(null);
+  const [inlineToolbarPosition, setInlineToolbarPosition] = useState(null);
   const pendingTabNavigationRef = useRef("");
   const backendAutosaveTimerRef = useRef(null);
   const backendProjectSnapshotRef = useRef("");
@@ -479,6 +550,29 @@ export default function PageBuilder({
 
   useEffect(() => {
     projectRef.current = project;
+  }, [project]);
+
+  useEffect(() => {
+    const pending = recentMetricAddRef.current;
+    if (!pending) return;
+
+    if (Date.now() > pending.expiresAt) {
+      recentMetricAddRef.current = null;
+      return;
+    }
+
+    const currentPage = project.pages?.find((page) => page.id === pending.pageId);
+    const currentElements = (currentPage?.sections || []).flatMap(getSectionElements);
+    const metricIsPresent = currentElements.some((element) => element.id === pending.elementId);
+
+    if (metricIsPresent || currentElements.length > 0) return;
+
+    setProject((currentProject) => ({
+      ...currentProject,
+      pages: currentProject.pages.map((page) =>
+        page.id === pending.pageId ? pending.pageSnapshot : page
+      ),
+    }));
   }, [project]);
 
   useEffect(() => {
@@ -668,11 +762,17 @@ export default function PageBuilder({
         if (!loadedProject) return;
 
         if (!cancelled) {
+          const nextProject = isDefaultShowcaseProject(loadedProject)
+            ? createCleanBlankProject()
+            : loadedProject;
+
           setBuilderProjectRecord(fullRecord);
-          setProject(loadedProject);
-          setSelected({ type: "page", id: loadedProject.activePageId });
-          persistProjectNow(loadedProject);
-          rememberStarterChoice();
+          setProject(nextProject);
+          setSelected({ type: "page", id: nextProject.activePageId });
+          persistProjectNow(nextProject);
+          if (!isDefaultShowcaseProject(loadedProject)) {
+            rememberStarterChoice();
+          }
           setModal((currentModal) => {
             if (currentModal !== "starter") return currentModal;
             setActiveTopbarAction("");
@@ -684,7 +784,7 @@ export default function PageBuilder({
           console.warn("Could not load builder project from backend.");
         }
         if (!cancelled) {
-          showToast("Using local draft cache. Save again when the backend is reachable.");
+          showToast("Your saved work is ready. You can keep editing.");
         }
       } finally {
         if (!cancelled) {
@@ -1036,13 +1136,16 @@ export default function PageBuilder({
   };
 
   const addPage = () => {
-    const page = createPage(`Page ${project.pages.length + 1}`, [heroSection()]);
+    const canvasSection = createBlankCanvasSection();
+    const page = createPage(`Page ${project.pages.length + 1}`, [canvasSection], {
+      canvasLayoutVersion: 1,
+    });
     updateProject((prev) => ({
       ...prev,
       pages: [...prev.pages, page],
       activePageId: page.id,
     }));
-    setSelected({ type: "page", id: page.id });
+    setSelected({ type: "section", id: canvasSection.id });
   };
 
   const duplicatePage = () => {
@@ -1205,14 +1308,27 @@ export default function PageBuilder({
       freeElements: [...(section.freeElements || []), nextElement],
     });
 
-    updateActivePage((page) => ({
-      ...page,
-      sections: isNewSection
-        ? [...(page.sections || []), updateTarget(targetSection)]
-        : (page.sections || []).map((section) =>
-            section.id === targetSection.id ? updateTarget(section) : section
-          ),
-    }));
+    updateActivePage((page) => {
+      const nextPage = {
+        ...page,
+        sections: isNewSection
+          ? [...(page.sections || []), updateTarget(targetSection)]
+          : (page.sections || []).map((section) =>
+              section.id === targetSection.id ? updateTarget(section) : section
+            ),
+      };
+
+      if (type === "metric") {
+        recentMetricAddRef.current = {
+          pageId: page.id,
+          elementId: nextElement.id,
+          pageSnapshot: nextPage,
+          expiresAt: Date.now() + 5000,
+        };
+      }
+
+      return nextPage;
+    });
     setSelected({ type: "element", id: nextElement.id });
     setPaletteDropSectionId("");
     showToast(`${nextElement.name || "Component"} added to ${targetSection.name || "section"}.`);
@@ -1760,7 +1876,7 @@ export default function PageBuilder({
     }
 
     if (demoMode) {
-      persistProject(nextProject, "Demo changes stay until refresh.", { silent });
+      persistProject(nextProject, "Changes saved for this preview.", { silent });
       setIsSavingProject(false);
       return;
     }
@@ -1797,17 +1913,15 @@ export default function PageBuilder({
       if (import.meta.env.DEV) {
         console.error("Could not save builder project.");
       }
-      const statusLabel = error?.status ? ` (${error.status})` : "";
-
       if (isLikelySessionFailure(error)) {
         if (!silent) {
-          showToast("Your session expired. Sign in again to save changes.");
+          showToast("Please sign in again, then save your changes.");
         }
         return;
       }
 
       if (!silent) {
-        showToast(`Saved on this device. Cloud save did not finish${statusLabel}.`);
+        showToast("Your changes are safe here. Please try saving again.");
       }
     } finally {
       setIsSavingProject(false);
@@ -1860,12 +1974,12 @@ export default function PageBuilder({
     };
 
     if (demoMode) {
-      persistProject(nextProject, "Website theme saved for this demo session.");
+      persistProject(nextProject, "Your theme changes are saved.");
       return;
     }
 
     if (builderProjectLoading) {
-      showToast("Builder project is still loading. Try saving again in a moment.");
+      showToast("Your site is still getting ready. Please try again in a moment.");
       return;
     }
 
@@ -1889,14 +2003,12 @@ export default function PageBuilder({
       if (import.meta.env.DEV) {
         console.error("Could not save website theme.");
       }
-      const statusLabel = error?.status ? ` (${error.status})` : "";
-
       if (isLikelySessionFailure(error)) {
-        showToast("Session expired. Please sign in again to save your theme changes.");
+        showToast("Please sign in again, then save your theme.");
         return;
       }
 
-      showToast(`Saved local theme draft. Backend save failed${statusLabel}.`);
+      showToast("Your theme changes are safe here. Please try saving again.");
     }
   };
 
@@ -1918,13 +2030,21 @@ export default function PageBuilder({
         const loadedProject = getDraftProjectFromRecord(fullRecord);
 
         if (loadedProject) {
-          setBuilderProjectRecord(fullRecord);
-          setProject(loadedProject);
-          setSelected({ type: "page", id: loadedProject.activePageId });
-          persistProjectNow(loadedProject);
-          backendProjectSnapshotRef.current = getAutosaveSnapshot(loadedProject);
+          const nextProject = isDefaultShowcaseProject(loadedProject)
+            ? createCleanBlankProject()
+            : loadedProject;
 
-          showToast("Loaded backend project.");
+          setBuilderProjectRecord(fullRecord);
+          setProject(nextProject);
+          setSelected({ type: "page", id: nextProject.activePageId });
+          persistProjectNow(nextProject);
+          backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
+
+          showToast(
+            isDefaultShowcaseProject(loadedProject)
+              ? "Blank builder canvas loaded."
+              : "Loaded backend project."
+          );
           return;
         }
       }
@@ -1942,10 +2062,17 @@ export default function PageBuilder({
 
     try {
       const loaded = cleanBuilderProject(JSON.parse(raw));
-      setProject(loaded);
-      setSelected({ type: "page", id: loaded.activePageId });
-      showToast("Loaded local draft cache.");
-      backendProjectSnapshotRef.current = getAutosaveSnapshot(loaded);
+      const nextProject = isDefaultShowcaseProject(loaded)
+        ? createCleanBlankProject()
+        : loaded;
+      setProject(nextProject);
+      setSelected({ type: "page", id: nextProject.activePageId });
+      showToast(
+        isDefaultShowcaseProject(loaded)
+          ? "Blank builder canvas loaded."
+          : "Your saved site is ready."
+      );
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
     } catch {
       alert("Saved project is not valid JSON.");
     }
@@ -1958,9 +2085,15 @@ export default function PageBuilder({
     ? resolveLiveSitePath(publicSiteSubdomain)
     : liveSitePath;
 
-  const publishProject = async () => {
+  const publishProject = async (skipOverlapCheck = false) => {
     setActiveTopbarAction("publish");
     setToast("");
+
+    if (!publicSiteSubdomain) {
+      setActiveTab("publish");
+      showToast("Choose your website address before going live.");
+      return;
+    }
 
     const publishedProject = {
       ...project,
@@ -1980,41 +2113,24 @@ export default function PageBuilder({
 
     const overlapWarnings = getProjectOverlapWarnings(publishedProject);
 
-    if (overlapWarnings.length > 0) {
-      const examples = overlapWarnings
-        .slice(0, 3)
-        .map(
-          (warning) =>
-            `- ${warning.page} / ${warning.section} (${warning.viewport}): ${warning.first} overlaps ${warning.second}`
-        )
-        .join("\n");
-      const remainingCount = Math.max(0, overlapWarnings.length - 3);
-      const confirmed = window.confirm(
-        `Your design contains ${overlapWarnings.length} overlapping component pair${overlapWarnings.length === 1 ? "" : "s"}. Overlapping content may be difficult to read after publishing.
-
-${examples}${remainingCount ? `\n- Plus ${remainingCount} more` : ""}
-
-Go live anyway?`
-      );
-
-      if (!confirmed) {
-        setActiveTopbarAction("");
-        showToast("Publishing cancelled. Adjust the overlapping components and try again.");
-        return;
-      }
+    if (!skipOverlapCheck && overlapWarnings.length > 0) {
+      setPublishOverlapWarnings(overlapWarnings);
+      return;
     }
 
+    setPublishOverlapWarnings([]);
+
     if (demoMode) {
-      persistProject(publishedProject, "Demo publish status updated until refresh.");
+      persistProject(publishedProject, "Your site is live for this preview.");
       return;
     }
 
     if (builderProjectLoading) {
-      showToast("Builder project is still loading. Try publishing again in a moment.");
+      showToast("Your site is still getting ready. Please try Go Live again in a moment.");
       return;
     }
 
-    persistProject(project, "Publishing to backend...");
+    persistProject(project, "Getting your site ready...");
 
     try {
       const payload = createBuilderProjectPayload({
@@ -2051,16 +2167,16 @@ Go live anyway?`
       setLiveSitePath(resolvedLiveSitePath);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
       pendingBackendProjectSnapshotRef.current = "";
-      showToast("Site published successfully.");
+      showToast("Your site is live. Go to the Publish page to open your website.");
     } catch (error) {
       console.error("Could not publish builder project:", error);
 
       if (isLikelySessionFailure(error)) {
-        showToast("Session expired. Please sign in again to publish.");
+        showToast("Please sign in again, then choose Go Live.");
         return;
       }
 
-      showToast(error?.message || "Publish failed. Your draft was not published.");
+      showToast("We couldn't put your site live. Please try again.");
     }
   };
 
@@ -2349,13 +2465,31 @@ Go live anyway?`
     );
   };
 
+  const positionInlineToolbarNear = useCallback((target) => {
+    if (!target || typeof window === "undefined") return;
+
+    const rect = target.getBoundingClientRect();
+    const left = Math.min(Math.max(rect.left + rect.width / 2, 18), window.innerWidth - 18);
+    const top = Math.min(Math.max(rect.top - 34, 84), window.innerHeight - 18);
+
+    setInlineToolbarPosition({ left, top });
+  }, []);
+
   const captureCanvasTextSelection = useCallback((event, field, itemIndex = null, elementId = selectedElement?.id) => {
     const range = getCanvasTextSelectionRange(event);
 
     if (!range) return;
 
+    positionInlineToolbarNear(event.currentTarget);
+
     if (range.collapsed) {
-      setTextSelection(null);
+      setTextSelection({
+        elementId,
+        field,
+        itemIndex,
+        start: 0,
+        end: 0,
+      });
       return;
     }
 
@@ -2366,25 +2500,109 @@ Go live anyway?`
       start: range.start,
       end: range.end,
     });
-  }, [selectedElement?.id]);
+  }, [positionInlineToolbarNear, selectedElement?.id]);
+
+  const getSelectedTextTargetValue = () => {
+    if (!selectedElement || textSelection?.elementId !== selectedElement.id) return "";
+
+    if (textSelection.field === "listTitle") {
+      return selectedElement.listTitle || "";
+    }
+
+    if (textSelection.field === "listItem") {
+      return getListItems(selectedElement)[textSelection.itemIndex] || "";
+    }
+
+    return selectedElement.content || "";
+  };
+
+  const getSelectedTextRange = () => {
+    if (!selectedElement || textSelection?.elementId !== selectedElement.id) return null;
+
+    const targetText = getSelectedTextTargetValue();
+    const targetLength = targetText.length;
+    if (!targetLength) return null;
+
+    const start = Number(textSelection.start) || 0;
+    const end = Number(textSelection.end) || 0;
+
+    return {
+      field: textSelection.field || "content",
+      itemIndex: textSelection.itemIndex ?? null,
+      start: start === end ? 0 : Math.max(0, Math.min(start, targetLength)),
+      end: start === end ? targetLength : Math.max(0, Math.min(end, targetLength)),
+    };
+  };
+
+  const selectedTextTargetIsListPart = () =>
+    selectedElement?.type === "list" &&
+    textSelection?.elementId === selectedElement.id &&
+    (textSelection.field === "listTitle" || textSelection.field === "listItem");
+
+  const getSelectedTextRangeStyle = (property) => {
+    const selectedRange = getSelectedTextRange();
+    if (!selectedElement || !selectedRange) return "";
+
+    const ranges = [
+      ...(selectedElement.richTextColors || []),
+      ...(selectedElement.richTextSizes || []),
+      ...(selectedElement.richTextStyles || []),
+    ];
+
+    return [...ranges].reverse().find(
+      (range) =>
+        range.field === selectedRange.field &&
+        (range.itemIndex ?? null) === selectedRange.itemIndex &&
+        range.start <= selectedRange.start &&
+        range.end >= selectedRange.end &&
+        range[property]
+    )?.[property] || "";
+  };
 
   const applyTextColor = (color) => {
-    if (
-      !selectedElement ||
-      textSelection?.elementId !== selectedElement.id ||
-      textSelection.start === textSelection.end
-    ) {
+    const selectedRange = getSelectedTextRange();
+
+    if (!selectedRange) {
       updateSelectedElement({ styles: { color, selectedTextColor: color } });
       return;
     }
 
-    const { field, itemIndex, start, end } = textSelection;
     updateSelectedElement({
       richTextColors: [
         ...(selectedElement.richTextColors || []),
-        { field, itemIndex, start, end, color },
+        { ...selectedRange, color },
       ],
       styles: { selectedTextColor: color },
+    });
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const getSelectedElementFontSizeNumber = () => {
+    const rawSize = String(selectedElement?.styles?.fontSize || "").trim();
+    const parsed = Number.parseInt(rawSize, 10);
+
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    if (selectedElement?.type === "heading") return 46;
+    if (selectedElement?.type === "button") return 16;
+    return 17;
+  };
+
+  const applyTextFontSize = (value) => {
+    const numericValue = Math.max(8, Math.min(120, Number.parseInt(value, 10) || 17));
+    const fontSize = `${numericValue}px`;
+    const selectedRange = getSelectedTextRange();
+
+    if (!selectedRange) {
+      updateSelectedElement({ styles: { fontSize } });
+      return;
+    }
+
+    updateSelectedElement({
+      richTextSizes: [
+        ...(selectedElement.richTextSizes || []),
+        { ...selectedRange, fontSize },
+      ],
+      styles: { selectedTextFontSize: fontSize },
     });
     window.getSelection()?.removeAllRanges();
   };
@@ -2400,6 +2618,12 @@ Go live anyway?`
     if (selectedElement.type === "heading") return "heading";
     if (selectedElement.type === "button") return "button";
     if (selectedElement.type === "list") {
+      if (textSelection?.elementId === selectedElement.id && textSelection.field === "listTitle") {
+        return "listTitle";
+      }
+      if (textSelection?.elementId === selectedElement.id && textSelection.field === "listItem") {
+        return "listItem";
+      }
       return selectedElement.listStyle === "decimal" ? "numbers" : "bullets";
     }
     return "text";
@@ -2407,6 +2631,8 @@ Go live anyway?`
 
   const updateSelectedElementTextFormat = (format) => {
     if (!selectedElement) return;
+
+    if (format === "listTitle" || format === "listItem") return;
 
     if (format === "bullets" || format === "numbers") {
       const listItems =
@@ -2441,6 +2667,20 @@ Go live anyway?`
     }
 
     if (action === "bold") {
+      if (selectedTextTargetIsListPart()) {
+        const selectedRange = getSelectedTextRange();
+        if (!selectedRange) return;
+
+        updateSelectedElement({
+          richTextStyles: [
+            ...(selectedElement.richTextStyles || []),
+            { ...selectedRange, fontWeight: "700" },
+          ],
+        });
+        window.getSelection()?.removeAllRanges();
+        return;
+      }
+
       updateSelectedElement({
         styles: {
           fontWeight:
@@ -2454,6 +2694,20 @@ Go live anyway?`
     }
 
     if (action === "italic") {
+      if (selectedTextTargetIsListPart()) {
+        const selectedRange = getSelectedTextRange();
+        if (!selectedRange) return;
+
+        updateSelectedElement({
+          richTextStyles: [
+            ...(selectedElement.richTextStyles || []),
+            { ...selectedRange, fontStyle: "italic" },
+          ],
+        });
+        window.getSelection()?.removeAllRanges();
+        return;
+      }
+
       updateSelectedElement({
         styles: {
           fontStyle: selectedElement.styles?.fontStyle === "italic" ? "" : "italic",
@@ -2463,6 +2717,20 @@ Go live anyway?`
     }
 
     if (action === "underline") {
+      if (selectedTextTargetIsListPart()) {
+        const selectedRange = getSelectedTextRange();
+        if (!selectedRange) return;
+
+        updateSelectedElement({
+          richTextStyles: [
+            ...(selectedElement.richTextStyles || []),
+            { ...selectedRange, textDecoration: "underline" },
+          ],
+        });
+        window.getSelection()?.removeAllRanges();
+        return;
+      }
+
       updateSelectedElement({
         styles: {
           textDecoration:
@@ -2484,11 +2752,24 @@ Go live anyway?`
   };
 
   const renderInlineTextToolbar = () => {
-    if (!selectedElementSupportsInlineTextToolbar) return null;
+    if (!selectedElementSupportsInlineTextToolbar || !inlineToolbarPosition) return null;
+
+    const selectedRangeFontSize = getSelectedTextRangeStyle("fontSize");
+    const toolbarFontSize = Number.parseInt(
+      selectedRangeFontSize ||
+        selectedElement.styles?.selectedTextFontSize ||
+        selectedElement.styles?.fontSize ||
+        getSelectedElementFontSizeNumber(),
+      10
+    );
 
     return (
       <div
-        className="builder-inline-text-toolbar"
+        className="builder-inline-text-toolbar is-floating"
+        style={{
+          left: `${inlineToolbarPosition.left}px`,
+          top: `${inlineToolbarPosition.top}px`,
+        }}
         role="toolbar"
         aria-label="Text formatting"
         onClick={(event) => event.stopPropagation()}
@@ -2499,20 +2780,44 @@ Go live anyway?`
           value={getInlineTextFormatValue()}
           onChange={(event) => updateSelectedElementTextFormat(event.target.value)}
         >
+          {selectedElement.type === "list" && (
+            <>
+              <option value="listTitle">Main sentence</option>
+              <option value="listItem">Bullet point</option>
+            </>
+          )}
           <option value="text">Text</option>
           <option value="heading">Heading</option>
           <option value="button">Button</option>
           <option value="bullets">Bullets</option>
           <option value="numbers">Numbers</option>
         </select>
+        <label className="builder-inline-toolbar-size" title="Text size">
+          <span>Size</span>
+          <input
+            type="number"
+            min="8"
+            max="120"
+            step="1"
+            value={toolbarFontSize}
+            onChange={(event) => applyTextFontSize(event.target.value)}
+          />
+        </label>
         {inlineTextToolbarButtons.map((item) => {
           const Icon = item.icon;
+          const selectedRangeFontWeight = getSelectedTextRangeStyle("fontWeight");
+          const selectedRangeFontStyle = getSelectedTextRangeStyle("fontStyle");
+          const selectedRangeTextDecoration = getSelectedTextRangeStyle("textDecoration");
           const isActive =
             (item.id === "bold" &&
-              (String(selectedElement.styles?.fontWeight || "").includes("700") ||
+              (String(selectedRangeFontWeight || "").includes("700") ||
+                String(selectedRangeFontWeight || "").includes("bold") ||
+                String(selectedElement.styles?.fontWeight || "").includes("700") ||
                 String(selectedElement.styles?.fontWeight || "").includes("bold"))) ||
-            (item.id === "italic" && selectedElement.styles?.fontStyle === "italic") ||
-            (item.id === "underline" && selectedElement.styles?.textDecoration === "underline") ||
+            (item.id === "italic" &&
+              (selectedRangeFontStyle === "italic" || selectedElement.styles?.fontStyle === "italic")) ||
+            (item.id === "underline" &&
+              (selectedRangeTextDecoration === "underline" || selectedElement.styles?.textDecoration === "underline")) ||
             (item.id === "bullets" &&
               selectedElement.type === "list" &&
               selectedElement.listStyle !== "decimal") ||
@@ -2592,6 +2897,16 @@ Go live anyway?`
 
     const canvasWidth = viewports[viewport] || viewports.desktop;
     const canvasHeight = getSectionCanvasHeight(section, viewport);
+    const expandableCanvasHeight =
+      dragState.interaction === "move"
+        ? Math.max(
+            canvasHeight,
+            (Number(dragState.startY) || 0) +
+              Math.max(0, deltaY) +
+              (Number(dragState.startHeight) || 0) +
+              48
+          )
+        : canvasHeight;
     const candidate = getDragCandidatePosition({
       dragState: {
         ...dragState,
@@ -2600,7 +2915,7 @@ Go live anyway?`
       },
       selectedElement,
       canvasWidth,
-      canvasHeight,
+      canvasHeight: expandableCanvasHeight,
       getMetricMinimumHeight,
       snapToGrid,
     });
@@ -2630,14 +2945,14 @@ Go live anyway?`
                 if (isRightSideNeighbor && verticalRangesMeet) {
                   clamped.width = Math.max(
                     Math.min(minimumSize.width, canvasWidth - nextCandidate.x),
-                    snapToGrid(other.x - nextCandidate.x - spacing)
+                    Math.round(other.x - nextCandidate.x - spacing)
                   );
                 }
 
                 if (other.y >= nextCandidate.y && horizontalRangesMeet) {
                   clamped.height = Math.max(
                     minimumSize.height,
-                    snapToGrid(other.y - nextCandidate.y - spacing)
+                    Math.round(other.y - nextCandidate.y - spacing)
                   );
                 }
 
@@ -2662,7 +2977,10 @@ Go live anyway?`
       return;
     }
 
-    if (dragState.interaction === "resize" && requiredSectionHeight > canvasHeight) {
+    if (
+      (dragState.interaction === "resize" || dragState.interaction === "move") &&
+      requiredSectionHeight > canvasHeight
+    ) {
       updateSections((sections) =>
         sections.map((item) =>
           item.id === section.id
@@ -2884,6 +3202,7 @@ Go live anyway?`
       setInsertTarget,
       setSelected,
       captureCanvasTextSelection,
+      textSelection,
       updateElementInlineText,
       runElementAction,
       renderConnectedForm,
@@ -2897,6 +3216,7 @@ Go live anyway?`
       startDrag,
       findElementLocation,
       captureCanvasTextSelection,
+      textSelection,
       updateElementInlineText,
       runElementAction,
       renderConnectedForm,
@@ -3141,9 +3461,10 @@ Go live anyway?`
                 </div>
               </div>
 
-              <BuilderSidebarSaveControl
+              <BuilderSidebarActions
                 isSavingProject={isSavingProject}
                 onSave={saveProject}
+                onGoLive={publishProject}
               />
 
             {designPanel === "Pages" && (
@@ -3251,7 +3572,10 @@ Go live anyway?`
       <main
         className="builder-canvas-shell"
         onClick={() => {
-          if (!preview) setSelected({ type: "page", id: activePage?.id });
+          if (!preview) {
+            setInlineToolbarPosition(null);
+            setSelected({ type: "page", id: activePage?.id });
+          }
         }}
       >
         {!preview && renderInlineTextToolbar()}
@@ -3444,6 +3768,10 @@ Go live anyway?`
           <h3>Page Settings</h3>
           <label>Page name<input value={activePage.name} onChange={(event) => updateActivePage((page) => ({ ...page, name: event.target.value }))} /></label>
           <label>Page link<input value={activePage.slug} onChange={(event) => updateActivePage((page) => ({ ...page, slug: event.target.value }))} /></label>
+          <label className="inspector-toggle-row">
+            <input type="checkbox" checked={activePage.showInNavigation !== false} onChange={(event) => updateActivePage((page) => ({ ...page, showInNavigation: event.target.checked }))} />
+            <span>Show this page in the header</span>
+          </label>
         </div>
       )}
 
@@ -3470,10 +3798,58 @@ Go live anyway?`
           {selectedElement.type !== "reservationBlock" && (
             <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
           )}
+          {(selectedElement.type === "loginBlock" || selectedElement.type === "registrationBlock") && (
+            <div className="auth-workflow-settings">
+              <strong>Authentication workflow</strong>
+              <label>
+                {selectedElement.type === "registrationBlock" ? "Login page after registration" : "Page after login"}
+                <select value={selectedElement.auth?.successPageId || ""} onChange={(event) => updateSelectedElement({ auth: { ...(selectedElement.auth || {}), successPageId: event.target.value } })}>
+                  {selectedElement.type === "registrationBlock" ? (
+                    <option value="">Find the Login page automatically</option>
+                  ) : (
+                    <option value="" hidden>Select a page</option>
+                  )}
+                  {project.pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
+                </select>
+              </label>
+              <p className="builder-note">The destination page can stay hidden from the header.</p>
+            </div>
+          )}
+          {carouselElementTypes.has(selectedElement.type) && (
+            <div className="carousel-timing-controls">
+              <strong>Slide timing</strong>
+              <label>
+                Auto slide
+                <select
+                  value={selectedElement.autoScroll ? "on" : "off"}
+                  onChange={(event) =>
+                    updateSelectedElement({ autoScroll: event.target.value === "on" })
+                  }
+                >
+                  <option value="on">On</option>
+                  <option value="off">Off</option>
+                </select>
+              </label>
+              <label>
+                Delay seconds
+                <input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={(Number(selectedElement.autoScrollMs) || 4000) / 1000}
+                  onChange={(event) =>
+                    updateSelectedElement({
+                      autoScrollMs: Math.max(1000, Number(event.target.value || 4) * 1000),
+                    })
+                  }
+                />
+              </label>
+            </div>
+          )}
           {carouselElementTypes.has(selectedElement.type) && (
             <details open className="carousel-slide-editor">
               <summary>Carousel slides</summary>
-              <p className="builder-note">Edit every slide and choose an image URL or upload your own image.</p>
+              <p className="builder-note">Edit every slide and choose or replace its image.</p>
               {parseCarouselSlides(selectedElement.content).map((slide, index) => (
                 <div className="metric-editor-item" key={`${selectedElement.id}_slide_${index}`}>
                   <strong>Slide {index + 1}</strong>
@@ -3485,14 +3861,26 @@ Go live anyway?`
                     const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item);
                     updateSelectedElement({ content: serializeCarouselSlides(slides) });
                   }} /></label>
-                  <label>Image URL<input value={slide.image} onChange={(event) => {
-                    const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, image: event.target.value } : item);
-                    updateSelectedElement({ content: serializeCarouselSlides(slides) });
-                  }} /></label>
-                  <label className="upload-image-button">
-                    {assetUploadBusy ? "Uploading..." : "Choose image"}
-                    <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={(event) => handleCarouselSlideImageUpload(event, index)} />
-                  </label>
+                  <div className="carousel-slide-image-control">
+                    <div className="carousel-slide-image-preview">
+                      {resolveMediaUrl(slide.image) ? (
+                        <img src={resolveMediaUrl(slide.image)} alt={slide.title || `Slide ${index + 1}`} />
+                      ) : (
+                        <span>No image</span>
+                      )}
+                    </div>
+                    <label className="upload-image-button">
+                      {assetUploadBusy ? "Uploading..." : resolveMediaUrl(slide.image) ? "Replace image" : "Choose image"}
+                      <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={(event) => handleCarouselSlideImageUpload(event, index)} />
+                    </label>
+                  </div>
+                  <details className="carousel-image-url-control">
+                    <summary>Manual image URL</summary>
+                    <label>Image URL<input value={slide.image} onChange={(event) => {
+                      const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, image: event.target.value } : item);
+                      updateSelectedElement({ content: serializeCarouselSlides(slides) });
+                    }} /></label>
+                  </details>
                   <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>Remove slide</button>
                 </div>
               ))}
@@ -3502,7 +3890,7 @@ Go live anyway?`
           {selectedElement.type === "list" && (
             <details open className="list-editor">
               <summary>List content</summary>
-              <label>Header (optional)<input value={selectedElement.listTitle || ""} placeholder="Add a header" onSelect={(event) => captureTextSelection(event, "listTitle")} onChange={(event) => updateSelectedElement({ listTitle: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "listTitle") })} /></label>
+              <label>Main sentence<input value={selectedElement.listTitle || ""} placeholder="Add a title for these points" onSelect={(event) => captureTextSelection(event, "listTitle")} onChange={(event) => updateSelectedElement({ listTitle: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "listTitle"), richTextSizes: (selectedElement.richTextSizes || []).filter((range) => range.field !== "listTitle"), richTextStyles: (selectedElement.richTextStyles || []).filter((range) => range.field !== "listTitle") })} /></label>
               <label>
                 Marker style
                 <select value={selectedElement.listStyle || "disc"} onChange={(event) => updateSelectedElement({ listStyle: event.target.value })}>
@@ -3517,7 +3905,7 @@ Go live anyway?`
                 <div className="list-editor-item" key={`${selectedElement.id}_list_${index}`}>
                   <label>Item {index + 1}<input value={item} onSelect={(event) => captureTextSelection(event, "listItem", index)} onChange={(event) => {
                     const listItems = getListItems(selectedElement).map((current, itemIndex) => itemIndex === index ? event.target.value : current);
-                    updateSelectedElement({ listItems, content: listItems.join("\n"), richTextColors: (selectedElement.richTextColors || []).filter((range) => !(range.field === "listItem" && range.itemIndex === index)) });
+                    updateSelectedElement({ listItems, content: listItems.join("\n"), richTextColors: (selectedElement.richTextColors || []).filter((range) => !(range.field === "listItem" && range.itemIndex === index)), richTextSizes: (selectedElement.richTextSizes || []).filter((range) => !(range.field === "listItem" && range.itemIndex === index)), richTextStyles: (selectedElement.richTextStyles || []).filter((range) => !(range.field === "listItem" && range.itemIndex === index)) });
                   }} /></label>
                   <button type="button" className="danger-lite" disabled={getListItems(selectedElement).length <= 1} onClick={() => {
                     const listItems = getListItems(selectedElement).filter((_, itemIndex) => itemIndex !== index);
@@ -3547,11 +3935,11 @@ Go live anyway?`
               </label>
               <label>
                 Metric text color
-                <input type="color" value={selectedElement.styles?.metricTextColor || "#172b4d"} onChange={(event) => updateSelectedElement({ styles: { metricTextColor: event.target.value } })} />
+                <input type="color" value={getColorInputValue(selectedElement.styles?.metricTextColor, "#172b4d")} onChange={(event) => updateSelectedElement({ styles: { metricTextColor: event.target.value } })} />
               </label>
               <label>
                 Symbol color (+, %, etc.)
-                <input type="color" value={selectedElement.styles?.metricSymbolColor || "#f1f66b"} onChange={(event) => updateSelectedElement({ styles: { metricSymbolColor: event.target.value } })} />
+                <input type="color" value={getColorInputValue(selectedElement.styles?.metricSymbolColor, "#f1b84b")} onChange={(event) => updateSelectedElement({ styles: { metricSymbolColor: event.target.value } })} />
               </label>
               {getMetricItems(selectedElement).map((metric, index) => (
                 <div className="metric-editor-item" key={`${selectedElement.id}_metric_${index}`}>
@@ -3642,32 +4030,6 @@ Go live anyway?`
                       <option value="420px">Large - 420px</option>
                       <option value="520px">Tall - 520px</option>
                     </select>
-                  </label>
-                  <label>
-                    Auto scroll
-                    <select
-                      value={selectedElement.autoScroll ? "on" : "off"}
-                      onChange={(event) =>
-                        updateSelectedElement({ autoScroll: event.target.value === "on" })
-                      }
-                    >
-                      <option value="on">On</option>
-                      <option value="off">Off</option>
-                    </select>
-                  </label>
-                  <label>
-                    Auto scroll timing
-                    <input
-                      type="number"
-                      min="1"
-                      step="0.5"
-                      value={(Number(selectedElement.autoScrollMs) || 4000) / 1000}
-                      onChange={(event) =>
-                        updateSelectedElement({
-                          autoScrollMs: Math.max(1000, Number(event.target.value || 4) * 1000),
-                        })
-                      }
-                    />
                   </label>
                   {selectedElement.type === "circularGallery" && (
                     <label>
@@ -4121,9 +4483,10 @@ Go live anyway?`
       saveProject={saveProject}
       loadProject={loadProject}
       exportProject={exportProject}
-      publishProject={publishProject}
       persistProjectNow={persistProjectNow}
       liveSitePath={canonicalLiveSitePath}
+      hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
+      openWebsiteSettings={() => navigate("/settings")}
       openFormPreviewPage={openFormPreviewPage}
     />
   );
@@ -4193,10 +4556,23 @@ Go live anyway?`
       tags: translated.tags || starter.tags,
     };
   };
+  const handleBuilderTextFieldKeyDown = (event) => {
+    if (!isBuilderTextEditingTarget(event.target)) return;
+
+    if ((event.key === " " || event.code === "Space") && event.defaultPrevented) {
+      if (insertSpaceIntoEditableTarget(event.target)) {
+        event.stopPropagation();
+      }
+      return;
+    }
+
+    event.stopPropagation();
+  };
 
   return (
     <div
       className={pageBuilderClassName}
+      onKeyDown={handleBuilderTextFieldKeyDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={() => setDragState(null)}
@@ -4214,7 +4590,6 @@ Go live anyway?`
           openPreviewPage={openPreviewPage}
           preview={preview}
           project={project}
-          publishProject={publishProject}
           renderWorkspaceNavigator={renderWorkspaceNavigator}
           saveProject={saveProject}
           setActiveTopbarAction={setActiveTopbarAction}
@@ -4246,9 +4621,12 @@ Go live anyway?`
         getStarterDisplay={getStarterDisplay}
         modal={modal}
         previewOverlapWarnings={previewOverlapWarnings}
+        publishOverlapWarnings={publishOverlapWarnings}
+        confirmPublishWithOverlaps={() => publishProject(true)}
         setElementPendingDelete={setElementPendingDelete}
         pagePendingDelete={pagePendingDelete}
         setPreviewOverlapWarnings={setPreviewOverlapWarnings}
+        setPublishOverlapWarnings={setPublishOverlapWarnings}
         setPagePendingDelete={setPagePendingDelete}
         setUserPendingDelete={setUserPendingDelete}
         starterSystems={starterSystems}
@@ -4257,10 +4635,7 @@ Go live anyway?`
         userPendingDelete={userPendingDelete}
       />
 
-      <PageBuilderStatusBar
-        canonicalLiveSitePath={canonicalLiveSitePath}
-        toast={toast}
-      />
+      <PageBuilderStatusBar toast={toast} />
     </div>
   );
 }

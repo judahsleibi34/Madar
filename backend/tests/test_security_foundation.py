@@ -94,6 +94,10 @@ class SecurityFoundationTests(unittest.TestCase):
         def public_form_submission():
             return {"ok": True}
 
+        @app.post("/public/sites/example/auth/{action}")
+        def public_tenant_auth(action: str):
+            return {"ok": True}
+
         @app.post("/issue-cookies")
         def issue_cookies(response: Response):
             csrf_token = set_auth_cookies(response, "access-token", "refresh-token")
@@ -283,6 +287,9 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/contact",
             "/billing/webhook",
             "/public/sites/example/forms/form-1/submissions",
+            "/public/sites/example/auth/register",
+            "/public/sites/example/auth/login",
+            "/public/sites/example/auth/logout",
         ]:
             with self.subTest(path=path):
                 response = client.post(

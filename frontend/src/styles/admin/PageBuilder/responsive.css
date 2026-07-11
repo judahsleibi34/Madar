@@ -281,6 +281,24 @@
   border-radius: 10px !important;
 }
 
+/* Free-positioned text keeps the author's typography at every size.
+   Resizing changes line wrapping and placement, never the font size. */
+.page-builder .builder-canvas.viewport-mobile .direct-element-frame-heading .builder-element-heading {
+  font-size: var(--builder-element-font-size, 46px) !important;
+  line-height: var(--builder-element-line-height, 1.08) !important;
+  text-align: var(--builder-element-text-align, inherit) !important;
+}
+
+.page-builder .builder-canvas.viewport-mobile .direct-element-frame-text .builder-element-text {
+  font-size: var(--builder-element-font-size, 17px) !important;
+  line-height: var(--builder-element-line-height, 1.5) !important;
+  text-align: var(--builder-element-text-align, inherit) !important;
+}
+
+.page-builder .builder-canvas.viewport-mobile .direct-element-frame-button .builder-element-button {
+  font-size: var(--builder-element-font-size, 15px) !important;
+}
+
 .page-builder .builder-canvas.viewport-mobile .builder-element {
   width: 100% !important;
   max-width: 100% !important;

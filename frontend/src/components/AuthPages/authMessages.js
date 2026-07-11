@@ -7,12 +7,15 @@ const userSafeAuthMessages = new Set([
   "account created. please verify your email before logging in.",
   "could not create account",
   "could not create user",
+  "could not prepare email verification",
+  "could not send verification email",
   "could not start mfa challenge",
   "could not verify mfa code",
   "email is already registered",
   "invalid email or password",
   "invalid or expired reset link.",
   "mfa login session expired",
+  "password reset link expired. request a new link.",
   "password must be at least 8 characters",
   "please verify your email before logging in.",
 ]);
@@ -51,15 +54,17 @@ export const normalizeAuthMessage = (detail, fallback) => {
 };
 
 export const formatAuthValidationToastMessage = (errors, labels) => {
-  const fields = Object.keys(errors || {})
+  const entries = Object.keys(errors || {})
     .filter((key) => Boolean(errors[key]))
-    .map((key) => labels[key] || key);
+    .map((key) => ({
+      label: labels[key] || key,
+      message: String(errors[key]).trim(),
+    }));
+  const fields = entries.map((entry) => entry.label);
 
   if (fields.length === 0) return "";
 
-  const messages = Object.keys(errors || {})
-    .filter((key) => Boolean(errors[key]))
-    .map((key) => String(errors[key]).toLowerCase());
+  const messages = entries.map((entry) => entry.message.toLowerCase());
   const allRequired = messages.every((message) => message.includes("required"));
 
   if (allRequired) {
@@ -68,8 +73,9 @@ export const formatAuthValidationToastMessage = (errors, labels) => {
     return `${fields.slice(0, -1).join(", ")}, and ${fields[fields.length - 1]} are required.`;
   }
 
-  if (fields.length === 1) return `${fields[0]} needs attention.`;
-  if (fields.length === 2) return `${fields[0]} and ${fields[1]} need attention.`;
+  if (entries.length === 1) return `${entries[0].label}: ${entries[0].message}`;
 
-  return `${fields.slice(0, -1).join(", ")}, and ${fields[fields.length - 1]} need attention.`;
+  return entries
+    .map((entry) => `${entry.label}: ${entry.message}`)
+    .join(" ");
 };

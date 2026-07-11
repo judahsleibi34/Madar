@@ -282,3 +282,36 @@ export const fetchPublicSite = async (subdomain) => {
   const data = await parseJsonResponse(response);
   return data || null;
 };
+
+export const registerTenantVisitor = async (subdomain, payload) => {
+  const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}/auth/register`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseJsonResponse(response);
+};
+
+export const loginTenantVisitor = async (subdomain, payload) => {
+  const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}/auth/login`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseJsonResponse(response);
+};
+
+export const getTenantVisitorStatus = async (subdomain) => {
+  const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}/auth/status`), {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseJsonResponse(response);
+};
+
+export const logoutTenantVisitor = async (subdomain) => {
+  const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}/auth/logout`), {
+    method: "POST",
+  });
+  return parseJsonResponse(response);
+};

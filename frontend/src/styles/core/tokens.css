@@ -103,6 +103,23 @@
   --builder-chrome-surface-muted: color-mix(in srgb, var(--theme-surface) 84%, var(--theme-bg-soft));
   --builder-chrome-border: color-mix(in srgb, var(--theme-border) 62%, transparent);
   --builder-chrome-shadow: 0 8px 18px rgba(var(--theme-shadow-rgb), 0.035);
+  --builder-bg: var(--builder-chrome-bg);
+  --builder-surface-1: var(--builder-chrome-surface);
+  --builder-surface-2: var(--builder-chrome-surface-raised);
+  --builder-surface-3: var(--builder-chrome-surface-muted);
+  --builder-border: var(--builder-chrome-border);
+  --builder-border-strong: color-mix(in srgb, var(--theme-border) 82%, transparent);
+  --builder-hover: color-mix(in srgb, var(--theme-text) 5%, transparent);
+  --builder-selected: color-mix(in srgb, var(--theme-text) 7%, transparent);
+  --builder-text: var(--theme-text);
+  --builder-text-muted: var(--theme-text-soft);
+  /* Backward-compatible aliases for builder modules migrated incrementally. */
+  --builder-neutral-bg: var(--builder-bg);
+  --builder-neutral-surface: var(--builder-surface-1);
+  --builder-neutral-surface-raised: var(--builder-surface-2);
+  --builder-neutral-surface-muted: var(--builder-surface-3);
+  --builder-neutral-hover: color-mix(in srgb, var(--builder-surface-2) 95%, var(--builder-text));
+  --builder-neutral-selected: color-mix(in srgb, var(--builder-surface-2) 93%, var(--builder-text));
 }
 
 :root[data-theme="dark"],
@@ -204,6 +221,22 @@ body.theme-dark {
   --builder-chrome-surface-muted: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-bg));
   --builder-chrome-border: color-mix(in srgb, var(--theme-border) 72%, transparent);
   --builder-chrome-shadow: 0 10px 22px rgba(var(--theme-black-rgb), 0.14);
+  --builder-bg: #101318;
+  --builder-surface-1: #15191f;
+  --builder-surface-2: #1a1f26;
+  --builder-surface-3: #20262f;
+  --builder-border: rgba(255, 255, 255, 0.09);
+  --builder-border-strong: rgba(255, 255, 255, 0.14);
+  --builder-hover: rgba(255, 255, 255, 0.05);
+  --builder-selected: rgba(255, 255, 255, 0.075);
+  --builder-text: #f4f6f8;
+  --builder-text-muted: #a7b0bd;
+  --builder-neutral-bg: var(--builder-bg);
+  --builder-neutral-surface: var(--builder-surface-1);
+  --builder-neutral-surface-raised: var(--builder-surface-2);
+  --builder-neutral-surface-muted: var(--builder-surface-3);
+  --builder-neutral-hover: var(--builder-surface-3);
+  --builder-neutral-selected: color-mix(in srgb, var(--builder-surface-3) 92%, var(--builder-text));
 }
 
 /* ============================================================

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Eye, EyeOff, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { postAuthJson, readApiError } from "../../utils/apiClient";
 import AuthToast from "./AuthToast";
@@ -16,11 +16,9 @@ const SAFE_BUSINESS_TEXT_PATTERN = /^[\p{L}\s.'\u2019&/(),-]+$/u;
 export default function SignUpPage({
   lang = "en",
   loginPath = "/login",
-  onSignupSuccess,
   mode = "account",
 }) {
   const { t } = useTranslation("auth");
-  const navigate = useNavigate();
   const pageDir = lang === "ar" ? "rtl" : "ltr";
   const isTenantOnboarding = mode === "tenant";
 
@@ -35,7 +33,7 @@ export default function SignUpPage({
     subdomain: "",
   });
 
-  const [, setErrors] = useState({});
+  const [errors, setErrors] = useState({});
   const [, setStatusMessage] = useState("");
   const [authToast, setAuthToast] = useState(null);
   const [emailVerificationDialog, setEmailVerificationDialog] = useState(null);
@@ -84,19 +82,34 @@ export default function SignUpPage({
     });
   };
 
-  const closeEmailVerificationDialog = () => {
-    const nextMessage = emailVerificationDialog?.message;
+  const getErrorProps = (fieldName) => {
+    const message = errors[fieldName];
 
-    setEmailVerificationDialog(null);
-
-    if (onSignupSuccess) {
-      onSignupSuccess();
-      return;
+    if (!message) {
+      return {};
     }
 
-    navigate(loginPath, {
-      state: nextMessage ? { message: nextMessage } : undefined,
-    });
+    return {
+      "aria-invalid": "true",
+      "aria-describedby": `signup-${fieldName}-error`,
+      className: "auth-field-error-input",
+    };
+  };
+
+  const renderFieldError = (fieldName) => {
+    const message = errors[fieldName];
+
+    if (!message) return null;
+
+    return (
+      <span className="auth-field-error" id={`signup-${fieldName}-error`} role="alert">
+        {message}
+      </span>
+    );
+  };
+
+  const dismissEmailVerificationDialog = () => {
+    setEmailVerificationDialog(null);
   };
 
   const validateSubdomain = (newErrors, values = formData) => {
@@ -417,7 +430,9 @@ export default function SignUpPage({
               placeholder={t("signup.firstName")}
               value={formData.firstName}
               onChange={handleChange}
+              {...getErrorProps("firstName")}
             />
+            {renderFieldError("firstName")}
           </label>
 
           <label>
@@ -428,7 +443,9 @@ export default function SignUpPage({
               placeholder={t("signup.lastName")}
               value={formData.lastName}
               onChange={handleChange}
+              {...getErrorProps("lastName")}
             />
+            {renderFieldError("lastName")}
           </label>
         </div>
 
@@ -441,7 +458,9 @@ export default function SignUpPage({
             value={formData.email}
             onChange={handleChange}
             dir="ltr"
+            {...getErrorProps("email")}
           />
+          {renderFieldError("email")}
         </label>
 
         <label>
@@ -454,6 +473,7 @@ export default function SignUpPage({
               value={formData.password}
               onChange={handleChange}
               dir="ltr"
+              {...getErrorProps("password")}
             />
             <button
               type="button"
@@ -463,6 +483,7 @@ export default function SignUpPage({
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          {renderFieldError("password")}
         </label>
 
         <label>
@@ -475,6 +496,7 @@ export default function SignUpPage({
               value={formData.confirmPassword}
               onChange={handleChange}
               dir="ltr"
+              {...getErrorProps("confirmPassword")}
             />
             <button
               type="button"
@@ -484,6 +506,7 @@ export default function SignUpPage({
               {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          {renderFieldError("confirmPassword")}
         </label>
 
         {isTenantOnboarding && (
@@ -498,7 +521,9 @@ export default function SignUpPage({
                 placeholder={t("signup.businessNamePlaceholder")}
                 value={formData.businessName}
                 onChange={handleChange}
+                {...getErrorProps("businessName")}
               />
+              {renderFieldError("businessName")}
             </label>
 
             <label>
@@ -509,7 +534,9 @@ export default function SignUpPage({
                 placeholder={t("signup.businessTypePlaceholder")}
                 value={formData.businessType}
                 onChange={handleChange}
+                {...getErrorProps("businessType")}
               />
+              {renderFieldError("businessType")}
             </label>
 
             <label>
@@ -523,7 +550,9 @@ export default function SignUpPage({
                 dir="ltr"
                 autoCapitalize="none"
                 autoCorrect="off"
+                {...getErrorProps("subdomain")}
               />
+              {renderFieldError("subdomain")}
               <small className="subdomain-preview">
                 {publicUrlPreviewLabel}: {publicUrlPreview}
               </small>
@@ -564,6 +593,17 @@ export default function SignUpPage({
             aria-modal="true"
             aria-labelledby="signup-verification-title"
           >
+            <button
+              type="button"
+              className="subscription-modal-close"
+              onClick={dismissEmailVerificationDialog}
+              aria-label={t("signup.closeVerification", {
+                defaultValue: "Close verification message",
+              })}
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+
             <div className="subscription-modal-icon" aria-hidden="true">
               i
             </div>
@@ -573,16 +613,6 @@ export default function SignUpPage({
                 {emailVerificationDialog.title}
               </h2>
               <p>{emailVerificationDialog.message}</p>
-            </div>
-
-            <div className="subscription-modal-actions">
-              <button
-                type="button"
-                className="subscription-modal-primary"
-                onClick={closeEmailVerificationDialog}
-              >
-                {t("signup.continueToLogin")}
-              </button>
             </div>
           </section>
         </div>

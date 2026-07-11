@@ -1,4 +1,5 @@
 import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
+import { AlertTriangle, Rocket } from "lucide-react";
 
 export default function PageBuilderModals({
   activeTab,
@@ -12,9 +13,12 @@ export default function PageBuilderModals({
   modal,
   pagePendingDelete,
   previewOverlapWarnings,
+  publishOverlapWarnings,
+  confirmPublishWithOverlaps,
   setElementPendingDelete,
   setPagePendingDelete,
   setPreviewOverlapWarnings,
+  setPublishOverlapWarnings,
   setUserPendingDelete,
   starterSystems,
   templateCopy,
@@ -122,6 +126,75 @@ export default function PageBuilderModals({
             <div className="overlap-warning-actions">
               <button type="button" onClick={() => setPreviewOverlapWarnings([])}>
                 Fix layout
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {publishOverlapWarnings.length > 0 && (
+        <div
+          className="builder-modal-backdrop"
+          onClick={() => setPublishOverlapWarnings([])}
+        >
+          <section
+            className="builder-modal overlap-warning-modal publish-overlap-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="publish-overlap-warning-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div className="publish-overlap-icon" aria-hidden="true">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <span className="modal-eyebrow">Publish check</span>
+                <h2 id="publish-overlap-warning-title">Check your layout before going live</h2>
+                <p>
+                  {publishOverlapWarnings.length} area{publishOverlapWarnings.length === 1 ? "" : "s"} may be hard to read. You can fix the layout now or publish it as it is.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="publish-overlap-close"
+                aria-label="Close"
+                onClick={() => setPublishOverlapWarnings([])}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="overlap-warning-list">
+              {publishOverlapWarnings.slice(0, 5).map((warning, index) => (
+                <article
+                  className="overlap-warning-item"
+                  key={`${warning.page}_${warning.section}_${warning.viewport}_${warning.first}_${warning.second}_${index}`}
+                >
+                  <div className="overlap-warning-item-top">
+                    <span>{warning.viewport}</span>
+                    <small>{warning.page} / {warning.section}</small>
+                  </div>
+                  <strong>{warning.first} overlaps {warning.second}</strong>
+                  <p>Move or resize either item so both are easy to read.</p>
+                </article>
+              ))}
+            </div>
+
+            {publishOverlapWarnings.length > 5 && (
+              <p className="overlap-warning-more">
+                Plus {publishOverlapWarnings.length - 5} more overlap
+                {publishOverlapWarnings.length - 5 === 1 ? "" : "s"}.
+              </p>
+            )}
+
+            <div className="overlap-warning-actions">
+              <button type="button" className="publish-overlap-fix" onClick={() => setPublishOverlapWarnings([])}>
+                Fix layout
+              </button>
+              <button type="button" className="publish-overlap-live" onClick={confirmPublishWithOverlaps}>
+                <Rocket size={16} aria-hidden="true" />
+                Go Live as is
               </button>
             </div>
           </section>

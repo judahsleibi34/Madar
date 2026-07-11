@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import time
 import threading
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, Request, Response
 
@@ -257,8 +258,44 @@ def build_user_payload(user_data):
         "subscription_type": user_data.get("subscription_type") or "",
         "payment_status": user_data.get("payment_status") or "",
         "user_type": normalize_user_type(user_data.get("user_type")),
+        "email_verified": user_data.get("email_verified") is not False,
+        "email_verified_at": user_data.get("email_verified_at"),
         "created_at": user_data.get("created_at"),
         "updated_at": user_data.get("updated_at"),
+    }
+
+
+def auth_user_email_is_verified(auth_user) -> bool:
+    return bool(
+        _get_auth_value(auth_user, "email_confirmed_at")
+        or _get_auth_value(auth_user, "confirmed_at")
+    )
+
+
+def mark_local_email_verified(user_data):
+    if user_data.get("email_verified") is not False:
+        return user_data
+
+    verified_at = datetime.now(timezone.utc).isoformat()
+    update_response = (
+        service_supabase.table("users")
+        .update(
+            {
+                "email_verified": True,
+                "email_verified_at": verified_at,
+            }
+        )
+        .eq("id", user_data.get("id"))
+        .execute()
+    )
+
+    if update_response.data:
+        return update_response.data[0]
+
+    return {
+        **user_data,
+        "email_verified": True,
+        "email_verified_at": verified_at,
     }
 
 
@@ -344,6 +381,16 @@ def get_authenticated_user_row(
         raise HTTPException(status_code=404, detail="User not found")
 
     user_data = user_response.data
+
+    if auth_user_email_is_verified(auth_user):
+        user_data = mark_local_email_verified(user_data)
+    else:
+        if response:
+            delete_auth_cookies(response)
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email before logging in.",
+        )
 
     if (
         allow_admin_account_access

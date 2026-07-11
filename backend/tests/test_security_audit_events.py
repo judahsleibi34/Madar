@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -24,8 +25,15 @@ def build_password_client():
 class FakeTableQuery:
     def __init__(self, data):
         self.data = data
+        self.update_payload = None
 
     def select(self, *_args, **_kwargs):
+        return self
+
+    def update(self, payload):
+        self.update_payload = payload
+        if isinstance(self.data, dict):
+            self.data.update(payload)
         return self
 
     def eq(self, *_args, **_kwargs):
@@ -53,7 +61,7 @@ class SecurityAuditEventTests(unittest.TestCase):
     def test_successful_login_records_security_audit_event(self):
         client = build_auth_client()
         auth_response = SimpleNamespace(
-            user=SimpleNamespace(id="auth-1"),
+            user=SimpleNamespace(id="auth-1", email_confirmed_at="2026-01-01T00:00:00Z"),
             session=SimpleNamespace(access_token="access", refresh_token="refresh"),
         )
         local_user = {"id": 5, "tenant_id": 7, "email": "user@example.com", "user_type": "user"}
@@ -100,8 +108,9 @@ class SecurityAuditEventTests(unittest.TestCase):
 
     def test_password_reset_completion_records_audit_event(self):
         client = build_password_client()
+        requested_at = datetime.now(timezone.utc).isoformat()
 
-        with patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "get_user", return_value=SimpleNamespace(user=SimpleNamespace(id="auth-1"))),              patch.object(password_routes.admin_supabase.auth.admin, "update_user_by_id"),              patch.object(password_routes, "get_local_user_by_auth_id", return_value={"id": 5, "tenant_id": 7}),              patch.object(password_routes, "record_security_event") as record_security_event:
+        with patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "get_user", return_value=SimpleNamespace(user=SimpleNamespace(id="auth-1"))),              patch.object(password_routes.admin_supabase.auth.admin, "update_user_by_id"),              patch.object(password_routes, "get_local_user_by_auth_id", return_value={"id": 5, "tenant_id": 7, "password_reset_requested_at": requested_at}),              patch.object(password_routes, "clear_password_reset_request"),              patch.object(password_routes, "record_security_event") as record_security_event:
             response = client.post("/auth/password-reset", json={"access_token": "reset-token", "password": "new-password123"})
 
         self.assertEqual(response.status_code, 200)
@@ -111,6 +120,20 @@ class SecurityAuditEventTests(unittest.TestCase):
         self.assertEqual(kwargs["actor_user_id"], 5)
         self.assertNotIn("reset-token", str(kwargs["metadata"]))
         self.assertNotIn("new-password123", str(kwargs["metadata"]))
+
+    def test_password_reset_rejects_links_older_than_ten_minutes(self):
+        client = build_password_client()
+        requested_at = (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()
+
+        with patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "get_user", return_value=SimpleNamespace(user=SimpleNamespace(id="auth-1"))),              patch.object(password_routes.admin_supabase.auth.admin, "update_user_by_id") as update_user_by_id,              patch.object(password_routes, "get_local_user_by_auth_id", return_value={"id": 5, "tenant_id": 7, "password_reset_requested_at": requested_at}),              patch.object(password_routes, "record_security_event"):
+            response = client.post("/auth/password-reset", json={"access_token": "reset-token", "password": "new-password123"})
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(
+            response.json()["detail"],
+            "Password reset link expired. Request a new link.",
+        )
+        update_user_by_id.assert_not_called()
 
     def test_password_change_records_audit_event(self):
         client = build_auth_client()

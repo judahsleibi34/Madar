@@ -585,5 +585,28 @@ class TestWebsiteSettingsServiceLegacyFallback(unittest.TestCase):
 
         self.assertIsNone(settings)
 
+class TenantSiteOwnerAccessTests(unittest.TestCase):
+    def test_subdomain_owner_can_use_existing_main_account(self):
+        settings = {"tenant_id": 7, "user_id": 3, "subdomain": "owner-site"}
+        user = {"id": 3, "tenant_id": 7, "email": "owner@example.com"}
+
+        with patch.object(public_site_routes, "get_active_tenant_membership", return_value=None), \
+             patch.object(public_site_routes, "get_tenant_staff_membership", return_value=None):
+            access = public_site_routes.get_tenant_site_access(settings, user)
+
+        self.assertEqual(access["role"], "owner")
+        self.assertEqual(access["tenant_id"], 7)
+
+    def test_unrelated_main_account_cannot_access_tenant_site(self):
+        settings = {"tenant_id": 7, "user_id": 3, "subdomain": "owner-site"}
+        user = {"id": 9, "tenant_id": 8, "email": "other@example.com"}
+
+        with patch.object(public_site_routes, "get_active_tenant_membership", return_value=None), \
+             patch.object(public_site_routes, "get_tenant_staff_membership", return_value=None):
+            access = public_site_routes.get_tenant_site_access(settings, user)
+
+        self.assertIsNone(access)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3873,6 +3873,16 @@ body.theme-dark .page-builder .workspace-tabs button.active,
   border-color: transparent !important;
   border-width: 0 !important;
   box-shadow: none !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  opacity: 1 !important;
+}
+
+.page-builder .workspace-tabs button:hover,
+.page-builder .workspace-tabs button.active {
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+  opacity: 1 !important;
 }
 
 .page-builder .logo-fallback,

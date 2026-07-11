@@ -3379,9 +3379,51 @@ body.theme-dark .forms-loading-shimmer,
 }
 
 .forms-secondary-actions,
+.form-library-file-actions,
 .forms-builder-actions {
   display: grid;
   gap: 8px;
+}
+
+.form-library-file-actions {
+  grid-template-columns: 1fr;
+}
+
+.form-library-file-actions .form-command-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.form-import-guide {
+  padding: 10px 12px;
+  border: 1px solid var(--madar-border);
+  border-radius: 12px;
+  background: var(--madar-surface-soft);
+}
+
+.form-import-guide summary {
+  cursor: pointer;
+  color: var(--madar-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.form-import-guide p {
+  color: var(--madar-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.form-import-guide pre {
+  max-height: 260px;
+  margin: 10px 0 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--madar-surface);
+  color: var(--madar-text);
+  font: 11px/1.5 Consolas, monospace;
+  white-space: pre-wrap;
 }
 
 .forms-builder-actions {

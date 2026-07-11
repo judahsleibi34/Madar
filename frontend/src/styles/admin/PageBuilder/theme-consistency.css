@@ -1,0 +1,1020 @@
+/* Final Page Builder chrome layer.
+   Keep this import last. It normalizes editor UI without styling the tenant canvas. */
+
+.page-builder {
+  --pb-bg: var(--builder-bg);
+  --pb-surface: var(--builder-surface-1);
+  --pb-surface-raised: var(--builder-surface-2);
+  --pb-surface-muted: var(--builder-surface-3);
+  --pb-border: var(--builder-border);
+  --pb-border-strong: var(--builder-border-strong);
+  --pb-hover: var(--builder-hover);
+  --pb-selected: var(--builder-selected);
+  --pb-text: var(--builder-text);
+  --pb-muted: var(--builder-text-muted);
+  --pb-accent: var(--theme-primary);
+  --pb-accent-soft: var(--theme-primary-soft);
+  --pb-danger: var(--theme-danger);
+  --pb-radius-sm: 10px;
+  --pb-radius: 14px;
+  --pb-radius-lg: 18px;
+  --pb-shadow: var(--builder-chrome-shadow);
+  background: var(--pb-bg) !important;
+  color: var(--pb-text) !important;
+}
+
+.page-builder .builder-topbar,
+.page-builder .builder-subbar,
+.page-builder .workspace-header {
+  background: var(--pb-surface) !important;
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+}
+
+.page-builder .builder-layout,
+.page-builder .workspace-page,
+.page-builder .forms-workbench,
+.page-builder .site-chrome-workspace,
+.page-builder .users-workspace,
+.page-builder .publish-workspace,
+.page-builder .reservations-workspace {
+  background: var(--pb-bg) !important;
+  color: var(--pb-text) !important;
+}
+
+.page-builder .builder-sidebar,
+.page-builder .builder-inspector,
+.page-builder .builder-side-panel,
+.page-builder .simple-add-question,
+.page-builder .forms-simple-document,
+.page-builder .simple-side-panel {
+  background: var(--pb-bg) !important;
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-panel,
+.page-builder .inspector-group,
+.page-builder .forms-panel-heading,
+.page-builder .simple-action-group,
+.page-builder .form-editor,
+.page-builder .site-chrome-card,
+.page-builder .reservation-settings-section,
+.page-builder .reservation-component,
+.page-builder .dashboard-panel,
+.page-builder .users-panel,
+.page-builder .users-roles-panel,
+.page-builder .user-row,
+.page-builder .user-settings-panel,
+.page-builder .role-editor-card,
+.page-builder .permission-group,
+.page-builder .users-card,
+.page-builder .publish-panel,
+.page-builder .publish-link-box,
+.page-builder .publish-qr-preview,
+.page-builder .publish-card,
+.page-builder .form-info-grid > *,
+.page-builder .forms-sidebar-stats > *,
+.page-builder .forms-section-sheet,
+.page-builder .simple-question-card,
+.page-builder .row-editor-card,
+.page-builder .metric-editor-item,
+.page-builder .list-editor-item,
+.page-builder .option-editor-stack,
+.page-builder .logic-rule-row,
+.page-builder .object-list,
+.page-builder .builder-modal,
+.page-builder .template-picker-modal,
+.page-builder .quiz-options-drawer {
+  background: var(--pb-surface) !important;
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+  box-shadow: var(--pb-shadow) !important;
+}
+
+.page-builder .inspector-toggle-row,
+.page-builder .auth-workflow-settings,
+.page-builder .form-import-guide,
+.page-builder .connected-placement-list,
+.page-builder .forms-theme-shape-grid > *,
+.page-builder .reservation-field,
+.page-builder .toggle-field,
+.page-builder .publish-subdomain-warning {
+  background: var(--pb-surface-muted) !important;
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(input, textarea, select) {
+  background: var(--pb-surface-raised) !important;
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(input, textarea)::placeholder {
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+  opacity: 0.78 !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(input, textarea, select):focus {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 3px var(--color-focus) !important;
+  outline: 0 !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-topbar,
+  .builder-subbar,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(h1, h2, h3, h4, h5, strong, label, legend, summary) {
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-topbar,
+  .builder-subbar,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) :is(p, small, em, .builder-note, .panel-help, .field-help) {
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+}
+
+.page-builder .workspace-tabs {
+  gap: 8px !important;
+  padding: 6px !important;
+  background: var(--pb-surface-muted) !important;
+  border: 1px solid var(--pb-border) !important;
+  border-radius: var(--pb-radius) !important;
+}
+
+.page-builder .workspace-tabs button {
+  min-height: 38px;
+  padding: 8px 14px !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pb-radius-sm) !important;
+  background: transparent !important;
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+  opacity: 1 !important;
+}
+
+.page-builder .workspace-tabs button:hover {
+  background: var(--pb-surface-raised) !important;
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+}
+
+.page-builder .workspace-tabs button.active {
+  background: var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: var(--app-primary-shadow) !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-topbar,
+  .builder-subbar,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) button:not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger) {
+  border-color: var(--pb-border) !important;
+  background: var(--pb-surface-raised) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  opacity: 1;
+  box-shadow: none !important;
+}
+
+.page-builder :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .workspace-page,
+  .builder-topbar,
+  .builder-subbar,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) button:not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger):hover {
+  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
+  background: var(--pb-accent-soft) !important;
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+}
+
+.page-builder :is(.page-primary-action, .primary-action, .forms-primary-action, .form-command-button-primary, .builder-sidebar-save-button) {
+  background: var(--pb-accent) !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: var(--app-primary-shadow) !important;
+}
+
+.page-builder :is(.danger-button, .danger-lite, .form-command-button-danger, .page-delete-action) {
+  border-color: color-mix(in srgb, var(--pb-danger) 34%, var(--pb-border)) !important;
+  background: color-mix(in srgb, var(--pb-danger) 10%, var(--pb-surface)) !important;
+  color: var(--pb-danger) !important;
+  -webkit-text-fill-color: var(--pb-danger) !important;
+}
+
+.page-builder :is(
+  .reservation-list-item.is-active,
+  .role-picker-list button.active,
+  .object-list button.active,
+  .page-list button.active,
+  .builder-tool-button.active,
+  .reservation-mode-switch button.active
+) {
+  border-color: var(--pb-accent) !important;
+  background: var(--pb-accent-soft) !important;
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+  box-shadow: inset 3px 0 0 var(--pb-accent) !important;
+}
+
+.page-builder :is(.workspace-kicker, .forms-panel-eyebrow, .simple-action-group-title) {
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+  letter-spacing: 0.06em;
+}
+
+.page-builder.theme-dark :is(.workspace-kicker, .forms-panel-eyebrow, .simple-action-group-title) {
+  color: var(--theme-primary-hover) !important;
+  -webkit-text-fill-color: var(--theme-primary-hover) !important;
+}
+
+.page-builder :is(.workspace-header h2, .forms-panel-heading h2) {
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+}
+
+.page-builder.theme-dark :is(.workspace-header h2, .forms-panel-heading h2) {
+  color: var(--theme-primary-hover) !important;
+  -webkit-text-fill-color: var(--theme-primary-hover) !important;
+}
+
+.page-builder button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+  box-shadow: none !important;
+}
+
+.page-builder :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--pb-accent);
+}
+
+.page-builder :is(.builder-modal-backdrop, .quiz-drawer-backdrop, .page-delete-modal-backdrop) {
+  background: var(--app-backdrop) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Tenant website and embedded form previews own their colors. */
+.page-builder .builder-canvas,
+.page-builder .builder-canvas *,
+.page-builder .builder-form-preview,
+.page-builder .builder-form-preview * {
+  -webkit-text-fill-color: initial;
+}
+
+.page-builder * {
+  scrollbar-color: color-mix(in srgb, var(--pb-muted) 55%, transparent) transparent;
+}
+
+/* Navigation state rules stay last so generic button normalization cannot override them. */
+.page-builder .workspace-tabs button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+}
+
+.page-builder .workspace-tabs button:hover {
+  border-color: var(--pb-border) !important;
+  background: var(--pb-surface-raised) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+}
+
+.page-builder .workspace-tabs button.active {
+  border-color: var(--pb-accent) !important;
+  background: var(--pb-accent) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+/* Dark editor surfaces: neutral charcoal fills, accent-only rings and borders. */
+.page-builder.theme-dark :is(
+  .builder-sidebar,
+  .builder-inspector,
+  .builder-side-panel,
+  .builder-panel,
+  .inspector-group,
+  .section-component-palette,
+  .component-palette,
+  .layer-tree,
+  .layer-item,
+  .object-list,
+  .forms-side-card,
+  .forms-section-sheet,
+  .simple-question-card,
+  .simple-action-group,
+  .form-editor,
+  .reservation-settings-section,
+  .dashboard-panel,
+  .publish-panel,
+  .site-chrome-card,
+  .role-editor-card,
+  .permission-group,
+  .daw-card,
+  .daw-section-card,
+  .daw-cleaning-tool,
+  .daw-report-panel
+) {
+  background: var(--builder-neutral-surface) !important;
+  background-image: none !important;
+}
+
+.page-builder.theme-dark .daw-page {
+  background: var(--builder-neutral-bg) !important;
+  background-image: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .daw-stepper button,
+  .daw-review-sidebar button,
+  .daw-group-grid button,
+  .daw-flow-actions,
+  .daw-report-submit-row,
+  .daw-inspection-box,
+  .daw-report-summary,
+  .daw-report-block,
+  .daw-friendly-panel,
+  .daw-review-summary-grid article,
+  .daw-dataset-stats article,
+  .daw-kpi-grid article,
+  .daw-object-grid article,
+  .daw-chart-list article,
+  .daw-report-source-popover,
+  .daw-column-menu,
+  .daw-source-body
+) {
+  background: var(--builder-neutral-surface) !important;
+  background-image: none !important;
+  border-color: var(--pb-border) !important;
+}
+
+.page-builder.theme-dark :is(
+  .daw-stepper button:hover,
+  .daw-review-sidebar button:hover,
+  .daw-group-grid button:hover
+) {
+  background: var(--builder-neutral-hover) !important;
+  background-image: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .daw-stepper button.active,
+  .daw-review-sidebar button.active,
+  .daw-group-grid button.active
+) {
+  background: var(--builder-neutral-selected) !important;
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: inset 3px 0 0 var(--theme-info) !important;
+}
+
+.page-builder.theme-dark :is(
+  .builder-modal .starter-card:hover,
+  .builder-modal .starter-card:focus-visible,
+  .builder-modal .section-card:hover,
+  .builder-modal .section-card:focus-visible
+) {
+  background: var(--builder-neutral-hover) !important;
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+}
+
+.page-builder.theme-dark :is(
+  .section-component-palette button,
+  .component-palette button,
+  .page-create-card,
+  .layer-tree button,
+  .forms-list-scroll button,
+  .question-type-buttons button,
+  .form-command-button,
+  .reservation-list-item,
+  .role-picker-list button,
+  .user-row,
+  .row-editor-card,
+  .metric-editor-item,
+  .list-editor-item,
+  .option-editor-stack,
+  .logic-rule-row,
+  .daw-source-tabs button,
+  .daw-analysis-domain-grid button,
+  .daw-cleaning-option
+) {
+  background: var(--builder-neutral-surface-raised) !important;
+  background-image: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .section-component-palette button,
+  .component-palette button,
+  .page-create-card,
+  .layer-tree button,
+  .forms-list-scroll button,
+  .question-type-buttons button,
+  .form-command-button,
+  .reservation-list-item,
+  .role-picker-list button,
+  .daw-source-tabs button,
+  .daw-analysis-domain-grid button
+):hover {
+  background: var(--builder-neutral-hover) !important;
+  background-image: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .layer-tree button.active,
+  .forms-list-scroll button.active,
+  .reservation-list-item.is-active,
+  .role-picker-list button.active,
+  .object-list button.active,
+  .page-list button.active,
+  .builder-tool-button.active,
+  .daw-source-tabs button.active,
+  .daw-analysis-domain-grid button.active,
+  .reservation-mode-switch button.active
+) {
+  background: var(--builder-neutral-selected) !important;
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: inset 3px 0 0 var(--theme-info) !important;
+}
+
+.page-builder.theme-dark :is(
+  .analysis-file-dropzone,
+  .daw-file-dropzone,
+  .file-dropzone,
+  .empty-column,
+  .empty-connected,
+  .reservation-empty-list,
+  .reservation-editor-empty,
+  .publish-empty-note,
+  .form-connect-card,
+  .quiz-answer-key
+) {
+  background: var(--builder-neutral-surface-muted) !important;
+  background-image: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .analysis-file-dropzone:hover,
+  .analysis-file-dropzone.is-dragging,
+  .daw-file-dropzone:hover,
+  .daw-file-dropzone.is-dragging,
+  .file-dropzone:hover,
+  .file-dropzone.is-dragging
+) {
+  background: var(--builder-neutral-hover) !important;
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-info) 28%, transparent) !important;
+}
+
+.page-builder.theme-dark :is(
+  .builder-element.is-selected,
+  .direct-element-frame.is-selected,
+  .site-section.is-selected
+) {
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-info) 34%, transparent) !important;
+}
+
+.page-builder.theme-dark .site-column.is-selected {
+  background: transparent !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-info) 34%, transparent) !important;
+}
+
+.page-builder.theme-dark :is(
+  .site-section.is-drop-target,
+  .direct-layout-section.is-drop-target,
+  .palette-drop-target,
+  .is-drop-target
+) {
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--theme-info) 42%, transparent) !important;
+}
+
+.page-builder.theme-dark .direct-layout-frame {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--theme-text) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--theme-text) 5%, transparent) 1px, transparent 1px) !important;
+}
+
+.page-builder.theme-dark :is(
+  .responses-checkbox-list label:hover,
+  .results-data-table tbody tr:hover td,
+  .results-data-table tbody tr.selected td,
+  .analysis-step-card button:hover,
+  .analysis-action-row button:hover,
+  .question-format-toolbar button:hover,
+  .question-format-toolbar select:hover,
+  .question-toolbar-color:hover
+) {
+  background: var(--builder-neutral-hover) !important;
+  background-image: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .publish-subdomain-warning,
+  .page-delete-card,
+  .auth-workflow-settings,
+  .inspector-toggle-row
+) {
+  background: var(--builder-neutral-surface-muted) !important;
+  background-image: none !important;
+}
+
+/* Shared workspace structure and hierarchy. */
+.page-builder :is(.reservations-workspace, .users-workspace-page, .publish-workspace, .site-chrome-workspace) {
+  width: min(100%, 1720px);
+  margin-inline: auto;
+  padding: 28px 32px 64px;
+  align-content: start;
+  box-sizing: border-box;
+}
+
+.page-builder :is(.reservations-workspace, .users-workspace-page, .publish-workspace, .site-chrome-workspace) > .workspace-header {
+  width: 100%;
+  min-height: 0;
+  margin: 0 0 18px;
+  padding: 20px 22px;
+  align-self: start;
+  border-radius: var(--pb-radius-lg) !important;
+  box-sizing: border-box;
+}
+
+.page-builder .workspace-header > div:first-child {
+  min-width: 0;
+}
+
+.page-builder .workspace-header h2 {
+  margin: 2px 0 4px;
+  font-size: clamp(20px, 1.5vw, 24px);
+  line-height: 1.15;
+}
+
+.page-builder .workspace-header p {
+  max-width: 760px;
+  line-height: 1.5;
+}
+
+.page-builder .users-workspace-page {
+  grid-auto-rows: max-content;
+}
+
+.page-builder .users-workspace-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+}
+
+.page-builder .users-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.page-builder .users-header-actions button {
+  min-height: 42px;
+  padding-inline: 16px;
+}
+
+.page-builder :is(.users-management-grid, .reservation-editor-layout, .publish-console, .site-chrome-layout) {
+  width: 100%;
+  gap: 18px;
+  align-items: start;
+}
+
+.page-builder :is(.users-panel, .users-roles-panel, .reservation-block-list, .reservation-editor-card, .publish-panel, .site-chrome-card) {
+  border-radius: var(--pb-radius-lg) !important;
+}
+
+.page-builder :is(.users-panel, .users-roles-panel) {
+  padding: 20px;
+}
+
+.page-builder :is(.users-panel-heading, .reservation-panel-heading, .publish-panel-title) {
+  min-height: 0;
+  align-items: flex-start;
+}
+
+.page-builder :is(.users-panel-heading h3, .reservation-panel-heading strong, .publish-panel-title h3) {
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
+.page-builder .reservation-editor-empty {
+  min-height: 156px;
+  padding: 20px;
+  align-items: center;
+}
+
+.page-builder .reservation-empty-actions {
+  align-self: center;
+}
+
+.page-builder .reservation-empty-actions button {
+  min-width: 230px;
+}
+
+@media (max-width: 980px) {
+  .page-builder :is(.reservations-workspace, .users-workspace-page, .publish-workspace, .site-chrome-workspace) {
+    padding: 20px 18px 48px;
+  }
+
+  .page-builder .users-workspace-header {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .users-header-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Canonical dark builder system. This is intentionally scoped to the editor;
+   tenant sites and standalone public previews continue to own their palettes. */
+.page-builder.theme-dark {
+  --theme-bg: var(--builder-bg);
+  --theme-bg-soft: var(--builder-surface-1);
+  --theme-surface: var(--builder-surface-1);
+  --theme-surface-2: var(--builder-surface-2);
+  --theme-surface-3: var(--builder-surface-3);
+  --theme-border: var(--builder-border);
+  --theme-text: var(--builder-text);
+  --theme-text-soft: var(--builder-text-muted);
+  --theme-text-muted: var(--builder-text-muted);
+  --madar-bg: var(--builder-bg);
+  --madar-surface: var(--builder-surface-1);
+  --madar-surface-soft: var(--builder-surface-2);
+  --madar-border: var(--builder-border);
+  --madar-text: var(--builder-text);
+  --madar-muted: var(--builder-text-muted);
+  background: var(--builder-bg) !important;
+  background-image: none !important;
+  color: var(--builder-text) !important;
+}
+
+.page-builder.theme-dark :is(
+  .builder-layout,
+  .workspace-page,
+  .forms-workbench,
+  .reservations-workspace,
+  .users-workspace-page,
+  .publish-workspace,
+  .site-chrome-workspace,
+  .theme-workspace-page,
+  .responses-results-page,
+  .daw-page,
+  .builder-canvas-shell
+) {
+  background: var(--builder-bg) !important;
+  background-image: none !important;
+  color: var(--builder-text) !important;
+}
+
+.page-builder.theme-dark :is(
+  .builder-topbar,
+  .builder-subbar,
+  .workspace-header,
+  .builder-sidebar,
+  .builder-inspector,
+  .builder-side-panel,
+  .simple-side-panel,
+  .simple-add-question,
+  .forms-simple-document,
+  .forms-panel-heading,
+  .builder-panel,
+  .dashboard-panel,
+  .users-panel,
+  .users-roles-panel,
+  .publish-panel,
+  .site-chrome-card,
+  .reservation-block-list,
+  .reservation-editor-card,
+  .reservation-settings-section,
+  .form-editor,
+  .daw-card,
+  .daw-section-card,
+  .daw-report-panel,
+  .daw-modal,
+  .builder-modal,
+  .template-picker-modal,
+  .quiz-options-drawer
+) {
+  background: var(--builder-surface-1) !important;
+  background-image: none !important;
+  border-color: var(--builder-border) !important;
+  color: var(--builder-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .inspector-group,
+  .simple-action-group,
+  .forms-side-card,
+  .forms-section-sheet,
+  .simple-question-card,
+  .row-editor-card,
+  .metric-editor-item,
+  .list-editor-item,
+  .option-editor-stack,
+  .logic-rule-row,
+  .permission-group,
+  .role-editor-card,
+  .user-row,
+  .publish-card,
+  .publish-link-box,
+  .publish-qr-preview,
+  .reservation-component,
+  .section-component-palette,
+  .component-palette,
+  .layer-tree,
+  .object-list,
+  .daw-cleaning-tool,
+  .daw-visualization-card,
+  .daw-visualization-frame,
+  .daw-plot-editor-card
+) {
+  background: var(--builder-surface-2) !important;
+  background-image: none !important;
+  border-color: var(--builder-border) !important;
+  color: var(--builder-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder.theme-dark :is(
+  .workspace-tabs,
+  .auth-workflow-settings,
+  .form-import-guide,
+  .connected-placement-list,
+  .inspector-toggle-row,
+  .reservation-field,
+  .toggle-field,
+  .publish-subdomain-warning,
+  .form-info-grid > *,
+  .forms-sidebar-stats > *,
+  .daw-flow-actions,
+  .daw-report-summary,
+  .daw-inspection-box
+) {
+  background: var(--builder-surface-3) !important;
+  background-image: none !important;
+  border-color: var(--builder-border) !important;
+  color: var(--builder-text) !important;
+}
+
+.page-builder.theme-dark :is(input, textarea, select, [role="combobox"], .daw-multi-select-trigger, .daw-multi-select-menu) {
+  background: var(--builder-surface-2) !important;
+  background-image: none !important;
+  border-color: var(--builder-border) !important;
+  color: var(--builder-text) !important;
+  -webkit-text-fill-color: var(--builder-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder.theme-dark :is(input, textarea)::placeholder {
+  color: var(--builder-text-muted) !important;
+  -webkit-text-fill-color: var(--builder-text-muted) !important;
+  opacity: 0.82 !important;
+}
+
+.page-builder.theme-dark option {
+  background: var(--builder-surface-2);
+  color: var(--builder-text);
+}
+
+.page-builder.theme-dark :is(input, textarea, select, button, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--theme-info) 78%, white) !important;
+  outline-offset: 2px;
+}
+
+.page-builder.theme-dark :is(
+  .workspace-tabs button,
+  .section-component-palette button,
+  .component-palette button,
+  .layer-tree button,
+  .forms-list-scroll button,
+  .question-type-buttons button,
+  .form-command-button,
+  .reservation-list-item,
+  .role-picker-list button,
+  .daw-source-tabs button,
+  .daw-analysis-domain-grid button,
+  .daw-stepper button,
+  .daw-review-sidebar button,
+  .daw-group-grid button
+) {
+  background: var(--builder-surface-2) !important;
+  background-image: none !important;
+  border-color: var(--builder-border) !important;
+  color: var(--builder-text) !important;
+  -webkit-text-fill-color: var(--builder-text) !important;
+}
+
+.page-builder.theme-dark :is(
+  .workspace-tabs button,
+  .section-component-palette button,
+  .component-palette button,
+  .layer-tree button,
+  .forms-list-scroll button,
+  .question-type-buttons button,
+  .reservation-list-item,
+  .role-picker-list button,
+  .daw-source-tabs button,
+  .daw-analysis-domain-grid button,
+  .daw-stepper button,
+  .daw-review-sidebar button,
+  .daw-group-grid button
+):hover {
+  background: color-mix(in srgb, var(--builder-surface-2) 95%, white) !important;
+  border-color: var(--builder-border-strong) !important;
+}
+
+.page-builder.theme-dark :is(
+  .workspace-tabs button.active,
+  .layer-tree button.active,
+  .forms-list-scroll button.active,
+  .reservation-list-item.is-active,
+  .role-picker-list button.active,
+  .object-list button.active,
+  .page-list button.active,
+  .builder-tool-button.active,
+  .reservation-mode-switch button.active,
+  .daw-source-tabs button.active,
+  .daw-analysis-domain-grid button.active,
+  .daw-stepper button.active,
+  .daw-review-sidebar button.active,
+  .daw-group-grid button.active
+) {
+  background: color-mix(in srgb, var(--builder-surface-3) 92%, white) !important;
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  color: var(--builder-text) !important;
+  -webkit-text-fill-color: var(--builder-text) !important;
+  box-shadow: inset 0 -2px 0 var(--theme-info) !important;
+}
+
+.page-builder.theme-dark :is(
+  .analysis-file-dropzone,
+  .daw-file-dropzone,
+  .file-dropzone,
+  .empty-column,
+  .empty-connected,
+  .reservation-empty-list,
+  .reservation-editor-empty,
+  .publish-empty-note,
+  .form-connect-card,
+  .quiz-answer-key
+) {
+  background: var(--builder-surface-1) !important;
+  background-image: none !important;
+  border-color: var(--builder-border-strong) !important;
+  color: var(--builder-text-muted) !important;
+}
+
+.page-builder.theme-dark :is(
+  .analysis-file-dropzone:hover,
+  .analysis-file-dropzone.is-dragging,
+  .daw-file-dropzone:hover,
+  .daw-file-dropzone.is-dragging,
+  .file-dropzone:hover,
+  .file-dropzone.is-dragging,
+  .site-section.is-drop-target,
+  .direct-layout-section.is-drop-target,
+  .palette-drop-target,
+  .is-drop-target
+) {
+  background: color-mix(in srgb, var(--builder-surface-1) 95%, white) !important;
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: inset 0 0 0 1px var(--theme-info) !important;
+}
+
+.page-builder.theme-dark :is(.builder-element.is-selected, .direct-element-frame.is-selected, .site-section.is-selected, .site-column.is-selected) {
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: var(--theme-info) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-info) 44%, transparent) !important;
+}
+
+/* The editor canvas participates in the builder theme in dark mode. Inline
+   website theme variables still control brand accents, typography and layout. */
+.page-builder.theme-dark .builder-canvas {
+  --theme-bg: var(--builder-bg) !important;
+  --theme-bg-soft: var(--builder-surface-1) !important;
+  --theme-surface: var(--builder-surface-1) !important;
+  --theme-surface-2: var(--builder-surface-2) !important;
+  --theme-surface-3: var(--builder-surface-3) !important;
+  --theme-border: var(--builder-border) !important;
+  --theme-text: var(--builder-text) !important;
+  --theme-text-soft: var(--builder-text-muted) !important;
+  --theme-text-muted: var(--builder-text-muted) !important;
+  --madar-bg: var(--builder-bg) !important;
+  --madar-surface: var(--builder-surface-1) !important;
+  --madar-surface-soft: var(--builder-surface-2) !important;
+  --madar-border: var(--builder-border) !important;
+  --madar-text: var(--builder-text) !important;
+  --madar-muted: var(--builder-text-muted) !important;
+  --form-theme-card: var(--builder-surface-1) !important;
+  --form-theme-field: var(--builder-surface-2) !important;
+  --form-theme-border: var(--builder-border) !important;
+  --form-theme-text: var(--builder-text) !important;
+  --form-theme-helper: var(--builder-text-muted) !important;
+  background: var(--builder-bg) !important;
+  color: var(--builder-text) !important;
+}
+
+.page-builder.theme-dark .builder-canvas :is(.built-site-header, .built-site-footer, .site-section, .builder-form-preview, .runtime-form-card) {
+  border-color: var(--builder-border) !important;
+}
+
+/* The dashboard shell sits outside .page-builder in the route tree. Scope its
+   neutralization to a dashboard that currently contains the dark builder. */
+body.theme-dark:has(.page-builder.theme-dark) :is(
+  .admin-dashboard-layout,
+  .page-builder-dashboard-page,
+  .admin-dashboard-main,
+  .admin-dashboard-content
+) {
+  background: var(--builder-bg) !important;
+  background-image: none !important;
+}
+
+body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar {
+  background: var(--builder-surface-1) !important;
+  background-image: none !important;
+  border-color: var(--builder-border) !important;
+}
+
+body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(button, a, .admin-sidebar-search) {
+  border-color: transparent !important;
+}
+
+body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(button, a):hover {
+  background: var(--builder-hover) !important;
+}
+
+body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(.active, [aria-current="page"]) {
+  background: var(--builder-surface-3) !important;
+  box-shadow: inset 2px 0 0 var(--theme-primary) !important;
+}

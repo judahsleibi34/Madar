@@ -10,7 +10,6 @@ import {
 } from "./PageBuilder.factories";
 import {
   getSectionElements,
-  isMetricsSection,
   isResponsesSection,
   removeDeprecatedBuilderElements,
   hasFormSection,
@@ -233,7 +232,6 @@ export const cleanBuilderProject = (project) => {
       const baseSections = (page.sections || [])
         .filter(
           (section) =>
-            !isMetricsSection(section) &&
             !(isResponsesSection(section) && !section.isPageCanvas)
         )
         .map(removeDeprecatedBuilderElements);
