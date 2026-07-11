@@ -3890,3 +3890,47 @@ body.theme-dark .page-builder .workspace-tabs button.active,
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
 }
+
+/* Keep light-mode builder routes on one continuous beige chrome surface.
+   Component surfaces (fields, compact cards, dialogs, and previews) retain
+   their own tokens in the more specific rules above. */
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) :is(
+  .workspace-page,
+  .builder-layout,
+  .builder-canvas-shell,
+  .builder-sidebar,
+  .builder-inspector
+) {
+  background: var(--builder-bg) !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) :is(
+  .builder-panel,
+  .builder-side-panel
+) {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+:root:not([data-theme="dark"]) .page-builder:not(.theme-dark) .theme-section-heading {
+  background: var(--builder-bg) !important;
+  box-shadow: none !important;
+}
+
+/* Dark builder chrome uses the same shell token through the full sidebar.
+   Editing tools, fields, buttons, and compact cards keep their elevated
+   component surfaces. */
+.page-builder.theme-dark .builder-sidebar {
+  background: var(--builder-bg) !important;
+  background-color: var(--builder-bg) !important;
+}
+
+.page-builder.theme-dark :is(
+  .builder-side-panel,
+  .builder-panel,
+  .pages-manager-panel
+) {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}

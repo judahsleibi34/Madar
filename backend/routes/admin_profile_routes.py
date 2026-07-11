@@ -50,7 +50,7 @@ def update_admin_profile(
     response: Response,
 ):
     try:
-        _, admin_user = require_system_admin(request, response)
+        _, admin_user = require_system_admin(request, response, require_aal2=True)
 
         update_payload = {}
 
@@ -172,7 +172,7 @@ async def upload_admin_avatar(
     file: UploadFile = File(...),
 ):
     try:
-        _, admin_user = require_system_admin(request, response)
+        _, admin_user = require_system_admin(request, response, require_aal2=True)
         enforce_avatar_upload_rate_limit(
             request,
             admin_user.get("id"),

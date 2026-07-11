@@ -999,7 +999,14 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"success": True})
+        body = response.json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["reservation_id"], SUBMISSION_ID)
+        self.assertEqual(body["message"], "Reservation submitted successfully.")
+        saved = fake_supabase.tables["builder_reservations"][-1]
+        self.assertEqual(saved["tenant_id"], 1)
+        self.assertEqual(saved["project_id"], PROJECT_ID)
+        self.assertEqual(saved["customer_name"], "Ada")
         notify_event.assert_called_once()
         self.assertEqual(notify_event.call_args.kwargs["tenant_id"], 1)
         self.assertEqual(notify_event.call_args.kwargs["event_type"], "builder.reservation_requested")

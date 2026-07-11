@@ -78,6 +78,10 @@ class SecurityFoundationTests(unittest.TestCase):
         def update_builder_project(project_id: str):
             return {"ok": True, "project_id": project_id}
 
+        @app.patch("/builder/reservations/{reservation_id}/status")
+        def update_builder_reservation_status(reservation_id: str):
+            return {"ok": True, "reservation_id": reservation_id}
+
         @app.get("/safe-read")
         def safe_read():
             return {"ok": True}
@@ -96,6 +100,14 @@ class SecurityFoundationTests(unittest.TestCase):
 
         @app.post("/public/sites/example/auth/{action}")
         def public_tenant_auth(action: str):
+            return {"ok": True}
+
+        @app.post("/public/sites/example/events")
+        def public_site_event():
+            return {"ok": True}
+
+        @app.post("/public/sites/example/not-events")
+        def unrelated_public_site_post():
             return {"ok": True}
 
         @app.post("/issue-cookies")
@@ -198,6 +210,22 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"ok": True, "project_id": "project-1"})
 
+    def test_builder_reservation_status_patch_requires_csrf(self):
+        client = self.build_origin_client()
+
+        response = client.patch(
+            "/builder/reservations/reservation-1/status",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+            },
+            json={"status": "confirmed"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Invalid CSRF token")
+
     def test_invalid_origin_rejected_for_cookie_authenticated_write(self):
         client = self.build_origin_client()
 
@@ -290,6 +318,7 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/sites/example/auth/register",
             "/public/sites/example/auth/login",
             "/public/sites/example/auth/logout",
+            "/public/sites/example/events",
         ]:
             with self.subTest(path=path):
                 response = client.post(
@@ -302,6 +331,21 @@ class SecurityFoundationTests(unittest.TestCase):
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json(), {"ok": True})
+
+    def test_unrelated_public_site_post_is_not_csrf_exempt(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/public/sites/example/not-events",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Invalid CSRF token")
 
     def test_auth_cookies_issue_csrf_token(self):
         client = self.build_origin_client()

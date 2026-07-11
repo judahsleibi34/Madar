@@ -15,7 +15,7 @@ def update_tenant_feature(
     request: Request,
     response: Response,
 ):
-    _, admin_user = require_system_admin(request, response)
+    _, admin_user = require_system_admin(request, response, require_aal2=True)
 
     feature = apply_verified_billing_update(
         tenant_id=update.tenant_id,

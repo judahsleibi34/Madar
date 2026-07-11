@@ -15,6 +15,19 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _app_env() -> str:
+    return (
+        os.getenv("APP_ENV")
+        or os.getenv("ENV")
+        or os.getenv("FASTAPI_ENV")
+        or "development"
+    ).strip().lower()
+
+
+def _is_local_development_env() -> bool:
+    return _app_env() in {"dev", "development", "local", "test", "testing"}
+
+
 def send_permission_code_email(*, recipient_email: str, code: str, expires_minutes: int) -> str:
     smtp_host = os.getenv("SMTP_HOST", "").strip()
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
@@ -24,15 +37,9 @@ def send_permission_code_email(*, recipient_email: str, code: str, expires_minut
     smtp_tls = _env_bool("SMTP_USE_TLS", True)
 
     if not smtp_host:
-        app_env = (
-            os.getenv("APP_ENV")
-            or os.getenv("ENV")
-            or os.getenv("FASTAPI_ENV")
-            or "development"
-        ).strip().lower()
-        allow_dev_delivery = _env_bool(
+        allow_dev_delivery = _is_local_development_env() and _env_bool(
             "ADMIN_ACCOUNT_ACCESS_ALLOW_DEV_EMAIL_LOG",
-            app_env not in {"prod", "production"},
+            True,
         )
 
         if allow_dev_delivery:

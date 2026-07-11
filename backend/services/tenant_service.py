@@ -27,8 +27,14 @@ def _as_int(value, field_name: str) -> int:
 def get_current_tenant_context(
     request: Request,
     response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
 ) -> TenantContext:
-    auth_user, user_data = require_regular_user(request, response)
+    auth_user, user_data = require_regular_user(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
 
     tenant_id = user_data.get("tenant_id")
     user_id = user_data.get("id")
@@ -77,15 +83,25 @@ def get_current_tenant_context(
 def require_active_tenant_member(
     request: Request,
     response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
 ) -> TenantContext:
-    return get_current_tenant_context(request, response)
+    return get_current_tenant_context(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
 
 
 def require_builder_write_access(
     request: Request,
     response: Response | None = None,
 ) -> TenantContext:
-    context = get_current_tenant_context(request, response)
+    context = get_current_tenant_context(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
 
     if context.role not in {"owner", "admin", "member"}:
         raise HTTPException(status_code=403, detail="Builder write access required")
@@ -97,7 +113,11 @@ def require_builder_admin_access(
     request: Request,
     response: Response | None = None,
 ) -> TenantContext:
-    context = get_current_tenant_context(request, response)
+    context = get_current_tenant_context(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
 
     if context.role not in {"owner", "admin"}:
         raise HTTPException(status_code=403, detail="Builder admin access required")

@@ -18,7 +18,7 @@ def generate_account_access_code(
     request: Request,
     response: Response,
 ):
-    _, admin_user = require_system_admin(request, response)
+    _, admin_user = require_system_admin(request, response, require_aal2=True)
     return generate_permission_code(
         request=request,
         admin_user=admin_user,
@@ -32,7 +32,7 @@ def verify_account_access_code(
     request: Request,
     response: Response,
 ):
-    _, admin_user = require_system_admin(request, response)
+    _, admin_user = require_system_admin(request, response, require_aal2=True)
     return verify_permission_code(
         request=request,
         response=response,
@@ -47,7 +47,11 @@ def end_account_access(
     request: Request,
     response: Response,
 ):
-    _, admin_user = require_system_admin(request, response)
+    _, admin_user = require_system_admin(
+        request,
+        response,
+        reject_admin_account_access=False,
+    )
     return end_admin_account_access_session(
         request=request,
         response=response,
