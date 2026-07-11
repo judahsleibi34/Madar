@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from supabase import create_client
@@ -8,17 +9,16 @@ from classes import PasswordReset
 from database import service_supabase, supabase
 from services.rate_limit_service import enforce_password_rate_limit
 from services.audit_service import record_security_event
+from services.frontend_url import resolve_frontend_url
 
 router = APIRouter(prefix="/auth", tags=["Password"])
 logger = logging.getLogger(__name__)
 
-FRONTEND_URL = (
-    os.getenv("FRONTEND_URL")
-    or os.getenv("FRONTEND_URLS", "http://localhost:5173").split(",")[0].strip()
-)
+FRONTEND_URL = resolve_frontend_url()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 RESET_MESSAGE = "If that email is registered, a password reset link has been sent."
+PASSWORD_RESET_TTL_MINUTES = int(os.getenv("PASSWORD_RESET_TTL_MINUTES", "10"))
 
 
 def get_local_user_by_auth_id(auth_id: str):
@@ -34,6 +34,51 @@ def get_local_user_by_auth_id(auth_id: str):
     )
 
     return result.data[0] if result.data else None
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _iso(value: datetime) -> str:
+    return value.isoformat()
+
+
+def _parse_datetime(value) -> datetime | None:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and value.strip():
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    else:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+
+    return parsed.astimezone(timezone.utc)
+
+
+def mark_password_reset_requested(user_id: int):
+    service_supabase.table("users").update(
+        {"password_reset_requested_at": _iso(_utc_now())}
+    ).eq("id", user_id).execute()
+
+
+def assert_password_reset_window(local_user: dict | None):
+    requested_at = _parse_datetime((local_user or {}).get("password_reset_requested_at"))
+    expires_at = requested_at + timedelta(minutes=PASSWORD_RESET_TTL_MINUTES) if requested_at else None
+
+    if not expires_at or expires_at <= _utc_now():
+        raise HTTPException(
+            status_code=401,
+            detail="Password reset link expired. Request a new link.",
+        )
+
+
+def clear_password_reset_request(user_id: int):
+    service_supabase.table("users").update(
+        {"password_reset_requested_at": None}
+    ).eq("id", user_id).execute()
 
 
 admin_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -68,6 +113,9 @@ def forgot_password(payload: dict, request: Request):
         if not user.data:
             return {"message": RESET_MESSAGE}
 
+        if user_row:
+            mark_password_reset_requested(user_row.get("id"))
+
         supabase.auth.reset_password_email(
             email,
             options={"redirect_to": f"{FRONTEND_URL}/reset-password"},
@@ -101,12 +149,17 @@ def password_reset(payload: PasswordReset, request: Request):
         if not user.user:
             raise HTTPException(status_code=401, detail="Invalid user or expired token")
 
+        local_user = get_local_user_by_auth_id(str(user.user.id))
+        assert_password_reset_window(local_user)
+
         admin_supabase.auth.admin.update_user_by_id(
             str(user.user.id),
             {"password": payload.password},
         )
 
-        local_user = get_local_user_by_auth_id(str(user.user.id))
+        if local_user:
+            clear_password_reset_request(local_user.get("id"))
+
         record_security_event(
             request=request,
             tenant_id=(local_user or {}).get("tenant_id"),

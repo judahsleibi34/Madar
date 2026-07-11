@@ -121,7 +121,7 @@ def ensure_subdomain_available(supabase_client: Any, subdomain: str) -> None:
 def default_builder_schema(business_name: str) -> dict[str, Any]:
     title = business_name.strip() or "New Site"
     return {
-        "name": f"{title} Website",
+        "name": "Untitled Site",
         "status": "draft",
         "activePageId": "home",
         "activeFormId": "",
@@ -129,8 +129,7 @@ def default_builder_schema(business_name: str) -> dict[str, Any]:
         "activeWorkflowId": "",
         "activeRoleId": "",
         "siteChrome": {
-            "brandName": title,
-            "logoText": title,
+            "brand": title,
             "subdomain": "",
         },
         "theme": {},
@@ -145,66 +144,22 @@ def default_builder_schema(business_name: str) -> dict[str, Any]:
                 "pageType": "main",
                 "sections": [
                     {
-                        "id": "hero",
-                        "name": "Hero",
-                        "mode": "auto",
+                        "id": "page-canvas",
+                        "name": "Page Canvas",
+                        "mode": "direct",
+                        "isPageCanvas": True,
                         "layout": {
-                            "width": "large",
-                            "paddingY": "large",
-                            "background": "#fbfaf8",
-                            "minHeight": 560,
+                            "width": "full",
+                            "paddingY": "none",
+                            "background": "transparent",
+                            "minHeight": 720,
+                            "minHeightByViewport": {
+                                "desktop": 720,
+                                "tablet": 720,
+                                "mobile": 720,
+                            },
                         },
-                        "rows": [
-                            {
-                                "id": "hero-row",
-                                "layout": {
-                                    "columns": "1",
-                                    "align": "center",
-                                    "gap": "medium",
-                                },
-                                "columns": [
-                                    {
-                                        "id": "hero-column",
-                                        "name": "Column",
-                                        "layout": {"align": "left"},
-                                        "elements": [
-                                            {
-                                                "id": "hero-title",
-                                                "type": "heading",
-                                                "name": "Heading",
-                                                "content": title,
-                                                "mode": "auto",
-                                                "connectedFormId": "",
-                                                "action": {
-                                                    "type": "none",
-                                                    "pageId": "",
-                                                    "sectionId": "",
-                                                    "formId": "",
-                                                    "url": "",
-                                                    "message": "",
-                                                    "status": "",
-                                                },
-                                                "position": {
-                                                    "desktop": {"x": 56, "y": 56, "width": 380, "height": 96},
-                                                    "tablet": {"x": 40, "y": 44, "width": 320, "height": 96},
-                                                    "mobile": {"x": 22, "y": 34, "width": 300, "height": 96},
-                                                },
-                                                "styles": {
-                                                    "color": "#1a2744",
-                                                    "backgroundColor": "",
-                                                    "borderRadius": "16px",
-                                                    "fontSize": "46px",
-                                                    "fontWeight": "950",
-                                                    "textAlign": "left",
-                                                    "lineHeight": "1.04",
-                                                    "alignSelf": "auto",
-                                                },
-                                            }
-                                        ],
-                                    }
-                                ],
-                            }
-                        ],
+                        "rows": [],
                         "freeElements": [],
                     }
                 ],

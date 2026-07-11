@@ -4,11 +4,21 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, HTTPException, Request, Response
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from database import service_supabase
+from database import service_supabase, supabase
+from services.auth_service import (
+    auth_user_email_is_verified,
+    build_user_payload,
+    delete_auth_cookies,
+    get_authenticated_user_row,
+    mark_local_email_verified,
+    set_auth_cookies,
+)
+from services.frontend_url import resolve_frontend_url
 from services.rate_limit_service import (
+    enforce_auth_rate_limit,
     enforce_public_form_submission_rate_limit,
     enforce_public_rate_limit,
     get_client_ip,
@@ -26,6 +36,7 @@ MAX_PUBLIC_BLOCK_EVENT_FIELDS = 100
 MAX_PUBLIC_BLOCK_EVENT_STRING_LENGTH = 5000
 MAX_PUBLIC_BLOCK_EVENT_JSON_BYTES = 64 * 1024
 BLOCK_TYPE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+FRONTEND_URL = resolve_frontend_url()
 
 
 class PublicFormSubmissionCreate(BaseModel):
@@ -57,6 +68,17 @@ class PublicBuilderBlockEventCreate(BaseModel):
         if not isinstance(value, dict):
             raise ValueError("payload must be a JSON object")
         return value
+
+
+class TenantRegisterRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=160)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=200)
+
+
+class TenantLoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=200)
 
 
 def rows(response):
@@ -521,6 +543,227 @@ def resolve_tenant_id(settings: dict):
         raise HTTPException(status_code=404, detail="Published site not found")
 
     return tenant_id
+
+
+def normalize_email(value: str) -> str:
+    return (value or "").strip().lower()
+
+
+def get_local_user_by_auth_id(auth_id: str):
+    return first_row(
+        service_supabase.table("users")
+        .select("*")
+        .eq("auth_id", str(auth_id))
+        .limit(1)
+        .execute()
+    )
+
+
+def get_active_tenant_membership(tenant_id: int, user_id: int):
+    return first_row(
+        service_supabase.table("tenant_site_memberships")
+        .select("*")
+        .eq("tenant_id", tenant_id)
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
+
+
+def get_tenant_staff_membership(tenant_id: int, user_id: int):
+    return first_row(
+        service_supabase.table("tenant_memberships")
+        .select("*")
+        .eq("tenant_id", tenant_id)
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
+
+
+def get_tenant_site_access(settings: dict, user_row: dict):
+    tenant_id = resolve_tenant_id(settings)
+    user_id = user_row.get("id")
+    site_membership = get_active_tenant_membership(tenant_id, user_id)
+    if site_membership:
+        return site_membership
+
+    staff_membership = get_tenant_staff_membership(tenant_id, user_id)
+    if staff_membership:
+        return staff_membership
+
+    if (
+        str(settings.get("user_id") or "") == str(user_id or "")
+        or str(user_row.get("tenant_id") or "") == str(tenant_id)
+    ):
+        return {"tenant_id": tenant_id, "user_id": user_id, "role": "owner", "status": "active"}
+
+    return None
+
+
+def require_tenant_visitor(subdomain: str, request: Request, response: Response):
+    settings = resolve_website_settings(normalize_subdomain(subdomain))
+    _, user_row = get_authenticated_user_row(request, response)
+    membership = get_tenant_site_access(settings, user_row)
+
+    if not membership:
+        raise HTTPException(status_code=403, detail="This account does not belong to this website")
+
+    return user_row, membership
+
+
+@router.post("/sites/{subdomain}/auth/register")
+def register_tenant_visitor(
+    subdomain: str,
+    payload: TenantRegisterRequest,
+    request: Request,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    settings = resolve_website_settings(clean_subdomain)
+    tenant_id = resolve_tenant_id(settings)
+    clean_email = normalize_email(payload.email)
+    name_parts = payload.full_name.strip().split(None, 1)
+    first_name = name_parts[0]
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+    auth_user_id = None
+    local_user_id = None
+
+    enforce_auth_rate_limit(request, "tenant_signup", f"{clean_subdomain}:{clean_email}")
+
+    existing = service_supabase.table("users").select("id").eq("email", clean_email).limit(1).execute()
+    if rows(existing):
+        raise HTTPException(status_code=409, detail="Email is already registered")
+
+    try:
+        auth_response = supabase.auth.sign_up(
+            {
+                "email": clean_email,
+                "password": payload.password,
+                "options": {
+                    "email_redirect_to": f"{FRONTEND_URL}/site/{clean_subdomain}",
+                    "data": {"first_name": first_name, "last_name": last_name},
+                },
+            }
+        )
+        if not auth_response.user:
+            raise HTTPException(status_code=400, detail="Could not create account")
+
+        auth_user_id = str(auth_response.user.id)
+        user_result = service_supabase.table("users").insert(
+            {
+                "auth_id": auth_user_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": clean_email,
+                "tenant_id": None,
+                "email_verified": False,
+                "email_verified_at": None,
+            }
+        ).execute()
+        local_user = first_row(user_result)
+        if not local_user:
+            raise HTTPException(status_code=400, detail="Could not create account")
+        local_user_id = local_user["id"]
+
+        service_supabase.table("tenant_site_memberships").insert(
+            {
+                "tenant_id": tenant_id,
+                "user_id": local_user["id"],
+                "auth_id": auth_user_id,
+                "role": "customer",
+                "status": "active",
+            }
+        ).execute()
+
+        return {
+            "message": "Account created. Check your email, then log in.",
+            "requires_email_verification": True,
+        }
+    except HTTPException:
+        if local_user_id:
+            try:
+                service_supabase.table("tenant_site_memberships").delete().eq("user_id", local_user_id).execute()
+                service_supabase.table("users").delete().eq("id", local_user_id).execute()
+            except Exception:
+                pass
+        if auth_user_id:
+            try:
+                service_supabase.auth.admin.delete_user(auth_user_id)
+            except Exception:
+                pass
+        raise
+    except Exception as error:
+        logger.warning("public.tenant_signup_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
+        if local_user_id:
+            try:
+                service_supabase.table("tenant_site_memberships").delete().eq("user_id", local_user_id).execute()
+                service_supabase.table("users").delete().eq("id", local_user_id).execute()
+            except Exception:
+                pass
+        if auth_user_id:
+            try:
+                service_supabase.auth.admin.delete_user(auth_user_id)
+            except Exception:
+                pass
+        raise HTTPException(status_code=400, detail="Could not create account") from error
+
+
+@router.post("/sites/{subdomain}/auth/login")
+def login_tenant_visitor(
+    subdomain: str,
+    payload: TenantLoginRequest,
+    request: Request,
+    response: Response,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    settings = resolve_website_settings(clean_subdomain)
+    tenant_id = resolve_tenant_id(settings)
+    clean_email = normalize_email(payload.email)
+    enforce_auth_rate_limit(request, "tenant_login", f"{clean_subdomain}:{clean_email}")
+
+    try:
+        auth_response = supabase.auth.sign_in_with_password(
+            {"email": clean_email, "password": payload.password}
+        )
+        if not auth_response.user or not auth_response.session:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not auth_user_email_is_verified(auth_response.user):
+            raise HTTPException(status_code=403, detail="Please verify your email before logging in")
+
+        user_row = get_local_user_by_auth_id(str(auth_response.user.id))
+        if not user_row or not get_tenant_site_access(settings, user_row):
+            raise HTTPException(status_code=403, detail="This account does not belong to this website")
+
+        user_row = mark_local_email_verified(user_row)
+        csrf_token = set_auth_cookies(
+            response,
+            auth_response.session.access_token,
+            auth_response.session.refresh_token,
+        )
+        return {"logged_in": True, "user": build_user_payload(user_row), "csrf_token": csrf_token}
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.warning("public.tenant_login_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
+        raise HTTPException(status_code=401, detail="Invalid email or password") from error
+
+
+@router.get("/sites/{subdomain}/auth/status")
+def tenant_visitor_status(subdomain: str, request: Request, response: Response):
+    try:
+        user_row, membership = require_tenant_visitor(subdomain, request, response)
+        return {"logged_in": True, "user": build_user_payload(user_row), "role": membership.get("role")}
+    except HTTPException:
+        return {"logged_in": False, "user": None}
+
+
+@router.post("/sites/{subdomain}/auth/logout")
+def logout_tenant_visitor(subdomain: str, response: Response):
+    normalize_subdomain(subdomain)
+    delete_auth_cookies(response)
+    return {"logged_in": False, "message": "Logged out"}
 
 @router.get("/sites/{subdomain}")
 def get_public_site(subdomain: str, request: Request):

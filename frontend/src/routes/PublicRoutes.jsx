@@ -161,21 +161,21 @@ export default function PublicRoutes({
             path="signup"
             element={<SignUpPage key={`signup-${lang}`} lang={lang} />}
           />
+
+          <Route
+            path="forgot-password"
+            element={
+              <ForgotPasswordPage key={`forgot-password-${lang}`} lang={lang} />
+            }
+          />
+
+          <Route
+            path="reset-password"
+            element={
+              <ResetPasswordPage key={`reset-password-${lang}`} lang={lang} />
+            }
+          />
         </Route>
-
-      <Route
-        path="forgot-password"
-        element={
-          <ForgotPasswordPage key={`forgot-password-${lang}`} lang={lang} />
-        }
-      />
-
-      <Route
-        path="reset-password"
-        element={
-          <ResetPasswordPage key={`reset-password-${lang}`} lang={lang} />
-        }
-      />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

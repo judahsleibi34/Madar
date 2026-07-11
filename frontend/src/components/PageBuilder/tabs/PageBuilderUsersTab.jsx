@@ -62,7 +62,7 @@ export default function PageBuilderUsersTab({
         </div>
 
         <div className="header-actions users-header-actions">
-          <button type="button" onClick={addUser}>
+          <button type="button" className="primary-action" onClick={addUser}>
             <UserPlus size={17} />
             Add user
           </button>

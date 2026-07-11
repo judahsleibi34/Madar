@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeAuthMessage } from "./authMessages";
+import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
 
 describe("normalizeAuthMessage", () => {
   it("keeps known user-safe auth messages", () => {
@@ -22,5 +22,37 @@ describe("normalizeAuthMessage", () => {
     expect(normalizeAuthMessage("auth.session.invalid", "Try again.")).toBe(
       "Your session is invalid or expired. Please log in again."
     );
+  });
+});
+
+describe("formatAuthValidationToastMessage", () => {
+  it("keeps required-field summaries compact", () => {
+    expect(
+      formatAuthValidationToastMessage(
+        {
+          firstName: "This field is required.",
+          email: "This field is required.",
+        },
+        {
+          firstName: "First name",
+          email: "Email",
+        }
+      )
+    ).toBe("First name and Email are required.");
+  });
+
+  it("includes explicit field problems for non-required errors", () => {
+    expect(
+      formatAuthValidationToastMessage(
+        {
+          email: "Please enter a valid email address.",
+          password: "Password must include a number.",
+        },
+        {
+          email: "Email",
+          password: "Password",
+        }
+      )
+    ).toBe("Email: Please enter a valid email address. Password: Password must include a number.");
   });
 });

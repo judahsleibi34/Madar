@@ -99,7 +99,9 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
         with patch.object(
             auth_service.supabase.auth,
             "get_user",
-            return_value=SimpleNamespace(user=SimpleNamespace(id="auth-admin")),
+            return_value=SimpleNamespace(
+                user=SimpleNamespace(id="auth-admin", email_confirmed_at="2026-01-01T00:00:00Z")
+            ),
         ), patch.object(auth_service, "service_supabase", _FakeServiceSupabase()), patch(
             "services.admin_account_access_service.resolve_admin_account_access_user",
             side_effect=resolve_target_with_context,
@@ -130,7 +132,9 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
         with patch.object(
             auth_service.supabase.auth,
             "get_user",
-            return_value=SimpleNamespace(user=SimpleNamespace(id="auth-admin")),
+            return_value=SimpleNamespace(
+                user=SimpleNamespace(id="auth-admin", email_confirmed_at="2026-01-01T00:00:00Z")
+            ),
         ), patch.object(auth_service, "service_supabase", _FakeServiceSupabase()), patch(
             "services.admin_account_access_service.resolve_admin_account_access_user",
             side_effect=resolve_target_with_context,

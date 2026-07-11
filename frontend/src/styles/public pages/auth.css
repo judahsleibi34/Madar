@@ -65,6 +65,26 @@
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
+.register-card input.auth-field-error-input,
+.login-card input.auth-field-error-input {
+  border-color: var(--theme-danger, #dc2626);
+  background: color-mix(in srgb, var(--theme-surface) 94%, #dc2626);
+}
+
+.register-card input.auth-field-error-input:focus,
+.login-card input.auth-field-error-input:focus {
+  border-color: var(--theme-danger, #dc2626);
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.12);
+}
+
+.auth-field-error {
+  color: var(--theme-danger, #dc2626);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .password-field {
   position: relative;
   display: flex;

@@ -13,7 +13,6 @@ export default function PageBuilderWorkspaceHeader({
   openPreviewPage,
   preview,
   project,
-  publishProject,
   renderWorkspaceNavigator,
   saveProject,
   setActiveTopbarAction,
@@ -41,7 +40,6 @@ export default function PageBuilderWorkspaceHeader({
         openPreviewPage={openPreviewPage}
         setPreview={setPreview}
         saveProject={saveProject}
-        publishProject={publishProject}
       />
 
       <PageBuilderSubbar

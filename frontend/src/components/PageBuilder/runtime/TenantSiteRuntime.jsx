@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
-import { fetchPublicSite, submitPublicBuilderEvent, submitPublicFormSubmission } from "../services/PageBuilder.api";
+import {
+  fetchPublicSite,
+  getTenantVisitorStatus,
+  loginTenantVisitor,
+  logoutTenantVisitor,
+  registerTenantVisitor,
+  submitPublicBuilderEvent,
+  submitPublicFormSubmission,
+} from "../services/PageBuilder.api";
 import { getFormSections } from "../core/PageBuilder.factories";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import {
   getContentDirection,
+  getDefaultFormLanguage,
   getDirectionForLanguage,
   getLocalizedOptions,
   getLocalizedValue,
-  getRuntimeLanguage,
   normalizeLanguageMode,
 } from "../core/PageBuilder.localization";
 import "../../../styles/admin/PageBuilder/index.css";
@@ -66,26 +74,73 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
   });
 
 const getRichTextRanges = (element, field, itemIndex = null) =>
-  (element?.richTextColors || []).filter(
-    (range) => range.field === field && (range.itemIndex ?? null) === itemIndex
-  );
+  [
+    ...(element?.richTextColors || []),
+    ...(element?.richTextSizes || []),
+    ...(element?.richTextStyles || []),
+  ].filter((range) => range.field === field && (range.itemIndex ?? null) === itemIndex);
 
 const renderRichText = (value, ranges = []) => {
   const text = String(value ?? "");
   const parts = [];
   let runStart = 0;
   let runColor = null;
+  let runFontSize = null;
+  let runFontWeight = null;
+  let runFontStyle = null;
+  let runTextDecoration = null;
 
   for (let index = 0; index <= text.length; index += 1) {
-    const color = index < text.length
-      ? [...ranges].reverse().find((range) => index >= range.start && index < range.end)?.color || null
-      : null;
-    if (index === 0) runColor = color;
-    if (color === runColor && index < text.length) continue;
+    const activeRanges =
+      index < text.length
+        ? [...ranges].reverse().filter((range) => index >= range.start && index < range.end)
+        : [];
+    const color = activeRanges.find((range) => range.color)?.color || null;
+    const fontSize = activeRanges.find((range) => range.fontSize)?.fontSize || null;
+    const fontWeight = activeRanges.find((range) => range.fontWeight)?.fontWeight || null;
+    const fontStyle = activeRanges.find((range) => range.fontStyle)?.fontStyle || null;
+    const textDecoration = activeRanges.find((range) => range.textDecoration)?.textDecoration || null;
+
+    if (index === 0) {
+      runColor = color;
+      runFontSize = fontSize;
+      runFontWeight = fontWeight;
+      runFontStyle = fontStyle;
+      runTextDecoration = textDecoration;
+    }
+    if (
+      color === runColor &&
+      fontSize === runFontSize &&
+      fontWeight === runFontWeight &&
+      fontStyle === runFontStyle &&
+      textDecoration === runTextDecoration &&
+      index < text.length
+    ) continue;
+
     const content = text.slice(runStart, index);
-    if (content) parts.push(runColor ? <span style={{ color: runColor }} key={`${runStart}_${runColor}`}>{content}</span> : content);
+    if (content) {
+      const style = {
+        ...(runColor ? { color: runColor } : {}),
+        ...(runFontSize ? { fontSize: runFontSize } : {}),
+        ...(runFontWeight ? { fontWeight: runFontWeight } : {}),
+        ...(runFontStyle ? { fontStyle: runFontStyle } : {}),
+        ...(runTextDecoration ? { textDecoration: runTextDecoration } : {}),
+      };
+
+      parts.push(
+        Object.keys(style).length ? (
+          <span style={style} key={`${runStart}_${runColor || ""}_${runFontSize || ""}_${runFontWeight || ""}_${runFontStyle || ""}_${runTextDecoration || ""}`}>{content}</span>
+        ) : (
+          content
+        )
+      );
+    }
     runStart = index;
     runColor = color;
+    runFontSize = fontSize;
+    runFontWeight = fontWeight;
+    runFontStyle = fontStyle;
+    runTextDecoration = textDecoration;
   }
 
   return parts.length ? parts : text;
@@ -315,6 +370,98 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
+  const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
+
+  useEffect(() => {
+    if (draftPreview) return;
+    let cancelled = false;
+
+    getTenantVisitorStatus(cleanSubdomain)
+      .then((result) => {
+        if (!cancelled) setTenantAuth({ loading: false, user: result?.logged_in ? result.user : null, message: "", error: "" });
+      })
+      .catch(() => {
+        if (!cancelled) setTenantAuth({ loading: false, user: null, message: "", error: "" });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanSubdomain, draftPreview]);
+
+  const submitTenantAuth = async (event, isRegistration, authElement) => {
+    event.preventDefault();
+    if (draftPreview || tenantAuth.loading) return;
+
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const password = String(form.get("password") || "");
+    const confirmPassword = String(form.get("confirmPassword") || "");
+
+    if (isRegistration && password !== confirmPassword) {
+      setTenantAuth((current) => ({ ...current, error: "Passwords do not match.", message: "" }));
+      return;
+    }
+
+    setTenantAuth((current) => ({ ...current, loading: true, error: "", message: "" }));
+
+    try {
+      const result = isRegistration
+        ? await registerTenantVisitor(cleanSubdomain, {
+            full_name: String(form.get("fullName") || "").trim(),
+            email: String(form.get("email") || "").trim(),
+            password,
+          })
+        : await loginTenantVisitor(cleanSubdomain, {
+            email: String(form.get("email") || "").trim(),
+            password,
+          });
+
+      setTenantAuth({
+        loading: false,
+        user: result?.logged_in ? result.user : null,
+        message: result?.message || (result?.logged_in ? "You are logged in." : "Account created. Check your email, then log in."),
+        error: "",
+      });
+      formElement.reset();
+      if (isRegistration && result?.requires_email_verification) {
+        const pageContainsLogin = (page) => (page.sections || []).some((section) =>
+          (section.freeElements || []).some((item) => item.type === "loginBlock") ||
+          (section.rows || []).some((row) =>
+            (row.columns || []).some((column) =>
+              (column.elements || []).some((item) => item.type === "loginBlock")
+            )
+          )
+        );
+        const currentPageIndex = pages.findIndex((page) => page.id === activePage?.id);
+        const destination =
+          pages.find((page) => page.id === authElement?.auth?.successPageId) ||
+          pages.find(pageContainsLogin) ||
+          pages[currentPageIndex + 1];
+        if (destination && destination.id !== activePage?.id) goToPage(destination);
+      } else if (result?.logged_in) {
+        const currentPageIndex = pages.findIndex((page) => page.id === activePage?.id);
+        const destination =
+          pages.find((page) => page.id === authElement?.auth?.successPageId) ||
+          pages[currentPageIndex + 1] ||
+          pages[0];
+        if (destination && destination.id !== activePage?.id) goToPage(destination);
+      }
+    } catch (error) {
+      setTenantAuth({ loading: false, user: null, message: "", error: error?.message || "Please try again." });
+    }
+  };
+
+  const logOutTenantVisitor = async () => {
+    if (tenantAuth.loading) return;
+    setTenantAuth((current) => ({ ...current, loading: true, error: "", message: "" }));
+    try {
+      await logoutTenantVisitor(cleanSubdomain);
+      setTenantAuth({ loading: false, user: null, message: "You are logged out.", error: "" });
+    } catch (error) {
+      setTenantAuth((current) => ({ ...current, loading: false, error: error?.message || "Please try again." }));
+    }
+  };
 
   useEffect(() => {
     if (draftPreview) {
@@ -536,6 +683,29 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   }, [pagePath, pages]);
 
   useEffect(() => {
+    if (!tenantAuth.user || !activePage) return;
+
+    const loginElement = (activePage.sections || [])
+      .flatMap((section) => [
+        ...(section.freeElements || []),
+        ...(section.rows || []).flatMap((row) =>
+          (row.columns || []).flatMap((column) => column.elements || [])
+        ),
+      ])
+      .find((element) => element.type === "loginBlock");
+
+    if (!loginElement) return;
+
+    const currentPageIndex = pages.findIndex((page) => page.id === activePage.id);
+    const destination =
+      pages.find((page) => page.id === loginElement.auth?.successPageId) ||
+      pages[currentPageIndex + 1] ||
+      pages[0];
+
+    if (destination && destination.id !== activePage.id) goToPage(destination);
+  }, [activePage, pages, tenantAuth.user]);
+
+  useEffect(() => {
     const syncViewport = () => setRuntimeViewport(getScreenViewport());
     syncViewport();
     window.addEventListener("resize", syncViewport);
@@ -715,7 +885,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     event.preventDefault();
 
     const answers = buildSubmissionAnswers(form, instanceKey);
-    const formLang = formLanguages[instanceKey] || getRuntimeLanguage(form, runtimeDirection === "rtl" ? "ar" : "en");
+    const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
     const formCopy = getTenantRuntimeContent(formLang);
     const missingField = getVisibleFieldsForInstance(form, getRuntimeFormFields(form), instanceKey).find(
       (field) => field.required && isEmptyAnswer(answers[field.id])
@@ -1011,8 +1181,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const instanceKey = `${formElementId || "form"}_${form.id}`;
     const status = formStatus[instanceKey] || {};
     const isSubmitting = Boolean(status.submitting);
-    const languageMode = normalizeLanguageMode(form.languageMode || form.localeMode || runtimeDirection);
-    const formLang = formLanguages[instanceKey] || getRuntimeLanguage(form, runtimeDirection === "rtl" ? "ar" : "en");
+    const languageMode = normalizeLanguageMode(form.languageMode || form.localeMode || form.defaultLanguage || "en");
+    const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
     const formCopy = getTenantRuntimeContent(formLang);
     const formDir = getDirectionForLanguage(formLang);
     const formSections = getFormSections(form);
@@ -1224,9 +1394,25 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       const isRegistration = element.type === "registrationBlock";
       const auth = element.auth || {};
 
+      if (tenantAuth.user) {
+        return (
+          <div key={element.id} {...props}>
+            <div className="builder-auth-component tenant-auth-account">
+              <div className="builder-auth-heading">
+                <h3>Welcome, {tenantAuth.user.first_name || tenantAuth.user.email}</h3>
+                <p>You are signed in to this website.</p>
+              </div>
+              <button type="button" className="runtime-submit" disabled={tenantAuth.loading} onClick={logOutTenantVisitor}>
+                {tenantAuth.loading ? "Please wait…" : "Log out"}
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div key={element.id} {...props}>
-          <form className="builder-auth-component" autoComplete="off" onSubmit={(event) => event.preventDefault()}>
+          <form className="builder-auth-component" autoComplete="on" onSubmit={(event) => submitTenantAuth(event, isRegistration, element)}>
             <div className="builder-auth-heading">
               <h3>{auth.title || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}</h3>
               <p>{auth.subtitle || (isRegistration ? runtimeCopy.runtime.createAccountSubtitle : runtimeCopy.runtime.loginSubtitle)}</p>
@@ -1234,25 +1420,27 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             {isRegistration && (
               <label>
                 {runtimeCopy.runtime.fullName}
-                <input type="text" name={`builder-demo-name-${element.id}`} autoComplete="off" placeholder={runtimeCopy.runtime.yourName} />
+                <input type="text" name="fullName" autoComplete="name" required placeholder={runtimeCopy.runtime.yourName} />
               </label>
             )}
             <label>
               {runtimeCopy.runtime.emailAddress}
-              <input type="email" name={`builder-demo-email-${element.id}`} autoComplete="off" placeholder={runtimeCopy.runtime.emailPlaceholder} />
+              <input type="email" name="email" autoComplete="email" required placeholder={runtimeCopy.runtime.emailPlaceholder} />
             </label>
             <label>
               {runtimeCopy.runtime.password}
-              <input type="password" name={`builder-demo-password-${element.id}`} autoComplete="new-password" placeholder={runtimeCopy.runtime.passwordPlaceholder} />
+              <input type="password" name="password" minLength={8} autoComplete={isRegistration ? "new-password" : "current-password"} required placeholder={runtimeCopy.runtime.passwordPlaceholder} />
             </label>
             {isRegistration && (
               <label>
                 {runtimeCopy.runtime.confirmPassword}
-                <input type="password" name={`builder-demo-confirm-${element.id}`} autoComplete="new-password" placeholder={runtimeCopy.runtime.confirmPasswordPlaceholder} />
+                <input type="password" name="confirmPassword" minLength={8} autoComplete="new-password" required placeholder={runtimeCopy.runtime.confirmPasswordPlaceholder} />
               </label>
             )}
-            <button type="submit" className="runtime-submit">
-              {auth.buttonText || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}
+            {tenantAuth.error && <p className="runtime-form-error" role="alert">{tenantAuth.error}</p>}
+            {tenantAuth.message && <p className="runtime-form-success" role="status">{tenantAuth.message}</p>}
+            <button type="submit" className="runtime-submit" disabled={tenantAuth.loading || draftPreview}>
+              {tenantAuth.loading ? "Please wait…" : auth.buttonText || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}
             </button>
             <p className="builder-auth-switch">
               {auth.switchText} <strong>{auth.switchActionText}</strong>
@@ -1398,7 +1586,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         </button>
 
         <nav className="tenant-site-nav">
-          {pages.map((page) => {
+          {pages.filter((page) => page.showInNavigation !== false).map((page) => {
             const pagePath =
               page.slug === "/"
                 ? siteHomePath

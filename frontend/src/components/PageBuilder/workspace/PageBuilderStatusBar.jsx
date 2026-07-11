@@ -1,4 +1,4 @@
-export default function PageBuilderStatusBar({ canonicalLiveSitePath, toast }) {
+export default function PageBuilderStatusBar({ toast }) {
   return (
     <>
       {toast && (
@@ -9,16 +9,6 @@ export default function PageBuilderStatusBar({ canonicalLiveSitePath, toast }) {
             <span>{toast}</span>
           </span>
         </div>
-      )}
-      {canonicalLiveSitePath && (
-        <a
-          className="builder-live-site-link"
-          href={canonicalLiveSitePath}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open live site
-        </a>
       )}
     </>
   );

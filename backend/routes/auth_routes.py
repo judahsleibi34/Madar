@@ -10,6 +10,8 @@ from services.auth_service import (
     delete_auth_cookies,
     build_user_payload,
     get_authenticated_user_row,
+    auth_user_email_is_verified,
+    mark_local_email_verified,
     normalize_user_type,
 )
 from services.billing_service import get_billing_summary_for_tenant
@@ -23,9 +25,11 @@ from services.mfa_login_service import (
 )
 from services.audit_service import record_security_event
 from services.user_security_settings_service import get_user_security_settings
+from services.frontend_url import resolve_frontend_url
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
+FRONTEND_URL = resolve_frontend_url()
 
 
 def ensure_csrf_token(request: Request, response: Response) -> str:
@@ -82,6 +86,38 @@ def get_local_user_by_auth_id(auth_id: str):
     return None
 
 
+def get_auth_user_by_email(clean_email: str):
+    if not clean_email:
+        return None
+
+    page = 1
+    per_page = 1000
+
+    while True:
+        try:
+            users = service_supabase.auth.admin.list_users(page=page, per_page=per_page)
+        except Exception as error:
+            logger.warning(
+                "auth.signup.auth_email_lookup_failed",
+                extra={"error_type": type(error).__name__},
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Could not verify email availability",
+            ) from error
+
+        for auth_user in users:
+            user_email = normalize_email(getattr(auth_user, "email", ""))
+
+            if user_email == clean_email:
+                return auth_user
+
+        if len(users) < per_page:
+            return None
+
+        page += 1
+
+
 def get_login_audit_user(clean_email: str):
     try:
         return get_local_user_by_email(clean_email)
@@ -96,12 +132,25 @@ def get_login_audit_user(clean_email: str):
 def assert_email_is_available(clean_email: str, allowed_auth_id: str | None = None):
     existing_user = get_local_user_by_email(clean_email)
 
-    if not existing_user:
+    if existing_user:
+        existing_auth_id = str(existing_user.get("auth_id") or "")
+
+        if allowed_auth_id and existing_auth_id == str(allowed_auth_id):
+            return
+
+        raise HTTPException(
+            status_code=409,
+            detail="Email is already registered",
+        )
+
+    existing_auth_user = get_auth_user_by_email(clean_email)
+
+    if not existing_auth_user:
         return
 
-    existing_auth_id = str(existing_user.get("auth_id") or "")
+    existing_auth_user_id = str(getattr(existing_auth_user, "id", "") or "")
 
-    if allowed_auth_id and existing_auth_id == str(allowed_auth_id):
+    if allowed_auth_id and existing_auth_user_id == str(allowed_auth_id):
         return
 
     raise HTTPException(
@@ -126,6 +175,47 @@ def get_auth_error_message(error: Exception) -> str:
         return "Email is already registered"
 
     return ""
+
+
+def send_signup_verification_email(clean_email: str):
+    try:
+        supabase.auth.resend(
+            {
+                "type": "signup",
+                "email": clean_email,
+                "options": {
+                    "email_redirect_to": f"{FRONTEND_URL}/login",
+                },
+            }
+        )
+
+    except Exception as error:
+        logger.warning(
+            "auth.signup.verification_email_failed",
+            extra={"email": clean_email, "error_type": type(error).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not send verification email",
+        ) from error
+
+
+def force_auth_user_email_unverified(auth_user_id: str):
+    try:
+        service_supabase.auth.admin.update_user_by_id(
+            auth_user_id,
+            {"email_confirm": False},
+        )
+
+    except Exception as error:
+        logger.warning(
+            "auth.signup.email_unconfirm_failed",
+            extra={"auth_id": auth_user_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not prepare email verification",
+        ) from error
 
 
 @router.post("/signup")
@@ -159,6 +249,7 @@ def signup(user: SignUpRequest, request: Request):
                     "email": clean_email,
                     "password": user.password,
                     "options": {
+                        "email_redirect_to": f"{FRONTEND_URL}/login",
                         "data": {
                             "first_name": first_name,
                             "last_name": last_name,
@@ -183,6 +274,8 @@ def signup(user: SignUpRequest, request: Request):
             raise HTTPException(status_code=400, detail="Could not create user")
 
         auth_user_id = str(auth_response.user.id)
+        force_auth_user_email_unverified(auth_user_id)
+        send_signup_verification_email(clean_email)
 
         assert_email_is_available(clean_email, allowed_auth_id=auth_user_id)
 
@@ -212,6 +305,8 @@ def signup(user: SignUpRequest, request: Request):
                         "last_name": last_name,
                         "email": clean_email,
                         "tenant_id": tenant_id,
+                        "email_verified": False,
+                        "email_verified_at": None,
                     }
                 )
                 .execute()
@@ -328,6 +423,14 @@ def login(user: LogIn, response: Response, request: Request):
                 status_code=404,
                 detail="Local user profile not found",
             )
+
+        if not auth_user_email_is_verified(auth_response.user):
+            raise HTTPException(
+                status_code=403,
+                detail="Please verify your email before logging in.",
+            )
+
+        local_user = mark_local_email_verified(local_user)
 
         local_email = normalize_email(local_user.get("email"))
 

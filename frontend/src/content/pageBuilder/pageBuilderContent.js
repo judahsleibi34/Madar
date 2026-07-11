@@ -7,7 +7,8 @@ const builderWorkspaceCopyEn = {
     preview: "Preview site",
     exitPreview: "Exit site preview",
     save: "Save builder",
-    goLive: "Publish site",
+    goLive: "Go Live",
+    publishing: "Publishing...",
   },
   tabs: {
     design: {

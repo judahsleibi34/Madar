@@ -98,6 +98,10 @@ class SecurityFoundationTests(unittest.TestCase):
         def public_form_submission():
             return {"ok": True}
 
+        @app.post("/public/sites/example/auth/{action}")
+        def public_tenant_auth(action: str):
+            return {"ok": True}
+
         @app.post("/public/sites/example/events")
         def public_site_event():
             return {"ok": True}
@@ -311,6 +315,9 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/contact",
             "/billing/webhook",
             "/public/sites/example/forms/form-1/submissions",
+            "/public/sites/example/auth/register",
+            "/public/sites/example/auth/login",
+            "/public/sites/example/auth/logout",
             "/public/sites/example/events",
         ]:
             with self.subTest(path=path):

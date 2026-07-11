@@ -101,7 +101,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         with patch.object(
             auth_service.supabase.auth,
             "get_user",
-            return_value=SimpleNamespace(user=SimpleNamespace(id="auth-admin")),
+            return_value=SimpleNamespace(
+                user=SimpleNamespace(id="auth-admin", email_confirmed_at="2026-01-01T00:00:00Z")
+            ),
         ), patch.object(
             auth_service,
             "service_supabase",
@@ -118,7 +120,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         with patch.object(
             auth_service.supabase.auth,
             "get_user",
-            return_value=SimpleNamespace(user=SimpleNamespace(id="auth-admin")),
+            return_value=SimpleNamespace(
+                user=SimpleNamespace(id="auth-admin", email_confirmed_at="2026-01-01T00:00:00Z")
+            ),
         ), patch.object(
             auth_service,
             "service_supabase",
@@ -135,7 +139,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         with patch.object(
             auth_service.supabase.auth,
             "get_user",
-            return_value=SimpleNamespace(user=SimpleNamespace(id="auth-user")),
+            return_value=SimpleNamespace(
+                user=SimpleNamespace(id="auth-user", email_confirmed_at="2026-01-01T00:00:00Z")
+            ),
         ), patch.object(
             auth_service,
             "service_supabase",
@@ -152,7 +158,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         with patch.object(
             auth_service.supabase.auth,
             "get_user",
-            return_value=SimpleNamespace(user=SimpleNamespace(id="auth-admin")),
+            return_value=SimpleNamespace(
+                user=SimpleNamespace(id="auth-admin", email_confirmed_at="2026-01-01T00:00:00Z")
+            ),
         ), patch.object(
             auth_service,
             "service_supabase",
@@ -182,7 +190,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         with patch.object(
             auth_service.supabase.auth,
             "get_user",
-            return_value=SimpleNamespace(user=SimpleNamespace(id="auth-admin")),
+            return_value=SimpleNamespace(
+                user=SimpleNamespace(id="auth-admin", email_confirmed_at="2026-01-01T00:00:00Z")
+            ),
         ), patch.object(
             auth_service,
             "service_supabase",

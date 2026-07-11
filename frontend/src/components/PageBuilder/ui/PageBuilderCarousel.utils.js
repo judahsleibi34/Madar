@@ -19,13 +19,12 @@ const fallbackSlides = [
 export const parseCarouselSlides = (content = "") => {
   const blocks = String(content || "")
     .split(/\n\s*\n/g)
-    .map((block) => block.trim())
-    .filter(Boolean);
+    .filter((block) => /\S/.test(block));
 
   const slides = blocks.map((block) => {
     const [title = "", description = "", image = ""] = block
       .split("\n")
-      .map((line) => line.trim());
+      .map((line) => line.replace(/\r/g, ""));
 
     return { title, description, image };
   });

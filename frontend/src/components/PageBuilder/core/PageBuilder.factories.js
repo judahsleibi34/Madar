@@ -87,9 +87,12 @@ export const createForm = (title = factoryCopy.form.title, fields = [], override
 
   return {
     id: createId("form"),
+    name: title,
     title,
     description: factoryCopy.form.description,
     successMessage: factoryCopy.form.successMessage,
+    languageMode: "en",
+    defaultLanguage: "en",
     connectedCollectionId: "",
     mode: "form",
     quiz: {
@@ -175,8 +178,7 @@ export const createElement = (type = "text", overrides = {}) => {
     },
     image: {
       name: factoryCopy.elements.image.name,
-      content:
-        "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop",
+      content: "",
       styles: {
         ...base.styles,
         borderRadius: "22px",
@@ -315,14 +317,14 @@ export const createElement = (type = "text", overrides = {}) => {
       name: factoryCopy.elements.metric.name,
       content: factoryCopy.elements.metric.content,
       metricColumns: 4,
-      metrics: factoryCopy.elements.metric.metrics,
+      metrics: (factoryCopy.elements.metric.metrics || []).map((metric) => ({ ...metric })),
       styles: {
         ...base.styles,
         backgroundColor: "var(--theme-surface)",
         borderRadius: "22px",
         alignSelf: "stretch",
-        metricTextColor: "var(--theme-text)",
-        metricSymbolColor: "var(--theme-warning)",
+        metricTextColor: "#172b4d",
+        metricSymbolColor: "#f1b84b",
       },
     },
     loginBlock: {
@@ -435,7 +437,7 @@ export const createPage = (name = factoryCopy.structure.page, sections = [], ove
   slug: name.toLowerCase() === "home" ? "/" : `/${slugify(name)}`,
   backgroundColor: "var(--theme-surface)",
   visibility: "public",
-  showInNavigation: true,
+  showInNavigation: name.toLowerCase() === "home",
   pageType: "main",
   sections,
   ...overrides,

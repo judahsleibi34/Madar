@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   Copy,
   Eye,
-  Globe2,
   MessageCircle,
   RefreshCw,
 } from "lucide-react";
@@ -37,14 +36,14 @@ const buildQrUrl = (data, version) => {
 export default function PageBuilderPublishTab({
   project,
   persistProjectNow,
-  publishProject,
   liveSitePath = "",
+  hasConfiguredSubdomain = false,
+  openWebsiteSettings,
   openFormPreviewPage,
   lang = "en",
 }) {
   const [publicQrVersion, setPublicQrVersion] = useState(1);
   const [formQrVersion, setFormQrVersion] = useState(1);
-  const [isPublishing, setIsPublishing] = useState(false);
   const content = getPublishContent(lang);
   const activeForm = project.forms?.find((form) => form.id === project.activeFormId) || project.forms?.[0];
   const publishSubdomain = sanitizeSubdomain(project?.publish?.subdomain || "");
@@ -65,18 +64,6 @@ export default function PageBuilderPublishTab({
   const copyFormPreviewLink = async () => {
     if (!formPreviewLink) return;
     await navigator.clipboard?.writeText(formPreviewLink);
-  };
-
-  const handlePublish = async () => {
-    if (!publishProject || isPublishing) return;
-
-    setIsPublishing(true);
-
-    try {
-      await publishProject();
-    } finally {
-      setIsPublishing(false);
-    }
   };
 
   const whatsAppUrl = publicLink ? `https://wa.me/?text=${encodeURIComponent(publicLink)}` : "";
@@ -108,6 +95,19 @@ export default function PageBuilderPublishTab({
 
   return (
     <div className="workspace-page publish-workspace">
+      {!hasConfiguredSubdomain && (
+        <section className="publish-subdomain-warning" role="alert">
+          <AlertTriangle size={22} aria-hidden="true" />
+          <div>
+            <strong>Choose your website address first</strong>
+            <p>Add a subdomain before using Go Live. Your subdomain becomes the address visitors use to open your website.</p>
+          </div>
+          <button type="button" className="primary-action" onClick={openWebsiteSettings}>
+            Add subdomain
+          </button>
+        </section>
+      )}
+
       <div className="workspace-header publish-site-header">
         <div>
           <h2>{content.title}</h2>
@@ -120,17 +120,6 @@ export default function PageBuilderPublishTab({
           <div className="publish-panel-title">
             <span>01</span>
             <h3>{content.statusTitle}</h3>
-          </div>
-          <div className="publish-actions">
-            <button
-              type="button"
-              className="primary-action"
-              onClick={handlePublish}
-              disabled={!publishProject || isPublishing}
-            >
-              <Globe2 size={15} aria-hidden="true" />
-              {isPublishing ? content.publishingSite : content.publishSite}
-            </button>
           </div>
           <dl className="publish-status-list">
             <div>

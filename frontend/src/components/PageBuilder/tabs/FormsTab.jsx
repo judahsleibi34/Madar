@@ -24,8 +24,10 @@ import {
   Trash2,
   Underline,
   Undo2,
+  Upload,
   X,
 } from "lucide-react";
+import { createId } from "../core/PageBuilder.constants";
 import { applyFormTemplate, FORM_TEMPLATES } from "../core/PageBuilder.formTemplates";
 import {
   getDirectionForLanguage,
@@ -94,6 +96,75 @@ const getColorValue = (value, fallback = "#000000") =>
   isHexColor(value) ? value : fallback;
 const formatColorValue = (value) => String(value || "").toUpperCase();
 
+const FORM_IMPORT_GUIDE = `Create a Madar form as a data-only JavaScript module. Return only this code shape (no functions, imports, comments, or markdown fences):
+
+export default {
+  "type": "madar-form",
+  "version": 1,
+  "form": {
+    "name": "Contact form",
+    "title": "Contact us",
+    "description": "Send us a message.",
+    "languageMode": "en",
+    "defaultLanguage": "en",
+    "pageMode": "paged",
+    "sections": [
+      {
+        "id": "contact-page",
+        "title": "Contact details",
+        "description": "",
+        "fields": [
+          {
+            "id": "email-field",
+            "label": "Email address",
+            "type": "email",
+            "required": true,
+            "helpText": "",
+            "placeholder": "name@example.com",
+            "options": []
+          }
+        ]
+      }
+    ]
+  }
+};
+
+Allowed field types: shortText, paragraph, email, number, date, dropdown, radio, checkboxes, file, money, phone, yesNo, status.
+Allowed languageMode values: en, ar, bilingual. Use unique string IDs. JSON with the same object shape is also accepted.`;
+
+const parseFormImportText = (contents) => {
+  let source = String(contents || "").replace(/^\uFEFF/, "").trim();
+  source = source.replace(/^```(?:javascript|js|json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  source = source.replace(/^export\s+default\s+/i, "");
+  source = source.replace(/^module\.exports\s*=\s*/i, "");
+  source = source.replace(/;\s*$/, "").trim();
+  return JSON.parse(source);
+};
+
+const cloneFormWithNewIds = (sourceForm) => {
+  const idMap = new Map();
+  const collectIds = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(collectIds);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    if (typeof value.id === "string" && value.id) {
+      idMap.set(value.id, createId("import"));
+    }
+    Object.values(value).forEach(collectIds);
+  };
+  const cloneValue = (value) => {
+    if (typeof value === "string") return idMap.get(value) || value;
+    if (Array.isArray(value)) return value.map(cloneValue);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneValue(item)]));
+  };
+
+  collectIds(sourceForm);
+  return cloneValue(sourceForm);
+};
+
 export default function FormsTab({
   project,
   updateProject,
@@ -140,7 +211,9 @@ export default function FormsTab({
   const [templateId, setTemplateId] = useState("");
   const [deleteFormCandidate, setDeleteFormCandidate] = useState(null);
   const [deleteFormPageCandidate, setDeleteFormPageCandidate] = useState(null);
+  const [importGuideCopied, setImportGuideCopied] = useState(false);
   const activeTextTargetRef = useRef(null);
+  const formImportInputRef = useRef(null);
   const formTheme = project.theme?.form || {};
   const formLanguageMode = normalizeLanguageMode(activeForm?.languageMode || lang);
   const primaryLanguage =
@@ -158,6 +231,59 @@ export default function FormsTab({
       (text, [key, replacement]) => text.replaceAll(`{${key}}`, replacement),
       value
     );
+
+  const getFormLibraryName = (form) =>
+    String(form?.name || form?.title || copy.labels.untitledForm).trim();
+
+  const importForm = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      const parsed = parseFormImportText(await file.text());
+      const sourceForm = parsed?.type === "madar-form" ? parsed.form : parsed;
+      if (!sourceForm || typeof sourceForm !== "object" || !Array.isArray(sourceForm.sections)) {
+        throw new Error("Invalid form file");
+      }
+
+      const importedForm = cloneFormWithNewIds({
+        ...sourceForm,
+        name: String(sourceForm.name || sourceForm.title || "Imported form").trim(),
+        title: String(sourceForm.title || sourceForm.name || "Imported form").trim(),
+        responses: [],
+        connectedCollectionId: "",
+      });
+      importedForm.id ||= createId("form");
+      importedForm.sections = importedForm.sections.map((section) => ({
+        ...section,
+        id: section.id || createId("formSection"),
+        fields: (section.fields || []).map((field) => ({
+          ...field,
+          id: field.id || createId("field"),
+        })),
+      }));
+
+      updateProject((currentProject) => ({
+        ...currentProject,
+        forms: [...(currentProject.forms || []), importedForm],
+        activeFormId: importedForm.id,
+      }));
+      setSelected({ type: "form", id: importedForm.id });
+    } catch {
+      window.alert("This file is not valid Madar form JSON or JavaScript data.");
+    }
+  };
+
+  const copyImportGuide = async () => {
+    try {
+      await navigator.clipboard.writeText(FORM_IMPORT_GUIDE);
+      setImportGuideCopied(true);
+      window.setTimeout(() => setImportGuideCopied(false), 1800);
+    } catch {
+      window.alert("Could not copy the guide. Select the documentation text and copy it manually.");
+    }
+  };
 
   const getFieldType = (type) =>
     fieldTypes.find((item) => item.id === type) || legacyFieldTypes[type] || fieldTypes[0];
@@ -630,8 +756,7 @@ export default function FormsTab({
         <aside className="simple-add-question" aria-label={copy.labels.formControls}>
           <div className="forms-panel-heading">
             <div>
-              <span className="forms-panel-eyebrow">Form library</span>
-              <h2>Forms</h2>
+              <h2>Form library</h2>
             </div>
             <span className="forms-count" aria-label={`${project.forms.length} forms`}>
               {project.forms.length}
@@ -662,11 +787,39 @@ export default function FormsTab({
             <select value={activeForm.id} onChange={(event) => selectForm(event.target.value)}>
               {project.forms.map((form) => (
                 <option key={form.id} value={form.id}>
-                  {form.title || copy.labels.untitledForm}
+                  {getFormLibraryName(form)}
                 </option>
               ))}
             </select>
           </label>
+          <label>
+            Form name
+            <input
+              value={activeForm.name || activeForm.title || ""}
+              placeholder="Name this form"
+              onChange={(event) =>
+                updateActiveForm((form) => ({ ...form, name: event.target.value }))
+              }
+            />
+          </label>
+          <div className="form-library-file-actions">
+            <FormButton icon={Upload} onClick={() => formImportInputRef.current?.click()}>Import form</FormButton>
+            <input
+              ref={formImportInputRef}
+              type="file"
+              accept="application/json,application/javascript,text/javascript,.json,.js,.mjs"
+              hidden
+              onChange={importForm}
+            />
+          </div>
+          <details className="form-import-guide">
+            <summary>AI form format guide</summary>
+            <p>Copy this guide into ChatGPT, describe the form you need, then import the generated JSON or JS file.</p>
+            <FormButton icon={Copy} onClick={copyImportGuide}>
+              {importGuideCopied ? "Copied" : "Copy ChatGPT guide"}
+            </FormButton>
+            <pre>{FORM_IMPORT_GUIDE}</pre>
+          </details>
           <FormButton className="forms-primary-action" icon={Plus} onClick={addForm}>
             {copy.messages.newForm}
           </FormButton>
