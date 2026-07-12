@@ -91,12 +91,12 @@ export default function UserWorkspaceRoutes({
 
       <Route
         path="/page-builder/form-preview/:formId"
-        element={<BuilderFormPreviewPage />}
+        element={<BuilderFormPreviewPage user={user} />}
       />
 
       <Route
-        path="/page-builder/preview"
-        element={<TenantSiteRuntime draftPreview />}
+        path="/page-builder/preview/*"
+        element={<TenantSiteRuntime draftPreview user={user} />}
       />
 
       <Route

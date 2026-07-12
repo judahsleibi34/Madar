@@ -29,6 +29,7 @@ import {
 } from "./pageBuilderWorkspace.helpers";
 import {
   STORAGE_KEY,
+  getBuilderStorageKey,
   viewports,
   builderTabs,
   alignmentOptions,
@@ -291,10 +292,10 @@ const isDefaultShowcaseProject = (project = {}) => {
 
 const createCleanBlankProject = () => cleanBuilderProject(createBlankWorkspaceProject());
 
-const getInitialWorkspaceProject = ({ demoMode = false } = {}) => {
+const getInitialWorkspaceProject = ({ demoMode = false, storageKey = STORAGE_KEY } = {}) => {
   const initialProject = demoMode
     ? cleanBuilderProject(createInitialProject())
-    : loadInitialProject();
+    : loadInitialProject(storageKey);
 
   if (!demoMode && isDefaultShowcaseProject(initialProject)) {
     return createCleanBlankProject();
@@ -464,14 +465,15 @@ export default function PageBuilder({
   const navigate = useNavigate();
   const routeTab = getBuilderTabFromPath(location.pathname);
   const routeDesignPanel = getBuilderDesignPanelFromPath(location.pathname);
+  const scopedStorageKey = getBuilderStorageKey(user?.id);
   const [project, setProject] = useState(() =>
-    withDefaultLandingPage(getInitialWorkspaceProject({ demoMode }))
+    withDefaultLandingPage(getInitialWorkspaceProject({ demoMode, storageKey: scopedStorageKey }))
   );
   const persistProjectNow = useDebouncedProjectStorage({
     delay: 120,
     disabled: demoMode,
     project,
-    storageKey: STORAGE_KEY,
+    storageKey: scopedStorageKey,
   });
   const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
   const [builderProjectLoading, setBuilderProjectLoading] = useState(!demoMode);
@@ -681,11 +683,11 @@ export default function PageBuilder({
     };
 
     const syncDraftFromStorage = () => {
-      syncSerializedProject(localStorage.getItem(STORAGE_KEY));
+      syncSerializedProject(localStorage.getItem(scopedStorageKey));
     };
 
     const handleDraftStorageUpdate = (event) => {
-      if (event.key !== STORAGE_KEY) return;
+      if (event.key !== scopedStorageKey) return;
       syncSerializedProject(event.newValue);
     };
 
@@ -699,7 +701,7 @@ export default function PageBuilder({
         : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
 
     const handleBroadcastDraftUpdate = (event) => {
-      if (event.data?.storageKey !== STORAGE_KEY) return;
+      if (event.data?.storageKey !== scopedStorageKey) return;
       syncSerializedProject(event.data.serializedProject);
     };
 
@@ -714,13 +716,14 @@ export default function PageBuilder({
       window.removeEventListener("focus", syncDraftFromStorage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [demoMode]);
+  }, [demoMode, scopedStorageKey]);
 
   useEffect(() => {
     if (demoMode) return;
 
     let cancelled = false;
     const cacheKey = user?.id || "current";
+    const projectSnapshotAtLoadStart = getAutosaveSnapshot(projectRef.current);
 
     const loadBackendProject = async () => {
       setBuilderProjectLoading(true);
@@ -744,6 +747,7 @@ export default function PageBuilder({
 
         try {
           fullRecord = await builderInitialProjectLoadPromises.get(cacheKey);
+          builderInitialProjectLoadPromises.delete(cacheKey);
         } catch (error) {
           builderInitialProjectLoadPromises.delete(cacheKey);
           throw error;
@@ -765,11 +769,16 @@ export default function PageBuilder({
           const nextProject = isDefaultShowcaseProject(loadedProject)
             ? createCleanBlankProject()
             : loadedProject;
+          const localProjectChangedWhileLoading =
+            getAutosaveSnapshot(projectRef.current) !== projectSnapshotAtLoadStart;
 
           setBuilderProjectRecord(fullRecord);
-          setProject(nextProject);
-          setSelected({ type: "page", id: nextProject.activePageId });
-          persistProjectNow(nextProject);
+          backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
+          if (!localProjectChangedWhileLoading) {
+            setProject(nextProject);
+            setSelected({ type: "page", id: nextProject.activePageId });
+            persistProjectNow(nextProject);
+          }
           if (!isDefaultShowcaseProject(loadedProject)) {
             rememberStarterChoice();
           }
@@ -826,9 +835,17 @@ export default function PageBuilder({
     };
 
     loadWebsiteSettings();
+    const refreshWebsiteSettings = () => loadWebsiteSettings();
+    const refreshVisibleWebsiteSettings = () => {
+      if (document.visibilityState === "visible") loadWebsiteSettings();
+    };
+    window.addEventListener("focus", refreshWebsiteSettings);
+    document.addEventListener("visibilitychange", refreshVisibleWebsiteSettings);
 
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", refreshWebsiteSettings);
+      document.removeEventListener("visibilitychange", refreshVisibleWebsiteSettings);
     };
   }, [demoMode, user?.id]);
 
@@ -842,6 +859,16 @@ export default function PageBuilder({
     return deferEffectStateUpdate(() => {
       const nextPath = resolveLiveSitePath(subdomain);
       setLiveSitePath((current) => (current === nextPath ? current : nextPath));
+      setProject((currentProject) => {
+        if (currentProject.publish?.subdomain === subdomain) return currentProject;
+        return {
+          ...currentProject,
+          publish: {
+            ...(currentProject.publish || {}),
+            subdomain,
+          },
+        };
+      });
     });
   }, [demoMode, websiteSettings?.subdomain]);
 
@@ -897,7 +924,8 @@ export default function PageBuilder({
 
   const openPreviewPage = () => {
     persistProjectNow(project);
-    window.open("/page-builder/preview", "_blank", "noopener,noreferrer");
+    const activePageSlug = activePage?.slug === "/" ? "" : activePage?.slug || "";
+    window.open(`/page-builder/preview${activePageSlug}`, "_blank", "noopener,noreferrer");
   };
 
   const openFormPreviewPage = (formId = activeForm?.id) => {
@@ -1846,11 +1874,11 @@ export default function PageBuilder({
       nextProject,
       message,
       demoMode,
-      storageKey: STORAGE_KEY,
+      storageKey: scopedStorageKey,
       setProject,
       showToast,
       silent: Boolean(options.silent),
-    }), [demoMode, showToast]);
+    }), [demoMode, scopedStorageKey, showToast]);
 
   const saveProject = useCallback(async ({ silent = false } = {}) => {
     if (!silent) {
@@ -2054,7 +2082,7 @@ export default function PageBuilder({
       }
     }
 
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(scopedStorageKey);
     if (!raw) {
       alert("No backend project or local draft cache found.");
       return;
@@ -2272,6 +2300,29 @@ export default function PageBuilder({
       maxWidth: `calc(100% - ${edge * 2}px)`,
       transform: `translate3d(${edge}px, ${y}px, 0)`,
     };
+  };
+
+  const restorePreviousDraft = () => {
+    const rawBackup = localStorage.getItem(`${scopedStorageKey}:backup`);
+    if (!rawBackup) {
+      showToast("No previous browser draft was found.");
+      return;
+    }
+
+    if (!window.confirm("Restore the previous browser draft? Your current draft will be kept as the next backup.")) return;
+
+    try {
+      const restoredProject = withDefaultLandingPage(cleanBuilderProject(JSON.parse(rawBackup)));
+      setProject(restoredProject);
+      setSelected({
+        type: restoredProject.forms?.length ? "form" : "page",
+        id: restoredProject.activeFormId || restoredProject.forms?.[0]?.id || restoredProject.activePageId || null,
+      });
+      persistProjectNow(restoredProject);
+      showToast("Previous draft restored. Check your form, then press Save form.");
+    } catch {
+      showToast("The previous browser draft could not be restored.");
+    }
   };
 
   const syncDirectFormBlockSize = useCallback((sectionId, element, node) => {
@@ -3967,7 +4018,12 @@ export default function PageBuilder({
               }}>+ Add item</button>
             </details>
           )}
-          {!carouselElementTypes.has(selectedElement.type) && selectedElement.type !== "list" && selectedElement.type !== "metric" && selectedElement.type !== "reservationBlock" && (
+          {!carouselElementTypes.has(selectedElement.type) &&
+            selectedElement.type !== "list" &&
+            selectedElement.type !== "metric" &&
+            selectedElement.type !== "reservationBlock" &&
+            selectedElement.type !== "loginBlock" &&
+            selectedElement.type !== "registrationBlock" && (
             <label>Content<textarea value={selectedElement.content} onSelect={(event) => captureTextSelection(event, "content")} onChange={(event) => updateSelectedElement({ content: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "content") })} /></label>
           )}
           {selectedElement.type === "metric" && (
@@ -4447,6 +4503,7 @@ export default function PageBuilder({
       openFormPreviewPage={openFormPreviewPage}
       openPreviewPage={openPreviewPage}
       saveProject={saveProject}
+      restorePreviousDraft={restorePreviousDraft}
       publishProject={publishProject}
       quizOptionsOpen={quizOptionsOpen}
       setQuizOptionsOpen={setQuizOptionsOpen}

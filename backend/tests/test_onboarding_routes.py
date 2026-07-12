@@ -27,6 +27,9 @@ class FakeAuthAdmin:
 
     def delete_user(self, user_id):
         self.deleted_users.append(user_id)
+        self.auth.auth_users = [
+            user for user in self.auth.auth_users if str(getattr(user, "id", "")) != str(user_id)
+        ]
         return SimpleNamespace()
 
     def update_user_by_id(self, user_id, payload):
@@ -56,6 +59,15 @@ class FakeAuth:
         )
         self.auth_users.append(auth_user)
         return SimpleNamespace(user=auth_user)
+
+    def sign_in_with_password(self, payload):
+        for auth_user in self.auth_users:
+            if (
+                auth_user.email == payload["email"]
+                and getattr(auth_user, "password", None) == payload["password"]
+            ):
+                return SimpleNamespace(user=auth_user)
+        raise RuntimeError("Invalid login credentials")
 
     def resend(self, payload):
         self.resent_verifications.append(payload)
@@ -251,6 +263,72 @@ class SignupRoutesTests(unittest.TestCase):
         self.assertEqual(fake_supabase.tables["tenants"], [])
         self.assertEqual(fake_supabase.tables["users"], [])
         self.assertEqual(fake_supabase.tables["tenant_memberships"], [])
+
+    def test_original_signup_recovers_unverified_auth_user_without_local_profile(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+        fake_supabase.auth.auth_users.append(
+            SimpleNamespace(
+                id="auth-orphaned",
+                email="orphaned@example.com",
+                email_confirmed_at=None,
+            )
+        )
+
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
+        ), patch.object(
+            auth_routes,
+            "enforce_auth_rate_limit",
+        ):
+            response = client.post(
+                "/auth/signup",
+                json={
+                    "first_name": "Recovered",
+                    "last_name": "Signup",
+                    "email": "Orphaned@Example.COM",
+                    "password": "super-secret-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("auth-orphaned", fake_supabase.auth.admin.deleted_users)
+        self.assertEqual(len(fake_supabase.tables["users"]), 1)
+        self.assertEqual(fake_supabase.tables["users"][0]["email"], "orphaned@example.com")
+
+    def test_original_signup_recovers_verified_auth_user_after_password_check(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+        fake_supabase.auth.auth_users.append(
+            SimpleNamespace(
+                id="auth-verified-orphan",
+                email="verified@example.com",
+                email_confirmed_at="2026-01-01T00:00:00+00:00",
+                password="super-secret-password",
+            )
+        )
+
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
+        ), patch.object(
+            auth_routes,
+            "enforce_auth_rate_limit",
+        ):
+            response = client.post(
+                "/auth/signup",
+                json={
+                    "first_name": "Verified",
+                    "last_name": "Owner",
+                    "email": "Verified@Example.COM",
+                    "password": "super-secret-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["requires_email_verification"])
+        self.assertEqual(response.json()["user"]["auth_id"], "auth-verified-orphan")
+        self.assertEqual(fake_supabase.auth.signed_up_users, [])
+        self.assertTrue(fake_supabase.tables["users"][0]["email_verified"])
 
     def test_original_signup_rejects_numeric_names(self):
         client = build_client()

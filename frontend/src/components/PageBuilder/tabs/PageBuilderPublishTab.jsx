@@ -150,7 +150,12 @@ export default function PageBuilderPublishTab({
           <div className="publish-link-card-body">
             <div className="publish-link-main">
                 <div className="publish-link-box">
-                  <input value={publicLink} readOnly placeholder={content.noPublicLink} />
+                  <input
+                    className={publicLink ? "" : "publish-link-note-input"}
+                    value={publicLink}
+                    readOnly
+                    placeholder={content.noPublicLink}
+                  />
                   <button type="button" onClick={copyPublicLink} disabled={!publicLink}>
                   <Copy size={15} aria-hidden="true" />
                     {content.copyLink}

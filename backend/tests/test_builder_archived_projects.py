@@ -426,8 +426,9 @@ class ArchivedBuilderProjectTests(unittest.TestCase):
         with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_rate_limit"):
             response = client.get("/public/sites/tenant-site")
 
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Published site not found")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["project"])
+        self.assertEqual(response.json()["site"]["subdomain"], "tenant-site")
 
 
 if __name__ == "__main__":
@@ -562,7 +563,7 @@ class PublicSiteContractTests(unittest.TestCase):
         self.assertIn("FINAL PUBLISH TEST 003", str(body["project"]["published_schema"]))
         self.assertNotIn("draft_schema", body["project"])
 
-    def test_public_site_without_published_project_returns_not_found(self):
+    def test_public_site_without_published_project_returns_site_chrome(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"] = [
             {
@@ -581,5 +582,6 @@ class PublicSiteContractTests(unittest.TestCase):
              patch.object(public_site_routes, "enforce_public_rate_limit"):
             response = client.get("/public/sites/tenant-site")
 
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Published site not found")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["project"])
+        self.assertEqual(response.json()["site"]["subdomain"], "tenant-site")

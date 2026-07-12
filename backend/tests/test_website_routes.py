@@ -183,6 +183,48 @@ class WebsiteRoutesTests(unittest.TestCase):
         )
         self.assertEqual(response.json()["website"], website)
 
+    def test_canonical_put_allows_clearing_optional_contact_email(self):
+        client = build_website_client()
+        website = {
+            "id": 1,
+            "tenant_id": 7,
+            "user_id": 3,
+            "subdomain": "fresh-site",
+            "contact_email": "",
+        }
+
+        with patch.object(
+            website_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(tenant_id=7, user_id=3),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3},
+        ), patch.object(
+            website_routes,
+            "save_settings_for_tenant",
+            return_value=website,
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
+            response = client.put(
+                "/website/settings",
+                json={
+                    "subdomain": "fresh-site",
+                    "brand": "Ibtikar Shipment Portal",
+                    "contact_email": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["website"]["contact_email"], "")
+        self.assertEqual(
+            save_settings.call_args.kwargs["update_payload"]["contact_email"],
+            "",
+        )
+
     def test_canonical_get_rejects_stale_user_tenant_without_active_membership(self):
         client = build_website_client()
         user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}

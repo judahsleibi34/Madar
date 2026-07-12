@@ -1,5 +1,10 @@
 export const STORAGE_KEY = "madar_app_builder_frontend_v4";
 
+export const getBuilderStorageKey = (userId) => {
+  const normalizedUserId = String(userId ?? "").trim();
+  return normalizedUserId ? `${STORAGE_KEY}:user:${normalizedUserId}` : `${STORAGE_KEY}:anonymous`;
+};
+
 export const createId = (prefix = "id") => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return `${prefix}_${crypto.randomUUID()}`;

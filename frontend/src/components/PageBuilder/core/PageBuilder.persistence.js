@@ -8,7 +8,13 @@ export const persistBuilderProject = ({
   silent = false,
 }) => {
   if (!demoMode) {
-    localStorage.setItem(storageKey, JSON.stringify(nextProject));
+    const serializedProject = JSON.stringify(nextProject);
+    const previousDraft = localStorage.getItem(storageKey);
+
+    if (previousDraft && previousDraft !== serializedProject) {
+      localStorage.setItem(`${storageKey}:backup`, previousDraft);
+    }
+    localStorage.setItem(storageKey, serializedProject);
   }
 
   setProject(nextProject);

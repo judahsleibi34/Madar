@@ -1237,6 +1237,54 @@ body.theme-dark .page-builder {
   color: var(--theme-text-soft) !important;
 }
 
+/* Keep standalone form previews on one coherent form-theme surface. */
+.builder-form-preview-page {
+  padding-inline: clamp(16px, 3vw, 56px) !important;
+  background: var(--form-theme-bg) !important;
+}
+
+.builder-form-preview-shell {
+  width: 100% !important;
+  max-width: 1600px !important;
+  box-sizing: border-box;
+  background: var(--form-theme-surface) !important;
+  border-color: var(--form-theme-border) !important;
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--form-theme-text) 9%, transparent) !important;
+}
+
+.builder-form-preview-topbar {
+  background: var(--form-theme-surface) !important;
+  border-color: var(--form-theme-border) !important;
+  color: var(--form-theme-text) !important;
+}
+
+.builder-form-preview-section,
+.builder-form-preview-question {
+  background: transparent !important;
+  border-color: var(--form-theme-border) !important;
+  box-shadow: none !important;
+}
+
+.builder-form-preview-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.builder-form-preview-question textarea,
+.builder-form-preview-question select,
+.builder-form-preview-options label {
+  background: var(--form-theme-input) !important;
+  border-color: var(--form-theme-border) !important;
+  color: var(--form-theme-text) !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 640px) {
+  .builder-form-preview-page {
+    padding-inline: 10px !important;
+  }
+
+  .builder-form-preview-shell {
+    padding: 16px !important;
+  }
+}
+
 /* Dark theme page-level adjustments */
 :root[data-theme="dark"] .hero-visual,
 :root[data-theme="dark"] .features-demo-panel,

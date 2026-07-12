@@ -15,11 +15,10 @@ def fake_user_scope(user_id, request, response):
     if request.headers.get("x-test-unauthenticated") == "1":
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    return SimpleNamespace(id=f"auth-{user_id}"), {
-        "id": int(user_id),
-        "tenant_id": request.headers.get("x-test-tenant-id", "1"),
-        "user_type": "user",
-    }
+    return SimpleNamespace(
+        user_id=int(user_id),
+        tenant_id=request.headers.get("x-test-tenant-id", "1"),
+    )
 
 
 class LargeDatasetProcessingTests(unittest.TestCase):
@@ -35,7 +34,7 @@ class LargeDatasetProcessingTests(unittest.TestCase):
 
         self.patches = [
             patch.dict("os.environ", {"DATA_UPLOAD_DIR": str(self.private_dir)}, clear=False),
-            patch.object(data_routes, "require_regular_user_id", side_effect=fake_user_scope),
+            patch.object(data_routes, "require_active_tenant_user_id", side_effect=fake_user_scope),
             patch.object(data_routes, "enforce_data_workspace_rate_limit", return_value=None),
             patch.object(data_services, "MAX_DATASET_UPLOAD_BYTES", 1024 * 1024),
             patch.object(data_services, "LARGE_DATASET_THRESHOLD_BYTES", 40),
