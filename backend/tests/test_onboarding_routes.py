@@ -185,6 +185,10 @@ class SignupRoutesTests(unittest.TestCase):
         ), patch.object(
             auth_routes,
             "enforce_auth_rate_limit",
+        ), patch.object(
+            auth_routes,
+            "FRONTEND_URL",
+            "http://localhost:5173",
         ):
             response = client.post(
                 "/auth/signup",
