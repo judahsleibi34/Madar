@@ -2857,7 +2857,7 @@ body.theme-dark .page-builder .builder-toast,
   text-transform: uppercase !important;
 }
 
-.page-builder .responses-results-page > .responses-results-header h2 {
+.page-builder .responses-results-page > .responses-results-header h1 {
   margin: 0 !important;
   color: var(--theme-text) !important;
   font-size: clamp(24px, 2.2vw, 32px) !important;
@@ -2931,8 +2931,8 @@ body.theme-dark .page-builder .builder-toast,
 }
 
 .page-builder .results-panel-title h3,
-.page-builder .results-table-header h3,
-.page-builder .responses-browser-heading h4 {
+.page-builder .results-table-header h2,
+.page-builder .responses-browser-heading h2 {
   color: var(--theme-text) !important;
   font-size: 16px !important;
   font-weight: 850 !important;
@@ -3883,6 +3883,121 @@ body.theme-dark .page-builder .workspace-tabs button.active,
   color: var(--theme-primary) !important;
   -webkit-text-fill-color: var(--theme-primary) !important;
   opacity: 1 !important;
+}
+
+/* Keep the builder workspace navigation text-only across every theme marker.
+   Some shared button styles paint a nested label or pseudo-element instead of
+   the button itself, so clear those layers as well. */
+.page-builder .workspace-tabs > button,
+.page-builder .workspace-tabs > button:hover,
+.page-builder .workspace-tabs > button.active,
+.page-builder.theme-dark .workspace-tabs > button,
+.page-builder.theme-dark .workspace-tabs > button:hover,
+.page-builder.theme-dark .workspace-tabs > button.active,
+.page-builder .workspace-tabs > button > *,
+.page-builder .workspace-tabs > button::before,
+.page-builder .workspace-tabs > button::after {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Carousel inspector controls follow the global semantic theme colors. */
+.page-builder .builder-inspector .carousel-slide-card,
+.page-builder .builder-inspector .carousel-slide-editor {
+  background: var(--builder-surface-raised) !important;
+  border-color: var(--builder-border) !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-image-control .upload-image-button,
+.page-builder .builder-inspector .carousel-slide-image-control .upload-image-button:hover {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .builder-inspector .carousel-remove-image {
+  background: var(--builder-surface-raised) !important;
+  border-color: var(--builder-border) !important;
+  color: var(--builder-text) !important;
+  -webkit-text-fill-color: var(--builder-text) !important;
+}
+
+.page-builder .builder-inspector .carousel-image-url-control,
+.page-builder .builder-inspector .carousel-image-url-control > summary {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--builder-text) !important;
+  -webkit-text-fill-color: var(--builder-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-card-body > .danger-lite {
+  background: color-mix(in srgb, var(--theme-danger) 10%, var(--builder-surface-raised)) !important;
+  border-color: color-mix(in srgb, var(--theme-danger) 34%, var(--builder-border)) !important;
+  color: var(--theme-danger) !important;
+  -webkit-text-fill-color: var(--theme-danger) !important;
+}
+
+/* Builder primary actions use the same compact global button treatment. */
+.page-builder :is(
+  .page-primary-action,
+  .primary-action,
+  .full-width-action,
+  .upload-image-button,
+  .runtime-submit,
+  .forms-primary-action,
+  .form-command-button-primary,
+  .builder-sidebar-save-button,
+  .daw-primary
+) {
+  min-height: 38px !important;
+  padding: 10px 14px !important;
+  background: var(--theme-primary) !important;
+  background-image: none !important;
+  border: 1px solid var(--theme-primary) !important;
+  border-radius: 8px !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: none !important;
+  font-weight: 800 !important;
+}
+
+.page-builder :is(
+  .page-primary-action,
+  .primary-action,
+  .full-width-action,
+  .upload-image-button,
+  .runtime-submit,
+  .forms-primary-action,
+  .form-command-button-primary,
+  .builder-sidebar-save-button,
+  .daw-primary
+) :is(span, strong, small, svg) {
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  stroke: currentColor;
+}
+
+.page-builder :is(
+  .page-primary-action,
+  .primary-action,
+  .full-width-action,
+  .upload-image-button,
+  .runtime-submit,
+  .forms-primary-action,
+  .form-command-button-primary,
+  .builder-sidebar-save-button,
+  .daw-primary
+):not(:disabled):hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: none !important;
 }
 
 .page-builder .logo-fallback,

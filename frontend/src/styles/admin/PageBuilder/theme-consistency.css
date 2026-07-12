@@ -387,7 +387,7 @@
 
 .page-builder .builder-inspector .carousel-slide-card-body {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  grid-template-columns: minmax(0, 1fr) !important;
   gap: 12px !important;
   min-width: 0 !important;
   padding: 12px !important;
@@ -395,8 +395,15 @@
 
 .page-builder .builder-inspector .carousel-slide-copy-fields {
   display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
   align-content: start !important;
   gap: 12px !important;
+  min-width: 0 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-copy-fields > label,
+.page-builder .builder-inspector .carousel-slide-copy-fields :is(input, textarea) {
+  width: 100% !important;
   min-width: 0 !important;
 }
 
@@ -1579,10 +1586,179 @@ html.theme-dark body .page-builder nav.workspace-tabs > button.active {
   box-shadow: none !important;
 }
 
+/* The Inspector is lazy-loaded after the global stylesheet. Keep its action
+   buttons on the same compact semantic button system used by the application. */
+.page-builder .builder-inspector :is(
+  .page-primary-action,
+  .primary-action,
+  .full-width-action,
+  .upload-image-button,
+  .forms-primary-action,
+  .form-command-button-primary
+) {
+  min-height: 38px !important;
+  padding: 10px 14px !important;
+  background: var(--theme-primary) !important;
+  background-image: none !important;
+  border: 1px solid var(--theme-primary) !important;
+  border-radius: 8px !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: none !important;
+  font-weight: 800 !important;
+}
+
+.page-builder .builder-inspector :is(
+  .page-primary-action,
+  .primary-action,
+  .full-width-action,
+  .upload-image-button,
+  .forms-primary-action,
+  .form-command-button-primary
+) :is(span, strong, small, svg) {
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  stroke: currentColor;
+}
+
+.page-builder .builder-inspector :is(
+  .page-primary-action,
+  .primary-action,
+  .full-width-action,
+  .upload-image-button,
+  .forms-primary-action,
+  .form-command-button-primary
+):not(:disabled):hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector :is(
+  button:not(.page-primary-action):not(.primary-action):not(.full-width-action):not(.forms-primary-action):not(.form-command-button-primary):not(.danger-button):not(.danger-lite),
+  .carousel-remove-image
+) {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-editor > .primary-action,
+.page-builder .builder-inspector .carousel-slide-image-control .upload-image-button,
+.page-builder .builder-inspector .carousel-slide-card > summary .carousel-slide-edit-hint.primary-action {
+  min-height: 40px !important;
+  padding: 10px 18px !important;
+  background: var(--action-primary, #9b2f25) !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  box-shadow: none !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-card > summary .carousel-slide-edit-hint.primary-action {
+  min-height: 34px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+}
+
+.page-builder .builder-inspector .carousel-slide-editor > .primary-action:not(:disabled):hover,
+.page-builder .builder-inspector .carousel-slide-image-control .upload-image-button:hover,
+.page-builder .builder-inspector .carousel-slide-card > summary:hover .carousel-slide-edit-hint.primary-action {
+  background: var(--action-primary-hover, #84271f) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.page-builder .builder-inspector :is(.danger-button, .danger-lite) {
+  min-height: 40px !important;
+  padding: 10px 18px !important;
+  background: color-mix(in srgb, var(--action-danger, var(--theme-danger)) 10%, var(--pb-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--action-danger, var(--theme-danger)) 48%, transparent) !important;
+  border-radius: 8px !important;
+  color: var(--action-danger, var(--theme-danger)) !important;
+  -webkit-text-fill-color: var(--action-danger, var(--theme-danger)) !important;
+  box-shadow: none !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+.page-builder .builder-inspector :is(.danger-button, .danger-lite):not(:disabled):hover {
+  background: color-mix(in srgb, var(--action-danger, var(--theme-danger)) 16%, var(--pb-surface)) !important;
+  border-color: var(--action-danger, var(--theme-danger)) !important;
+  color: var(--action-danger, var(--theme-danger)) !important;
+  -webkit-text-fill-color: var(--action-danger, var(--theme-danger)) !important;
+}
+
+.page-builder .builder-inspector :is(.primary-action, .upload-image-button, .danger-button, .danger-lite):focus-visible {
+  outline: 0 !important;
+  box-shadow: var(--action-focus-ring, 0 0 0 3px rgba(155, 47, 37, 0.28)) !important;
+}
+
+.page-builder .builder-inspector :is(.primary-action, .upload-image-button, .danger-button, .danger-lite):active {
+  transform: translateY(1px) !important;
+}
+
+.page-builder .builder-inspector :is(.primary-action, .upload-image-button, .danger-button, .danger-lite):disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
 .page-builder .inspector-toggle-row,
 .page-builder.theme-dark .inspector-toggle-row,
 :root[data-theme="dark"] .page-builder .inspector-toggle-row,
 body.theme-dark .page-builder .inspector-toggle-row {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Final structural surface guard. This chunk is loaded lazily, after the
+   application-wide migration stylesheet. */
+.page-builder :is(
+  .builder-desktop-shell,
+  .builder-layout,
+  .builder-canvas-shell,
+  .workspace-page,
+  .forms-simple-shell,
+  .responses-results-page,
+  .reservations-workspace,
+  .publish-workspace,
+  .theme-workspace-page,
+  .users-workspace-page,
+  .daw-page,
+  .daw-layout,
+  .daw-flow
+) {
+  background: var(--builder-bg) !important;
+  background-color: var(--builder-bg) !important;
+}
+
+.page-builder :is(.builder-panel, .builder-side-panel, .pages-manager-panel) {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.page-builder.theme-dark :is(.builder-sidebar, .builder-inspector, .builder-topbar, .builder-subbar),
+:root[data-theme="dark"] .page-builder :is(.builder-sidebar, .builder-inspector, .builder-topbar, .builder-subbar),
+body.theme-dark .page-builder :is(.builder-sidebar, .builder-inspector, .builder-topbar, .builder-subbar) {
+  background: var(--surface-1) !important;
+  background-color: var(--surface-1) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+.page-builder .responses-results-page > .responses-results-header,
+.page-builder.theme-dark .responses-results-page > .responses-results-header,
+:root[data-theme="dark"] .page-builder .responses-results-page > .responses-results-header,
+body.theme-dark .page-builder .responses-results-page > .responses-results-header {
   background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;

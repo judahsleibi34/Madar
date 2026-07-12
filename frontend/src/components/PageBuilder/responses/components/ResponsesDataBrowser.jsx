@@ -16,7 +16,7 @@ export default function ResponsesDataBrowser({
       <div className="responses-list-panel">
         <div className="responses-browser-heading">
           <div>
-            <h4>{t.submissionList}</h4>
+            <h2>{t.submissionList}</h2>
             <p>{t.submissionListText}</p>
           </div>
           <span>{displayedResponses.length}</span>
@@ -68,7 +68,7 @@ export default function ResponsesDataBrowser({
       <div className="responses-detail-panel">
         <div className="responses-browser-heading">
           <div>
-            <h4>{t.submissionDetails}</h4>
+            <h2>{t.submissionDetails}</h2>
             <p>{t.submissionDetailsText}</p>
           </div>
           {selectedResponse && <span>{selectedResponse.status || t.newStatus}</span>}

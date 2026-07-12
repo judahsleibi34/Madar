@@ -2864,7 +2864,7 @@ export default function DataAnalysisWorkspace({
       <header className="daw-header" id="daw-top">
         <div>
           <span className="daw-kicker">{t.kicker}</span>
-          <h2>{t.title}</h2>
+          <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </div>
       </header>

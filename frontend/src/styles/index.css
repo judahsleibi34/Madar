@@ -36,6 +36,7 @@
 @import "./admin/PageBuilder/index.css";
 @import "./theme-refinement.css";
 @import "./route-refinement.css";
+@import "/src/styles/global-theme-migration.css";
 
 /* ============================================================
    TEMP: Builder demo route styles

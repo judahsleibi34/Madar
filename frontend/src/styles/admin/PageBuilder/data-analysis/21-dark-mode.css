@@ -26,7 +26,7 @@
   color: var(--theme-text);
 }
 
-.theme-dark .page-builder .daw-header h2,
+.theme-dark .page-builder .daw-header h1,
 .theme-dark .page-builder .daw-section-heading h3,
 .theme-dark .page-builder .daw-report-header h3,
 .theme-dark .page-builder .daw-source-body h4,
@@ -41,7 +41,7 @@
 .theme-dark .page-builder .daw-warning-list h4,
 .theme-dark .page-builder .daw-insight-list,
 .theme-dark .page-builder .daw-chart-list strong,
-[data-theme="dark"] .page-builder .daw-header h2,
+[data-theme="dark"] .page-builder .daw-header h1,
 [data-theme="dark"] .page-builder .daw-section-heading h3,
 [data-theme="dark"] .page-builder .daw-report-header h3,
 [data-theme="dark"] .page-builder .daw-source-body h4,
@@ -57,6 +57,11 @@
 [data-theme="dark"] .page-builder .daw-insight-list,
 [data-theme="dark"] .page-builder .daw-chart-list strong {
   color: var(--theme-text-inverse);
+}
+
+.theme-dark .page-builder .daw-kicker,
+[data-theme="dark"] .page-builder .daw-kicker {
+  color: var(--action-primary, #9b2f25);
 }
 
 .theme-dark .page-builder .daw-header p,
