@@ -103,7 +103,7 @@ export default function BuilderResponsesPage({
               <div className="results-table-header">
                 <div>
                   <span className="workspace-kicker">{t.selectedForm}</span>
-                  <h3>{data.selectedForm.title}</h3>
+                  <h2>{data.selectedForm.title}</h2>
                   <p>
                     {connectedCollection
                       ? `${t.savingTo} ${connectedCollection.name}`
@@ -207,7 +207,7 @@ export default function BuilderResponsesPage({
               <section className="responses-assistant-panel daw-card daw-assistant-card">
                 <div className="daw-section-heading">
                   <span>{t.assistantKicker}</span>
-                  <h4>{t.assistantTitle}</h4>
+                  <h2>{t.assistantTitle}</h2>
                   <p>{t.assistantText}</p>
                 </div>
 

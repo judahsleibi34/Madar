@@ -3855,7 +3855,7 @@ export default function PageBuilder({
                   <details className="carousel-slide-card" defaultOpen={index === 0} key={`${selectedElement.id}_slide_${index}`}>
                     <summary>
                       <span>Slide {index + 1}</span>
-                      <span className="carousel-slide-edit-hint">
+                      <span className="carousel-slide-edit-hint primary-action">
                         {resolveMediaUrl(slide.image) ? "Edit image" : "Add image"}
                       </span>
                     </summary>
@@ -3892,18 +3892,47 @@ export default function PageBuilder({
                     </div>
                   </div>
                   <details className="carousel-image-url-control">
-                    <summary>Manual image URL</summary>
-                    <label>Image URL<input value={slide.image} onChange={(event) => {
-                      const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, image: event.target.value } : item);
-                      updateSelectedElement({ content: serializeCarouselSlides(slides) });
-                    }} /></label>
+                    <summary>Public image URL</summary>
+                    <label>
+                      HTTPS image URL
+                      <input
+                        key={`${selectedElement.id}_slide_url_${index}_${slide.image}`}
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        placeholder="https://example.com/image.jpg"
+                        defaultValue={/^https:\/\//i.test(String(slide.image || "").trim()) ? slide.image : ""}
+                        onBlur={(event) => {
+                          const imageUrl = event.currentTarget.value.trim();
+                          const urlError = getStoredUrlError(imageUrl, {
+                            fieldName: "Image URL",
+                            allowRelative: false,
+                            allowEmpty: true,
+                          });
+
+                          if (urlError) {
+                            showToast(urlError);
+                            event.currentTarget.value = /^https:\/\//i.test(String(slide.image || "").trim()) ? slide.image : "";
+                            return;
+                          }
+
+                          if (imageUrl === slide.image || (!imageUrl && !/^https:\/\//i.test(String(slide.image || "").trim()))) return;
+
+                          const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, image: imageUrl } : item
+                          );
+                          updateSelectedElement({ content: serializeCarouselSlides(slides) });
+                        }}
+                      />
+                      <small>Only public HTTPS image URLs are accepted. Uploaded file paths stay hidden.</small>
+                    </label>
                   </details>
                   <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>Remove slide</button>
                     </div>
                   </details>
                 ))}
               </div>
-              <button type="button" onClick={() => updateSelectedElement({ content: serializeCarouselSlides([...parseCarouselSlides(selectedElement.content), { title: "New story", description: "Add your story here.", image: "" }]) })}>+ Add slide</button>
+              <button type="button" className="primary-action" onClick={() => updateSelectedElement({ content: serializeCarouselSlides([...parseCarouselSlides(selectedElement.content), { title: "New story", description: "Add your story here.", image: "" }]) })}>+ Add slide</button>
             </details>
           )}
           {selectedElement.type === "list" && (

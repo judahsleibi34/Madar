@@ -23,7 +23,7 @@ export default function ResponsesSidebar({
   return (
     <aside className="results-form-list">
       <div className="results-panel-title">
-        <h3>{t.chooseForm}</h3>
+        <h2>{t.chooseForm}</h2>
         <p>{t.selectForm}</p>
       </div>
 
@@ -67,7 +67,7 @@ export default function ResponsesSidebar({
       {selectedForm && (
         <div className="responses-search-panel">
           <div className="results-panel-title">
-            <h3>{t.searchData}</h3>
+            <h2>{t.searchData}</h2>
             <p>{t.searchDataText}</p>
           </div>
 

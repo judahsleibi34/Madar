@@ -169,7 +169,14 @@ export default function ArchivePage({ user }) {
 
   return (
     <section className="archive-page dashboard-page" aria-labelledby="archive-title">
-      <header className="archive-header">
+      <header className="archive-context-header">
+        <div>
+          <h2>Untitled Site</h2>
+          <p>Review, clean, and analyze your collected data.</p>
+        </div>
+      </header>
+
+      <header className="archive-header admin-dashboard-header">
         <div>
           <span className="archive-kicker">Archive</span>
           <h1 id="archive-title">Saved work history</h1>
@@ -202,25 +209,39 @@ export default function ArchivePage({ user }) {
         })}
       </div>
 
-      <nav className="archive-filter-tabs" aria-label="Archive filters">
-        {FILTERS.map((filter) => {
-          const Icon = filter.icon;
-          return (
-            <button
-              type="button"
-              key={filter.id}
-              className={activeFilter === filter.id ? "is-active" : ""}
-              onClick={() => setActiveFilter(filter.id)}
-            >
-              <Icon size={16} aria-hidden="true" />
-              <span>{filter.label}</span>
-              <strong>{counts[filter.id] || 0}</strong>
-            </button>
-          );
-        })}
-      </nav>
+      <section className="archive-filter-section" aria-labelledby="archive-browse-title">
+        <div className="archive-section-heading">
+          <div>
+            <span>Saved items</span>
+            <h2 id="archive-browse-title">Browse archive</h2>
+          </div>
+          <p>{filteredItems.length} of {items.length} items</p>
+        </div>
+
+        <nav className="archive-filter-tabs" aria-label="Archive filters">
+          {FILTERS.map((filter) => {
+            const Icon = filter.icon;
+            return (
+              <button
+                type="button"
+                key={filter.id}
+                className={activeFilter === filter.id ? "is-active" : ""}
+                onClick={() => setActiveFilter(filter.id)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{filter.label}</span>
+                <strong>{counts[filter.id] || 0}</strong>
+              </button>
+            );
+          })}
+        </nav>
+      </section>
 
       <section className="archive-list" aria-label="Archived items">
+        <div className="archive-list-heading">
+          <h2>Archived items</h2>
+          <span>{filteredItems.length}</span>
+        </div>
         {status === "loading" ? (
           <div className="archive-empty-state">Loading archived work...</div>
         ) : null}

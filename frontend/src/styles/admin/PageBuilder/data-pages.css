@@ -83,7 +83,7 @@
   text-transform: none;
 }
 
-.page-builder .responses-results-page > .responses-results-header h2 {
+.page-builder .responses-results-page > .responses-results-header h1 {
   font-size: 20px;
   line-height: 1.2;
 }
@@ -398,7 +398,7 @@
 }
 
 .page-builder .results-panel-title h3,
-.page-builder .results-table-header h3,
+.page-builder .results-table-header h2,
 .page-builder .analytics-card h3 {
   margin: 0;
   color: var(--madar-text);
@@ -601,7 +601,7 @@
   padding: 14px;
 }
 
-.page-builder .responses-browser-heading h4 {
+.page-builder .responses-browser-heading h2 {
   margin: 0;
   color: var(--madar-text);
   font-size: 16px;

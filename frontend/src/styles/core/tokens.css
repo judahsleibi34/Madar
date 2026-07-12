@@ -13,18 +13,29 @@
   --madar-button-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.18);
   --madar-button-shadow-hover: 0 16px 32px rgba(var(--theme-primary-rgb), 0.24);
 
-  --theme-bg: #fafaf7;
-  --theme-bg-soft: #f1eee6;
+  /* Shared application surfaces. Structural layout uses --app-bg; white is
+     reserved for compact controls, intentional cards, previews, and content. */
+  --app-bg: var(--madar-cream);
+  --surface-1: #f7f5ef;
+  --surface-2: #ffffff;
+  --surface-3: #ebe7dc;
+  --border-subtle: #e2dfd5;
+  --border-strong: rgba(27, 42, 74, 0.22);
+  --text-primary: #1b2a4a;
+  --text-muted: #6f778b;
+
+  --theme-bg: var(--app-bg);
+  --theme-bg-soft: var(--app-bg);
   --theme-surface: #ffffff;
   --theme-surface-elevated: var(--theme-surface-2);
-  --theme-surface-2: #f7f5ef;
-  --theme-surface-3: #f1eee6;
-  --theme-border: #e2dfd5;
-  --theme-border-strong: rgba(27, 42, 74, 0.22);
-  --theme-text: #1b2a4a;
+  --theme-surface-2: var(--surface-1);
+  --theme-surface-3: var(--surface-3);
+  --theme-border: var(--border-subtle);
+  --theme-border-strong: var(--border-strong);
+  --theme-text: var(--text-primary);
   --theme-text-secondary: var(--theme-text-soft);
   --theme-text-soft: #4a5470;
-  --theme-text-muted: #8891a6;
+  --theme-text-muted: var(--text-muted);
   --theme-text-inverse: #ffffff;
   --theme-text-inverse-rgb: 255, 255, 255;
   --theme-black-rgb: 0, 0, 0;
@@ -97,10 +108,10 @@
   --app-chrome-translucent: color-mix(in srgb, var(--theme-surface) 92%, transparent);
   --app-success-strong: #4ade80;
   --app-success-strong-rgb: 74, 222, 128;
-  --builder-chrome-bg: color-mix(in srgb, var(--theme-surface) 88%, var(--theme-bg-soft));
-  --builder-chrome-surface: color-mix(in srgb, var(--theme-surface) 92%, var(--theme-bg-soft));
-  --builder-chrome-surface-raised: color-mix(in srgb, var(--theme-surface) 96%, var(--theme-bg-soft));
-  --builder-chrome-surface-muted: color-mix(in srgb, var(--theme-surface) 84%, var(--theme-bg-soft));
+  --builder-chrome-bg: var(--app-bg);
+  --builder-chrome-surface: var(--surface-1);
+  --builder-chrome-surface-raised: var(--theme-surface);
+  --builder-chrome-surface-muted: var(--surface-1);
   --builder-chrome-border: color-mix(in srgb, var(--theme-border) 62%, transparent);
   --builder-chrome-shadow: 0 8px 18px rgba(var(--theme-shadow-rgb), 0.035);
   --builder-bg: var(--builder-chrome-bg);

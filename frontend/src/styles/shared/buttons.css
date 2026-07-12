@@ -1,7 +1,15 @@
 /* ============================================================
-   GLOBAL MADAR GRADIENT BUTTON SYSTEM
-   Applies to main buttons across the whole website
+   GLOBAL MADAR BUTTON SYSTEM
    ============================================================ */
+
+:root {
+  --action-primary: #9b2f25;
+  --action-primary-hover: #84271f;
+  --action-primary-active: #712019;
+  --action-danger: var(--action-primary);
+  --action-danger-soft: color-mix(in srgb, var(--action-danger) 10%, var(--theme-surface));
+  --action-focus-ring: 0 0 0 3px color-mix(in srgb, var(--action-primary) 28%, transparent);
+}
 
 /* Main action buttons across pages */
 .btn-signup,
@@ -13,16 +21,26 @@
 .pricing-card:hover .plan-btn,
 .primary-action,
 .small-action {
-  border: none;
-  background: var(--madar-gradient);
-  color: var(--theme-text-inverse);
-  box-shadow: var(--madar-button-shadow);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--action-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  box-shadow: none;
+  cursor: pointer;
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
+    background-color 0.16s ease,
+    transform 0.08s ease,
+    opacity 0.16s ease;
 }
 
 .btn-signup:hover,
@@ -34,10 +52,45 @@
 .pricing-card:hover .plan-btn:hover,
 .primary-action:hover,
 .small-action:hover {
-  background: var(--madar-gradient-hover);
-  color: var(--theme-text-inverse);
-  transform: translateY(-2px);
-  box-shadow: var(--madar-button-shadow-hover);
+  background: var(--action-primary-hover);
+  color: #fff;
+  transform: none;
+  box-shadow: none;
+}
+
+:is(
+  .btn-signup,
+  .register-submit,
+  .login-submit,
+  .forgot-card button,
+  .contact-form button,
+  .plan-btn.primary,
+  .primary-action,
+  .small-action
+):active {
+  background: var(--action-primary-active);
+  transform: translateY(1px);
+}
+
+:is(
+  .btn-signup,
+  .register-submit,
+  .login-submit,
+  .forgot-card button,
+  .contact-form button,
+  .plan-btn.primary,
+  .primary-action,
+  .small-action
+):focus-visible {
+  outline: 0;
+  box-shadow: var(--action-focus-ring);
+}
+
+:is(button, [role="button"], .btn-signup, .primary-action):disabled,
+:is(button, [role="button"], .btn-signup, .primary-action)[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Outline/secondary buttons: gradient on hover */
@@ -105,4 +158,34 @@
   color: var(--madar-red);
   transform: none;
   box-shadow: none;
+}
+
+/* Destructive actions remain visually distinct from primary actions. */
+:is(.danger-button, .danger-lite, .page-delete-action, .form-command-button-danger) {
+  min-height: 40px;
+  padding: 10px 18px;
+  border: 1px solid color-mix(in srgb, var(--action-danger) 48%, transparent);
+  border-radius: 8px;
+  background: var(--action-danger-soft);
+  color: var(--action-danger);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  box-shadow: none;
+}
+
+:is(.danger-button, .danger-lite, .page-delete-action, .form-command-button-danger):not(:disabled):hover {
+  border-color: var(--action-danger);
+  background: color-mix(in srgb, var(--action-danger) 16%, var(--theme-surface));
+  color: var(--action-danger);
+}
+
+:is(.danger-button, .danger-lite, .page-delete-action, .form-command-button-danger):active {
+  transform: translateY(1px);
+}
+
+:is(.danger-button, .danger-lite, .page-delete-action, .form-command-button-danger):focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--action-danger) 24%, transparent);
 }
