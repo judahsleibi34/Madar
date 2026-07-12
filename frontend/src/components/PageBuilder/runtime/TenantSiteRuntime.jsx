@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { STORAGE_KEY, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
+import { getBuilderStorageKey, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
   fetchPublicSite,
   getTenantVisitorStatus,
@@ -147,6 +147,65 @@ const renderRichText = (value, ranges = []) => {
 };
 
 const carouselElementTypes = new Set(["card", "carousel", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
+const authElementTypes = new Set(["loginBlock", "registrationBlock"]);
+
+const getPageElements = (page) =>
+  (page?.sections || []).flatMap((section) => [
+    ...(section.freeElements || []),
+    ...(section.rows || []).flatMap((row) =>
+      (row.columns || []).flatMap((column) => column.elements || [])
+    ),
+  ]);
+
+const getPageAuthElements = (page) =>
+  getPageElements(page).filter((element) => authElementTypes.has(element.type));
+
+export const getRuntimeAuthFlow = (pages = []) => ({
+  entryPage:
+    pages.find((page) =>
+      getPageAuthElements(page).some((element) => element.type === "loginBlock")
+    ) || null,
+  destinationPageIds: new Set(
+    pages.flatMap((page) =>
+      getPageAuthElements(page)
+        .filter((element) => element.type === "loginBlock")
+        .map((element) => element.auth?.successPageId)
+        .filter(Boolean)
+    )
+  ),
+});
+
+export const runtimePageRequiresAuthentication = (page, destinationPageIds = new Set()) =>
+  Boolean(
+    page && (
+      destinationPageIds.has(page.id) ||
+      ["private", "authenticated", "members"].includes(
+        String(page.visibility || "").toLowerCase()
+      )
+    )
+  );
+
+export const resolveRuntimePage = ({
+  pages = [],
+  requestedPage = null,
+  authEntryPage = null,
+  authDestinationPageIds = new Set(),
+  isPublicRuntime = true,
+  authLoading = false,
+  user = null,
+} = {}) => {
+  const fallbackPage = requestedPage || pages[0] || null;
+  if (
+    isPublicRuntime &&
+    !authLoading &&
+    !user &&
+    runtimePageRequiresAuthentication(requestedPage, authDestinationPageIds) &&
+    authEntryPage
+  ) {
+    return authEntryPage;
+  }
+  return fallbackPage;
+};
 
 const legacyFieldTypes = {
   money: { id: "money", label: runtimeFallbackCopy.legacyFieldTypes.money.label, group: runtimeFallbackCopy.legacyFieldTypes.money.group, input: "number" },
@@ -309,9 +368,9 @@ const getCleanSubdomain = (value = "") =>
     .replace(/-{2,}/g, "-")
     .replace(/^-+|-+$/g, "") || runtimeFallbackCopy.runtime.subdomain;
 
-const loadDraftPreviewProject = () => {
+const loadDraftPreviewProject = (storageKey) => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -354,7 +413,7 @@ const getSectionCanvasHeight = (section, viewportName) =>
   Number(section?.layout?.minHeight) ||
   560;
 
-export default function TenantSiteRuntime({ draftPreview = false } = {}) {
+export default function TenantSiteRuntime({ draftPreview = false, user = null } = {}) {
   const params = useParams();
   const { subdomain = "my-site" } = params;
   const location = useLocation();
@@ -363,13 +422,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const cleanSubdomain = getCleanSubdomain(subdomain);
   const isPublicRuntime = !draftPreview;
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
-  const [project, setProject] = useState(() => (draftPreview ? loadDraftPreviewProject() : null));
+  const storageKey = getBuilderStorageKey(user?.id);
+  const [project, setProject] = useState(() => (draftPreview ? loadDraftPreviewProject(storageKey) : null));
+  const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState(() => (draftPreview ? "ready" : "loading"));
   const [formAnswers, setFormAnswers] = useState({});
   const [formStatus, setFormStatus] = useState({});
   const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
+  const [authPanelModes, setAuthPanelModes] = useState({});
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
 
   useEffect(() => {
@@ -423,6 +485,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         message: result?.message || (result?.logged_in ? "You are logged in." : "Account created. Check your email, then log in."),
         error: "",
       });
+      if (isRegistration) {
+        setAuthPanelModes((current) => ({ ...current, [authElement.id]: false }));
+      }
       formElement.reset();
       if (isRegistration && result?.requires_email_verification) {
         const pageContainsLogin = (page) => (page.sections || []).some((section) =>
@@ -471,11 +536,11 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       };
 
       const syncDraftFromStorage = () => {
-        syncSerializedProject(localStorage.getItem(STORAGE_KEY));
+        syncSerializedProject(localStorage.getItem(storageKey));
       };
 
       const handleDraftStorageUpdate = (event) => {
-        if (event.key !== STORAGE_KEY) return;
+        if (event.key !== storageKey) return;
         syncSerializedProject(event.newValue);
       };
 
@@ -485,7 +550,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
 
       const handleBroadcastDraftUpdate = (event) => {
-        if (event.data?.storageKey !== STORAGE_KEY) return;
+        if (event.data?.storageKey !== storageKey) return;
         syncSerializedProject(event.data.serializedProject);
       };
 
@@ -505,6 +570,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
     let cancelled = false;
     setProject(null);
+    setPublicSiteProfile(null);
     setPublicSiteState("loading");
 
     const loadBackendPublishedSite = async () => {
@@ -513,6 +579,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         const publishedProject = publicSite?.project?.published_schema;
 
         if (cancelled) return;
+
+        setPublicSiteProfile(publicSite?.site || null);
 
         if (publishedProject && typeof publishedProject === "object") {
           setProject(publishedProject);
@@ -537,9 +605,24 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [cleanSubdomain, draftPreview]);
+  }, [cleanSubdomain, draftPreview, storageKey]);
   const site = {
     ...defaultSiteChrome,
+    ...(publicSiteProfile
+      ? {
+          brand: publicSiteProfile.brand || defaultSiteChrome.brand,
+          footerStoreName:
+            publicSiteProfile.footer_store_name ||
+            publicSiteProfile.brand ||
+            defaultSiteChrome.footerStoreName,
+          logoUrl: publicSiteProfile.logo_url || "",
+          contactEmail:
+            publicSiteProfile.contact_email || defaultSiteChrome.contactEmail,
+          phone: publicSiteProfile.phone || defaultSiteChrome.phone,
+          description:
+            publicSiteProfile.description || defaultSiteChrome.description,
+        }
+      : {}),
     ...(project?.siteChrome || {}),
   };
   const runtimeLanguage =
@@ -547,7 +630,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     project?.lang ||
     site.language ||
     site.lang ||
-    site.footerLanguageLabel;
+    "en";
   const runtimeDirection =
     String(runtimeLanguage || "").toLowerCase().startsWith("ar") ? "rtl" : "ltr";
   const runtimeCopy = getTenantRuntimeContent(runtimeDirection === "rtl" ? "ar" : "en");
@@ -557,8 +640,26 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     [project?.pages]
   );
   const activePath = location.pathname;
-  const pagePath = `/${params["*"] || ""}`;
+  const previewBasePath = "/page-builder/preview";
+  const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
+  const routePagePath = draftPreview
+    ? location.pathname.slice(previewBasePath.length)
+    : `/${params["*"] || ""}`;
+  const pagePath = routePagePath && routePagePath !== "/" ? routePagePath : "/";
   const normalizedPagePath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
+  const requestedPage = useMemo(() => {
+    const normalizedPath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
+    return pages.find((page) => {
+      const normalizedSlug = page.slug === "/" ? "/" : String(page.slug || "").replace(/\/+$/, "");
+      return normalizedSlug === normalizedPath;
+    }) || null;
+  }, [pagePath, pages]);
+  const { entryPage: authEntryPage, destinationPageIds: authDestinationPageIds } = useMemo(
+    () => getRuntimeAuthFlow(pages),
+    [pages]
+  );
+  const pageRequiresAuthentication = (page) =>
+    runtimePageRequiresAuthentication(page, authDestinationPageIds);
   const hasBuilderPageForRoute = pages.some((page) => {
     const normalizedSlug = page.slug === "/" ? "/" : String(page.slug || "").replace(/\/+$/, "");
     return normalizedSlug === normalizedPagePath;
@@ -570,7 +671,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       activePath.endsWith("/forgot-password") ||
       activePath.endsWith("/dashboard"));
 
-  const siteHomePath = `/site/${cleanSubdomain}`;
+  const siteHomePath = runtimeBasePath;
 
   const pageLinks = splitLines(site.footerShopLinks || runtimeCopy.runtime.footerShopLinks);
   const helpLinks = splitLines(site.footerHelpLinks || runtimeCopy.runtime.footerHelpLinks);
@@ -609,8 +710,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       return;
     }
 
-    const slug = page.slug === "/" ? "" : page.slug;
-    navigate(`/site/${cleanSubdomain}${slug}`);
+    const destination =
+      isPublicRuntime &&
+      !tenantAuth.loading &&
+      !tenantAuth.user &&
+      pageRequiresAuthentication(page) &&
+      authEntryPage
+        ? authEntryPage
+        : page;
+    const slug = destination.slug === "/" ? "" : destination.slug;
+    navigate(`${runtimeBasePath}${slug}`);
   };
 
   const resolveFooterPageLink = (value) => {
@@ -673,14 +782,39 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     }
   };
 
-  const activePage = useMemo(() => {
-    const normalizedPath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
-    return (
-      pages.find((page) => page.slug === normalizedPath) ||
-      pages.find((page) => page.slug === "/" && normalizedPath === "/") ||
-      pages[0]
-    );
-  }, [pagePath, pages]);
+  const activePage = resolveRuntimePage({
+    pages,
+    requestedPage,
+    authEntryPage,
+    authDestinationPageIds,
+    isPublicRuntime,
+    authLoading: tenantAuth.loading,
+    user: tenantAuth.user,
+  });
+
+  useEffect(() => {
+    if (!isPublicRuntime || publicSiteState !== "ready" || tenantAuth.loading || !pages.length) return;
+
+    const destination =
+      activePage && (!requestedPage || activePage.id !== requestedPage.id)
+        ? activePage
+        : null;
+
+    if (!destination) return;
+    const destinationPath = destination.slug === "/" ? runtimeBasePath : `${runtimeBasePath}${destination.slug}`;
+    if (location.pathname !== destinationPath) navigate(destinationPath, { replace: true });
+  }, [
+    authEntryPage,
+    activePage,
+    location.pathname,
+    navigate,
+    pages,
+    publicSiteState,
+    requestedPage,
+    runtimeBasePath,
+    tenantAuth.loading,
+    tenantAuth.user,
+  ]);
 
   useEffect(() => {
     if (!tenantAuth.user || !activePage) return;
@@ -860,10 +994,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         success: "",
       },
     }));
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
   const goToNextFormPage = (form, instanceKey, currentPage, currentPageIndex, pageCount) => {
-    const missingField = getMissingFieldForSection(form, currentPage, instanceKey);
+    const missingField = draftPreview
+      ? null
+      : getMissingFieldForSection(form, currentPage, instanceKey);
 
     if (missingField) {
       setFormStatus((prev) => ({
@@ -992,7 +1129,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const renderRuntimeField = (field, form, instanceKey, disabled, formLang = "en") => {
     const formCopy = getTenantRuntimeContent(formLang);
     const meta = getFieldType(field.type);
-    const placeholder = getLocalizedValue(field, "placeholder", formLang) || getModernFieldPlaceholder(field, formCopy);
+    const placeholder = field.showDetailsEditor === true
+      ? getLocalizedValue(field, "placeholder", formLang) || getModernFieldPlaceholder(field, formCopy)
+      : "";
     const currentValue = formAnswers[instanceKey]?.[field.id] ?? field.defaultValue ?? "";
     const baseId = `${instanceKey}_${field.id}`;
     const fieldDirection = getContentDirection(
@@ -1186,7 +1325,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const formCopy = getTenantRuntimeContent(formLang);
     const formDir = getDirectionForLanguage(formLang);
     const formSections = getFormSections(form);
-    const isPagedForm = (form.pageMode || "paged") === "paged" && formSections.length > 1;
+    const isPagedForm = formSections.length > 1;
     const currentPageIndex = Math.max(
       0,
       Math.min(Number(formPages[instanceKey] || 0), Math.max(formSections.length - 1, 0))
@@ -1197,15 +1336,17 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       return (
       <div className="runtime-form-section" key={section.id}>
         <div className="runtime-form-section-header">
-          <h4>{getLocalizedValue(section, "title", formLang) || section.title}</h4>
+          <h1 className="form-page-title" dir={section.titleStyle?.direction} style={{ ...(section.titleStyle || {}), textStyle: undefined }}>{getLocalizedValue(section, "title", formLang) || section.title}</h1>
           {(getLocalizedValue(section, "description", formLang) || section.description) && (
-            <p>{getLocalizedValue(section, "description", formLang) || section.description}</p>
+            <h2 className="form-page-description" dir={section.descriptionStyle?.direction} style={{ ...(section.descriptionStyle || {}), textStyle: undefined }}>{getLocalizedValue(section, "description", formLang) || section.description}</h2>
           )}
         </div>
 
         {visibleFields.map((field) => {
           const label = getLocalizedValue(field, "label", formLang) || field.label;
-          const helpText = getLocalizedValue(field, "helpText", formLang) || field.helpText;
+          const helpText = field.showDetailsEditor === true
+            ? getLocalizedValue(field, "helpText", formLang) || field.helpText
+            : "";
           const fieldDirection = getContentDirection(
             `${label || ""} ${helpText || ""} ${getRuntimeFieldOptions(field, formLang).join(" ")}`,
             formDir
@@ -1216,7 +1357,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
               <div className="runtime-question-field" dir={fieldDirection}>
                 <span className="runtime-question-title" dir={fieldDirection}>
                   {label}
-                  {field.required ? " *" : ""}
+                  {field.required && <span className="form-required-marker" aria-hidden="true"> *</span>}
                 </span>
                 {helpText && (
                   <small dir={getContentDirection(helpText, fieldDirection)}>
@@ -1245,8 +1386,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
               <button type="button" className={formLang === "ar" ? "active" : ""} onClick={() => setFormLanguages((prev) => ({ ...prev, [instanceKey]: "ar" }))}>{formCopy.runtime.arabic}</button>
             </div>
           )}
-          <h3>{getLocalizedValue(form, "title", formLang) || form.title}</h3>
-          <p>{getLocalizedValue(form, "description", formLang) || form.description}</p>
           {isPagedForm && (
             <div className="runtime-form-progress" aria-label={formCopy.runtime.formProgress}>
               <span style={{ width: `${Math.round(((currentPageIndex + 1) / formSections.length) * 100)}%` }} />
@@ -1254,11 +1393,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           )}
         </div>
 
-        {isPagedForm
-          ? currentPage
-            ? renderRuntimeFormPage(currentPage)
-            : null
-          : formSections.map((section) => renderRuntimeFormPage(section))}
+        {isPagedForm ? (
+          <>
+            <div className="form-page-counter-title">
+              {formCopy.runtime.pageCount
+                .replace("{current}", currentPageIndex + 1)
+                .replace("{total}", formSections.length)}
+            </div>
+            {currentPage ? renderRuntimeFormPage(currentPage) : null}
+          </>
+        ) : formSections.map((section) => renderRuntimeFormPage(section))}
 
         {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
         {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}
@@ -1277,15 +1421,11 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           )}
 
           <span className="runtime-form-page-count">
-                {isPagedForm
-                  ? formLang === "ar"
-                    ? formCopy.runtime.pageCount
-                        .replace("{current}", currentPageIndex + 1)
-                        .replace("{total}", formSections.length)
-                    : formCopy.runtime.pageCount
-                        .replace("{current}", currentPageIndex + 1)
-                        .replace("{total}", formSections.length)
-                  : formCopy.runtime.sectionsCount.replace("{count}", formSections.length)}
+            {isPagedForm
+              ? formCopy.runtime.pageCount
+                  .replace("{current}", currentPageIndex + 1)
+                  .replace("{total}", formSections.length)
+              : ""}
           </span>
 
           {isPagedForm && currentPageIndex < formSections.length - 1 ? (
@@ -1391,8 +1531,14 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       );
     }
     if (element.type === "loginBlock" || element.type === "registrationBlock") {
-      const isRegistration = element.type === "registrationBlock";
+      const defaultRegistrationMode = element.type === "registrationBlock";
+      const isRegistration = authPanelModes[element.id] ?? defaultRegistrationMode;
       const auth = element.auth || {};
+      const useConfiguredCopy = isRegistration === defaultRegistrationMode;
+      const switchAuthMode = () => {
+        setAuthPanelModes((current) => ({ ...current, [element.id]: !isRegistration }));
+        setTenantAuth((current) => ({ ...current, error: "", message: "" }));
+      };
 
       if (tenantAuth.user) {
         return (
@@ -1414,8 +1560,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         <div key={element.id} {...props}>
           <form className="builder-auth-component" autoComplete="on" onSubmit={(event) => submitTenantAuth(event, isRegistration, element)}>
             <div className="builder-auth-heading">
-              <h3>{auth.title || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}</h3>
-              <p>{auth.subtitle || (isRegistration ? runtimeCopy.runtime.createAccountSubtitle : runtimeCopy.runtime.loginSubtitle)}</p>
+              <h3>{(useConfiguredCopy && auth.title) || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}</h3>
+              <p>{(useConfiguredCopy && auth.subtitle) || (isRegistration ? runtimeCopy.runtime.createAccountSubtitle : runtimeCopy.runtime.loginSubtitle)}</p>
             </div>
             {isRegistration && (
               <label>
@@ -1440,10 +1586,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             {tenantAuth.error && <p className="runtime-form-error" role="alert">{tenantAuth.error}</p>}
             {tenantAuth.message && <p className="runtime-form-success" role="status">{tenantAuth.message}</p>}
             <button type="submit" className="runtime-submit" disabled={tenantAuth.loading || draftPreview}>
-              {tenantAuth.loading ? "Please wait…" : auth.buttonText || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}
+              {tenantAuth.loading ? "Please wait…" : (useConfiguredCopy && auth.buttonText) || (isRegistration ? runtimeCopy.runtime.createAccount : runtimeCopy.runtime.login)}
             </button>
             <p className="builder-auth-switch">
-              {auth.switchText} <strong>{auth.switchActionText}</strong>
+              {isRegistration ? "Already registered?" : "Don't have an account?"}{" "}
+              <button type="button" onClick={switchAuthMode}>
+                {isRegistration ? runtimeCopy.runtime.login : runtimeCopy.runtime.createAccount}
+              </button>
             </p>
           </form>
         </div>
@@ -1475,21 +1624,28 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     return <div key={element.id} {...props}>{element.content}</div>;
   };
 
-  const renderUnavailableState = (title, body) => (
+  const renderUnavailableState = (title, body, state = "unavailable") => (
     <main className="tenant-runtime-main">
-      <section className="tenant-runtime-card">
+      <section className={`tenant-runtime-card tenant-runtime-status-${state}`}>
+        {state === "loading" && <span className="tenant-runtime-loader" aria-hidden="true" />}
         <p className="tenant-eyebrow">{cleanSubdomain}.madar.app</p>
         <h1>{title}</h1>
         <p>{body}</p>
+        {state === "unavailable" && (
+          <button type="button" className="tenant-runtime-retry" onClick={() => window.location.reload()}>
+            Try again
+          </button>
+        )}
       </section>
     </main>
   );
 
   const renderPublishedPage = () => {
-    if (isPublicRuntime && publicSiteState === "loading") {
+    if (isPublicRuntime && (publicSiteState === "loading" || tenantAuth.loading)) {
       return renderUnavailableState(
         runtimeCopy.runtime.loadingTitle,
-        runtimeCopy.runtime.loadingBody
+        runtimeCopy.runtime.loadingBody,
+        "loading"
       );
     }
 
@@ -1518,7 +1674,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                       minHeight: `${getSectionCanvasHeight(section, runtimeViewport)}px`,
                     }}
                   >
-                    {(section.freeElements || []).map((element) => (
+                    {(section.freeElements || [])
+                      .filter((element) =>
+                        tenantAuth.user ||
+                        activePage?.id !== authEntryPage?.id ||
+                        authElementTypes.has(element.type)
+                      )
+                      .map((element) => (
                       <div
                         key={element.id}
                         className={`direct-element-frame direct-element-frame-${element.type}`}
@@ -1551,6 +1713,11 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                         className={`site-column column-align-${column.layout.align}`}
                       >
                         {(column.elements || [])
+                          .filter((element) =>
+                            tenantAuth.user ||
+                            activePage?.id !== authEntryPage?.id ||
+                            authElementTypes.has(element.type)
+                          )
                           .filter((element) => !carouselElementTypes.has(element.type))
                           .map((element) => renderElement(element, false))}
                       </div>
@@ -1590,7 +1757,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             const pagePath =
               page.slug === "/"
                 ? siteHomePath
-                : `/site/${cleanSubdomain}${page.slug}`;
+                : `${runtimeBasePath}${page.slug}`;
 
             return (
               <button
@@ -1708,9 +1875,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           </button>
         </div>
       )}
-      {(draftPreview || publicSiteState === "ready") && renderHeader()}
+      {(draftPreview || isPublicRuntime) && renderHeader()}
       {renderMainContent()}
-      {(draftPreview || publicSiteState === "ready") && renderFooter()}
+      {(draftPreview || isPublicRuntime) && renderFooter()}
     </div>
   );
 }

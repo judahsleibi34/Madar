@@ -52,6 +52,7 @@ const commonFieldTypes = [
   "shortText",
   "paragraph",
   "email",
+  "phone",
   "number",
   "date",
   "radio",
@@ -201,6 +202,7 @@ export default function FormsTab({
   renderConnectedForm,
   openFormPreviewPage,
   saveProject,
+  restorePreviousDraft,
 
   quizOptionsOpen,
   setQuizOptionsOpen,
@@ -212,7 +214,9 @@ export default function FormsTab({
   const [deleteFormCandidate, setDeleteFormCandidate] = useState(null);
   const [deleteFormPageCandidate, setDeleteFormPageCandidate] = useState(null);
   const [importGuideCopied, setImportGuideCopied] = useState(false);
+  const [isSavingForm, setIsSavingForm] = useState(false);
   const activeTextTargetRef = useRef(null);
+  const activePageTextTargetRef = useRef("description");
   const formImportInputRef = useRef(null);
   const formTheme = project.theme?.form || {};
   const formLanguageMode = normalizeLanguageMode(activeForm?.languageMode || lang);
@@ -298,10 +302,11 @@ export default function FormsTab({
   const activeSectionId = sections[0]?.id || null;
   const placements = activeForm ? getFormPlacements(activeForm.id) : [];
   const getFriendlyPageTitle = (section, sectionIndex) => {
-    if (sectionIndex === 0) return copy.labels.titlePage;
     const title = section.title || "";
     const legacyMatch = title.match(/^Section\s+(\d+)$/i);
-    return legacyMatch ? `${copy.labels.page} ${legacyMatch[1]}` : title || `${copy.labels.page} ${sectionIndex + 1}`;
+    return legacyMatch
+      ? `${copy.labels.page} ${legacyMatch[1]}`
+      : title || (sectionIndex === 0 ? copy.labels.titlePage : `${copy.labels.page} ${sectionIndex + 1}`);
   };
 
   const addQuestion = (typeId = questionType, sectionId = activeSectionId) => {
@@ -676,6 +681,37 @@ export default function FormsTab({
     target.focus();
   };
 
+  const updatePageTextStyle = (section, updates) => {
+    const target = activePageTextTargetRef.current === "title" ? "title" : "description";
+    const styleKey = `${target}Style`;
+    updateFormSection(section.id, {
+      [styleKey]: { ...(section[styleKey] || {}), ...updates },
+    });
+  };
+
+  const runPageTextAction = (section, action) => {
+    const target = activePageTextTargetRef.current === "title" ? "title" : "description";
+    const current = section[`${target}Style`] || {};
+    const toggle = (property, value) =>
+      updatePageTextStyle(section, { [property]: current[property] === value ? "" : value });
+    if (action === "bold") toggle("fontWeight", "700");
+    if (action === "italic") toggle("fontStyle", "italic");
+    if (action === "underline") toggle("textDecoration", "underline");
+    if (action.startsWith("align-")) {
+      updatePageTextStyle(section, { textAlign: action.replace("align-", "") });
+    }
+  };
+
+  const applyPageTextStyle = (section, textStyle) => {
+    const styles = {
+      h1: { fontSize: "24px", fontWeight: "950" },
+      h2: { fontSize: "20px", fontWeight: "900" },
+      h3: { fontSize: "17px", fontWeight: "850" },
+      text: { fontSize: "", fontWeight: "" },
+    };
+    updatePageTextStyle(section, { textStyle, ...(styles[textStyle] || styles.text) });
+  };
+
   const openPlacement = (placement) => {
     selectPage(placement.pageId);
     setActiveTab("design");
@@ -687,6 +723,16 @@ export default function FormsTab({
       await saveProject();
     }
     setQuizOptionsOpen(false);
+  };
+
+  const saveForm = async () => {
+    if (!saveProject || isSavingForm) return;
+    setIsSavingForm(true);
+    try {
+      await saveProject();
+    } finally {
+      setIsSavingForm(false);
+    }
   };
 
   const updateFormThemeValue = (key, value) => {
@@ -911,6 +957,12 @@ export default function FormsTab({
           <div className="simple-action-groups">
             <section className="simple-action-group">
               <span className="simple-action-group-title">{copy.labels.formActions}</span>
+              <FormButton variant="primary" icon={Save} disabled={isSavingForm} onClick={saveForm}>
+                {isSavingForm ? "Saving..." : "Save form"}
+              </FormButton>
+              <FormButton icon={RotateCcw} onClick={restorePreviousDraft}>
+                Restore previous draft
+              </FormButton>
               <FormButton icon={Settings} onClick={() => setQuizOptionsOpen(true)}>
                 {copy.labels.formSettings}
               </FormButton>
@@ -1003,11 +1055,28 @@ export default function FormsTab({
               className={`forms-section-sheet simple-section-sheet ${sectionIndex === 0 ? "form-intro-page" : ""}`}
               key={section.id}
             >
+              <div className="question-format-toolbar form-page-description-toolbar" role="toolbar" aria-label={copy.labels.pageDescription}>
+                <select aria-label={copy.toolbar.textStyle} defaultValue="text" onChange={(event) => getActiveFormTextTarget() ? applyTargetTextStyle(getActiveFormTextTarget(), event.target.value) : applyPageTextStyle(section, event.target.value)}>
+                  <option value="text">{copy.toolbar.text}</option><option value="h1">{copy.toolbar.heading1}</option><option value="h2">{copy.toolbar.heading2}</option><option value="h3">{copy.toolbar.heading3}</option>
+                </select>
+                {textToolbarButtons.filter(({ action }) => !["undo", "redo", "bullets", "numbers"].includes(action)).map(({ action, label, icon: Icon }) => (
+                  <button key={action} type="button" title={label} aria-label={label} onMouseDown={(event) => { event.preventDefault(); getActiveFormTextTarget() ? runFormDescriptionToolbarAction(action) : runPageTextAction(section, action); }}><Icon size={15} aria-hidden="true" /></button>
+                ))}
+                <button type="button" title={copy.toolbar.leftToRight} onMouseDown={(event) => { event.preventDefault(); getActiveFormTextTarget() ? setActiveFormTextDirection("ltr") : updatePageTextStyle(section, { direction: "ltr", textAlign: "left" }); }}>{copy.toolbar.directionLtrShort}</button>
+                <button type="button" title={copy.toolbar.rightToLeft} onMouseDown={(event) => { event.preventDefault(); getActiveFormTextTarget() ? setActiveFormTextDirection("rtl") : updatePageTextStyle(section, { direction: "rtl", textAlign: "right" }); }}>{copy.toolbar.directionRtlShort}</button>
+                <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#1f2937" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "color", event.target.value) : updatePageTextStyle(section, { color: event.target.value })} /></label>
+                <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#ffffff" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "backgroundColor", event.target.value) : updatePageTextStyle(section, { backgroundColor: event.target.value })} /></label>
+              </div>
               <div className="forms-section-heading">
                 <input
                   value={getFriendlyPageTitle(section, sectionIndex)}
                   placeholder={sectionIndex === 0 ? copy.labels.titlePage : `${copy.labels.page} ${sectionIndex + 1}`}
-                  readOnly={sectionIndex === 0}
+                  dir={section.titleStyle?.direction || formDirection}
+                  style={{ ...(section.titleStyle || {}), textStyle: undefined }}
+                  onFocus={() => {
+                    activeTextTargetRef.current = null;
+                    activePageTextTargetRef.current = "title";
+                  }}
                   onChange={(event) =>
                     updateFormSection(section.id, { title: event.target.value })
                   }
@@ -1030,14 +1099,20 @@ export default function FormsTab({
               <textarea
                 value={section.description || ""}
                 placeholder={copy.placeholders.pageDescription}
+                dir={section.descriptionStyle?.direction || formDirection}
+                style={{ ...(section.descriptionStyle || {}), textStyle: undefined }}
+                onFocus={() => {
+                  activeTextTargetRef.current = null;
+                  activePageTextTargetRef.current = "description";
+                }}
                 onChange={(event) =>
                   updateFormSection(section.id, { description: event.target.value })
                 }
               />
 
               {sectionIndex === 0 && (
-                <div className="form-page-intro">
-                  <div className="question-format-toolbar form-title-toolbar" role="toolbar" aria-label={copy.labels.formTitleFormatting}>
+                <div className="form-page-intro" style={{ display: "none" }} aria-hidden="true">
+                  <div hidden style={{ display: "none" }} className="question-format-toolbar form-title-toolbar" role="toolbar" aria-label={copy.labels.formTitleFormatting}>
                     <select
                       aria-label={copy.toolbar.textStyle}
                       defaultValue="h1"
@@ -1133,7 +1208,7 @@ export default function FormsTab({
                   )}
                   <label className="form-description-field">
                     <span>{copy.messages.formDescriptionHelp}</span>
-                    <div className="question-format-toolbar form-description-toolbar" role="toolbar" aria-label={copy.labels.formDescriptionFormatting}>
+                    <div hidden style={{ display: "none" }} className="question-format-toolbar form-description-toolbar" role="toolbar" aria-label={copy.labels.formDescriptionFormatting}>
                       <select
                         aria-label={copy.toolbar.textStyle}
                         defaultValue="text"
@@ -1246,13 +1321,28 @@ export default function FormsTab({
                       key={field.id}
                       onClick={() => setSelected({ type: "field", id: field.id })}
                     >
+                    <div className="question-format-toolbar question-card-toolbar" role="toolbar" aria-label={copy.toolbar.descriptionExampleFormatting}>
+                      <select aria-label={copy.toolbar.textStyle} defaultValue="text" onChange={(event) => applyTargetTextStyle(getActiveTextTarget(field), event.target.value)}>
+                        <option value="text">{copy.toolbar.text}</option><option value="h1">{copy.toolbar.heading1}</option><option value="h2">{copy.toolbar.heading2}</option><option value="h3">{copy.toolbar.heading3}</option>
+                      </select>
+                      {textToolbarButtons.filter(({ action }) => !["undo", "redo", "bullets", "numbers"].includes(action)).map(({ action, label, icon: Icon }) => (
+                        <button key={action} type="button" title={label} aria-label={label} onMouseDown={(event) => { event.preventDefault(); runTextToolbarAction(field, action); }}><Icon size={15} aria-hidden="true" /></button>
+                      ))}
+                      <button type="button" title={copy.toolbar.leftToRight} onMouseDown={(event) => { event.preventDefault(); setTextDirection(field, "ltr"); }}>{copy.toolbar.directionLtrShort}</button>
+                      <button type="button" title={copy.toolbar.rightToLeft} onMouseDown={(event) => { event.preventDefault(); setTextDirection(field, "rtl"); }}>{copy.toolbar.directionRtlShort}</button>
+                      <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#1f2937" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "color", event.target.value)} /></label>
+                      <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#ffffff" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "backgroundColor", event.target.value)} /></label>
+                    </div>
                     <div className="simple-question-main">
                       <span className="question-index">{fieldIndex + 1}</span>
                       <input
                         className="question-title-input"
+                        data-field-id={field.id}
+                        data-field-key="label"
                         dir={formDirection}
                         value={getLocalizedValue(field, "label", primaryLanguage)}
                         placeholder={copy.placeholders.question}
+                        onFocus={(event) => { activeTextTargetRef.current = event.currentTarget; }}
                         onChange={(event) =>
                           updateLocalizedFieldValue(field, "label", event.target.value)
                         }
@@ -1297,7 +1387,8 @@ export default function FormsTab({
                     )}
 
                     <div className="question-advanced">
-                      <div className="question-format-toolbar" role="toolbar" aria-label={copy.toolbar.descriptionExampleFormatting}>
+                      {field.showDetailsEditor === true && (
+                      <div hidden style={{ display: "none" }} className="question-format-toolbar" role="toolbar" aria-label={copy.toolbar.descriptionExampleFormatting}>
                         <select
                           aria-label={copy.toolbar.textStyle}
                           defaultValue="text"
@@ -1359,7 +1450,10 @@ export default function FormsTab({
                           />
                         </label>
                       </div>
+                      )}
+                      {field.showDetailsEditor === true && (
                       <div className="question-detail-row">
+                        {field.showDetailsEditor === true && (
                         <label className="question-mini-field">
                           <span>{copy.labels.description}</span>
                           <textarea
@@ -1396,6 +1490,8 @@ export default function FormsTab({
                             </div>
                           )}
                         </label>
+                        )}
+                        {field.showDetailsEditor === true && (
                         <label className="question-mini-field">
                           <span>{copy.labels.example}</span>
                           <input
@@ -1432,7 +1528,9 @@ export default function FormsTab({
                             </div>
                           )}
                         </label>
+                        )}
                       </div>
+                      )}
 
                       {choiceFieldTypes.has(field.type) && (
                         <div className="options-editor option-row-editor" dir={formDirection}>
@@ -1448,9 +1546,15 @@ export default function FormsTab({
                               <div className="option-editor-row">
                                 <span>{optionIndex + 1}</span>
                                 <input
+                                  data-field-id={field.id}
+                                  data-field-key="option"
+                                  data-option-index={optionIndex}
                                   value={option}
                                   dir={formDirection}
                                   placeholder={formatCopy(copy.placeholders.option, { number: optionIndex + 1 })}
+                                  onFocus={(event) => {
+                                    activeTextTargetRef.current = event.currentTarget;
+                                  }}
                                   onChange={(event) =>
                                     updateFieldOption(field, optionIndex, event.target.value)
                                   }
@@ -1471,10 +1575,17 @@ export default function FormsTab({
                                 <label className="translation-entry-field option-translation-field">
                                   <span>{getLanguageName(translationLanguage)} {formatCopy(copy.suffixes.optionTranslation, { number: optionIndex + 1 })}</span>
                                   <textarea
+                                    data-field-id={field.id}
+                                    data-field-key="option"
+                                    data-field-lang={translationLanguage}
+                                    data-option-index={optionIndex}
                                     rows={2}
                                     dir={translationDirection}
                                     value={getExplicitTranslationOptions(field)[optionIndex] || ""}
                                     placeholder={formatCopy(copy.placeholders.translateOption, { number: optionIndex + 1 })}
+                                    onFocus={(event) => {
+                                      activeTextTargetRef.current = event.currentTarget;
+                                    }}
                                     onChange={(event) =>
                                       updateFieldTranslationOption(field, optionIndex, event.target.value)
                                     }
@@ -1569,16 +1680,26 @@ export default function FormsTab({
                     </div>
 
                     <footer className="question-actions simple-question-actions">
-                      <label className="checkbox-control">
-                        <input
-                          type="checkbox"
-                          checked={field.required}
-                          onChange={(event) =>
-                            updateFormField(field.id, { required: event.target.checked })
-                          }
-                        />
-                        {copy.labels.required}
-                      </label>
+                      <div className="question-toggle-controls">
+                        <label className="checkbox-control">
+                          <input
+                            type="checkbox"
+                            checked={field.required}
+                            onChange={(event) =>
+                              updateFormField(field.id, { required: event.target.checked })
+                            }
+                          />
+                          {copy.labels.required}
+                        </label>
+                        <label className="checkbox-control">
+                          <input
+                            type="checkbox"
+                            checked={field.showDetailsEditor === true}
+                            onChange={(event) => updateFormField(field.id, { showDetailsEditor: event.target.checked })}
+                          />
+                          {copy.labels.description}
+                        </label>
+                      </div>
                       <FormButton icon={ChevronUp} title={copy.labels.moveQuestionUp} onClick={() => moveFormField(field.id, "up")} />
                       <FormButton icon={ChevronDown} title={copy.labels.moveQuestionDown} onClick={() => moveFormField(field.id, "down")} />
                       <FormButton icon={Copy} onClick={() => duplicateFormField(field.id)}>
@@ -1605,8 +1726,22 @@ export default function FormsTab({
               >
                 {copy.labels.addQuestionHere}
               </FormButton>
+              <FormButton
+                className="forms-insert-page-button"
+                icon={ListPlus}
+                onClick={() => addFormSection(section.id)}
+              >
+                Add page after this page
+              </FormButton>
             </section>
           ))}
+          <FormButton
+            className="forms-add-page-button"
+            icon={ListPlus}
+            onClick={addFormSection}
+          >
+            {copy.labels.addPage}
+          </FormButton>
         </div>
         </main>
 

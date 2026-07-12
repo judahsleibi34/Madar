@@ -93,6 +93,31 @@ def require_active_tenant_member(
     )
 
 
+def require_active_tenant_user_id(
+    user_id: int,
+    request: Request,
+    response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
+) -> TenantContext:
+    """Authorize a path-scoped user and require a current tenant membership."""
+    context = require_active_tenant_member(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
+
+    try:
+        path_user_id = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="User id is invalid")
+
+    if context.user_id != path_user_id:
+        raise HTTPException(status_code=403, detail="User id does not match session")
+
+    return context
+
+
 def require_builder_write_access(
     request: Request,
     response: Response | None = None,

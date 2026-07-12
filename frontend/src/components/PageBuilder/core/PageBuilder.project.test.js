@@ -62,4 +62,70 @@ describe("cleanBuilderProject", () => {
     );
     expect(elements).toHaveLength(4);
   });
+
+  it("preserves every form page and field through save/reload normalization", () => {
+    const form = {
+      id: "form_full_regression",
+      name: "Order intake",
+      title: "Order intake",
+      description: "Complete order form",
+      successMessage: "Order received",
+      languageMode: "bilingual",
+      defaultLanguage: "en",
+      pageMode: "paged",
+      mode: "form",
+      connectedCollectionId: "orders",
+      customFormSetting: { retain: true },
+      sections: [
+        {
+          id: "page_one",
+          title: "Buyer details",
+          description: "First page",
+          titleStyle: { color: "#123456", fontWeight: "700" },
+          fields: [
+            {
+              id: "buyer_name",
+              type: "shortText",
+              label: "Buyer name",
+              required: true,
+              helpText: "Legal name",
+              placeholder: "Jane Doe",
+              translations: { ar: { label: "اسم المشتري" } },
+            },
+          ],
+        },
+        {
+          id: "page_two",
+          title: "Order details",
+          description: "Second page",
+          fields: [
+            {
+              id: "currency",
+              type: "radio",
+              label: "Currency",
+              required: true,
+              options: ["EUR", "USD", "ILS"],
+              translations: { ar: { options: ["يورو", "دولار", "شيكل"] } },
+              visibilityRules: [{ id: "rule_1", action: "show" }],
+            },
+          ],
+        },
+      ],
+      responses: [{ id: "legacy-response" }],
+    };
+
+    const cleaned = cleanBuilderProject({
+      name: "Form regression project",
+      forms: [form],
+      activeFormId: form.id,
+    });
+
+    const savedForm = cleaned.forms[0];
+    expect(savedForm.id).toBe(form.id);
+    expect(savedForm.sections).toEqual(form.sections);
+    expect(savedForm.sections).toHaveLength(2);
+    expect(savedForm.sections.flatMap((section) => section.fields)).toHaveLength(2);
+    expect(savedForm.customFormSetting).toEqual({ retain: true });
+    expect(savedForm.responses).toEqual([]);
+  });
 });

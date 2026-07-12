@@ -511,7 +511,7 @@ def require_regular_user(
     )
     user_type = normalize_user_type(user_data.get("user_type"))
 
-    if user_type == "admin":
+    if user_type != "user":
         raise HTTPException(status_code=403, detail="User access is required")
 
     return auth_user, user_data

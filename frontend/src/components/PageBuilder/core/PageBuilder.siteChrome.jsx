@@ -55,7 +55,7 @@ export const createSiteChromeRenderers = ({
           </button>
 
           <nav className="built-site-nav">
-            {project.pages.map((page) => (
+            {project.pages.filter((page) => page.showInNavigation !== false).map((page) => (
               <button
                 type="button"
                 key={page.id}

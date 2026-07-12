@@ -44,7 +44,10 @@ class WebsiteSettingsUpdate(BaseModel):
     brand: Optional[str] = None
     footer_store_name: Optional[str] = None
     logo_url: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
+    # Empty contact details are valid and are normalized by website_routes.
+    # EmailStr rejects "" during request parsing, preventing users from
+    # intentionally clearing an optional contact email.
+    contact_email: Optional[str] = None
     phone: Optional[str] = None
     description: Optional[str] = None
     

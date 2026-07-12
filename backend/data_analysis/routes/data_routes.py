@@ -4,8 +4,8 @@ from fastapi import APIRouter, HTTPException, Request, Response, UploadFile, Fil
 from pydantic import BaseModel
 
 from data_analysis import services as data_services
-from services.auth_service import require_regular_user_id
 from services.rate_limit_service import enforce_data_workspace_rate_limit
+from services.tenant_service import require_active_tenant_user_id
 
 
 router = APIRouter(
@@ -23,14 +23,12 @@ def get_storage_scope(
     response: Response,
     user_id: int,
 ) -> tuple[str, str]:
-    _, user_data = require_regular_user_id(user_id, request, response)
-    tenant_id = user_data.get("tenant_id")
-    user_id = user_data.get("id")
+    context = require_active_tenant_user_id(user_id, request, response)
 
-    if tenant_id is None or user_id is None:
-        raise HTTPException(status_code=400, detail="User storage scope is not available.")
-
-    return data_services.safe_scope_value(tenant_id), data_services.safe_scope_value(user_id)
+    return (
+        data_services.safe_scope_value(context.tenant_id),
+        data_services.safe_scope_value(context.user_id),
+    )
 
 
 @router.post("/read")

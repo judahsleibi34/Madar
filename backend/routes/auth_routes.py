@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
@@ -159,6 +160,71 @@ def assert_email_is_available(clean_email: str, allowed_auth_id: str | None = No
     )
 
 
+def recover_or_remove_orphaned_auth_user(clean_email: str, password: str):
+    """Resolve an Auth identity left without an application profile.
+
+    Unverified identities can be safely recreated. Verified identities are
+    reused only after the supplied password proves ownership.
+    """
+    if get_local_user_by_email(clean_email):
+        return None
+
+    auth_user = get_auth_user_by_email(clean_email)
+
+    if not auth_user:
+        return None
+
+    # Supabase User objects expose email_confirmed_at. Do not make assumptions
+    # for unknown response shapes, and never recycle a verified identity.
+    missing = object()
+    email_confirmed_at = getattr(auth_user, "email_confirmed_at", missing)
+
+    auth_user_id = str(getattr(auth_user, "id", "") or "")
+
+    if not auth_user_id:
+        return None
+
+    if email_confirmed_at is missing or email_confirmed_at is not None:
+        try:
+            auth_response = supabase.auth.sign_in_with_password(
+                {"email": clean_email, "password": password}
+            )
+            authenticated_user = getattr(auth_response, "user", None)
+            authenticated_user_id = str(getattr(authenticated_user, "id", "") or "")
+        except Exception:
+            authenticated_user_id = ""
+
+        if authenticated_user_id != auth_user_id:
+            raise HTTPException(
+                status_code=409,
+                detail="Email is already registered",
+            )
+
+        logger.info(
+            "auth.signup.orphaned_verified_auth_user_recovered",
+            extra={"auth_id": auth_user_id},
+        )
+        return auth_user_id
+
+    try:
+        service_supabase.auth.admin.delete_user(auth_user_id)
+        logger.info(
+            "auth.signup.orphaned_auth_user_removed",
+            extra={"auth_id": auth_user_id},
+        )
+    except Exception as error:
+        logger.warning(
+            "auth.signup.orphaned_auth_user_cleanup_failed",
+            extra={"auth_id": auth_user_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not prepare account registration",
+        ) from error
+
+    return None
+
+
 def get_auth_error_message(error: Exception) -> str:
     raw_message = str(error).lower()
 
@@ -221,6 +287,7 @@ def force_auth_user_email_unverified(auth_user_id: str):
 @router.post("/signup")
 def signup(user: SignUpRequest, request: Request):
     auth_user_id = None
+    auth_user_created_this_request = False
     tenant_id = None
     signup_complete = False
 
@@ -241,41 +308,45 @@ def signup(user: SignUpRequest, request: Request):
                 detail="Password must be at least 8 characters",
             )
 
-        assert_email_is_available(clean_email)
+        auth_user_id = recover_or_remove_orphaned_auth_user(clean_email, user.password)
+        recovered_verified_auth_user = bool(auth_user_id)
+        assert_email_is_available(clean_email, allowed_auth_id=auth_user_id)
 
-        try:
-            auth_response = supabase.auth.sign_up(
-                {
-                    "email": clean_email,
-                    "password": user.password,
-                    "options": {
-                        "email_redirect_to": f"{FRONTEND_URL}/login",
-                        "data": {
-                            "first_name": first_name,
-                            "last_name": last_name,
+        if not recovered_verified_auth_user:
+            try:
+                auth_response = supabase.auth.sign_up(
+                    {
+                        "email": clean_email,
+                        "password": user.password,
+                        "options": {
+                            "email_redirect_to": f"{FRONTEND_URL}/login",
+                            "data": {
+                                "first_name": first_name,
+                                "last_name": last_name,
+                            },
                         },
-                    },
-                }
-            )
+                    }
+                )
 
-        except Exception as auth_create_error:
-            logger.warning(
-                "auth.signup.auth_create_failed",
-                extra={"email": clean_email, "error_type": type(auth_create_error).__name__},
-            )
-            friendly_message = get_auth_error_message(auth_create_error)
+            except Exception as auth_create_error:
+                logger.warning(
+                    "auth.signup.auth_create_failed",
+                    extra={"email": clean_email, "error_type": type(auth_create_error).__name__},
+                )
+                friendly_message = get_auth_error_message(auth_create_error)
 
-            if friendly_message:
-                raise HTTPException(status_code=409, detail=friendly_message)
+                if friendly_message:
+                    raise HTTPException(status_code=409, detail=friendly_message)
 
-            raise HTTPException(status_code=400, detail="Could not create user")
+                raise HTTPException(status_code=400, detail="Could not create user")
 
-        if not auth_response.user:
-            raise HTTPException(status_code=400, detail="Could not create user")
+            if not auth_response.user:
+                raise HTTPException(status_code=400, detail="Could not create user")
 
-        auth_user_id = str(auth_response.user.id)
-        force_auth_user_email_unverified(auth_user_id)
-        send_signup_verification_email(clean_email)
+            auth_user_id = str(auth_response.user.id)
+            auth_user_created_this_request = True
+            force_auth_user_email_unverified(auth_user_id)
+            send_signup_verification_email(clean_email)
 
         assert_email_is_available(clean_email, allowed_auth_id=auth_user_id)
 
@@ -305,8 +376,8 @@ def signup(user: SignUpRequest, request: Request):
                         "last_name": last_name,
                         "email": clean_email,
                         "tenant_id": tenant_id,
-                        "email_verified": False,
-                        "email_verified_at": None,
+                        "email_verified": recovered_verified_auth_user,
+                        "email_verified_at": datetime.now(timezone.utc).isoformat() if recovered_verified_auth_user else None,
                     }
                 )
                 .execute()
@@ -342,8 +413,12 @@ def signup(user: SignUpRequest, request: Request):
         signup_complete = True
 
         return {
-            "message": "Account created. Please verify your email before logging in.",
-            "requires_email_verification": True,
+            "message": (
+                "Account created. You can now log in."
+                if recovered_verified_auth_user
+                else "Account created. Please verify your email before logging in."
+            ),
+            "requires_email_verification": not recovered_verified_auth_user,
             "user": {
                 "auth_id": auth_user_id,
                 "local_id": local_user["id"],
@@ -385,7 +460,7 @@ def signup(user: SignUpRequest, request: Request):
             except Exception as cleanup_error:
                 logger.warning("auth.signup.tenant_cleanup_failed", extra={"tenant_id": tenant_id, "error_type": type(cleanup_error).__name__})
 
-        if not signup_complete and auth_user_id:
+        if not signup_complete and auth_user_id and auth_user_created_this_request:
             try:
                 service_supabase.auth.admin.delete_user(auth_user_id)
             except Exception as cleanup_error:

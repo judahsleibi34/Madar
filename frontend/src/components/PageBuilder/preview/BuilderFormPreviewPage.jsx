@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { STORAGE_KEY } from "../core/PageBuilder.constants";
+import { getBuilderStorageKey } from "../core/PageBuilder.constants";
 import { getFormSections } from "../core/PageBuilder.factories";
 import {
   getDefaultFormLanguage,
@@ -25,9 +25,9 @@ const deferEffectStateUpdate = (callback) => {
   };
 };
 
-const loadDraftProject = () => {
+const loadDraftProject = (storageKey) => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     return raw ? cleanBuilderProject(JSON.parse(raw)) : null;
   } catch {
     return null;
@@ -73,10 +73,11 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
     return answer === option;
   });
 
-export default function BuilderFormPreviewPage() {
+export default function BuilderFormPreviewPage({ user = null }) {
   const { formId = "" } = useParams();
   const navigate = useNavigate();
-  const [project, setProject] = useState(loadDraftProject);
+  const storageKey = getBuilderStorageKey(user?.id);
+  const [project, setProject] = useState(() => loadDraftProject(storageKey));
   const form = useMemo(
     () => project?.forms?.find((item) => item.id === formId) || project?.forms?.[0] || null,
     [formId, project?.forms]
@@ -85,7 +86,7 @@ export default function BuilderFormPreviewPage() {
   const languageMode = normalizeLanguageMode(form?.languageMode || form?.localeMode || "en");
   const [formLang, setFormLang] = useState(() => getDefaultFormLanguage(form, "en"));
   const formDirection = getDirectionForLanguage(formLang);
-  const isPagedForm = (form?.pageMode || "paged") === "paged" && sections.length > 1;
+  const isPagedForm = sections.length > 1;
   const [pageIndex, setPageIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [errors, setErrors] = useState({});
@@ -94,6 +95,7 @@ export default function BuilderFormPreviewPage() {
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizDeactivated, setQuizDeactivated] = useState(false);
   const quizCompleteRef = useRef(false);
+  const formShellRef = useRef(null);
   const currentSection = sections[Math.min(pageIndex, Math.max(sections.length - 1, 0))];
   const isQuiz = form?.mode === "quiz";
   const quizSettings = useMemo(() => getQuizSettings(form), [form]);
@@ -104,11 +106,11 @@ export default function BuilderFormPreviewPage() {
     };
 
     const syncDraftFromStorage = () => {
-      syncSerializedProject(localStorage.getItem(STORAGE_KEY));
+      syncSerializedProject(localStorage.getItem(storageKey));
     };
 
     const handleDraftStorageUpdate = (event) => {
-      if (event.key !== STORAGE_KEY) return;
+      if (event.key !== storageKey) return;
       syncSerializedProject(event.newValue);
     };
 
@@ -118,7 +120,7 @@ export default function BuilderFormPreviewPage() {
         : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
 
     const handleBroadcastDraftUpdate = (event) => {
-      if (event.data?.storageKey !== STORAGE_KEY) return;
+      if (event.data?.storageKey !== storageKey) return;
       syncSerializedProject(event.data.serializedProject);
     };
 
@@ -132,7 +134,7 @@ export default function BuilderFormPreviewPage() {
       window.removeEventListener("storage", handleDraftStorageUpdate);
       window.removeEventListener("focus", syncDraftFromStorage);
     };
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     quizCompleteRef.current = false;
@@ -144,7 +146,10 @@ export default function BuilderFormPreviewPage() {
       setFormError("");
       setFormLang(getDefaultFormLanguage(form, "en"));
     });
-  }, [form, form?.id, isQuiz]);
+  // Keep the respondent on the current page when the same form is autosaved or
+  // synchronized from the builder. Reset only when a different form is opened.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form?.id, isQuiz]);
 
   useEffect(() => {
     if (!isQuiz || !quizSettings.lockScreen || !quizStarted || submitted) return undefined;
@@ -198,11 +203,13 @@ export default function BuilderFormPreviewPage() {
   const goNext = () => {
     setFormError("");
     setPageIndex((current) => Math.min(current + 1, sections.length - 1));
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
   const goPrevious = () => {
     setFormError("");
     setPageIndex((current) => Math.max(current - 1, 0));
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
   const submitForm = (event) => {
@@ -259,8 +266,12 @@ export default function BuilderFormPreviewPage() {
     const value = getAnswerValue(rawValue);
     const options = getFieldOptions(field, formLang);
     const label = getLocalizedValue(field, "label", formLang) || field.label;
-    const helpText = getLocalizedValue(field, "helpText", formLang) || field.helpText;
-    const placeholder = getLocalizedValue(field, "placeholder", formLang) || field.placeholder || "";
+    const helpText = field.showDetailsEditor === true
+      ? getLocalizedValue(field, "helpText", formLang) || field.helpText
+      : "";
+    const placeholder = field.showDetailsEditor === true
+      ? getLocalizedValue(field, "placeholder", formLang) || field.placeholder || ""
+      : "";
 
     let input;
     if (field.type === "paragraph") {
@@ -327,7 +338,10 @@ export default function BuilderFormPreviewPage() {
     return (
       <div className="builder-form-preview-question" key={field.id}>
         <label>
-          <span>{label}{field.required ? " *" : ""}</span>
+          <span>
+            {label}
+            {field.required && <span className="form-required-marker" aria-hidden="true"> *</span>}
+          </span>
           {helpText && <small>{helpText}</small>}
           {input}
         </label>
@@ -357,9 +371,9 @@ export default function BuilderFormPreviewPage() {
         <strong>Form preview</strong>
       </header>
 
-      <form className="builder-form-preview-shell" onSubmit={submitForm}>
-        <div className="builder-form-preview-header">
-          {languageMode === "bilingual" && (
+      <form ref={formShellRef} className="builder-form-preview-shell" onSubmit={submitForm}>
+        {languageMode === "bilingual" && (
+          <div className="builder-form-preview-header">
             <div className="runtime-language-switch" role="group" aria-label="Form language">
               <button type="button" className={formLang === "en" ? "active" : ""} onClick={() => setFormLang("en")}>
                 English
@@ -368,12 +382,8 @@ export default function BuilderFormPreviewPage() {
                 العربية
               </button>
             </div>
-          )}
-          <h1>{getLocalizedValue(form, "title", formLang) || form.title || "Untitled form"}</h1>
-          {(getLocalizedValue(form, "description", formLang) || form.description) && (
-            <p>{getLocalizedValue(form, "description", formLang) || form.description}</p>
-          )}
-        </div>
+          </div>
+        )}
 
         {submitted ? (
           <section className="builder-form-preview-success">
@@ -397,13 +407,16 @@ export default function BuilderFormPreviewPage() {
           </section>
         ) : (
           <>
+            {isPagedForm && (
+              <div className="form-page-counter-title">Page {pageIndex + 1} of {sections.length}</div>
+            )}
             {(isPagedForm ? [currentSection] : sections).filter(Boolean).map((section) => (
               <section className="builder-form-preview-section" key={section.id}>
-                {(getLocalizedValue(section, "title", formLang) || section.title) && section !== sections[0] && (
-                  <h2>{getLocalizedValue(section, "title", formLang) || section.title}</h2>
+                {(getLocalizedValue(section, "title", formLang) || section.title) && (
+                  <h1 className="form-page-title" dir={section.titleStyle?.direction} style={{ ...(section.titleStyle || {}), textStyle: undefined }}>{getLocalizedValue(section, "title", formLang) || section.title}</h1>
                 )}
                 {(getLocalizedValue(section, "description", formLang) || section.description) && (
-                  <p>{getLocalizedValue(section, "description", formLang) || section.description}</p>
+                  <h2 className="form-page-description" dir={section.descriptionStyle?.direction} style={{ ...(section.descriptionStyle || {}), textStyle: undefined }}>{getLocalizedValue(section, "description", formLang) || section.description}</h2>
                 )}
                 {(section.fields || []).map(renderField)}
               </section>
@@ -417,7 +430,7 @@ export default function BuilderFormPreviewPage() {
                   Previous
                 </button>
               )}
-              {isPagedForm && <span>Page {pageIndex + 1} of {sections.length}</span>}
+              {isPagedForm && <span className="runtime-form-page-count">Page {pageIndex + 1} of {sections.length}</span>}
               {isPagedForm && pageIndex < sections.length - 1 ? (
                 <button type="button" onClick={goNext}>Next</button>
               ) : (

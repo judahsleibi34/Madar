@@ -72,6 +72,21 @@ def fake_require_regular_user_id(current_user):
     return _fake
 
 
+def fake_require_active_tenant_user_id(current_user):
+    def _fake(user_id, request, response, **_kwargs):
+        if current_user is None:
+            raise HTTPException(status_code=401, detail="Not logged in")
+        if current_user.get("user_type") != "user":
+            raise HTTPException(status_code=403, detail="User access is required")
+        if current_user.get("tenant_id") is None:
+            raise HTTPException(status_code=403, detail="User workspace access is required")
+        if int(current_user["id"]) != int(user_id):
+            raise HTTPException(status_code=403, detail="User id does not match session")
+        return tenant_context(current_user)
+
+    return _fake
+
+
 def tenant_context(user=TENANT_A_USER, *, role="owner", status="active"):
     return TenantContext(
         tenant_id=user["tenant_id"],
@@ -142,7 +157,7 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
 
     def auth_patches(self, current_user):
         return (
-            patch.object(data_routes, "require_regular_user_id", side_effect=fake_require_regular_user_id(current_user)),
+            patch.object(data_routes, "require_active_tenant_user_id", side_effect=fake_require_active_tenant_user_id(current_user)),
             patch.object(analysis_routes, "require_regular_user_id", side_effect=fake_require_regular_user_id(current_user)),
             patch.object(data_routes, "enforce_data_workspace_rate_limit", return_value=None),
             patch.object(cleaning_routes, "enforce_data_workspace_rate_limit", return_value=None),

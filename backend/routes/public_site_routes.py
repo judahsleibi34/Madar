@@ -658,6 +658,7 @@ def register_tenant_visitor(
                 "last_name": last_name,
                 "email": clean_email,
                 "tenant_id": None,
+                "user_type": "site_user",
                 "email_verified": False,
                 "email_verified_at": None,
             }
@@ -772,7 +773,12 @@ def get_public_site(subdomain: str, request: Request):
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
 
-    project = get_latest_published_project_for_tenant(tenant_id)
+    try:
+        project = get_latest_published_project_for_tenant(tenant_id)
+    except HTTPException as error:
+        if error.status_code != 404:
+            raise
+        project = None
 
     return {
         "success": True,
@@ -785,9 +791,11 @@ def get_public_site(subdomain: str, request: Request):
             "phone": settings.get("phone"),
             "description": settings.get("description"),
         },
-        "project": {
-            "published_schema": project.get("published_schema") or {},
-        },
+        "project": (
+            {"published_schema": project.get("published_schema") or {}}
+            if project
+            else None
+        ),
     }
 
 

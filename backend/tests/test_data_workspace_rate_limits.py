@@ -12,12 +12,8 @@ from services import rate_limit_service
 from services.rate_limit_service import InMemoryRateLimitStore
 
 
-def fake_require_regular_user_id(user_id, request, response):
-    return SimpleNamespace(id=f"auth-{user_id}"), {
-        "id": int(user_id),
-        "tenant_id": "tenant-a",
-        "user_type": "user",
-    }
+def fake_require_active_tenant_user_id(user_id, request, response):
+    return SimpleNamespace(user_id=int(user_id), tenant_id="tenant-a")
 
 
 class DataWorkspaceRateLimitTests(unittest.TestCase):
@@ -26,8 +22,8 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
         rate_limit_service._memory_store = InMemoryRateLimitStore()
         self.auth_patch = patch.object(
             data_routes,
-            "require_regular_user_id",
-            side_effect=fake_require_regular_user_id,
+            "require_active_tenant_user_id",
+            side_effect=fake_require_active_tenant_user_id,
         )
         self.auth_patch.start()
 

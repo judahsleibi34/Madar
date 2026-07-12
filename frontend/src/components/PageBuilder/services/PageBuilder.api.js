@@ -1,5 +1,7 @@
 import { apiFetch } from "../../../utils/apiClient";
 
+const builderProjectUpdateQueues = new Map();
+
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 export const USER_STATUS_PATH =
   import.meta.env.VITE_USER_STATUS_PATH || "/auth/user_status";
@@ -126,14 +128,26 @@ export const createBuilderProject = async ({ name, slug, draft_schema }) => {
 };
 
 export const updateBuilderProject = async (projectId, payload) => {
-  const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}`), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  const previousUpdate = builderProjectUpdateQueues.get(projectId) || Promise.resolve();
+  const queuedUpdate = previousUpdate.catch(() => undefined).then(async () => {
+    const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await parseJsonResponse(response);
+    return data?.project || null;
   });
 
-  const data = await parseJsonResponse(response);
-  return data?.project || null;
+  builderProjectUpdateQueues.set(projectId, queuedUpdate);
+  try {
+    return await queuedUpdate;
+  } finally {
+    if (builderProjectUpdateQueues.get(projectId) === queuedUpdate) {
+      builderProjectUpdateQueues.delete(projectId);
+    }
+  }
 };
 
 export const publishBuilderProject = async (projectId) => {

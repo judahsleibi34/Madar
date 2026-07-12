@@ -69,15 +69,32 @@ export const createRuntimeFormRenderers = ({
     }));
   };
 
+  const changeFormPage = (event, formId, pageIndex, pageCount) => {
+    const formElement = event.currentTarget.closest(".runtime-form");
+    const previewScroller = formElement?.closest(".forms-live-preview-page, .simple-preview-panel");
+    setFormPage(formId, pageIndex, pageCount);
+    requestAnimationFrame(() => {
+      if (previewScroller) {
+        previewScroller.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  };
+
   const renderFieldInput = (form, field, disabled = false, activeFormLang = null) => {
     const formLang = activeFormLang || getRuntimeLanguage(form, lang);
     const rawValue = runtimeAnswers[form.id]?.[field.id] ?? field.defaultValue ?? "";
     const value = getAnswerValue(rawValue);
     const error = runtimeErrors[field.id];
     const meta = getFieldType(field.type);
-    const placeholder = getLocalizedValue(field, "placeholder", formLang) || getModernFieldPlaceholder(field);
+    const placeholder = field.showDetailsEditor === true
+      ? getLocalizedValue(field, "placeholder", formLang) || getModernFieldPlaceholder(field)
+      : "";
     const label = getLocalizedValue(field, "label", formLang) || field.label;
-    const helpText = getLocalizedValue(field, "helpText", formLang) || field.helpText;
+    const helpText = field.showDetailsEditor === true
+      ? getLocalizedValue(field, "helpText", formLang) || field.helpText
+      : "";
     const options = getLocalizedOptions(field, formLang).filter((option) => String(option || "").trim());
     const fieldDirection = getContentDirection(
       `${label || ""} ${helpText || ""} ${options.join(" ")}`,
@@ -250,7 +267,7 @@ export const createRuntimeFormRenderers = ({
         <label dir={fieldDirection}>
           <span className="runtime-question-title" dir={fieldDirection}>
             {label}
-            {field.required ? " *" : ""}
+            {field.required && <span className="form-required-marker" aria-hidden="true"> *</span>}
           </span>
           {helpText && <small dir={getContentDirection(helpText, fieldDirection)}>{helpText}</small>}
           {inputNode}
@@ -275,7 +292,7 @@ export const createRuntimeFormRenderers = ({
     const currentQuestionIndex = Math.min(quizSession?.currentIndex || 0, Math.max(quizFields.length - 1, 0));
     const currentField = quizFields[currentQuestionIndex];
     const formSections = getFormSections(form);
-    const isPagedForm = (form.pageMode || "paged") === "paged" && formSections.length > 1;
+    const isPagedForm = formSections.length > 1;
     const currentPageIndex = Math.max(
       0,
       Math.min(Number(runtimeFormPages?.[form.id] || 0), Math.max(formSections.length - 1, 0))
@@ -284,9 +301,9 @@ export const createRuntimeFormRenderers = ({
     const renderRuntimeFormPage = (section) => (
       <div className="runtime-form-section" key={section.id}>
         <div className="runtime-form-section-header">
-          <h4>{getLocalizedValue(section, "title", formLang) || section.title}</h4>
+          <h1 className="form-page-title" dir={section.titleStyle?.direction} style={{ ...(section.titleStyle || {}), textStyle: undefined }}>{getLocalizedValue(section, "title", formLang) || section.title}</h1>
           {(getLocalizedValue(section, "description", formLang) || section.description) && (
-            <p>{getLocalizedValue(section, "description", formLang) || section.description}</p>
+            <h2 className="form-page-description" dir={section.descriptionStyle?.direction} style={{ ...(section.descriptionStyle || {}), textStyle: undefined }}>{getLocalizedValue(section, "description", formLang) || section.description}</h2>
           )}
         </div>
 
@@ -318,8 +335,6 @@ export const createRuntimeFormRenderers = ({
               </button>
             </div>
           )}
-          <h3>{getLocalizedValue(form, "title", formLang) || form.title}</h3>
-          <p>{getLocalizedValue(form, "description", formLang) || form.description}</p>
           {isQuiz && (
             <div className="quiz-runtime-meta">
               <span>{quizFields.length} questions</span>
@@ -397,6 +412,9 @@ export const createRuntimeFormRenderers = ({
           </div>
         ) : (
           <>
+            {isPagedForm && (
+              <div className="form-page-counter-title">Page {currentPageIndex + 1} of {formSections.length}</div>
+            )}
             {isPagedForm
               ? currentPage
                 ? renderRuntimeFormPage(currentPage)
@@ -408,7 +426,7 @@ export const createRuntimeFormRenderers = ({
                 <button
                   type="button"
                   disabled={currentPageIndex === 0}
-                  onClick={() => setFormPage(form.id, currentPageIndex - 1, formSections.length)}
+                  onClick={(event) => changeFormPage(event, form.id, currentPageIndex - 1, formSections.length)}
                 >
                   Previous
                 </button>
@@ -417,13 +435,13 @@ export const createRuntimeFormRenderers = ({
               )}
 
               <span className="runtime-form-page-count">
-                {isPagedForm ? `Page ${currentPageIndex + 1} of ${formSections.length}` : `${formSections.length} sections`}
+                {isPagedForm ? `Page ${currentPageIndex + 1} of ${formSections.length}` : ""}
               </span>
 
               {isPagedForm && currentPageIndex < formSections.length - 1 ? (
                 <button
                   type="button"
-                  onClick={() => setFormPage(form.id, currentPageIndex + 1, formSections.length)}
+                  onClick={(event) => changeFormPage(event, form.id, currentPageIndex + 1, formSections.length)}
                 >
                   Next
                 </button>

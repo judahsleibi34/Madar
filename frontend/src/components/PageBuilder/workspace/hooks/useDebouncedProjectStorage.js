@@ -43,6 +43,10 @@ export default function useDebouncedProjectStorage({
 
         if (serializedProject === lastSerializedRef.current) return;
 
+        const previousDraft = localStorage.getItem(storageKey);
+        if (previousDraft && previousDraft !== serializedProject) {
+          localStorage.setItem(`${storageKey}:backup`, previousDraft);
+        }
         localStorage.setItem(storageKey, serializedProject);
         channelRef.current?.postMessage({
           storageKey,

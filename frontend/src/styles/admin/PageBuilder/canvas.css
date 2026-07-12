@@ -502,6 +502,24 @@
   color: var(--madar-red);
 }
 
+.builder-auth-switch button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--madar-red);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.builder-auth-switch button:hover,
+.builder-auth-switch button:focus-visible {
+  color: var(--madar-red-dark);
+}
+
 .direct-element-frame-loginBlock .direct-element-content,
 .direct-element-frame-registrationBlock .direct-element-content {
   overflow: hidden;

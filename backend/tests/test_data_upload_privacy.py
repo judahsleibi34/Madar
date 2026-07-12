@@ -22,11 +22,7 @@ def fake_user_scope(user_id, request, response):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     tenant_id = request.headers.get("x-test-tenant-id", "1")
-    return SimpleNamespace(id=f"auth-{user_id}"), {
-        "id": int(user_id),
-        "tenant_id": tenant_id,
-        "user_type": "user",
-    }
+    return SimpleNamespace(user_id=int(user_id), tenant_id=tenant_id)
 
 
 def fake_builder_context(tenant_id=1, user_id=1):
@@ -65,7 +61,7 @@ class DataUploadPrivacyTests(unittest.TestCase):
                 },
                 clear=False,
             ),
-            patch.object(data_routes, "require_regular_user_id", side_effect=fake_user_scope),
+            patch.object(data_routes, "require_active_tenant_user_id", side_effect=fake_user_scope),
             patch.object(data_routes, "enforce_data_workspace_rate_limit", return_value=None),
             patch.object(builder_routes, "BUILDER_ASSET_UPLOAD_DIR", self.public_dir),
             patch.object(builder_routes, "BUILDER_ASSET_MAX_BYTES", 5 * 1024 * 1024),
