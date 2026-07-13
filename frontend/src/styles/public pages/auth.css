@@ -2,6 +2,29 @@
    REGISTER / SIGN UP PAGE
    ============================================================ */
 
+.login-page,
+.register-page {
+  position: relative;
+  isolation: isolate;
+}
+
+.login-page::after,
+.register-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url("../../assets/MadarTemplates/madar_header.svg") center / clamp(320px, 50vw, 680px) auto no-repeat;
+  opacity: 0.055;
+  pointer-events: none;
+}
+
+.login-page > *,
+.register-page > * {
+  position: relative;
+  z-index: 1;
+}
+
 .register-page {
   flex: 1;
   display: flex;
@@ -14,7 +37,7 @@
 
 .register-card {
   width: 100%;
-  max-width: 460px;
+  max-width: 780px;
   background: var(--theme-surface);
   border: 1px solid var(--theme-border);
   border-radius: 18px;
@@ -22,7 +45,7 @@
   box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .register-card h1 {
@@ -153,7 +176,7 @@ html[dir="rtl"] .register-card h1 {
 }
 
 .register-card.login-card {
-  max-width: 480px;
+  max-width: 780px;
 }
 
 .register-card.login-card .register-row {
@@ -174,6 +197,13 @@ html[dir="rtl"] .register-card h1 {
 }
 
 @media (max-width: 980px) {
+  .login-page::after,
+  .register-page::after {
+    background-size: min(82vw, 520px) auto;
+  }
+}
+
+@media (max-width: 720px) {
   .register-page {
     flex-direction: column;
     align-items: center;
@@ -184,6 +214,7 @@ html[dir="rtl"] .register-card h1 {
   .register-card {
     max-width: 480px;
     padding: 24px;
+    gap: 18px;
   }
 
   .register-row {
@@ -967,6 +998,55 @@ html[dir="rtl"] .forgot-card .form-status-message {
   font-weight: 750;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.auth-terms-consent {
+  display: grid;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.register-card .auth-terms-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.register-card .auth-terms-row input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  border-radius: 5px;
+  accent-color: var(--theme-primary);
+  cursor: pointer;
+}
+
+.register-card .auth-terms-row .auth-terms-copy {
+  color: var(--theme-text-soft);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.register-card .auth-terms-copy a {
+  color: var(--theme-primary);
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.register-card .auth-terms-copy a:hover {
+  color: var(--theme-primary-hover);
+}
+
+.auth-terms-consent.has-error input[type="checkbox"] {
+  outline: 2px solid var(--theme-danger, #dc2626);
+  outline-offset: 2px;
 }
 
 .login-card[dir="rtl"] .auth-section-title,

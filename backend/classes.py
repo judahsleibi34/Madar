@@ -16,6 +16,7 @@ class SignUpRequest(BaseModel):
     business_type: Optional[str] = None
     subdomain: Optional[str] = None
     selected_plan: Optional[dict[str, Any]] = None
+    terms_accepted: bool = False
 
 class LogIn(BaseModel): 
     email: EmailStr

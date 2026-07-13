@@ -60,6 +60,7 @@ from services.email_verification_service import (
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
 FRONTEND_URL = resolve_frontend_url()
+CURRENT_TERMS_VERSION = "2026-07-13"
 
 
 def ensure_csrf_token(request: Request, response: Response) -> str:
@@ -312,6 +313,13 @@ def signup(user: SignUpRequest, request: Request, response: Response):
             else ""
         )
 
+        if user.terms_accepted is not True:
+            raise api_error(
+                400,
+                "terms_acceptance_required",
+                "You must agree to the Terms and Conditions to create an account.",
+            )
+
         if not clean_email:
             raise HTTPException(status_code=400, detail="Email is required")
 
@@ -386,6 +394,8 @@ def signup(user: SignUpRequest, request: Request, response: Response):
                         "pending_account_expires_at": (
                             datetime.now(timezone.utc) + timedelta(days=14)
                         ).isoformat(),
+                        "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
+                        "terms_version": CURRENT_TERMS_VERSION,
                     }
                 )
                 .execute()

@@ -63,6 +63,19 @@
   line-height: 1.75;
 }
 
+.privacy-policy-related-link {
+  margin: 8px 0 0;
+  color: var(--theme-text-soft);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.privacy-policy-related-link a {
+  color: var(--theme-primary);
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
 html[data-theme="dark"] .privacy-policy-page,
 body.theme-dark .privacy-policy-page,
 html[data-theme="dark"] .privacy-policy-hero h1,

@@ -196,6 +196,32 @@ class SignupRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_signup_requires_terms_acceptance_before_creating_identity(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
+        ):
+            response = client.post(
+                "/auth/signup",
+                json={
+                    "first_name": "Madar",
+                    "last_name": "Owner",
+                    "email": "owner@example.com",
+                    "password": "super-secret-password",
+                    "terms_accepted": False,
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "terms_acceptance_required",
+        )
+        self.assertEqual(fake_supabase.auth.admin.created_users, [])
+        self.assertEqual(fake_supabase.tables["users"], [])
+
     def test_signup_creates_pending_user_without_active_tenant_resources(self):
         client = build_client()
         fake_supabase = FakeSupabase()
@@ -227,6 +253,7 @@ class SignupRoutesTests(unittest.TestCase):
                     "last_name": "Signup",
                     "email": "Existing@Example.COM",
                     "password": "super-secret-password",
+                    "terms_accepted": True,
                     "business_name": "Ignored Business",
                     "subdomain": "ignored-site",
                 },
@@ -257,6 +284,11 @@ class SignupRoutesTests(unittest.TestCase):
             fake_supabase.tables["users"][0]["account_status"],
             "pending_verification",
         )
+        self.assertEqual(
+            fake_supabase.tables["users"][0]["terms_version"],
+            auth_routes.CURRENT_TERMS_VERSION,
+        )
+        self.assertTrue(fake_supabase.tables["users"][0]["terms_accepted_at"])
         self.assertEqual(fake_supabase.tables["tenant_memberships"], [])
         self.assertEqual(len(fake_supabase.tables["pending_account_onboarding"]), 1)
 
@@ -280,6 +312,7 @@ class SignupRoutesTests(unittest.TestCase):
                     "last_name": "Signup",
                     "email": "Existing@Example.COM",
                     "password": "super-secret-password",
+                    "terms_accepted": True,
                 },
             )
 
@@ -325,6 +358,7 @@ class SignupRoutesTests(unittest.TestCase):
                     "last_name": "Signup",
                     "email": "Orphaned@Example.COM",
                     "password": "super-secret-password",
+                    "terms_accepted": True,
                 },
             )
 
@@ -379,6 +413,7 @@ class SignupRoutesTests(unittest.TestCase):
                     "last_name": "Owner",
                     "email": "Verified@Example.COM",
                     "password": "super-secret-password",
+                    "terms_accepted": True,
                 },
             )
 
@@ -400,6 +435,7 @@ class SignupRoutesTests(unittest.TestCase):
                     "last_name": "Signup",
                     "email": "Existing@Example.COM",
                     "password": "super-secret-password",
+                    "terms_accepted": True,
                 }
                 payload.update(payload_overrides)
 

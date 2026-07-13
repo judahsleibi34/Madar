@@ -1,13 +1,14 @@
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
-export default function PrivacyPolicyPage({ lang = "en" }) {
+export default function TermsAndConditionsPage({ lang = "en" }) {
   const { t } = useTranslation("public");
   const currentLang = lang === "ar" ? "ar" : "en";
-  const page = t("privacy", { returnObjects: true });
+  const page = t("terms", { returnObjects: true });
 
   return (
     <main
-      className="privacy-policy-page"
+      className="privacy-policy-page terms-and-conditions-page"
       dir={currentLang === "ar" ? "rtl" : "ltr"}
       lang={currentLang}
     >
@@ -24,6 +25,11 @@ export default function PrivacyPolicyPage({ lang = "en" }) {
             <p>{section.body}</p>
           </section>
         ))}
+
+        <p className="privacy-policy-related-link">
+          {page.privacyPrefix}{" "}
+          <Link to="/privacy-policy">{page.privacyLink}</Link>.
+        </p>
       </div>
     </main>
   );
