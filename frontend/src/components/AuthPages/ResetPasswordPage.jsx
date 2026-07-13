@@ -20,7 +20,9 @@ export default function ResetPasswordPage({ lang = "en" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState(() =>
-    accessToken ? "" : t("resetPassword.invalidToken")
+    accessToken
+      ? ""
+      : t("resetPassword.invalidToken")
   );
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

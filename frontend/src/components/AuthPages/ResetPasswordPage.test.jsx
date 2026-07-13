@@ -12,6 +12,20 @@ describe("password recovery URL handling", () => {
     ).toEqual({
       accessToken: "provider-token",
       requestToken: "request-nonce",
+      providerError: false,
+    });
+  });
+
+  it("accepts provider recovery parameters in the query without using a homepage fallback", () => {
+    expect(
+      readRecoveryContext({
+        hash: "",
+        search: "?access_token=provider-token&type=recovery&request_token=request-nonce",
+      })
+    ).toEqual({
+      accessToken: "provider-token",
+      requestToken: "request-nonce",
+      providerError: false,
     });
   });
 

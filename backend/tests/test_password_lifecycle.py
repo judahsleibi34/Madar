@@ -226,12 +226,18 @@ class PasswordLifecycleTests(unittest.TestCase):
             response = password_client().post(
                 "/auth/forgot-password",
                 json={"email": "Owner@Example.COM"},
+                headers={"Origin": "http://127.0.0.1:3001"},
             )
 
         self.assertEqual(response.status_code, 200)
         reset.assert_called_once()
         self.assertEqual(reset.call_args.args[0], "owner@example.com")
         self.assertIn("request_token=", reset.call_args.kwargs["options"]["redirect_to"])
+        self.assertTrue(
+            reset.call_args.kwargs["options"]["redirect_to"].startswith(
+                "http://127.0.0.1:3001/reset-password?"
+            )
+        )
 
     def test_forgot_password_does_not_send_without_durable_request_record(self):
         reset = Mock()

@@ -12,7 +12,7 @@ from classes import PasswordReset
 from database import service_supabase, supabase
 from services.rate_limit_service import enforce_password_rate_limit
 from services.audit_service import record_security_event
-from services.frontend_url import resolve_frontend_url
+from services.frontend_url import resolve_frontend_url_for_request
 from services.account_lifecycle_service import auth_email_is_verified, effective_account_status
 from services.api_errors import api_error
 from services.identity_service import (
@@ -26,7 +26,6 @@ from services.password_policy import validate_password
 router = APIRouter(prefix="/auth", tags=["Password"])
 logger = logging.getLogger(__name__)
 
-FRONTEND_URL = resolve_frontend_url()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 RESET_MESSAGE = "If that email is registered, a password reset link has been sent."
@@ -317,7 +316,8 @@ def forgot_password(payload: dict, request: Request):
         # resistance when storage is unavailable.
         if not request_token:
             return {"message": RESET_MESSAGE}
-        redirect_to = f"{FRONTEND_URL}/reset-password"
+        frontend_url = resolve_frontend_url_for_request(request.headers.get("origin"))
+        redirect_to = f"{frontend_url}/reset-password"
         redirect_to = f"{redirect_to}?request_token={quote(request_token, safe='')}"
 
         supabase.auth.reset_password_email(
