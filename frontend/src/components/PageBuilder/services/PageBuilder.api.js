@@ -1,4 +1,4 @@
-import { apiFetch } from "../../../utils/apiClient";
+import { apiFetch, createApiError } from "../../../utils/apiClient";
 
 const builderProjectUpdateQueues = new Map();
 
@@ -25,10 +25,7 @@ const parseJsonResponse = async (response) => {
   }
 
   if (!response.ok) {
-    const error = new Error(data?.detail || data?.message || "Request failed");
-    error.status = response.status;
-    error.data = data;
-    throw error;
+    throw createApiError(response, data);
   }
 
   return data;
@@ -150,11 +147,29 @@ export const updateBuilderProject = async (projectId, payload) => {
   }
 };
 
-export const publishBuilderProject = async (projectId) => {
+export const publishBuilderProject = async (projectId, expectedRevision = null) => {
   const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}/publish`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(
+      expectedRevision === null || expectedRevision === undefined
+        ? {}
+        : { expected_revision: expectedRevision }
+    ),
+  });
+
+  return parseJsonResponse(response);
+};
+
+export const unpublishBuilderProject = async (projectId, expectedRevision = null) => {
+  const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}/unpublish`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      expectedRevision === null || expectedRevision === undefined
+        ? {}
+        : { expected_revision: expectedRevision }
+    ),
   });
 
   return parseJsonResponse(response);
@@ -274,13 +289,24 @@ export const submitPublicFormSubmission = async (subdomain, formId, payload) => 
   return parseJsonResponse(response);
 };
 
-export const submitPublicBuilderEvent = async (subdomain, payload) => {
+export const submitPublicBuilderEvent = async (
+  subdomain,
+  payload,
+  { idempotencyKey = "" } = {}
+) => {
+  const cleanKey = String(idempotencyKey || "").slice(0, 128);
   const response = await fetch(
     getApiUrl(`/public/sites/${subdomain}/events`),
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+        ...(cleanKey ? { "Idempotency-Key": cleanKey } : {}),
+      },
+      body: JSON.stringify({
+        ...payload,
+        ...(cleanKey ? { idempotency_key: cleanKey } : {}),
+      }),
     }
   );
 

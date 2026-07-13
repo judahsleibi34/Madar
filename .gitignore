@@ -63,3 +63,6 @@ backend/.env.ai.local
 # Local env backups
 .env.backup*
 .env.*.backup*
+
+# Private uploaded user data
+backend/private_uploads/

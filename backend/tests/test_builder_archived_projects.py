@@ -435,6 +435,32 @@ if __name__ == "__main__":
     unittest.main()
 
 class PublicSiteContractTests(unittest.TestCase):
+    def test_public_site_preserves_published_page_routing_metadata_only(self):
+        fake_supabase = FakeSupabase()
+        published_schema = {
+            "defaultPageId": "home",
+            "activePageId": "form",
+            "pages": [
+                {"id": "home", "name": "Home", "slug": "/", "isDefault": True, "showInNavigation": True, "order": 0, "sections": []},
+                {"id": "form", "name": "Form", "slug": "/form", "isDefault": False, "showInNavigation": True, "order": 1, "sections": []},
+                {"id": "hidden", "name": "Hidden", "slug": "/hidden", "isDefault": False, "showInNavigation": False, "order": 2, "sections": []},
+            ],
+            "forms": [],
+        }
+        fake_supabase.tables["builder_projects"][0].update({
+            "draft_schema": {"private": "draft-only"},
+            "published_schema": published_schema,
+        })
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["project"], {"published_schema": published_schema})
+        self.assertNotIn("draft_schema", response.json()["project"])
+
     def test_public_site_returns_latest_published_project_and_hides_draft_schema(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"] = [

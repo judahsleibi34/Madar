@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
 
 from database import service_supabase
+from services.notification_outbox_service import (
+    enqueue_notification,
+    mark_notification_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +181,31 @@ def create_tenant_notification_event(
         "body": body[:1000],
         "data": data or {},
     }
+    deduplication_material = ":".join(
+        (
+            str(tenant_id),
+            str(event_type),
+            str(source_type),
+            str(source_id or ""),
+        )
+    )
+    outbox_row = enqueue_notification(
+        channel="internal",
+        template="tenant_event",
+        tenant_id=int(tenant_id),
+        recipient_reference=f"tenant:{int(tenant_id)}",
+        deduplication_key=hashlib.sha256(
+            deduplication_material.encode("utf-8")
+        ).hexdigest(),
+        payload={
+            "event_type": str(event_type)[:120],
+            "source_type": str(source_type)[:120],
+            "source_id": str(source_id or "")[:200] or None,
+            "title": event_payload["title"],
+            "body": event_payload["body"],
+        },
+        client=service_supabase,
+    )
 
     try:
         event_response = service_supabase.table("notification_events").insert(event_payload).execute()
@@ -213,9 +243,22 @@ def create_tenant_notification_event(
                 "source_id": source_id,
             },
         )
+        if outbox_row and outbox_row.get("id"):
+            mark_notification_result(
+                str(outbox_row["id"]),
+                succeeded=True,
+                client=service_supabase,
+            )
         return event
 
     except Exception as error:
+        if outbox_row and outbox_row.get("id"):
+            mark_notification_result(
+                str(outbox_row["id"]),
+                succeeded=False,
+                failure_code="notification_event_failed",
+                client=service_supabase,
+            )
         logger.warning(
             "notifications.event_create_failed",
             extra={

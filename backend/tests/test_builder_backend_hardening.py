@@ -436,7 +436,20 @@ class BuilderBackendHardeningTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["site"], {"subdomain": "tenant-site", "tenant_id": 1})
-        self.assertEqual(body["project"]["published_schema"], draft_schema)
+        self.assertEqual(
+            body["project"]["published_schema"],
+            {
+                "defaultPageId": "page-1",
+                "pages": [{
+                    "id": "page-1",
+                    "slug": "/",
+                    "isDefault": True,
+                    "showInNavigation": True,
+                    "order": 0,
+                }],
+            },
+        )
+        self.assertEqual(draft_schema, {"pages": [{"id": "page-1"}]})
         self.assertEqual(body["project"]["published_version"], 4)
         self.assertEqual(body["project"]["status"], "published")
         self.assertTrue(body["project"]["last_published_at"])

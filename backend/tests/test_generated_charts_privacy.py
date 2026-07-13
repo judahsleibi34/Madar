@@ -51,7 +51,11 @@ class GeneratedChartsPrivacyTests(unittest.TestCase):
                 clear=False,
             ),
             patch.object(visualization_routes, "get_storage_scope", side_effect=self.get_storage_scope),
-            patch.object(visualization_routes, "enforce_data_workspace_rate_limit", return_value=None),
+            patch.object(
+                visualization_routes,
+                "enforce_visualization_generation_rate_limit",
+                return_value=None,
+            ),
         ]
 
         for item in self.patches:

@@ -4,5 +4,5 @@ export const PUBLIC_API_ROUTES = {
 
 export const BILLING_API_ROUTES = {
   checkout: "/billing/checkout",
+  current: "/billing/current",
 };
-

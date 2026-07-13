@@ -1,9 +1,209 @@
 import { describe, expect, it } from "vitest";
 import { createElement, createPage, createSection } from "./PageBuilder.factories";
 import { getSectionElements } from "./PageBuilder.layout";
-import { cleanBuilderProject } from "./PageBuilder.project";
+import {
+  buildFormConnectionUpdate,
+  cleanBuilderProject,
+  normalizeBuilderProjectShape,
+  repairDuplicateProjectIds,
+} from "./PageBuilder.project";
 
 describe("cleanBuilderProject", () => {
+  it("normalizes legacy button actions without moving page-owned blocks", () => {
+    const normalized = normalizeBuilderProjectShape({
+      pages: [
+        { id: "home", name: "Home", sections: [{ freeElements: [{ id: "heading", type: "heading" }] }] },
+        { id: "buttons", name: "Buttons", sections: [{ freeElements: [{
+          id: "button",
+          type: "button",
+          action: { actionType: "page", targetPageId: "home" },
+        }] }] },
+      ],
+      forms: [],
+    });
+
+    expect(normalized.pages[0].sections[0].freeElements.map((item) => item.id)).toEqual(["heading"]);
+    expect(normalized.pages[1].sections[0].freeElements[0].action).toMatchObject({
+      type: "goToPage",
+      pageId: "home",
+    });
+  });
+
+  it("stores one canonical string form reference from the editor selector", () => {
+    expect(buildFormConnectionUpdate(42)).toEqual({ connectedFormId: "42" });
+  });
+
+  it.each(["formId", "form_id"])(
+    "normalizes legacy %s without retaining the legacy field",
+    (legacyField) => {
+      const normalized = normalizeBuilderProjectShape({
+        forms: [{ id: 42, title: "Form 1" }],
+        pages: [{
+          id: 7,
+          name: "Home",
+          sections: [{
+            rows: [{ columns: [{ elements: [{
+              id: 9,
+              type: "formBlock",
+              [legacyField]: 42,
+            }] }] }],
+          }],
+        }],
+      });
+      const block = normalized.pages[0].sections[0].rows[0].columns[0].elements[0];
+
+      expect(normalized.forms[0].id).toBe("42");
+      expect(normalized.pages[0].id).toBe("7");
+      expect(block.id).toBe("9");
+      expect(block.connectedFormId).toBe("42");
+      expect(block).not.toHaveProperty("formId");
+      expect(block).not.toHaveProperty("form_id");
+    }
+  );
+
+  it("keeps an explicit disconnection and never fabricates a replacement form", () => {
+    const normalized = normalizeBuilderProjectShape({
+      forms: [],
+      pages: [{
+        id: "home",
+        sections: [{ elements: [{
+          id: "block-1",
+          type: "formBlock",
+          connectedFormId: "",
+          formId: "deleted-form",
+        }] }],
+      }],
+    });
+    const block = normalized.pages[0].sections[0].rows[0].columns[0].elements[0];
+
+    expect(normalized.forms).toEqual([]);
+    expect(block.connectedFormId).toBe("");
+    expect(block).not.toHaveProperty("formId");
+  });
+
+  it("never copies a later page form block onto Home during cleanup", () => {
+    const project = {
+      directLayoutVersion: 3,
+      forms: [{ id: "form-1", title: "Form 1" }],
+      pages: [
+        { id: "home", name: "Home", sections: [] },
+        {
+          id: "contact",
+          name: "Contact",
+          sections: [{ elements: [{
+            id: "contact-block",
+            type: "formBlock",
+            connectedFormId: "form-1",
+          }] }],
+        },
+      ],
+    };
+
+    const cleanedOnce = cleanBuilderProject(project);
+    const cleanedTwice = cleanBuilderProject(cleanedOnce);
+    const countBlocks = (value, pageId) => value.pages
+      .find((page) => page.id === pageId)
+      .sections.flatMap(getSectionElements)
+      .filter((element) => element.type === "formBlock").length;
+
+    expect(countBlocks(cleanedOnce, "home")).toBe(0);
+    expect(countBlocks(cleanedOnce, "contact")).toBe(1);
+    expect(countBlocks(cleanedTwice, "home")).toBe(0);
+    expect(countBlocks(cleanedTwice, "contact")).toBe(1);
+  });
+
+  it("repairs duplicate and missing block ids globally without changing block data or order", () => {
+    const source = {
+      pages: [
+        { id: "home", name: "Home", sections: [{ freeElements: [
+          { id: "shared", type: "heading", content: "First" },
+          { id: "", type: "text", content: "Missing" },
+        ] }] },
+        { id: "second", name: "Page 2", sections: [{ rows: [{ columns: [{ elements: [
+          { id: "shared", type: "formBlock", content: "Second", connectedFormId: "form-1" },
+        ] }] }] }] },
+      ],
+      forms: [{ id: "form-1", title: "Form 1" }],
+    };
+    const before = structuredClone(source);
+    const generated = ["element_missing", "element_duplicate"];
+    const repaired = repairDuplicateProjectIds(source, {
+      idFactory: () => generated.shift(),
+    });
+    const blocks = repaired.project.pages.flatMap((page) =>
+      page.sections.flatMap(getSectionElements)
+    );
+
+    expect(source).toEqual(before);
+    expect(blocks.map((block) => block.id)).toEqual([
+      "shared",
+      "element_missing",
+      "element_duplicate",
+    ]);
+    expect(blocks.map((block) => block.content)).toEqual(["First", "Missing", "Second"]);
+    expect(blocks[2].connectedFormId).toBe("form-1");
+    expect(repaired.repairs).toEqual([
+      expect.objectContaining({ kind: "block", oldId: "", newId: "element_missing", pageId: "home" }),
+      expect.objectContaining({ kind: "block", oldId: "shared", newId: "element_duplicate", pageId: "second" }),
+    ]);
+  });
+
+  it("is idempotent and preserves the first duplicate occurrence", () => {
+    const source = {
+      pages: [{ id: "home", sections: [{ freeElements: [
+        { id: "same", type: "text", content: "First" },
+        { id: "same", type: "text", content: "Second" },
+      ] }] }],
+      forms: [],
+    };
+    const once = repairDuplicateProjectIds(source, { idFactory: () => "element_repaired" });
+    const twice = repairDuplicateProjectIds(once.project, {
+      idFactory: () => { throw new Error("idempotent repair must not generate another id"); },
+    });
+
+    expect(once.project.pages[0].sections[0].freeElements[0].id).toBe("same");
+    expect(twice.project).toEqual(once.project);
+    expect(twice.repairs).toEqual([]);
+  });
+
+  it("repairs duplicate page and form ids without rewriting ambiguous references", () => {
+    const ids = ["page_repaired", "form_repaired"];
+    const { project, repairs } = repairDuplicateProjectIds({
+      activePageId: "page-1",
+      activeFormId: "form-1",
+      pages: [
+        { id: "page-1", name: "Home", sections: [] },
+        { id: "page-1", name: "Copy", sections: [{ freeElements: [
+          { id: "block-1", type: "formBlock", connectedFormId: "form-1" },
+        ] }] },
+      ],
+      forms: [{ id: "form-1", title: "First" }, { id: "form-1", title: "Second" }],
+    }, { idFactory: () => ids.shift() });
+
+    expect(project.pages.map((page) => page.id)).toEqual(["page-1", "page_repaired"]);
+    expect(project.forms.map((form) => form.id)).toEqual(["form-1", "form_repaired"]);
+    expect(project.pages[1].sections[0].freeElements[0].connectedFormId).toBe("form-1");
+    expect(project.activePageId).toBe("page-1");
+    expect(project.activeFormId).toBe("form-1");
+    expect(repairs.map((repair) => repair.kind)).toEqual(["page", "form"]);
+  });
+
+  it("deduplicates legacy elements already represented in canonical freeElements before id repair", () => {
+    const project = {
+      pages: [{ id: "home", sections: [{
+        mode: "direct",
+        elements: [{ id: "same-block", type: "text", content: "Legacy" }],
+        freeElements: [{ id: "same-block", type: "text", content: "Canonical" }],
+      }] }],
+      forms: [],
+    };
+
+    const cleaned = cleanBuilderProject(project);
+    const blocks = cleaned.pages[0].sections.flatMap(getSectionElements);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ id: "same-block", content: "Canonical" });
+  });
+
   it("keeps the full page canvas when it contains a Metrics component", () => {
     const heading = createElement("heading", { content: "Keep this heading" });
     const metric = createElement("metric");

@@ -34,14 +34,21 @@ export const createFormHandlers = ({
   const deleteActiveForm = () => {
     if (!activeForm) return;
 
-    const remainingForms = (project.forms || []).filter((form) => form.id !== activeForm.id);
+    const activeFormId = String(activeForm.id || "");
+    const remainingForms = (project.forms || []).filter(
+      (form) => String(form.id || "") !== activeFormId
+    );
     const nextForm = remainingForms[0] || null;
 
     updateProject((prev) => ({
       ...prev,
-      forms: (prev.forms || []).filter((form) => form.id !== activeForm.id),
+      forms: (prev.forms || []).filter(
+        (form) => String(form.id || "") !== activeFormId
+      ),
       activeFormId: nextForm?.id || "",
-      workflows: (prev.workflows || []).filter((workflow) => workflow.formId !== activeForm.id),
+      workflows: (prev.workflows || []).filter(
+        (workflow) => String(workflow.formId || "") !== activeFormId
+      ),
       pages: (prev.pages || []).map((page) => ({
         ...page,
         sections: (page.sections || []).map((section) => ({
@@ -51,15 +58,15 @@ export const createFormHandlers = ({
             columns: (row.columns || []).map((column) => ({
               ...column,
               elements: (column.elements || []).map((element) =>
-                element.connectedFormId === activeForm.id
-                  ? { ...element, connectedFormId: nextForm?.id || "" }
+                String(element.connectedFormId || "") === activeFormId
+                  ? { ...element, connectedFormId: "" }
                   : element
               ),
             })),
           })),
           freeElements: (section.freeElements || []).map((element) =>
-            element.connectedFormId === activeForm.id
-              ? { ...element, connectedFormId: nextForm?.id || "" }
+            String(element.connectedFormId || "") === activeFormId
+              ? { ...element, connectedFormId: "" }
               : element
           ),
         })),

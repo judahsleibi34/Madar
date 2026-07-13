@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   getRuntimeAuthFlow,
+  getRuntimeNavigationPages,
+  getRuntimePageSections,
   resolveRuntimePage,
   runtimePageRequiresAuthentication,
 } from "./TenantSiteRuntime";
@@ -27,6 +29,21 @@ const formPage = {
 };
 
 describe("tenant runtime page flow", () => {
+  it("keeps block collections scoped to the selected page", () => {
+    const home = { id: "home", sections: [{ freeElements: [{ id: "heading", type: "heading" }] }] };
+    const form = { id: "form", sections: [{ freeElements: [{ id: "form-block", type: "formBlock", connectedFormId: "form-1" }] }] };
+    const buttons = { id: "buttons", sections: [{ freeElements: [{ id: "button", type: "button" }] }] };
+
+    expect(getRuntimePageSections(home)[0].freeElements.map((item) => item.type)).toEqual(["heading"]);
+    expect(getRuntimePageSections(form)[0].freeElements.map((item) => item.type)).toEqual(["formBlock"]);
+    expect(getRuntimePageSections(buttons)[0].freeElements.map((item) => item.type)).toEqual(["button"]);
+  });
+
+  it("does not fall back to another page's blocks when the selected page is empty", () => {
+    expect(getRuntimePageSections({ id: "empty", sections: [] })).toEqual([]);
+    expect(getRuntimePageSections(null)).toEqual([]);
+  });
+
   it("treats a login success destination as protected", () => {
     const flow = getRuntimeAuthFlow([loginPage, formPage]);
 
@@ -62,7 +79,20 @@ describe("tenant runtime page flow", () => {
     expect(resolved).toBe(formPage);
   });
 
-  it("falls back to the first page for an unknown route", () => {
-    expect(resolveRuntimePage({ pages: [loginPage, formPage] })).toBe(loginPage);
+  it("does not fall back to another page for an unknown public route", () => {
+    expect(resolveRuntimePage({
+      pages: [loginPage, formPage],
+      allowDefaultFallback: false,
+    })).toBeNull();
+  });
+
+  it("keeps hidden pages routable but out of header navigation", () => {
+    const hiddenPage = { ...formPage, showInNavigation: false };
+    expect(getRuntimeNavigationPages([loginPage, hiddenPage])).toEqual([loginPage]);
+    expect(resolveRuntimePage({
+      pages: [loginPage, hiddenPage],
+      requestedPage: hiddenPage,
+      user: { id: 2 },
+    })).toBe(hiddenPage);
   });
 });

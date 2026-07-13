@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getReservationContent } from "../../../content/pageBuilder";
+import { createReservationIdempotencyKey } from "../runtime/reservationSubmission";
 import "./ReservationBlock.css";
 
 const reservationDefaults = getReservationContent("en");
@@ -44,6 +45,15 @@ export default function ReservationBlock({
   );
   const [values, setValues] = useState(() => initialValues(serviceOptions[0]));
   const [errors, setErrors] = useState({});
+  const [idempotencyKey, setIdempotencyKey] = useState(createReservationIdempotencyKey);
+  const [honeypot, setHoneypot] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionStartedAtRef = useRef(0);
+  const submissionDisabled = disabled || isSubmitting;
+
+  useEffect(() => {
+    submissionStartedAtRef.current = Date.now();
+  }, []);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -56,7 +66,7 @@ export default function ReservationBlock({
     });
   };
 
-  const submitReservation = (event) => {
+  const submitReservation = async (event) => {
     event.preventDefault();
 
     const nextErrors = {};
@@ -69,13 +79,30 @@ export default function ReservationBlock({
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    onSubmit?.({
-      ...values,
-      guests: Number(values.guests) || 1,
-      submittedAt: new Date().toISOString(),
-    });
+    setIsSubmitting(true);
 
-    setValues(initialValues(serviceOptions[0]));
+    try {
+      const submitted = await onSubmit?.({
+        ...values,
+        guests: Number(values.guests) || 1,
+      }, idempotencyKey, honeypot, Math.min(
+        86_400_000,
+        Math.max(0, Date.now() - submissionStartedAtRef.current)
+      ));
+
+      if (submitted === "reset_idempotency") {
+        // The server confirmed this key belongs to different data. Preserve all
+        // fields, but let the user's next intentional submit start a new request.
+        setIdempotencyKey(createReservationIdempotencyKey());
+      } else if (submitted !== false) {
+        setValues(initialValues(serviceOptions[0]));
+        setIdempotencyKey(createReservationIdempotencyKey());
+        setHoneypot("");
+        submissionStartedAtRef.current = Date.now();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderField = (key) => {
@@ -88,7 +115,7 @@ export default function ReservationBlock({
           {meta.label}
           <select
             value={values.service}
-            disabled={disabled}
+            disabled={submissionDisabled}
             onChange={(event) => updateValue("service", event.target.value)}
           >
             {serviceOptions.map((service) => (
@@ -108,7 +135,7 @@ export default function ReservationBlock({
           {meta.label}
           <textarea
             value={values.notes}
-            disabled={disabled}
+            disabled={submissionDisabled}
             placeholder={meta.placeholder}
             onChange={(event) => updateValue("notes", event.target.value)}
           />
@@ -131,7 +158,7 @@ export default function ReservationBlock({
         <input
           {...inputProps}
           value={values[key]}
-          disabled={disabled}
+          disabled={submissionDisabled}
           placeholder={meta.placeholder}
           onChange={(event) => updateValue(key, event.target.value)}
         />
@@ -142,6 +169,17 @@ export default function ReservationBlock({
 
   return (
     <form className="reservation-block" onSubmit={submitReservation}>
+      <label className="runtime-honeypot" aria-hidden="true">
+        Website
+        <input
+          type="text"
+          name="website"
+          value={honeypot}
+          tabIndex={-1}
+          autoComplete="off"
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
+      </label>
       <div className="reservation-block-header">
         <div>
           <span>{content.kicker}</span>
@@ -160,7 +198,7 @@ export default function ReservationBlock({
       </div>
 
       <div className="reservation-footer">
-        <button type="submit" className="reservation-submit" disabled={disabled}>
+        <button type="submit" className="reservation-submit" disabled={submissionDisabled}>
           {submitLabel}
         </button>
 

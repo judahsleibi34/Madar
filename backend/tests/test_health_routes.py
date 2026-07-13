@@ -25,36 +25,47 @@ class HealthRouteTests(unittest.TestCase):
 
         with patch.object(
             health_routes,
-            "get_config_readiness",
+            "get_readiness",
             return_value={
-                "supabase_url": True,
-                "supabase_anon_key": True,
-                "supabase_service_key": True,
-                "service_key_is_distinct": True,
+                "ready": True,
+                "components": {
+                    "database": "ok",
+                    "redis": "ok",
+                    "auth": "ok",
+                    "storage": "ok",
+                    "schema": "ok",
+                    "admin_mfa_policy": "not_required",
+                },
             },
         ):
             response = client.get("/health/ready")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "ok")
+        self.assertIs(response.json()["ready"], True)
 
     def test_ready_returns_degraded_when_config_missing(self):
         client = build_client()
 
         with patch.object(
             health_routes,
-            "get_config_readiness",
+            "get_readiness",
             return_value={
-                "supabase_url": True,
-                "supabase_anon_key": True,
-                "supabase_service_key": False,
-                "service_key_is_distinct": False,
+                "ready": False,
+                "components": {
+                    "database": "ok",
+                    "redis": "unavailable",
+                    "auth": "ok",
+                    "storage": "ok",
+                    "schema": "ok",
+                    "admin_mfa_policy": "ok",
+                },
             },
         ):
             response = client.get("/health/ready")
 
         self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json()["status"], "degraded")
+        self.assertIs(response.json()["ready"], False)
+        self.assertEqual(response.json()["components"]["redis"], "unavailable")
 
 
 if __name__ == "__main__":

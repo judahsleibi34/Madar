@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import auth_routes
+from services import onboarding_service
 
 
 def build_client():
@@ -23,7 +24,12 @@ class FakeAuthAdmin:
 
     def create_user(self, payload):
         self.created_users.append(payload)
-        return SimpleNamespace(user=SimpleNamespace(id=f"auth-user-{len(self.created_users)}"))
+        auth_user = SimpleNamespace(
+            id=f"auth-user-{len(self.created_users)}",
+            email=payload.get("email"),
+        )
+        self.auth.auth_users.append(auth_user)
+        return SimpleNamespace(user=auth_user)
 
     def delete_user(self, user_id):
         self.deleted_users.append(user_id)
@@ -131,6 +137,7 @@ class FakeSupabase:
             "tenants": [],
             "users": [],
             "tenant_memberships": [],
+            "pending_account_onboarding": [],
         }
 
     def table(self, table_name):
@@ -161,6 +168,19 @@ class FakeSupabase:
 
 
 class SignupRoutesTests(unittest.TestCase):
+    def test_legacy_immediate_tenant_provisioning_is_blocked(self):
+        with self.assertRaises(onboarding_service.HTTPException) as raised:
+            onboarding_service.create_onboarded_tenant(
+                supabase_client=object(),
+                payload=object(),
+            )
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(
+            raised.exception.detail["code"],
+            "pending_verification_flow_required",
+        )
+
     def test_signup_onboard_endpoint_is_removed(self):
         client = build_client()
 
@@ -176,7 +196,7 @@ class SignupRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_original_signup_route_creates_tenant_user_and_membership(self):
+    def test_signup_creates_pending_user_without_active_tenant_resources(self):
         client = build_client()
         fake_supabase = FakeSupabase()
 
@@ -185,6 +205,20 @@ class SignupRoutesTests(unittest.TestCase):
         ), patch.object(
             auth_routes,
             "enforce_auth_rate_limit",
+        ), patch.object(
+            auth_routes,
+            "FRONTEND_URL",
+            "http://localhost:5173",
+        ), patch.object(
+            auth_routes,
+            "send_verification_email",
+            return_value={"sent": True, "retry_after": 60},
+        ), patch.object(
+            auth_routes,
+            "set_pending_verification_cookie",
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
         ):
             response = client.post(
                 "/auth/signup",
@@ -206,33 +240,25 @@ class SignupRoutesTests(unittest.TestCase):
         )
         self.assertTrue(body["requires_email_verification"])
         self.assertEqual(body["user"]["email"], "existing@example.com")
-        self.assertEqual(len(fake_supabase.auth.signed_up_users), 1)
-        self.assertEqual(fake_supabase.auth.signed_up_users[0]["email"], "existing@example.com")
+        self.assertEqual(len(fake_supabase.auth.admin.created_users), 1)
+        self.assertEqual(fake_supabase.auth.admin.created_users[0]["email"], "existing@example.com")
         self.assertEqual(
-            fake_supabase.auth.signed_up_users[0]["options"]["email_redirect_to"],
-            "http://localhost:5173/login",
+            fake_supabase.auth.admin.created_users[0]["email_confirm"],
+            False,
         )
-        self.assertEqual(
-            fake_supabase.auth.resent_verifications[0],
-            {
-                "type": "signup",
-                "email": "existing@example.com",
-                "options": {
-                    "email_redirect_to": "http://localhost:5173/login",
-                },
-            },
-        )
-        self.assertEqual(
-            fake_supabase.auth.admin.updated_users[0],
-            ("auth-user-1", {"email_confirm": False}),
-        )
-        self.assertNotIn("email_confirm", fake_supabase.auth.signed_up_users[0])
-        self.assertEqual(len(fake_supabase.tables["tenants"]), 1)
-        self.assertEqual(fake_supabase.tables["tenants"][0]["brand_name"], "")
+        self.assertEqual(fake_supabase.auth.admin.updated_users, [])
+        self.assertEqual(fake_supabase.auth.signed_up_users, [])
+        self.assertEqual(fake_supabase.tables["tenants"], [])
         self.assertEqual(len(fake_supabase.tables["users"]), 1)
         self.assertIs(fake_supabase.tables["users"][0]["email_verified"], False)
         self.assertIsNone(fake_supabase.tables["users"][0]["email_verified_at"])
-        self.assertEqual(len(fake_supabase.tables["tenant_memberships"]), 1)
+        self.assertIsNone(fake_supabase.tables["users"][0]["tenant_id"])
+        self.assertEqual(
+            fake_supabase.tables["users"][0]["account_status"],
+            "pending_verification",
+        )
+        self.assertEqual(fake_supabase.tables["tenant_memberships"], [])
+        self.assertEqual(len(fake_supabase.tables["pending_account_onboarding"]), 1)
 
     def test_original_signup_rejects_email_that_already_exists_in_supabase_auth(self):
         client = build_client()
@@ -259,10 +285,11 @@ class SignupRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["detail"], "Email is already registered")
-        self.assertEqual(fake_supabase.auth.signed_up_users, [])
+        self.assertEqual(fake_supabase.auth.admin.created_users, [])
         self.assertEqual(fake_supabase.tables["tenants"], [])
         self.assertEqual(fake_supabase.tables["users"], [])
         self.assertEqual(fake_supabase.tables["tenant_memberships"], [])
+        self.assertEqual(fake_supabase.tables["pending_account_onboarding"], [])
 
     def test_original_signup_recovers_unverified_auth_user_without_local_profile(self):
         client = build_client()
@@ -280,6 +307,16 @@ class SignupRoutesTests(unittest.TestCase):
         ), patch.object(
             auth_routes,
             "enforce_auth_rate_limit",
+        ), patch.object(
+            auth_routes,
+            "send_verification_email",
+            return_value={"sent": True, "retry_after": 60},
+        ), patch.object(
+            auth_routes,
+            "set_pending_verification_cookie",
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
         ):
             response = client.post(
                 "/auth/signup",
@@ -308,11 +345,32 @@ class SignupRoutesTests(unittest.TestCase):
             )
         )
 
+        def provision_verified(_auth_user, local_user):
+            return (
+                {
+                    **local_user,
+                    "tenant_id": 1,
+                    "email_verified": True,
+                    "account_status": "active",
+                },
+                True,
+            )
+
         with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
             auth_routes, "service_supabase", fake_supabase
         ), patch.object(
             auth_routes,
             "enforce_auth_rate_limit",
+        ), patch.object(
+            auth_routes,
+            "synchronize_verified_account",
+            side_effect=provision_verified,
+        ) as synchronize, patch.object(
+            auth_routes,
+            "record_verification_result",
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
         ):
             response = client.post(
                 "/auth/signup",
@@ -328,7 +386,8 @@ class SignupRoutesTests(unittest.TestCase):
         self.assertFalse(response.json()["requires_email_verification"])
         self.assertEqual(response.json()["user"]["auth_id"], "auth-verified-orphan")
         self.assertEqual(fake_supabase.auth.signed_up_users, [])
-        self.assertTrue(fake_supabase.tables["users"][0]["email_verified"])
+        self.assertEqual(response.json()["user"]["account_status"], "active")
+        synchronize.assert_called_once()
 
     def test_original_signup_rejects_numeric_names(self):
         client = build_client()
@@ -380,7 +439,11 @@ class SignupRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
             response.json()["detail"],
-            "Please verify your email before logging in.",
+            {
+                "code": "email_verification_required",
+                "message": "Verify your email before logging in.",
+                "context": {"resend_available_after": 0},
+            },
         )
 
     def test_login_rejects_session_when_supabase_user_is_not_email_confirmed(self):
@@ -411,6 +474,9 @@ class SignupRoutesTests(unittest.TestCase):
         ), patch.object(
             auth_routes,
             "record_security_event",
+        ), patch.object(
+            auth_routes,
+            "set_pending_verification_cookie",
         ):
             response = client.post(
                 "/auth/login",
@@ -423,7 +489,83 @@ class SignupRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
             response.json()["detail"],
-            "Please verify your email before logging in.",
+            {
+                "code": "email_verification_required",
+                "message": "Verify your email before logging in.",
+                "context": {"resend_available_after": 0},
+            },
+        )
+
+    def test_main_login_rejects_public_site_visitor_account(self):
+        client = build_client()
+        auth_response = SimpleNamespace(
+            user=SimpleNamespace(
+                id="auth-visitor",
+                email="visitor@example.com",
+                email_confirmed_at="2026-01-01T00:00:00Z",
+                confirmed_at="2026-01-01T00:00:00Z",
+            ),
+            session=SimpleNamespace(access_token="access", refresh_token="refresh"),
+        )
+        local_user = {
+            "id": 22,
+            "auth_id": "auth-visitor",
+            "tenant_id": None,
+            "email": "visitor@example.com",
+            "email_verified": True,
+            "account_kind": "site_visitor",
+            "account_status": "active",
+        }
+
+        with patch.object(auth_routes, "enforce_auth_rate_limit"), patch.object(
+            auth_routes.supabase.auth,
+            "sign_in_with_password",
+            return_value=auth_response,
+        ), patch.object(
+            auth_routes,
+            "get_local_user_by_auth_id",
+            return_value=local_user,
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
+        ):
+            response = client.post(
+                "/auth/login",
+                json={
+                    "email": "visitor@example.com",
+                    "password": "super-secret-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "platform_account_required",
+        )
+
+    def test_main_user_status_does_not_authenticate_public_site_visitor(self):
+        client = build_client()
+        local_user = {
+            "id": 22,
+            "auth_id": "auth-visitor",
+            "tenant_id": None,
+            "email": "visitor@example.com",
+            "account_kind": "site_visitor",
+            "account_status": "active",
+        }
+
+        with patch.object(
+            auth_routes,
+            "get_authenticated_user_row",
+            return_value=(SimpleNamespace(id="auth-visitor"), local_user),
+        ):
+            response = client.get("/auth/user_status")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["logged_in"])
+        self.assertEqual(
+            response.json()["account_state"],
+            "platform_account_required",
         )
 
 

@@ -10,6 +10,14 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, Request, Response
 
 from database import service_supabase, supabase
+from services.account_lifecycle_service import (
+    ACTIVE_ACCOUNT_STATUS,
+    effective_account_status,
+    is_platform_account,
+    synchronize_verified_account,
+)
+from services.identity_service import canonical_auth_email, normalize_email
+from services.api_errors import api_error
 from services.request_security import (
     create_csrf_token,
     delete_csrf_cookie,
@@ -260,6 +268,9 @@ def build_user_payload(user_data):
         "user_type": normalize_user_type(user_data.get("user_type")),
         "email_verified": user_data.get("email_verified") is not False,
         "email_verified_at": user_data.get("email_verified_at"),
+        "account_status": effective_account_status(user_data),
+        "account_kind": user_data.get("account_kind") or "platform",
+        "pending_email": user_data.get("pending_email"),
         "created_at": user_data.get("created_at"),
         "updated_at": user_data.get("updated_at"),
     }
@@ -384,13 +395,26 @@ def get_authenticated_user_row(
     user_data = user_response.data
 
     if auth_user_email_is_verified(auth_user):
-        user_data = mark_local_email_verified(user_data)
+        provider_email = canonical_auth_email(auth_user)
+        if (
+            effective_account_status(user_data) != ACTIVE_ACCOUNT_STATUS
+            or (
+                provider_email
+                and normalize_email(user_data.get("email")) != provider_email
+            )
+        ):
+            user_data, _ = synchronize_verified_account(auth_user, user_data)
+        else:
+            user_data = mark_local_email_verified(user_data)
     else:
         if response:
             delete_auth_cookies(response)
         raise HTTPException(
             status_code=403,
-            detail="Please verify your email before logging in.",
+            detail={
+                "code": "email_verification_required",
+                "message": "Verify your email before logging in.",
+            },
         )
 
     if normalize_user_type(user_data.get("user_type")) == "admin":
@@ -513,6 +537,12 @@ def require_regular_user(
 
     if user_type != "user":
         raise HTTPException(status_code=403, detail="User access is required")
+    if not is_platform_account(user_data):
+        raise api_error(
+            403,
+            "platform_account_required",
+            "This account is limited to the website where it was created.",
+        )
 
     return auth_user, user_data
 

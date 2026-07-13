@@ -91,6 +91,110 @@ def fake_admin():
 
 
 class UserProfileUrlValidationTests(unittest.TestCase):
+    def test_profile_updates_first_and_last_name_together(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+
+        with patch.object(user_routes, "service_supabase", fake_supabase), patch.object(
+            user_routes,
+            "require_regular_user_id",
+            return_value=(object(), fake_user()),
+        ):
+            response = client.put(
+                "/users/3/profile",
+                json={"first_name": "Updated", "last_name": "Owner"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            fake_supabase.users_query.payload,
+            {"first_name": "Updated", "last_name": "Owner"},
+        )
+
+    def test_user_info_read_supports_get_without_mutation(self):
+        client = build_client()
+        with patch.object(
+            user_routes,
+            "require_regular_user_id",
+            return_value=(object(), fake_user()),
+        ), patch.object(
+            user_routes,
+            "get_billing_summary_for_tenant",
+            return_value={},
+        ):
+            response = client.get("/users/3/info")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["first_name"], "Madar")
+
+    def test_profile_same_email_is_unchanged_while_other_fields_update(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+
+        with patch.object(user_routes, "service_supabase", fake_supabase), patch.object(
+            user_routes,
+            "require_regular_user_id",
+            return_value=(object(), fake_user()),
+        ):
+            response = client.put(
+                "/users/3/profile",
+                json={"email": "Madar@Example.COM", "first_name": "Updated"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(fake_supabase.users_query.payload, {"first_name": "Updated"})
+
+    def test_profile_changed_email_rejects_entire_update_atomically(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+
+        with patch.object(user_routes, "service_supabase", fake_supabase), patch.object(
+            user_routes,
+            "require_regular_user_id",
+            return_value=(object(), fake_user()),
+        ):
+            response = client.put(
+                "/users/3/profile",
+                json={"email": "new@example.com", "first_name": "Must Not Change"},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "email_change_requires_verification_flow",
+        )
+        self.assertIsNone(fake_supabase.users_query.payload)
+
+    def test_admin_profile_changed_email_rejects_entire_update_atomically(self):
+        client = build_profile_client()
+        fake_supabase = FakeSupabase()
+        provider_admin = type(
+            "AuthUser",
+            (),
+            {"id": "admin-auth-1", "email": "admin@example.com"},
+        )()
+
+        with patch.object(
+            admin_profile_routes,
+            "service_supabase",
+            fake_supabase,
+        ), patch.object(
+            admin_profile_routes,
+            "require_system_admin",
+            return_value=(provider_admin, fake_admin()),
+        ), patch.object(admin_profile_routes, "record_security_event"):
+            response = client.put(
+                "/admin/profile/profile",
+                json={"email": "new@example.com", "first_name": "Must Not Change"},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "email_change_requires_verification_flow",
+        )
+        self.assertIsNone(fake_supabase.users_query.payload)
+
     def test_profile_avatar_allows_uploaded_relative_path(self):
         client = build_client()
         fake_supabase = FakeSupabase()

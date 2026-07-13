@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
 from typing import Any, Optional, Literal
 
 class ContactMessage(BaseModel):
@@ -11,6 +12,10 @@ class SignUpRequest(BaseModel):
     last_name: str
     email: EmailStr
     password: str
+    business_name: Optional[str] = None
+    business_type: Optional[str] = None
+    subdomain: Optional[str] = None
+    selected_plan: Optional[dict[str, Any]] = None
 
 class LogIn(BaseModel): 
     email: EmailStr
@@ -38,6 +43,11 @@ class UserProfileUpdate(BaseModel):
 class PasswordReset(BaseModel):
     access_token: str
     password: str
+    request_token: Optional[str] = Field(default=None, min_length=20, max_length=500)
+
+
+class EmailVerificationResendRequest(BaseModel):
+    email: Optional[EmailStr] = None
 
 class WebsiteSettingsUpdate(BaseModel):
     subdomain: Optional[str] = None
@@ -53,7 +63,17 @@ class WebsiteSettingsUpdate(BaseModel):
     
 class BillingCheckoutRequest(BaseModel):
     subscription_type: Literal["full_platform", "individual_builder"]
-    plan: Literal["starter", "pro", "business", "basic", "premium"]
+    plan: Literal[
+        "starter",
+        "pro",
+        "business",
+        "cms",
+        "forms_data",
+        "cms_plus",
+        "complete",
+        "basic",
+        "premium",
+    ]
     builder_type: Optional[
         Literal["website", "forms", "quiz", "reservation", "reports", "data"]
     ] = None
@@ -61,11 +81,12 @@ class BillingCheckoutRequest(BaseModel):
 
 class AdminBillingUpdateRequest(BillingCheckoutRequest):
     tenant_id: int
-    payment_status: Literal["pending", "active", "past_due", "canceled"] = "active"
+    payment_status: Literal["pending", "active", "past_due", "canceled", "expired"] = "active"
 
 
 class BillingWebhookUpdateRequest(AdminBillingUpdateRequest):
-    provider_event_id: Optional[str] = None
+    provider_event_id: str = Field(..., min_length=1, max_length=200)
+    provider_occurred_at: Optional[datetime] = None
 
 
 class AdminUserTypeUpdateRequest(BaseModel):
@@ -87,7 +108,7 @@ class AdminAccountAccessVerifyRequest(BaseModel):
     
 class UpdatePassword(BaseModel):
     current_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=8)
+    new_password: str
 
 class MfaEnrollRequest(BaseModel):
     friendly_name: Optional[str] = Field(default=None, max_length=64)
@@ -106,4 +127,3 @@ class MfaLoginVerifyRequest(BaseModel):
     factor_id: str = Field(..., min_length=1, max_length=200)
     code: str = Field(..., min_length=6, max_length=12)
     challenge_id: Optional[str] = Field(default=None, max_length=200)
-

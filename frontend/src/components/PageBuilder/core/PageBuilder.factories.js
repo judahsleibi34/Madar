@@ -438,6 +438,7 @@ export const createPage = (name = factoryCopy.structure.page, sections = [], ove
   id: createId("page"),
   name,
   slug: name.toLowerCase() === "home" ? "/" : `/${slugify(name)}`,
+  isDefault: name.toLowerCase() === "home",
   backgroundColor: "var(--theme-surface)",
   visibility: "public",
   showInNavigation: name.toLowerCase() === "home",

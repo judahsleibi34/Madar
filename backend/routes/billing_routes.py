@@ -4,9 +4,14 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from classes import BillingCheckoutRequest, BillingWebhookUpdateRequest
+from services.api_errors import error_detail
 from services.audit_service import record_audit_event
 from services.tenant_service import TenantContext, require_active_tenant_member
-from services.billing_service import apply_pending_checkout_selection, apply_verified_billing_update
+from services.billing_service import (
+    apply_billing_webhook_event,
+    apply_pending_checkout_selection,
+    get_current_billing_state,
+)
 
 
 router = APIRouter(tags=["Billing"])
@@ -59,8 +64,11 @@ def build_checkout_response(
 
     return {
         "success": True,
-        "requires_payment": True,
-        "message": "Checkout request saved. Payment provider integration is not configured yet.",
+        "code": "billing_not_configured",
+        "checkout_available": False,
+        "requires_payment": False,
+        "request_status": "pending_manual_activation",
+        "message": "Online checkout is not available yet. Your access request was saved for manual review.",
         "checkout": {
             "tenant_id": feature.get("tenant_id", tenant_id),
             "subscription_type": feature.get("subscription_type"),
@@ -86,6 +94,19 @@ def create_canonical_checkout(
     return build_checkout_response(checkout, context, request=request)
 
 
+@router.get("/billing/current")
+def current_billing_state(request: Request, response: Response):
+    context = require_active_tenant_member(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
+    return {
+        "success": True,
+        "billing": get_current_billing_state(context.tenant_id),
+    }
+
+
 @router.post("/users/{user_id}/billing/checkout")
 def create_checkout(
     user_id: int,
@@ -107,25 +128,55 @@ def billing_webhook(
     update: BillingWebhookUpdateRequest,
     x_madar_webhook_secret: str = Header(default=""),
 ):
+    app_env = (
+        os.getenv("APP_ENV")
+        or os.getenv("ENV")
+        or os.getenv("FASTAPI_ENV")
+        or "development"
+    ).strip().lower()
     expected_secret = os.getenv("BILLING_WEBHOOK_SECRET", "")
 
+    if app_env in {"prod", "production"}:
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail(
+                "billing_not_configured",
+                "A signed billing provider webhook is not configured.",
+            ),
+        )
+
     if not expected_secret:
-        raise HTTPException(status_code=503, detail="Billing webhook is not configured.")
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail(
+                "billing_not_configured",
+                "Billing webhook processing is not configured.",
+            ),
+        )
 
     if not secrets.compare_digest(x_madar_webhook_secret, expected_secret):
-        raise HTTPException(status_code=401, detail="Invalid webhook signature.")
+        raise HTTPException(
+            status_code=401,
+            detail=error_detail(
+                "webhook_signature_invalid",
+                "Invalid webhook signature.",
+            ),
+        )
 
-    feature = apply_verified_billing_update(
+    event_result = apply_billing_webhook_event(
         tenant_id=update.tenant_id,
         subscription_type=update.subscription_type,
         plan=update.plan,
         builder_type=update.builder_type,
         payment_status=update.payment_status,
-        source="webhook",
         provider_event_id=update.provider_event_id,
+        provider_occurred_at=update.provider_occurred_at,
     )
 
     return {
         "success": True,
-        "data": feature,
+        "duplicate": event_result.get("duplicate", False),
+        "event_id": event_result.get("event_id"),
+        "ignored": event_result.get("ignored", False),
+        "data": event_result.get("feature"),
     }

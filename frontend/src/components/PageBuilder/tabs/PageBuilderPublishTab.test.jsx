@@ -4,7 +4,7 @@ import PageBuilderPublishTab from "./PageBuilderPublishTab";
 
 const project = {
   name: "Madar Site",
-  status: "draft",
+  status: "published",
   publish: {},
   forms: [],
 };

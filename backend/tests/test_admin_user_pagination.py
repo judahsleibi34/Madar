@@ -94,7 +94,7 @@ class AdminUserPaginationTests(unittest.TestCase):
                 "affected_user_id": 4,
                 "source": "admin",
                 "old_user_type": "user",
-                "affected_user_email": "user@example.com",
+                "affected_user_email_hash": "b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514",
             },
         )
         self.assertNotIn("token", str(audit_kwargs["metadata"]).lower())
@@ -168,7 +168,7 @@ class AdminUserPaginationTests(unittest.TestCase):
             {
                 "deleted_user_id": 4,
                 "source": "admin",
-                "deleted_user_email": "user@example.com",
+                "deleted_user_email_hash": "b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514",
                 "deleted_user_type": "user",
             },
         )

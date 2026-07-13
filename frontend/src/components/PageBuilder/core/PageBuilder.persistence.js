@@ -31,11 +31,18 @@ export const createBuilderProjectPayload = ({
   builderProjectRecord,
   getBuilderProjectName,
   getBuilderProjectSlug,
-}) => ({
-  name: getBuilderProjectName(project),
-  slug: getBuilderProjectSlug(project, builderProjectRecord),
-  draft_schema: project,
-});
+}) => {
+  const expectedRevision = Number(builderProjectRecord?.draft_revision);
+
+  return {
+    name: getBuilderProjectName(project),
+    slug: getBuilderProjectSlug(project, builderProjectRecord),
+    draft_schema: project,
+    ...(Number.isInteger(expectedRevision) && expectedRevision >= 0
+      ? { expected_revision: expectedRevision }
+      : {}),
+  };
+};
 
 const downloadBuilderProjectJson = (payload) => {
   if (typeof document === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
