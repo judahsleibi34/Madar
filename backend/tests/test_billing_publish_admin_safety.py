@@ -1,3 +1,4 @@
+import copy
 import unittest
 from unittest.mock import patch
 
@@ -359,6 +360,139 @@ class _ProjectMutationSupabase:
 
 
 class BuilderRevisionSafetyTests(unittest.TestCase):
+    def test_publish_routing_prefers_home_over_editor_selection_and_form_pages(self):
+        schema = {
+            "activePageId": "form-page",
+            "pages": [
+                {
+                    "id": "form-page",
+                    "name": "Form",
+                    "slug": "/form",
+                    "sections": [{"freeElements": [{
+                        "id": "form-block",
+                        "type": "formBlock",
+                        "connectedFormId": "form-1",
+                    }]}],
+                },
+                {"id": "home", "name": "Home", "sections": [{"freeElements": [{"id": "hero", "type": "heading"}]}]},
+                {"id": "about", "name": "About", "slug": "/about", "showInNavigation": False, "sections": []},
+            ],
+            "forms": [{"id": "form-1"}],
+        }
+
+        validated, _ = builder_routes.validate_publish_schema(schema)
+
+        self.assertEqual(validated["defaultPageId"], "home")
+        self.assertEqual([page["id"] for page in validated["pages"]], ["form-page", "home", "about"])
+        self.assertEqual([page["slug"] for page in validated["pages"]], ["/form", "/", "/about"])
+        self.assertEqual([page["isDefault"] for page in validated["pages"]], [False, True, False])
+        self.assertFalse(validated["pages"][2]["showInNavigation"])
+
+    def test_publish_routing_rejects_duplicate_invalid_and_reserved_slugs(self):
+        with self.assertRaises(HTTPException) as duplicate:
+            builder_routes.validate_publish_schema({
+                "pages": [
+                    {"id": "home", "name": "Home", "slug": "/"},
+                    {"id": "one", "name": "One", "slug": "/about"},
+                    {"id": "two", "name": "Two", "slug": "/about"},
+                ],
+                "forms": [],
+            })
+        self.assertEqual(duplicate.exception.detail["context"]["issue_type"], "duplicate_page_slug")
+
+        with self.assertRaises(HTTPException) as invalid:
+            builder_routes.validate_publish_schema({
+                "pages": [
+                    {"id": "home", "name": "Home", "slug": "/"},
+                    {"id": "bad", "name": "Bad", "slug": "/../bad"},
+                ],
+                "forms": [],
+            })
+        self.assertEqual(invalid.exception.detail["context"]["issue_type"], "invalid_page_slug")
+
+        with self.assertRaises(HTTPException) as reserved:
+            builder_routes.validate_publish_schema({
+                "pages": [
+                    {"id": "home", "name": "Home", "slug": "/"},
+                    {"id": "login", "name": "Login", "slug": "/login"},
+                ],
+                "forms": [],
+            })
+        self.assertEqual(reserved.exception.detail["context"]["issue_type"], "reserved_page_slug")
+
+    def test_publish_validation_rejects_global_duplicate_block_ids_with_safe_context(self):
+        schema = {
+            "pages": [
+                {
+                    "id": "home",
+                    "name": "Home",
+                    "slug": "/",
+                    "sections": [{"freeElements": [
+                        {"id": "duplicate", "type": "text", "content": "Private content is omitted"},
+                    ]}],
+                },
+                {
+                    "id": "page-2",
+                    "name": "Page 2",
+                    "slug": "/page-2",
+                    "sections": [{"rows": [{"columns": [{"elements": [
+                        {"id": "duplicate", "type": "formBlock", "connectedFormId": "form-1"},
+                    ]}]}]}],
+                },
+            ],
+            "forms": [{"id": "form-1"}],
+        }
+        before = copy.deepcopy(schema)
+
+        with self.assertRaises(HTTPException) as duplicate:
+            builder_routes.validate_publish_schema(schema)
+
+        context = duplicate.exception.detail["context"]
+        self.assertEqual(context["issue_type"], "duplicate_block_id")
+        self.assertEqual(context["duplicate_id"], "duplicate")
+        self.assertEqual(
+            context["occurrences"],
+            [
+                {
+                    "page_id": "home",
+                    "page_name": "Home",
+                    "block_id": "duplicate",
+                    "block_type": "text",
+                    "occurrence_index": 0,
+                },
+                {
+                    "page_id": "page-2",
+                    "page_name": "Page 2",
+                    "block_id": "duplicate",
+                    "block_type": "formBlock",
+                    "occurrence_index": 0,
+                },
+            ],
+        )
+        self.assertNotIn("content", context["occurrences"][0])
+        self.assertEqual(schema, before)
+
+    def test_publish_validation_rejects_duplicate_page_and_form_ids_with_context(self):
+        with self.assertRaises(HTTPException) as duplicate_page:
+            builder_routes.validate_publish_schema({
+                "pages": [{"id": "page", "name": "One"}, {"id": "page", "name": "Two"}],
+                "forms": [],
+            })
+        self.assertEqual(
+            duplicate_page.exception.detail["context"]["issue_type"],
+            "duplicate_page_id",
+        )
+
+        with self.assertRaises(HTTPException) as duplicate_form:
+            builder_routes.validate_publish_schema({
+                "pages": [{"id": "home"}],
+                "forms": [{"id": "form", "title": "One"}, {"id": "form", "title": "Two"}],
+            })
+        self.assertEqual(
+            duplicate_form.exception.detail["context"]["issue_type"],
+            "duplicate_form_id",
+        )
+
     def test_publish_validation_rejects_unsafe_and_inconsistent_blocks(self):
         unsafe_schema = {
             "pages": [
@@ -399,6 +533,125 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
             disconnected.exception.detail["code"],
             "publish_validation_failed",
         )
+        self.assertEqual(
+            disconnected.exception.detail["context"],
+            {
+                "issue_type": "orphaned_form_block",
+                "page_id": "home",
+                "page_name": "",
+                "block_id": "form-block-1",
+                "block_label": "Form",
+                "form_id": "missing-form",
+            },
+        )
+
+    def test_publish_validation_normalizes_valid_legacy_form_reference(self):
+        schema = {
+            "pages": [{
+                "id": "home",
+                "name": "Home",
+                "sections": [{"elements": [{
+                    "id": "form-block-1",
+                    "type": "formBlock",
+                    "formId": "contact-form",
+                }]}],
+            }],
+            "forms": [{"id": "contact-form"}],
+        }
+
+        validated, _ = builder_routes.validate_publish_schema(schema)
+
+        self.assertEqual(
+            validated["pages"][0]["sections"][0]["elements"][0]["connectedFormId"],
+            "contact-form",
+        )
+        self.assertNotIn(
+            "formId",
+            validated["pages"][0]["sections"][0]["elements"][0],
+        )
+
+    def test_publish_validation_accepts_canonical_multi_page_form_references_without_adding_blocks(self):
+        schema = {
+            "pages": [
+                {
+                    "id": "home",
+                    "name": "Home",
+                    "slug": "/",
+                    "sections": [{"elements": [{
+                        "id": "home-form-block",
+                        "type": "formBlock",
+                        "connectedFormId": "form-1",
+                    }]}],
+                },
+                {
+                    "id": "contact",
+                    "name": "Contact",
+                    "slug": "/contact",
+                    "sections": [{"elements": [{
+                        "id": "contact-form-block",
+                        "type": "formBlock",
+                        "connectedFormId": "form-2",
+                    }]}],
+                },
+            ],
+            "forms": [{"id": "form-1"}, {"id": "form-2"}],
+        }
+        block_count_before = sum(
+            len(section.get("elements") or [])
+            for page in schema["pages"]
+            for section in page["sections"]
+        )
+
+        validated, _ = builder_routes.validate_publish_schema(schema)
+
+        block_count_after = sum(
+            len(section.get("elements") or [])
+            for page in validated["pages"]
+            for section in page["sections"]
+        )
+        self.assertEqual(block_count_after, block_count_before)
+        self.assertEqual(block_count_after, 2)
+
+    def test_publish_validation_normalizes_snake_case_legacy_form_reference(self):
+        schema = {
+            "pages": [{
+                "id": "home",
+                "sections": [{"elements": [{
+                    "id": "form-block-1",
+                    "type": "formBlock",
+                    "form_id": "form-1",
+                }]}],
+            }],
+            "forms": [{"id": "form-1"}],
+        }
+
+        validated, _ = builder_routes.validate_publish_schema(schema)
+        block = validated["pages"][0]["sections"][0]["elements"][0]
+
+        self.assertEqual(block["connectedFormId"], "form-1")
+        self.assertNotIn("form_id", block)
+
+    def test_publish_validation_does_not_resurrect_legacy_reference_after_explicit_disconnect(self):
+        schema = {
+            "pages": [{
+                "id": "home",
+                "sections": [{"elements": [{
+                    "id": "form-block-1",
+                    "type": "formBlock",
+                    "connectedFormId": "",
+                    "formId": "form-1",
+                }]}],
+            }],
+            "forms": [{"id": "form-1"}],
+        }
+
+        with self.assertRaises(HTTPException) as disconnected:
+            builder_routes.validate_publish_schema(schema)
+
+        self.assertEqual(
+            disconnected.exception.detail["context"]["issue_type"],
+            "orphaned_form_block",
+        )
 
     def test_publish_validation_accepts_nested_action_type_as_configuration(self):
         schema = {
@@ -435,8 +688,68 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
 
         validated, version = builder_routes.validate_publish_schema(schema)
 
-        self.assertIs(validated, schema)
         self.assertEqual(version, 1)
+        self.assertEqual(
+            validated["pages"][0]["sections"][0]["rows"][0]["columns"][0]["elements"][0]["action"]["pageId"],
+            "home",
+        )
+        self.assertIsNot(validated, schema)
+        self.assertEqual(
+            validated["pages"][0]["sections"][0]["rows"][0]["columns"][0]["elements"][0]["action"],
+            {"type": "goToPage", "pageId": "home"},
+        )
+        self.assertNotIn("defaultPageId", schema)
+
+    def test_publish_validation_keeps_page_block_collections_separate(self):
+        schema = {
+            "pages": [
+                {"id": "home", "name": "Home", "slug": "/", "sections": [{"freeElements": [{"id": "hero", "type": "heading"}]}]},
+                {"id": "form", "name": "Form", "slug": "/form", "sections": [{"freeElements": [{"id": "form-block", "type": "formBlock", "connectedFormId": "form-1"}]}]},
+                {"id": "buttons", "name": "Buttons", "slug": "/buttons", "sections": [{"freeElements": [{"id": "message", "type": "button", "action": {"type": "showMessage", "message": "Hello"}}]}]},
+            ],
+            "forms": [{"id": "form-1"}],
+        }
+
+        validated, _ = builder_routes.validate_publish_schema(schema)
+
+        self.assertEqual([item["type"] for item in validated["pages"][0]["sections"][0]["freeElements"]], ["heading"])
+        self.assertEqual([item["type"] for item in validated["pages"][1]["sections"][0]["freeElements"]], ["formBlock"])
+        self.assertEqual([item["type"] for item in validated["pages"][2]["sections"][0]["freeElements"]], ["button"])
+
+    def test_publish_validation_enforces_button_action_contract_with_safe_context(self):
+        def schema_for(action):
+            return {
+                "pages": [{
+                    "id": "home",
+                    "name": "Home",
+                    "slug": "/",
+                    "sections": [{"freeElements": [{"id": "button-1", "type": "button", "action": action}]}],
+                }],
+                "forms": [],
+            }
+
+        valid_actions = [
+            {"type": "goToPage", "pageId": "home"},
+            {"type": "openUrl", "url": "https://example.com/path"},
+            {"type": "showMessage", "message": "Safe plain text"},
+        ]
+        for action in valid_actions:
+            validated, _ = builder_routes.validate_publish_schema(schema_for(action))
+            self.assertEqual(validated["pages"][0]["sections"][0]["freeElements"][0]["action"]["type"], action["type"])
+
+        invalid_actions = [
+            ({"type": "goToPage", "pageId": "missing"}, "invalid_button_page_target"),
+            ({"type": "openUrl", "url": "javascript:alert(1)"}, "invalid_button_url"),
+            ({"type": "showMessage", "message": "  "}, "empty_button_message"),
+        ]
+        for action, issue_type in invalid_actions:
+            with self.assertRaises(HTTPException) as rejected:
+                builder_routes.validate_publish_schema(schema_for(action))
+            context = rejected.exception.detail["context"]
+            self.assertEqual(context["issue_type"], issue_type)
+            self.assertEqual(context["page_id"], "home")
+            self.assertEqual(context["block_id"], "button-1")
+            self.assertNotIn("message", context)
 
     def test_draft_update_increments_revision_with_expected_filter(self):
         project = {

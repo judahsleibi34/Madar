@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import re
@@ -18,7 +19,7 @@ from services.billing_service import require_publish_entitlement
 from services.notification_outbox_service import enqueue_notification
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
 from services.website_settings_service import require_public_subdomain
-from services.url_validation import validate_builder_schema_urls
+from services.url_validation import validate_builder_schema_urls, validate_public_url
 from services.tenant_service import (
     TenantContext,
     require_active_tenant_member,
@@ -43,7 +44,11 @@ SUBMISSION_STATUS_VALUES = {label.lower(): value for value, label in SUBMISSION_
 RESERVATION_STATUSES = {"new", "confirmed", "cancelled", "completed", "rejected"}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
 UNSAFE_BUILDER_ELEMENT_TYPES = {"html", "rawhtml", "script", "iframe"}
-PUBLIC_ROUTE_PATTERN = re.compile(r"^/?[A-Za-z0-9/_-]{0,200}$")
+PUBLIC_PAGE_SLUG_PATTERN = re.compile(r"^/[a-z0-9]+(?:-[a-z0-9]+)*$")
+RESERVED_PUBLIC_PAGE_SLUGS = {
+    "admin", "api", "auth", "builder", "dashboard", "forgot-password",
+    "login", "reset-password", "settings", "signup", "verify-email",
+}
 BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
 BUILDER_ASSET_UPLOAD_DIR = get_public_uploads_dir()
 BUILDER_ASSET_EXTENSIONS = {
@@ -81,6 +86,114 @@ def normalize_name(value: str) -> str:
         )
 
     return name
+
+
+def _page_slug_from_name(value: Any, index: int) -> str:
+    segment = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower()).strip("-")
+    return f"/{segment or f'page-{index + 1}'}"
+
+
+def normalize_published_page_routes(schema: dict[str, Any]) -> dict[str, Any]:
+    pages = schema.get("pages") or []
+    if not pages:
+        return schema
+
+    explicit_default_id = str(schema.get("defaultPageId") or "").strip()
+    explicit_default_pages = [page for page in pages if page.get("isDefault") is True or page.get("is_default") is True]
+    if len(explicit_default_pages) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail(
+                "publish_validation_failed",
+                "Exactly one published page must be the homepage.",
+                context={
+                    "issue_type": "missing_default_page",
+                    "occurrences": [
+                        {"page_id": str(page.get("id") or ""), "page_name": str(page.get("name") or page.get("title") or "Untitled page")}
+                        for page in explicit_default_pages
+                    ],
+                },
+            ),
+        )
+
+    default_page = next((page for page in pages if str(page.get("id") or "") == explicit_default_id), None)
+    default_page = default_page or (explicit_default_pages[0] if explicit_default_pages else None)
+    default_page = default_page or next(
+        (page for page in pages if str(page.get("slug", page.get("path", ""))).strip() == "/"),
+        None,
+    )
+    default_page = default_page or next(
+        (page for page in pages if str(page.get("name") or page.get("title") or "").strip().lower() == "home"),
+        pages[0],
+    )
+    default_page_id = str(default_page.get("id") or "")
+    schema["defaultPageId"] = default_page_id
+
+    route_occurrences: dict[str, list[dict[str, Any]]] = {}
+    for index, page in enumerate(pages):
+        page_id = str(page.get("id") or "")
+        page_name = str(page.get("name") or page.get("title") or "Untitled page")
+        page_route_name = page.get("name") or page.get("title")
+        is_default = page_id == default_page_id
+        raw_route = str(page.get("slug", page.get("path", page.get("route", ""))) or "").strip()
+        if is_default:
+            route = "/"
+        elif not raw_route or raw_route == "/":
+            route = _page_slug_from_name(page_route_name, index)
+        else:
+            route = "/" + raw_route.lstrip("/").rstrip("/")
+            if not PUBLIC_PAGE_SLUG_PATTERN.fullmatch(route):
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_detail(
+                        "publish_validation_failed",
+                        "A published page link is invalid.",
+                        context={
+                            "issue_type": "invalid_page_slug",
+                            "page_id": page_id,
+                            "page_name": page_name,
+                            "page_slug": raw_route,
+                        },
+                    ),
+                )
+        if not is_default and route.lstrip("/") in RESERVED_PUBLIC_PAGE_SLUGS:
+            raise HTTPException(
+                status_code=400,
+                detail=error_detail(
+                    "publish_validation_failed",
+                    "A published page link uses a reserved route.",
+                    context={
+                        "issue_type": "reserved_page_slug",
+                        "page_id": page_id,
+                        "page_name": page_name,
+                        "page_slug": route,
+                    },
+                ),
+            )
+        page["slug"] = route
+        page["isDefault"] = is_default
+        page["showInNavigation"] = page.get("showInNavigation", page.get("show_in_header", True)) is not False
+        page["order"] = index
+        page.pop("is_default", None)
+        page.pop("show_in_header", None)
+        context = {"page_id": page_id, "page_name": page_name, "page_slug": route}
+        route_occurrences.setdefault(route, []).append(context)
+
+    for route, occurrences in route_occurrences.items():
+        if len(occurrences) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=error_detail(
+                    "publish_validation_failed",
+                    "Published pages must use unique page links.",
+                    context={
+                        "issue_type": "duplicate_page_slug",
+                        "duplicate_slug": route,
+                        "occurrences": occurrences,
+                    },
+                ),
+            )
+    return schema
 
 
 def detect_builder_asset_content_type(content: bytes) -> str | None:
@@ -121,7 +234,12 @@ def get_builder_asset_target(tenant_id: int | str, filename: str) -> tuple[Path,
     return target_dir, resolved_target, tenant_dir
 
 
-def assert_json_object(value: Any, field_name: str = "draft_schema") -> dict:
+def assert_json_object(
+    value: Any,
+    field_name: str = "draft_schema",
+    *,
+    validate_urls: bool = True,
+) -> dict:
     if value is None:
         return {}
 
@@ -139,7 +257,11 @@ def assert_json_object(value: Any, field_name: str = "draft_schema") -> dict:
             detail=f"{field_name} is too large",
         )
 
-    return validate_builder_schema_urls(value, field_name=field_name)
+    return (
+        validate_builder_schema_urls(value, field_name=field_name)
+        if validate_urls
+        else value
+    )
 
 
 def _project_revision(project: dict[str, Any]) -> int:
@@ -175,7 +297,9 @@ def validate_publish_schema(
 ) -> tuple[dict[str, Any], int]:
     """Revalidate persisted builder JSON and its supported schema version at publish."""
 
-    schema = assert_json_object(value, field_name="draft_schema")
+    schema = copy.deepcopy(
+        assert_json_object(value, field_name="draft_schema", validate_urls=False)
+    )
     raw_schema_version = schema.get(
         "schema_version",
         schema.get("version", project_schema_version if project_schema_version is not None else 1),
@@ -220,8 +344,8 @@ def validate_publish_schema(
                 ),
             )
 
-        seen_ids: set[str] = set()
-        for item in collection or []:
+        occurrences: dict[str, list[dict[str, Any]]] = {}
+        for index, item in enumerate(collection or []):
             if not isinstance(item, dict):
                 raise HTTPException(
                     status_code=400,
@@ -231,24 +355,48 @@ def validate_publish_schema(
                     ),
                 )
             item_id = str(item.get("id") or "").strip()
-            if item_id and item_id in seen_ids:
+            item_context = {
+                "occurrence_index": index,
+                f"{collection_name[:-1]}_id": item_id,
+                f"{collection_name[:-1]}_name": str(
+                    item.get("name") or item.get("title") or f"Untitled {collection_name[:-1]}"
+                ),
+            }
+            if not item_id:
                 raise HTTPException(
                     status_code=400,
                     detail=error_detail(
                         "publish_validation_failed",
-                        f"Project {collection_name} contain duplicate ids.",
+                        f"Every project {collection_name[:-1]} must have an id.",
+                        context={
+                            "issue_type": f"missing_{collection_name[:-1]}_id",
+                            "occurrences": [item_context],
+                        },
                     ),
                 )
-            if item_id:
-                seen_ids.add(item_id)
+            occurrences.setdefault(item_id, []).append(item_context)
+        for item_id, item_occurrences in occurrences.items():
+            if len(item_occurrences) > 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_detail(
+                        "publish_validation_failed",
+                        f"Project {collection_name} must have unique ids.",
+                        context={
+                            "issue_type": f"duplicate_{collection_name[:-1]}_id",
+                            "duplicate_id": item_id,
+                            "occurrences": item_occurrences,
+                        },
+                    ),
+                )
+
+    schema = normalize_published_page_routes(schema)
 
     form_ids = {
         str(form.get("id") or "").strip()
         for form in schema.get("forms") or []
         if isinstance(form, dict) and str(form.get("id") or "").strip()
     }
-    block_ids: set[str] = set()
-    public_routes: set[str] = set()
 
     def page_elements(page: dict[str, Any]):
         """Yield real builder elements, not nested config objects with a `type` key."""
@@ -271,26 +419,52 @@ def validate_publish_schema(
                         if isinstance(element, dict):
                             yield element
 
-    def inspect_element(element: dict[str, Any]) -> None:
-        element_type = str(element.get("type") or "").strip()
-        block_id = str(element.get("id") or "").strip()
-        if not element_type or not block_id:
-            raise HTTPException(
-                status_code=400,
-                detail=error_detail(
-                    "publish_validation_failed",
-                    "Every published block must have a type and id.",
-                ),
-            )
-        if block_id in block_ids:
+    block_occurrences: dict[str, list[dict[str, Any]]] = {}
+    for page in schema.get("pages") or []:
+        if not isinstance(page, dict):
+            continue
+        for occurrence_index, element in enumerate(page_elements(page)):
+            element_type = str(element.get("type") or "").strip()
+            block_id = str(element.get("id") or "").strip()
+            occurrence = {
+                "page_id": str(page.get("id") or ""),
+                "page_name": str(page.get("name") or page.get("title") or "Untitled page"),
+                "block_id": block_id,
+                "block_type": element_type or "unknown",
+                "occurrence_index": occurrence_index,
+            }
+            if not element_type or not block_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_detail(
+                        "publish_validation_failed",
+                        "Every published block must have a type and id.",
+                        context={
+                            "issue_type": "missing_block_id" if not block_id else "missing_block_type",
+                            "occurrences": [occurrence],
+                        },
+                    ),
+                )
+            block_occurrences.setdefault(block_id, []).append(occurrence)
+
+    for block_id, occurrences in block_occurrences.items():
+        if len(occurrences) > 1:
             raise HTTPException(
                 status_code=400,
                 detail=error_detail(
                     "publish_validation_failed",
                     "Published blocks must have unique ids.",
+                    context={
+                        "issue_type": "duplicate_block_id",
+                        "duplicate_id": block_id,
+                        "occurrences": occurrences,
+                    },
                 ),
             )
-        block_ids.add(block_id)
+
+    def inspect_element(page: dict[str, Any], element: dict[str, Any]) -> None:
+        element_type = str(element.get("type") or "").strip()
+        block_id = str(element.get("id") or "").strip()
         if element_type.lower() in UNSAFE_BUILDER_ELEMENT_TYPES:
             raise HTTPException(
                 status_code=400,
@@ -300,15 +474,31 @@ def validate_publish_schema(
                 ),
             )
         if element_type == "formBlock":
-            connected_form_id = str(element.get("connectedFormId") or "").strip()
+            raw_connected_form_id = (
+                element.get("connectedFormId")
+                if "connectedFormId" in element
+                else element.get("formId", element.get("form_id"))
+            )
+            connected_form_id = str(raw_connected_form_id or "").strip()
             if not connected_form_id or connected_form_id not in form_ids:
                 raise HTTPException(
                     status_code=400,
                     detail=error_detail(
                         "publish_validation_failed",
                         "A published form block is not connected to a valid form.",
+                        context={
+                            "issue_type": "orphaned_form_block",
+                            "page_id": str(page.get("id") or ""),
+                            "page_name": str(page.get("name") or page.get("title") or ""),
+                            "block_id": block_id,
+                            "block_label": str(element.get("name") or element.get("label") or "Form"),
+                            "form_id": connected_form_id,
+                        },
                     ),
                 )
+            element["connectedFormId"] = connected_form_id
+            element.pop("formId", None)
+            element.pop("form_id", None)
         if element_type == "reservationBlock" and not isinstance(
             element.get("reservation"), dict
         ):
@@ -319,34 +509,101 @@ def validate_publish_schema(
                     "A reservation block has invalid configuration.",
                 ),
             )
-
-    for page in schema.get("pages") or []:
-        if isinstance(page, dict):
-            public_route = page.get("path", page.get("route", page.get("slug")))
-            if public_route is not None and not PUBLIC_ROUTE_PATTERN.fullmatch(
-                str(public_route).strip()
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail=error_detail(
-                        "publish_validation_failed",
-                        "A public page route is invalid.",
-                    ),
-                )
-            if public_route is not None:
-                normalized_route = "/" + str(public_route).strip().lstrip("/")
-                if normalized_route in public_routes:
+        if element_type == "button":
+            raw_action = element.get("action")
+            action = raw_action if isinstance(raw_action, dict) else {}
+            raw_action_type = str(
+                action.get("type")
+                or action.get("actionType")
+                or action.get("action_type")
+                or "none"
+            ).strip()
+            action_type = {
+                "page": "goToPage",
+                "gotopage": "goToPage",
+                "internal": "goToPage",
+                "url": "openUrl",
+                "openurl": "openUrl",
+                "external": "openUrl",
+                "message": "showMessage",
+                "showmessage": "showMessage",
+                "none": "none",
+            }.get(raw_action_type.lower())
+            action_context = {
+                "page_id": str(page.get("id") or ""),
+                "page_name": str(page.get("name") or page.get("title") or "Untitled page"),
+                "block_id": block_id,
+                "action_type": action_type or raw_action_type,
+            }
+            if action_type == "goToPage":
+                target_page_id = str(
+                    action.get("pageId")
+                    or action.get("targetPageId")
+                    or action.get("page_id")
+                    or ""
+                ).strip()
+                if target_page_id not in {
+                    str(item.get("id") or "")
+                    for item in schema.get("pages") or []
+                    if isinstance(item, dict)
+                }:
                     raise HTTPException(
                         status_code=400,
                         detail=error_detail(
                             "publish_validation_failed",
-                            "Published pages must use unique public routes.",
+                            "A button must target a published page.",
+                            context={**action_context, "issue_type": "invalid_button_page_target"},
                         ),
                     )
-                public_routes.add(normalized_route)
-            for element in page_elements(page):
-                inspect_element(element)
+                action = {**action, "type": action_type, "pageId": target_page_id}
+            elif action_type == "openUrl":
+                action_url = str(action.get("url") or action.get("href") or "").strip()
+                try:
+                    validate_public_url(
+                        action_url,
+                        field_name="Button action URL",
+                        allow_empty=False,
+                        allow_relative=False,
+                    )
+                except HTTPException:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=error_detail(
+                            "publish_validation_failed",
+                            "A button must use a valid HTTPS URL.",
+                            context={**action_context, "issue_type": "invalid_button_url"},
+                        ),
+                    ) from None
+                action = {**action, "type": action_type, "url": action_url}
+            elif action_type == "showMessage":
+                message = str(action.get("message") or "")
+                if not message.strip():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=error_detail(
+                            "publish_validation_failed",
+                            "A message button must contain a message.",
+                            context={**action_context, "issue_type": "empty_button_message"},
+                        ),
+                    )
+                action = {**action, "type": action_type, "message": message}
+            elif action_type is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_detail(
+                        "publish_validation_failed",
+                        "A button has an unsupported action.",
+                        context={**action_context, "issue_type": "invalid_button_action"},
+                    ),
+                )
+            element["action"] = action
 
+    for page in schema.get("pages") or []:
+        if isinstance(page, dict):
+            for element in page_elements(page):
+                inspect_element(page, element)
+
+    validate_builder_schema_urls(schema, field_name="draft_schema")
     return schema, schema_version
 
 
