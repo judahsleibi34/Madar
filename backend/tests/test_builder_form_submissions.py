@@ -301,6 +301,30 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"]["message"], "Required field is missing")
 
+    def test_public_submission_honeypot_is_rejected_without_insert(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        initial_count = len(fake_supabase.tables["builder_form_submissions"])
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={
+                    "answers": {"field_name": "Bot"},
+                    "honeypot": "filled",
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"]["code"], "submission_rejected")
+        self.assertEqual(
+            len(fake_supabase.tables["builder_form_submissions"]),
+            initial_count,
+        )
+        notify_event.assert_not_called()
+
     def test_public_submission_rejects_too_many_answer_fields(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
@@ -993,6 +1017,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                         "service": "Dinner",
                         "date": "2026-07-10",
                         "time": "19:00",
+                        "timezone": "Asia/Jerusalem",
                         "guests": 2,
                     },
                 },
@@ -1011,7 +1036,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(notify_event.call_args.kwargs["tenant_id"], 1)
         self.assertEqual(notify_event.call_args.kwargs["event_type"], "builder.reservation_requested")
         self.assertEqual(notify_event.call_args.kwargs["block_type"], "reservationBlock")
-        self.assertEqual(notify_event.call_args.kwargs["source_id"], RESERVATION_BLOCK_ID)
+        self.assertEqual(notify_event.call_args.kwargs["source_id"], SUBMISSION_ID)
         self.assertEqual(notify_event.call_args.kwargs["data"]["payload"]["service"], "Dinner")
 
     def test_public_event_rejects_missing_published_block(self):

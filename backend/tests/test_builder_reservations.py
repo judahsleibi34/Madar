@@ -1,6 +1,6 @@
 import copy
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 
@@ -117,12 +117,13 @@ class PublicBuilderReservationTests(unittest.TestCase):
         self.assertEqual(saved["customer_name"], "Ada")
         self.assertEqual(saved["customer_email"], "ada@example.com")
         self.assertEqual(saved["customer_phone"], "+123")
-        self.assertEqual(saved["starts_at"], "2026-07-10T19:00:00")
+        self.assertEqual(saved["starts_at"], "2026-07-10T19:00:00+03:00")
         self.assertEqual(saved["timezone"], "Asia/Jerusalem")
         self.assertEqual(saved["status"], "new")
         self.assertEqual(saved["user_agent"], "reservation-agent")
         self.assertEqual(saved["payload"]["tenant_id"], 999)
         notify_event.assert_called_once()
+        self.assertEqual(notify_event.call_args.kwargs["source_id"], SUBMISSION_ID)
         self.assertEqual(notify_event.call_args.kwargs["data"]["reservation_id"], SUBMISSION_ID)
 
     def test_public_reservation_unknown_subdomain_fails_without_insert(self):
@@ -141,6 +142,133 @@ class PublicBuilderReservationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertNotIn("builder_reservations", fake_supabase.tables)
         notify_event.assert_not_called()
+
+    def test_public_reservation_honeypot_is_rejected_before_insert(self):
+        fake_supabase = FakeSupabase()
+        add_published_reservation_block(fake_supabase)
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+            response = client.post(
+                "/public/sites/tenant-site/events",
+                json={
+                    "block_type": "reservationBlock",
+                    "block_id": RESERVATION_BLOCK_ID,
+                    "honeypot": "bot-filled",
+                    "payload": {},
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"]["code"], "submission_rejected")
+        self.assertNotIn("builder_reservations", fake_supabase.tables)
+        notify_event.assert_not_called()
+
+    def test_public_reservation_rejects_invalid_timezone(self):
+        fake_supabase = FakeSupabase()
+        add_published_reservation_block(fake_supabase)
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                "/public/sites/tenant-site/events",
+                json={
+                    "block_type": "reservationBlock",
+                    "block_id": RESERVATION_BLOCK_ID,
+                    "payload": {
+                        "date": "2026-07-10",
+                        "time": "19:00",
+                        "timezone": "Not/A_Timezone",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "reservation_timezone_invalid",
+        )
+
+    def test_idempotent_replay_does_not_duplicate_notification(self):
+        fake_supabase = FakeSupabase()
+        add_published_reservation_block(fake_supabase)
+        client = build_public_client(fake_supabase)
+        saved = {
+            "id": RESERVATION_ID,
+            "tenant_id": 1,
+            "project_id": PROJECT_ID,
+        }
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(
+                 public_site_routes,
+                 "insert_builder_reservation",
+                 side_effect=[(saved, False), (saved, True)],
+             ), \
+             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+            request_json = {
+                "block_type": "reservationBlock",
+                "block_id": RESERVATION_BLOCK_ID,
+                "idempotency_key": "madar-reservation-test-0001",
+                "payload": {
+                    "date": "2026-07-10",
+                    "time": "19:00",
+                    "timezone": "Asia/Jerusalem",
+                },
+            }
+            first = client.post("/public/sites/tenant-site/events", json=request_json)
+            second = client.post("/public/sites/tenant-site/events", json=request_json)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertFalse(first.json()["idempotent_replay"])
+        self.assertEqual(second.status_code, 200)
+        self.assertTrue(second.json()["idempotent_replay"])
+        self.assertEqual(
+            first.json()["cancellation_token"],
+            second.json()["cancellation_token"],
+        )
+        notify_event.assert_called_once()
+
+    def test_storage_conflicts_have_stable_codes(self):
+        idempotency_error = public_site_routes._reservation_storage_error(
+            RuntimeError("database error: idempotency_conflict")
+        )
+        slot_error = public_site_routes._reservation_storage_error(
+            RuntimeError("database error: reservation_slot_unavailable")
+        )
+
+        self.assertEqual(idempotency_error.status_code, 409)
+        self.assertEqual(idempotency_error.detail["code"], "idempotency_conflict")
+        self.assertEqual(slot_error.status_code, 409)
+        self.assertEqual(slot_error.detail["code"], "reservation_slot_unavailable")
+
+    def test_cancellation_replay_has_stable_code(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.rpc = MagicMock(
+            return_value=MagicMock(
+                execute=MagicMock(
+                    side_effect=RuntimeError("reservation_cancellation_replayed")
+                )
+            )
+        )
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/reservations/{RESERVATION_ID}/cancel",
+                json={"token": "x" * 40},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "reservation_cancellation_replayed",
+        )
 
     def test_public_reservation_unknown_block_fails_without_insert(self):
         fake_supabase = FakeSupabase()
@@ -186,11 +314,13 @@ class BuilderReservationManagementTests(unittest.TestCase):
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "enqueue_notification") as enqueue:
             response = client.get(f"/builder/reservations/{RESERVATION_ID}")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["reservation"]["id"], RESERVATION_ID)
+        enqueue.assert_not_called()
 
     def test_tenant_can_update_reservation_status(self):
         fake_supabase = FakeSupabase()
@@ -198,7 +328,8 @@ class BuilderReservationManagementTests(unittest.TestCase):
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()):
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
+             patch.object(builder_routes, "enqueue_notification") as enqueue:
             response = client.patch(
                 f"/builder/reservations/{RESERVATION_ID}/status",
                 json={"status": "confirmed"},
@@ -207,6 +338,9 @@ class BuilderReservationManagementTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["reservation"]["status"], "confirmed")
         self.assertEqual(fake_supabase.tables["builder_reservations"][0]["status"], "confirmed")
+        enqueue.assert_called_once()
+        self.assertEqual(enqueue.call_args.kwargs["template"], "reservation_status_changed")
+        self.assertEqual(enqueue.call_args.kwargs["payload"]["status"], "confirmed")
 
     def test_invalid_status_is_rejected(self):
         fake_supabase = FakeSupabase()

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getBuilderStorageKey, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
@@ -26,6 +26,7 @@ import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
 import { resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
+import { getReservationErrorMessage } from "./reservationSubmission";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
 const MADAR_ATTRIBUTION_URL = "https://madar.app/";
@@ -264,6 +265,11 @@ const inputTypeForField = (fieldType) => {
 
 const getSubmissionErrorMessage = (error, copy = runtimeFallbackCopy) => {
   const detail = error?.data?.detail;
+  const code = detail?.code || error?.code || "";
+
+  if (code === "submission_rejected") {
+    return "This submission could not be accepted. Review it and try again.";
+  }
 
   if (typeof detail === "string") return detail;
 
@@ -427,12 +433,14 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState(() => (draftPreview ? "ready" : "loading"));
   const [formAnswers, setFormAnswers] = useState({});
+  const [formHoneypots, setFormHoneypots] = useState({});
   const [formStatus, setFormStatus] = useState({});
   const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
   const [authPanelModes, setAuthPanelModes] = useState({});
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
+  const publicSubmissionStartedAtRef = useRef(Date.now());
 
   useEffect(() => {
     if (draftPreview) return;
@@ -1049,9 +1057,15 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
       await submitPublicFormSubmission(cleanSubdomain, form.id, {
         answers,
         form_element_id: formElementId,
+        honeypot: formHoneypots[instanceKey] || "",
+        submission_elapsed_ms: Math.min(
+          86_400_000,
+          Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
+        ),
       });
 
       setFormAnswers((prev) => ({ ...prev, [instanceKey]: {} }));
+      setFormHoneypots((prev) => ({ ...prev, [instanceKey]: "" }));
       setFormPages((prev) => ({ ...prev, [instanceKey]: 0 }));
       setFormStatus((prev) => ({
         ...prev,
@@ -1073,7 +1087,13 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     }
   };
 
-  const submitRuntimeReservation = async (element, values) => {
+  const submitRuntimeReservation = async (
+    element,
+    values,
+    idempotencyKey,
+    honeypot = "",
+    submissionElapsedMs = null
+  ) => {
     const instanceKey = element.id || "reservation";
     const reservation = element.reservation || {};
 
@@ -1091,20 +1111,30 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
           error: "",
         },
       }));
-      return;
+      return true;
     }
 
     try {
-      await submitPublicBuilderEvent(cleanSubdomain, {
-        block_type: "reservationBlock",
-        block_id: element.id,
-        event_type: "builder.reservation_requested",
-        title: "New reservation request",
-        payload: {
-          ...values,
-          reservation_title: reservation.title || "",
+      await submitPublicBuilderEvent(
+        cleanSubdomain,
+        {
+          block_type: "reservationBlock",
+          block_id: element.id,
+          event_type: "builder.reservation_requested",
+          title: "New reservation request",
+          honeypot,
+          ...(Number.isFinite(submissionElapsedMs)
+            ? { submission_elapsed_ms: Math.min(86_400_000, Math.max(0, submissionElapsedMs)) }
+            : {}),
+          payload: {
+            ...values,
+            reservation_title: reservation.title || "",
+            timezone:
+              Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          },
         },
-      });
+        { idempotencyKey }
+      );
 
       setReservationStatus((prev) => ({
         ...prev,
@@ -1114,15 +1144,19 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
           error: "",
         },
       }));
-    } catch {
+      return true;
+    } catch (error) {
       setReservationStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           submitting: false,
           success: "",
-          error: "Could not send this reservation request. Please try again.",
+          error: getReservationErrorMessage(error),
         },
       }));
+      return error?.code === "idempotency_conflict"
+        ? "reset_idempotency"
+        : false;
     }
   };
 
@@ -1379,6 +1413,22 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
         dir={formDir}
         onSubmit={(event) => submitRuntimeForm(event, form, formElementId, instanceKey)}
       >
+        <label className="runtime-honeypot" aria-hidden="true">
+          Website
+          <input
+            type="text"
+            name="website"
+            value={formHoneypots[instanceKey] || ""}
+            tabIndex={-1}
+            autoComplete="off"
+            onChange={(event) =>
+              setFormHoneypots((prev) => ({
+                ...prev,
+                [instanceKey]: event.target.value,
+              }))
+            }
+          />
+        </label>
         <div className="runtime-form-header">
           {languageMode === "bilingual" && (
             <div className="runtime-language-switch" role="group" aria-label={formCopy.runtime.formLanguage}>
@@ -1612,7 +1662,15 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
             fields={reservation.fields}
             submitLabel={reservation.submitLabel}
             disabled={Boolean(status.submitting)}
-            onSubmit={(values) => submitRuntimeReservation(element, values)}
+            onSubmit={(values, idempotencyKey, honeypot, submissionElapsedMs) =>
+              submitRuntimeReservation(
+                element,
+                values,
+                idempotencyKey,
+                honeypot,
+                submissionElapsedMs
+              )
+            }
           />
           {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
           {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}

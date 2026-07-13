@@ -106,6 +106,10 @@ class SecurityFoundationTests(unittest.TestCase):
         def public_site_event():
             return {"ok": True}
 
+        @app.post("/public/reservations/33333333-3333-4333-8333-333333333333/cancel")
+        def public_reservation_cancel():
+            return {"ok": True}
+
         @app.post("/auth/email-verification/resend")
         def resend_email_verification():
             return {"ok": True}
@@ -323,6 +327,7 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/sites/example/auth/login",
             "/public/sites/example/auth/logout",
             "/public/sites/example/events",
+            "/public/reservations/33333333-3333-4333-8333-333333333333/cancel",
             "/auth/email-verification/resend",
         ]:
             with self.subTest(path=path):

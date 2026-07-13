@@ -32,6 +32,7 @@ CSRF_EXEMPT_PATTERNS = (
     re.compile(r"^/public/sites/[^/]+/forms/[^/]+/submissions$"),
     re.compile(r"^/public/sites/[^/]+/auth/(?:register|login|logout)$"),
     re.compile(r"^/public/sites/[^/]+/events$"),
+    re.compile(r"^/public/reservations/[0-9a-fA-F-]+/cancel$"),
 )
 
 
