@@ -54,8 +54,8 @@ silently changed or consolidated without checking applied migration records.
 ## Rules for future migrations
 
 - Every new migration must use a unique numeric prefix.
-- Migrations `043` through `045` are now allocated in the development history;
-  the next real schema migration must use `046` or higher.
+- Migrations `043` through `046` are now allocated in the development history;
+  the next real schema migration must use `047` or higher.
 - Do not add no-op SQL migrations solely to document historical numbering.
 - Add each migration to both trees with identical filenames and content until
   one tree is formally selected as authoritative.
