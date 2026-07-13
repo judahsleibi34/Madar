@@ -7,7 +7,11 @@ from classes import BillingCheckoutRequest, BillingWebhookUpdateRequest
 from services.api_errors import error_detail
 from services.audit_service import record_audit_event
 from services.tenant_service import TenantContext, require_active_tenant_member
-from services.billing_service import apply_billing_webhook_event, apply_pending_checkout_selection
+from services.billing_service import (
+    apply_billing_webhook_event,
+    apply_pending_checkout_selection,
+    get_current_billing_state,
+)
 
 
 router = APIRouter(tags=["Billing"])
@@ -88,6 +92,19 @@ def create_canonical_checkout(
         allow_admin_account_access=False,
     )
     return build_checkout_response(checkout, context, request=request)
+
+
+@router.get("/billing/current")
+def current_billing_state(request: Request, response: Response):
+    context = require_active_tenant_member(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
+    return {
+        "success": True,
+        "billing": get_current_billing_state(context.tenant_id),
+    }
 
 
 @router.post("/users/{user_id}/billing/checkout")

@@ -201,8 +201,100 @@ def get_existing_feature_for_tenant(
     else:
         query = query.eq("builder_type", builder_type)
 
-    result = query.limit(1).execute()
-    return result.data[0] if result.data else None
+    result = query.limit(50).execute()
+    features = [item for item in (result.data or []) if isinstance(item, dict)]
+    features.sort(
+        key=lambda feature: (
+            str(feature.get("payment_status") or "").strip().lower() == "active",
+            _feature_timestamp(feature),
+            str(feature.get("id") or ""),
+        ),
+        reverse=True,
+    )
+    return features[0] if features else None
+
+
+def _feature_timestamp(feature: dict[str, Any]) -> str:
+    return str(
+        feature.get("billing_state_changed_at")
+        or feature.get("updated_at")
+        or feature.get("created_at")
+        or ""
+    )
+
+
+def _feature_plan_key(feature: dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(feature.get("subscription_type") or "").strip().lower(),
+        str(feature.get("builder_type") or "").strip().lower(),
+        str(feature.get("plan") or "").strip().lower(),
+    )
+
+
+def normalize_current_billing_features(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Collapse historical duplicates into one safe current billing view."""
+    safe_fields = {
+        "id",
+        "subscription_type",
+        "plan",
+        "builder_type",
+        "payment_status",
+        "billing_state_changed_at",
+        "updated_at",
+        "created_at",
+    }
+    features = [
+        {key: feature.get(key) for key in safe_fields if key in feature}
+        for feature in rows
+        if isinstance(feature, dict)
+    ]
+    features.sort(
+        key=lambda feature: (_feature_timestamp(feature), str(feature.get("id") or "")),
+        reverse=True,
+    )
+
+    active = next(
+        (feature for feature in features if str(feature.get("payment_status") or "").lower() == "active"),
+        None,
+    )
+    pending = next(
+        (feature for feature in features if str(feature.get("payment_status") or "").lower() == "pending"),
+        None,
+    )
+    if active and pending and _feature_plan_key(active) == _feature_plan_key(pending):
+        pending = None
+
+    selected_ids = {
+        str(feature.get("id"))
+        for feature in (active, pending)
+        if feature and feature.get("id") is not None
+    }
+    seen_other_states: set[tuple[str, str, str, str]] = set()
+    other_states = []
+    for feature in features:
+        status = str(feature.get("payment_status") or "").strip().lower()
+        if status in {"active", "pending"} or str(feature.get("id")) in selected_ids:
+            continue
+        key = (*_feature_plan_key(feature), status)
+        if key in seen_other_states:
+            continue
+        seen_other_states.add(key)
+        other_states.append(feature)
+
+    current = active or pending or (other_states[0] if other_states else None)
+    current_features = [feature for feature in (active, pending) if feature] + other_states
+    if pending:
+        pending = {**pending, "requested_at": _feature_timestamp(pending)}
+
+    return {
+        "state": str((current or {}).get("payment_status") or "none"),
+        "current": current,
+        "active": active,
+        "pending_request": pending,
+        "other_states": other_states,
+        # Compatibility field: only normalized current states, never raw duplicate rows.
+        "features": current_features,
+    }
 
 
 def get_billing_summary_for_tenant(tenant_id: int | str | None) -> dict[str, Any]:
@@ -243,6 +335,36 @@ def get_billing_summary_for_tenant(tenant_id: int | str | None) -> dict[str, Any
         "builder_type": active_feature.get("builder_type") or "",
         "features": features,
     }
+
+
+def get_current_billing_state(tenant_id: int | str) -> dict[str, Any]:
+    """Return persisted, tenant-scoped plan state without invented billing data."""
+    try:
+        result = (
+            service_supabase
+            .table("features")
+            .select(
+                "id, subscription_type, plan, builder_type, payment_status, "
+                "billing_state_changed_at, updated_at, created_at"
+            )
+            .eq("tenant_id", tenant_id)
+            .limit(50)
+            .execute()
+        )
+    except Exception as error:
+        logger.warning(
+            "billing.current_state_failed",
+            extra={"tenant_id": tenant_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail(
+                "dependency_unavailable",
+                "Billing state is temporarily unavailable.",
+            ),
+        )
+
+    return normalize_current_billing_features(result.data or [])
 
 
 def persist_feature_selection(
@@ -303,6 +425,23 @@ def persist_feature_selection(
         )
         return existing
 
+    if (
+        source == "checkout"
+        and normalized_payment_status == "pending"
+        and existing
+        and str(existing.get("payment_status") or "").strip().lower() == "pending"
+        and _feature_plan_key(existing) == _feature_plan_key(payload)
+    ):
+        logger.info(
+            "billing.pending_request_reused",
+            extra={
+                "tenant_id": tenant_id,
+                "subscription_type": normalized["subscription_type"],
+                "builder_type": normalized["builder_type"],
+            },
+        )
+        return existing
+
     try:
         if existing:
             result = (
@@ -317,6 +456,25 @@ def persist_feature_selection(
             result = service_supabase.table("features").insert(payload).execute()
 
     except Exception as error:
+        if source == "checkout" and normalized_payment_status == "pending":
+            try:
+                concurrent = get_existing_feature_for_tenant(
+                    tenant_id=tenant_id,
+                    subscription_type=str(normalized["subscription_type"]),
+                    builder_type=normalized["builder_type"],
+                )
+            except Exception:
+                concurrent = None
+            if (
+                concurrent
+                and str(concurrent.get("payment_status") or "").strip().lower() == "pending"
+                and _feature_plan_key(concurrent) == _feature_plan_key(payload)
+            ):
+                logger.info(
+                    "billing.concurrent_pending_request_reused",
+                    extra={"tenant_id": tenant_id},
+                )
+                return concurrent
         logger.warning("billing.features_update_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not apply billing update.")
 
