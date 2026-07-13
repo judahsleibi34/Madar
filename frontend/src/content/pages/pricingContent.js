@@ -28,6 +28,10 @@ export const pricingContent = {
       "CMS is included with reservations so customers can book from a public page.",
     saving: "Saving...",
     success: "Subscription request saved. Payment setup is not connected yet.",
+    requestSaved: "Your access request was saved. No payment was taken.",
+    requestTitle: "Access request saved",
+    availabilityNotice:
+      "Online checkout is coming soon. Requesting a plan records your interest for manual follow-up and does not charge you.",
     loginRequired: "Please log in before choosing a plan.",
     serverError: "Could not connect to server.",
 
@@ -39,7 +43,7 @@ export const pricingContent = {
         badge: "CMS only",
         price: "$15",
         recommended: false,
-        cta: "Choose CMS Builder",
+        cta: "Request CMS access",
         description:
           "For a website you can update yourself without forms, analysis, or bookings.",
         bestFor:
@@ -67,7 +71,7 @@ export const pricingContent = {
         badge: "Forms and analysis",
         price: "$10",
         recommended: false,
-        cta: "Choose Forms + DA",
+        cta: "Request Forms + DA access",
         description:
           "For collecting information and reviewing it without a full website.",
         bestFor:
@@ -95,7 +99,7 @@ export const pricingContent = {
         badge: "CMS + one module",
         price: "$20",
         recommended: true,
-        cta: "Choose CMS Plus",
+        cta: "Request CMS Plus access",
         description:
           "For a website plus one extra workflow: forms or reservations.",
         bestFor:
@@ -122,7 +126,7 @@ export const pricingContent = {
         badge: "CMS + forms + reservations",
         price: "$25",
         recommended: false,
-        cta: "Choose Complete",
+        cta: "Request Complete access",
         description:
           "For teams that need the full setup: website, forms, analysis, and reservations.",
         bestFor:
@@ -213,6 +217,10 @@ export const pricingContent = {
       "CMS is included with reservations so customers can book from a public page.",
     saving: "Saving...",
     success: "Subscription request saved. Payment setup is not connected yet.",
+    requestSaved: "تم حفظ طلب الوصول. لم يتم تحصيل أي دفعة.",
+    requestTitle: "تم حفظ طلب الوصول",
+    availabilityNotice:
+      "الدفع الإلكتروني سيتوفر قريباً. طلب الخطة يسجل اهتمامك للمتابعة اليدوية ولا يخصم أي مبلغ.",
     loginRequired: "Please log in before choosing a plan.",
     serverError: "Could not connect to server.",
 
@@ -224,7 +232,7 @@ export const pricingContent = {
         badge: "CMS only",
         price: "$15",
         recommended: false,
-        cta: "Choose CMS Builder",
+        cta: "طلب الوصول إلى CMS",
         description:
           "For a website you can update yourself without forms, analysis, or bookings.",
         bestFor:
@@ -252,7 +260,7 @@ export const pricingContent = {
         badge: "Forms and analysis",
         price: "$10",
         recommended: false,
-        cta: "Choose Forms + DA",
+        cta: "طلب الوصول إلى النماذج والتحليل",
         description:
           "For collecting information and reviewing it without a full website.",
         bestFor:
@@ -280,7 +288,7 @@ export const pricingContent = {
         badge: "CMS + one module",
         price: "$20",
         recommended: true,
-        cta: "Choose CMS Plus",
+        cta: "طلب الوصول إلى CMS Plus",
         description:
           "For a website plus one extra workflow: forms or reservations.",
         bestFor:
@@ -307,7 +315,7 @@ export const pricingContent = {
         badge: "CMS + forms + reservations",
         price: "$25",
         recommended: false,
-        cta: "Choose Complete",
+        cta: "طلب الوصول إلى الخطة الكاملة",
         description:
           "For teams that need the full setup: website, forms, analysis, and reservations.",
         bestFor:

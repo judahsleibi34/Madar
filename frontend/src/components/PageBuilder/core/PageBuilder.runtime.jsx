@@ -278,7 +278,7 @@ export const createRuntimeFormRenderers = ({
   };
 
   const renderConnectedForm = (formId, { allowInteraction = false } = {}) => {
-    const form = project.forms.find((item) => item.id === formId) || project.forms[0];
+    const form = project.forms.find((item) => String(item.id) === String(formId || ""));
     if (!form) return <div className="empty-connected">No form selected.</div>;
     const formLang = runtimeFormLanguages?.[form.id] || getDefaultFormLanguage(form, lang);
     const formDir = getDirectionForLanguage(formLang);

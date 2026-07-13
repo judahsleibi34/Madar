@@ -10,6 +10,7 @@ const AdminAccountAccessPage = lazy(() =>
   import("../components/DashboardBuilder/AdminAccountAccessPage")
 );
 const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
+const SecurityMfaPage = lazy(() => import("../components/DashboardBuilder/SecurityMfaPage"));
 const NotificationsPage = lazy(() =>
   import("../components/DashboardBuilder/NotificationsPage")
 );
@@ -122,6 +123,11 @@ export default function AdminRoutes({
           element={renderRestrictedPage(
             appShellContent.restrictedAccess.workspaceOnly
           )}
+        />
+
+        <Route
+          path="/settings/security/*"
+          element={renderShell(<SecurityMfaPage lang={lang} />)}
         />
 
         <Route

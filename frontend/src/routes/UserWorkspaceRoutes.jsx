@@ -6,6 +6,7 @@ import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
 const ChangePasswordPage = lazy(() => import("../components/DashboardBuilder/ChangePasswordPage"));
+const SecurityMfaPage = lazy(() => import("../components/DashboardBuilder/SecurityMfaPage"));
 const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
 const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDashboard"));
 const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
@@ -167,6 +168,11 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/settings/change-password/*"
         element={renderShell(<ChangePasswordPage lang={lang} />)}
+      />
+
+      <Route
+        path="/settings/security/*"
+        element={renderShell(<SecurityMfaPage lang={lang} />)}
       />
 
       <Route

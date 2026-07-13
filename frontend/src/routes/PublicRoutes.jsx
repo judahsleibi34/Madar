@@ -19,6 +19,7 @@ const LoginPage = lazy(() => import("../components/AuthPages/LoginPage"));
 const SignUpPage = lazy(() => import("../components/AuthPages/SignUpPage"));
 const ForgotPasswordPage = lazy(() => import("../components/AuthPages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../components/AuthPages/ResetPasswordPage"));
+const EmailVerificationPage = lazy(() => import("../components/AuthPages/EmailVerificationPage"));
 
 const canPrefetchRoutes = () => {
   if (typeof navigator === "undefined") return true;
@@ -44,7 +45,8 @@ export default function PublicRoutes({
     location.pathname.startsWith("/login") ||
     location.pathname.startsWith("/signup") ||
     location.pathname.startsWith("/forgot-password") ||
-    location.pathname.startsWith("/reset-password");
+    location.pathname.startsWith("/reset-password") ||
+    location.pathname.startsWith("/verify-email");
   const isDemoPath = location.pathname.startsWith("/demo");
   const skeletonVariant = isAuthPath ? "auth" : isDemoPath ? "public-page" : "public-page";
 
@@ -157,7 +159,7 @@ export default function PublicRoutes({
 
           <Route
             path="signup"
-            element={<SignUpPage key={`signup-${lang}`} lang={lang} />}
+            element={<SignUpPage key={`signup-${lang}`} lang={lang} mode="tenant" />}
           />
 
           <Route
@@ -171,6 +173,13 @@ export default function PublicRoutes({
             path="reset-password"
             element={
               <ResetPasswordPage key={`reset-password-${lang}`} lang={lang} />
+            }
+          />
+
+          <Route
+            path="verify-email"
+            element={
+              <EmailVerificationPage key={`verify-email-${lang}`} lang={lang} />
             }
           />
         </Route>

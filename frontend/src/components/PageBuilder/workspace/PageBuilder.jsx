@@ -62,7 +62,12 @@ import {
   createBlankWorkspaceProject,
   createInitialProject,
 } from "../core/PageBuilder.starters";
-import { sanitizeSubdomain } from "../core/PageBuilder.routing";
+import {
+  collectPublicPageRoutingIssues,
+  normalizeProjectPageRouting,
+  sanitizeSubdomain,
+  setProjectDefaultPage,
+} from "../core/PageBuilder.routing";
 import { parseCarouselSlides, serializeCarouselSlides } from "../ui/PageBuilderCarousel.utils";
 import PageBuilderModals from "./PageBuilderModals";
 import PageBuilderStatusBar from "./PageBuilderStatusBar";
@@ -84,9 +89,20 @@ import {
   fetchWebsiteSettings,
   listBuilderProjects,
   publishBuilderProject,
+  unpublishBuilderProject,
   updateBuilderProject,
   uploadBuilderAsset,
 } from "../services/PageBuilder.api";
+import {
+  collectProjectIdIssues,
+  collectFormConnectionIssues,
+  getProjectIdIssueMessage,
+  getFormConnectionFocusTarget,
+  getFormConnectionIssueMessage,
+  getBuilderConflictMessage,
+  isBuilderError,
+  isBuilderRevisionError,
+} from "../core/PageBuilder.errors";
 import {
   applyThemeModeToProject,
   getPageBuilderThemeClassName,
@@ -147,10 +163,14 @@ import {
   commitDirectElementInteraction,
 } from "../core/PageBuilder.layout";
 import {
+  buildFormConnectionUpdate,
   cleanBuilderProject,
+  cleanBuilderProjectWithRepairs,
+  normalizeFormReference,
   getBuilderProjectName,
   getBuilderProjectSlug,
   getDraftProjectFromRecord,
+  getDraftProjectFromRecordWithRepairs,
   getPreviewCanvasStyle,
 } from "../core/PageBuilder.project";
 import {
@@ -176,6 +196,7 @@ import {
 } from "../core/PageBuilder.selectors";
 import {
   runElementActionWithHandlers,
+  getButtonActionIssue,
   getDirectFrameAtPoint,
 } from "../core/PageBuilder.actions";
 import {
@@ -370,6 +391,25 @@ const collectBuilderUrlErrors = createBuilderUrlErrorCollector({
   carouselElementTypes,
 });
 
+const collectButtonActionIssues = (project) =>
+  (project?.pages || []).flatMap((page) =>
+    (page?.sections || []).flatMap((section) =>
+      getSectionElements(section).flatMap((element) => {
+        const issue = getButtonActionIssue({
+          element,
+          pages: project?.pages || [],
+          getStoredUrlError,
+        });
+        return issue ? [{
+          ...issue,
+          page_id: String(page?.id || ""),
+          page_name: String(page?.name || page?.title || "Untitled page"),
+          block_id: String(element?.id || ""),
+        }] : [];
+      })
+    )
+  );
+
 const stripAutosaveMetadata = (project = {}) => {
   const nextProject = {
     ...project,
@@ -518,6 +558,7 @@ export default function PageBuilder({
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
   const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isUnpublishingProject, setIsUnpublishingProject] = useState(false);
   const [liveSitePath, setLiveSitePath] = useState("");
   const [websiteSettings, setWebsiteSettings] = useState(null);
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
@@ -857,7 +898,8 @@ export default function PageBuilder({
           return;
         }
 
-        const loadedProject = withDefaultLandingPage(getDraftProjectFromRecord(fullRecord));
+        const loadedResult = getDraftProjectFromRecordWithRepairs(fullRecord);
+        const loadedProject = withDefaultLandingPage(loadedResult.project);
 
         if (!loadedProject) return;
 
@@ -869,13 +911,18 @@ export default function PageBuilder({
             getAutosaveSnapshot(projectRef.current) !== projectSnapshotAtLoadStart;
 
           setBuilderProjectRecord(fullRecord);
-          backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
+          backendProjectSnapshotRef.current = loadedResult.repairs.length > 0
+            ? ""
+            : getAutosaveSnapshot(nextProject);
           // A local draft is the freshest edit source. Hydrating the backend
           // record must not replace it after the workspace is already visible.
           if (!hasLocalDraftAtLoadStart && !localProjectChangedWhileLoading) {
             setProject(nextProject);
             setSelected({ type: "page", id: nextProject.activePageId });
             persistProjectNow(nextProject);
+            if (loadedResult.repairs.length > 0) {
+              showToast("Madar repaired duplicate internal block IDs. Save once before going live.");
+            }
           }
           if (!isDefaultShowcaseProject(loadedProject)) {
             rememberStarterChoice();
@@ -1259,7 +1306,7 @@ export default function PageBuilder({
     const page = createPage(`Page ${project.pages.length + 1}`, [canvasSection], {
       canvasLayoutVersion: 1,
     });
-    updateProject((prev) => ({
+    updateProject((prev) => normalizeProjectPageRouting({
       ...prev,
       pages: [...prev.pages, page],
       activePageId: page.id,
@@ -1272,8 +1319,9 @@ export default function PageBuilder({
     const copy = cloneWithNewIds(activePage);
     copy.name = `${activePage.name} Copy`;
     copy.slug = `${activePage.slug === "/" ? "/home" : activePage.slug}-copy`;
+    copy.isDefault = false;
 
-    updateProject((prev) => ({
+    updateProject((prev) => normalizeProjectPageRouting({
       ...prev,
       pages: [...prev.pages, copy],
       activePageId: copy.id,
@@ -1312,9 +1360,10 @@ export default function PageBuilder({
       safeProjectPages.find((page) => page.id !== pagePendingDelete.id) ||
       safeProjectPages[0];
 
-    updateProject((prev) => ({
+    updateProject((prev) => normalizeProjectPageRouting({
       ...prev,
       pages: (prev.pages || []).filter((page) => page.id !== pagePendingDelete.id),
+      defaultPageId: prev.defaultPageId === pagePendingDelete.id ? "" : prev.defaultPageId,
       activePageId: nextPage.id,
     }));
     setSelected({ type: "page", id: nextPage.id });
@@ -1978,7 +2027,7 @@ export default function PageBuilder({
       silent: Boolean(options.silent),
     }), [demoMode, scopedStorageKey, showToast]);
 
-  const saveSingleProjectRevision = useCallback(async ({ nextProject, silent }) => {
+  const saveSingleProjectRevision = useCallback(async ({ nextProject, silent, repairs = [] }) => {
     const urlErrors = collectBuilderUrlErrors(nextProject);
     if (urlErrors.length > 0) {
       if (!silent) showToast(urlErrors[0]);
@@ -1994,8 +2043,11 @@ export default function PageBuilder({
       return false;
     }
 
-    if (silent) persistProjectNow(nextProject);
-    else persistProject(nextProject, "Saving your changes...", { silent: false });
+    if (silent && repairs.length === 0) {
+      persistProjectNow(nextProject);
+    } else {
+      persistProject(nextProject, "Saving your changes...", { silent });
+    }
 
     try {
       const currentRecord = builderProjectRecordRef.current;
@@ -2013,16 +2065,30 @@ export default function PageBuilder({
       setBuilderProjectRecord(savedRecord);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
       pendingBackendProjectSnapshotRef.current = "";
-      if (!silent) showToast("Your changes are saved.");
+      if (!silent) {
+        showToast(repairs.length > 0
+          ? "Duplicate internal IDs were repaired and your changes are saved."
+          : "Your changes are saved.");
+      }
       return true;
     } catch (error) {
-      if (import.meta.env.DEV) console.error("Could not save builder project.");
+      if (import.meta.env.DEV) {
+        console.error("Could not save builder project.");
+      }
+      if (isLikelySessionFailure(error)) {
+        if (!silent) {
+          showToast("Please sign in again, then save your changes.");
+        }
+        return false;
+      }
+
+      if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
+        return false;
+      }
+
       if (!silent) {
-        showToast(
-          isLikelySessionFailure(error)
-            ? "Please sign in again, then save your changes."
-            : "Your changes are safe here. Please try saving again."
-        );
+        showToast("Your changes are safe here. Please try saving again.");
       }
       return false;
     }
@@ -2046,10 +2112,12 @@ export default function PageBuilder({
             lastSavedAt: new Date().toISOString(),
           },
         };
+    const repaired = cleanBuilderProjectWithRepairs(nextProject);
     const request = {
-      nextProject,
+      nextProject: repaired.project,
       silent,
-      snapshot: getAutosaveSnapshot(nextProject),
+      repairs: repaired.repairs,
+      snapshot: getAutosaveSnapshot(repaired.project),
     };
 
     if (!silent) setActiveTopbarAction("save");
@@ -2196,6 +2264,11 @@ export default function PageBuilder({
         return;
       }
 
+      if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
+        return;
+      }
+
       showToast("Your theme changes are safe here. Please try saving again.");
     }
   };
@@ -2288,15 +2361,70 @@ export default function PageBuilder({
       return;
     }
 
-    const publishedProject = {
+    const pageRoutingIssues = collectPublicPageRoutingIssues(project);
+    if (pageRoutingIssues.length > 0) {
+      const issue = pageRoutingIssues[0];
+      if (issue.page_id) {
+        updateProject((prev) => ({ ...prev, activePageId: issue.page_id }));
+        setSelected({ type: "page", id: issue.page_id });
+      }
+      setActiveTab("design");
+      setDesignPanel("Pages");
+      showToast("Review the homepage and page links before going live.");
+      return;
+    }
+
+    const projectIdIssues = collectProjectIdIssues(project);
+    if (projectIdIssues.length > 0) {
+      showToast(getProjectIdIssueMessage(projectIdIssues[0]));
+      return;
+    }
+
+    const formConnectionIssues = collectFormConnectionIssues(project);
+    if (formConnectionIssues.length > 0) {
+      const issue = formConnectionIssues[0];
+      const target = getFormConnectionFocusTarget(issue);
+      if (project.activePageId !== target.pageId) {
+        updateProject((prev) => ({ ...prev, activePageId: target.pageId }));
+      }
+      setSelected(target.selection);
+      setActiveTab("design");
+      setDesignPanel("Pages");
+      showToast(getFormConnectionIssueMessage(issue));
+      return;
+    }
+
+    const savedAt = new Date().toISOString();
+    const draftForPublish = {
       ...project,
-      status: "published",
       publish: {
         ...project.publish,
-        lastSavedAt: new Date().toISOString(),
+        lastSavedAt: savedAt,
+      },
+    };
+    const publishedProject = {
+      ...draftForPublish,
+      status: "published",
+      publish: {
+        ...draftForPublish.publish,
         lastPublishedAt: new Date().toISOString(),
       },
     };
+    const buttonActionIssues = collectButtonActionIssues(publishedProject);
+    if (buttonActionIssues.length > 0) {
+      const issue = buttonActionIssues[0];
+      updateProject((prev) => ({ ...prev, activePageId: issue.page_id }));
+      setSelected({ type: "element", id: issue.block_id });
+      setActiveTab("design");
+      setDesignPanel("Pages");
+      const messages = {
+        invalid_button_page_target: "Choose a valid destination page for this button before publishing.",
+        invalid_button_url: "Enter a valid HTTPS URL for this button before publishing.",
+        empty_button_message: "Enter a message for this button before publishing.",
+      };
+      showToast(messages[issue.issue_type] || "Review this button action before publishing.");
+      return;
+    }
     const urlErrors = collectBuilderUrlErrors(publishedProject);
 
     if (urlErrors.length > 0) {
@@ -2327,7 +2455,7 @@ export default function PageBuilder({
 
     try {
       const payload = createBuilderProjectPayload({
-        project: publishedProject,
+        project: draftForPublish,
         builderProjectRecord,
         getBuilderProjectName,
         getBuilderProjectSlug,
@@ -2337,7 +2465,13 @@ export default function PageBuilder({
         ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
         : await createBuilderProject(payload, user?.id);
 
-      const publishResponse = await publishBuilderProject(savedRecord.id, user?.id);
+      setBuilderProjectRecord(savedRecord);
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(draftForPublish);
+
+      const publishResponse = await publishBuilderProject(
+        savedRecord.id,
+        savedRecord?.draft_revision
+      );
       const publishedRecord = publishResponse?.project || savedRecord;
       const publishedSite = publishResponse?.site || {};
       const resolvedPublicSubdomain = sanitizeSubdomain(
@@ -2347,19 +2481,23 @@ export default function PageBuilder({
         ? resolveLiveSitePath(resolvedPublicSubdomain)
         : "";
 
+      // The server publish has already committed at this point. Reflect that
+      // durable state even if the optional public-link metadata is incomplete.
+      setBuilderProjectRecord(publishedRecord);
+      persistProject(publishedProject, "");
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
+      pendingBackendProjectSnapshotRef.current = "";
+
       if (import.meta.env.DEV) {
         console.debug("Builder publish completed.");
       }
 
       if (!resolvedLiveSitePath) {
-        throw new Error("Published site subdomain was not returned by the backend.");
+        showToast("Your site is live, but its public link could not be loaded. Refresh the Publish page.");
+        return;
       }
 
-      setBuilderProjectRecord(publishedRecord);
-      persistProject(publishedProject, "");
       setLiveSitePath(resolvedLiveSitePath);
-      backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
-      pendingBackendProjectSnapshotRef.current = "";
       showToast("Your site is live. Go to the Publish page to open your website.");
     } catch (error) {
       console.error("Could not publish builder project:", error);
@@ -2369,7 +2507,83 @@ export default function PageBuilder({
         return;
       }
 
+      if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
+        return;
+      }
+
+      if (isBuilderError(error, "entitlement_pending")) {
+        showToast("Your publishing access is still pending. No changes were lost.");
+        return;
+      }
+
+      if (
+        isBuilderError(error, "entitlement_inactive") ||
+        isBuilderError(error, "payment_required")
+      ) {
+        showToast("Publishing is not active for this workspace. Review your plan; your edits are still saved locally.");
+        return;
+      }
+
+      if (isBuilderError(error, "publish_validation_failed")) {
+        if (String(error.context?.issue_type || "").includes("_id")) {
+          showToast(getProjectIdIssueMessage(error.context));
+          return;
+        }
+        const issue = error.context?.issue_type === "orphaned_form_block"
+          ? error.context
+          : null;
+        if (issue) {
+          if (issue.page_id) updateProject((prev) => ({ ...prev, activePageId: issue.page_id }));
+          if (issue.block_id) setSelected({ type: "element", id: issue.block_id });
+          setActiveTab("design");
+          setDesignPanel("Pages");
+          showToast(getFormConnectionIssueMessage(issue));
+        } else {
+          showToast(error.message || "This draft is not ready to publish. Review the highlighted content.");
+        }
+        return;
+      }
+
       showToast("We couldn't put your site live. Please try again.");
+    }
+  };
+
+  const unpublishProject = async () => {
+    if (!builderProjectRecord?.id || project.status !== "published") return;
+    if (!window.confirm("Take this website offline? The current published content will be preserved for a later republish.")) {
+      return;
+    }
+
+    setIsUnpublishingProject(true);
+
+    try {
+      const response = await unpublishBuilderProject(
+        builderProjectRecord.id,
+        builderProjectRecord.draft_revision
+      );
+      const nextRecord = response?.project || builderProjectRecord;
+      const unpublishedProject = {
+        ...project,
+        status: "draft",
+      };
+
+      setBuilderProjectRecord(nextRecord);
+      persistProject(unpublishedProject, "Your website is offline. Its last published version is preserved.");
+      setLiveSitePath("");
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(unpublishedProject);
+    } catch (error) {
+      if (isLikelySessionFailure(error)) {
+        showToast("Please sign in again before taking this site offline.");
+      } else if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
+      } else if (isBuilderError(error, "project_not_published")) {
+        showToast("This website is already offline.");
+      } else {
+        showToast("We could not take the website offline. It remains published.");
+      }
+    } finally {
+      setIsUnpublishingProject(false);
     }
   };
 
@@ -3933,7 +4147,29 @@ export default function PageBuilder({
         <div className="inspector-group">
           <h3>Page Settings</h3>
           <label>Page name<input value={activePage.name} onChange={(event) => updateActivePage((page) => ({ ...page, name: event.target.value }))} /></label>
-          <label>Page link<input value={activePage.slug} onChange={(event) => updateActivePage((page) => ({ ...page, slug: event.target.value }))} /></label>
+          <label>
+            Page link
+            <input
+              value={activePage.slug}
+              disabled={activePage.isDefault === true}
+              onChange={(event) => updateActivePage((page) => ({ ...page, slug: event.target.value }))}
+            />
+          </label>
+          <label className="inspector-toggle-row">
+            <input
+              type="radio"
+              name="builder-default-page"
+              checked={activePage.isDefault === true}
+              onChange={() => updateProject((prev) => setProjectDefaultPage(prev, activePage.id))}
+            />
+            <span>Use as homepage</span>
+          </label>
+          {collectPublicPageRoutingIssues(project).some((issue) =>
+            issue.page_id === activePage.id ||
+            issue.occurrences?.some((page) => page.page_id === activePage.id)
+          ) && (
+            <p className="builder-note" role="alert">Choose a unique, non-reserved page link before publishing.</p>
+          )}
           <label className="inspector-toggle-row">
             <input type="checkbox" checked={activePage.showInNavigation !== false} onChange={(event) => updateActivePage((page) => ({ ...page, showInNavigation: event.target.checked }))} />
             <span>Show this page in the header</span>
@@ -4275,7 +4511,7 @@ export default function PageBuilder({
           )}
 
           {selectedElement.type === "formBlock" && (
-            <label>Connected form<select value={selectedElement.connectedFormId || ""} onChange={(event) => updateSelectedElement({ connectedFormId: event.target.value })}>{project.forms.map((form) => <option key={form.id} value={form.id}>{form.title}</option>)}</select></label>
+            <label>Connected form<select value={normalizeFormReference(selectedElement.connectedFormId)} onChange={(event) => updateSelectedElement(buildFormConnectionUpdate(event.target.value))}><option value="">Choose a form</option>{project.forms.map((form) => <option key={form.id} value={String(form.id)}>{form.title}</option>)}</select></label>
           )}
 
           {selectedElement.type === "reservationBlock" && (
@@ -4320,7 +4556,7 @@ export default function PageBuilder({
           {selectedElement.type === "button" && (
             <details>
               <summary>Interaction</summary>
-              <label>Action<select value={selectedElement.action?.type || "none"} onChange={(event) => updateSelectedElement({ action: { type: event.target.value } })}>
+              <label>Action<select value={selectedElement.action?.type || "none"} onChange={(event) => updateSelectedElement({ action: { type: event.target.value, pageId: "", url: "", message: "" } })}>
                 <option value="none">None</option>
                 <option value="goToPage">Go to page</option>
                 <option value="openUrl">Open URL</option>
@@ -4708,6 +4944,9 @@ export default function PageBuilder({
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
       openFormPreviewPage={openFormPreviewPage}
+      onUnpublish={unpublishProject}
+      isUnpublishing={isUnpublishingProject}
+      lang={lang}
     />
   );
 
@@ -4878,4 +5117,3 @@ export default function PageBuilder({
     </div>
   );
 }
-

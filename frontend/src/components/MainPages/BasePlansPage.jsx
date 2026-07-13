@@ -11,7 +11,11 @@ import {
 import { getPricingContent } from "../../content";
 import { PUBLIC_ROUTES, DASHBOARD_ROUTES } from "../../config/routes";
 import { BILLING_API_ROUTES } from "../../services/apiRoutes";
-import { apiFetch, getApiUrl } from "../../utils/apiClient";
+import {
+  apiFetch,
+  getApiUrl,
+  readApiErrorCode,
+} from "../../utils/apiClient";
 import SubscriptionStatusModal from "./SubscriptionStatusModal";
 
 const MODULE_ICONS = {
@@ -86,6 +90,7 @@ export default function BasePlansPage({ lang = "en" }) {
   const [modalState, setModalState] = useState({
     open: false,
     type: "success",
+    title: "",
     message: "",
   });
 
@@ -135,12 +140,22 @@ export default function BasePlansPage({ lang = "en" }) {
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
+        const errorCode = readApiErrorCode(data);
         setModalState({
           open: true,
-          type: response.status === 401 ? "login" : "error",
+          type:
+            response.status === 401
+              ? "login"
+              : errorCode === "billing_not_configured"
+                ? "success"
+                : "error",
+          title:
+            errorCode === "billing_not_configured" ? t.requestTitle : "",
           message:
             response.status === 401
               ? t.loginRequired
+              : errorCode === "billing_not_configured"
+                ? t.availabilityNotice
               : getFriendlySubscriptionError(data?.detail, activeLang),
         });
         return;
@@ -149,7 +164,11 @@ export default function BasePlansPage({ lang = "en" }) {
       setModalState({
         open: true,
         type: "success",
-        message: t.success,
+        title: t.requestTitle,
+        message:
+          data?.checkout_available === false || data?.requires_payment === false
+            ? data?.message || t.requestSaved
+            : t.success,
       });
     } catch (error) {
       console.error("Subscription request failed:", error);
@@ -170,6 +189,7 @@ export default function BasePlansPage({ lang = "en" }) {
     setModalState({
       open: false,
       type: "success",
+      title: "",
       message: "",
     });
 
@@ -193,6 +213,7 @@ export default function BasePlansPage({ lang = "en" }) {
         <div className="pricing-section-heading">
           <h2>{t.basePlansTitle}</h2>
           <p>{t.basePlansSubtitle}</p>
+          <p role="note"><strong>{t.availabilityNotice}</strong></p>
         </div>
       </section>
 
@@ -325,6 +346,7 @@ export default function BasePlansPage({ lang = "en" }) {
         open={modalState.open}
         type={modalState.type}
         lang={activeLang}
+        title={modalState.title}
         message={modalState.message}
         onConfirm={handleModalConfirm}
       />

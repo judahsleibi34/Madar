@@ -1,8 +1,14 @@
-import json
-import re
 import logging
-from datetime import datetime
+import base64
+import hashlib
+import hmac
+import json
+import os
+import re
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -13,7 +19,6 @@ from services.auth_service import (
     build_user_payload,
     delete_auth_cookies,
     get_authenticated_user_row,
-    mark_local_email_verified,
     set_auth_cookies,
 )
 from services.frontend_url import resolve_frontend_url
@@ -24,6 +29,9 @@ from services.rate_limit_service import (
     get_client_ip,
 )
 from services.notification_service import create_builder_block_event_notification
+from services.notification_outbox_service import enqueue_notification
+from services.api_errors import api_error
+from services.account_lifecycle_service import synchronize_verified_account
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -36,12 +44,21 @@ MAX_PUBLIC_BLOCK_EVENT_FIELDS = 100
 MAX_PUBLIC_BLOCK_EVENT_STRING_LENGTH = 5000
 MAX_PUBLIC_BLOCK_EVENT_JSON_BYTES = 64 * 1024
 BLOCK_TYPE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,200}$")
+MIN_PUBLIC_SUBMISSION_ELAPSED_MS = int(
+    os.getenv("MIN_PUBLIC_SUBMISSION_ELAPSED_MS", "750")
+)
+RESERVATION_CANCELLATION_TTL_DAYS = int(
+    os.getenv("RESERVATION_CANCELLATION_TTL_DAYS", "30")
+)
 FRONTEND_URL = resolve_frontend_url()
 
 
 class PublicFormSubmissionCreate(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
     form_element_id: Optional[str] = None
+    honeypot: Optional[str] = Field(default=None, max_length=200)
+    submission_elapsed_ms: Optional[int] = Field(default=None, ge=0, le=86_400_000)
 
     @field_validator("answers")
     @classmethod
@@ -59,6 +76,9 @@ class PublicBuilderBlockEventCreate(BaseModel):
     event_type: Optional[str] = Field(default=None, max_length=120)
     title: Optional[str] = Field(default=None, max_length=200)
     payload: dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=200)
+    honeypot: Optional[str] = Field(default=None, max_length=200)
+    submission_elapsed_ms: Optional[int] = Field(default=None, ge=0, le=86_400_000)
 
     @field_validator("payload")
     @classmethod
@@ -81,6 +101,10 @@ class TenantLoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=200)
 
 
+class PublicReservationCancellationRequest(BaseModel):
+    token: str = Field(..., min_length=32, max_length=256)
+
+
 def rows(response):
     return getattr(response, "data", None) or []
 
@@ -88,6 +112,107 @@ def rows(response):
 def first_row(response):
     result_rows = rows(response)
     return result_rows[0] if result_rows else None
+
+
+def _public_token_secret() -> bytes:
+    value = (
+        os.getenv("RESERVATION_TOKEN_SECRET")
+        or os.getenv("CSRF_SECRET")
+        or os.getenv("SUPABASE_SERVICE_KEY")
+        or os.getenv("SECRET_KEY")
+        or "madar-development-public-token-secret"
+    )
+    return value.encode("utf-8")
+
+
+def hash_public_identifier(value: str) -> str:
+    return hmac.new(
+        _public_token_secret(),
+        value.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def reject_suspicious_public_submission(
+    *,
+    honeypot: str | None,
+    submission_elapsed_ms: int | None,
+    route_name: str,
+) -> None:
+    suspicious = bool((honeypot or "").strip()) or (
+        submission_elapsed_ms is not None
+        and submission_elapsed_ms < MIN_PUBLIC_SUBMISSION_ELAPSED_MS
+    )
+    if not suspicious:
+        return
+    logger.info(
+        "public.submission_spam_rejected",
+        extra={"route_name": route_name},
+    )
+    raise api_error(
+        400,
+        "submission_rejected",
+        "The submission could not be accepted.",
+    )
+
+
+def normalize_idempotency_key(event: PublicBuilderBlockEventCreate, request: Request) -> str | None:
+    body_key = (event.idempotency_key or "").strip()
+    header_key = (request.headers.get("idempotency-key") or "").strip()
+    if body_key and header_key and not hmac.compare_digest(body_key, header_key):
+        raise api_error(
+            409,
+            "idempotency_conflict",
+            "The idempotency key does not match this request.",
+        )
+    key = header_key or body_key
+    if not key:
+        return None
+    if not IDEMPOTENCY_KEY_PATTERN.fullmatch(key):
+        raise api_error(
+            400,
+            "idempotency_key_invalid",
+            "The idempotency key is invalid.",
+        )
+    return key
+
+
+def canonical_request_hash(payload: dict[str, Any]) -> str:
+    serialized = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def build_cancellation_token(
+    *,
+    tenant_id: int,
+    project_id: str,
+    block_id: str,
+    idempotency_key_hash: str | None,
+    request_hash: str,
+) -> str:
+    if idempotency_key_hash:
+        material = ":".join(
+            (
+                "reservation-cancellation",
+                str(tenant_id),
+                project_id,
+                block_id,
+                idempotency_key_hash,
+                request_hash,
+            )
+        )
+        digest = hmac.new(
+            _public_token_secret(),
+            material.encode("utf-8"),
+            hashlib.sha256,
+        ).digest()
+        return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return secrets.token_urlsafe(32)
 
 
 def get_latest_published_project_for_tenant(tenant_id: int):
@@ -388,6 +513,117 @@ def reservation_datetime_from_payload(payload: dict[str, Any], *keys: str) -> st
     return None
 
 
+def normalize_reservation_timing(payload: dict[str, Any]) -> dict[str, str | None]:
+    timezone_name = first_payload_text(
+        payload,
+        "timezone",
+        "time_zone",
+        "timeZone",
+        max_length=120,
+    )
+    timezone_value = None
+    if timezone_name:
+        try:
+            timezone_value = ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError:
+            raise api_error(
+                400,
+                "reservation_timezone_invalid",
+                "Choose a valid timezone.",
+            )
+
+    starts_at = reservation_datetime_from_payload(
+        payload,
+        "starts_at",
+        "startsAt",
+        "start",
+        "start_at",
+        "startAt",
+    )
+    ends_at = parse_public_datetime(
+        first_payload_text(
+            payload,
+            "ends_at",
+            "endsAt",
+            "end",
+            "end_at",
+            "endAt",
+            max_length=120,
+        )
+    )
+    start_was_supplied = any(
+        compact_public_text(payload.get(key), max_length=120)
+        for key in (
+            "starts_at",
+            "startsAt",
+            "start",
+            "start_at",
+            "startAt",
+            "date",
+            "reservation_date",
+            "reservationDate",
+            "time",
+            "start_time",
+            "startTime",
+        )
+    )
+    end_was_supplied = any(
+        compact_public_text(payload.get(key), max_length=120)
+        for key in ("ends_at", "endsAt", "end", "end_at", "endAt")
+    )
+    if start_was_supplied and not starts_at:
+        raise api_error(
+            400,
+            "reservation_time_invalid",
+            "Choose a valid reservation start time.",
+        )
+    if end_was_supplied and not ends_at:
+        raise api_error(
+            400,
+            "reservation_time_invalid",
+            "Choose a valid reservation end time.",
+        )
+
+    normalized: dict[str, str | None] = {
+        "starts_at": None,
+        "ends_at": None,
+        "timezone": timezone_name,
+    }
+    parsed_values: list[datetime | None] = []
+    for value in (starts_at, ends_at):
+        if not value:
+            parsed_values.append(None)
+            continue
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            if timezone_value is None:
+                raise api_error(
+                    400,
+                    "reservation_timezone_required",
+                    "Choose a timezone for the reservation.",
+                )
+            parsed = parsed.replace(tzinfo=timezone_value)
+        parsed_values.append(parsed)
+
+    parsed_start, parsed_end = parsed_values
+    if parsed_start and parsed_end and parsed_start >= parsed_end:
+        raise api_error(
+            400,
+            "reservation_time_invalid",
+            "The reservation end time must be after its start time.",
+        )
+    normalized["starts_at"] = parsed_start.isoformat() if parsed_start else None
+    normalized["ends_at"] = parsed_end.isoformat() if parsed_end else None
+    return normalized
+
+
+def reservation_block_is_exclusive(block: dict[str, Any]) -> bool:
+    reservation = block.get("reservation")
+    if not isinstance(reservation, dict):
+        return False
+    return str(reservation.get("bookingMode") or "restricted").strip().lower() != "flexible"
+
+
 def build_reservation_field_snapshot(block: dict, block_id: str | None, block_type: str) -> list[dict[str, Any]]:
     snapshot = {
         "block_id": block_id or block.get("id"),
@@ -412,7 +648,9 @@ def build_builder_reservation_payload(
     title: str,
     payload: dict[str, Any],
     request: Request,
+    timing: dict[str, str | None] | None = None,
 ) -> dict[str, Any]:
+    clean_timing = timing or normalize_reservation_timing(payload)
     return {
         "tenant_id": tenant_id,
         "project_id": project.get("id"),
@@ -423,9 +661,9 @@ def build_builder_reservation_payload(
         "customer_name": first_payload_text(payload, "customer_name", "customerName", "name", "full_name", "fullName"),
         "customer_email": first_payload_text(payload, "customer_email", "customerEmail", "email"),
         "customer_phone": first_payload_text(payload, "customer_phone", "customerPhone", "phone", "contact"),
-        "starts_at": reservation_datetime_from_payload(payload, "starts_at", "startsAt", "start", "start_at", "startAt"),
-        "ends_at": reservation_datetime_from_payload(payload, "ends_at", "endsAt", "end", "end_at", "endAt"),
-        "timezone": first_payload_text(payload, "timezone", "time_zone", "timeZone", max_length=120),
+        "starts_at": clean_timing.get("starts_at"),
+        "ends_at": clean_timing.get("ends_at"),
+        "timezone": clean_timing.get("timezone"),
         "status": "new",
         "payload": payload,
         "field_snapshot": build_reservation_field_snapshot(block, block_id, block_type),
@@ -434,9 +672,74 @@ def build_builder_reservation_payload(
     }
 
 
-def insert_builder_reservation(payload: dict[str, Any]) -> dict[str, Any]:
+def _reservation_storage_error(error: Exception) -> HTTPException:
+    text = str(error).lower()
+    if "idempotency_conflict" in text:
+        return api_error(
+            409,
+            "idempotency_conflict",
+            "This idempotency key was already used for a different request.",
+        )
+    if "reservation_slot_unavailable" in text:
+        return api_error(
+            409,
+            "reservation_slot_unavailable",
+            "That reservation slot is no longer available.",
+        )
+    if "reservation_time" in text or "reservation_payload_invalid" in text:
+        return api_error(
+            400,
+            "reservation_time_invalid",
+            "The reservation time is invalid.",
+        )
+    return api_error(
+        503,
+        "dependency_unavailable",
+        "The reservation could not be saved. Try again shortly.",
+    )
+
+
+def insert_builder_reservation(
+    payload: dict[str, Any],
+    *,
+    idempotency_key_hash: str | None,
+    request_hash: str,
+    exclusive_slot: bool,
+) -> tuple[dict[str, Any], bool]:
     try:
-        insert_response = service_supabase.table("builder_reservations").insert(payload).execute()
+        rpc = getattr(service_supabase, "rpc", None)
+        if callable(rpc):
+            insert_response = rpc(
+                "create_builder_reservation_safe",
+                {
+                    "p_reservation": payload,
+                    "p_idempotency_key_hash": idempotency_key_hash,
+                    "p_request_hash": request_hash,
+                    "p_exclusive_slot": exclusive_slot,
+                },
+            ).execute()
+            data = getattr(insert_response, "data", None)
+            if isinstance(data, list):
+                result = data[0] if data else None
+            else:
+                result = data
+            if not isinstance(result, dict) or not isinstance(result.get("reservation"), dict):
+                raise RuntimeError("reservation_rpc_empty_result")
+            return result["reservation"], bool(result.get("duplicate"))
+
+        # Lightweight in-memory clients used by unit tests do not implement RPC.
+        # Production uses the Supabase RPC above so the overlap check is atomic.
+        direct_payload = {
+            **payload,
+            "idempotency_key_hash": idempotency_key_hash,
+            "request_hash": request_hash,
+            "exclusive_slot": exclusive_slot,
+        }
+        insert_response = (
+            service_supabase.table("builder_reservations")
+            .insert(direct_payload)
+            .execute()
+        )
     except Exception as error:
         logger.warning(
             "public.builder_reservation_failed",
@@ -447,14 +750,18 @@ def insert_builder_reservation(payload: dict[str, Any]) -> dict[str, Any]:
                 "error_type": type(error).__name__,
             },
         )
-        raise HTTPException(status_code=500, detail="Could not submit reservation")
+        raise _reservation_storage_error(error)
 
     saved_reservation = first_row(insert_response)
 
     if not saved_reservation:
-        raise HTTPException(status_code=500, detail="Could not submit reservation")
+        raise api_error(
+            503,
+            "dependency_unavailable",
+            "The reservation could not be saved. Try again shortly.",
+        )
 
-    return saved_reservation
+    return saved_reservation, False
 
 
 def validate_form_answers(form: dict, answers: dict[str, Any]) -> dict[str, Any]:
@@ -658,7 +965,8 @@ def register_tenant_visitor(
                 "last_name": last_name,
                 "email": clean_email,
                 "tenant_id": None,
-                "user_type": "site_user",
+                "account_kind": "site_visitor",
+                "account_status": "pending_verification",
                 "email_verified": False,
                 "email_verified_at": None,
             }
@@ -737,7 +1045,7 @@ def login_tenant_visitor(
         if not user_row or not get_tenant_site_access(settings, user_row):
             raise HTTPException(status_code=403, detail="This account does not belong to this website")
 
-        user_row = mark_local_email_verified(user_row)
+        user_row, _ = synchronize_verified_account(auth_response.user, user_row)
         csrf_token = set_auth_cookies(
             response,
             auth_response.session.access_token,
@@ -816,6 +1124,11 @@ def submit_public_builder_form(
         request,
         "create",
         f"{clean_subdomain}:{clean_form_id}",
+    )
+    reject_suspicious_public_submission(
+        honeypot=submission.honeypot,
+        submission_elapsed_ms=submission.submission_elapsed_ms,
+        route_name="form",
     )
 
     settings = resolve_website_settings(clean_subdomain)
@@ -906,11 +1219,17 @@ def submit_public_builder_block_event(
     block_type = normalize_public_block_type(event.block_type)
     block_id = (event.block_id or "").strip() or None
     event_type = normalize_public_event_type(event.event_type, block_type)
+    idempotency_key = normalize_idempotency_key(event, request)
 
     enforce_public_form_submission_rate_limit(
         request,
         "event",
         f"{clean_subdomain}:{block_type}:{block_id or 'unknown'}",
+    )
+    reject_suspicious_public_submission(
+        honeypot=event.honeypot,
+        submission_elapsed_ms=event.submission_elapsed_ms,
+        route_name="event",
     )
 
     settings = resolve_website_settings(clean_subdomain)
@@ -936,6 +1255,7 @@ def submit_public_builder_block_event(
         str(key)[:120]: normalize_event_value(value)
         for key, value in payload.items()
     }
+    timing = normalize_reservation_timing(cleaned_payload)
 
     if block_type == "reservationBlock":
         reservation = block.get("reservation") or {}
@@ -949,37 +1269,89 @@ def submit_public_builder_block_event(
         title = event.title or "New site event"
         body = f"{block_type} triggered an event on the published site."
 
-    saved_reservation = insert_builder_reservation(
-        build_builder_reservation_payload(
+    reservation_payload = build_builder_reservation_payload(
+        tenant_id=tenant_id,
+        project=project,
+        subdomain=clean_subdomain,
+        block=block,
+        block_id=block_id,
+        block_type=block_type,
+        title=title,
+        payload=cleaned_payload,
+        request=request,
+        timing=timing,
+    )
+    stable_request_payload = {
+        key: value
+        for key, value in reservation_payload.items()
+        if key not in {"submitter_ip", "user_agent"}
+    }
+    request_hash = canonical_request_hash(stable_request_payload)
+    idempotency_key_hash = (
+        hash_public_identifier(f"reservation-idempotency:{idempotency_key}")
+        if idempotency_key
+        else None
+    )
+    cancellation_token = None
+    if block_type == "reservationBlock":
+        cancellation_token = build_cancellation_token(
             tenant_id=tenant_id,
-            project=project,
-            subdomain=clean_subdomain,
-            block=block,
-            block_id=block_id,
-            block_type=block_type,
-            title=title,
-            payload=cleaned_payload,
-            request=request,
+            project_id=str(project.get("id") or ""),
+            block_id=str(block_id or block.get("id") or block_type),
+            idempotency_key_hash=idempotency_key_hash,
+            request_hash=request_hash,
         )
+        reservation_payload["cancellation_token_hash"] = hash_public_identifier(
+            f"reservation-cancellation:{cancellation_token}"
+        )
+        reservation_payload["cancellation_expires_at"] = (
+            datetime.now(timezone.utc) + timedelta(days=RESERVATION_CANCELLATION_TTL_DAYS)
+        ).isoformat()
+    saved_reservation, duplicate = insert_builder_reservation(
+        reservation_payload,
+        idempotency_key_hash=idempotency_key_hash,
+        request_hash=request_hash,
+        exclusive_slot=(
+            block_type == "reservationBlock" and reservation_block_is_exclusive(block)
+        ),
     )
     reservation_id = str(saved_reservation.get("id") or "")
 
-    create_builder_block_event_notification(
-        tenant_id=tenant_id,
-        event_type=event_type,
-        block_type=block_type,
-        source_id=block_id or str(block.get("id") or block_type),
-        title=title,
-        body=body,
-        data={
-            "project_id": project.get("id"),
-            "block_id": block.get("id"),
-            "block_type": block_type,
-            "reservation_id": reservation_id,
-            "subdomain": clean_subdomain,
-            "payload": cleaned_payload,
-        },
-    )
+    if not duplicate:
+        create_builder_block_event_notification(
+            tenant_id=tenant_id,
+            event_type=event_type,
+            block_type=block_type,
+            source_id=reservation_id or block_id or str(block.get("id") or block_type),
+            title=title,
+            body=body,
+            data={
+                "project_id": project.get("id"),
+                "block_id": block.get("id"),
+                "block_type": block_type,
+                "reservation_id": reservation_id,
+                "subdomain": clean_subdomain,
+                "payload": cleaned_payload,
+            },
+        )
+        customer_email = str(saved_reservation.get("customer_email") or "").strip().lower()
+        if block_type == "reservationBlock" and customer_email:
+            enqueue_notification(
+                channel="email",
+                template="reservation_confirmation",
+                tenant_id=tenant_id,
+                recipient_hash=hash_public_identifier(customer_email),
+                recipient_reference=f"reservation:{reservation_id}",
+                deduplication_key=hash_public_identifier(
+                    f"reservation-confirmation:{reservation_id}"
+                ),
+                payload={
+                    "reservation_id": reservation_id,
+                    "status": str(saved_reservation.get("status") or "new"),
+                    "site_subdomain": clean_subdomain,
+                },
+                client=service_supabase,
+            )
 
     logger.info(
         "public.builder_block_event_created",
@@ -990,11 +1362,111 @@ def submit_public_builder_block_event(
             "block_id": block.get("id"),
             "block_type": block_type,
             "event_type": event_type,
+            "idempotent_replay": duplicate,
         },
     )
 
+    response_payload = {
+        "success": True,
+        "reservation_id": reservation_id,
+        "idempotent_replay": duplicate,
+        "message": "Reservation submitted successfully.",
+    }
+    if cancellation_token:
+        response_payload["cancellation_token"] = cancellation_token
+    return response_payload
+
+
+@router.post("/reservations/{reservation_id}/cancel")
+def cancel_public_builder_reservation(
+    reservation_id: str,
+    cancellation: PublicReservationCancellationRequest,
+    request: Request,
+):
+    if not re.fullmatch(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}",
+        reservation_id,
+    ):
+        raise api_error(404, "reservation_cancellation_invalid", "Cancellation link is invalid.")
+
+    enforce_public_form_submission_rate_limit(
+        request,
+        "reservation_cancel",
+        reservation_id,
+    )
+
+    token_hash = hash_public_identifier(
+        f"reservation-cancellation:{cancellation.token}"
+    )
+    try:
+        response = service_supabase.rpc(
+            "cancel_builder_reservation_safe",
+            {
+                "p_reservation_id": reservation_id,
+                "p_token_hash": token_hash,
+                "p_cancelled_at": datetime.now(timezone.utc).isoformat(),
+            },
+        ).execute()
+        data = getattr(response, "data", None)
+        reservation = data[0] if isinstance(data, list) and data else data
+        if not isinstance(reservation, dict):
+            raise RuntimeError("reservation_cancellation_empty_result")
+    except Exception as error:
+        text = str(error).lower()
+        if "reservation_cancellation_replayed" in text:
+            raise api_error(
+                409,
+                "reservation_cancellation_replayed",
+                "This reservation was already cancelled.",
+            )
+        if "reservation_cancellation_expired" in text:
+            raise api_error(
+                410,
+                "reservation_cancellation_expired",
+                "This cancellation link has expired.",
+            )
+        if "reservation_cancellation_unavailable" in text:
+            raise api_error(
+                409,
+                "reservation_cancellation_unavailable",
+                "This reservation can no longer be cancelled online.",
+            )
+        if "reservation_cancellation_invalid" in text:
+            raise api_error(
+                404,
+                "reservation_cancellation_invalid",
+                "Cancellation link is invalid.",
+            )
+        logger.warning(
+            "public.builder_reservation_cancel_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        raise api_error(
+            503,
+            "dependency_unavailable",
+            "The reservation could not be cancelled. Try again shortly.",
+        )
+
+    logger.info(
+        "public.builder_reservation_cancelled",
+        extra={"reservation_id": reservation_id},
+    )
+    customer_email = str(reservation.get("customer_email") or "").strip().lower()
+    if customer_email:
+        enqueue_notification(
+            channel="email",
+            template="reservation_status_changed",
+            tenant_id=reservation.get("tenant_id"),
+            recipient_hash=hash_public_identifier(customer_email),
+            recipient_reference=f"reservation:{reservation_id}",
+            deduplication_key=hash_public_identifier(
+                f"reservation-cancelled:{reservation_id}"
+            ),
+            payload={"reservation_id": reservation_id, "status": "cancelled"},
+            client=service_supabase,
+        )
     return {
         "success": True,
         "reservation_id": reservation_id,
-        "message": "Reservation submitted successfully.",
+        "status": "cancelled",
     }

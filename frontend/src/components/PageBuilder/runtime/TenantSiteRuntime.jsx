@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getBuilderStorageKey, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
@@ -26,6 +26,14 @@ import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
 import { resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
+import { getReservationErrorMessage } from "./reservationSubmission";
+import {
+  getDefaultPublicPage,
+  getPublicPagePath,
+  resolvePublicPageByPath,
+} from "../core/PageBuilder.routing";
+import { runPublicElementAction } from "../core/PageBuilder.actions";
+import { getStoredUrlError } from "../core/PageBuilder.url";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
 const MADAR_ATTRIBUTION_URL = "https://madar.app/";
@@ -157,6 +165,10 @@ const getPageElements = (page) =>
     ),
   ]);
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const getRuntimePageSections = (page) =>
+  Array.isArray(page?.sections) ? page.sections : [];
+
 const getPageAuthElements = (page) =>
   getPageElements(page).filter((element) => authElementTypes.has(element.type));
 
@@ -189,16 +201,22 @@ export const runtimePageRequiresAuthentication = (page, destinationPageIds = new
   );
 
 // eslint-disable-next-line react-refresh/only-export-components
+export const getRuntimeNavigationPages = (pages = []) =>
+  pages.filter((page) => page?.showInNavigation !== false);
+
+// eslint-disable-next-line react-refresh/only-export-components
 export const resolveRuntimePage = ({
   pages = [],
   requestedPage = null,
+  defaultPage = null,
+  allowDefaultFallback = true,
   authEntryPage = null,
   authDestinationPageIds = new Set(),
   isPublicRuntime = true,
   authLoading = false,
   user = null,
 } = {}) => {
-  const fallbackPage = requestedPage || pages[0] || null;
+  const fallbackPage = requestedPage || (allowDefaultFallback ? defaultPage || pages[0] : null);
   if (
     isPublicRuntime &&
     !authLoading &&
@@ -268,6 +286,11 @@ const inputTypeForField = (fieldType) => {
 
 const getSubmissionErrorMessage = (error, copy = runtimeFallbackCopy) => {
   const detail = error?.data?.detail;
+  const code = detail?.code || error?.code || "";
+
+  if (code === "submission_rejected") {
+    return "This submission could not be accepted. Review it and try again.";
+  }
 
   if (typeof detail === "string") return detail;
 
@@ -431,12 +454,15 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState(() => (draftPreview ? "ready" : "loading"));
   const [formAnswers, setFormAnswers] = useState({});
+  const [formHoneypots, setFormHoneypots] = useState({});
   const [formStatus, setFormStatus] = useState({});
   const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
   const [authPanelModes, setAuthPanelModes] = useState({});
+  const [publicActionMessage, setPublicActionMessage] = useState("");
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
+  const publicSubmissionStartedAtRef = useRef(Date.now());
 
   useEffect(() => {
     if (draftPreview) return;
@@ -651,23 +677,20 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     : `/${params["*"] || ""}`;
   const pagePath = routePagePath && routePagePath !== "/" ? routePagePath : "/";
   const normalizedPagePath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
+  const defaultPage = useMemo(
+    () => getDefaultPublicPage(pages, project?.defaultPageId),
+    [pages, project?.defaultPageId]
+  );
   const requestedPage = useMemo(() => {
-    const normalizedPath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
-    return pages.find((page) => {
-      const normalizedSlug = page.slug === "/" ? "/" : String(page.slug || "").replace(/\/+$/, "");
-      return normalizedSlug === normalizedPath;
-    }) || null;
-  }, [pagePath, pages]);
+    return resolvePublicPageByPath(pages, pagePath, project?.defaultPageId);
+  }, [pagePath, pages, project?.defaultPageId]);
   const { entryPage: authEntryPage, destinationPageIds: authDestinationPageIds } = useMemo(
     () => getRuntimeAuthFlow(pages),
     [pages]
   );
   const pageRequiresAuthentication = (page) =>
     runtimePageRequiresAuthentication(page, authDestinationPageIds);
-  const hasBuilderPageForRoute = pages.some((page) => {
-    const normalizedSlug = page.slug === "/" ? "/" : String(page.slug || "").replace(/\/+$/, "");
-    return normalizedSlug === normalizedPagePath;
-  });
+  const hasBuilderPageForRoute = Boolean(requestedPage);
   const isUnsupportedWorkspaceRoute =
     !hasBuilderPageForRoute &&
     (activePath.endsWith("/login") ||
@@ -675,7 +698,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
       activePath.endsWith("/forgot-password") ||
       activePath.endsWith("/dashboard"));
 
-  const siteHomePath = runtimeBasePath;
+  const siteHomePath = getPublicPagePath(runtimeBasePath, defaultPage || { isDefault: true });
 
   const pageLinks = splitLines(site.footerShopLinks || runtimeCopy.runtime.footerShopLinks);
   const helpLinks = splitLines(site.footerHelpLinks || runtimeCopy.runtime.footerHelpLinks);
@@ -722,9 +745,24 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
       authEntryPage
         ? authEntryPage
         : page;
-    const slug = destination.slug === "/" ? "" : destination.slug;
-    navigate(`${runtimeBasePath}${slug}`);
+    navigate(getPublicPagePath(runtimeBasePath, destination));
   };
+
+  const runPublicButtonAction = (element) => runPublicElementAction({
+    element,
+    pages,
+    goToPage,
+    getStoredUrlError,
+    openExternal: (url, openInNewTab) => {
+      if (openInNewTab) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        window.location.assign(url);
+      }
+    },
+    showMessage: setPublicActionMessage,
+    showUnavailable: setPublicActionMessage,
+  });
 
   const resolveFooterPageLink = (value) => {
     const normalizedValue = String(value || "")
@@ -789,12 +827,22 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
   const activePage = resolveRuntimePage({
     pages,
     requestedPage,
+    defaultPage,
+    allowDefaultFallback: normalizedPagePath === "/",
     authEntryPage,
     authDestinationPageIds,
     isPublicRuntime,
     authLoading: tenantAuth.loading,
     user: tenantAuth.user,
   });
+  const activePageSections = useMemo(
+    () => getRuntimePageSections(activePage),
+    [activePage?.id, activePage?.sections]
+  );
+
+  useEffect(() => {
+    setPublicActionMessage("");
+  }, [activePage?.id]);
 
   useEffect(() => {
     if (!isPublicRuntime || publicSiteState !== "ready" || tenantAuth.loading || !pages.length) return;
@@ -805,7 +853,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
         : null;
 
     if (!destination) return;
-    const destinationPath = destination.slug === "/" ? runtimeBasePath : `${runtimeBasePath}${destination.slug}`;
+    const destinationPath = getPublicPagePath(runtimeBasePath, destination);
     if (location.pathname !== destinationPath) navigate(destinationPath, { replace: true });
   }, [
     authEntryPage,
@@ -1053,9 +1101,15 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
       await submitPublicFormSubmission(cleanSubdomain, form.id, {
         answers,
         form_element_id: formElementId,
+        honeypot: formHoneypots[instanceKey] || "",
+        submission_elapsed_ms: Math.min(
+          86_400_000,
+          Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
+        ),
       });
 
       setFormAnswers((prev) => ({ ...prev, [instanceKey]: {} }));
+      setFormHoneypots((prev) => ({ ...prev, [instanceKey]: "" }));
       setFormPages((prev) => ({ ...prev, [instanceKey]: 0 }));
       setFormStatus((prev) => ({
         ...prev,
@@ -1077,7 +1131,13 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     }
   };
 
-  const submitRuntimeReservation = async (element, values) => {
+  const submitRuntimeReservation = async (
+    element,
+    values,
+    idempotencyKey,
+    honeypot = "",
+    submissionElapsedMs = null
+  ) => {
     const instanceKey = element.id || "reservation";
     const reservation = element.reservation || {};
 
@@ -1095,20 +1155,30 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
           error: "",
         },
       }));
-      return;
+      return true;
     }
 
     try {
-      await submitPublicBuilderEvent(cleanSubdomain, {
-        block_type: "reservationBlock",
-        block_id: element.id,
-        event_type: "builder.reservation_requested",
-        title: "New reservation request",
-        payload: {
-          ...values,
-          reservation_title: reservation.title || "",
+      await submitPublicBuilderEvent(
+        cleanSubdomain,
+        {
+          block_type: "reservationBlock",
+          block_id: element.id,
+          event_type: "builder.reservation_requested",
+          title: "New reservation request",
+          honeypot,
+          ...(Number.isFinite(submissionElapsedMs)
+            ? { submission_elapsed_ms: Math.min(86_400_000, Math.max(0, submissionElapsedMs)) }
+            : {}),
+          payload: {
+            ...values,
+            reservation_title: reservation.title || "",
+            timezone:
+              Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          },
         },
-      });
+        { idempotencyKey }
+      );
 
       setReservationStatus((prev) => ({
         ...prev,
@@ -1118,15 +1188,19 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
           error: "",
         },
       }));
-    } catch {
+      return true;
+    } catch (error) {
       setReservationStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           submitting: false,
           success: "",
-          error: "Could not send this reservation request. Please try again.",
+          error: getReservationErrorMessage(error),
         },
       }));
+      return error?.code === "idempotency_conflict"
+        ? "reset_idempotency"
+        : false;
     }
   };
 
@@ -1318,7 +1392,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
   };
 
   const renderConnectedForm = (formId, formElementId = "") => {
-    const form = project?.forms?.find((item) => item.id === formId) || project?.forms?.[0];
+    const form = project?.forms?.find((item) => String(item.id) === String(formId || ""));
     if (!form) return <div className="empty-connected">{runtimeCopy.runtime.noFormSelected}</div>;
 
     const instanceKey = `${formElementId || "form"}_${form.id}`;
@@ -1383,6 +1457,22 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
         dir={formDir}
         onSubmit={(event) => submitRuntimeForm(event, form, formElementId, instanceKey)}
       >
+        <label className="runtime-honeypot" aria-hidden="true">
+          Website
+          <input
+            type="text"
+            name="website"
+            value={formHoneypots[instanceKey] || ""}
+            tabIndex={-1}
+            autoComplete="off"
+            onChange={(event) =>
+              setFormHoneypots((prev) => ({
+                ...prev,
+                [instanceKey]: event.target.value,
+              }))
+            }
+          />
+        </label>
         <div className="runtime-form-header">
           {languageMode === "bilingual" && (
             <div className="runtime-language-switch" role="group" aria-label={formCopy.runtime.formLanguage}>
@@ -1458,7 +1548,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
 
     if (element.type === "heading") return <h1 key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</h1>;
     if (element.type === "text") return <p key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</p>;
-    if (element.type === "button") return <button key={element.id} type="button" {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</button>;
+    if (element.type === "button") return <button key={element.id} type="button" {...props} onClick={() => runPublicButtonAction(element)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</button>;
     if (element.type === "image") {
       const imageSrc = resolveMediaUrl(element.content);
       return imageSrc ? (
@@ -1616,7 +1706,15 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
             fields={reservation.fields}
             submitLabel={reservation.submitLabel}
             disabled={Boolean(status.submitting)}
-            onSubmit={(values) => submitRuntimeReservation(element, values)}
+            onSubmit={(values, idempotencyKey, honeypot, submissionElapsedMs) =>
+              submitRuntimeReservation(
+                element,
+                values,
+                idempotencyKey,
+                honeypot,
+                submissionElapsedMs
+              )
+            }
           />
           {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
           {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}
@@ -1653,17 +1751,25 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
       );
     }
 
-    if (!project || !activePage) {
+    if (!project) {
       return renderUnavailableState(
         runtimeCopy.runtime.noPublishedTitle,
         runtimeCopy.runtime.noPublishedBody
       );
     }
 
+    if (!activePage) {
+      return renderUnavailableState(
+        "Page not found",
+        "This page is not part of the published website.",
+        "not-found"
+      );
+    }
+
     return (
-      <main className="tenant-runtime-page">
+      <main key={activePage.id} className="tenant-runtime-page" data-page-id={activePage.id}>
         <div className={`builder-canvas viewport-${runtimeViewport}`}>
-          {(activePage.sections || []).map((section) => {
+          {activePageSections.map((section) => {
             if (section.mode === "free" || section.mode === "direct") {
               return (
                 <section
@@ -1757,17 +1863,14 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
         </button>
 
         <nav className="tenant-site-nav">
-          {pages.filter((page) => page.showInNavigation !== false).map((page) => {
-            const pagePath =
-              page.slug === "/"
-                ? siteHomePath
-                : `${runtimeBasePath}${page.slug}`;
+          {getRuntimeNavigationPages(pages).map((page) => {
+            const pagePath = getPublicPagePath(runtimeBasePath, page);
 
             return (
               <button
                 type="button"
                 key={page.id}
-                className={activePath === pagePath ? "active" : ""}
+                className={activePath.replace(/\/+$/, "") === pagePath.replace(/\/+$/, "") ? "active" : ""}
                 onClick={() => goToPage(page)}
               >
                 {page.name}
@@ -1881,6 +1984,12 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
       )}
       {(draftPreview || isPublicRuntime) && renderHeader()}
       {renderMainContent()}
+      {publicActionMessage && (
+        <div className="tenant-runtime-action-message" role="status" aria-live="polite">
+          <span>{publicActionMessage}</span>
+          <button type="button" onClick={() => setPublicActionMessage("")} aria-label="Dismiss message">×</button>
+        </div>
+      )}
       {(draftPreview || isPublicRuntime) && renderFooter()}
     </div>
   );

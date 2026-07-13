@@ -23,7 +23,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 RATE_LIMIT_ENABLED = _env_bool("RATE_LIMIT_ENABLED", True)
-RATE_LIMIT_FAIL_OPEN = _env_bool("RATE_LIMIT_FAIL_OPEN", True)
+RATE_LIMIT_FAIL_OPEN = _env_bool("RATE_LIMIT_FAIL_OPEN", False)
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 DEFAULT_TRUSTED_PROXY_IPS = "127.0.0.1,::1"

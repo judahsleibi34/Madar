@@ -10,6 +10,7 @@ export const PUBLIC_ROUTES = {
   demo: "/demo",
   login: "/login",
   signup: "/signup",
+  verifyEmail: "/verify-email",
 };
 
 export const DASHBOARD_ROUTES = {
@@ -27,4 +28,3 @@ export const DASHBOARD_ROUTES = {
 };
 
 export const POST_LOGIN_FALLBACK_ROUTE = DASHBOARD_ROUTES.dashboard;
-

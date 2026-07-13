@@ -40,6 +40,8 @@ export default function PageBuilderPublishTab({
   hasConfiguredSubdomain = false,
   openWebsiteSettings,
   openFormPreviewPage,
+  onUnpublish,
+  isUnpublishing = false,
   lang = "en",
 }) {
   const [publicQrVersion, setPublicQrVersion] = useState(1);
@@ -48,7 +50,8 @@ export default function PageBuilderPublishTab({
   const activeForm = project.forms?.find((form) => form.id === project.activeFormId) || project.forms?.[0];
   const publishSubdomain = sanitizeSubdomain(project?.publish?.subdomain || "");
   const configuredLiveSitePath = publishSubdomain ? `/site/${publishSubdomain}/` : "";
-  const resolvedLiveSitePath = liveSitePath || configuredLiveSitePath;
+  const isPublished = project.status === "published";
+  const resolvedLiveSitePath = isPublished ? liveSitePath || configuredLiveSitePath : "";
   const publicLink = resolvedLiveSitePath
     ? `${window.location.origin}${resolvedLiveSitePath}`
     : "";
@@ -139,6 +142,16 @@ export default function PageBuilderPublishTab({
               <dd>{project.publish?.lastPublishedAt || content.notPublished}</dd>
             </div>
           </dl>
+          {isPublished && onUnpublish && (
+            <button
+              type="button"
+              className="publish-unpublish-button"
+              disabled={isUnpublishing}
+              onClick={onUnpublish}
+            >
+              {isUnpublishing ? content.unpublishingSite : content.unpublishSite}
+            </button>
+          )}
         </section>
 
         <section className="publish-panel publish-link-panel">

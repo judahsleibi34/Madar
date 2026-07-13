@@ -21,6 +21,8 @@ CSRF_EXEMPT_PATHS = {
     ("POST", "/auth/signup"),
     ("POST", "/auth/forgot-password"),
     ("POST", "/auth/password-reset"),
+    ("POST", "/auth/email-verification/resend"),
+    ("POST", "/auth/email-verification/clear-context"),
     ("POST", "/auth/refresh"),
     ("POST", "/auth/log_out"),
     ("POST", "/billing/webhook"),
@@ -30,6 +32,7 @@ CSRF_EXEMPT_PATTERNS = (
     re.compile(r"^/public/sites/[^/]+/forms/[^/]+/submissions$"),
     re.compile(r"^/public/sites/[^/]+/auth/(?:register|login|logout)$"),
     re.compile(r"^/public/sites/[^/]+/events$"),
+    re.compile(r"^/public/reservations/[0-9a-fA-F-]+/cancel$"),
 )
 
 

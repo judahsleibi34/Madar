@@ -1,10 +1,10 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from database import service_supabase, supabase
-from classes import SignUpRequest, LogIn, UpdatePassword
+from classes import EmailVerificationResendRequest, SignUpRequest, LogIn, UpdatePassword
 from services.rate_limit_service import enforce_auth_rate_limit
 from services.auth_service import (
     set_auth_cookies,
@@ -15,8 +15,22 @@ from services.auth_service import (
     mark_local_email_verified,
     normalize_user_type,
 )
+from services.account_lifecycle_service import (
+    ACTIVE_ACCOUNT_STATUS,
+    EXPIRED_PENDING_ACCOUNT_STATUS,
+    PENDING_ACCOUNT_STATUS,
+    effective_account_status,
+    is_platform_account,
+    synchronize_verified_account,
+)
+from services.api_errors import api_error
 from services.billing_service import get_billing_summary_for_tenant
-from services.onboarding_service import validate_person_name
+from services.onboarding_service import (
+    ensure_subdomain_available,
+    validate_onboarding_subdomain,
+    validate_optional_business_text,
+    validate_person_name,
+)
 from services.request_security import CSRF_HEADER_NAME, create_csrf_token, set_csrf_cookie
 from services.mfa_login_service import (
     create_pending_mfa_client,
@@ -27,6 +41,21 @@ from services.mfa_login_service import (
 from services.audit_service import record_security_event
 from services.user_security_settings_service import get_user_security_settings
 from services.frontend_url import resolve_frontend_url
+from services.identity_service import auth_value, canonical_auth_email
+from services.password_policy import validate_password
+from services.pending_verification_context import (
+    delete_pending_verification_cookie,
+    read_pending_verification_context,
+    set_pending_verification_cookie,
+)
+from services.email_verification_service import (
+    GENERIC_RESEND_MESSAGE,
+    mask_email,
+    pending_account_is_expired,
+    record_verification_result,
+    resend_available_after,
+    send_verification_email,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
@@ -119,6 +148,21 @@ def get_auth_user_by_email(clean_email: str):
         page += 1
 
 
+def get_auth_user_by_id(auth_id: str):
+    if not auth_id:
+        return None
+    response = service_supabase.auth.admin.get_user_by_id(str(auth_id))
+    return auth_value(response, "user") or response
+
+
+def get_bearer_token(request: Request) -> str:
+    authorization = request.headers.get("authorization", "").strip()
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return ""
+    return token.strip()
+
+
 def get_login_audit_user(clean_email: str):
     try:
         return get_local_user_by_email(clean_email)
@@ -204,7 +248,7 @@ def recover_or_remove_orphaned_auth_user(clean_email: str, password: str):
             "auth.signup.orphaned_verified_auth_user_recovered",
             extra={"auth_id": auth_user_id},
         )
-        return auth_user_id
+        return auth_user
 
     try:
         service_supabase.auth.admin.delete_user(auth_user_id)
@@ -243,87 +287,62 @@ def get_auth_error_message(error: Exception) -> str:
     return ""
 
 
-def send_signup_verification_email(clean_email: str):
-    try:
-        supabase.auth.resend(
-            {
-                "type": "signup",
-                "email": clean_email,
-                "options": {
-                    "email_redirect_to": f"{FRONTEND_URL}/login",
-                },
-            }
-        )
-
-    except Exception as error:
-        logger.warning(
-            "auth.signup.verification_email_failed",
-            extra={"email": clean_email, "error_type": type(error).__name__},
-        )
-        raise HTTPException(
-            status_code=500,
-            detail="Could not send verification email",
-        ) from error
-
-
-def force_auth_user_email_unverified(auth_user_id: str):
-    try:
-        service_supabase.auth.admin.update_user_by_id(
-            auth_user_id,
-            {"email_confirm": False},
-        )
-
-    except Exception as error:
-        logger.warning(
-            "auth.signup.email_unconfirm_failed",
-            extra={"auth_id": auth_user_id, "error_type": type(error).__name__},
-        )
-        raise HTTPException(
-            status_code=500,
-            detail="Could not prepare email verification",
-        ) from error
-
-
 @router.post("/signup")
-def signup(user: SignUpRequest, request: Request):
+def signup(user: SignUpRequest, request: Request, response: Response):
     auth_user_id = None
     auth_user_created_this_request = False
-    tenant_id = None
+    recovered_verified_auth_user = False
     signup_complete = False
 
     try:
         clean_email = normalize_email(user.email)
         first_name = validate_person_name(user.first_name, "First name")
         last_name = validate_person_name(user.last_name, "Last name")
-        owner_name = f"{first_name} {last_name}".strip()
+        business_name = validate_optional_business_text(
+            user.business_name,
+            "Business name",
+        )
+        business_type = validate_optional_business_text(
+            user.business_type,
+            "Business type",
+        )
+        requested_subdomain = (
+            validate_onboarding_subdomain(user.subdomain)
+            if str(user.subdomain or "").strip()
+            else ""
+        )
 
         if not clean_email:
             raise HTTPException(status_code=400, detail="Email is required")
 
+        enforce_auth_rate_limit(request, "signup_ip")
         enforce_auth_rate_limit(request, "signup", clean_email)
 
-        if not user.password or len(user.password.strip()) < 8:
-            raise HTTPException(
-                status_code=400,
-                detail="Password must be at least 8 characters",
-            )
+        password = validate_password(user.password)
 
-        auth_user_id = recover_or_remove_orphaned_auth_user(clean_email, user.password)
-        recovered_verified_auth_user = bool(auth_user_id)
+        auth_user = recover_or_remove_orphaned_auth_user(clean_email, password)
+        recovered_verified_auth_user = bool(auth_user)
+        auth_user_id = (
+            str(getattr(auth_user, "id", "") or "")
+            if recovered_verified_auth_user
+            else None
+        )
         assert_email_is_available(clean_email, allowed_auth_id=auth_user_id)
+        if requested_subdomain:
+            ensure_subdomain_available(service_supabase, requested_subdomain)
 
         if not recovered_verified_auth_user:
             try:
-                auth_response = supabase.auth.sign_up(
+                # Create the provider identity without triggering an early email. The
+                # confirmation is sent only after local pending state is durable.
+                auth_response = service_supabase.auth.admin.create_user(
                     {
                         "email": clean_email,
-                        "password": user.password,
-                        "options": {
-                            "email_redirect_to": f"{FRONTEND_URL}/login",
-                            "data": {
-                                "first_name": first_name,
-                                "last_name": last_name,
-                            },
+                        "password": password,
+                        "email_confirm": False,
+                        "user_metadata": {
+                            "first_name": first_name,
+                            "last_name": last_name,
                         },
                     }
                 )
@@ -331,7 +350,7 @@ def signup(user: SignUpRequest, request: Request):
             except Exception as auth_create_error:
                 logger.warning(
                     "auth.signup.auth_create_failed",
-                    extra={"email": clean_email, "error_type": type(auth_create_error).__name__},
+                    extra={"error_type": type(auth_create_error).__name__},
                 )
                 friendly_message = get_auth_error_message(auth_create_error)
 
@@ -343,28 +362,11 @@ def signup(user: SignUpRequest, request: Request):
             if not auth_response.user:
                 raise HTTPException(status_code=400, detail="Could not create user")
 
+            auth_user = auth_response.user
             auth_user_id = str(auth_response.user.id)
             auth_user_created_this_request = True
-            force_auth_user_email_unverified(auth_user_id)
-            send_signup_verification_email(clean_email)
 
         assert_email_is_available(clean_email, allowed_auth_id=auth_user_id)
-
-        tenant_insert = (
-            service_supabase.table("tenants")
-            .insert(
-                {
-                    "brand_name": "",
-                    "owner_name": owner_name,
-                }
-            )
-            .execute()
-        )
-
-        if not tenant_insert.data:
-            raise HTTPException(status_code=400, detail="Could not create account")
-
-        tenant_id = tenant_insert.data[0]["tenant_id"]
 
         try:
             user_insert = (
@@ -375,9 +377,15 @@ def signup(user: SignUpRequest, request: Request):
                         "first_name": first_name,
                         "last_name": last_name,
                         "email": clean_email,
-                        "tenant_id": tenant_id,
-                        "email_verified": recovered_verified_auth_user,
-                        "email_verified_at": datetime.now(timezone.utc).isoformat() if recovered_verified_auth_user else None,
+                        "tenant_id": None,
+                        "account_kind": "platform",
+                        "email_verified": False,
+                        "email_verified_at": None,
+                        "account_status": PENDING_ACCOUNT_STATUS,
+                        "verification_required_at": datetime.now(timezone.utc).isoformat(),
+                        "pending_account_expires_at": (
+                            datetime.now(timezone.utc) + timedelta(days=14)
+                        ).isoformat(),
                     }
                 )
                 .execute()
@@ -386,7 +394,7 @@ def signup(user: SignUpRequest, request: Request):
         except Exception as user_insert_error:
             logger.warning(
                 "auth.signup.user_insert_failed",
-                extra={"auth_id": auth_user_id, "tenant_id": tenant_id, "error_type": type(user_insert_error).__name__},
+                extra={"auth_id": auth_user_id, "error_type": type(user_insert_error).__name__},
             )
             friendly_message = get_auth_error_message(user_insert_error)
 
@@ -400,15 +408,63 @@ def signup(user: SignUpRequest, request: Request):
 
         local_user = user_insert.data[0]
 
-        service_supabase.table("tenant_memberships").insert(
+        service_supabase.table("pending_account_onboarding").insert(
             {
-                "tenant_id": tenant_id,
                 "user_id": local_user["id"],
                 "auth_id": auth_user_id,
-                "role": "owner",
-                "status": "active",
+                "business_name": business_name or None,
+                "business_type": business_type or None,
+                "requested_subdomain": requested_subdomain or None,
+                "selected_plan": user.selected_plan,
+                "status": "pending",
             }
         ).execute()
+
+        delivery = {"retry_after": 0}
+        if recovered_verified_auth_user:
+            local_user, activated = synchronize_verified_account(auth_user, local_user)
+            record_verification_result(
+                auth_user=auth_user,
+                user_data=local_user,
+                request=request,
+                succeeded=True,
+            )
+            record_security_event(
+                request=request,
+                tenant_id=local_user.get("tenant_id"),
+                actor_user_id=local_user["id"],
+                action="auth.email_verification_succeeded",
+                target_type="user",
+                target_id=local_user["id"],
+                metadata={"provisioned": activated, "reason": "orphan_recovery"},
+            )
+        else:
+            delivery = send_verification_email(
+                auth_user=auth_user,
+                user_data=local_user,
+                request=request,
+                frontend_url=FRONTEND_URL,
+            )
+            if not delivery.get("sent"):
+                raise api_error(
+                    503,
+                    "email_verification_delivery_failed",
+                    "The account could not be created because the verification email was not sent.",
+                )
+
+            set_pending_verification_cookie(
+                response,
+                auth_id=auth_user_id,
+                user_id=local_user["id"],
+            )
+            record_security_event(
+                request=request,
+                actor_user_id=local_user["id"],
+                action="auth.email_verification_sent",
+                target_type="user",
+                target_id=local_user["id"],
+                metadata={"reason": "signup"},
+            )
 
         signup_complete = True
 
@@ -422,11 +478,13 @@ def signup(user: SignUpRequest, request: Request):
             "user": {
                 "auth_id": auth_user_id,
                 "local_id": local_user["id"],
-                "tenant_id": tenant_id,
+                "tenant_id": local_user.get("tenant_id"),
                 "email": clean_email,
                 "first_name": first_name,
                 "last_name": last_name,
+                "account_status": effective_account_status(local_user),
             },
+            "resend_available_after": delivery.get("retry_after", 60),
         }
 
     except HTTPException:
@@ -439,11 +497,11 @@ def signup(user: SignUpRequest, request: Request):
     finally:
         if not signup_complete and auth_user_id:
             try:
-                service_supabase.table("tenant_memberships").delete().eq(
+                service_supabase.table("pending_account_onboarding").delete().eq(
                     "auth_id", auth_user_id
                 ).execute()
             except Exception as cleanup_error:
-                logger.warning("auth.signup.membership_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
+                logger.warning("auth.signup.pending_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
 
             try:
                 service_supabase.table("users").delete().eq(
@@ -452,19 +510,261 @@ def signup(user: SignUpRequest, request: Request):
             except Exception as cleanup_error:
                 logger.warning("auth.signup.user_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
 
-        if not signup_complete and tenant_id is not None:
-            try:
-                service_supabase.table("tenants").delete().eq(
-                    "tenant_id", tenant_id
-                ).execute()
-            except Exception as cleanup_error:
-                logger.warning("auth.signup.tenant_cleanup_failed", extra={"tenant_id": tenant_id, "error_type": type(cleanup_error).__name__})
-
         if not signup_complete and auth_user_id and auth_user_created_this_request:
             try:
                 service_supabase.auth.admin.delete_user(auth_user_id)
             except Exception as cleanup_error:
                 logger.warning("auth.signup.auth_cleanup_failed", extra={"auth_id": auth_user_id, "error_type": type(cleanup_error).__name__})
+
+
+@router.get("/email-verification/status")
+def email_verification_status(request: Request, response: Response):
+    """Resolve only a signed pending context or provider access token."""
+    context = read_pending_verification_context(request)
+    bearer_token = get_bearer_token(request)
+
+    if not context and not bearer_token:
+        return {
+            "state": "unknown",
+            "account_status": None,
+            "resend_available_after": 0,
+        }
+
+    try:
+        if bearer_token:
+            auth_response = supabase.auth.get_user(bearer_token)
+            auth_user = auth_value(auth_response, "user")
+        else:
+            auth_user = get_auth_user_by_id(str(context["auth_id"]))
+
+        auth_id = str(auth_value(auth_user, "id") or "")
+        if not auth_user or not auth_id:
+            return {
+                "state": "unknown",
+                "account_status": None,
+                "resend_available_after": 0,
+            }
+        if context and auth_id != str(context.get("auth_id")):
+            return {
+                "state": "unknown",
+                "account_status": None,
+                "resend_available_after": 0,
+            }
+
+        local_user = get_local_user_by_auth_id(auth_id)
+        if not local_user:
+            return {
+                "state": "unknown",
+                "account_status": None,
+                "resend_available_after": 0,
+            }
+        if context and int(local_user.get("id")) != int(context.get("user_id")):
+            return {
+                "state": "unknown",
+                "account_status": None,
+                "resend_available_after": 0,
+            }
+
+        if not auth_user_email_is_verified(auth_user):
+            if (
+                effective_account_status(local_user) == EXPIRED_PENDING_ACCOUNT_STATUS
+                or pending_account_is_expired(local_user)
+            ):
+                if effective_account_status(local_user) != EXPIRED_PENDING_ACCOUNT_STATUS:
+                    service_supabase.table("users").update(
+                        {"account_status": EXPIRED_PENDING_ACCOUNT_STATUS}
+                    ).eq("id", local_user.get("id")).execute()
+                    record_security_event(
+                        request=request,
+                        actor_user_id=local_user.get("id"),
+                        action="auth.pending_account_expired",
+                        target_type="user",
+                        target_id=local_user.get("id"),
+                        metadata={"source": "verification_status"},
+                    )
+                    record_verification_result(
+                        auth_user=auth_user,
+                        user_data=local_user,
+                        request=request,
+                        succeeded=False,
+                        failure_code="pending_account_expired",
+                    )
+                return {
+                    "state": "expired",
+                    "account_status": EXPIRED_PENDING_ACCOUNT_STATUS,
+                    "masked_email": mask_email(canonical_auth_email(auth_user)),
+                    "resend_available_after": 0,
+                }
+
+            return {
+                "state": "pending",
+                "account_status": effective_account_status(local_user),
+                "masked_email": mask_email(canonical_auth_email(auth_user)),
+                "resend_available_after": resend_available_after(local_user),
+            }
+
+        synchronized, activated = synchronize_verified_account(auth_user, local_user)
+        delete_pending_verification_cookie(response)
+        if activated or local_user.get("email_verified") is not True:
+            record_verification_result(
+                auth_user=auth_user,
+                user_data=synchronized,
+                request=request,
+                succeeded=True,
+            )
+            record_security_event(
+                request=request,
+                tenant_id=synchronized.get("tenant_id"),
+                actor_user_id=synchronized.get("id"),
+                action="auth.email_verification_succeeded",
+                target_type="user",
+                target_id=synchronized.get("id"),
+                metadata={"provisioned": activated},
+            )
+        return {
+            "state": "verified",
+            "account_status": effective_account_status(synchronized),
+            "masked_email": mask_email(canonical_auth_email(auth_user)),
+            "resend_available_after": 0,
+            "continue_to": "/login",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.warning(
+            "auth.email_verification.status_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return {
+            "state": "provider_unavailable",
+            "account_status": None,
+            "resend_available_after": 0,
+        }
+
+
+@router.post("/email-verification/resend")
+def resend_email_verification(
+    payload: EmailVerificationResendRequest,
+    request: Request,
+):
+    context = read_pending_verification_context(request)
+    clean_email = normalize_email(str(payload.email or ""))
+    identifier = str((context or {}).get("auth_id") or clean_email or "anonymous")
+
+    try:
+        enforce_auth_rate_limit(request, "email_verification_resend_ip")
+        enforce_auth_rate_limit(request, "email_verification_resend", identifier)
+    except HTTPException as error:
+        if error.status_code == 429:
+            raise api_error(
+                429,
+                "email_verification_resend_limited",
+                "Too many verification email requests. Please try again later.",
+            ) from error
+        raise
+
+    known_context = bool(context)
+    local_user = None
+    auth_user = None
+
+    try:
+        if context:
+            local_user = get_local_user_by_auth_id(str(context["auth_id"]))
+            if local_user and int(local_user.get("id")) == int(context.get("user_id")):
+                auth_user = get_auth_user_by_id(str(context["auth_id"]))
+            else:
+                local_user = None
+        elif clean_email:
+            local_user = get_local_user_by_email(clean_email)
+            if local_user and local_user.get("auth_id"):
+                auth_user = get_auth_user_by_id(str(local_user["auth_id"]))
+                if canonical_auth_email(auth_user) != clean_email:
+                    local_user = None
+                    auth_user = None
+
+        if (
+            not local_user
+            or not auth_user
+            or auth_user_email_is_verified(auth_user)
+            or effective_account_status(local_user) in {
+                ACTIVE_ACCOUNT_STATUS,
+                EXPIRED_PENDING_ACCOUNT_STATUS,
+            }
+        ):
+            return {
+                "message": GENERIC_RESEND_MESSAGE,
+                "state": "pending",
+                "resend_available_after": 0,
+            }
+
+        delivery = send_verification_email(
+            auth_user=auth_user,
+            user_data=local_user,
+            request=request,
+            frontend_url=FRONTEND_URL,
+        )
+        action = (
+            "auth.email_verification_resend_limited"
+            if delivery.get("limited")
+            else "auth.email_verification_sent"
+            if delivery.get("sent")
+            else "auth.email_verification_failed"
+        )
+        record_security_event(
+            request=request,
+            actor_user_id=local_user.get("id"),
+            action=action,
+            target_type="user",
+            target_id=local_user.get("id"),
+            metadata={
+                "reason": "resend",
+                "delivery_status": (
+                    "limited" if delivery.get("limited") else "sent" if delivery.get("sent") else "failed"
+                ),
+            },
+        )
+
+        if known_context and delivery.get("limited"):
+            raise api_error(
+                429,
+                "email_verification_resend_limited",
+                "Please wait before requesting another verification email.",
+                context={
+                    "resend_available_after": int(delivery.get("retry_after") or 0),
+                },
+            )
+
+        response_payload = {
+            "message": GENERIC_RESEND_MESSAGE,
+            "state": "pending",
+            "resend_available_after": (
+                delivery.get("retry_after", 0) if known_context else 0
+            ),
+        }
+        if known_context and delivery.get("failure_code") == "provider_unavailable":
+            response_payload["state"] = "provider_unavailable"
+        return response_payload
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.warning(
+            "auth.email_verification.resend_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return {
+            "message": GENERIC_RESEND_MESSAGE,
+            "state": "provider_unavailable" if known_context else "pending",
+            "resend_available_after": 0,
+        }
+
+
+@router.post("/email-verification/clear-context")
+def clear_email_verification_context(response: Response):
+    """Forget only the signed pending-browser context; no account is deleted."""
+    delete_pending_verification_cookie(response)
+    return {"success": True}
 
 
 @router.post("/login")
@@ -478,6 +778,7 @@ def login(user: LogIn, response: Response, request: Request):
         if not clean_email:
             raise HTTPException(status_code=400, detail="Email is required")
 
+        enforce_auth_rate_limit(request, "login_ip")
         enforce_auth_rate_limit(request, "login", clean_email)
 
         auth_response = supabase.auth.sign_in_with_password(
@@ -499,53 +800,58 @@ def login(user: LogIn, response: Response, request: Request):
                 detail="Local user profile not found",
             )
 
-        if not auth_user_email_is_verified(auth_response.user):
-            raise HTTPException(
-                status_code=403,
-                detail="Please verify your email before logging in.",
+        if not is_platform_account(local_user):
+            raise api_error(
+                403,
+                "platform_account_required",
+                "Use the login page for the website where this account was created.",
             )
 
-        local_user = mark_local_email_verified(local_user)
+        if not auth_user_email_is_verified(auth_response.user):
+            set_pending_verification_cookie(
+                response,
+                auth_id=auth_user_id,
+                user_id=local_user["id"],
+            )
+            raise api_error(
+                403,
+                "email_verification_required",
+                "Verify your email before logging in.",
+                context={
+                    "resend_available_after": resend_available_after(local_user),
+                },
+            )
 
-        local_email = normalize_email(local_user.get("email"))
-
-        if local_email != clean_email:
-            existing_email_user = get_local_user_by_email(clean_email)
-
-            if (
-                existing_email_user
-                and str(existing_email_user.get("auth_id")) != auth_user_id
-            ):
-                raise HTTPException(
-                    status_code=409,
-                    detail="Email is already linked to another user",
+        provider_email = canonical_auth_email(auth_response.user)
+        requires_lifecycle_sync = (
+            effective_account_status(local_user) != ACTIVE_ACCOUNT_STATUS
+            or (provider_email and normalize_email(local_user.get("email")) != provider_email)
+        )
+        if requires_lifecycle_sync:
+            local_user, activated = synchronize_verified_account(
+                auth_response.user,
+                local_user,
+            )
+            if activated:
+                record_verification_result(
+                    auth_user=auth_response.user,
+                    user_data=local_user,
+                    request=request,
+                    succeeded=True,
                 )
-
-            try:
-                update_response = (
-                    service_supabase.table("users")
-                    .update({"email": clean_email})
-                    .eq("auth_id", auth_user_id)
-                    .execute()
+                record_security_event(
+                    request=request,
+                    tenant_id=local_user.get("tenant_id"),
+                    actor_user_id=local_user.get("id"),
+                    action="auth.email_verification_succeeded",
+                    target_type="user",
+                    target_id=local_user.get("id"),
+                    metadata={"provisioned": True},
                 )
+        else:
+            local_user = mark_local_email_verified(local_user)
 
-            except Exception as email_sync_error:
-                logger.warning(
-                    "auth.login.email_sync_failed",
-                    extra={"auth_id": auth_user_id, "error_type": type(email_sync_error).__name__},
-                )
-                raise HTTPException(
-                    status_code=409,
-                    detail="Could not sync login email",
-                )
-
-            if not update_response.data:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Could not sync user email",
-                )
-
-            local_user = update_response.data[0]
+        delete_pending_verification_cookie(response)
 
         mfa_enrollment_recommended = False
 
@@ -644,6 +950,35 @@ def login(user: LogIn, response: Response, request: Request):
         logger.warning("auth.login.failed", extra={"error_type": type(e).__name__})
         raw_message = str(e).lower()
         if "email" in raw_message and ("confirm" in raw_message or "verified" in raw_message):
+            if audit_user and pending_account_is_expired(audit_user):
+                try:
+                    service_supabase.table("users").update(
+                        {"account_status": EXPIRED_PENDING_ACCOUNT_STATUS}
+                    ).eq("id", audit_user.get("id")).execute()
+                except Exception as expiry_error:
+                    logger.warning(
+                        "auth.login.expiry_mark_failed",
+                        extra={"error_type": type(expiry_error).__name__},
+                    )
+                record_security_event(
+                    request=request,
+                    actor_user_id=audit_user.get("id"),
+                    action="auth.pending_account_expired",
+                    target_type="user",
+                    target_id=audit_user.get("id"),
+                    metadata={"source": "login"},
+                )
+                raise api_error(
+                    410,
+                    "pending_account_expired",
+                    "This pending account has expired. Please sign up again.",
+                )
+            if audit_user and audit_user.get("auth_id") and audit_user.get("id"):
+                set_pending_verification_cookie(
+                    response,
+                    auth_id=str(audit_user["auth_id"]),
+                    user_id=audit_user["id"],
+                )
             record_security_event(
                 request=request,
                 tenant_id=(audit_user or {}).get("tenant_id"),
@@ -657,9 +992,13 @@ def login(user: LogIn, response: Response, request: Request):
                     "error_type": type(e).__name__,
                 },
             )
-            raise HTTPException(
-                status_code=403,
-                detail="Please verify your email before logging in.",
+            raise api_error(
+                403,
+                "email_verification_required",
+                "Verify your email before logging in.",
+                context={
+                    "resend_available_after": resend_available_after(audit_user),
+                },
             )
 
         record_security_event(
@@ -682,6 +1021,12 @@ def login(user: LogIn, response: Response, request: Request):
 def user_status(request: Request, response: Response):
     try:
         _, user_data = get_authenticated_user_row(request, response, allow_refresh=False)
+        if not is_platform_account(user_data):
+            raise api_error(
+                403,
+                "platform_account_required",
+                "This account is limited to the website where it was created.",
+            )
         user_payload = build_user_payload(user_data)
         user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
         csrf_token = ensure_csrf_token(request, response)
@@ -692,14 +1037,17 @@ def user_status(request: Request, response: Response):
             "csrf_token": csrf_token,
         }
 
-    except HTTPException:
+    except HTTPException as error:
         # Keep this status probe non-destructive. A delayed/failed background
         # auth check can otherwise erase newer cookies from a successful refresh
         # or login response that reached the browser first.
-        return {
+        payload = {
             "logged_in": False,
             "user": None,
         }
+        if isinstance(error.detail, dict) and error.detail.get("code"):
+            payload["account_state"] = error.detail["code"]
+        return payload
 
     except Exception as e:
         logger.warning("auth.user_status.failed", extra={"error_type": type(e).__name__})
@@ -750,23 +1098,17 @@ def change_password(
             allow_admin_account_access=False,
         )
 
-        clean_email = normalize_email(user_data.get("email"))
-        current_password = payload.current_password.strip()
-        new_password = payload.new_password.strip()
+        clean_email = canonical_auth_email(auth_user)
+        current_password = payload.current_password
+        new_password = validate_password(payload.new_password, label="New password")
 
         if not clean_email:
             raise HTTPException(status_code=400, detail="User email not found")
 
-        if not current_password or not new_password:
+        if not current_password:
             raise HTTPException(
                 status_code=400,
-                detail="Current password and new password are required",
-            )
-
-        if len(new_password) < 8:
-            raise HTTPException(
-                status_code=400,
-                detail="New password must be at least 8 characters",
+                detail="Current password is required",
             )
 
         if current_password == new_password:

@@ -4674,6 +4674,23 @@ body.theme-dark .runtime-language-switch button:hover:not(.active),
   grid-column: 1 / -1;
 }
 
+.publish-unpublish-button {
+  align-self: flex-start;
+  border: 1px solid var(--theme-danger, #dc2626);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--theme-danger, #dc2626);
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.publish-unpublish-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .publish-panel {
   min-width: 0;
   border: 1px solid var(--madar-border);

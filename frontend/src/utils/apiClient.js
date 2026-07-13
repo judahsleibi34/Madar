@@ -93,6 +93,33 @@ export const readApiErrorCode = (data) => {
   return "";
 };
 
+export const readApiErrorContext = (data) => {
+  const context = data?.detail?.context ?? data?.context ?? data?.error?.context;
+
+  return context && typeof context === "object" && !Array.isArray(context)
+    ? context
+    : {};
+};
+
+export const parseApiError = (data, fallback = "Request failed") => ({
+  code: readApiErrorCode(data),
+  message: readApiError(data, fallback),
+  context: readApiErrorContext(data),
+});
+
+export const createApiError = (response, data, fallback = "Request failed") => {
+  const parsed = parseApiError(data, fallback);
+  const error = new Error(parsed.message);
+
+  error.name = "ApiError";
+  error.status = Number(response?.status || 0);
+  error.code = parsed.code;
+  error.context = parsed.context;
+  error.data = data;
+
+  return error;
+};
+
 const refreshCsrfToken = async () => {
   const response = await fetch(getApiUrl("/auth/user_status"), {
     method: "GET",
@@ -129,6 +156,9 @@ export const apiFetch = async (input, init = {}) => {
   const isAuthEndpoint =
     inputUrl.includes("/auth/login") ||
     inputUrl.includes("/auth/signup") ||
+    inputUrl.includes("/auth/email-verification/") ||
+    inputUrl.includes("/auth/forgot-password") ||
+    inputUrl.includes("/auth/password-reset") ||
     inputUrl.includes("/auth/log_out") ||
     inputUrl.includes("/auth/user_status") ||
     isAuthRefresh;

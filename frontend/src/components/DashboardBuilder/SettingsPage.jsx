@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImagePlus, KeyRound, Save, X } from "lucide-react";
 import SmartLink from "../SmartLink";
@@ -15,6 +15,7 @@ import { uploadBuilderAsset } from "../PageBuilder/services/PageBuilder.api";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
 import { getSettingsContent } from "../../content";
+import { buildProfilePayload } from "./profilePayload";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -29,6 +30,7 @@ const CONTROL_CHARS_PATTERN = new RegExp(
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
+const accountInfoRequests = new Map();
 
 const deferEffectStateUpdate = (callback) => {
   let cancelled = false;
@@ -59,6 +61,16 @@ const readApiResponse = async (response) => {
   } catch {
     return { detail: text };
   }
+};
+
+const loadAccountInfo = (url) => {
+  if (!accountInfoRequests.has(url)) {
+    const request = apiFetch(url, { method: "GET", cache: "no-store" })
+      .then(async (response) => ({ response, data: await readApiResponse(response) }))
+      .finally(() => accountInfoRequests.delete(url));
+    accountInfoRequests.set(url, request);
+  }
+  return accountInfoRequests.get(url);
 };
 
 const getInitialAccountForm = (user) => ({
@@ -98,20 +110,6 @@ const getApiErrorMessage = (detail, fallback) => {
   }
 
   return fallback;
-};
-
-const buildProfilePayload = (form) => {
-  const payload = {
-    first_name: form.first_name.trim(),
-    last_name: form.last_name.trim(),
-    phone: form.phone.trim(),
-    avatar: form.avatar.trim(),
-  };
-
-  const email = form.email.trim();
-  if (email) payload.email = email;
-
-  return payload;
 };
 
 const isValidEmail = (value) => {
@@ -202,6 +200,7 @@ export default function SettingsPage({
   const [notification, setNotification] = useState(null);
 
   const [isSavingAccount, setIsSavingAccount] = useState(false);
+  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
@@ -219,6 +218,13 @@ export default function SettingsPage({
         profileDescription: "These details are used for the admin dashboard and your account identity.",
       }
     : t;
+  const onUserUpdatedRef = useRef(onUserUpdated);
+  const userId = user?.id;
+
+  useEffect(() => {
+    onUserUpdatedRef.current = onUserUpdated;
+  }, [onUserUpdated]);
+
   const userApiPath = useCallback((path) => {
     if (accountApiBasePath) {
       const basePath = accountApiBasePath.startsWith("http")
@@ -228,12 +234,12 @@ export default function SettingsPage({
       return `${basePath}${path}`;
     }
 
-    if (!user?.id) {
+    if (!userId) {
       throw new Error(t.sessionExpired);
     }
 
-    return `${API_URL}/users/${encodeURIComponent(user.id)}${path}`;
-  }, [accountApiBasePath, t.sessionExpired, user]);
+    return `${API_URL}/users/${encodeURIComponent(userId)}${path}`;
+  }, [accountApiBasePath, t.sessionExpired, userId]);
 
   const avatarUrl = resolveMediaUrl(accountForm.avatar);
   const shouldShowAvatarImage = Boolean(avatarUrl) && !avatarLoadFailed;
@@ -329,17 +335,11 @@ export default function SettingsPage({
       errors.last_name = t.lastNameRequired;
     }
 
-    if (!accountForm.email.trim()) {
-      errors.email = t.emailRequired;
-    } else if (!isValidEmail(accountForm.email)) {
-      errors.email = t.emailInvalid;
-    }
-
     setFieldErrors((prev) => ({
       ...prev,
       first_name: errors.first_name || "",
       last_name: errors.last_name || "",
-      email: errors.email || "",
+      email: "",
     }));
 
     return errors;
@@ -380,7 +380,7 @@ export default function SettingsPage({
       setAccountForm(getInitialAccountForm(user));
       setAvatarLoadFailed(false);
     });
-  }, [user]);
+  }, [user, userId]);
 
   useEffect(() => {
     return deferEffectStateUpdate(() => {
@@ -398,12 +398,11 @@ export default function SettingsPage({
     let cancelled = false;
 
     const loadAccount = async () => {
-      try {
-        const response = await apiFetch(userApiPath("/info"), {
-          method: "POST",
-        });
+      if (!accountApiBasePath && !userId) return;
+      setIsLoadingAccount(true);
 
-        const data = await readApiResponse(response);
+      try {
+        const { response, data } = await loadAccountInfo(userApiPath("/info"));
 
         if (!response.ok) {
           if (!cancelled && response.status === 401) {
@@ -421,12 +420,14 @@ export default function SettingsPage({
         if (!cancelled && data.user) {
           setAccountForm(getInitialAccountForm(data.user));
           setAvatarLoadFailed(false);
-          onUserUpdated?.(data.user);
+          onUserUpdatedRef.current?.(data.user);
         }
       } catch {
         if (!cancelled) {
           showNotification("error", t.accountError);
         }
+      } finally {
+        if (!cancelled) setIsLoadingAccount(false);
       }
     };
 
@@ -435,7 +436,7 @@ export default function SettingsPage({
     return () => {
       cancelled = true;
     };
-  }, [onUserUpdated, t.accountError, t.sessionExpired, userApiPath]);
+  }, [accountApiBasePath, t.accountError, t.sessionExpired, userApiPath, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -771,6 +772,7 @@ export default function SettingsPage({
                   onChange={(event) =>
                     updateAccountField("first_name", event.target.value)
                   }
+                  disabled={isLoadingAccount}
                 />
                 {fieldErrors.first_name && (
                   <span className="settings-field-error">
@@ -787,6 +789,7 @@ export default function SettingsPage({
                   onChange={(event) =>
                     updateAccountField("last_name", event.target.value)
                   }
+                  disabled={isLoadingAccount}
                 />
                 {fieldErrors.last_name && (
                   <span className="settings-field-error">
@@ -800,16 +803,13 @@ export default function SettingsPage({
                 <input
                   type="email"
                   value={accountForm.email}
-                  className={fieldErrors.email ? "field-has-error" : ""}
-                  onChange={(event) =>
-                    updateAccountField("email", event.target.value)
-                  }
+                  readOnly
+                  disabled
+                  aria-describedby="settings-canonical-email-help"
                 />
-                {fieldErrors.email && (
-                  <span className="settings-field-error">
-                    {fieldErrors.email}
-                  </span>
-                )}
+                <small id="settings-canonical-email-help">
+                  {t.emailChangeUnavailable}
+                </small>
               </label>
 
               <label>
@@ -840,7 +840,7 @@ export default function SettingsPage({
             <button
               className="settings-save-button"
               type="submit"
-              disabled={isSavingAccount}
+              disabled={isLoadingAccount || isSavingAccount}
             >
               <Save size={18} />
               {isSavingAccount ? t.saving : t.saveProfile}
@@ -1023,4 +1023,3 @@ export default function SettingsPage({
     </section>
   );
 }
-

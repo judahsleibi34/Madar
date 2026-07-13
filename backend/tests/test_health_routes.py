@@ -1,0 +1,72 @@
+import unittest
+from unittest.mock import patch
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from routes import health_routes
+
+
+def build_client():
+    app = FastAPI()
+    app.include_router(health_routes.router)
+    return TestClient(app)
+
+
+class HealthRouteTests(unittest.TestCase):
+    def test_live_returns_ok(self):
+        response = build_client().get("/health/live")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+
+    def test_ready_returns_ok_when_configured(self):
+        client = build_client()
+
+        with patch.object(
+            health_routes,
+            "get_readiness",
+            return_value={
+                "ready": True,
+                "components": {
+                    "database": "ok",
+                    "redis": "ok",
+                    "auth": "ok",
+                    "storage": "ok",
+                    "schema": "ok",
+                    "admin_mfa_policy": "not_required",
+                },
+            },
+        ):
+            response = client.get("/health/ready")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.json()["ready"], True)
+
+    def test_ready_returns_degraded_when_config_missing(self):
+        client = build_client()
+
+        with patch.object(
+            health_routes,
+            "get_readiness",
+            return_value={
+                "ready": False,
+                "components": {
+                    "database": "ok",
+                    "redis": "unavailable",
+                    "auth": "ok",
+                    "storage": "ok",
+                    "schema": "ok",
+                    "admin_mfa_policy": "ok",
+                },
+            },
+        ):
+            response = client.get("/health/ready")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIs(response.json()["ready"], False)
+        self.assertEqual(response.json()["components"]["redis"], "unavailable")
+
+
+if __name__ == "__main__":
+    unittest.main()

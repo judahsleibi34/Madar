@@ -191,6 +191,68 @@ html[dir="rtl"] .register-card h1 {
   }
 }
 
+.verification-card {
+  max-width: 520px;
+  text-align: center;
+}
+
+.verification-icon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--theme-primary);
+  background: color-mix(in srgb, var(--theme-primary) 12%, transparent);
+}
+
+.verification-icon-success {
+  color: var(--theme-success, #15803d);
+  background: color-mix(in srgb, var(--theme-success, #15803d) 12%, transparent);
+}
+
+.verification-icon-error {
+  color: var(--theme-danger, #dc2626);
+  background: color-mix(in srgb, var(--theme-danger, #dc2626) 10%, transparent);
+}
+
+.verification-destination,
+.verification-help {
+  margin: 0;
+  color: var(--theme-text-muted);
+  line-height: 1.6;
+}
+
+.verification-destination strong {
+  color: var(--theme-text);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.verification-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.verification-actions .login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.verification-secondary {
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 /* ============================================================
    AUTH DARK MODE
    ============================================================ */
