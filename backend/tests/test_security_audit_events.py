@@ -94,9 +94,24 @@ class SecurityAuditEventTests(unittest.TestCase):
 
     def test_password_reset_request_records_audit_event(self):
         client = build_password_client()
-        fake_service = FakeSupabaseTableClient({"id": 5, "tenant_id": 7})
+        auth_user = SimpleNamespace(
+            id="auth-1",
+            email="user@example.com",
+            email_confirmed_at="2026-01-01T00:00:00Z",
+        )
+        local_user = {
+            "id": 5,
+            "auth_id": "auth-1",
+            "tenant_id": 7,
+            "account_status": "active",
+        }
 
-        with patch.object(password_routes, "service_supabase", fake_service),              patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "reset_password_email"),              patch.object(password_routes, "record_security_event") as record_security_event:
+        with patch.object(password_routes, "enforce_password_rate_limit"), \
+             patch.object(password_routes, "find_auth_user_by_email", return_value=auth_user), \
+             patch.object(password_routes, "get_local_user_by_auth_id", return_value=local_user), \
+             patch.object(password_routes, "create_password_reset_request", return_value="n" * 32), \
+             patch.object(password_routes.supabase.auth, "reset_password_email"), \
+             patch.object(password_routes, "record_security_event") as record_security_event:
             response = client.post("/auth/forgot-password", json={"email": "user@example.com"})
 
         self.assertEqual(response.status_code, 200)
@@ -110,8 +125,8 @@ class SecurityAuditEventTests(unittest.TestCase):
         client = build_password_client()
         requested_at = datetime.now(timezone.utc).isoformat()
 
-        with patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "get_user", return_value=SimpleNamespace(user=SimpleNamespace(id="auth-1"))),              patch.object(password_routes.admin_supabase.auth.admin, "update_user_by_id"),              patch.object(password_routes, "get_local_user_by_auth_id", return_value={"id": 5, "tenant_id": 7, "password_reset_requested_at": requested_at}),              patch.object(password_routes, "clear_password_reset_request"),              patch.object(password_routes, "record_security_event") as record_security_event:
-            response = client.post("/auth/password-reset", json={"access_token": "reset-token", "password": "new-password123"})
+        with patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "get_user", return_value=SimpleNamespace(user=SimpleNamespace(id="auth-1", email_confirmed_at="2026-01-01T00:00:00Z"))),              patch.object(password_routes.admin_supabase.auth.admin, "update_user_by_id"),              patch.object(password_routes, "get_local_user_by_auth_id", return_value={"id": 5, "tenant_id": 7, "password_reset_requested_at": requested_at}),              patch.object(password_routes, "claim_password_reset_request", return_value="request-1"),              patch.object(password_routes, "finish_password_reset_request"),              patch.object(password_routes, "clear_password_reset_request"),              patch.object(password_routes, "record_security_event") as record_security_event:
+            response = client.post("/auth/password-reset", json={"access_token": "reset-token", "password": "new-password123", "request_token": "n" * 32})
 
         self.assertEqual(response.status_code, 200)
         record_security_event.assert_called_once()
@@ -125,14 +140,11 @@ class SecurityAuditEventTests(unittest.TestCase):
         client = build_password_client()
         requested_at = (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()
 
-        with patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "get_user", return_value=SimpleNamespace(user=SimpleNamespace(id="auth-1"))),              patch.object(password_routes.admin_supabase.auth.admin, "update_user_by_id") as update_user_by_id,              patch.object(password_routes, "get_local_user_by_auth_id", return_value={"id": 5, "tenant_id": 7, "password_reset_requested_at": requested_at}),              patch.object(password_routes, "record_security_event"):
+        with patch.dict("os.environ", {"PASSWORD_RESET_LEGACY_LINKS_ALLOWED_UNTIL": "2099-01-01T00:00:00Z"}),              patch.object(password_routes, "enforce_password_rate_limit"),              patch.object(password_routes.supabase.auth, "get_user", return_value=SimpleNamespace(user=SimpleNamespace(id="auth-1", email_confirmed_at="2026-01-01T00:00:00Z"))),              patch.object(password_routes.admin_supabase.auth.admin, "update_user_by_id") as update_user_by_id,              patch.object(password_routes, "get_local_user_by_auth_id", return_value={"id": 5, "tenant_id": 7, "password_reset_requested_at": requested_at}),              patch.object(password_routes, "record_security_event"):
             response = client.post("/auth/password-reset", json={"access_token": "reset-token", "password": "new-password123"})
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(
-            response.json()["detail"],
-            "Password reset link expired. Request a new link.",
-        )
+        self.assertEqual(response.json()["detail"]["code"], "password_reset_expired")
         update_user_by_id.assert_not_called()
 
     def test_password_change_records_audit_event(self):
@@ -140,7 +152,7 @@ class SecurityAuditEventTests(unittest.TestCase):
         user_data = {"id": 5, "tenant_id": 7, "email": "user@example.com", "user_type": "user"}
         fake_service = SimpleNamespace(auth=SimpleNamespace(admin=SimpleNamespace(update_user_by_id=Mock())))
 
-        with patch.object(auth_routes, "get_authenticated_user_row", return_value=(SimpleNamespace(id="auth-1"), user_data)),              patch.object(auth_routes, "service_supabase", fake_service),              patch.object(auth_routes.supabase.auth, "sign_in_with_password", side_effect=[SimpleNamespace(user=SimpleNamespace(id="auth-1")), SimpleNamespace(session=None)]),              patch.object(auth_routes, "ensure_csrf_token", return_value="csrf"),              patch.object(auth_routes, "record_security_event") as record_security_event:
+        with patch.object(auth_routes, "get_authenticated_user_row", return_value=(SimpleNamespace(id="auth-1", email="user@example.com"), user_data)),              patch.object(auth_routes, "service_supabase", fake_service),              patch.object(auth_routes.supabase.auth, "sign_in_with_password", side_effect=[SimpleNamespace(user=SimpleNamespace(id="auth-1")), SimpleNamespace(session=None)]),              patch.object(auth_routes, "ensure_csrf_token", return_value="csrf"),              patch.object(auth_routes, "record_security_event") as record_security_event:
             response = client.put(
                 "/auth/password/change",
                 json={"current_password": "old-password123", "new_password": "new-password123"},

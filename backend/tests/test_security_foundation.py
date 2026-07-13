@@ -106,6 +106,10 @@ class SecurityFoundationTests(unittest.TestCase):
         def public_site_event():
             return {"ok": True}
 
+        @app.post("/auth/email-verification/resend")
+        def resend_email_verification():
+            return {"ok": True}
+
         @app.post("/public/sites/example/not-events")
         def unrelated_public_site_post():
             return {"ok": True}
@@ -319,6 +323,7 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/sites/example/auth/login",
             "/public/sites/example/auth/logout",
             "/public/sites/example/events",
+            "/auth/email-verification/resend",
         ]:
             with self.subTest(path=path):
                 response = client.post(

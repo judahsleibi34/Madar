@@ -15,6 +15,8 @@ from services.auth_service import (
     require_regular_user,
     require_regular_user_id,
 )
+from services.api_errors import api_error
+from services.identity_service import canonical_auth_email
 from services.url_validation import validate_public_url
 
 router = APIRouter(prefix="/users/{user_id}", tags=["User"])
@@ -145,12 +147,27 @@ def update_user_profile(
     response: Response,
 ):
     try:
-        _, user_data = require_regular_user_id(
+        auth_user, user_data = require_regular_user_id(
             user_id,
             request,
             response,
             allow_admin_account_access=False,
         )
+
+        if profile.email is not None:
+            clean_email = normalize_email(str(profile.email))
+            current_email = canonical_auth_email(auth_user) or normalize_email(
+                user_data.get("email")
+            )
+
+            if clean_email != current_email:
+                # Reject before constructing or issuing any update so a request
+                # cannot partially change names/avatar alongside an unsafe email.
+                raise api_error(
+                    409,
+                    "email_change_requires_verification_flow",
+                    "Email changes require a verified email-change flow.",
+                )
 
         update_payload = {}
 
@@ -159,31 +176,6 @@ def update_user_profile(
 
         if profile.last_name is not None:
             update_payload["last_name"] = profile.last_name.strip()
-
-        if profile.email is not None:
-            clean_email = normalize_email(str(profile.email))
-
-            if not clean_email:
-                raise HTTPException(status_code=400, detail="Email is required")
-
-            existing_user = (
-                service_supabase.table("users")
-                .select("id, auth_id, email")
-                .eq("email", clean_email)
-                .limit(1)
-                .execute()
-            )
-
-            if existing_user.data:
-                existing = existing_user.data[0]
-
-                if str(existing.get("auth_id")) != str(user_data.get("auth_id")):
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Email is already registered",
-                    )
-
-            update_payload["email"] = clean_email
 
         if profile.phone is not None:
             update_payload["phone"] = profile.phone.strip()
