@@ -773,3 +773,28 @@ body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-paginati
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+.tenant-runtime-action-message {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  box-shadow: 0 12px 30px rgba(var(--theme-shadow-rgb), 0.2);
+}
+
+.tenant-runtime-action-message button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
