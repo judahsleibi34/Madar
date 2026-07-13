@@ -56,7 +56,6 @@ import {
   createPosition,
 } from "../core/PageBuilder.factories";
 import {
-  heroSection,
   formSection,
   buildStarterProject,
   createBlankCanvasSection,
@@ -68,6 +67,7 @@ import { parseCarouselSlides, serializeCarouselSlides } from "../ui/PageBuilderC
 import PageBuilderModals from "./PageBuilderModals";
 import PageBuilderStatusBar from "./PageBuilderStatusBar";
 import PageBuilderWorkspaceHeader from "./PageBuilderWorkspaceHeader";
+import PageBuilderMeasuredFrame from "./PageBuilderMeasuredFrame";
 import {
   FormsTab,
   ReservationsTab,
@@ -131,7 +131,9 @@ import {
 import {
   getSectionElements,
   directElementHeight,
+  estimateFormBlockHeight,
   getMetricItems,
+  getMinimumBuilderSectionHeight,
   getMetricMinimumHeight,
   getDirectElementMinimumSize,
   getSectionCanvasHeight,
@@ -141,8 +143,8 @@ import {
   snapToGrid,
   getDragCandidatePosition,
   getMovedElementPosition,
-  moveFreeElementBetweenSections,
   createMovedFreeElement,
+  commitDirectElementInteraction,
 } from "../core/PageBuilder.layout";
 import {
   cleanBuilderProject,
@@ -161,6 +163,8 @@ import {
   getRowCarouselElements,
 } from "../core/PageBuilder.elementLayout";
 import {
+  getBuilderDraftReadStatus,
+  hasUnreadableBuilderDraft,
   loadInitialProject,
 } from "../core/PageBuilder.storage";
 import {
@@ -179,7 +183,9 @@ import {
   createBuilderProjectPayload,
   exportBuilderProjectJson,
 } from "../core/PageBuilder.persistence";
-import useDebouncedProjectStorage from "./hooks/useDebouncedProjectStorage";
+import useDebouncedProjectStorage, {
+  isNewerExternalDraftMessage,
+} from "./hooks/useDebouncedProjectStorage";
 
 import {
   getBuilderElementStyle,
@@ -469,16 +475,26 @@ export default function PageBuilder({
   const [project, setProject] = useState(() =>
     withDefaultLandingPage(getInitialWorkspaceProject({ demoMode, storageKey: scopedStorageKey }))
   );
-  const persistProjectNow = useDebouncedProjectStorage({
-    delay: 120,
-    disabled: demoMode,
+  const hasProtectedUnreadableDraft = hasUnreadableBuilderDraft(scopedStorageKey);
+  const hasUnrecoverableBrowserDraft =
+    getBuilderDraftReadStatus(scopedStorageKey) === "unrecoverable";
+  const {
+    acceptExternalRevision,
+    getLastPersistedAt: getLastLocalDraftPersistedAt,
+    hasUnsavedChanges: hasUnsavedLocalDraftChanges,
+    persistNow: persistProjectNow,
+    sourceId: draftSourceId,
+  } = useDebouncedProjectStorage({
+    delay: 7000,
+    disabled: demoMode || hasProtectedUnreadableDraft,
     project,
     storageKey: scopedStorageKey,
   });
   const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
   const [builderProjectLoading, setBuilderProjectLoading] = useState(!demoMode);
-  const [activeTab, setActiveTabState] = useState(routeTab || initialTab || "design");
-  const [designPanel, setDesignPanel] = useState("Pages");
+  const [internalActiveTab, setInternalActiveTab] = useState(initialTab || routeTab || "design");
+  const activeTab = hideWorkspaceTabs ? internalActiveTab : (routeTab || "design");
+  const [designPanel, setDesignPanelState] = useState(routeDesignPanel || "Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
   const [selected, setSelected] = useState(() => ({
@@ -509,14 +525,24 @@ export default function PageBuilder({
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
   const projectRef = useRef(project);
+  const dragPreviewFrameRef = useRef(null);
+  const pendingDragPreviewRef = useRef(null);
   const recentMetricAddRef = useRef(null);
   const userId = user?.id;
   const [textSelection, setTextSelection] = useState(null);
   const [inlineToolbarPosition, setInlineToolbarPosition] = useState(null);
-  const pendingTabNavigationRef = useRef("");
   const backendAutosaveTimerRef = useRef(null);
+  const backendBackupAutosaveTimerRef = useRef(null);
   const backendProjectSnapshotRef = useRef("");
   const pendingBackendProjectSnapshotRef = useRef("");
+  const builderProjectRecordRef = useRef(builderProjectRecord);
+  const remoteSaveInFlightRef = useRef(false);
+  const remoteSaveActiveSnapshotRef = useRef("");
+  const remoteSavePromiseRef = useRef(null);
+  const pendingRemoteSaveRef = useRef(null);
+  const externalDraftRevisionsRef = useRef(new Map());
+  const pendingExternalDraftRef = useRef(null);
+  const dragStateRef = useRef(dragState);
   const urlValidationToastShownRef = useRef(false);
 
   const showToast = useCallback((message) => {
@@ -537,12 +563,25 @@ export default function PageBuilder({
 
   const setActiveTab = useCallback(
     (nextTab) => {
-      setActiveTabState(nextTab);
+      if (hideWorkspaceTabs) {
+        setInternalActiveTab(nextTab);
+        return;
+      }
 
+      const nextPath = builderTabPathById[nextTab];
+      if (nextPath && location.pathname !== nextPath) {
+        navigate(nextPath);
+      }
+    },
+    [hideWorkspaceTabs, location.pathname, navigate]
+  );
+
+  const setDesignPanel = useCallback(
+    (nextPanel) => {
+      setDesignPanelState(nextPanel);
       if (hideWorkspaceTabs) return;
 
-      pendingTabNavigationRef.current = nextTab;
-      const nextPath = builderTabPathById[nextTab];
+      const nextPath = builderDesignPanelPathById[nextPanel] || builderTabPathById.design;
       if (nextPath && location.pathname !== nextPath) {
         navigate(nextPath);
       }
@@ -553,6 +592,14 @@ export default function PageBuilder({
   useEffect(() => {
     projectRef.current = project;
   }, [project]);
+
+  useEffect(() => {
+    builderProjectRecordRef.current = builderProjectRecord;
+  }, [builderProjectRecord]);
+
+  useEffect(() => {
+    dragStateRef.current = dragState;
+  }, [dragState]);
 
   useEffect(() => {
     const pending = recentMetricAddRef.current;
@@ -594,12 +641,12 @@ export default function PageBuilder({
 
   useEffect(() => {
     if (!routeTab) return;
-    if (pendingTabNavigationRef.current) return;
 
     return deferEffectStateUpdate(() => {
-      setActiveTabState(routeTab);
       if (routeTab === "design") {
-        setDesignPanel(routeDesignPanel);
+        setDesignPanelState((currentPanel) =>
+          currentPanel === routeDesignPanel ? currentPanel : routeDesignPanel
+        );
       }
       if (routeTab !== "design" && modal === "starter") {
         setModal(null);
@@ -614,34 +661,6 @@ export default function PageBuilder({
       navigate(builderTabPathById.design, { replace: true });
     }
   }, [hideWorkspaceTabs, location.pathname, navigate, routeTab]);
-
-  useEffect(() => {
-    if (hideWorkspaceTabs) return;
-    if (pendingTabNavigationRef.current) {
-      const pendingTab = pendingTabNavigationRef.current;
-      const pendingPath = builderTabPathById[pendingTab];
-
-      if (!pendingPath) {
-        pendingTabNavigationRef.current = "";
-      } else if (location.pathname !== pendingPath) {
-        navigate(pendingPath, { replace: true });
-        return;
-      } else {
-        pendingTabNavigationRef.current = "";
-      }
-
-    }
-
-    if (routeTab && routeTab !== activeTab) return;
-
-    const nextPath =
-      activeTab === "design"
-        ? builderDesignPanelPathById[designPanel] || builderTabPathById.design
-        : builderTabPathById[activeTab];
-    if (nextPath && location.pathname !== nextPath) {
-      navigate(nextPath, { replace: true });
-    }
-  }, [activeTab, designPanel, hideWorkspaceTabs, location.pathname, navigate, routeTab]);
 
   useEffect(() => {
     const requiresLayoutNormalization =
@@ -664,35 +683,68 @@ export default function PageBuilder({
   useEffect(() => {
     if (demoMode) return undefined;
 
-    const syncSerializedProject = (serializedProject) => {
-      if (!serializedProject) return;
+    const applyExternalDraft = (candidate) => {
+      if (!candidate?.serializedProject) return false;
       try {
-        const nextProject = cleanBuilderProject(JSON.parse(serializedProject));
-
-        setProject((currentProject) => {
-          const currentSerialized = JSON.stringify(cleanBuilderProject(currentProject));
-          const nextSerialized = JSON.stringify(nextProject);
-
-          return currentSerialized === nextSerialized ? currentProject : nextProject;
-        });
-      } catch {
-        if (import.meta.env.DEV) {
-          console.warn("Could not sync builder draft from another tab.");
+        const nextProject = cleanBuilderProject(JSON.parse(candidate.serializedProject));
+        const currentProject = projectRef.current;
+        if (candidate.projectId && currentProject?.id && candidate.projectId !== currentProject.id) {
+          return false;
         }
+        if (JSON.stringify(currentProject) === JSON.stringify(nextProject)) {
+          acceptExternalRevision(candidate.serializedProject, candidate.timestamp, candidate.revision);
+          return true;
+        }
+
+        acceptExternalRevision(candidate.serializedProject, candidate.timestamp, candidate.revision);
+        setProject(nextProject);
+        showToast("A newer draft from another tab was applied.");
+        return true;
+      } catch (error) {
+        if (import.meta.env.DEV) console.warn("Could not sync builder draft from another tab.", error);
+        return false;
       }
     };
 
-    const syncDraftFromStorage = () => {
-      syncSerializedProject(localStorage.getItem(scopedStorageKey));
+    const considerExternalDraft = (candidate) => {
+      const sourceKey = candidate.sourceId || "storage-fallback";
+      const previousRevision = externalDraftRevisionsRef.current.get(sourceKey) || 0;
+      if (!isNewerExternalDraftMessage(candidate, {
+        currentProjectId: projectRef.current?.id || "",
+        lastPersistedAt: getLastLocalDraftPersistedAt(),
+        previousRevision,
+        sourceId: draftSourceId,
+      })) return;
+      if (candidate.revision) externalDraftRevisionsRef.current.set(sourceKey, candidate.revision);
+
+      const editorBusy =
+        Boolean(dragStateRef.current) ||
+        remoteSaveInFlightRef.current ||
+        isBuilderTextEditingTarget(document.activeElement) ||
+        hasUnsavedLocalDraftChanges();
+      if (editorBusy) {
+        const pending = pendingExternalDraftRef.current;
+        if (!pending || Number(candidate.timestamp || 0) >= Number(pending.timestamp || 0)) {
+          pendingExternalDraftRef.current = candidate;
+        }
+        showToast("A newer draft from another tab is waiting until your local edits are safe.");
+        return;
+      }
+
+      applyExternalDraft(candidate);
     };
 
     const handleDraftStorageUpdate = (event) => {
-      if (event.key !== scopedStorageKey) return;
-      syncSerializedProject(event.newValue);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") syncDraftFromStorage();
+      if (draftSyncChannel) return;
+      if (event.key !== scopedStorageKey || !event.newValue) return;
+      considerExternalDraft({
+        sourceId: "storage-fallback",
+        revision: 0,
+        storageKey: scopedStorageKey,
+        projectId: "",
+        timestamp: Date.now(),
+        serializedProject: event.newValue,
+      });
     };
 
     const draftSyncChannel =
@@ -702,21 +754,58 @@ export default function PageBuilder({
 
     const handleBroadcastDraftUpdate = (event) => {
       if (event.data?.storageKey !== scopedStorageKey) return;
-      syncSerializedProject(event.data.serializedProject);
+      considerExternalDraft(event.data);
     };
 
     draftSyncChannel?.addEventListener("message", handleBroadcastDraftUpdate);
     window.addEventListener("storage", handleDraftStorageUpdate);
-    window.addEventListener("focus", syncDraftFromStorage);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       draftSyncChannel?.removeEventListener("message", handleBroadcastDraftUpdate);
       draftSyncChannel?.close();
       window.removeEventListener("storage", handleDraftStorageUpdate);
-      window.removeEventListener("focus", syncDraftFromStorage);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [demoMode, scopedStorageKey]);
+  }, [
+    acceptExternalRevision,
+    demoMode,
+    draftSourceId,
+    getLastLocalDraftPersistedAt,
+    hasUnsavedLocalDraftChanges,
+    scopedStorageKey,
+    showToast,
+  ]);
+
+  useEffect(() => {
+    const pending = pendingExternalDraftRef.current;
+    if (!pending || dragState || isSavingProject) return;
+    if (isBuilderTextEditingTarget(document.activeElement) || hasUnsavedLocalDraftChanges()) return;
+    if (pending.timestamp && pending.timestamp <= getLastLocalDraftPersistedAt()) {
+      pendingExternalDraftRef.current = null;
+      return;
+    }
+
+    try {
+      const nextProject = cleanBuilderProject(JSON.parse(pending.serializedProject));
+      if (pending.projectId && project.id && pending.projectId !== project.id) {
+        pendingExternalDraftRef.current = null;
+        return;
+      }
+      acceptExternalRevision(pending.serializedProject, pending.timestamp, pending.revision);
+      pendingExternalDraftRef.current = null;
+      setProject(nextProject);
+      showToast("The queued draft from another tab was applied.");
+    } catch (error) {
+      pendingExternalDraftRef.current = null;
+      if (import.meta.env.DEV) console.warn("Queued external builder draft was unreadable.", error);
+    }
+  }, [
+    acceptExternalRevision,
+    dragState,
+    getLastLocalDraftPersistedAt,
+    hasUnsavedLocalDraftChanges,
+    isSavingProject,
+    project,
+    showToast,
+  ]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -724,6 +813,13 @@ export default function PageBuilder({
     let cancelled = false;
     const cacheKey = user?.id || "current";
     const projectSnapshotAtLoadStart = getAutosaveSnapshot(projectRef.current);
+    let hasLocalDraftAtLoadStart = false;
+
+    try {
+      hasLocalDraftAtLoadStart = Boolean(localStorage.getItem(scopedStorageKey));
+    } catch {
+      // Continue with the backend project when storage is unavailable.
+    }
 
     const loadBackendProject = async () => {
       setBuilderProjectLoading(true);
@@ -774,7 +870,9 @@ export default function PageBuilder({
 
           setBuilderProjectRecord(fullRecord);
           backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
-          if (!localProjectChangedWhileLoading) {
+          // A local draft is the freshest edit source. Hydrating the backend
+          // record must not replace it after the workspace is already visible.
+          if (!hasLocalDraftAtLoadStart && !localProjectChangedWhileLoading) {
             setProject(nextProject);
             setSelected({ type: "page", id: nextProject.activePageId });
             persistProjectNow(nextProject);
@@ -807,7 +905,7 @@ export default function PageBuilder({
     return () => {
       cancelled = true;
     };
-  }, [demoMode, persistProjectNow, showToast, user?.id]);
+  }, [demoMode, persistProjectNow, scopedStorageKey, showToast, user?.id]);
 
   useEffect(() => {
     if (demoMode) {
@@ -871,13 +969,6 @@ export default function PageBuilder({
       });
     });
   }, [demoMode, websiteSettings?.subdomain]);
-
-  useEffect(() => {
-    if (demoMode) return;
-    if (!project) return;
-
-    persistProjectNow(project);
-  }, [demoMode, persistProjectNow, project]);
 
   const safeProjectPages = useMemo(
     () => (Array.isArray(project.pages) ? project.pages : []),
@@ -1284,6 +1375,7 @@ export default function PageBuilder({
         ? { connectedFormId: project.activeFormId }
         : {}
     );
+    const nextElementConnectedFormId = overrides.connectedFormId || element.connectedFormId;
     const existingTarget =
       activePage?.sections.find((section) => section.id === requestedSectionId) ||
       selectedSection ||
@@ -1308,7 +1400,12 @@ export default function PageBuilder({
       }, 8) + 16;
       const useDropPoint = viewportName === viewport && dropPoint;
       const width = Math.min(Number(base.width) || 380, canvasWidth - 24);
-      const height = directElementHeight(element);
+      const connectedForm = type === "formBlock"
+        ? project.forms.find((form) => form.id === nextElementConnectedFormId)
+        : null;
+      const height = type === "formBlock"
+        ? estimateFormBlockHeight(connectedForm, viewportName)
+        : directElementHeight(element);
 
       nextPosition[viewportName] = {
         ...base,
@@ -1321,6 +1418,7 @@ export default function PageBuilder({
       };
       requiredHeights[viewportName] = Math.max(
         getSectionCanvasHeight(targetSection, viewportName),
+        getMinimumBuilderSectionHeight(),
         nextPosition[viewportName].y + height + 24
       );
     });
@@ -1880,89 +1978,114 @@ export default function PageBuilder({
       silent: Boolean(options.silent),
     }), [demoMode, scopedStorageKey, showToast]);
 
-  const saveProject = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) {
-      setActiveTopbarAction("save");
-    }
-    setIsSavingProject(true);
-
-    const nextProject = {
-      ...project,
-      publish: {
-        ...project.publish,
-        lastSavedAt: new Date().toISOString(),
-      },
-    };
+  const saveSingleProjectRevision = useCallback(async ({ nextProject, silent }) => {
     const urlErrors = collectBuilderUrlErrors(nextProject);
-
     if (urlErrors.length > 0) {
-      setIsSavingProject(false);
-      if (!silent) {
-        showToast(urlErrors[0]);
-      }
-      return;
+      if (!silent) showToast(urlErrors[0]);
+      return false;
     }
 
     if (demoMode) {
       persistProject(nextProject, "Changes saved for this preview.", { silent });
-      setIsSavingProject(false);
-      return;
+      return true;
     }
-
     if (builderProjectLoading) {
-      setIsSavingProject(false);
-      if (!silent) {
-        showToast("Still loading your site. Try saving again in a moment.");
-      }
-      return;
+      if (!silent) showToast("Still loading your site. Try saving again in a moment.");
+      return false;
     }
 
-    persistProject(nextProject, "Saving your changes...", { silent });
+    if (silent) persistProjectNow(nextProject);
+    else persistProject(nextProject, "Saving your changes...", { silent: false });
 
     try {
+      const currentRecord = builderProjectRecordRef.current;
       const payload = createBuilderProjectPayload({
         project: nextProject,
-        builderProjectRecord,
+        builderProjectRecord: currentRecord,
         getBuilderProjectName,
         getBuilderProjectSlug,
       });
-
-      const savedRecord = builderProjectRecord?.id
-        ? await updateBuilderProject(builderProjectRecord.id, payload, userId)
+      const savedRecord = currentRecord?.id
+        ? await updateBuilderProject(currentRecord.id, payload, userId)
         : await createBuilderProject(payload, userId);
 
+      builderProjectRecordRef.current = savedRecord;
       setBuilderProjectRecord(savedRecord);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
       pendingBackendProjectSnapshotRef.current = "";
-      if (!silent) {
-        showToast("Your changes are saved.");
-      }
+      if (!silent) showToast("Your changes are saved.");
+      return true;
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Could not save builder project.");
-      }
-      if (isLikelySessionFailure(error)) {
-        if (!silent) {
-          showToast("Please sign in again, then save your changes.");
-        }
-        return;
-      }
-
+      if (import.meta.env.DEV) console.error("Could not save builder project.");
       if (!silent) {
-        showToast("Your changes are safe here. Please try saving again.");
+        showToast(
+          isLikelySessionFailure(error)
+            ? "Please sign in again, then save your changes."
+            : "Your changes are safe here. Please try saving again."
+        );
       }
-    } finally {
-      setIsSavingProject(false);
+      return false;
     }
-  }, [
-    builderProjectLoading,
-    builderProjectRecord,
-    demoMode,
-    persistProject,
-    project,
-    showToast,
-    userId,
-  ]);
+  }, [builderProjectLoading, demoMode, persistProject, persistProjectNow, showToast, userId]);
+
+  const saveProject = useCallback(({ silent = false, projectOverride = null } = {}) => {
+    if (hasProtectedUnreadableDraft) {
+      if (!silent) {
+        showToast("The stored draft is unreadable and was preserved. Export your current view before resolving it.");
+      }
+      return Promise.resolve(false);
+    }
+
+    const sourceProject = projectOverride || projectRef.current;
+    const nextProject = silent
+      ? sourceProject
+      : {
+          ...sourceProject,
+          publish: {
+            ...(sourceProject.publish || {}),
+            lastSavedAt: new Date().toISOString(),
+          },
+        };
+    const request = {
+      nextProject,
+      silent,
+      snapshot: getAutosaveSnapshot(nextProject),
+    };
+
+    if (!silent) setActiveTopbarAction("save");
+    if (remoteSaveInFlightRef.current) {
+      if (
+        silent &&
+        (request.snapshot === remoteSaveActiveSnapshotRef.current ||
+          request.snapshot === pendingRemoteSaveRef.current?.snapshot)
+      ) {
+        return remoteSavePromiseRef.current || Promise.resolve(false);
+      }
+      pendingRemoteSaveRef.current = request;
+      return remoteSavePromiseRef.current || Promise.resolve(false);
+    }
+
+    remoteSaveInFlightRef.current = true;
+    setIsSavingProject(true);
+    remoteSavePromiseRef.current = (async () => {
+      let currentRequest = request;
+      let result = false;
+      while (currentRequest) {
+        pendingRemoteSaveRef.current = null;
+        remoteSaveActiveSnapshotRef.current = currentRequest.snapshot;
+        result = await saveSingleProjectRevision(currentRequest);
+        currentRequest = pendingRemoteSaveRef.current;
+      }
+      return result;
+    })().finally(() => {
+      remoteSaveInFlightRef.current = false;
+      remoteSaveActiveSnapshotRef.current = "";
+      remoteSavePromiseRef.current = null;
+      setIsSavingProject(false);
+    });
+
+    return remoteSavePromiseRef.current;
+  }, [hasProtectedUnreadableDraft, saveSingleProjectRevision, showToast]);
 
   useEffect(() => {
     if (demoMode || builderProjectLoading) return;
@@ -1979,19 +2102,56 @@ export default function PageBuilder({
 
     window.clearTimeout(backendAutosaveTimerRef.current);
     backendAutosaveTimerRef.current = window.setTimeout(() => {
+      if (dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) return;
       pendingBackendProjectSnapshotRef.current = currentSnapshot;
-      saveProject({ silent: true }).finally(() => {
+      saveProject({ silent: true, projectOverride: project }).finally(() => {
         pendingBackendProjectSnapshotRef.current = "";
       });
-    }, 6000);
+    }, 7000);
 
     return () => {
       window.clearTimeout(backendAutosaveTimerRef.current);
     };
   }, [builderProjectLoading, demoMode, project, saveProject]);
 
+  useEffect(() => {
+    if (demoMode || builderProjectLoading) return undefined;
+    backendBackupAutosaveTimerRef.current = window.setInterval(() => {
+      const latestProject = projectRef.current;
+      if (!latestProject || dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) return;
+      const latestSnapshot = getAutosaveSnapshot(latestProject);
+      if (latestSnapshot === backendProjectSnapshotRef.current) return;
+      saveProject({ silent: true, projectOverride: latestProject });
+    }, 120000);
+    return () => window.clearInterval(backendBackupAutosaveTimerRef.current);
+  }, [builderProjectLoading, demoMode, saveProject]);
+
+  useEffect(() => {
+    if (demoMode || builderProjectLoading) return undefined;
+    const saveLatestIfSafe = () => {
+      if (dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) return;
+      const latestProject = projectRef.current;
+      if (!latestProject || getAutosaveSnapshot(latestProject) === backendProjectSnapshotRef.current) return;
+      saveProject({ silent: true, projectOverride: latestProject });
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") saveLatestIfSafe();
+    };
+    window.addEventListener("blur", saveLatestIfSafe);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("blur", saveLatestIfSafe);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [builderProjectLoading, demoMode, saveProject]);
+
   const saveThemeProject = async () => {
     setActiveTopbarAction("theme");
+
+    if (hasProtectedUnreadableDraft) {
+      showToast("The stored draft is unreadable and was preserved. Theme saving is paused for safety.");
+      return;
+    }
 
     const nextProject = {
       ...project,
@@ -2116,6 +2276,11 @@ export default function PageBuilder({
   const publishProject = async (skipOverlapCheck = false) => {
     setActiveTopbarAction("publish");
     setToast("");
+
+    if (hasProtectedUnreadableDraft) {
+      showToast("The stored draft is unreadable and was preserved. Publishing is paused for safety.");
+      return;
+    }
 
     if (!publicSiteSubdomain) {
       setActiveTab("publish");
@@ -2285,12 +2450,19 @@ export default function PageBuilder({
     }), [activePage, findElementLocation, viewport]);
 
   const getDirectElementFrameStyle = (element) => {
-    const style = getFreeElementStyle(element);
+    const previewPosition = dragState?.elementId === element.id ? dragState.previewPosition : null;
+    const renderedElement = previewPosition
+      ? {
+          ...element,
+          position: { ...(element.position || {}), [viewport]: previewPosition },
+        }
+      : element;
+    const style = getFreeElementStyle(renderedElement);
 
     if (element.type !== "formBlock") return style;
 
     const edge = viewport === "mobile" ? 12 : 24;
-    const position = element.position?.[viewport] || createPosition()[viewport];
+    const position = renderedElement.position?.[viewport] || createPosition()[viewport];
     const y = Math.max(0, Number(position.y) || 0);
 
     return {
@@ -2325,95 +2497,70 @@ export default function PageBuilder({
     }
   };
 
-  const syncDirectFormBlockSize = useCallback((sectionId, element, node) => {
-    if (!node || element.type !== "formBlock") return;
+  const reconcileDirectFormBlockSize = useCallback((sectionId, elementId, measuredHeight) => {
+    if (!measuredHeight || dragState?.elementId === elementId) return;
 
-    window.requestAnimationFrame(() => {
-      const content = node.querySelector(".direct-element-content");
-      const measuredHeight = Math.ceil(content?.scrollHeight || node.scrollHeight || 0);
-      if (!measuredHeight) return;
+    const canvasWidth = viewports[viewport] || viewports.desktop;
+    const edge = viewport === "mobile" ? 12 : 24;
+    const nextWidth = Math.max(120, canvasWidth - edge * 2);
 
-      const canvasWidth = viewports[viewport] || viewports.desktop;
-      const edge = viewport === "mobile" ? 12 : 24;
-      const nextWidth = Math.max(120, canvasWidth - edge * 2);
+    updateProject((prev) => {
+      let projectChanged = false;
+      const pages = prev.pages.map((page) => {
+        if (page.id !== activePage?.id) return page;
 
-      updateProject((prev) => {
-        let projectChanged = false;
-        const pages = prev.pages.map((page) => {
-          if (page.id !== activePage?.id) return page;
+        let pageChanged = false;
+        const sections = page.sections.map((section) => {
+          if (section.id !== sectionId) return section;
 
-          let pageChanged = false;
-          const sections = page.sections.map((section) => {
-            if (section.id !== sectionId) return section;
+          let formY = 0;
+          let geometryChanged = false;
+          const freeElements = (section.freeElements || []).map((item) => {
+            if (item.id !== elementId || item.type !== "formBlock") return item;
 
-            let changed = false;
-            let formY = Number(element.position?.[viewport]?.y) || 0;
-            const freeElements = (section.freeElements || []).map((item) => {
-              if (item.id !== element.id) return item;
+            const current = item.position?.[viewport] || createPosition()[viewport];
+            formY = Number(current.y) || 0;
+            const nextPosition = { ...current, x: edge, width: nextWidth, height: measuredHeight };
+            const changed =
+              Math.abs((Number(current.x) || 0) - nextPosition.x) > 1 ||
+              Math.abs((Number(current.width) || 0) - nextPosition.width) > 1 ||
+              Math.abs((Number(current.height) || 0) - nextPosition.height) > 1;
+            if (!changed) return item;
 
-              const current = item.position?.[viewport] || createPosition()[viewport];
-              formY = Number(current.y) || 0;
-              const nextPosition = {
-                ...current,
-                x: edge,
-                width: nextWidth,
-                height: measuredHeight,
-              };
-
-              const positionChanged =
-                Math.abs((Number(current.x) || 0) - nextPosition.x) > 1 ||
-                Math.abs((Number(current.width) || 0) - nextPosition.width) > 1 ||
-                Math.abs((Number(current.height) || 0) - nextPosition.height) > 1;
-
-              if (!positionChanged) return item;
-
-              changed = true;
-              return {
-                ...item,
-                position: {
-                  ...(item.position || {}),
-                  [viewport]: nextPosition,
-                },
-              };
-            });
-
-            const requiredHeight = formY + measuredHeight + edge;
-            const currentSectionHeight = getSectionCanvasHeight(section, viewport);
-            const nextMinHeight = Math.max(currentSectionHeight, requiredHeight);
-            const sectionHeightChanged = nextMinHeight !== currentSectionHeight;
-
-            if (!changed && !sectionHeightChanged) return section;
-
-            pageChanged = true;
+            geometryChanged = true;
             return {
-              ...section,
-              layout: {
-                ...(section.layout || {}),
-                minHeight:
-                  viewport === "desktop"
-                    ? nextMinHeight
-                    : section.layout?.minHeight,
-                minHeightByViewport: {
-                  ...(section.layout?.minHeightByViewport || {}),
-                  [viewport]: nextMinHeight,
-                },
-              },
-              freeElements,
+              ...item,
+              position: { ...(item.position || {}), [viewport]: nextPosition },
             };
           });
 
-          if (!pageChanged) return page;
-          projectChanged = true;
+          const currentSectionHeight = getSectionCanvasHeight(section, viewport);
+          const nextSectionHeight = Math.max(currentSectionHeight, formY + measuredHeight + edge);
+          if (!geometryChanged && nextSectionHeight === currentSectionHeight) return section;
+
+          pageChanged = true;
           return {
-            ...page,
-            sections,
+            ...section,
+            layout: {
+              ...(section.layout || {}),
+              minHeight: viewport === "desktop" ? nextSectionHeight : section.layout?.minHeight,
+              minHeightByViewport: {
+                ...(section.layout?.minHeightByViewport || {}),
+                [viewport]: nextSectionHeight,
+              },
+            },
+            freeElements,
           };
         });
 
-        return projectChanged ? { ...prev, pages } : prev;
+        if (!pageChanged) return page;
+        projectChanged = true;
+        return { ...page, sections };
       });
+
+      return projectChanged ? { ...prev, pages } : prev;
     });
-  }, [activePage?.id, updateProject, viewport]);
+  }, [activePage?.id, dragState?.elementId, updateProject, viewport]);
 
   const {
     handleSelectedElementImageUpload,
@@ -2488,6 +2635,7 @@ export default function PageBuilder({
 
     event.stopPropagation();
     event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
 
     const current = element.position?.[viewport] || createPosition()[viewport];
 
@@ -2500,6 +2648,9 @@ export default function PageBuilder({
       startY: current.y || 0,
       startWidth: current.width || 240,
       startHeight: current.height || 80,
+      pointerId: event.pointerId,
+      previewPosition: { ...current },
+      previewSectionHeight: 0,
       interaction,
     });
   }, [preview, viewport]);
@@ -2909,7 +3060,7 @@ export default function PageBuilder({
           <Baseline size={16} aria-hidden="true" />
           <input
             type="color"
-            value={selectedElement.styles?.selectedTextColor || selectedElement.styles?.color || "#1b2a4a"}
+            value={selectedElement.styles?.selectedTextColor || selectedElement.styles?.color || "#162033"}
             onChange={(event) => applyTextColor(event.target.value)}
           />
         </label>
@@ -2917,7 +3068,7 @@ export default function PageBuilder({
           <Highlighter size={16} aria-hidden="true" />
           <input
             type="color"
-            value={selectedElement.styles?.backgroundColor || "#ffffff"}
+            value={selectedElement.styles?.backgroundColor || "#fffdfa"}
             onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })}
           />
         </label>
@@ -2925,196 +3076,142 @@ export default function PageBuilder({
     );
   };
 
-  const handleMouseMove = (event) => {
-    if (!dragState || !selectedElement || selectedElement.id !== dragState.elementId) return;
+  const handlePointerMove = (event) => {
+    if (
+      !dragState ||
+      !selectedElement ||
+      selectedElement.id !== dragState.elementId ||
+      (dragState.pointerId !== undefined && event.pointerId !== dragState.pointerId)
+    ) return;
 
     const deltaX = event.clientX - dragState.startClientX;
     const deltaY = event.clientY - dragState.startClientY;
     const section = getElementSection(selectedElement.id);
     if (!section) return;
 
-    if (dragState.interaction === "move") {
-      const dropFrame = getDirectFrameAtPoint(event.clientX, event.clientY);
-      const dropSectionId = dropFrame?.dataset?.sectionId || "";
-      const nextDropSectionId = dropSectionId !== section.id ? dropSectionId : "";
-
-      if (nextDropSectionId !== (dragState.dropSectionId || "")) {
-        setDragState((currentState) => ({
-          ...currentState,
-          dropSectionId: nextDropSectionId,
-        }));
-      }
-    }
-
     const canvasWidth = viewports[viewport] || viewports.desktop;
     const canvasHeight = getSectionCanvasHeight(section, viewport);
-    const expandableCanvasHeight =
-      dragState.interaction === "move"
-        ? Math.max(
-            canvasHeight,
-            (Number(dragState.startY) || 0) +
-              Math.max(0, deltaY) +
-              (Number(dragState.startHeight) || 0) +
-              48
-          )
-        : canvasHeight;
+    const expandableCanvasHeight = Math.max(
+      canvasHeight,
+      (Number(dragState.startY) || 0) + Math.max(0, deltaY) + (Number(dragState.startHeight) || 0) + 48
+    );
     const candidate = getDragCandidatePosition({
-      dragState: {
-        ...dragState,
-        deltaX,
-        deltaY,
-      },
+      dragState: { ...dragState, deltaX, deltaY },
       selectedElement,
       canvasWidth,
       canvasHeight: expandableCanvasHeight,
-      getMetricMinimumHeight,
       snapToGrid,
     });
-    const constrainedCandidate =
-      dragState.interaction === "resize"
-        ? (() => {
+    const constrainedCandidate = dragState.interaction === "resize"
+      ? (section.freeElements || [])
+          .filter((element) => element.id !== selectedElement.id)
+          .reduce((nextCandidate, element) => {
             const spacing = 12;
-            const currentElements = section.freeElements || [];
+            const other = element.position?.[viewport] || createPosition()[viewport];
+            if (!positionsOverlap(nextCandidate, other, spacing)) return nextCandidate;
+
             const minimumSize = getDirectElementMinimumSize(selectedElement);
-
-            return currentElements
-              .filter((element) => element.id !== selectedElement.id)
-              .reduce((nextCandidate, element) => {
-                const other = element.position?.[viewport] || createPosition()[viewport];
-                if (!positionsOverlap(nextCandidate, other, spacing)) return nextCandidate;
-
-                const verticalRangesMeet =
-                  nextCandidate.y < other.y + other.height + spacing &&
-                  nextCandidate.y + nextCandidate.height + spacing > other.y;
-                const horizontalRangesMeet =
-                  nextCandidate.x < other.x + other.width + spacing &&
-                  nextCandidate.x + nextCandidate.width + spacing > other.x;
-                const isRightSideNeighbor =
-                  other.x >= dragState.startX + dragState.startWidth + spacing;
-                const clamped = { ...nextCandidate };
-
-                if (isRightSideNeighbor && verticalRangesMeet) {
-                  clamped.width = Math.max(
-                    Math.min(minimumSize.width, canvasWidth - nextCandidate.x),
-                    Math.round(other.x - nextCandidate.x - spacing)
-                  );
-                }
-
-                if (other.y >= nextCandidate.y && horizontalRangesMeet) {
-                  clamped.height = Math.max(
-                    minimumSize.height,
-                    Math.round(other.y - nextCandidate.y - spacing)
-                  );
-                }
-
-                return clamped;
-              }, candidate);
-          })()
-        : candidate;
-
+            const clamped = { ...nextCandidate };
+            const verticalRangesMeet = nextCandidate.y < other.y + other.height + spacing && nextCandidate.y + nextCandidate.height + spacing > other.y;
+            const horizontalRangesMeet = nextCandidate.x < other.x + other.width + spacing && nextCandidate.x + nextCandidate.width + spacing > other.x;
+            if (other.x >= dragState.startX + dragState.startWidth + spacing && verticalRangesMeet) {
+              clamped.width = Math.max(
+                Math.min(minimumSize.width, canvasWidth - nextCandidate.x),
+                Math.round(other.x - nextCandidate.x - spacing)
+              );
+            }
+            if (other.y >= nextCandidate.y && horizontalRangesMeet) {
+              clamped.height = Math.max(minimumSize.height, Math.round(other.y - nextCandidate.y - spacing));
+            }
+            return clamped;
+          }, candidate)
+      : candidate;
     const current = selectedElement.position?.[viewport] || createPosition()[viewport];
-    const requiredSectionHeight = snapToGrid((Number(constrainedCandidate.y) || 0) + (Number(constrainedCandidate.height) || 0) + 48);
-    const nextPosition = {
-      ...current,
-      ...constrainedCandidate,
+    const previewPosition = { ...current, ...constrainedCandidate };
+    const dropFrame = dragState.interaction === "move"
+      ? getDirectFrameAtPoint(event.clientX, event.clientY)
+      : null;
+    const dropSectionId = dropFrame?.dataset?.sectionId;
+
+    pendingDragPreviewRef.current = {
+      previewPosition,
+      previewSectionHeight: Math.max(
+        canvasHeight,
+        snapToGrid((Number(previewPosition.y) || 0) + (Number(previewPosition.height) || 0) + 48)
+      ),
+      dropSectionId: dropSectionId && dropSectionId !== section.id ? dropSectionId : "",
     };
 
-    if (
-      Number(current.x) === Number(nextPosition.x) &&
-      Number(current.y) === Number(nextPosition.y) &&
-      Number(current.width) === Number(nextPosition.width) &&
-      Number(current.height) === Number(nextPosition.height)
-    ) {
-      return;
-    }
-
-    if (
-      (dragState.interaction === "resize" || dragState.interaction === "move") &&
-      requiredSectionHeight > canvasHeight
-    ) {
-      updateSections((sections) =>
-        sections.map((item) =>
-          item.id === section.id
-            ? {
-                ...item,
-                layout: {
-                  ...item.layout,
-                  minHeight:
-                    viewport === "desktop"
-                      ? requiredSectionHeight
-                      : item.layout?.minHeight,
-                  minHeightByViewport: {
-                    ...(item.layout?.minHeightByViewport || {}),
-                    [viewport]: requiredSectionHeight,
-                  },
-                },
-              }
-            : item
-        )
-      );
-    }
-
-    updateSelectedElement({
-      position: {
-        ...selectedElement.position,
-        [viewport]: nextPosition,
-      },
+    if (dragPreviewFrameRef.current !== null) return;
+    dragPreviewFrameRef.current = window.requestAnimationFrame(() => {
+      dragPreviewFrameRef.current = null;
+      const previewUpdate = pendingDragPreviewRef.current;
+      if (!previewUpdate) return;
+      setDragState((currentState) => currentState ? { ...currentState, ...previewUpdate } : currentState);
     });
   };
 
-  const handleMouseUp = (event) => {
-    if (!dragState || dragState.interaction !== "move" || !selectedElement) {
-      setDragState(null);
-      return;
-    }
+  const handlePointerUp = (event) => {
+    if (!dragState || !selectedElement || selectedElement.id !== dragState.elementId) return;
 
-    const targetFrame = dragState.dropSectionId
-      ? document.querySelector(
-          `.direct-layout-frame[data-section-id="${CSS.escape(dragState.dropSectionId)}"]`
-        )
-      : getDirectFrameAtPoint(event.clientX, event.clientY);
-    const targetSectionId = targetFrame?.dataset?.sectionId;
+    if (dragPreviewFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragPreviewFrameRef.current);
+      dragPreviewFrameRef.current = null;
+    }
+    const finalPreview = pendingDragPreviewRef.current || dragState;
+    pendingDragPreviewRef.current = null;
     const sourceLocation = findElementLocation(selectedElement.id);
+    const targetFrame = finalPreview.dropSectionId
+      ? document.querySelector(`.direct-layout-frame[data-section-id="${CSS.escape(finalPreview.dropSectionId)}"]`)
+      : null;
+    const targetSection = activePage?.sections.find((section) => section.id === finalPreview.dropSectionId);
 
-    if (!targetSectionId || !sourceLocation || targetSectionId === sourceLocation.sectionId) {
-      setDragState(null);
-      return;
-    }
+    if (targetFrame && targetSection && sourceLocation && sourceLocation.sectionId !== targetSection.id) {
+      const frameRect = targetFrame.getBoundingClientRect();
+      const nextPosition = getMovedElementPosition({
+        selectedElement,
+        targetSection,
+        viewport,
+        event,
+        frameRect,
+        viewports,
+        createPosition,
+        getSectionCanvasHeight,
+      });
+      const movedElement = createMovedFreeElement(selectedElement, nextPosition);
 
-    const targetSection = activePage?.sections.find((section) => section.id === targetSectionId);
-    const frameRect = targetFrame.getBoundingClientRect();
-
-    if (!targetSection || !frameRect.width || !frameRect.height) {
-      setDragState(null);
-      return;
-    }
-
-    const nextPosition = getMovedElementPosition({
-      selectedElement,
-      targetSection,
-      viewport,
-      event,
-      frameRect,
-      viewports,
-      createPosition,
-      getSectionCanvasHeight,
-    });
-
-    const movedElement = createMovedFreeElement(selectedElement, nextPosition);
-
-    updateSections((sections) =>
-      moveFreeElementBetweenSections({
-        sections,
-        sourceSectionId: sourceLocation.sectionId,
-        targetSectionId,
+      updateSections((sections) => commitDirectElementInteraction(sections, {
         elementId: selectedElement.id,
         movedElement,
-      })
-    );
+        sourceSectionId: sourceLocation.sectionId,
+        targetSectionId: targetSection.id,
+      }));
+      showToast(`Moved ${selectedElement.name || "component"} to ${targetSection.name || "section"}.`);
+    } else if (sourceLocation && finalPreview.previewPosition) {
+      updateSections((sections) => commitDirectElementInteraction(sections, {
+        elementId: selectedElement.id,
+        previewPosition: finalPreview.previewPosition,
+        previewSectionHeight: finalPreview.previewSectionHeight,
+        sourceSectionId: sourceLocation.sectionId,
+        viewportName: viewport,
+      }));
+    }
 
     setDragState(null);
     setSelected({ type: "element", id: selectedElement.id });
-    showToast(`Moved ${selectedElement.name || "component"} to ${targetSection.name || "section"}.`);
+    window.setTimeout(() => {
+      const committedProject = projectRef.current;
+      if (committedProject) saveProject({ silent: true, projectOverride: committedProject });
+    }, 0);
+  };
+
+  const handlePointerCancel = () => {
+    if (dragPreviewFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragPreviewFrameRef.current);
+      dragPreviewFrameRef.current = null;
+    }
+    pendingDragPreviewRef.current = null;
+    setDragState(null);
   };
 
   const {
@@ -3154,7 +3251,14 @@ export default function PageBuilder({
     ]
   );
 
+  const hasActiveQuizSession = useMemo(
+    () => Object.values(quizSessions).some((session) => session?.active),
+    [quizSessions]
+  );
+
   useEffect(() => {
+    if (!hasActiveQuizSession) return undefined;
+
     const timer = window.setInterval(() => {
       setQuizSessions((prev) => {
         let changed = false;
@@ -3182,7 +3286,7 @@ export default function PageBuilder({
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [hasActiveQuizSession]);
 
   useEffect(() => {
     Object.entries(quizSessions).forEach(([formId, session]) => {
@@ -3641,13 +3745,16 @@ export default function PageBuilder({
 
           {activePage?.sections.map((section) => {
             const isSelected = selected.type === "section" && selected.id === section.id;
+            const renderedSectionHeight = dragState?.elementId && getElementSection(dragState.elementId)?.id === section.id
+              ? Math.max(getSectionCanvasHeight(section, viewport), Number(dragState.previewSectionHeight) || 0)
+              : getSectionCanvasHeight(section, viewport);
 
             if (section.mode === "direct") {
               return (
                 <section
                   key={section.id}
                   className={`site-section direct-layout-section width-${section.layout.width} ${isSelected ? "is-selected" : ""} ${dragState?.dropSectionId === section.id || paletteDropSectionId === section.id ? "is-drop-target" : ""}`}
-                  style={{ backgroundColor: section.layout.background, minHeight: getSectionCanvasHeight(section, viewport) }}
+                  style={{ backgroundColor: section.layout.background, minHeight: renderedSectionHeight }}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (!preview) {
@@ -3666,7 +3773,7 @@ export default function PageBuilder({
                   <div
                     className="direct-layout-frame"
                     data-section-id={section.id}
-                    style={{ width: `min(100%, ${viewports[viewport]}px)`, minHeight: `${getSectionCanvasHeight(section, viewport)}px` }}
+                    style={{ width: `min(100%, ${viewports[viewport]}px)`, minHeight: `${renderedSectionHeight}px` }}
                     onDragOver={(event) => {
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "copy";
@@ -3681,11 +3788,19 @@ export default function PageBuilder({
                   >
                     {(section.freeElements || []).map((element) => {
                       const elementSelected = selected.type === "element" && selected.id === element.id;
+                      const DirectFrame = element.type === "formBlock" ? PageBuilderMeasuredFrame : "div";
 
                       return (
-                        <div
+                        <DirectFrame
                           key={element.id}
-                          ref={(node) => syncDirectFormBlockSize(section.id, element, node)}
+                          {...(element.type === "formBlock"
+                            ? {
+                                measureEnabled: !preview && dragState?.elementId !== element.id,
+                                measurementKey: `${element.id}:${viewport}`,
+                                onMeasuredHeight: (height) =>
+                                  reconcileDirectFormBlockSize(section.id, element.id, height),
+                              }
+                            : {})}
                           className={`direct-element-frame direct-element-frame-${element.type} ${elementSelected ? "is-selected" : ""}`}
                           style={getDirectElementFrameStyle(element)}
                           tabIndex={-1}
@@ -3694,7 +3809,7 @@ export default function PageBuilder({
                             event.currentTarget.focus({ preventScroll: true });
                             setSelected({ type: "element", id: element.id });
                           }}
-                          onMouseDown={
+                          onPointerDown={
                             preview
                               ? undefined
                               : (event) =>
@@ -3716,7 +3831,7 @@ export default function PageBuilder({
                                 className="direct-move-handle"
                                 aria-label={`Move ${element.name || "component"}`}
                                 title="Drag to move in any direction"
-                                onMouseDown={(event) => startDrag(event, element, "move", true)}
+                                onPointerDown={(event) => startDrag(event, element, "move", true)}
                               >
                                 <Move size={13} aria-hidden="true" />
                               </button>
@@ -3725,11 +3840,11 @@ export default function PageBuilder({
                                 className="direct-resize-handle"
                                 aria-label={`Resize ${element.name || "component"}`}
                                 title="Drag to resize"
-                                onMouseDown={(event) => startDrag(event, element, "resize", true)}
+                                onPointerDown={(event) => startDrag(event, element, "resize", true)}
                               />
                             </>
                           )}
-                        </div>
+                        </DirectFrame>
                       );
                     })}
                   </div>
@@ -4039,7 +4154,7 @@ export default function PageBuilder({
               </label>
               <label>
                 Metric text color
-                <input type="color" value={getColorInputValue(selectedElement.styles?.metricTextColor, "#172b4d")} onChange={(event) => updateSelectedElement({ styles: { metricTextColor: event.target.value } })} />
+                <input type="color" value={getColorInputValue(selectedElement.styles?.metricTextColor, "#162033")} onChange={(event) => updateSelectedElement({ styles: { metricTextColor: event.target.value } })} />
               </label>
               <label>
                 Symbol color (+, %, etc.)
@@ -4633,6 +4748,24 @@ export default function PageBuilder({
     </nav>
   );
 
+  if (hasUnrecoverableBrowserDraft && !builderProjectRecord) {
+    return (
+      <div className={getPageBuilderThemeClassName({ mode: appThemeMode || "light", renderMode: "editing" })}>
+        <main className="workspace-page" role="alert" aria-live="assertive">
+          <section className="workspace-header">
+            <div>
+              <span className="workspace-kicker">Draft recovery</span>
+              <h2>{builderProjectLoading ? "Checking for a safe backend copy..." : "This browser draft cannot be read"}</h2>
+              <p>
+                The original browser value and its backup were left untouched. Saving and publishing are paused so neither value can be replaced with an empty project.
+              </p>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   const activeHelper =
     builderCopy.tabs[activeTab]?.helper ||
     builderTabs.find((tab) => tab.id === activeTab)?.helper ||
@@ -4648,6 +4781,7 @@ export default function PageBuilder({
     getPageBuilderThemeClassName({
       mode: appThemeMode || "light",
       preview,
+      renderMode: preview ? "preview" : "editing",
     }) +
     (activeTab === "forms" ? " forms-workspace-active" : "") +
     (activeTab === "responses" ? " responses-workspace-active" : "") +
@@ -4678,9 +4812,9 @@ export default function PageBuilder({
     <div
       className={pageBuilderClassName}
       onKeyDown={handleBuilderTextFieldKeyDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={() => setDragState(null)}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
     >
       <div className="builder-desktop-shell">
         <PageBuilderWorkspaceHeader

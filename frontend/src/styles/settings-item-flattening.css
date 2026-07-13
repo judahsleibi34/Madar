@@ -1,0 +1,101 @@
+/* Repeated settings are content within a panel, not nested cards.
+   Keep only actual interactive fields and actions on surface-2. */
+:where(
+  .forms-theme-token,
+  .forms-theme-color-input,
+  .forms-theme-shape-grid > label,
+  .theme-token-control,
+  .theme-token-input,
+  .theme-number-control,
+  .theme-select-control,
+  .theme-sidebar-grid .theme-token-control,
+  .theme-sidebar-grid .theme-token-input,
+  .theme-sidebar-grid .theme-number-control,
+  .theme-sidebar-grid .theme-select-control
+) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.forms-theme-color-input,
+.theme-token-input,
+.theme-sidebar-grid .theme-token-input {
+  min-height: 34px;
+  padding: 2px 0 !important;
+}
+
+.forms-theme-token > span:first-child,
+.forms-theme-shape-grid > label,
+.theme-token-label {
+  color: var(--text-primary) !important;
+}
+
+.forms-theme-color-input strong,
+.theme-token-value,
+.theme-sidebar-grid .theme-token-value {
+  color: var(--text-secondary) !important;
+}
+
+/* Number/select fields are inputs, so they retain the nested control surface. */
+:where(
+  .forms-theme-shape-grid input,
+  .theme-number-control input,
+  .theme-select-control select,
+  .theme-sidebar-grid .theme-number-control input,
+  .theme-sidebar-grid .theme-select-control select
+) {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--app-radius-control) !important;
+  color: var(--text-primary) !important;
+}
+
+.forms-theme-grid,
+.forms-theme-shape-grid,
+.theme-grid,
+.theme-sidebar-grid {
+  row-gap: 14px;
+}
+
+/* Form actions are a compact menu inside the sidebar panel, not a stack of
+   nested cards. Semantic color and hover state communicate action type. */
+.page-builder .forms-form-actions-group .form-command-button,
+.page-builder.theme-dark .forms-form-actions-group .form-command-button,
+:root[data-theme="dark"] .page-builder .forms-form-actions-group .form-command-button,
+body.theme-dark .page-builder .forms-form-actions-group .form-command-button {
+  min-height: 38px !important;
+  padding: 8px 6px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .forms-form-actions-group .form-command-button:last-child {
+  border-bottom: 0 !important;
+}
+
+.page-builder .forms-form-actions-group .form-command-button:hover:not(:disabled) {
+  background: var(--surface-2) !important;
+  color: var(--accent) !important;
+  -webkit-text-fill-color: var(--accent) !important;
+}
+
+.page-builder .forms-form-actions-group .form-command-button-primary {
+  color: var(--accent) !important;
+  -webkit-text-fill-color: var(--accent) !important;
+}
+
+.page-builder .forms-form-actions-group .form-command-button-danger {
+  color: var(--theme-danger) !important;
+  -webkit-text-fill-color: var(--theme-danger) !important;
+}

@@ -48,9 +48,9 @@
   --space-3xl: 5rem;
 
   --radius-sm: 0.625rem;
-  --radius-md: 0.875rem;
-  --radius-lg: 1.375rem;
-  --radius-xl: 1.75rem;
+  --radius-md: var(--app-radius-control);
+  --radius-lg: var(--app-radius-card);
+  --radius-xl: var(--app-radius-panel);
   --radius-full: 999px;
 
   --shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.08);

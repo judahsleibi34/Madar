@@ -1,5 +1,4 @@
 export const MADAR_THEME_STORAGE_KEY = "madar-theme-mode";
-const MADAR_LIGHT_THEME_RESTORE_KEY = "madar-light-theme-restored-v1";
 
 export const SUPPORTED_THEME_MODES = {
   light: {
@@ -20,12 +19,6 @@ export function normalizeThemeMode(mode) {
 
 export function readStoredThemeMode() {
   try {
-    if (localStorage.getItem(MADAR_LIGHT_THEME_RESTORE_KEY) !== "true") {
-      localStorage.setItem(MADAR_THEME_STORAGE_KEY, "light");
-      localStorage.setItem(MADAR_LIGHT_THEME_RESTORE_KEY, "true");
-      return "light";
-    }
-
     const stored = localStorage.getItem(MADAR_THEME_STORAGE_KEY);
     return stored === "dark" || stored === "light" ? stored : "light";
   } catch {
@@ -33,37 +26,63 @@ export function readStoredThemeMode() {
   }
 }
 
-export function applyThemeMode(mode) {
+export function applyThemeMode(mode, { emit = true, persist = true } = {}) {
   const safeMode = normalizeThemeMode(mode);
   const activeTheme = SUPPORTED_THEME_MODES[safeMode];
+  const previousMode = document.documentElement.dataset.theme;
 
   document.documentElement.dataset.theme = safeMode;
+  document.documentElement.style.colorScheme = activeTheme.colorScheme;
 
   Object.values(SUPPORTED_THEME_MODES).forEach(({ className }) => {
-    document.documentElement.classList.remove(className);
+    document.documentElement.classList.toggle(className, className === activeTheme.className);
   });
-
-  document.documentElement.classList.add(activeTheme.className);
 
   if (document.body) {
     Object.values(SUPPORTED_THEME_MODES).forEach(({ className }) => {
-      document.body.classList.remove(className);
+      document.body.classList.toggle(className, className === activeTheme.className);
     });
-
-    document.body.classList.add(activeTheme.className);
   }
 
-  try {
-    localStorage.setItem(MADAR_THEME_STORAGE_KEY, safeMode);
-  } catch {
-    // Ignore localStorage errors.
+  if (persist) {
+    try {
+      localStorage.setItem(MADAR_THEME_STORAGE_KEY, safeMode);
+    } catch {
+      // Ignore localStorage errors.
+    }
   }
 
-  window.dispatchEvent(
-    new CustomEvent("madar-theme-change", {
-      detail: { mode: safeMode },
-    })
-  );
+  if (emit && previousMode !== safeMode) {
+    window.dispatchEvent(
+      new CustomEvent("madar-theme-change", {
+        detail: { mode: safeMode },
+      })
+    );
+  }
 
   return safeMode;
+}
+
+export function transitionThemeMode(mode) {
+  const safeMode = normalizeThemeMode(mode);
+  if (document.documentElement.dataset.theme === safeMode) return safeMode;
+
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if (!reduceMotion && typeof document.startViewTransition === "function") {
+    document.startViewTransition(() => applyThemeMode(safeMode));
+    return safeMode;
+  }
+
+  if (!reduceMotion) {
+    document.documentElement.classList.add("theme-transitioning");
+    window.requestAnimationFrame(() => {
+      applyThemeMode(safeMode);
+      window.setTimeout(() => {
+        document.documentElement.classList.remove("theme-transitioning");
+      }, 170);
+    });
+    return safeMode;
+  }
+
+  return applyThemeMode(safeMode);
 }

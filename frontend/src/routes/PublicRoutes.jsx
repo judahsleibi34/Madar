@@ -5,15 +5,14 @@ import RouteSuspense from "../components/common/RouteSuspense";
 import MainLayout from "../components/MainPages/MainLayout";
 
 const loadHomePage = () => import("../components/MainPages/HeroSection");
-const loadProductTourPage = () => import("../components/MainPages/FeaturesPage");
 const loadBasePlansPage = () => import("../components/MainPages/BasePlansPage");
 
 const HomePage = lazy(loadHomePage);
-const ProductTourPage = lazy(loadProductTourPage);
 const BasePlansPage = lazy(loadBasePlansPage);
 const TeamPage = lazy(() => import("../components/MainPages/TeamPage"));
 const AboutSection = lazy(() => import("../components/MainPages/AboutSection"));
 const ContactPage = lazy(() => import("../components/MainPages/ContactPage"));
+const PrivacyPolicyPage = lazy(() => import("../components/MainPages/PrivacyPolicyPage"));
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
 
 const LoginPage = lazy(() => import("../components/AuthPages/LoginPage"));
@@ -53,7 +52,6 @@ export default function PublicRoutes({
     if (location.pathname !== "/" || !canPrefetchRoutes()) return undefined;
 
     const prefetchLikelyPublicRoutes = () => {
-      loadProductTourPage();
       loadBasePlansPage();
     };
 
@@ -90,11 +88,6 @@ export default function PublicRoutes({
           }
         >
           <Route index element={<HomePage key={`home-${lang}`} lang={lang} />} />
-
-        <Route
-          path="product-tour"
-          element={<ProductTourPage key={`product-tour-${lang}`} lang={lang} />}
-        />
 
         <Route
           path="demo"
@@ -140,6 +133,11 @@ export default function PublicRoutes({
           <Route
             path="contact"
             element={<ContactPage key={`contact-${lang}`} lang={lang} />}
+          />
+
+          <Route
+            path="privacy-policy"
+            element={<PrivacyPolicyPage key={`privacy-policy-${lang}`} lang={lang} />}
           />
 
           <Route

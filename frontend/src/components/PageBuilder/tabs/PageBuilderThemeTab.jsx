@@ -25,16 +25,16 @@ const fontFamilyOptions = [
 ];
 
 const colorFallbacks = {
-  background: "#fafaf7",
-  surface: "#ffffff",
-  softSurface: "#f7f5ef",
-  inputBackground: "#ffffff",
-  text: "#1b2a4a",
+  background: "#f4f0e8",
+  surface: "#fffdfa",
+  softSurface: "#f8f4ed",
+  inputBackground: "#f8f4ed",
+  text: "#162033",
   muted: "#6f7787",
-  primary: "#1b2a4a",
+  primary: "#162033",
   accent: "#852c21",
   accentDark: "#6f241b",
-  border: "#d8dde6",
+  border: "#ddd6ca",
   buttonText: "#ffffff",
 };
 

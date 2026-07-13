@@ -1,7 +1,7 @@
 const copy = {
   en: {
     title: "Privacy Policy",
-    updated: "Last updated: June 21, 2026",
+    updated: "Last updated: July 13, 2026",
     intro:
       "Madar collects the information needed to provide accounts, tenant workspaces, website builder features, contact forms, and support workflows.",
     sections: [
@@ -34,7 +34,7 @@ const copy = {
   },
   ar: {
     title: "سياسة الخصوصية",
-    updated: "آخر تحديث: 21 يونيو 2026",
+    updated: "آخر تحديث: 13 يوليو 2026",
     intro:
       "تجمع مدار المعلومات اللازمة لتوفير الحسابات ومساحات عمل المؤسسات وأدوات بناء المواقع ونماذج التواصل وطلبات الدعم.",
     sections: [
@@ -72,7 +72,7 @@ export default function PrivacyPolicyPage({ lang = "en" }) {
   const page = copy[currentLang];
 
   return (
-    <section className="privacy-policy-page" dir={currentLang === "ar" ? "rtl" : "ltr"} lang={currentLang}>
+    <main className="privacy-policy-page" dir={currentLang === "ar" ? "rtl" : "ltr"} lang={currentLang}>
       <header className="privacy-policy-hero">
         <p>{page.updated}</p>
         <h1>{page.title}</h1>
@@ -87,6 +87,6 @@ export default function PrivacyPolicyPage({ lang = "en" }) {
           </section>
         ))}
       </div>
-    </section>
+    </main>
   );
 }

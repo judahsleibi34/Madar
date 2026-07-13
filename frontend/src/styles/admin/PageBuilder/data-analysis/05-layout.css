@@ -84,14 +84,14 @@
   width: 10px !important;
   min-height: 28px !important;
   border-radius: 999px !important;
-  background: #9a9a9a !important;
+  background: var(--text-muted) !important;
   transform: translateX(-50%) !important;
   pointer-events: none !important;
 }
 
 .daw-normal-slider-track:hover .daw-normal-slider-thumb,
 .daw-normal-slider-track:focus-visible .daw-normal-slider-thumb {
-  background: #b0b0b0 !important;
+  background: var(--text-secondary) !important;
 }
 
 .daw-page[dir="rtl"] .daw-normal-slider {

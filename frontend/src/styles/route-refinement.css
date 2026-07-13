@@ -3,8 +3,8 @@
 
 :root {
   --route-shell-padding: clamp(28px, 5vw, 72px);
-  --route-card-radius: 22px;
-  --route-control-radius: 14px;
+  --route-card-radius: var(--app-radius-panel);
+  --route-control-radius: var(--app-radius-control);
   --route-card-shadow: var(--app-card-shadow);
   --route-card-shadow-hover: var(--app-card-shadow-hover);
 }

@@ -10,11 +10,11 @@
 @import "./core/tokens.css";
 @import "./variables.css";
 @import "./core/base.css";
+@import "./core/theme-contract.css";
 
 @import "./public layout/header.css";
 @import "./public pages/home.css";
 @import "./public pages/contact.css";
-@import "./public pages/features.css";
 @import "./public layout/footer.css";
 
 @import "./utils/rtl.css";
@@ -36,7 +36,12 @@
 @import "./admin/PageBuilder/index.css";
 @import "./theme-refinement.css";
 @import "./route-refinement.css";
-@import "/src/styles/global-theme-migration.css";
+@import "/src/styles/dark-compact-summaries.css";
+@import "/src/styles/settings-item-flattening.css";
+@import "/src/styles/preview-theme-isolation.css";
+@import "/src/styles/theme-transition.css";
+/* Canonical Page Builder geometry must follow legacy route refinements. */
+@import "./admin/PageBuilder/workspace-stability.css";
 
 /* ============================================================
    TEMP: Builder demo route styles

@@ -23,6 +23,12 @@
   color: var(--pb-text) !important;
 }
 
+:root:not([data-theme="dark"]) .page-builder {
+  --pb-radius-sm: var(--app-radius-control);
+  --pb-radius: var(--app-radius-card);
+  --pb-radius-lg: var(--app-radius-panel);
+}
+
 .page-builder .builder-topbar,
 .page-builder .builder-subbar,
 .page-builder .workspace-header {
@@ -48,10 +54,10 @@
 .page-builder .simple-add-question,
 .page-builder .forms-simple-document,
 .page-builder .simple-side-panel {
-  background: var(--pb-bg) !important;
+  background: var(--pb-surface) !important;
   border-color: var(--pb-border) !important;
   color: var(--pb-text) !important;
-  box-shadow: none !important;
+  box-shadow: var(--pb-shadow) !important;
 }
 
 .page-builder .builder-panel,
@@ -107,6 +113,30 @@
   box-shadow: none !important;
 }
 
+/* Compact form summary is one grouped region, not four nested cards. */
+.page-builder .forms-sidebar-stats {
+  background: transparent !important;
+  border-color: var(--pb-border) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .forms-sidebar-stats > * {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.page-builder .forms-sidebar-stats > :nth-child(even) {
+  border-inline-start: 1px solid var(--pb-border) !important;
+  padding-inline-start: 8px;
+}
+
+.page-builder .forms-sidebar-stats > :nth-child(n + 3) {
+  border-top: 1px solid var(--pb-border) !important;
+  padding-top: 6px;
+}
+
 /* Builder chrome follows the application's global font. The tenant canvas is
    deliberately excluded so website typography remains theme-controlled. */
 .page-builder :is(
@@ -133,7 +163,7 @@
 /* Inspector component system */
 .page-builder .builder-inspector {
   padding: 16px !important;
-  background: var(--pb-bg) !important;
+  background: var(--pb-surface) !important;
   color: var(--pb-text) !important;
   border-inline-start: 1px solid var(--pb-border) !important;
 }
@@ -1210,7 +1240,6 @@
   .toggle-field,
   .publish-subdomain-warning,
   .form-info-grid > *,
-  .forms-sidebar-stats > *,
   .daw-flow-actions,
   .daw-report-summary,
   .daw-inspection-box
@@ -1355,35 +1384,15 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-info) 44%, transparent) !important;
 }
 
-/* The editor canvas participates in the builder theme in dark mode. Inline
-   website theme variables still control brand accents, typography and layout. */
+/* The canvas renders user-authored website content. Its inline website/form
+   variables must remain independent from the surrounding dark editor. */
 .page-builder.theme-dark .builder-canvas {
-  --theme-bg: var(--builder-bg) !important;
-  --theme-bg-soft: var(--builder-surface-1) !important;
-  --theme-surface: var(--builder-surface-1) !important;
-  --theme-surface-2: var(--builder-surface-2) !important;
-  --theme-surface-3: var(--builder-surface-3) !important;
-  --theme-border: var(--builder-border) !important;
-  --theme-text: var(--builder-text) !important;
-  --theme-text-soft: var(--builder-text-muted) !important;
-  --theme-text-muted: var(--builder-text-muted) !important;
-  --madar-bg: var(--builder-bg) !important;
-  --madar-surface: var(--builder-surface-1) !important;
-  --madar-surface-soft: var(--builder-surface-2) !important;
-  --madar-border: var(--builder-border) !important;
-  --madar-text: var(--builder-text) !important;
-  --madar-muted: var(--builder-text-muted) !important;
-  --form-theme-card: var(--builder-surface-1) !important;
-  --form-theme-field: var(--builder-surface-2) !important;
-  --form-theme-border: var(--builder-border) !important;
-  --form-theme-text: var(--builder-text) !important;
-  --form-theme-helper: var(--builder-text-muted) !important;
-  background: var(--builder-bg) !important;
-  color: var(--builder-text) !important;
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
 }
 
 .page-builder.theme-dark .builder-canvas :is(.built-site-header, .built-site-footer, .site-section, .builder-form-preview, .runtime-form-card) {
-  border-color: var(--builder-border) !important;
+  border-color: var(--theme-border) !important;
 }
 
 /* The dashboard shell sits outside .page-builder in the route tree. Scope its

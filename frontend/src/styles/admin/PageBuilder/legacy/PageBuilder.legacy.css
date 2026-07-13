@@ -206,7 +206,7 @@
 
 .page-builder .data-workspace,
 .page-builder .responses-workspace {
-  background: #f7f8fb !important;
+  background: var(--app-bg) !important;
 }
 
 .page-builder .data-summary-grid {
@@ -398,7 +398,7 @@
   min-height: 42px !important;
   border: 1px solid transparent !important;
   border-radius: 12px !important;
-  background: #f3f5f8 !important;
+  background: var(--surface-2) !important;
   color: var(--madar-text) !important;
   box-shadow: none !important;
   transform: none !important;
@@ -429,7 +429,7 @@
 
 .page-builder .layer-tree .layer-section-button {
   min-height: 46px !important;
-  background: #eef1f5 !important;
+  background: var(--surface-2) !important;
   color: var(--madar-text) !important;
   border-color: transparent !important;
   font-size: 15px !important;
@@ -439,7 +439,7 @@
 .page-builder .layer-tree .layer-element-button {
   min-height: 38px !important;
   border-radius: 10px !important;
-  background: #f8f9fb !important;
+  background: var(--surface-1) !important;
   color: var(--theme-text) !important;
   font-size: 13px !important;
   font-weight: 900 !important;
@@ -466,7 +466,7 @@
 }
 
 .page-builder .layer-tree .layer-element-button.active {
-  background: #fffaf8 !important;
+  background: var(--surface-1) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.5) !important;
   box-shadow: inset 3px 0 0 var(--madar-red) !important;
 }
@@ -669,14 +669,14 @@
 .page-builder:not(.preview-mode) .builder-side-panel::-webkit-scrollbar-track,
 .page-builder .builder-canvas-shell::-webkit-scrollbar-track,
 .page-builder .workspace-page::-webkit-scrollbar-track {
-  background: #f1eee9 !important;
+  background: var(--app-bg) !important;
 }
 
 .page-builder:not(.preview-mode) .builder-side-panel::-webkit-scrollbar-thumb,
 .page-builder .builder-canvas-shell::-webkit-scrollbar-thumb,
 .page-builder .workspace-page::-webkit-scrollbar-thumb {
   background: rgba(var(--theme-shadow-rgb), 0.28) !important;
-  border: 2px solid #f1eee9 !important;
+  border: 2px solid var(--app-bg) !important;
   border-radius: 999px !important;
 }
 
@@ -724,7 +724,7 @@
   font-weight: 950 !important;
   line-height: 1 !important;
   letter-spacing: 0 !important;
-  background: #f3f5f8 !important;
+  background: var(--surface-2) !important;
   color: var(--madar-text) !important;
   box-shadow: none !important;
 }
@@ -742,7 +742,7 @@
 
 .page-builder .builder-topbar-actions > button.primary-action {
   min-width: 104px !important;
-  background: #f3f5f8 !important;
+  background: var(--surface-2) !important;
   border-color: transparent !important;
   color: var(--madar-text) !important;
   box-shadow: none !important;

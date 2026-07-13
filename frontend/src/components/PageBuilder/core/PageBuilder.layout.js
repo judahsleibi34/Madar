@@ -103,6 +103,25 @@ export const directElementHeight = (element) => {
   return heights[element?.type] || 140;
 };
 
+export const estimateFormBlockHeight = (form, viewportName = "desktop") => {
+  const sections = Array.isArray(form?.sections) ? form.sections : [];
+  const fieldHeight = (field) => {
+    if (field?.type === "paragraph" || field?.type === "file") return 118;
+    if (["radio", "checkboxes"].includes(field?.type)) {
+      return 82 + Math.max(1, Array.isArray(field.options) ? field.options.length : 0) * 38;
+    }
+    return 86;
+  };
+  const contentHeight = sections.reduce(
+    (total, section) =>
+      total + 72 + (section.fields || []).reduce((fieldTotal, field) => fieldTotal + fieldHeight(field), 0),
+    0
+  );
+  const responsiveAllowance = viewportName === "mobile" ? 120 : viewportName === "tablet" ? 72 : 40;
+
+  return Math.max(460, 190 + contentHeight + responsiveAllowance);
+};
+
 export const getMetricItems = (element) => {
   if (Array.isArray(element?.metrics) && element.metrics.length) return element.metrics;
 
@@ -127,6 +146,81 @@ export const getSectionCanvasHeight = (section, viewportName) =>
   Number(section?.layout?.minHeightByViewport?.[viewportName]) ||
   Number(section?.layout?.minHeight) ||
   560;
+
+export const commitDirectElementInteraction = (sections, {
+  elementId,
+  movedElement = null,
+  previewPosition = null,
+  previewSectionHeight = 0,
+  sourceSectionId,
+  targetSectionId = "",
+  viewportName = "desktop",
+} = {}) => {
+  const isCrossSectionMove = Boolean(
+    movedElement && targetSectionId && sourceSectionId !== targetSectionId
+  );
+
+  return sections.map((section) => {
+    if (isCrossSectionMove && section.id === sourceSectionId) {
+      return {
+        ...section,
+        freeElements: (section.freeElements || []).filter((element) => element.id !== elementId),
+      };
+    }
+
+    if (isCrossSectionMove && section.id === targetSectionId) {
+      const minHeightByViewport = { ...(section.layout?.minHeightByViewport || {}) };
+      ["desktop", "tablet", "mobile"].forEach((nextViewportName) => {
+        const position = movedElement.position?.[nextViewportName] || createPosition()[nextViewportName];
+        minHeightByViewport[nextViewportName] = Math.max(
+          getSectionCanvasHeight(section, nextViewportName),
+          (Number(position.y) || 0) + (Number(position.height) || 0) + 48
+        );
+      });
+      return {
+        ...section,
+        layout: {
+          ...(section.layout || {}),
+          minHeight: minHeightByViewport.desktop,
+          minHeightByViewport,
+        },
+        freeElements: [...(section.freeElements || []), movedElement],
+      };
+    }
+
+    if (isCrossSectionMove || section.id !== sourceSectionId || !previewPosition) return section;
+
+    const currentHeight = getSectionCanvasHeight(section, viewportName);
+    const nextHeight = Math.max(currentHeight, Number(previewSectionHeight) || 0);
+    return {
+      ...section,
+      layout: {
+        ...(section.layout || {}),
+        minHeight: viewportName === "desktop" ? nextHeight : section.layout?.minHeight,
+        minHeightByViewport: {
+          ...(section.layout?.minHeightByViewport || {}),
+          [viewportName]: nextHeight,
+        },
+      },
+      freeElements: (section.freeElements || []).map((element) =>
+        element.id === elementId
+          ? {
+              ...element,
+              position: {
+                ...(element.position || {}),
+                [viewportName]: previewPosition,
+              },
+            }
+          : element
+      ),
+    };
+  });
+};
+
+export const getMinimumBuilderSectionHeight = (viewportHeight) => {
+  const availableHeight = Math.max(0, Number(viewportHeight) || (typeof window !== "undefined" ? window.innerHeight : 900));
+  return Math.max(360, Math.round((availableHeight - 126) * 0.5));
+};
 
 export const createDirectPositions = (section, viewportName) => {
   const canvasWidth = viewports[viewportName] || viewports.desktop;
