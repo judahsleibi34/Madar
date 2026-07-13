@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { postAuthJson } from "../../utils/apiClient";
+import { postAuthJson, readApiError, readApiErrorCode } from "../../utils/apiClient";
 import AuthToast from "./AuthToast";
 import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
+import {
+  isEmailVerificationRequiredError,
+  rememberPendingVerificationEmail,
+} from "./emailVerification";
 
 export default function LoginPage({
   lang = "en",
@@ -15,6 +19,7 @@ export default function LoginPage({
 }) {
   const { t } = useTranslation("auth");
   const location = useLocation();
+  const navigate = useNavigate();
   const pageDir = lang === "ar" ? "rtl" : "ltr";
 
   const [formData, setFormData] = useState({
@@ -149,10 +154,31 @@ export default function LoginPage({
           return;
         }
 
-        const rawDetail = typeof data.detail === "string" ? data.detail : "";
-        const message = rawDetail.toLowerCase().includes("verify your email")
-          ? t("login.emailNotVerified")
-          : normalizeAuthMessage(data.detail, t("login.serverError"));
+        const rawDetail = readApiError(data, "");
+        const errorCode = readApiErrorCode(data);
+
+        if (errorCode === "pending_account_expired") {
+          navigate("/signup", {
+            replace: true,
+            state: { accountExpired: true },
+          });
+          return;
+        }
+
+        if (isEmailVerificationRequiredError(data)) {
+          const email = rememberPendingVerificationEmail(formData.email);
+          navigate("/verify-email", {
+            state: {
+              email,
+              resendAvailableAfter: Number(
+                data?.detail?.context?.resend_available_after || 0
+              ),
+            },
+          });
+          return;
+        }
+
+        const message = normalizeAuthMessage(rawDetail, t("login.serverError"));
         setStatusMessage(message);
         showAuthToast({
           type: "error",

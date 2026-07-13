@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   apiFetch,
   clearCsrfToken,
+  createApiError,
+  parseApiError,
   postAuthJson,
   postPublicJson,
   readApiError,
@@ -62,6 +64,47 @@ describe("apiClient response readers", () => {
   it("readApiError falls back for non-JSON or unrecognized error payloads", () => {
     expect(readApiError({ detail: "" }, "Fallback message")).toBe("Fallback message");
     expect(readApiError(null, "Fallback message")).toBe("Fallback message");
+  });
+
+  it("normalizes structured errors without breaking legacy string details", () => {
+    expect(
+      parseApiError({
+        detail: {
+          code: "project_revision_conflict",
+          message: "This project was updated elsewhere.",
+          context: { current_revision: 7 },
+        },
+      })
+    ).toEqual({
+      code: "project_revision_conflict",
+      message: "This project was updated elsewhere.",
+      context: { current_revision: 7 },
+    });
+
+    expect(parseApiError({ detail: "Legacy error" })).toEqual({
+      code: "",
+      message: "Legacy error",
+      context: {},
+    });
+  });
+
+  it("creates typed API errors for centralized frontend recovery", () => {
+    const error = createApiError(
+      { status: 409 },
+      {
+        detail: {
+          code: "idempotency_conflict",
+          message: "This retry does not match the original request.",
+          context: { existing_id: "reservation-1" },
+        },
+      }
+    );
+
+    expect(error.name).toBe("ApiError");
+    expect(error.status).toBe(409);
+    expect(error.code).toBe("idempotency_conflict");
+    expect(error.context).toEqual({ existing_id: "reservation-1" });
+    expect(error.message).toBe("This retry does not match the original request.");
   });
 });
 

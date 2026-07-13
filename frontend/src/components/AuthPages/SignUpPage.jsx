@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Eye, EyeOff, X } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { postAuthJson, readApiError } from "../../utils/apiClient";
 import AuthToast from "./AuthToast";
 import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
+import { rememberPendingVerificationEmail } from "./emailVerification";
+import { meetsMinimumPasswordPolicy, PASSWORD_MIN_LENGTH } from "./passwordPolicy";
 
 const PUBLIC_SITE_DOMAIN = import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "";
 
@@ -19,6 +21,7 @@ export default function SignUpPage({
   mode = "account",
 }) {
   const { t } = useTranslation("auth");
+  const navigate = useNavigate();
   const pageDir = lang === "ar" ? "rtl" : "ltr";
   const isTenantOnboarding = mode === "tenant";
 
@@ -36,7 +39,6 @@ export default function SignUpPage({
   const [errors, setErrors] = useState({});
   const [, setStatusMessage] = useState("");
   const [authToast, setAuthToast] = useState(null);
-  const [emailVerificationDialog, setEmailVerificationDialog] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -106,10 +108,6 @@ export default function SignUpPage({
         {message}
       </span>
     );
-  };
-
-  const dismissEmailVerificationDialog = () => {
-    setEmailVerificationDialog(null);
   };
 
   const validateSubdomain = (newErrors, values = formData) => {
@@ -274,9 +272,10 @@ export default function SignUpPage({
       newErrors.email = t("validation.invalidEmail");
     }
 
-    const passwordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
-    if (values.password && !passwordRegex.test(values.password)) {
+    if (
+      values.password &&
+      !meetsMinimumPasswordPolicy(values.password)
+    ) {
       newErrors.password = t("signup.passwordInvalid");
     }
 
@@ -307,12 +306,20 @@ export default function SignUpPage({
   };
 
   const getRequestPayload = () => {
-    return {
+    const payload = {
       first_name: formData.firstName.trim(),
       last_name: formData.lastName.trim(),
       email: formData.email.trim(),
       password: formData.password,
     };
+
+    if (isTenantOnboarding) {
+      payload.business_name = formData.businessName.trim() || null;
+      payload.business_type = formData.businessType.trim() || null;
+      payload.subdomain = normalizedSubdomain || null;
+    }
+
+    return payload;
   };
 
   const applyApiErrors = (response, data) => {
@@ -384,9 +391,13 @@ export default function SignUpPage({
 
       if (data.requires_email_verification) {
         setAuthToast(null);
-        setEmailVerificationDialog({
-          title: t("signup.verifyEmailTitle"),
-          message,
+        const email = rememberPendingVerificationEmail(formData.email);
+        navigate("/verify-email", {
+          replace: true,
+          state: {
+            email,
+            resendAvailableAfter: Number(data.resend_available_after || 0),
+          },
         });
         return;
       }
@@ -471,6 +482,7 @@ export default function SignUpPage({
               name="password"
               placeholder={t("signup.password")}
               value={formData.password}
+              minLength={PASSWORD_MIN_LENGTH}
               onChange={handleChange}
               dir="ltr"
               {...getErrorProps("password")}
@@ -494,6 +506,7 @@ export default function SignUpPage({
               name="confirmPassword"
               placeholder={t("signup.confirmPassword")}
               value={formData.confirmPassword}
+              minLength={PASSWORD_MIN_LENGTH}
               onChange={handleChange}
               dir="ltr"
               {...getErrorProps("confirmPassword")}
@@ -582,41 +595,6 @@ export default function SignUpPage({
         onDismiss={() => setAuthToast(null)}
       />
 
-      {emailVerificationDialog && (
-        <div
-          className="subscription-modal-backdrop"
-          dir={pageDir}
-        >
-          <section
-            className="subscription-modal subscription-modal-success"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="signup-verification-title"
-          >
-            <button
-              type="button"
-              className="subscription-modal-close"
-              onClick={dismissEmailVerificationDialog}
-              aria-label={t("signup.closeVerification", {
-                defaultValue: "Close verification message",
-              })}
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
-
-            <div className="subscription-modal-icon" aria-hidden="true">
-              i
-            </div>
-
-            <div className="subscription-modal-copy">
-              <h2 id="signup-verification-title">
-                {emailVerificationDialog.title}
-              </h2>
-              <p>{emailVerificationDialog.message}</p>
-            </div>
-          </section>
-        </div>
-      )}
     </main>
   );
 }

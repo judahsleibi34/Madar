@@ -1,26 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { postAuthJson } from "../../utils/apiClient";
+import { postAuthJson, readApiError, readApiErrorCode } from "../../utils/apiClient";
 import { normalizeAuthMessage } from "./authMessages";
-
-const readRecoveryToken = () => {
-  const hash = window.location.hash;
-  const params = new URLSearchParams(hash.replace("#", ""));
-  const token = params.get("access_token");
-  const type = params.get("type");
-
-  return token && type === "recovery" ? token : null;
-};
+import { meetsMinimumPasswordPolicy, PASSWORD_MIN_LENGTH } from "./passwordPolicy";
+import { readRecoveryContext } from "./resetPasswordRecovery";
 
 export default function ResetPasswordPage({ lang = "en" }) {
   const { t } = useTranslation("auth");
   const navigate = useNavigate();
   const pageDir = lang === "ar" ? "rtl" : "ltr";
 
-  const [accessToken] = useState(readRecoveryToken);
+  const [recoveryContext] = useState(readRecoveryContext);
+  const accessToken = recoveryContext.accessToken;
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -31,11 +25,24 @@ export default function ResetPasswordPage({ lang = "en" }) {
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    query.delete("request_token");
+    const cleanQuery = query.toString();
+    window.history.replaceState(
+      window.history.state,
+      document.title,
+      `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`
+    );
+  }, []);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (!password) return setError(t("validation.required"));
-    if (password.length < 6) return setError(t("resetPassword.passwordShort"));
+    if (!meetsMinimumPasswordPolicy(password)) {
+      return setError(t("resetPassword.passwordShort"));
+    }
     if (password !== confirm) return setError(t("resetPassword.passwordMismatch"));
 
     setIsSubmitting(true);
@@ -44,11 +51,32 @@ export default function ResetPasswordPage({ lang = "en" }) {
     try {
       const { response, data } = await postAuthJson(
         "/auth/password-reset",
-        { access_token: accessToken, password }
+        {
+          access_token: accessToken,
+          password,
+          ...(recoveryContext.requestToken
+            ? { request_token: recoveryContext.requestToken }
+            : {}),
+        }
       );
 
       if (!response.ok) {
-        setError(normalizeAuthMessage(data.detail, t("resetPassword.unknownError")));
+        const code = readApiErrorCode(data);
+        const codeMessages = {
+          password_policy_failed: t("resetPassword.passwordShort"),
+          password_reset_expired: t("resetPassword.expired"),
+          password_reset_replayed: t("resetPassword.replayed"),
+          password_reset_in_progress: t("resetPassword.inProgress"),
+          password_reset_invalid: t("resetPassword.invalidToken"),
+          email_verification_required: t("login.emailNotVerified"),
+        };
+        setError(
+          codeMessages[code] ||
+          normalizeAuthMessage(
+            readApiError(data, ""),
+            t("resetPassword.unknownError")
+          )
+        );
         return;
       }
 
@@ -81,6 +109,7 @@ export default function ResetPasswordPage({ lang = "en" }) {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
+                  minLength={PASSWORD_MIN_LENGTH}
                   onChange={(event) => {
                     setPassword(event.target.value);
                     setError("");
@@ -103,6 +132,7 @@ export default function ResetPasswordPage({ lang = "en" }) {
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   value={confirm}
+                  minLength={PASSWORD_MIN_LENGTH}
                   onChange={(event) => {
                     setConfirm(event.target.value);
                     setError("");

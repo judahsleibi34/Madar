@@ -15,6 +15,7 @@ import { uploadBuilderAsset } from "../PageBuilder/services/PageBuilder.api";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
 import { getSettingsContent } from "../../content";
+import { buildProfilePayload } from "./profilePayload";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -98,20 +99,6 @@ const getApiErrorMessage = (detail, fallback) => {
   }
 
   return fallback;
-};
-
-const buildProfilePayload = (form) => {
-  const payload = {
-    first_name: form.first_name.trim(),
-    last_name: form.last_name.trim(),
-    phone: form.phone.trim(),
-    avatar: form.avatar.trim(),
-  };
-
-  const email = form.email.trim();
-  if (email) payload.email = email;
-
-  return payload;
 };
 
 const isValidEmail = (value) => {
@@ -329,17 +316,11 @@ export default function SettingsPage({
       errors.last_name = t.lastNameRequired;
     }
 
-    if (!accountForm.email.trim()) {
-      errors.email = t.emailRequired;
-    } else if (!isValidEmail(accountForm.email)) {
-      errors.email = t.emailInvalid;
-    }
-
     setFieldErrors((prev) => ({
       ...prev,
       first_name: errors.first_name || "",
       last_name: errors.last_name || "",
-      email: errors.email || "",
+      email: "",
     }));
 
     return errors;
@@ -800,16 +781,13 @@ export default function SettingsPage({
                 <input
                   type="email"
                   value={accountForm.email}
-                  className={fieldErrors.email ? "field-has-error" : ""}
-                  onChange={(event) =>
-                    updateAccountField("email", event.target.value)
-                  }
+                  readOnly
+                  disabled
+                  aria-describedby="settings-canonical-email-help"
                 />
-                {fieldErrors.email && (
-                  <span className="settings-field-error">
-                    {fieldErrors.email}
-                  </span>
-                )}
+                <small id="settings-canonical-email-help">
+                  {t.emailChangeUnavailable}
+                </small>
               </label>
 
               <label>
@@ -1023,4 +1001,3 @@ export default function SettingsPage({
     </section>
   );
 }
-

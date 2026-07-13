@@ -12,6 +12,8 @@
     firstName: "First name",
     lastName: "Last name",
     email: "Email",
+    emailChangeUnavailable:
+      "Your verified login email cannot be edited here. A secure email-change flow is coming soon.",
     phoneNumber: "Phone number",
     saveProfile: "Save profile",
     changePassword: "Change password",
@@ -75,6 +77,8 @@
     firstName: "ط§ظ„ط§ط³ظ… ط§ظ„ط£ظˆظ„",
     lastName: "ط§ط³ظ… ط§ظ„ط¹ط§ط¦ظ„ط©",
     email: "ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ",
+    emailChangeUnavailable:
+      "لا يمكن تعديل بريد تسجيل الدخول الموثق من هنا. ستتوفر آلية آمنة لتغيير البريد قريباً.",
     phoneNumber: "ط±ظ‚ظ… ط§ظ„ظ‡ط§طھظپ",
     saveProfile: "ط­ظپط¸ ط§ظ„ظ…ظ„ظپ ط§ظ„ط´ط®طµظٹ",
     changePassword: "طھط؛ظٹظٹط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±",
