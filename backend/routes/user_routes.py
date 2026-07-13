@@ -119,7 +119,7 @@ def is_duplicate_error(error: Exception) -> bool:
     )
 
 
-@router.post("/info")
+@router.get("/info")
 def user_info(user_id: int, request: Request, response: Response):
     try:
         _, user_data = require_regular_user_id(user_id, request, response)
@@ -137,6 +137,12 @@ def user_info(user_id: int, request: Request, response: Response):
     except Exception as e:
         logger.warning("user.info.failed", extra={"user_id": user_id, "error_type": type(e).__name__})
         raise HTTPException(status_code=500, detail="Could not fetch user info")
+
+
+@router.post("/info", include_in_schema=False)
+def user_info_legacy(user_id: int, request: Request, response: Response):
+    """Compatibility alias for older clients; account reads are otherwise GET-only."""
+    return user_info(user_id, request, response)
 
 
 @router.put("/profile")

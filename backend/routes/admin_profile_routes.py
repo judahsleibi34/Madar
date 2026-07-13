@@ -25,7 +25,7 @@ router = APIRouter(prefix="/admin/profile", tags=["Admin Profile"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/info")
+@router.get("/info")
 def admin_profile_info(request: Request, response: Response):
     try:
         _, admin_user = require_system_admin(request, response)
@@ -41,6 +41,12 @@ def admin_profile_info(request: Request, response: Response):
     except Exception as e:
         logger.warning("admin.profile.info_failed", extra={"error_type": type(e).__name__})
         raise HTTPException(status_code=500, detail="Could not fetch admin profile")
+
+
+@router.post("/info", include_in_schema=False)
+def admin_profile_info_legacy(request: Request, response: Response):
+    """Compatibility alias for older admin clients; account reads are GET-only."""
+    return admin_profile_info(request, response)
 
 
 @router.put("/profile")

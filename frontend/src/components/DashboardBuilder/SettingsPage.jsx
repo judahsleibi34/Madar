@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImagePlus, KeyRound, Save, X } from "lucide-react";
 import SmartLink from "../SmartLink";
@@ -30,6 +30,7 @@ const CONTROL_CHARS_PATTERN = new RegExp(
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
+const accountInfoRequests = new Map();
 
 const deferEffectStateUpdate = (callback) => {
   let cancelled = false;
@@ -60,6 +61,16 @@ const readApiResponse = async (response) => {
   } catch {
     return { detail: text };
   }
+};
+
+const loadAccountInfo = (url) => {
+  if (!accountInfoRequests.has(url)) {
+    const request = apiFetch(url, { method: "GET", cache: "no-store" })
+      .then(async (response) => ({ response, data: await readApiResponse(response) }))
+      .finally(() => accountInfoRequests.delete(url));
+    accountInfoRequests.set(url, request);
+  }
+  return accountInfoRequests.get(url);
 };
 
 const getInitialAccountForm = (user) => ({
@@ -189,6 +200,7 @@ export default function SettingsPage({
   const [notification, setNotification] = useState(null);
 
   const [isSavingAccount, setIsSavingAccount] = useState(false);
+  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
@@ -206,6 +218,9 @@ export default function SettingsPage({
         profileDescription: "These details are used for the admin dashboard and your account identity.",
       }
     : t;
+  const onUserUpdatedRef = useRef(onUserUpdated);
+  onUserUpdatedRef.current = onUserUpdated;
+  const userId = user?.id;
   const userApiPath = useCallback((path) => {
     if (accountApiBasePath) {
       const basePath = accountApiBasePath.startsWith("http")
@@ -215,12 +230,12 @@ export default function SettingsPage({
       return `${basePath}${path}`;
     }
 
-    if (!user?.id) {
+    if (!userId) {
       throw new Error(t.sessionExpired);
     }
 
-    return `${API_URL}/users/${encodeURIComponent(user.id)}${path}`;
-  }, [accountApiBasePath, t.sessionExpired, user]);
+    return `${API_URL}/users/${encodeURIComponent(userId)}${path}`;
+  }, [accountApiBasePath, t.sessionExpired, userId]);
 
   const avatarUrl = resolveMediaUrl(accountForm.avatar);
   const shouldShowAvatarImage = Boolean(avatarUrl) && !avatarLoadFailed;
@@ -361,7 +376,7 @@ export default function SettingsPage({
       setAccountForm(getInitialAccountForm(user));
       setAvatarLoadFailed(false);
     });
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     return deferEffectStateUpdate(() => {
@@ -379,12 +394,11 @@ export default function SettingsPage({
     let cancelled = false;
 
     const loadAccount = async () => {
-      try {
-        const response = await apiFetch(userApiPath("/info"), {
-          method: "POST",
-        });
+      if (!accountApiBasePath && !userId) return;
+      setIsLoadingAccount(true);
 
-        const data = await readApiResponse(response);
+      try {
+        const { response, data } = await loadAccountInfo(userApiPath("/info"));
 
         if (!response.ok) {
           if (!cancelled && response.status === 401) {
@@ -402,12 +416,14 @@ export default function SettingsPage({
         if (!cancelled && data.user) {
           setAccountForm(getInitialAccountForm(data.user));
           setAvatarLoadFailed(false);
-          onUserUpdated?.(data.user);
+          onUserUpdatedRef.current?.(data.user);
         }
       } catch {
         if (!cancelled) {
           showNotification("error", t.accountError);
         }
+      } finally {
+        if (!cancelled) setIsLoadingAccount(false);
       }
     };
 
@@ -416,7 +432,7 @@ export default function SettingsPage({
     return () => {
       cancelled = true;
     };
-  }, [onUserUpdated, t.accountError, t.sessionExpired, userApiPath]);
+  }, [accountApiBasePath, t.accountError, t.sessionExpired, userApiPath, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -752,6 +768,7 @@ export default function SettingsPage({
                   onChange={(event) =>
                     updateAccountField("first_name", event.target.value)
                   }
+                  disabled={isLoadingAccount}
                 />
                 {fieldErrors.first_name && (
                   <span className="settings-field-error">
@@ -768,6 +785,7 @@ export default function SettingsPage({
                   onChange={(event) =>
                     updateAccountField("last_name", event.target.value)
                   }
+                  disabled={isLoadingAccount}
                 />
                 {fieldErrors.last_name && (
                   <span className="settings-field-error">
@@ -818,7 +836,7 @@ export default function SettingsPage({
             <button
               className="settings-save-button"
               type="submit"
-              disabled={isSavingAccount}
+              disabled={isLoadingAccount || isSavingAccount}
             >
               <Save size={18} />
               {isSavingAccount ? t.saving : t.saveProfile}

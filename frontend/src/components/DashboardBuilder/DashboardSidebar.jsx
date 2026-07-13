@@ -359,7 +359,10 @@ export default function DashboardSidebar({
           <button
             type="button"
             className={`admin-sidebar-utility ${
-              isActive(DASHBOARD_ROUTES.settings) ? "active" : ""
+              isActive(DASHBOARD_ROUTES.settings) &&
+              !isActive(DASHBOARD_ROUTES.settingsSecurity)
+                ? "active"
+                : ""
             }`}
             onClick={() => goTo(DASHBOARD_ROUTES.settings)}
             title={t("sidebar.settings")}

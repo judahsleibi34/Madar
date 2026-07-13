@@ -91,6 +91,42 @@ def fake_admin():
 
 
 class UserProfileUrlValidationTests(unittest.TestCase):
+    def test_profile_updates_first_and_last_name_together(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+
+        with patch.object(user_routes, "service_supabase", fake_supabase), patch.object(
+            user_routes,
+            "require_regular_user_id",
+            return_value=(object(), fake_user()),
+        ):
+            response = client.put(
+                "/users/3/profile",
+                json={"first_name": "Updated", "last_name": "Owner"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            fake_supabase.users_query.payload,
+            {"first_name": "Updated", "last_name": "Owner"},
+        )
+
+    def test_user_info_read_supports_get_without_mutation(self):
+        client = build_client()
+        with patch.object(
+            user_routes,
+            "require_regular_user_id",
+            return_value=(object(), fake_user()),
+        ), patch.object(
+            user_routes,
+            "get_billing_summary_for_tenant",
+            return_value={},
+        ):
+            response = client.get("/users/3/info")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["first_name"], "Madar")
+
     def test_profile_same_email_is_unchanged_while_other_fields_update(self):
         client = build_client()
         fake_supabase = FakeSupabase()
