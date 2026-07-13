@@ -303,7 +303,10 @@ export const getDraftProjectFromRecord = (record) => {
     return null;
   }
 
-  return cleanBuilderProject(record.draft_schema);
+  return cleanBuilderProject({
+    ...record.draft_schema,
+    ...(record.status ? { status: record.status } : {}),
+  });
 };
 
 export const getPreviewCanvasStyle = (viewport, isPreview, viewports) => {
@@ -318,4 +321,3 @@ export const getPreviewCanvasStyle = (viewport, isPreview, viewports) => {
     maxWidth: "100%",
   };
 };
-

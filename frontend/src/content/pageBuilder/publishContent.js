@@ -13,6 +13,8 @@ const publishContentEn = {
   noPublicLink: "Configure a website subdomain before sharing the live site.",
   publishSite: "Publish site",
   publishingSite: "Publishing...",
+  unpublishSite: "Take site offline",
+  unpublishingSite: "Taking site offline...",
   checklistTitle: "Site publish checklist",
   bilingualOptional: " (only for bilingual forms)",
   checklist: {

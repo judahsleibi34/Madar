@@ -57,6 +57,28 @@ describe("builder project persistence", () => {
     expect(payload.draft_schema.forms[0].sections[8].fields[0].label).toBe("Question 9");
   });
 
+  it("sends the backend revision when updating an existing project", () => {
+    const payload = createBuilderProjectPayload({
+      project: fullProject,
+      builderProjectRecord: { id: "project-1", draft_revision: 12 },
+      getBuilderProjectName: (project) => project.name,
+      getBuilderProjectSlug: (project) => project.slug,
+    });
+
+    expect(payload).toMatchObject({ expected_revision: 12 });
+  });
+
+  it("keeps compatibility with records created before revision support", () => {
+    const payload = createBuilderProjectPayload({
+      project: fullProject,
+      builderProjectRecord: { id: "project-1" },
+      getBuilderProjectName: (project) => project.name,
+      getBuilderProjectSlug: (project) => project.slug,
+    });
+
+    expect(payload).not.toHaveProperty("expected_revision");
+  });
+
   it("does not truncate the saved form when overwriting a previous draft", () => {
     localStorage.setItem("builder-regression", JSON.stringify({ name: "Old draft", forms: [] }));
 

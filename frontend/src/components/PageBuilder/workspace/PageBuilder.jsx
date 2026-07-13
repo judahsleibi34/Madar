@@ -56,7 +56,6 @@ import {
   createPosition,
 } from "../core/PageBuilder.factories";
 import {
-  heroSection,
   formSection,
   buildStarterProject,
   createBlankCanvasSection,
@@ -84,9 +83,15 @@ import {
   fetchWebsiteSettings,
   listBuilderProjects,
   publishBuilderProject,
+  unpublishBuilderProject,
   updateBuilderProject,
   uploadBuilderAsset,
 } from "../services/PageBuilder.api";
+import {
+  getBuilderConflictMessage,
+  isBuilderError,
+  isBuilderRevisionError,
+} from "../core/PageBuilder.errors";
 import {
   applyThemeModeToProject,
   getPageBuilderThemeClassName,
@@ -502,6 +507,7 @@ export default function PageBuilder({
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
   const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isUnpublishingProject, setIsUnpublishingProject] = useState(false);
   const [liveSitePath, setLiveSitePath] = useState("");
   const [websiteSettings, setWebsiteSettings] = useState(null);
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
@@ -1948,6 +1954,11 @@ export default function PageBuilder({
         return;
       }
 
+      if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
+        return;
+      }
+
       if (!silent) {
         showToast("Your changes are safe here. Please try saving again.");
       }
@@ -2033,6 +2044,11 @@ export default function PageBuilder({
       }
       if (isLikelySessionFailure(error)) {
         showToast("Please sign in again, then save your theme.");
+        return;
+      }
+
+      if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
         return;
       }
 
@@ -2123,12 +2139,19 @@ export default function PageBuilder({
       return;
     }
 
-    const publishedProject = {
+    const savedAt = new Date().toISOString();
+    const draftForPublish = {
       ...project,
-      status: "published",
       publish: {
         ...project.publish,
-        lastSavedAt: new Date().toISOString(),
+        lastSavedAt: savedAt,
+      },
+    };
+    const publishedProject = {
+      ...draftForPublish,
+      status: "published",
+      publish: {
+        ...draftForPublish.publish,
         lastPublishedAt: new Date().toISOString(),
       },
     };
@@ -2162,7 +2185,7 @@ export default function PageBuilder({
 
     try {
       const payload = createBuilderProjectPayload({
-        project: publishedProject,
+        project: draftForPublish,
         builderProjectRecord,
         getBuilderProjectName,
         getBuilderProjectSlug,
@@ -2172,7 +2195,13 @@ export default function PageBuilder({
         ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
         : await createBuilderProject(payload, user?.id);
 
-      const publishResponse = await publishBuilderProject(savedRecord.id, user?.id);
+      setBuilderProjectRecord(savedRecord);
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(draftForPublish);
+
+      const publishResponse = await publishBuilderProject(
+        savedRecord.id,
+        savedRecord?.draft_revision
+      );
       const publishedRecord = publishResponse?.project || savedRecord;
       const publishedSite = publishResponse?.site || {};
       const resolvedPublicSubdomain = sanitizeSubdomain(
@@ -2182,19 +2211,23 @@ export default function PageBuilder({
         ? resolveLiveSitePath(resolvedPublicSubdomain)
         : "";
 
+      // The server publish has already committed at this point. Reflect that
+      // durable state even if the optional public-link metadata is incomplete.
+      setBuilderProjectRecord(publishedRecord);
+      persistProject(publishedProject, "");
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
+      pendingBackendProjectSnapshotRef.current = "";
+
       if (import.meta.env.DEV) {
         console.debug("Builder publish completed.");
       }
 
       if (!resolvedLiveSitePath) {
-        throw new Error("Published site subdomain was not returned by the backend.");
+        showToast("Your site is live, but its public link could not be loaded. Refresh the Publish page.");
+        return;
       }
 
-      setBuilderProjectRecord(publishedRecord);
-      persistProject(publishedProject, "");
       setLiveSitePath(resolvedLiveSitePath);
-      backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
-      pendingBackendProjectSnapshotRef.current = "";
       showToast("Your site is live. Go to the Publish page to open your website.");
     } catch (error) {
       console.error("Could not publish builder project:", error);
@@ -2204,7 +2237,68 @@ export default function PageBuilder({
         return;
       }
 
+      if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
+        return;
+      }
+
+      if (isBuilderError(error, "entitlement_pending")) {
+        showToast("Your publishing access is still pending. No changes were lost.");
+        return;
+      }
+
+      if (
+        isBuilderError(error, "entitlement_inactive") ||
+        isBuilderError(error, "payment_required")
+      ) {
+        showToast("Publishing is not active for this workspace. Review your plan; your edits are still saved locally.");
+        return;
+      }
+
+      if (isBuilderError(error, "publish_validation_failed")) {
+        showToast(error.message || "This draft is not ready to publish. Review the highlighted content.");
+        return;
+      }
+
       showToast("We couldn't put your site live. Please try again.");
+    }
+  };
+
+  const unpublishProject = async () => {
+    if (!builderProjectRecord?.id || project.status !== "published") return;
+    if (!window.confirm("Take this website offline? The current published content will be preserved for a later republish.")) {
+      return;
+    }
+
+    setIsUnpublishingProject(true);
+
+    try {
+      const response = await unpublishBuilderProject(
+        builderProjectRecord.id,
+        builderProjectRecord.draft_revision
+      );
+      const nextRecord = response?.project || builderProjectRecord;
+      const unpublishedProject = {
+        ...project,
+        status: "draft",
+      };
+
+      setBuilderProjectRecord(nextRecord);
+      persistProject(unpublishedProject, "Your website is offline. Its last published version is preserved.");
+      setLiveSitePath("");
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(unpublishedProject);
+    } catch (error) {
+      if (isLikelySessionFailure(error)) {
+        showToast("Please sign in again before taking this site offline.");
+      } else if (isBuilderRevisionError(error)) {
+        showToast(getBuilderConflictMessage(error));
+      } else if (isBuilderError(error, "project_not_published")) {
+        showToast("This website is already offline.");
+      } else {
+        showToast("We could not take the website offline. It remains published.");
+      }
+    } finally {
+      setIsUnpublishingProject(false);
     }
   };
 
@@ -4593,6 +4687,9 @@ export default function PageBuilder({
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
       openFormPreviewPage={openFormPreviewPage}
+      onUnpublish={unpublishProject}
+      isUnpublishing={isUnpublishingProject}
+      lang={lang}
     />
   );
 
@@ -4744,4 +4841,3 @@ export default function PageBuilder({
     </div>
   );
 }
-
