@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Request, Response
 
 from classes import AdminUserTypeUpdateRequest
-from services.audit_service import record_audit_event
+from services.audit_service import hash_audit_identifier, record_audit_event
 from services.admin_user_service import (
     delete_user_account,
     list_users_with_features,
@@ -61,7 +61,9 @@ def change_user_type(
         metadata["old_user_type"] = updated_user.get("old_user_type")
 
     if updated_user.get("email") is not None:
-        metadata["affected_user_email"] = updated_user.get("email")
+        metadata["affected_user_email_hash"] = hash_audit_identifier(
+            updated_user.get("email")
+        )
 
     record_audit_event(
         request=request,
@@ -98,7 +100,9 @@ def delete_user(
     }
 
     if deleted_user.get("email") is not None:
-        metadata["deleted_user_email"] = deleted_user.get("email")
+        metadata["deleted_user_email_hash"] = hash_audit_identifier(
+            deleted_user.get("email")
+        )
 
     if deleted_user.get("user_type") is not None:
         metadata["deleted_user_type"] = deleted_user.get("user_type")

@@ -81,7 +81,9 @@ class BillingRoutesTests(unittest.TestCase):
         )
         body = response.json()
         self.assertTrue(body["success"])
-        self.assertTrue(body["requires_payment"])
+        self.assertFalse(body["requires_payment"])
+        self.assertFalse(body["checkout_available"])
+        self.assertEqual(body["code"], "billing_not_configured")
         self.assertIn("saved", body["message"].lower())
         self.assertEqual(body["data"], feature)
         self.assertEqual(
@@ -623,6 +625,38 @@ class BillingServiceTests(unittest.TestCase):
         self.assertEqual(feature["plan"], "premium")
         self.assertEqual(feature["builder_type"], "forms")
         self.assertEqual(feature["payment_status"], "pending")
+
+    def test_placeholder_checkout_never_downgrades_active_feature(self):
+        fake_supabase = FakeBillingSupabase()
+        active_feature = {
+            "id": 46,
+            "tenant_id": 7,
+            "subscription_type": "full_platform",
+            "plan": "pro",
+            "builder_type": None,
+            "payment_status": "active",
+        }
+
+        with patch.object(
+            billing_service,
+            "get_existing_feature_for_tenant",
+            return_value=active_feature,
+        ), patch.object(
+            billing_service,
+            "service_supabase",
+            fake_supabase,
+        ):
+            feature = billing_service.apply_pending_checkout_selection(
+                tenant_id=7,
+                subscription_type="full_platform",
+                plan="business",
+                builder_type=None,
+                updated_by_user_id=3,
+            )
+
+        self.assertEqual(feature, active_feature)
+        self.assertEqual(feature["payment_status"], "active")
+        self.assertEqual(fake_supabase.tables, [])
 
     def test_verified_billing_update_can_mark_feature_active(self):
         fake_supabase = FakeBillingSupabase()

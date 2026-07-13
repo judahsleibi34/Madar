@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from services.url_validation import validate_public_url
+from services.url_validation import validate_builder_schema_urls, validate_public_url
 
 
 class UrlValidationTests(unittest.TestCase):
@@ -83,6 +83,29 @@ class UrlValidationTests(unittest.TestCase):
                 validate_public_url(svg_url, field_name="Logo URL", allow_relative=True)
 
             self.assertEqual(error.exception.status_code, 400)
+
+    def test_rejects_unsafe_urls_in_all_supported_carousel_variants(self):
+        for element_type in ("carouselSpotlight", "carouselStack", "carouselEditorial"):
+            with self.subTest(element_type=element_type), self.assertRaises(HTTPException):
+                validate_builder_schema_urls(
+                    {
+                        "pages": [
+                            {
+                                "sections": [
+                                    {
+                                        "elements": [
+                                            {
+                                                "id": "carousel-1",
+                                                "type": element_type,
+                                                "content": "Title\nDescription\njavascript:alert(1)",
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                )
 
 
 if __name__ == "__main__":
