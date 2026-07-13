@@ -219,8 +219,12 @@ export default function SettingsPage({
       }
     : t;
   const onUserUpdatedRef = useRef(onUserUpdated);
-  onUserUpdatedRef.current = onUserUpdated;
   const userId = user?.id;
+
+  useEffect(() => {
+    onUserUpdatedRef.current = onUserUpdated;
+  }, [onUserUpdated]);
+
   const userApiPath = useCallback((path) => {
     if (accountApiBasePath) {
       const basePath = accountApiBasePath.startsWith("http")
@@ -376,7 +380,7 @@ export default function SettingsPage({
       setAccountForm(getInitialAccountForm(user));
       setAvatarLoadFailed(false);
     });
-  }, [userId]);
+  }, [user, userId]);
 
   useEffect(() => {
     return deferEffectStateUpdate(() => {

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run theme:audit && vite build",
+    "theme:audit": "node scripts/check-theme-contract.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run --environment jsdom src",

@@ -1,6 +1,5 @@
 export const PUBLIC_ROUTES = {
   home: "/",
-  productTour: "/product-tour",
   pricing: "/pricing",
   pricingBasePlans: "/pricing/base-plans",
   pricingCustomPlan: "/pricing/custom-plan",

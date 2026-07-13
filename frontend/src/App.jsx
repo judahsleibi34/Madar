@@ -19,7 +19,7 @@ import {
   clearCsrfToken,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
-import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
+import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -224,7 +224,7 @@ export default function App() {
   }, [i18n]);
 
   useEffect(() => {
-    applyThemeMode(themeMode);
+    applyThemeMode(themeMode, { emit: false });
   }, [themeMode]);
 
   useEffect(() => {
@@ -245,7 +245,9 @@ export default function App() {
 
     const handleStorage = (event) => {
       if (event.key !== "madar-theme-mode") return;
-      setThemeMode(event.newValue === "dark" ? "dark" : "light");
+      const nextMode = event.newValue === "dark" ? "dark" : "light";
+      applyThemeMode(nextMode, { emit: false, persist: false });
+      setThemeMode(nextMode);
     };
 
     window.addEventListener("madar-theme-change", handleThemeEvent);
@@ -258,8 +260,7 @@ export default function App() {
   }, []);
 
   const handleThemeModeChange = useCallback((nextMode) => {
-    const safeMode = applyThemeMode(nextMode);
-    setThemeMode(safeMode);
+    transitionThemeMode(nextMode);
   }, []);
 
   useEffect(() => {

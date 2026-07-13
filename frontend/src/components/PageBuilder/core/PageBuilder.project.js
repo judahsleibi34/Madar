@@ -11,7 +11,6 @@ import {
   createPage,
 } from "./PageBuilder.factories";
 import {
-  getSectionElements,
   isResponsesSection,
   removeDeprecatedBuilderElements,
   removeDuplicateFormHeadings,
@@ -25,7 +24,7 @@ export const buildFormConnectionUpdate = (value) => ({
 });
 
 const nextUnusedId = (prefix, usedIds, idFactory) => {
-  let candidate = "";
+  let candidate;
   do {
     candidate = String(idFactory(prefix) || "").trim();
   } while (!candidate || usedIds.has(candidate));

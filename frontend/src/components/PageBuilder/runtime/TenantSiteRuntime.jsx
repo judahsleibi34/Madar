@@ -165,12 +165,15 @@ const getPageElements = (page) =>
     ),
   ]);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getRuntimePageSections = (page) =>
   Array.isArray(page?.sections) ? page.sections : [];
 
 const getPageAuthElements = (page) =>
   getPageElements(page).filter((element) => authElementTypes.has(element.type));
 
+// Runtime routing helpers are exported for focused tests alongside this component.
+// eslint-disable-next-line react-refresh/only-export-components
 export const getRuntimeAuthFlow = (pages = []) => ({
   entryPage:
     pages.find((page) =>
@@ -186,6 +189,7 @@ export const getRuntimeAuthFlow = (pages = []) => ({
   ),
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const runtimePageRequiresAuthentication = (page, destinationPageIds = new Set()) =>
   Boolean(
     page && (
@@ -196,9 +200,11 @@ export const runtimePageRequiresAuthentication = (page, destinationPageIds = new
     )
   );
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getRuntimeNavigationPages = (pages = []) =>
   pages.filter((page) => page?.showInNavigation !== false);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const resolveRuntimePage = ({
   pages = [],
   requestedPage = null,

@@ -20,6 +20,7 @@ export const createElementRenderer = ({
   carouselElementTypes,
   selected,
   preview,
+  renderMode = preview ? "preview" : "editing",
   getFreeElementStyle,
   getElementStyle,
   startDrag,
@@ -123,7 +124,7 @@ export const createElementRenderer = ({
     const commonProps = {
       className: `builder-element builder-element-${element.type} ${isSelected ? "is-selected" : ""}`,
       style: isFree ? getFreeElementStyle(element) : getElementStyle(element),
-      onMouseDown: (event) => startDrag(event, element),
+      onPointerDown: (event) => startDrag(event, element),
       onClick: (event) => {
         event.stopPropagation();
         if (!preview) {
@@ -206,7 +207,7 @@ export const createElementRenderer = ({
             style={{ width: carouselWidth, maxWidth: carouselWidth }}
           >
             <PageBuilderCarousel
-              autoScroll={Boolean(element.autoScroll)}
+              autoScroll={renderMode !== "editing" && Boolean(element.autoScroll)}
               autoScrollMs={element.autoScrollMs}
               content={element.content}
               name={element.name}
@@ -248,7 +249,7 @@ export const createElementRenderer = ({
         <div key={element.id} {...commonProps} className={`${commonProps.className} metric-group`} style={{ ...commonProps.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "var(--theme-text)", "--metric-symbol-color": element.styles?.metricSymbolColor || "var(--theme-warning)" }}>
           {metrics.map((metric, index) => (
             <div className="metric-group-item" key={`${element.id}_${index}`}>
-              <strong className="metric-value"><CountUpText value={metric.value} /></strong>
+              <strong className="metric-value"><CountUpText value={metric.value} animateValue={renderMode !== "editing"} /></strong>
               <span className="metric-label">{metric.label}</span>
               {metric.description && <span className="metric-description">{metric.description}</span>}
             </div>

@@ -1,13 +1,14 @@
 /* Shared design tokens */
-:root {
+:root,
+:root[data-theme="light"] {
   color-scheme: light;
 
-  --madar-bg: #fafaf7;
-  --madar-navy: #1b2a4a;
-  --madar-navy-dark: #0f1626;
+  --madar-bg: var(--app-bg);
+  --madar-navy: #162033;
+  --madar-navy-dark: #101317;
   --madar-red: var(--theme-primary);
   --madar-red-dark: var(--theme-primary-hover);
-  --madar-cream: #f1eee6;
+  --madar-cream: #f4f0e8;
   --madar-gradient: var(--theme-gradient);
   --madar-gradient-hover: var(--theme-gradient-hover);
   --madar-button-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.18);
@@ -15,35 +16,37 @@
 
   /* Shared application surfaces. Structural layout uses --app-bg; white is
      reserved for compact controls, intentional cards, previews, and content. */
-  --app-bg: var(--madar-cream);
-  --surface-1: #f7f5ef;
-  --surface-2: #ffffff;
-  --surface-3: #ebe7dc;
-  --border-subtle: #e2dfd5;
-  --border-strong: rgba(27, 42, 74, 0.22);
-  --text-primary: #1b2a4a;
-  --text-muted: #6f778b;
+  --app-bg: #f4f0e8;
+  --surface-1: #fffdfa;
+  --surface-2: #f8f4ed;
+  --surface-3: var(--surface-2);
+  --border-subtle: #ddd6ca;
+  --border-strong: #c8bfb1;
+  --text-primary: #162033;
+  --text-secondary: #465066;
+  --text-muted: #6f7787;
+  --accent: #852c21;
 
   --theme-bg: var(--app-bg);
-  --theme-bg-soft: var(--app-bg);
-  --theme-surface: #ffffff;
+  --theme-bg-soft: var(--surface-2);
+  --theme-surface: var(--surface-1);
   --theme-surface-elevated: var(--theme-surface-2);
-  --theme-surface-2: var(--surface-1);
-  --theme-surface-3: var(--surface-3);
+  --theme-surface-2: var(--surface-2);
+  --theme-surface-3: var(--surface-2);
   --theme-border: var(--border-subtle);
   --theme-border-strong: var(--border-strong);
   --theme-text: var(--text-primary);
   --theme-text-secondary: var(--theme-text-soft);
-  --theme-text-soft: #4a5470;
+  --theme-text-soft: var(--text-secondary);
   --theme-text-muted: var(--text-muted);
   --theme-text-inverse: #ffffff;
   --theme-text-inverse-rgb: 255, 255, 255;
   --theme-black-rgb: 0, 0, 0;
-  --theme-paper-surface: #ffffff;
-  --theme-paper-surface-soft: #f7f5ef;
-  --theme-paper-text: #1b2a4a;
-  --theme-paper-text-soft: #4a5470;
-  --theme-paper-border: #e2dfd5;
+  --theme-paper-surface: var(--surface-1);
+  --theme-paper-surface-soft: var(--surface-2);
+  --theme-paper-text: var(--text-primary);
+  --theme-paper-text-soft: var(--text-secondary);
+  --theme-paper-border: var(--border-subtle);
   --theme-primary: #852C21;
   --theme-primary-hover: #6f241b;
   --theme-primary-soft: rgba(133, 44, 33, 0.1);
@@ -64,13 +67,13 @@
   --theme-text-gradient: var(--theme-primary);
   --theme-shadow: 0 18px 44px rgba(27, 42, 74, 0.12);
   --theme-shadow-rgb: 27, 42, 74;
-  --theme-footer-bg: #070808;
-  --theme-footer-bg-soft: #130f0e;
-  --theme-footer-surface: rgba(255, 255, 255, 0.07);
-  --theme-footer-border: rgba(255, 255, 255, 0.12);
-  --theme-footer-text: #fff7ef;
-  --theme-footer-text-soft: #ead9ce;
-  --theme-footer-text-muted: #bcada4;
+  --theme-footer-bg: var(--surface-1);
+  --theme-footer-bg-soft: var(--surface-2);
+  --theme-footer-surface: var(--surface-2);
+  --theme-footer-border: var(--border-subtle);
+  --theme-footer-text: var(--text-primary);
+  --theme-footer-text-soft: var(--text-secondary);
+  --theme-footer-text-muted: var(--text-muted);
 
   /* Semantic app color aliases. Keep --theme-* as the compatibility layer. */
   --color-bg: var(--theme-bg);
@@ -96,13 +99,13 @@
   --color-focus: rgba(var(--theme-primary-rgb), 0.16);
   --app-surface-alpha: color-mix(in srgb, var(--theme-surface) 84%, transparent);
   --app-focus-ring: 0 0 0 4px var(--color-focus);
-  --app-shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.06);
-  --app-shadow-md: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
+  --app-shadow-sm: 0 6px 18px rgba(var(--theme-shadow-rgb), 0.055);
+  --app-shadow-md: 0 12px 32px rgba(var(--theme-shadow-rgb), 0.075);
   --app-primary-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.18);
-  --app-card-shadow: 0 18px 46px rgba(var(--theme-shadow-rgb), 0.09);
-  --app-card-shadow-hover: 0 22px 52px rgba(var(--theme-shadow-rgb), 0.12);
-  --app-header-shadow: 0 10px 28px rgba(var(--theme-shadow-rgb), 0.06);
-  --app-panel-shadow: 0 22px 56px rgba(var(--theme-shadow-rgb), 0.08);
+  --app-card-shadow: 0 10px 28px rgba(var(--theme-shadow-rgb), 0.07);
+  --app-card-shadow-hover: 0 14px 36px rgba(var(--theme-shadow-rgb), 0.1);
+  --app-header-shadow: 0 6px 20px rgba(var(--theme-shadow-rgb), 0.05);
+  --app-panel-shadow: 0 14px 38px rgba(var(--theme-shadow-rgb), 0.075);
   --app-modal-shadow: 0 28px 80px rgba(var(--theme-shadow-rgb), 0.18);
   --app-backdrop: rgba(var(--theme-shadow-rgb), 0.58);
   --app-chrome-translucent: color-mix(in srgb, var(--theme-surface) 92%, transparent);
@@ -110,18 +113,22 @@
   --app-success-strong-rgb: 74, 222, 128;
   --builder-chrome-bg: var(--app-bg);
   --builder-chrome-surface: var(--surface-1);
-  --builder-chrome-surface-raised: var(--theme-surface);
-  --builder-chrome-surface-muted: var(--surface-1);
-  --builder-chrome-border: color-mix(in srgb, var(--theme-border) 62%, transparent);
-  --builder-chrome-shadow: 0 8px 18px rgba(var(--theme-shadow-rgb), 0.035);
+  --builder-chrome-surface-raised: var(--surface-2);
+  --builder-chrome-surface-muted: var(--surface-2);
+  --app-radius-control: 12px;
+  --app-radius-card: 16px;
+  --app-radius-panel: 18px;
+  --app-control-shadow: inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.72);
+  --builder-chrome-border: var(--border-subtle);
+  --builder-chrome-shadow: var(--app-shadow-sm);
   --builder-bg: var(--builder-chrome-bg);
   --builder-surface-1: var(--builder-chrome-surface);
   --builder-surface-2: var(--builder-chrome-surface-raised);
   --builder-surface-3: var(--builder-chrome-surface-muted);
   --builder-border: var(--builder-chrome-border);
   --builder-border-strong: color-mix(in srgb, var(--theme-border) 82%, transparent);
-  --builder-hover: color-mix(in srgb, var(--theme-text) 5%, transparent);
-  --builder-selected: color-mix(in srgb, var(--theme-text) 7%, transparent);
+  --builder-hover: var(--surface-2);
+  --builder-selected: color-mix(in srgb, var(--surface-2) 90%, var(--accent));
   --builder-text: var(--theme-text);
   --builder-text-muted: var(--theme-text-soft);
   /* Backward-compatible aliases for builder modules migrated incrementally. */
@@ -133,21 +140,21 @@
   --builder-neutral-selected: color-mix(in srgb, var(--builder-surface-2) 93%, var(--builder-text));
 }
 
-:root[data-theme="dark"],
-html.theme-dark,
-body.theme-dark {
+:root[data-theme="dark"] {
   color-scheme: dark;
 
   /* Shared neutral dark palette. All dark application themes resolve through
      these primitives so route shells cannot drift back toward navy/slate. */
-  --app-bg: #101318;
-  --surface-1: #15191f;
-  --surface-2: #1a1f26;
-  --surface-3: #20262f;
-  --border-subtle: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --app-bg: #101317;
+  --surface-1: #181d23;
+  --surface-2: #232a32;
+  --surface-3: var(--surface-2);
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.17);
   --text-primary: #f4f6f8;
-  --text-muted: #a7b0bd;
+  --text-secondary: #c8ced6;
+  --text-muted: #9ca6b2;
+  --accent: #852c21;
 
   --madar-bg: var(--app-bg);
   --madar-navy: var(--surface-3);
@@ -159,12 +166,12 @@ body.theme-dark {
   --theme-surface: var(--surface-1);
   --theme-surface-elevated: var(--theme-surface-2);
   --theme-surface-2: var(--surface-2);
-  --theme-surface-3: var(--surface-3);
+  --theme-surface-3: var(--surface-2);
   --theme-border: var(--border-subtle);
   --theme-border-strong: var(--border-strong);
   --theme-text: var(--text-primary);
   --theme-text-secondary: var(--theme-text-soft);
-  --theme-text-soft: var(--text-muted);
+  --theme-text-soft: var(--text-secondary);
   --theme-text-muted: var(--text-muted);
   --theme-text-inverse: #ffffff;
   --theme-text-inverse-rgb: 255, 255, 255;
@@ -172,7 +179,7 @@ body.theme-dark {
   --theme-paper-surface: var(--surface-1);
   --theme-paper-surface-soft: var(--surface-2);
   --theme-paper-text: var(--text-primary);
-  --theme-paper-text-soft: var(--text-muted);
+  --theme-paper-text-soft: var(--text-secondary);
   --theme-paper-border: var(--border-subtle);
   --theme-primary: #852C21;
   --theme-primary-hover: #c94730;
@@ -199,7 +206,7 @@ body.theme-dark {
   --theme-footer-surface: rgba(255, 255, 255, 0.07);
   --theme-footer-border: rgba(255, 255, 255, 0.12);
   --theme-footer-text: var(--text-primary);
-  --theme-footer-text-soft: var(--text-muted);
+  --theme-footer-text-soft: var(--text-secondary);
   --theme-footer-text-muted: var(--text-muted);
 
   --color-bg: var(--theme-bg);
@@ -237,16 +244,20 @@ body.theme-dark {
   --app-chrome-translucent: color-mix(in srgb, var(--theme-surface) 90%, transparent);
   --app-success-strong: #4ade80;
   --app-success-strong-rgb: 74, 222, 128;
+  --app-radius-control: 14px;
+  --app-radius-card: 22px;
+  --app-radius-panel: 22px;
+  --app-control-shadow: none;
   --builder-chrome-bg: var(--app-bg);
   --builder-chrome-surface: var(--surface-1);
   --builder-chrome-surface-raised: var(--surface-2);
-  --builder-chrome-surface-muted: var(--surface-3);
+  --builder-chrome-surface-muted: var(--surface-2);
   --builder-chrome-border: var(--border-subtle);
   --builder-chrome-shadow: 0 10px 22px rgba(var(--theme-black-rgb), 0.14);
   --builder-bg: var(--app-bg);
   --builder-surface-1: var(--surface-1);
   --builder-surface-2: var(--surface-2);
-  --builder-surface-3: var(--surface-3);
+  --builder-surface-3: var(--surface-2);
   --builder-border: var(--border-subtle);
   --builder-border-strong: var(--border-strong);
   --builder-hover: rgba(255, 255, 255, 0.05);

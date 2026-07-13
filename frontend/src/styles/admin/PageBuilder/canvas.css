@@ -930,6 +930,19 @@
   white-space: normal;
 }
 
+/* Editing is a static authoring surface. Preview and tenant runtime keep the
+   published motion defined above and in PageBuilderCarousel.css. */
+.page-builder:not(.preview-mode) .builder-element-list li {
+  opacity: 1;
+  animation: none;
+}
+
+.page-builder:not(.preview-mode) .page-builder-carousel .carousel-stage > img,
+.page-builder:not(.preview-mode) .page-builder-carousel .carousel-copy,
+.page-builder:not(.preview-mode) .page-builder-carousel.carousel-variant-spotlight .carousel-stage::before {
+  animation: none;
+}
+
 .builder-element-embed strong {
   min-width: 0;
   font-size: clamp(12px, min(9cqw, 14cqh), 18px);

@@ -906,35 +906,37 @@ export default function FormsTab({
             </label>
           </div>
 
-          <section className="simple-action-group forms-theme-action-group">
-            <span className="simple-action-group-title">Form colors</span>
-            <div className="forms-theme-grid">
-              {formThemeColorControls.map(renderFormThemeColorControl)}
+          <details className="simple-action-group forms-theme-action-group">
+            <summary className="simple-action-group-title">Form colors</summary>
+            <div className="forms-theme-action-body">
+              <div className="forms-theme-grid">
+                {formThemeColorControls.map(renderFormThemeColorControl)}
+              </div>
+              <div className="forms-theme-shape-grid">
+                <label>
+                  Form corners
+                  <input
+                    type="number"
+                    min="0"
+                    value={formTheme.radius ?? defaultFormTheme.radius}
+                    onChange={(event) => updateFormThemeValue("radius", Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Field corners
+                  <input
+                    type="number"
+                    min="0"
+                    value={formTheme.fieldRadius ?? defaultFormTheme.fieldRadius}
+                    onChange={(event) => updateFormThemeValue("fieldRadius", Number(event.target.value))}
+                  />
+                </label>
+              </div>
+              <FormButton icon={RotateCcw} onClick={resetFormTheme}>
+                Reset form colors
+              </FormButton>
             </div>
-            <div className="forms-theme-shape-grid">
-              <label>
-                Form corners
-                <input
-                  type="number"
-                  min="0"
-                  value={formTheme.radius ?? defaultFormTheme.radius}
-                  onChange={(event) => updateFormThemeValue("radius", Number(event.target.value))}
-                />
-              </label>
-              <label>
-                Field corners
-                <input
-                  type="number"
-                  min="0"
-                  value={formTheme.fieldRadius ?? defaultFormTheme.fieldRadius}
-                  onChange={(event) => updateFormThemeValue("fieldRadius", Number(event.target.value))}
-                />
-              </label>
-            </div>
-            <FormButton icon={RotateCcw} onClick={resetFormTheme}>
-              Reset form colors
-            </FormButton>
-          </section>
+          </details>
 
           <label>
             {copy.labels.addQuestion}
@@ -955,7 +957,7 @@ export default function FormsTab({
             </FormButton>
           </div>
           <div className="simple-action-groups">
-            <section className="simple-action-group">
+            <section className="simple-action-group forms-form-actions-group">
               <span className="simple-action-group-title">{copy.labels.formActions}</span>
               <FormButton variant="primary" icon={Save} disabled={isSavingForm} onClick={saveForm}>
                 {isSavingForm ? "Saving..." : "Save form"}
@@ -1064,8 +1066,8 @@ export default function FormsTab({
                 ))}
                 <button type="button" title={copy.toolbar.leftToRight} onMouseDown={(event) => { event.preventDefault(); getActiveFormTextTarget() ? setActiveFormTextDirection("ltr") : updatePageTextStyle(section, { direction: "ltr", textAlign: "left" }); }}>{copy.toolbar.directionLtrShort}</button>
                 <button type="button" title={copy.toolbar.rightToLeft} onMouseDown={(event) => { event.preventDefault(); getActiveFormTextTarget() ? setActiveFormTextDirection("rtl") : updatePageTextStyle(section, { direction: "rtl", textAlign: "right" }); }}>{copy.toolbar.directionRtlShort}</button>
-                <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#1f2937" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "color", event.target.value) : updatePageTextStyle(section, { color: event.target.value })} /></label>
-                <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#ffffff" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "backgroundColor", event.target.value) : updatePageTextStyle(section, { backgroundColor: event.target.value })} /></label>
+                <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#162033" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "color", event.target.value) : updatePageTextStyle(section, { color: event.target.value })} /></label>
+                <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#fffdfa" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "backgroundColor", event.target.value) : updatePageTextStyle(section, { backgroundColor: event.target.value })} /></label>
               </div>
               <div className="forms-section-heading">
                 <input
@@ -1169,7 +1171,7 @@ export default function FormsTab({
                       <Highlighter size={16} aria-hidden="true" />
                       <input
                         type="color"
-                        defaultValue="#f4f7fb"
+                        defaultValue="#f8f4ed"
                         onChange={(event) => applyTargetColor(getActiveFormTextTarget(), "backgroundColor", event.target.value)}
                       />
                     </label>
@@ -1330,8 +1332,8 @@ export default function FormsTab({
                       ))}
                       <button type="button" title={copy.toolbar.leftToRight} onMouseDown={(event) => { event.preventDefault(); setTextDirection(field, "ltr"); }}>{copy.toolbar.directionLtrShort}</button>
                       <button type="button" title={copy.toolbar.rightToLeft} onMouseDown={(event) => { event.preventDefault(); setTextDirection(field, "rtl"); }}>{copy.toolbar.directionRtlShort}</button>
-                      <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#1f2937" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "color", event.target.value)} /></label>
-                      <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#ffffff" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "backgroundColor", event.target.value)} /></label>
+                      <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#162033" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "color", event.target.value)} /></label>
+                      <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#fffdfa" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "backgroundColor", event.target.value)} /></label>
                     </div>
                     <div className="simple-question-main">
                       <span className="question-index">{fieldIndex + 1}</span>
@@ -1445,7 +1447,7 @@ export default function FormsTab({
                           <Highlighter size={16} aria-hidden="true" />
                           <input
                             type="color"
-                            defaultValue="#f4f7fb"
+                            defaultValue="#f8f4ed"
                             onChange={(event) => applyTargetColor(getActiveTextTarget(field), "backgroundColor", event.target.value)}
                           />
                         </label>

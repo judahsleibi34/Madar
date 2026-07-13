@@ -22,12 +22,12 @@ export const getPageBuilderThemeClassName = ({ mode = "light", preview = false }
 };
 
 export const defaultWebsiteTheme = {
-  background: "#fafaf7",
-  softSurface: "#f7f5ef",
-  surface: "#ffffff",
-  text: "#1b2a4a",
+  background: "#f4f0e8",
+  softSurface: "#f8f4ed",
+  surface: "#fffdfa",
+  text: "#162033",
   muted: "#6f7787",
-  primary: "#1b2a4a",
+  primary: "#162033",
   accent: "#852c21",
   accentDark: "#6f241b",
   buttonText: "#ffffff",
@@ -35,12 +35,12 @@ export const defaultWebsiteTheme = {
 };
 
 export const defaultFormTheme = {
-  background: "#ffffff",
-  surface: "#ffffff",
-  inputBackground: "#ffffff",
-  text: "#1b2a4a",
+  background: "#f4f0e8",
+  surface: "#fffdfa",
+  inputBackground: "#f8f4ed",
+  text: "#162033",
   muted: "#6f7787",
-  border: "#d8dde6",
+  border: "#ddd6ca",
   accent: "#852c21",
   buttonText: "#ffffff",
   radius: 8,

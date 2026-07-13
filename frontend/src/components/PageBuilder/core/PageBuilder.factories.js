@@ -326,7 +326,7 @@ export const createElement = (type = "text", overrides = {}) => {
         backgroundColor: "var(--theme-surface)",
         borderRadius: "22px",
         alignSelf: "stretch",
-        metricTextColor: "#172b4d",
+        metricTextColor: "#162033",
         metricSymbolColor: "#f1b84b",
       },
     },

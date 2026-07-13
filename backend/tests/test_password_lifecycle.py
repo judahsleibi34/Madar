@@ -206,7 +206,14 @@ class PasswordLifecycleTests(unittest.TestCase):
 
     def test_forgot_password_sends_only_to_matching_canonical_auth_email(self):
         reset = Mock()
-        with patch.object(password_routes, "enforce_password_rate_limit"), patch.object(
+        with patch.dict(
+            "os.environ",
+            {
+                "FRONTEND_URL": "",
+                "FRONTEND_URLS": "http://127.0.0.1:3001",
+            },
+            clear=False,
+        ), patch.object(password_routes, "enforce_password_rate_limit"), patch.object(
             password_routes,
             "find_auth_user_by_email",
             return_value=confirmed_auth_user(),

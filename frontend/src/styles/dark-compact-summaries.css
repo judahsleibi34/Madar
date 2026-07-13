@@ -1,0 +1,125 @@
+/* Dark-mode compact summaries belong to their parent panel. They are not
+   individual cards and therefore must not introduce another surface level. */
+:is(:root[data-theme="dark"], html.theme-dark, body.theme-dark) :is(
+  .forms-sidebar-stats,
+  .users-inline-stats,
+  .results-summary-grid,
+  .analytics-summary-grid,
+  .user-management-stats,
+  .notifications-summary-grid,
+  .archive-summary-grid,
+  .admin-access-summary-grid,
+  .data-summary-grid,
+  .responses-metric-grid,
+  .daw-review-summary-grid,
+  .daw-dataset-stats,
+  .daw-kpi-grid,
+  .daw-plot-summary-grid
+) {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+:is(:root[data-theme="dark"], html.theme-dark, body.theme-dark) :is(
+  .forms-sidebar-stats > *,
+  .users-inline-stats > *,
+  .results-summary-grid > *,
+  .analytics-summary-grid > *,
+  .user-management-stats > *,
+  .notifications-summary-grid > *,
+  .archive-summary-grid > *,
+  .admin-access-summary-grid > *,
+  .data-summary-grid > *,
+  .responses-metric-grid > *,
+  .daw-review-summary-grid > *,
+  .daw-dataset-stats > *,
+  .daw-kpi-grid > *,
+  .daw-plot-summary-grid > *
+) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+:is(:root[data-theme="dark"], html.theme-dark, body.theme-dark) :is(
+  .forms-sidebar-stats > * + *,
+  .users-inline-stats > * + *,
+  .results-summary-grid > * + *,
+  .analytics-summary-grid > * + *,
+  .user-management-stats > * + *,
+  .notifications-summary-grid > * + *,
+  .archive-summary-grid > * + *,
+  .admin-access-summary-grid > * + *,
+  .data-summary-grid > * + *,
+  .responses-metric-grid > * + *,
+  .daw-review-summary-grid > * + *,
+  .daw-dataset-stats > * + *,
+  .daw-kpi-grid > * + *,
+  .daw-plot-summary-grid > * + *
+) {
+  border-inline-start: 1px solid var(--border-subtle) !important;
+}
+
+:is(:root[data-theme="dark"], html.theme-dark, body.theme-dark) :is(
+  .forms-sidebar-stats,
+  .users-inline-stats,
+  .results-summary-grid,
+  .analytics-summary-grid,
+  .user-management-stats,
+  .notifications-summary-grid,
+  .archive-summary-grid,
+  .admin-access-summary-grid,
+  .data-summary-grid,
+  .responses-metric-grid,
+  .daw-review-summary-grid,
+  .daw-dataset-stats,
+  .daw-kpi-grid,
+  .daw-plot-summary-grid
+) :is(span, small, p) {
+  color: var(--text-muted) !important;
+}
+
+:is(:root[data-theme="dark"], html.theme-dark, body.theme-dark) :is(
+  .forms-sidebar-stats,
+  .users-inline-stats,
+  .results-summary-grid,
+  .analytics-summary-grid,
+  .user-management-stats,
+  .notifications-summary-grid,
+  .archive-summary-grid,
+  .admin-access-summary-grid,
+  .data-summary-grid,
+  .responses-metric-grid,
+  .daw-review-summary-grid,
+  .daw-dataset-stats,
+  .daw-kpi-grid,
+  .daw-plot-summary-grid
+) :is(strong, b, output) {
+  color: var(--text-primary) !important;
+}
+
+@media (max-width: 680px) {
+  :is(:root[data-theme="dark"], html.theme-dark, body.theme-dark) :is(
+    .forms-sidebar-stats > * + *,
+    .users-inline-stats > * + *,
+    .results-summary-grid > * + *,
+    .analytics-summary-grid > * + *,
+    .user-management-stats > * + *,
+    .notifications-summary-grid > * + *,
+    .archive-summary-grid > * + *,
+    .admin-access-summary-grid > * + *,
+    .data-summary-grid > * + *,
+    .responses-metric-grid > * + *,
+    .daw-review-summary-grid > * + *,
+    .daw-dataset-stats > * + *,
+    .daw-kpi-grid > * + *,
+    .daw-plot-summary-grid > * + *
+  ) {
+    border-inline-start: 0 !important;
+    border-top: 1px solid var(--border-subtle) !important;
+  }
+}

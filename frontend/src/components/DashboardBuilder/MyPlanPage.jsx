@@ -10,6 +10,7 @@ const titleCase = (value) =>
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getBillingDisplayState = (billing) => {
   const active = billing?.active || null;
   const rawPending = billing?.pending_request || null;
