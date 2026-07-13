@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
-from database import get_config_readiness
+from services.readiness_service import get_readiness
 
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -14,11 +14,11 @@ def live():
 
 @router.get("/ready")
 def ready():
-    checks = get_config_readiness()
-    if all(checks.values()):
-        return {"status": "ok", "checks": checks}
+    readiness = get_readiness()
+    if readiness["ready"]:
+        return readiness
 
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        content={"status": "degraded", "checks": checks},
+        content=readiness,
     )
