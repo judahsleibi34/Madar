@@ -11,6 +11,7 @@ import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
 const publicNavItems = [
   ...primaryNavigationItems,
   { id: "privacy", labelKey: "privacy", path: PUBLIC_ROUTES.privacyPolicy },
+  { id: "terms", labelKey: "terms", path: PUBLIC_ROUTES.termsAndConditions },
 ];
 
 export default function Header({

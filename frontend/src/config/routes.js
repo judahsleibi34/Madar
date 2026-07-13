@@ -7,6 +7,7 @@ export const PUBLIC_ROUTES = {
   about: "/about",
   contact: "/contact",
   privacyPolicy: "/privacy-policy",
+  termsAndConditions: "/terms-and-conditions",
   demo: "/demo",
   login: "/login",
   signup: "/signup",

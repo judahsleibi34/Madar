@@ -34,18 +34,18 @@ function getFriendlySubscriptionError(errorDetail, lang = "en") {
 
   if (text.includes("duplicate key value") || text.includes("already exists")) {
     return isArabic
-      ? "ظ‡ط°ط§ ط§ظ„ط§ط´طھط±ط§ظƒ ظ…ظˆط¬ظˆط¯ ط¨ط§ظ„ظپط¹ظ„ ظپظٹ ط­ط³ط§ط¨ظƒ."
+      ? "هذا الاشتراك موجود بالفعل في حسابك."
       : "This subscription is already active on your account.";
   }
 
   if (text.includes("User does not have a tenant_id")) {
     return isArabic
-      ? "ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ط¹ط«ظˆط± ط¹ظ„ظ‰ ظ…ط³ط§ط­ط© ط§ظ„ط¹ظ…ظ„ ط§ظ„ط®ط§طµط© ط¨ط­ط³ط§ط¨ظƒ. ظٹط±ط¬ظ‰ طھط³ط¬ظٹظ„ ط§ظ„ط¯ط®ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰."
+      ? "لا يمكن العثور على مساحة العمل الخاصة بحسابك. يرجى تسجيل الدخول مرة أخرى."
       : "We could not find your workspace. Please log in again.";
   }
 
   return isArabic
-    ? "طھط¹ط°ط± ط­ظپط¸ ط§ظ„ط§ط´طھط±ط§ظƒ. ظٹط±ط¬ظ‰ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰."
+    ? "تعذر حفظ الاشتراك. يرجى المحاولة مرة أخرى."
     : "Could not save your subscription. Please try again.";
 }
 

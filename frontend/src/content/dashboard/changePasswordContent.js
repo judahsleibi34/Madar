@@ -1,4 +1,4 @@
-﻿export const changePasswordContent = {
+export const changePasswordContent = {
   en: {
     eyebrow: "Account security",
     title: "Change password",
@@ -20,24 +20,24 @@
     hidePassword: "Hide password",
   },
   ar: {
-    eyebrow: "ط£ظ…ط§ظ† ط§ظ„ط­ط³ط§ط¨",
-    title: "طھط؛ظٹظٹط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±",
+    eyebrow: "أمان الحساب",
+    title: "تغيير كلمة المرور",
     subtitle:
-      "ط£ظƒظ‘ط¯ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط­ط§ظ„ظٹط©طŒ ط«ظ… ط£ط¯ط®ظ„ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط¬ط¯ظٹط¯ط© ظˆط£ظƒظ‘ط¯ظ‡ط§.",
-    currentPassword: "ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط­ط§ظ„ظٹط©",
-    newPassword: "ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط¬ط¯ظٹط¯ط©",
-    confirmNewPassword: "طھط£ظƒظٹط¯ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط¬ط¯ظٹط¯ط©",
-    cancel: "ط¥ظ„ط؛ط§ط،",
-    updatePassword: "طھط­ط¯ظٹط« ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±",
-    updatingPassword: "ط¬ط§ط±ظچ ط§ظ„طھط­ط¯ظٹط«...",
-    passwordMismatch: "ظƒظ„ظ…طھط§ ط§ظ„ظ…ط±ظˆط± ط§ظ„ط¬ط¯ظٹط¯طھط§ظ† ط؛ظٹط± ظ…طھط·ط§ط¨ظ‚طھظٹظ†.",
-    passwordTooShort: "ظٹط¬ط¨ ط£ظ† طھظƒظˆظ† ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± 8 ط£ط­ط±ظپ ط¹ظ„ظ‰ ط§ظ„ط£ظ‚ظ„.",
-    passwordFieldsRequired: "ظٹط±ط¬ظ‰ طھط¹ط¨ط¦ط© ط¬ظ…ظٹط¹ ط­ظ‚ظˆظ„ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±.",
-    passwordUpdated: "طھظ… طھط­ط¯ظٹط« ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط¨ظ†ط¬ط§ط­.",
-    passwordUpdateError: "طھط¹ط°ط± طھط­ط¯ظٹط« ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±.",
-    backToSettings: "ط§ظ„ط¹ظˆط¯ط© ط¥ظ„ظ‰ ط§ظ„ط¥ط¹ط¯ط§ط¯ط§طھ",
-    showPassword: "ط¥ط¸ظ‡ط§ط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±",
-    hidePassword: "ط¥ط®ظپط§ط، ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±",
+      "أكّد كلمة المرور الحالية، ثم أدخل كلمة المرور الجديدة وأكّدها.",
+    currentPassword: "كلمة المرور الحالية",
+    newPassword: "كلمة المرور الجديدة",
+    confirmNewPassword: "تأكيد كلمة المرور الجديدة",
+    cancel: "إلغاء",
+    updatePassword: "تحديث كلمة المرور",
+    updatingPassword: "جارٍ التحديث...",
+    passwordMismatch: "كلمتا المرور الجديدتان غير متطابقتين.",
+    passwordTooShort: "يجب أن تكون كلمة المرور 8 أحرف على الأقل.",
+    passwordFieldsRequired: "يرجى تعبئة جميع حقول كلمة المرور.",
+    passwordUpdated: "تم تحديث كلمة المرور بنجاح.",
+    passwordUpdateError: "تعذر تحديث كلمة المرور.",
+    backToSettings: "العودة إلى الإعدادات",
+    showPassword: "إظهار كلمة المرور",
+    hidePassword: "إخفاء كلمة المرور",
   },
 };
 

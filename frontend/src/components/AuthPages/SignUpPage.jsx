@@ -34,6 +34,7 @@ export default function SignUpPage({
     businessName: "",
     businessType: "",
     subdomain: "",
+    acceptedTerms: false,
   });
 
   const [errors, setErrors] = useState({});
@@ -64,6 +65,7 @@ export default function SignUpPage({
     businessName: t("signup.businessName"),
     businessType: t("signup.businessType"),
     subdomain: t("signup.subdomain"),
+    acceptedTerms: t("signup.termsAndConditions"),
   };
   const showAuthToast = ({ type = "error", title, message, kind = "status" }) => {
     setAuthToast({
@@ -197,6 +199,10 @@ export default function SignUpPage({
         : t("validation.required");
     }
 
+    if (safeDetail.includes("terms")) {
+      nextErrors.acceptedTerms = t("signup.termsRequired");
+    }
+
     if (safeDetail.includes("email")) {
       nextErrors.email = safeDetail.includes("registered")
         ? ""
@@ -247,6 +253,9 @@ export default function SignUpPage({
     if (!values.confirmPassword.trim()) {
       newErrors.confirmPassword = t("validation.required");
     }
+    if (!values.acceptedTerms) {
+      newErrors.acceptedTerms = t("signup.termsRequired");
+    }
 
     if (isTenantOnboarding) {
       validateTextValue(
@@ -291,8 +300,12 @@ export default function SignUpPage({
   };
 
   const handleChange = (event) => {
-    const { name, value } = event.target;
-    const nextValue = name === "subdomain" ? value.toLowerCase() : value;
+    const { checked, name, type, value } = event.target;
+    const nextValue = type === "checkbox"
+      ? checked
+      : name === "subdomain"
+        ? value.toLowerCase()
+        : value;
     const nextFormData = { ...formData, [name]: nextValue };
 
     setFormData(nextFormData);
@@ -311,6 +324,7 @@ export default function SignUpPage({
       last_name: formData.lastName.trim(),
       email: formData.email.trim(),
       password: formData.password,
+      terms_accepted: formData.acceptedTerms,
     };
 
     if (isTenantOnboarding) {
@@ -336,6 +350,7 @@ export default function SignUpPage({
         if (field === "business_type") newErrors.businessType = getTextOnlyMessage(t("signup.businessType"));
         if (field === "subdomain") newErrors.subdomain = t("signup.subdomainInvalid");
         if (field === "password") newErrors.password = error.msg || t("validation.required");
+        if (field === "terms_accepted") newErrors.acceptedTerms = t("signup.termsRequired");
       });
 
       setErrors((prev) => ({ ...prev, ...newErrors }));
@@ -474,83 +489,87 @@ export default function SignUpPage({
           {renderFieldError("email")}
         </label>
 
-        <label>
-          {t("signup.password")}
-          <div className="password-field">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder={t("signup.password")}
-              value={formData.password}
-              minLength={PASSWORD_MIN_LENGTH}
-              onChange={handleChange}
-              dir="ltr"
-              {...getErrorProps("password")}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={t("signup.togglePassword")}
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-          {renderFieldError("password")}
-        </label>
+        <div className="register-row">
+          <label>
+            {t("signup.password")}
+            <div className="password-field">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder={t("signup.password")}
+                value={formData.password}
+                minLength={PASSWORD_MIN_LENGTH}
+                onChange={handleChange}
+                dir="ltr"
+                {...getErrorProps("password")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={t("signup.togglePassword")}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {renderFieldError("password")}
+          </label>
 
-        <label>
-          {t("signup.confirmPassword")}
-          <div className="password-field">
-            <input
-              type={showConfirmPassword ? "text" : "password"}
-              name="confirmPassword"
-              placeholder={t("signup.confirmPassword")}
-              value={formData.confirmPassword}
-              minLength={PASSWORD_MIN_LENGTH}
-              onChange={handleChange}
-              dir="ltr"
-              {...getErrorProps("confirmPassword")}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label={t("signup.toggleConfirmPassword")}
-            >
-              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-          {renderFieldError("confirmPassword")}
-        </label>
+          <label>
+            {t("signup.confirmPassword")}
+            <div className="password-field">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                placeholder={t("signup.confirmPassword")}
+                value={formData.confirmPassword}
+                minLength={PASSWORD_MIN_LENGTH}
+                onChange={handleChange}
+                dir="ltr"
+                {...getErrorProps("confirmPassword")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                aria-label={t("signup.toggleConfirmPassword")}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {renderFieldError("confirmPassword")}
+          </label>
+        </div>
 
         {isTenantOnboarding && (
           <>
             <div className="auth-section-title">{t("signup.businessSection")}</div>
 
-            <label>
-              {t("signup.businessName")}
-              <input
-                type="text"
-                name="businessName"
-                placeholder={t("signup.businessNamePlaceholder")}
-                value={formData.businessName}
-                onChange={handleChange}
-                {...getErrorProps("businessName")}
-              />
-              {renderFieldError("businessName")}
-            </label>
+            <div className="register-row">
+              <label>
+                {t("signup.businessName")}
+                <input
+                  type="text"
+                  name="businessName"
+                  placeholder={t("signup.businessNamePlaceholder")}
+                  value={formData.businessName}
+                  onChange={handleChange}
+                  {...getErrorProps("businessName")}
+                />
+                {renderFieldError("businessName")}
+              </label>
 
-            <label>
-              {t("signup.businessType")}
-              <input
-                type="text"
-                name="businessType"
-                placeholder={t("signup.businessTypePlaceholder")}
-                value={formData.businessType}
-                onChange={handleChange}
-                {...getErrorProps("businessType")}
-              />
-              {renderFieldError("businessType")}
-            </label>
+              <label>
+                {t("signup.businessType")}
+                <input
+                  type="text"
+                  name="businessType"
+                  placeholder={t("signup.businessTypePlaceholder")}
+                  value={formData.businessType}
+                  onChange={handleChange}
+                  {...getErrorProps("businessType")}
+                />
+                {renderFieldError("businessType")}
+              </label>
+            </div>
 
             <label>
               {t("signup.subdomain")}
@@ -572,6 +591,27 @@ export default function SignUpPage({
             </label>
           </>
         )}
+
+        <div className={`auth-terms-consent${errors.acceptedTerms ? " has-error" : ""}`}>
+          <label className="auth-terms-row" htmlFor="signup-accepted-terms">
+            <input
+              id="signup-accepted-terms"
+              type="checkbox"
+              name="acceptedTerms"
+              checked={formData.acceptedTerms}
+              onChange={handleChange}
+              aria-required="true"
+              {...getErrorProps("acceptedTerms")}
+            />
+            <span className="auth-terms-copy">
+              {t("signup.agreeToTerms")} {" "}
+              <Link to="/terms-and-conditions" target="_blank" rel="noopener noreferrer">
+                {t("signup.termsAndConditions")}
+              </Link>
+            </span>
+          </label>
+          {renderFieldError("acceptedTerms")}
+        </div>
 
         <button
           className="login-submit register-submit"

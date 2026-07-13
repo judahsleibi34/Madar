@@ -13,6 +13,7 @@ const TeamPage = lazy(() => import("../components/MainPages/TeamPage"));
 const AboutSection = lazy(() => import("../components/MainPages/AboutSection"));
 const ContactPage = lazy(() => import("../components/MainPages/ContactPage"));
 const PrivacyPolicyPage = lazy(() => import("../components/MainPages/PrivacyPolicyPage"));
+const TermsAndConditionsPage = lazy(() => import("../components/MainPages/TermsAndConditionsPage"));
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
 
 const LoginPage = lazy(() => import("../components/AuthPages/LoginPage"));
@@ -140,6 +141,11 @@ export default function PublicRoutes({
           <Route
             path="privacy-policy"
             element={<PrivacyPolicyPage key={`privacy-policy-${lang}`} lang={lang} />}
+          />
+
+          <Route
+            path="terms-and-conditions"
+            element={<TermsAndConditionsPage key={`terms-and-conditions-${lang}`} lang={lang} />}
           />
 
           <Route

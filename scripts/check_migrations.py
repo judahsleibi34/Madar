@@ -16,7 +16,7 @@ TREE_PATHS = {
     "supabase": REPO_ROOT / "supabase" / "migrations",
 }
 FILENAME_PATTERN = re.compile(r"^(?P<number>\d{3})_(?P<description>[a-z0-9][a-z0-9_]*)\.sql$")
-NEXT_MIGRATION_NUMBER = 43
+NEXT_MIGRATION_NUMBER = 44
 
 HISTORICAL_COMMON_FILES = {
     "001_initial_schema.sql",
@@ -57,9 +57,9 @@ HISTORICAL_COMMON_FILES = {
     "038_create_notifications.sql",
     "039_create_ai_usage_reservation.sql",
     "040_add_user_email_verification_status.sql",
-    "040_create_builder_reservations.sql",
     "041_add_password_reset_request_timestamp.sql",
     "042_create_tenant_site_memberships.sql",
+    "043_create_account_lifecycle.sql",
 }
 
 HISTORICAL_FILES = {
@@ -75,12 +75,7 @@ HISTORICAL_FILES = {
     },
 }
 
-GRANDFATHERED_DUPLICATES = {
-    40: {
-        "040_add_user_email_verification_status.sql",
-        "040_create_builder_reservations.sql",
-    }
-}
+GRANDFATHERED_DUPLICATES = {}
 
 SWAPPED_FILES = (
     (
@@ -172,7 +167,7 @@ def check_duplicate_numbers(
                 f"{', '.join(sorted(actual)) or 'nothing'}"
             )
 
-    # All prefixes below 043 are occupied historical history. A new file using
+    # All prefixes below 044 are occupied historical history. A new file using
     # one therefore creates a duplicate and is rejected above. This diagnostic
     # documents the required floor for the next unique migration.
     unique_numbers = set(by_number)
