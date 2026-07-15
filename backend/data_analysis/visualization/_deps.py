@@ -27,6 +27,10 @@ except Exception:
 
 try:
     import pygwalker as pyg
+    from pygwalker.services.global_var import GlobalVarManager
+
+    if os.getenv("PYGWALKER_TELEMETRY_ENABLED", "false").strip().lower() != "true":
+        GlobalVarManager.set_privacy("offline")
 except Exception:
     pyg = None
 
