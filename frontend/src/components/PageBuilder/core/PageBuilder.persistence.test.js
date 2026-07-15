@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createBuilderProjectPayload,
   persistBuilderProject,
+  validateBuilderSaveAcknowledgement,
+  validateBuilderSchemaAcknowledgement,
 } from "./PageBuilder.persistence";
 import {
   cleanBuilderProject,
@@ -10,6 +12,8 @@ import {
 } from "./PageBuilder.project";
 import { loadInitialProject } from "./PageBuilder.storage";
 import { collectFormConnectionIssues } from "./PageBuilder.errors";
+import { stripEditorOnlyState } from "./PageBuilder.editorState";
+import { getSectionElements } from "./PageBuilder.layout";
 
 const fullProject = {
   id: "project_regression",
@@ -47,7 +51,9 @@ describe("builder project persistence", () => {
       demoMode: false,
     });
 
-    expect(JSON.parse(localStorage.getItem("builder-regression"))).toEqual(fullProject);
+    expect(JSON.parse(localStorage.getItem("builder-regression"))).toEqual(
+      stripEditorOnlyState(fullProject)
+    );
     expect(setProject).toHaveBeenCalledWith(fullProject);
   });
 
@@ -59,7 +65,8 @@ describe("builder project persistence", () => {
       getBuilderProjectSlug: (project) => project.slug,
     });
 
-    expect(payload.draft_schema).toBe(fullProject);
+    expect(payload.draft_schema).toEqual(stripEditorOnlyState(fullProject));
+    expect(payload.draft_schema).not.toBe(fullProject);
     expect(payload.draft_schema.forms[0].sections).toHaveLength(9);
     expect(payload.draft_schema.forms[0].sections[8].fields[0].label).toBe("Question 9");
   });
@@ -73,6 +80,72 @@ describe("builder project persistence", () => {
     });
 
     expect(payload).toMatchObject({ expected_revision: 12 });
+  });
+
+  it("requires an acknowledgement for the exact project with a newer revision", () => {
+    expect(validateBuilderSaveAcknowledgement({
+      projectId: "project-1",
+      previousRevision: 5,
+      savedRecord: { id: "project-1", draft_revision: 6 },
+    })).toBe(6);
+    expect(() => validateBuilderSaveAcknowledgement({
+      projectId: "project-1",
+      previousRevision: 5,
+      savedRecord: { id: "project-2", draft_revision: 6 },
+    })).toThrow(/acknowledgement/i);
+    expect(() => validateBuilderSaveAcknowledgement({
+      projectId: "project-1",
+      previousRevision: 5,
+      savedRecord: { id: "project-1", draft_revision: 5 },
+    })).toThrow(/acknowledgement/i);
+  });
+
+  it("accepts reordered acknowledgement objects but rejects real schema differences", () => {
+    const submittedProject = {
+      pages: [{ id: "home", settings: { title: "Home", visible: true } }],
+      theme: { colors: { surface: "#fff", primary: "#111" } },
+    };
+    const reorderedSchema = {
+      theme: { colors: { primary: "#111", surface: "#fff" } },
+      pages: [{ settings: { visible: true, title: "Home" }, id: "home" }],
+    };
+
+    expect(validateBuilderSchemaAcknowledgement({
+      savedRecord: { draft_schema: reorderedSchema },
+      submittedProject,
+    })).toBe(true);
+    expect(() => validateBuilderSchemaAcknowledgement({
+      savedRecord: {
+        draft_schema: {
+          ...reorderedSchema,
+          pages: [{ settings: { visible: true, title: "Changed" }, id: "home" }],
+        },
+      },
+      submittedProject,
+    })).toThrow(/does not match/);
+  });
+
+  it("excludes all editor selections while retaining public routing state", () => {
+    const payload = createBuilderProjectPayload({
+      project: {
+        ...fullProject,
+        activePageId: "page-2",
+        activeWorkflowId: "workflow-1",
+        activeRoleId: "role-1",
+        defaultPageId: "home",
+        pages: [{ id: "home", isDefault: true }, { id: "page-2" }],
+      },
+      builderProjectRecord: { id: "project-1", draft_revision: 12 },
+      getBuilderProjectName: (project) => project.name,
+      getBuilderProjectSlug: (project) => project.slug,
+    });
+
+    expect(payload.draft_schema).not.toHaveProperty("activePageId");
+    expect(payload.draft_schema).not.toHaveProperty("activeFormId");
+    expect(payload.draft_schema).not.toHaveProperty("activeWorkflowId");
+    expect(payload.draft_schema).not.toHaveProperty("activeRoleId");
+    expect(payload.draft_schema.defaultPageId).toBe("home");
+    expect(payload.draft_schema.pages[0].isDefault).toBe(true);
   });
 
   it("keeps compatibility with records created before revision support", () => {
@@ -97,7 +170,9 @@ describe("builder project persistence", () => {
       demoMode: false,
     });
 
-    expect(JSON.parse(localStorage.getItem("builder-regression"))).toEqual(fullProject);
+    expect(JSON.parse(localStorage.getItem("builder-regression"))).toEqual(
+      stripEditorOnlyState(fullProject)
+    );
     expect(JSON.parse(localStorage.getItem("builder-regression:backup"))).toEqual({
       name: "Old draft",
       forms: [],
@@ -139,7 +214,7 @@ describe("builder project persistence", () => {
       getBuilderProjectSlug: (project) => project.slug,
     });
     const reloadedBlock = payload.draft_schema.pages[0].sections
-      .flatMap((section) => section.freeElements || [])
+      .flatMap(getSectionElements)
       .find((element) => element.id === "block-1");
 
     expect(reloadedBlock.connectedFormId).toBe("form-1");

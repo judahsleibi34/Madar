@@ -410,7 +410,8 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         }
         client = build_public_client(fake_supabase)
 
-        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada"}},
@@ -467,7 +468,9 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         project["draft_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
         client = build_public_client(fake_supabase)
 
-        with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification"):
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada", "field_email": "ada@example.com"}},

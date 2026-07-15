@@ -35,7 +35,6 @@ const buildQrUrl = (data, version) => {
 
 export default function PageBuilderPublishTab({
   project,
-  persistProjectNow,
   liveSitePath = "",
   hasConfiguredSubdomain = false,
   openWebsiteSettings,
@@ -182,7 +181,6 @@ export default function PageBuilderPublishTab({
                 <button
                   type="button"
                   onClick={() => {
-                    persistProjectNow?.(project);
                     if (publicLink) {
                       window.open(publicLink, "_blank", "noopener,noreferrer");
                     }

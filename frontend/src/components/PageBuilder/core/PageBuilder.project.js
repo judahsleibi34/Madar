@@ -1,8 +1,10 @@
-import { createBlankWorkspaceProject } from "./PageBuilder.starters";
-import { createId, defaultSiteChrome } from "./PageBuilder.constants";
+import { defaultSiteChrome, defaultTheme } from "./PageBuilder.constants";
 import { normalizeProjectPageRouting } from "./PageBuilder.routing";
 import { normalizeElementAction } from "./PageBuilder.actions";
-import { internalPageNames } from "./PageBuilder.copy";
+import {
+  stripEditorOnlyState,
+  withLocalProjectEditorDefaults,
+} from "./PageBuilder.editorState";
 import {
   createElement,
   createColumn,
@@ -31,11 +33,13 @@ const nextUnusedId = (prefix, usedIds, idFactory) => {
   return candidate;
 };
 
-export const repairDuplicateProjectIds = (project, { idFactory = createId } = {}) => {
+export const repairDuplicateProjectIds = (project, { idFactory = null } = {}) => {
   const source = project && typeof project === "object" && !Array.isArray(project)
     ? project
     : {};
   const repairs = [];
+  let deterministicRepairIndex = 0;
+  const nextId = idFactory || ((prefix) => `${prefix}_repaired_${++deterministicRepairIndex}`);
   const usedPageIds = new Set();
   const usedFormIds = new Set();
   const usedBlockIds = new Set();
@@ -47,7 +51,7 @@ export const repairDuplicateProjectIds = (project, { idFactory = createId } = {}
       return oldId;
     }
 
-    const newId = nextUnusedId(prefix, usedIds, idFactory);
+    const newId = nextUnusedId(prefix, usedIds, nextId);
     usedIds.add(newId);
     repairs.push({ kind, oldId, newId, ...context });
     return newId;
@@ -127,9 +131,12 @@ export const repairDuplicateProjectIds = (project, { idFactory = createId } = {}
   };
 };
 
-const normalizeBuilderElementShape = (element) => {
+const deterministicRoutineId = (prefix, path) =>
+  `${prefix}_${String(path || "item").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase()}`;
+
+const normalizeBuilderElementShape = (element, path = "element") => {
   if (!element || typeof element !== "object" || Array.isArray(element)) {
-    return createElement("text");
+    return createElement("text", { id: deterministicRoutineId("element", path) });
   }
 
   const elementName = String(element.name || "").trim().toLowerCase();
@@ -155,7 +162,10 @@ const normalizeBuilderElementShape = (element) => {
   }
 
   const { formId: legacyFormId, form_id: legacyFormIdSnake, ...canonicalElement } = element;
-  const normalized = createElement(element.type || "text", canonicalElement);
+  const normalized = createElement(element.type || "text", {
+    ...canonicalElement,
+    id: String(element.id || deterministicRoutineId("element", path)),
+  });
   normalized.id = String(normalized.id || "");
   normalized.action = normalizeElementAction(element.action);
   if (normalized.type === "formBlock") {
@@ -169,17 +179,18 @@ const normalizeBuilderElementShape = (element) => {
   return normalized;
 };
 
-const normalizeBuilderColumnShape = (column) => {
+const normalizeBuilderColumnShape = (column, path = "column") => {
   const source =
     column && typeof column === "object" && !Array.isArray(column)
       ? column
       : {};
   const elements = Array.isArray(source.elements)
-    ? source.elements.map(normalizeBuilderElementShape)
+    ? source.elements.map((element, index) => normalizeBuilderElementShape(element, `${path}_element_${index}`))
     : [];
 
   return createColumn(elements, {
     ...source,
+    id: String(source.id || deterministicRoutineId("column", path)),
     name: source.name || "Column",
     layout: {
       align: "left",
@@ -189,17 +200,18 @@ const normalizeBuilderColumnShape = (column) => {
   });
 };
 
-const normalizeBuilderRowShape = (row) => {
+const normalizeBuilderRowShape = (row, path = "row") => {
   const source =
     row && typeof row === "object" && !Array.isArray(row)
       ? row
       : {};
   const columns = Array.isArray(source.columns) && source.columns.length > 0
-    ? source.columns.map(normalizeBuilderColumnShape)
-    : [normalizeBuilderColumnShape({ elements: source.elements || [] })];
+    ? source.columns.map((column, index) => normalizeBuilderColumnShape(column, `${path}_column_${index}`))
+    : [normalizeBuilderColumnShape({ elements: source.elements || [] }, `${path}_column_0`)];
 
   return createRow(columns, {
     ...source,
+    id: String(source.id || deterministicRoutineId("row", path)),
     layout: {
       columns: String(source.layout?.columns || columns.length || 1),
       align: source.layout?.align || "center",
@@ -210,7 +222,7 @@ const normalizeBuilderRowShape = (row) => {
   });
 };
 
-const normalizeBuilderSectionShape = (section) => {
+const normalizeBuilderSectionShape = (section, path = "section") => {
   const source =
     section && typeof section === "object" && !Array.isArray(section)
       ? section
@@ -226,15 +238,20 @@ const normalizeBuilderSectionShape = (section) => {
         (element) => !freeElementIds.has(String(element?.id || ""))
       )
     : [];
-  const rows = Array.isArray(source.rows) && source.rows.length > 0
-    ? source.rows.map(normalizeBuilderRowShape)
-    : [normalizeBuilderRowShape({ elements: legacyElements })];
-  const freeElements = sourceFreeElements.map(normalizeBuilderElementShape);
+  const rows = Array.isArray(source.rows)
+    ? source.rows.map((row, index) => normalizeBuilderRowShape(row, `${path}_row_${index}`))
+    : legacyElements.length > 0 || !["direct", "free"].includes(source.mode)
+      ? [normalizeBuilderRowShape({ elements: legacyElements }, `${path}_row_0`)]
+      : [];
+  const freeElements = sourceFreeElements.map((element, index) =>
+    normalizeBuilderElementShape(element, `${path}_free_${index}`)
+  );
   const canonicalSource = Object.fromEntries(
     Object.entries(source).filter(([key]) => key !== "elements")
   );
 
   const base = createSection({
+    id: String(source.id || deterministicRoutineId("section", path)),
     name: source.name || source.type || "Section",
     mode: source.mode || "auto",
     layout: source.layout || {},
@@ -255,43 +272,40 @@ const normalizeBuilderSectionShape = (section) => {
   };
 };
 
-const normalizeBuilderPageShape = (page, fallbackPage) => {
+const normalizeBuilderPageShape = (page, path = "page") => {
   const source =
     page && typeof page === "object" && !Array.isArray(page)
       ? page
-      : fallbackPage || {};
+      : {};
   const sections = Array.isArray(source.sections)
-    ? source.sections.map(normalizeBuilderSectionShape)
+    ? source.sections.map((section, index) => normalizeBuilderSectionShape(section, `${path}_section_${index}`))
     : [];
 
-  const normalizedPage = createPage(source.name || fallbackPage?.name || "Home", sections, {
+  const normalizedPage = createPage(source.name || "Untitled page", sections, {
     ...source,
-    slug: source.slug || source.path || fallbackPage?.slug || "/",
-    backgroundColor: source.backgroundColor || fallbackPage?.backgroundColor || "var(--theme-surface)",
-    visibility: source.visibility || fallbackPage?.visibility || "public",
+    id: String(source.id || deterministicRoutineId("page", path)),
+    slug: source.slug || source.path || "/",
+    backgroundColor: source.backgroundColor || "var(--theme-surface)",
+    visibility: source.visibility || "public",
     showInNavigation:
       typeof source.showInNavigation === "boolean"
         ? source.showInNavigation
-        : fallbackPage?.showInNavigation ?? true,
-    pageType: source.pageType || fallbackPage?.pageType || "main",
+        : true,
+    pageType: source.pageType || "main",
     sections,
   });
   return { ...normalizedPage, id: String(normalizedPage.id || "") };
 };
 
 export const normalizeBuilderProjectShape = (project) => {
-  const fallback = createBlankWorkspaceProject();
   const source =
     project && typeof project === "object" && !Array.isArray(project)
       ? project
       : {};
 
-  const sourcePages =
-    Array.isArray(source.pages) && source.pages.length > 0
-      ? source.pages
-      : fallback.pages;
+  const sourcePages = Array.isArray(source.pages) ? source.pages : [];
   const normalizedPages = sourcePages.map((page, index) =>
-    normalizeBuilderPageShape(page, fallback.pages[index])
+    normalizeBuilderPageShape(page, `page_${index}`)
   );
   const routedProject = normalizeProjectPageRouting({
     ...source,
@@ -302,21 +316,26 @@ export const normalizeBuilderProjectShape = (project) => {
   const forms = (
     Array.isArray(source.forms)
       ? source.forms
-      : fallback.forms
-  ).map((form) => ({ ...form, id: String(form?.id || "") }));
+      : []
+  ).map((form, index) => ({
+    ...form,
+    id: String(form?.id || deterministicRoutineId("form", `form_${index}`)),
+  }));
 
   const workflows = Array.isArray(source.workflows)
     ? source.workflows
-    : fallback.workflows || [];
+    : [];
 
-  const roles = Array.isArray(source.roles) ? source.roles : fallback.roles || [];
-  const users = Array.isArray(source.users) ? source.users : fallback.users || [];
+  const roles = Array.isArray(source.roles) ? source.roles : [];
+  const users = Array.isArray(source.users) ? source.users : [];
   const collections = Array.isArray(source.collections)
     ? source.collections
-    : fallback.collections || [];
+    : [];
 
   return {
-    ...fallback,
+    name: "Untitled Site",
+    status: "draft",
+    publish: { environment: "local" },
     ...source,
     pages,
     defaultPageId: routedProject.defaultPageId,
@@ -340,11 +359,11 @@ export const normalizeBuilderProjectShape = (project) => {
       ? source.activeRoleId
       : roles[0]?.id || "",
     siteChrome: {
-      ...(fallback.siteChrome || defaultSiteChrome),
+      ...defaultSiteChrome,
       ...(source.siteChrome || {}),
     },
     theme: {
-      ...(fallback.theme || {}),
+      ...defaultTheme,
       ...(source.theme || {}),
     },
   };
@@ -352,18 +371,18 @@ export const normalizeBuilderProjectShape = (project) => {
 
 export const cleanBuilderProjectWithRepairs = (project) => {
   const normalizedProject = normalizeBuilderProjectShape(project);
+  const layoutVersion = Number(project?.directLayoutVersion);
+  const requiresExplicitLegacyLayoutMigration =
+    Number.isInteger(layoutVersion) && layoutVersion > 0 && layoutVersion < 4;
 
-  if (!normalizedProject.pages.length) {
+  // Direct-layout conversion was a one-time, versioned migration. Routine
+  // hydration/comparison must preserve modern section structures verbatim and
+  // must not infer legacy content from names or block types.
+  if (!requiresExplicitLegacyLayoutMigration || !normalizedProject.pages.length) {
     return repairDuplicateProjectIds(normalizedProject);
   }
 
-  const cleanedPages = normalizedProject.pages
-    .filter(
-      (page, index) =>
-        index === 0 ||
-        !internalPageNames.has(String(page.name || "").toLowerCase())
-    )
-    .map((page) => {
+  const cleanedPages = normalizedProject.pages.map((page) => {
       const baseSections = (page.sections || [])
         .filter(
           (section) =>
@@ -382,31 +401,16 @@ export const cleanBuilderProjectWithRepairs = (project) => {
     });
 
   const pages = cleanedPages.length ? cleanedPages : normalizedProject.pages;
-  const forms = normalizedProject.forms.map((form) => ({
-    ...form,
-    responses: [],
-  }));
-  const collections = normalizedProject.collections.map((collection) => ({
-    ...collection,
-    records: [],
-  }));
-
   return repairDuplicateProjectIds({
     ...normalizedProject,
     directLayoutVersion: 4,
     activePageId: pages.some((page) => page.id === normalizedProject.activePageId)
       ? normalizedProject.activePageId
       : pages[0]?.id || "",
-    siteChrome: {
-      ...normalizedProject.siteChrome,
-      footerShopLinks: String(normalizedProject.siteChrome?.footerShopLinks || "")
-        .split("\n")
-        .filter((item) => !["Responses", "Reports", "Orders"].includes(item.trim()))
-        .join("\n"),
-    },
+    siteChrome: normalizedProject.siteChrome,
     pages,
-    forms,
-    collections,
+    forms: normalizedProject.forms,
+    collections: normalizedProject.collections,
   });
 };
 
@@ -420,7 +424,7 @@ export const normalizeProjectSlug = (value) => {
     .replace(/-{2,}/g, "-")
     .replace(/^-+|-+$/g, "");
 
-  return cleanValue || `builder-project-${Date.now()}`;
+  return cleanValue || "builder-project";
 };
 
 export const getBuilderProjectName = (project) =>
@@ -435,10 +439,11 @@ export const getDraftProjectFromRecord = (record) => {
     return null;
   }
 
-  return cleanBuilderProject({
-    ...record.draft_schema,
+  const project = cleanBuilderProject({
+    ...stripEditorOnlyState(record.draft_schema),
     ...(record.status ? { status: record.status } : {}),
   });
+  return withLocalProjectEditorDefaults(project);
 };
 
 export const getDraftProjectFromRecordWithRepairs = (record) => {
@@ -446,10 +451,14 @@ export const getDraftProjectFromRecordWithRepairs = (record) => {
     return { project: null, repairs: [] };
   }
 
-  return cleanBuilderProjectWithRepairs({
-    ...record.draft_schema,
+  const result = cleanBuilderProjectWithRepairs({
+    ...stripEditorOnlyState(record.draft_schema),
     ...(record.status ? { status: record.status } : {}),
   });
+  return {
+    ...result,
+    project: result.project ? withLocalProjectEditorDefaults(result.project) : null,
+  };
 };
 
 export const getPreviewCanvasStyle = (viewport, isPreview, viewports) => {

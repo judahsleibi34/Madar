@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
+import { getBuilderProjectIdFromPath } from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
 import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
@@ -19,6 +20,16 @@ const TenantSiteRuntime = lazy(() =>
   import("../components/PageBuilder/runtime/TenantSiteRuntime")
 );
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
+const BuilderProjectChooser = lazy(() =>
+  import("../components/PageBuilder/workspace/BuilderProjectChooser")
+);
+
+function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps }) {
+  const location = useLocation();
+  const projectId = getBuilderProjectIdFromPath(location.pathname);
+  if (!projectId) return <BuilderProjectChooser workspace={workspace} autoOpenSingleProject />;
+  return <PageBuilder key={`${workspace}:${projectId}`} {...pageBuilderProps} />;
+}
 
 export default function UserWorkspaceRoutes({
   lang,
@@ -91,20 +102,20 @@ export default function UserWorkspaceRoutes({
       />
 
       <Route
-        path="/page-builder/form-preview/:formId"
+        path="/page-builder/projects/:projectId/form-preview/:formId"
         element={<BuilderFormPreviewPage user={user} />}
       />
 
       <Route
-        path="/page-builder/preview/*"
+        path="/page-builder/projects/:projectId/preview/*"
         element={<TenantSiteRuntime draftPreview user={user} />}
       />
 
       <Route
         path="/page-builder/*"
         element={renderShell(
-          <PageBuilder
-            key="page-builder-main"
+          <BuilderWorkspaceEntry
+            workspace="page-builder"
             user={user}
             templateLang={lang}
             appThemeMode={themeMode}
@@ -117,8 +128,8 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/builder-responses/*"
         element={renderShell(
-          <PageBuilder
-            key="builder-responses-page"
+          <BuilderWorkspaceEntry
+            workspace="builder-responses"
             user={user}
             initialTab="responses"
             visibleTabIds={["responses"]}
@@ -135,8 +146,8 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/builder-data/*"
         element={renderShell(
-          <PageBuilder
-            key="builder-data-page"
+          <BuilderWorkspaceEntry
+            workspace="builder-data"
             user={user}
             initialTab="data"
             visibleTabIds={["data"]}

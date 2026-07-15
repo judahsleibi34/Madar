@@ -1,6 +1,11 @@
 import { apiFetch, createApiError } from "../../../utils/apiClient";
+import { getPersistableProject } from "../core/PageBuilder.editorState";
 
-const builderProjectUpdateQueues = new Map();
+export const BUILDER_CLIENT_CONTRACT = "cloud-draft-v1";
+const builderWriteHeaders = () => ({
+  "Content-Type": "application/json",
+  "X-Madar-Builder-Contract": BUILDER_CLIENT_CONTRACT,
+});
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 export const USER_STATUS_PATH =
@@ -116,8 +121,8 @@ export const fetchBuilderProject = async (projectId) => {
 export const createBuilderProject = async ({ name, slug, draft_schema }) => {
   const response = await apiFetch(getApiUrl("/builder/projects"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, slug, draft_schema }),
+    headers: builderWriteHeaders(),
+    body: JSON.stringify({ name, slug, draft_schema: getPersistableProject(draft_schema) }),
   });
 
   const data = await parseJsonResponse(response);
@@ -125,32 +130,25 @@ export const createBuilderProject = async ({ name, slug, draft_schema }) => {
 };
 
 export const updateBuilderProject = async (projectId, payload) => {
-  const previousUpdate = builderProjectUpdateQueues.get(projectId) || Promise.resolve();
-  const queuedUpdate = previousUpdate.catch(() => undefined).then(async () => {
-    const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}`), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await parseJsonResponse(response);
-    return data?.project || null;
+  const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}`), {
+    method: "PUT",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify({
+      ...payload,
+      ...(payload?.draft_schema
+        ? { draft_schema: getPersistableProject(payload.draft_schema) }
+        : {}),
+    }),
   });
 
-  builderProjectUpdateQueues.set(projectId, queuedUpdate);
-  try {
-    return await queuedUpdate;
-  } finally {
-    if (builderProjectUpdateQueues.get(projectId) === queuedUpdate) {
-      builderProjectUpdateQueues.delete(projectId);
-    }
-  }
+  const data = await parseJsonResponse(response);
+  return data?.project || null;
 };
 
 export const publishBuilderProject = async (projectId, expectedRevision = null) => {
   const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}/publish`), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: builderWriteHeaders(),
     body: JSON.stringify(
       expectedRevision === null || expectedRevision === undefined
         ? {}
@@ -164,7 +162,7 @@ export const publishBuilderProject = async (projectId, expectedRevision = null) 
 export const unpublishBuilderProject = async (projectId, expectedRevision = null) => {
   const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}/unpublish`), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: builderWriteHeaders(),
     body: JSON.stringify(
       expectedRevision === null || expectedRevision === undefined
         ? {}

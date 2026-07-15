@@ -57,8 +57,9 @@ describe("PageBuilderPublishTab", () => {
     expect(screen.queryByRole("button", { name: /publish site|go live/i })).toBeNull();
   });
 
-  it("preview site persists the project before opening", () => {
+  it("opens the confirmed live site without writing browser recovery", () => {
     const persistProjectNow = vi.fn();
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(
       <PageBuilderPublishTab
@@ -70,6 +71,11 @@ describe("PageBuilderPublishTab", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /preview site/i }));
 
-    expect(persistProjectNow).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith(
+      "http://localhost:3000/site/disco2/",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    expect(persistProjectNow).not.toHaveBeenCalled();
   });
 });

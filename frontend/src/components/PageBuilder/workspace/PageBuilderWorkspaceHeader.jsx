@@ -14,7 +14,6 @@ export default function PageBuilderWorkspaceHeader({
   preview,
   project,
   renderWorkspaceNavigator,
-  saveProject,
   setActiveTopbarAction,
   setModal,
   setPreview,
@@ -39,7 +38,6 @@ export default function PageBuilderWorkspaceHeader({
         setModal={setModal}
         openPreviewPage={openPreviewPage}
         setPreview={setPreview}
-        saveProject={saveProject}
       />
 
       <PageBuilderSubbar
