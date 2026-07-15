@@ -4,11 +4,38 @@ import { getSectionElements } from "./PageBuilder.layout";
 import {
   buildFormConnectionUpdate,
   cleanBuilderProject,
+  getDraftProjectFromRecord,
   normalizeBuilderProjectShape,
   repairDuplicateProjectIds,
 } from "./PageBuilder.project";
 
 describe("cleanBuilderProject", () => {
+  it("ignores legacy server editor selection and hydrates the persisted default locally", () => {
+    const loaded = getDraftProjectFromRecord({
+      status: "draft",
+      draft_schema: {
+        activePageId: "page-2",
+        activeFormId: "form-2",
+        activeWorkflowId: "workflow-2",
+        activeRoleId: "role-2",
+        defaultPageId: "home",
+        pages: [
+          { id: "home", name: "Home", isDefault: true, sections: [] },
+          { id: "page-2", name: "Page 2", sections: [] },
+        ],
+        forms: [{ id: "form-1" }, { id: "form-2" }],
+        workflows: [{ id: "workflow-1" }, { id: "workflow-2" }],
+        roles: [{ id: "role-1" }, { id: "role-2" }],
+      },
+    });
+
+    expect(loaded.activePageId).toBe("home");
+    expect(loaded.activeFormId).toBe("form-1");
+    expect(loaded.activeWorkflowId).toBe("workflow-1");
+    expect(loaded.activeRoleId).toBe("role-1");
+    expect(loaded.defaultPageId).toBe("home");
+  });
+
   it("normalizes legacy button actions without moving page-owned blocks", () => {
     const normalized = normalizeBuilderProjectShape({
       pages: [
@@ -326,6 +353,78 @@ describe("cleanBuilderProject", () => {
     expect(savedForm.sections).toHaveLength(2);
     expect(savedForm.sections.flatMap((section) => section.fields)).toHaveLength(2);
     expect(savedForm.customFormSetting).toEqual({ retain: true });
-    expect(savedForm.responses).toEqual([]);
+    expect(savedForm.responses).toEqual([{ id: "legacy-response" }]);
+  });
+
+  it.each(["Reports", "Orders", "Responses", "Submit Request", "Submit Report", "Place Order"])(
+    "preserves a legitimate %s page and matching footer link",
+    (name) => {
+      const project = cleanBuilderProject({
+        pages: [
+          { id: "home", name: "Home", slug: "/", sections: [] },
+          { id: `page-${name}`, name, slug: `/${name.toLowerCase().replaceAll(" ", "-")}`, sections: [] },
+        ],
+        forms: [],
+        collections: [{ id: "collection-1", records: [{ id: "record-1" }] }],
+        siteChrome: { footerShopLinks: name },
+      });
+
+      expect(project.pages.map((page) => page.name)).toContain(name);
+      expect(project.siteChrome.footerShopLinks).toBe(name);
+      expect(project.collections[0].records).toEqual([{ id: "record-1" }]);
+    }
+  );
+
+  it("preserves an explicit empty page array", () => {
+    expect(cleanBuilderProject({ pages: [], forms: [] }).pages).toEqual([]);
+  });
+
+  it("does not run historical layout cleanup during routine modern normalization", () => {
+    const project = cleanBuilderProject({
+      directLayoutVersion: 4,
+      pages: [{
+        id: "reports",
+        name: "Reports",
+        sections: [
+          {
+            id: "empty-direct",
+            mode: "direct",
+            rows: [],
+            freeElements: [],
+            customSectionField: { keep: true },
+          },
+          {
+            id: "responses",
+            mode: "auto",
+            rows: [{ id: "row", columns: [{ id: "column", elements: [{
+              id: "responses-table",
+              type: "responsesTable",
+              customBlockField: "keep",
+            }] }] }],
+          },
+        ],
+      }],
+      forms: [],
+    });
+
+    expect(project.pages[0].sections).toHaveLength(2);
+    expect(project.pages[0].sections[0].rows).toEqual([]);
+    expect(project.pages[0].sections[0].customSectionField).toEqual({ keep: true });
+    expect(project.pages[0].sections[1].rows[0].columns[0].elements[0]).toMatchObject({
+      id: "responses-table",
+      type: "responsesTable",
+      customBlockField: "keep",
+    });
+  });
+
+  it("normalizes malformed input deterministically without random or time-based IDs", () => {
+    const source = { pages: [{ name: "Reports", sections: [{ mode: "direct", freeElements: [{ type: "text" }] }] }], forms: [{}] };
+    const first = cleanBuilderProject(source);
+    const second = cleanBuilderProject(source);
+
+    expect(first).toEqual(second);
+    expect(first.pages[0].id).toBe("page_page_0");
+    expect(first.pages[0].sections[0].freeElements[0].id).toContain("element_page_0_section_0_free_0");
+    expect(first.forms[0].id).toBe("form_form_0");
   });
 });

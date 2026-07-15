@@ -4,6 +4,10 @@ export const isBuilderRevisionError = (error) =>
   isBuilderError(error, "project_revision_conflict") ||
   isBuilderError(error, "project_revision_required");
 
+export const isBuilderTerminalConflictError = (error) =>
+  isBuilderRevisionError(error) ||
+  isBuilderError(error, "builder_client_upgrade_required");
+
 export const getBuilderConflictMessage = (error) => {
   const currentRevision = Number(error?.context?.current_revision);
   const revisionNote = Number.isInteger(currentRevision)

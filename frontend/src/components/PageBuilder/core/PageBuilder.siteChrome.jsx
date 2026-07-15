@@ -1,6 +1,11 @@
 import { resolveMediaUrl } from "../../../utils/media";
 import { defaultSiteChrome } from "./PageBuilder.constants";
 import { splitLines } from "./PageBuilder.text";
+import {
+  findPageByNavigationReference,
+  getNavigablePages,
+  getPageNavigationLabel,
+} from "./PageBuilder.navigation";
 
 const MADAR_ATTRIBUTION_URL = "https://madar.app/";
 
@@ -21,13 +26,7 @@ export const createSiteChromeRenderers = ({
       event.stopPropagation();
 
       const targetValue = String(site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel || "").trim();
-      const normalizedTarget = targetValue.toLowerCase().replace(/^\//, "").trim();
-      const targetPage = project.pages.find((page) => {
-        const normalizedId = String(page.id || "").toLowerCase();
-        const normalizedName = String(page.name || "").toLowerCase().trim();
-        const normalizedSlug = String(page.slug || "").toLowerCase().replace(/^\//, "").trim();
-        return normalizedId === normalizedTarget || normalizedName === normalizedTarget || normalizedSlug === normalizedTarget;
-      });
+      const targetPage = findPageByNavigationReference(project.pages, targetValue);
 
       if (targetPage) selectPage(targetPage.id);
     };
@@ -55,7 +54,14 @@ export const createSiteChromeRenderers = ({
           </button>
 
           <nav className="built-site-nav">
-            {project.pages.filter((page) => page.showInNavigation !== false).map((page) => (
+            {getNavigablePages(project.pages, {
+              excludePageIds: [
+                findPageByNavigationReference(
+                  project.pages,
+                  site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel
+                )?.id,
+              ],
+            }).map((page) => (
               <button
                 type="button"
                 key={page.id}
@@ -65,7 +71,7 @@ export const createSiteChromeRenderers = ({
                   selectPage(page.id);
                 }}
               >
-                {page.name}
+                {getPageNavigationLabel(page)}
               </button>
             ))}
           </nav>
