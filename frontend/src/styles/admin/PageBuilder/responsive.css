@@ -4,10 +4,6 @@
    ============================================================ */
 
 @media (max-width: 1380px) {
-  .page-builder .builder-layout {
-    grid-template-columns: 300px minmax(0, 1fr) 280px;
-  }
-
   .page-builder .workspace-context-bar {
     grid-template-columns: 1fr;
   }
@@ -50,16 +46,6 @@
 }
 
 @media (max-width: 1240px) {
-  .page-builder .builder-layout {
-    grid-template-columns: 280px minmax(0, 1fr);
-  }
-
-  .page-builder .builder-inspector {
-    grid-column: span 2;
-    border-left: none;
-    border-top: 1px solid var(--madar-border);
-  }
-
   .page-builder .users-grid,
   .page-builder .publish-grid {
     grid-template-columns: 1fr;
@@ -136,7 +122,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 899px) {
   .page-builder .builder-desktop-shell {
     display: none;
   }

@@ -67,6 +67,14 @@ class RateLimitResult:
     window_seconds: int
 
 
+class RateLimitBackendUnavailable(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=503,
+            detail="Request protection service is temporarily unavailable. Please try again.",
+        )
+
+
 class InMemoryRateLimitStore:
     def __init__(self):
         self._values = {}
@@ -115,7 +123,7 @@ def get_rate_limit_store():
         _store = RedisRateLimitStore(REDIS_URL)
     except Exception as exc:
         if not RATE_LIMIT_FAIL_OPEN:
-            raise RuntimeError(f"Rate limiter Redis unavailable: {exc}") from exc
+            raise RateLimitBackendUnavailable() from exc
         logger.warning("rate_limit.redis_unavailable", extra={"error_type": type(exc).__name__})
         _store = _memory_store
 
@@ -429,7 +437,7 @@ def enforce_rate_limit(
         count = store.incr_with_ttl(key, window_seconds)
     except Exception as exc:
         if not RATE_LIMIT_FAIL_OPEN:
-            raise RuntimeError(f"Rate limiter Redis unavailable: {exc}") from exc
+            raise RateLimitBackendUnavailable() from exc
 
         logger.warning("rate_limit.fallback_used", extra={"error_type": type(exc).__name__})
         fallback_store = _memory_store

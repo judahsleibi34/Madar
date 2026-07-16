@@ -602,6 +602,35 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response.json()["detail"], "Too many requests. Please try again later.")
 
+    def test_rate_limit_backend_outage_returns_service_unavailable(self):
+        app = FastAPI()
+
+        class UnavailableStore:
+            def incr_with_ttl(self, _key, _window_seconds):
+                raise ConnectionError("Redis unavailable")
+
+        @app.post("/limited")
+        def limited(request: Request):
+            enforce_rate_limit(
+                request,
+                "test",
+                limit=2,
+                window_seconds=60,
+            )
+            return {"ok": True}
+
+        client = TestClient(app)
+
+        with patch.object(rate_limit_service, "_store", UnavailableStore()), \
+             patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
+             patch.object(rate_limit_service, "RATE_LIMIT_FAIL_OPEN", False):
+            response = client.post("/limited")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["detail"],
+            "Request protection service is temporarily unavailable. Please try again.",
+        )
     def get_migrations_dir(self):
         candidates = []
         configured_dir = os.getenv("MADAR_MIGRATIONS_DIR")

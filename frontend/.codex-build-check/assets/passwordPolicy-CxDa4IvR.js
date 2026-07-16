@@ -1,0 +1,1 @@
+var e=e=>String(e||``).length>=8;export{e as t};

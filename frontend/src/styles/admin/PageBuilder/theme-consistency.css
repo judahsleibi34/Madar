@@ -514,17 +514,7 @@
   grid-column: 1 / -1 !important;
 }
 
-@media (min-width: 1381px) {
-  .page-builder:not(.preview-mode) .builder-layout {
-    grid-template-columns: 320px minmax(0, 1fr) 400px !important;
-  }
-}
-
-@media (min-width: 1241px) and (max-width: 1380px) {
-  .page-builder:not(.preview-mode) .builder-layout {
-    grid-template-columns: 300px minmax(0, 1fr) 340px !important;
-  }
-
+@media (max-width: 1380px) {
   .page-builder .builder-inspector .carousel-slide-card-body {
     grid-template-columns: 1fr !important;
   }

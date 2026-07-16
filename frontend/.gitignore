@@ -12,6 +12,19 @@ dist/
 dist-ssr/
 *.local
 .env
+.env.local
+.env.test
+.env.*.local
+
+# Playwright output and authenticated browser state
+playwright/.auth/
+.auth/
+test-results/
+playwright-report/
+blob-report/
+*auth-state*.json
+*storage-state*.json
+*cookies*.json
 
 # Editor directories and files
 .vscode/*

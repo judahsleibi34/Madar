@@ -3,6 +3,10 @@ import re
 
 from pathlib import Path
 
+# Load the repository environment before importing routes or services whose
+# module-level configuration depends on it (notably Redis rate limiting).
+import database as _database_config  # noqa: F401
+
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware

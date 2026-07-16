@@ -14,6 +14,7 @@ venv/
 env/
 backend/madar_back/
 backend/madar_backend_env/
+.env.test.local
 
 # Build output
 dist/
@@ -33,7 +34,25 @@ backend/avatar_uploads/
 .env
 *.env
 *.local
+.env.local
+.env.test
+.env.*.local
 backend/.env
+
+# Browser-test credentials and authentication state
+playwright/.auth/
+**/playwright/.auth/
+.auth/
+**/.auth/
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+blob-report/
+**/blob-report/
+*auth-state*.json
+*storage-state*.json
+*cookies*.json
 
 # Python cache
 __pycache__/

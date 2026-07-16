@@ -1,7 +1,70 @@
+import { useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 
 import DashboardSidebar from "../components/DashboardBuilder/DashboardSidebar";
 import { appShellContent } from "../content";
+
+const AUTHENTICATED_REFERENCE_WIDTH = 1440;
+const AUTHENTICATED_REFERENCE_HEIGHT = 900;
+const AUTHENTICATED_MIN_LAYOUT_SCALE = 0.67;
+const AUTHENTICATED_MIN_TEXT_SCALE = 0.82;
+
+function useAuthenticatedReferenceScale() {
+  const shellRef = useRef(null);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell || typeof ResizeObserver === "undefined") return undefined;
+
+    let animationFrame = 0;
+    let previousLayoutScale = "";
+    let previousTextScale = "";
+
+    const updateScale = () => {
+      animationFrame = 0;
+      const { width, height } = shell.getBoundingClientRect();
+      if (!width || !height) return;
+
+      const rawScale = Math.min(
+        width / AUTHENTICATED_REFERENCE_WIDTH,
+        height / AUTHENTICATED_REFERENCE_HEIGHT
+      );
+      const layoutScale = Math.max(
+        AUTHENTICATED_MIN_LAYOUT_SCALE,
+        Math.min(1, rawScale)
+      ).toFixed(4);
+      const textScale = Math.max(
+        AUTHENTICATED_MIN_TEXT_SCALE,
+        Number(layoutScale)
+      ).toFixed(4);
+
+      if (layoutScale !== previousLayoutScale) {
+        shell.style.setProperty("--ui-layout-scale", layoutScale);
+        previousLayoutScale = layoutScale;
+      }
+      if (textScale !== previousTextScale) {
+        shell.style.setProperty("--ui-text-scale", textScale);
+        previousTextScale = textScale;
+      }
+    };
+
+    const scheduleScaleUpdate = () => {
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(updateScale);
+    };
+
+    const observer = new ResizeObserver(scheduleScaleUpdate);
+    observer.observe(shell);
+    shell.querySelectorAll(":scope > .admin-sidebar, :scope > .admin-dashboard-page").forEach((element) => observer.observe(element));
+    scheduleScaleUpdate();
+
+    return () => {
+      observer.disconnect();
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, []);
+
+  return shellRef;
+}
 
 export function RestrictedAccessWindow({
   title = appShellContent.restrictedAccess.title,
@@ -488,8 +551,10 @@ export function DashboardShell({
   const isShellRtl = activeLang === "ar";
   const useCompactBuilderSidebar = isPageBuilderShell || compactSidebar;
 
+  const shellRef = useAuthenticatedReferenceScale();
   return (
     <div
+      ref={shellRef}
       className={[
         "admin-dashboard-layout",
         useCompactBuilderSidebar ? "admin-dashboard-layout-builder" : "",

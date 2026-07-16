@@ -52,7 +52,15 @@ The backend is the trust boundary. It owns cookie/session validation, CSRF check
 
 ## Required Environment Variables
 
-The backend loads configuration from `.env` and Docker Compose. Do not commit secrets.
+The backend loads configuration from the repository-root `.env` and Docker
+Compose. Local development explicitly reloads that file with override enabled,
+so stale variables inherited from an old terminal cannot silently point the API
+at a different Supabase project. Production keeps deployment-provided
+environment variables authoritative.
+
+Use `MADAR_ENV_FILE` to select another env file. Use
+`MADAR_ENV_OVERRIDE=false` only when you intentionally want shell variables to
+win during local development. Do not commit secrets.
 
 Core required values:
 

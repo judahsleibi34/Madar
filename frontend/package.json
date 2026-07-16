@@ -11,6 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run --environment jsdom src",
     "test:e2e": "playwright test",
+    "test:e2e:responsive-auth": "playwright test e2e/responsive-auth.spec.mjs",
+    "test:e2e:responsive-visual": "playwright test e2e/responsive-visual.spec.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug"
@@ -33,6 +35,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "dotenv": "^17.4.2",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
