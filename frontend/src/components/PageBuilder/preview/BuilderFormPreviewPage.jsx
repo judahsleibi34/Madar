@@ -98,7 +98,7 @@ export default function BuilderFormPreviewPage({ user = null }) {
   const formShellRef = useRef(null);
   const currentSection = sections[Math.min(pageIndex, Math.max(sections.length - 1, 0))];
   const isQuiz = form?.mode === "quiz";
-  const quizSettings = useMemo(() => getQuizSettings(form), [form]);
+  const quizSettings = useMemo(() => getQuizSettings(form || {}), [form]);
 
   useEffect(() => {
     const syncSerializedProject = (serializedProject) => {

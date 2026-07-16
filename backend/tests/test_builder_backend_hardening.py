@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -7,6 +8,7 @@ from unittest.mock import patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+import database
 from routes import builder_routes
 from services.tenant_service import TenantContext, require_builder_admin_access
 
@@ -668,6 +670,54 @@ class BuilderBackendHardeningTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "User id does not match session")
+
+    def test_local_environment_file_overrides_stale_shell_values(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            env_path = Path(temporary_directory) / ".env"
+            env_path.write_text(
+                "SUPABASE_URL=https://fresh-project.supabase.co\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "development",
+                    "SUPABASE_URL": "https://stale-project.supabase.co",
+                },
+                clear=True,
+            ), patch.object(database, "DEFAULT_ENV_PATH", env_path):
+                loaded_path = database.load_backend_environment()
+
+                self.assertEqual(loaded_path, env_path.resolve())
+                self.assertEqual(
+                    os.environ["SUPABASE_URL"],
+                    "https://fresh-project.supabase.co",
+                )
+
+    def test_production_environment_keeps_deployment_values(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            env_path = Path(temporary_directory) / ".env"
+            env_path.write_text(
+                "SUPABASE_URL=https://local-file.supabase.co\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "production",
+                    "SUPABASE_URL": "https://deployment.supabase.co",
+                },
+                clear=True,
+            ), patch.object(database, "DEFAULT_ENV_PATH", env_path):
+                database.load_backend_environment()
+
+                self.assertEqual(
+                    os.environ["SUPABASE_URL"],
+                    "https://deployment.supabase.co",
+                )
+
 
     def test_database_requires_service_key(self):
         database_path = Path(__file__).resolve().parents[1] / "database.py"
