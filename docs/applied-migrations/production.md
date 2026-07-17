@@ -19,3 +19,13 @@ role-expansion migration has not run.
 
 Do not mark version `049` or any later repository migration as applied until an
 operator verifies the production ledger after deployment.
+
+## Repository migrations not yet verified as applied
+
+| Version | Name | State |
+|---|---|---|
+| `050` | `restrict_authenticated_privileged_writes` | Pending |
+| `051` | `bind_public_sites_to_projects` | Pending |
+| `052` | `publish_validated_builder_schema` | Pending |
+
+These entries are deployment candidates, not claims about live database state.

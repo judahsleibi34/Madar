@@ -16,6 +16,10 @@ July 17, 2026:
   `add_terms_acceptance`.
 - `049_expand_tenant_site_member_roles.sql` is pending and must not be described
   as applied.
+- `050_restrict_authenticated_privileged_writes.sql`,
+  `051_bind_public_sites_to_projects.sql`, and
+  `052_publish_validated_builder_schema.sql` are repository migrations pending
+  isolated staging validation and operator application.
 
 Production independently retains the customer-only
 `tenant_site_memberships_role_check`, confirming the role-expansion SQL has not
