@@ -1499,22 +1499,6 @@ export default function PageBuilder({
     setProject((prev) => updater(prev));
   }, []);
 
-  useEffect(() => {
-    if (activeTab !== "users") return;
-    if (safeProjectRoles.some((role) => role.id === "customer")) return;
-
-    const customerRole = {
-      ...createRole("Customer"),
-      id: "customer",
-      description: "Default role for people who register on the published site.",
-    };
-    updateProject((current) => ({
-      ...current,
-      roles: [...(current.roles || []), customerRole],
-      activeRoleId: current.activeRoleId || customerRole.id,
-    }));
-  }, [activeTab, safeProjectRoles, updateProject]);
-
   const setThemeMode = (mode) => {
     updateProject((prev) => applyThemeModeToProject(prev, mode));
   };
