@@ -1791,9 +1791,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
       return (
         <main className="tenant-runtime-page tenant-runtime-form-page" data-form-id={publishedForm.id}>
-          <section className="tenant-runtime-standalone-form">
-            {renderConnectedForm(publishedForm.id, "published-form-link")}
-          </section>
+          {renderConnectedForm(publishedForm.id, "published-form-link")}
         </main>
       );
     }

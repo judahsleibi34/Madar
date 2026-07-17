@@ -148,11 +148,14 @@ export const createSiteChromeRenderers = ({
 
           </div>
 
-          <div className="ecommerce-footer-column ecommerce-footer-links-column">
+          <div className="ecommerce-footer-column ecommerce-footer-pages-column">
             <h4>{site.footerShopTitle || "Pages"}</h4>
             <div className="ecommerce-footer-links-grid">
               {pageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
             </div>
+          </div>
+
+          <div className="ecommerce-footer-column ecommerce-footer-help-column">
             <h4>{site.footerHelpTitle || "Help"}</h4>
             <div className="ecommerce-footer-links-grid">
               {helpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}

@@ -112,6 +112,26 @@
   outline-offset: 2px;
 }
 
+/* The authoring canvas follows the center column's live width. Direct element
+   geometry is scaled by the renderer, so the editor never needs an x-axis. */
+.page-builder .builder-canvas-shell {
+  overflow-x: hidden !important;
+}
+
+.page-builder:not(.preview-mode) .builder-canvas {
+  width: var(--builder-canvas-fit-width, 100%) !important;
+  max-width: 100% !important;
+}
+
+/* Free-positioned sections use the complete canvas as their coordinate plane.
+   The generic site-section width rules add a 24px inset on both sides, which
+   makes an element that is correctly clamped to the logical right edge appear
+   outside the visible grid. Keep the frame and the positioning boundary equal. */
+.page-builder .direct-layout-section {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
 @media (max-width: 899px) {
   .page-builder .builder-desktop-shell {
     height: auto;
