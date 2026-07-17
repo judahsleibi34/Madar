@@ -118,6 +118,49 @@ export const fetchBuilderProject = async (projectId) => {
   return data?.project || null;
 };
 
+export const fetchBuilderSiteMembers = async (projectId) => {
+  const response = await apiFetch(
+    getApiUrl(`/builder/projects/${projectId}/site-members`),
+    { method: "GET", cache: "no-store" }
+  );
+  const data = await parseJsonResponse(response);
+  return data?.members || [];
+};
+
+export const createBuilderSiteMember = async (projectId, member) => {
+  const response = await apiFetch(
+    getApiUrl(`/builder/projects/${projectId}/site-members`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(member),
+    }
+  );
+  const data = await parseJsonResponse(response);
+  return data?.member || null;
+};
+
+export const updateBuilderSiteMember = async (projectId, membershipId, updates) => {
+  const response = await apiFetch(
+    getApiUrl(`/builder/projects/${projectId}/site-members/${membershipId}`),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    }
+  );
+  const data = await parseJsonResponse(response);
+  return data?.member || null;
+};
+
+export const deleteBuilderSiteMember = async (projectId, membershipId) => {
+  const response = await apiFetch(
+    getApiUrl(`/builder/projects/${projectId}/site-members/${membershipId}`),
+    { method: "DELETE" }
+  );
+  return parseJsonResponse(response);
+};
+
 export const createBuilderProject = async ({ name, slug, draft_schema }) => {
   const response = await apiFetch(getApiUrl("/builder/projects"), {
     method: "POST",

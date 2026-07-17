@@ -20,6 +20,16 @@ function LocationProbe() {
 describe("BuilderProjectChooser", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("presents a structured, accessible loading state while projects are fetched", () => {
+    listBuilderProjects.mockReturnValue(new Promise(() => {}));
+    const { container } = render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
+
+    expect(screen.getByRole("status").textContent).toContain("Loading your projects");
+    expect(screen.getByText("Loading projects...")).toBeTruthy();
+    expect(container.querySelector(".builder-project-chooser").getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelectorAll(".builder-project-loading-row")).toHaveLength(3);
+  });
+
   it("keeps two backend projects explicit and opens the selected one", async () => {
     listBuilderProjects.mockResolvedValue([
       { id: "project-a", name: "Alpha", status: "draft" },

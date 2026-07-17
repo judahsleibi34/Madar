@@ -18,6 +18,8 @@ describe("PageBuilderPageInspector", () => {
     );
 
     expect(screen.getByDisplayValue("Page 2")).toBeTruthy();
+    expect(screen.getByLabelText("Use as homepage").type).toBe("checkbox");
+    expect(screen.getByLabelText("Show this page in the header").type).toBe("checkbox");
     fireEvent.change(screen.getByLabelText("Page link"), { target: { value: "/services" } });
     fireEvent.click(screen.getByLabelText("Show this page in the header"));
     expect(onUpdate).toHaveBeenCalledWith({ slug: "/services" });
