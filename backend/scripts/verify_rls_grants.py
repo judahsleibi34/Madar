@@ -57,6 +57,7 @@ SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
     "increment_ai_usage_daily",
     "provision_verified_account",
     "publish_builder_project_atomic",
+    "publish_validated_builder_project_atomic",
     "reserve_ai_usage_daily",
 )
 
@@ -92,6 +93,16 @@ ALLOWED_DIRECT_GRANTS = {
     },
     "features": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
     "audit_logs": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+}
+
+# These backend-owned tables have an intentionally narrower browser contract
+# than the general sensitive-table matrix: authenticated may read them and may
+# hold no other table privilege. Keeping the exact tuple-keyed allowlist visible
+# prevents future PostgreSQL privileges from passing by default.
+AUTHENTICATED_SELECT_ONLY_GRANTS = {
+    ("authenticated", "public", "users"): {"SELECT"},
+    ("authenticated", "public", "builder_projects"): {"SELECT"},
+    ("authenticated", "public", "website_settings"): {"SELECT"},
 }
 
 EXPECTED_POLICIES: dict[str, dict[str, Callable[[str, str], bool]]] = {
@@ -347,11 +358,30 @@ def find_unsafe_grants(table: str, grants: list[dict[str, str]]) -> list[str]:
     unsafe: list[str] = []
     allowed_for_table = ALLOWED_DIRECT_GRANTS.get(table, {})
     for grant in grants:
-        grantee = grant["grantee"]
-        privilege = grant["privilege_type"]
-        if privilege not in allowed_for_table.get(grantee, set()):
+        grantee = str(grant["grantee"]).lower()
+        privilege = str(grant["privilege_type"]).upper()
+        allowed = AUTHENTICATED_SELECT_ONLY_GRANTS.get(
+            (grantee, "public", table),
+            allowed_for_table.get(grantee, set()),
+        )
+        if privilege not in allowed:
             unsafe.append(f"{grantee}:{privilege}")
     return sorted(set(unsafe))
+
+
+def describe_unsafe_grants(table: str, unsafe_grants: list[str]) -> list[str]:
+    descriptions: list[str] = []
+    for value in unsafe_grants:
+        role, privilege = value.split(":", 1)
+        allowed = AUTHENTICATED_SELECT_ONLY_GRANTS.get(
+            (role, "public", table),
+            ALLOWED_DIRECT_GRANTS.get(table, {}).get(role, set()),
+        )
+        expected = ",".join(sorted(allowed)) if allowed else "none"
+        descriptions.append(
+            f"role={role} table=public.{table} unexpected={privilege} expected={expected}"
+        )
+    return descriptions
 
 
 def find_missing_policies(table: str, policies: list[dict[str, str]]) -> list[str]:
@@ -461,7 +491,10 @@ def print_report(
             if report.exists and not report.rls_enabled:
                 reasons.append("RLS disabled")
             if report.unsafe_grants:
-                reasons.append("unsafe grants: " + ", ".join(report.unsafe_grants))
+                reasons.append(
+                    "unsafe grants: "
+                    + "; ".join(describe_unsafe_grants(report.table, report.unsafe_grants))
+                )
             if report.missing_policies:
                 reasons.append("missing policies: " + ", ".join(report.missing_policies))
             print(f"- {report.table}: {'; '.join(reasons)}")

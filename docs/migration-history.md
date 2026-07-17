@@ -14,21 +14,21 @@ July 17, 2026:
   `create_notification_outbox`.
 - `048_add_terms_acceptance.sql` is applied as version `048`, name
   `add_terms_acceptance`.
-- `049_expand_tenant_site_member_roles.sql` is pending and must not be described
-  as applied.
-- `050_restrict_authenticated_privileged_writes.sql`,
-  `051_bind_public_sites_to_projects.sql`, and
-  `052_publish_validated_builder_schema.sql` are repository migrations pending
-  isolated staging validation and operator application.
+- `049_expand_tenant_site_member_roles.sql` through
+  `052_publish_validated_builder_schema.sql` were subsequently applied manually
+  and are operator-verified as applied.
+- Production privilege verification after those migrations found historical
+  `REFERENCES`, `TRIGGER`, and `TRUNCATE` privileges still granted to
+  `authenticated` on `public.builder_projects`. Migration 050 revoked DML but
+  did not reset these residual privileges.
+- `053_remove_residual_authenticated_privileges.sql` is the pending corrective
+  migration. It has not been applied by Codex and must not be described as
+  applied until an operator verifies the production ledger.
 
-Production independently retains the customer-only
-`tenant_site_memberships_role_check`, confirming the role-expansion SQL has not
-been applied there.
-
-The pending role migration was originally introduced with the conflicting
+The role migration was originally introduced with the conflicting
 prefix `047`. Because notification outbox owns the verified production identity
-`047` and `048` is also applied, the unapplied role migration was renamed to
-`049` in both repository trees without changing its SQL.
+`047` and `048` is also applied, the then-unapplied role migration was renamed
+to `049` in both repository trees without changing its SQL.
 
 ## Historical exceptions
 
