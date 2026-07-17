@@ -51,11 +51,38 @@ RESERVED_PUBLIC_PAGE_SLUGS = {
 }
 BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
 BUILDER_ASSET_UPLOAD_DIR = get_public_uploads_dir()
+BUILDER_CLIENT_CONTRACT = "cloud-draft-v1"
 BUILDER_ASSET_EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/webp": ".webp",
 }
+
+
+def require_supported_builder_client(request: Request) -> str:
+    headers = getattr(request, "headers", None) or {}
+    supplied = str(headers.get("X-Madar-Builder-Contract") or "").strip()
+    supported = {
+        item.strip()
+        for item in os.getenv(
+            "SUPPORTED_BUILDER_CLIENT_CONTRACTS",
+            BUILDER_CLIENT_CONTRACT,
+        ).split(",")
+        if item.strip()
+    }
+    enforce_missing = os.getenv(
+        "ENFORCE_BUILDER_CLIENT_CONTRACT",
+        "false",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if (supplied and supplied in supported) or (not supplied and not enforce_missing):
+        return supplied
+    raise HTTPException(
+        status_code=409,
+        detail=error_detail(
+            "builder_client_upgrade_required",
+            "Reload Madar before editing this project.",
+        ),
+    )
 
 
 def normalize_slug(value: str) -> str:
@@ -1075,6 +1102,7 @@ def create_builder_project(
     request: Request,
     response: Response,
 ):
+    require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_write_access)
 
     payload = {
@@ -1122,8 +1150,17 @@ def update_builder_project(
     request: Request,
     response: Response,
 ):
+    require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_write_access)
     existing_project = get_project_for_tenant(project_id, context.tenant_id)
+    if str(existing_project.get("status") or "draft").strip().lower() == "archived":
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "builder_project_archived",
+                "Archived projects cannot be edited.",
+            ),
+        )
     current_revision = _project_revision(existing_project)
     requested_expected_revision = getattr(project, "expected_revision", None)
     if "draft_revision" in existing_project and requested_expected_revision is None:
@@ -1210,6 +1247,7 @@ def update_builder_project(
 @router.delete("/users/{user_id}/builder/projects/{project_id}", include_in_schema=False)
 @router.delete("/builder/projects/{project_id}")
 def archive_builder_project(project_id: str, request: Request, response: Response):
+    require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_admin_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
 
@@ -1417,6 +1455,7 @@ def publish_builder_project(
     response: Response,
     publish: Optional[BuilderProjectPublish] = Body(default=None),
 ):
+    require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_write_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
     entitlement = require_publish_entitlement(context.tenant_id)
@@ -1489,6 +1528,7 @@ def unpublish_builder_project(
     response: Response,
     unpublish: Optional[BuilderProjectUnpublish] = Body(default=None),
 ):
+    require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_write_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
     current_revision = _project_revision(project)

@@ -116,8 +116,9 @@ describe("PageBuilderPublishTab", () => {
     expect(openPublicFormPage).toHaveBeenCalledWith("form-1");
   });
 
-  it("preview site persists the project before opening", () => {
+  it("opens the confirmed live site without writing browser recovery", () => {
     const persistProjectNow = vi.fn();
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(
       <PageBuilderPublishTab
@@ -129,6 +130,11 @@ describe("PageBuilderPublishTab", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /preview site/i }));
 
-    expect(persistProjectNow).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://madarportal.com/site/disco2/",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    expect(persistProjectNow).not.toHaveBeenCalled();
   });
 });

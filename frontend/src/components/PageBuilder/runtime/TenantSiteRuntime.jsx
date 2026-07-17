@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { getBuilderStorageKey, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
+import { defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
   fetchPublicForm,
+  fetchBuilderProject,
   fetchPublicSite,
   getTenantVisitorStatus,
   loginTenantVisitor,
@@ -33,6 +34,11 @@ import {
   getPublicPagePath,
   resolvePublicPageByPath,
 } from "../core/PageBuilder.routing";
+import {
+  findPageByNavigationReference,
+  getNavigablePages,
+  getPageNavigationLabel,
+} from "../core/PageBuilder.navigation";
 import { runPublicElementAction } from "../core/PageBuilder.actions";
 import { getStoredUrlError } from "../core/PageBuilder.url";
 
@@ -203,7 +209,7 @@ export const runtimePageRequiresAuthentication = (page, destinationPageIds = new
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const getRuntimeNavigationPages = (pages = []) =>
-  pages.filter((page) => page?.showInNavigation !== false);
+  getNavigablePages(pages);
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const resolveRuntimePage = ({
@@ -396,26 +402,6 @@ const getCleanSubdomain = (value = "") =>
     .replace(/-{2,}/g, "-")
     .replace(/^-+|-+$/g, "") || runtimeFallbackCopy.runtime.subdomain;
 
-const loadDraftPreviewProject = (storageKey) => {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
-
-const parseDraftPreviewProject = (serializedProject) => {
-  if (!serializedProject) return null;
-  try {
-    return JSON.parse(serializedProject);
-  } catch {
-    return null;
-  }
-};
-
 const getScreenViewport = () => {
   if (typeof window === "undefined") return "desktop";
   if (window.innerWidth <= viewports.mobile) return "mobile";
@@ -449,16 +435,15 @@ const decodePathSegment = (value) => {
   }
 };
 
-export default function TenantSiteRuntime({ draftPreview = false, user = null } = {}) {
+export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const params = useParams();
-  const { subdomain = "my-site" } = params;
+  const { projectId = "", subdomain = "my-site" } = params;
   const location = useLocation();
   const navigate = useNavigate();
 
   const cleanSubdomain = getCleanSubdomain(subdomain);
   const isPublicRuntime = !draftPreview;
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
-  const storageKey = getBuilderStorageKey(user?.id);
   const activePath = location.pathname;
   const previewBasePath = "/page-builder/preview";
   const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
@@ -476,9 +461,9 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
   const standaloneFormId = directStandaloneFormId || (standaloneFormMatch
     ? decodePathSegment(standaloneFormMatch[1])
     : "");
-  const [project, setProject] = useState(() => (draftPreview ? loadDraftPreviewProject(storageKey) : null));
+  const [project, setProject] = useState(null);
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
-  const [publicSiteState, setPublicSiteState] = useState(() => (draftPreview ? "ready" : "loading"));
+  const [publicSiteState, setPublicSiteState] = useState("loading");
   const [formAnswers, setFormAnswers] = useState({});
   const [formHoneypots, setFormHoneypots] = useState({});
   const [formStatus, setFormStatus] = useState({});
@@ -586,41 +571,31 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
 
   useEffect(() => {
     if (draftPreview) {
-      const syncSerializedProject = (serializedProject) => {
-        setProject(parseDraftPreviewProject(serializedProject));
-        setPublicSiteState("ready");
-      };
+      let cancelled = false;
+      setProject(null);
+      setPublicSiteState("loading");
+      if (!projectId) {
+        setPublicSiteState("unavailable");
+        return undefined;
+      }
 
-      const syncDraftFromStorage = () => {
-        syncSerializedProject(localStorage.getItem(storageKey));
-      };
-
-      const handleDraftStorageUpdate = (event) => {
-        if (event.key !== storageKey) return;
-        syncSerializedProject(event.newValue);
-      };
-
-      const draftSyncChannel =
-        typeof BroadcastChannel === "undefined"
-          ? null
-          : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
-
-      const handleBroadcastDraftUpdate = (event) => {
-        if (event.data?.storageKey !== storageKey) return;
-        syncSerializedProject(event.data.serializedProject);
-      };
-
-      syncDraftFromStorage();
-      setPublicSiteState("ready");
-      draftSyncChannel?.addEventListener("message", handleBroadcastDraftUpdate);
-      window.addEventListener("storage", handleDraftStorageUpdate);
-      window.addEventListener("focus", syncDraftFromStorage);
+      fetchBuilderProject(projectId)
+        .then((record) => {
+          if (cancelled) return;
+          const serverDraft = record?.draft_schema;
+          if (serverDraft && typeof serverDraft === "object") {
+            setProject(serverDraft);
+            setPublicSiteState("ready");
+          } else {
+            setPublicSiteState("unavailable");
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setPublicSiteState("unavailable");
+        });
 
       return () => {
-        draftSyncChannel?.removeEventListener("message", handleBroadcastDraftUpdate);
-        draftSyncChannel?.close();
-        window.removeEventListener("storage", handleDraftStorageUpdate);
-        window.removeEventListener("focus", syncDraftFromStorage);
+        cancelled = true;
       };
     }
 
@@ -683,7 +658,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     return () => {
       cancelled = true;
     };
-  }, [cleanSubdomain, draftPreview, standaloneFormId, storageKey]);
+  }, [cleanSubdomain, draftPreview, projectId, standaloneFormId]);
   const site = {
     ...defaultSiteChrome,
     ...(publicSiteProfile
@@ -853,13 +828,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     const targetValue = String(site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel || "").trim();
     if (!targetValue) return;
 
-    const normalizedTarget = targetValue.toLowerCase().replace(/^\//, "").trim();
-    const targetPage = pages.find((page) => {
-      const normalizedId = String(page.id || "").toLowerCase();
-      const normalizedName = String(page.name || "").toLowerCase().trim();
-      const normalizedSlug = String(page.slug || "").toLowerCase().replace(/^\//, "").trim();
-      return normalizedId === normalizedTarget || normalizedName === normalizedTarget || normalizedSlug === normalizedTarget;
-    });
+    const targetPage = findPageByNavigationReference(pages, targetValue);
 
     if (targetPage) {
       goToPage(targetPage);
@@ -1934,7 +1903,14 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
         </button>
 
         <nav className="tenant-site-nav">
-          {getRuntimeNavigationPages(pages).map((page) => {
+          {getNavigablePages(pages, {
+            excludePageIds: [
+              findPageByNavigationReference(
+                pages,
+                site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel
+              )?.id,
+            ],
+          }).map((page) => {
             const pagePath = getPublicPagePath(runtimeBasePath, page);
 
             return (
@@ -1944,7 +1920,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
                 className={activePath.replace(/\/+$/, "") === pagePath.replace(/\/+$/, "") ? "active" : ""}
                 onClick={() => goToPage(page)}
               >
-                {page.name}
+                {getPageNavigationLabel(page)}
               </button>
             );
           })}

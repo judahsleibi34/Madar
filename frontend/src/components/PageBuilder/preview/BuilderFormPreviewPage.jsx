@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { getBuilderStorageKey } from "../core/PageBuilder.constants";
 import { getFormSections } from "../core/PageBuilder.factories";
 import {
   getDefaultFormLanguage,
@@ -13,6 +12,7 @@ import {
 import { cleanBuilderProject } from "../core/PageBuilder.project";
 import { getQuizSettings } from "../core/PageBuilder.quiz";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
+import { fetchBuilderProject } from "../services/PageBuilder.api";
 import "../../../styles/admin/PageBuilder/index.css";
 
 const deferEffectStateUpdate = (callback) => {
@@ -23,26 +23,6 @@ const deferEffectStateUpdate = (callback) => {
   return () => {
     cancelled = true;
   };
-};
-
-const loadDraftProject = (storageKey) => {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw ? cleanBuilderProject(JSON.parse(raw)) : null;
-  } catch {
-    return null;
-  }
-};
-
-const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
-
-const parseDraftProject = (serializedProject) => {
-  if (!serializedProject) return null;
-  try {
-    return cleanBuilderProject(JSON.parse(serializedProject));
-  } catch {
-    return null;
-  }
 };
 
 const getFieldOptions = (field = {}, lang = "en") =>
@@ -73,11 +53,10 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
     return answer === option;
   });
 
-export default function BuilderFormPreviewPage({ user = null }) {
-  const { formId = "" } = useParams();
+export default function BuilderFormPreviewPage() {
+  const { formId = "", projectId = "" } = useParams();
   const navigate = useNavigate();
-  const storageKey = getBuilderStorageKey(user?.id);
-  const [project, setProject] = useState(() => loadDraftProject(storageKey));
+  const [project, setProject] = useState(null);
   const form = useMemo(
     () => project?.forms?.find((item) => item.id === formId) || project?.forms?.[0] || null,
     [formId, project?.forms]
@@ -101,40 +80,20 @@ export default function BuilderFormPreviewPage({ user = null }) {
   const quizSettings = useMemo(() => getQuizSettings(form || {}), [form]);
 
   useEffect(() => {
-    const syncSerializedProject = (serializedProject) => {
-      setProject(parseDraftProject(serializedProject));
-    };
-
-    const syncDraftFromStorage = () => {
-      syncSerializedProject(localStorage.getItem(storageKey));
-    };
-
-    const handleDraftStorageUpdate = (event) => {
-      if (event.key !== storageKey) return;
-      syncSerializedProject(event.newValue);
-    };
-
-    const draftSyncChannel =
-      typeof BroadcastChannel === "undefined"
-        ? null
-        : new BroadcastChannel(BUILDER_DRAFT_SYNC_CHANNEL);
-
-    const handleBroadcastDraftUpdate = (event) => {
-      if (event.data?.storageKey !== storageKey) return;
-      syncSerializedProject(event.data.serializedProject);
-    };
-
-    draftSyncChannel?.addEventListener("message", handleBroadcastDraftUpdate);
-    window.addEventListener("storage", handleDraftStorageUpdate);
-    window.addEventListener("focus", syncDraftFromStorage);
+    let cancelled = false;
+    if (!projectId) return undefined;
+    fetchBuilderProject(projectId)
+      .then((record) => {
+        if (!cancelled) setProject(cleanBuilderProject(record?.draft_schema || {}));
+      })
+      .catch(() => {
+        if (!cancelled) setProject(null);
+      });
 
     return () => {
-      draftSyncChannel?.removeEventListener("message", handleBroadcastDraftUpdate);
-      draftSyncChannel?.close();
-      window.removeEventListener("storage", handleDraftStorageUpdate);
-      window.removeEventListener("focus", syncDraftFromStorage);
+      cancelled = true;
     };
-  }, [storageKey]);
+  }, [projectId]);
 
   useEffect(() => {
     quizCompleteRef.current = false;
@@ -355,7 +314,7 @@ export default function BuilderFormPreviewPage({ user = null }) {
       <main className="builder-form-preview-page" style={getPageBuilderThemeVars(project?.theme)}>
         <section className="builder-form-preview-shell">
           <h1>No form found</h1>
-          <button type="button" onClick={() => navigate("/page-builder")}>Back to builder</button>
+          <button type="button" onClick={() => navigate(`/page-builder/projects/${projectId}/forms`)}>Back to builder</button>
         </section>
       </main>
     );
@@ -364,7 +323,7 @@ export default function BuilderFormPreviewPage({ user = null }) {
   return (
     <main className="builder-form-preview-page" dir={formDirection} style={getPageBuilderThemeVars(project?.theme)}>
       <header className="builder-form-preview-topbar">
-        <button type="button" onClick={() => navigate("/page-builder")}>
+        <button type="button" onClick={() => navigate(`/page-builder/projects/${projectId}/forms`)}>
           <ArrowLeft size={16} aria-hidden="true" />
           Back to builder
         </button>

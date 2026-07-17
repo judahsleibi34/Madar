@@ -202,7 +202,6 @@ export default function FormsTab({
   renderConnectedForm,
   openFormPreviewPage,
   saveProject,
-  restorePreviousDraft,
 
   quizOptionsOpen,
   setQuizOptionsOpen,
@@ -718,10 +717,7 @@ export default function FormsTab({
     setDesignPanel("Sections");
   };
 
-  const saveSettings = async () => {
-    if (saveProject) {
-      await saveProject();
-    }
+  const saveSettings = () => {
     setQuizOptionsOpen(false);
   };
 
@@ -963,9 +959,6 @@ export default function FormsTab({
               <span className="simple-action-group-title">{copy.labels.formActions}</span>
               <FormButton variant="primary" icon={Save} disabled={isSavingForm} onClick={saveForm}>
                 {isSavingForm ? "Saving..." : "Save form"}
-              </FormButton>
-              <FormButton icon={RotateCcw} onClick={restorePreviousDraft}>
-                Restore previous draft
               </FormButton>
               <FormButton icon={Settings} onClick={() => setQuizOptionsOpen(true)}>
                 {copy.labels.formSettings}

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { persistBuilderProject } from "./PageBuilder.persistence";
+import { getPersistableProject } from "./PageBuilder.editorState";
 import { getBuilderDraftReadStatus, loadInitialProject } from "./PageBuilder.storage";
 
 const STORAGE_KEY = "madar_app_builder_frontend_v4:user:data-safety-test";
@@ -101,7 +102,7 @@ const roundTrip = (fixture) => {
   });
 
   const reloaded = loadInitialProject(STORAGE_KEY);
-  expect(reloaded).toEqual(edited);
+  expect(getPersistableProject(reloaded)).toEqual(getPersistableProject(edited));
   expect(collectIds(reloaded)).toEqual(beforeIds);
   expect(reloaded.pages.length).toBe(loaded.pages.length);
   expect(reloaded.pages.flatMap((page) => page.sections).length)

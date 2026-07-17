@@ -565,7 +565,8 @@ class SecurityFoundationTests(unittest.TestCase):
 
         with patch.object(rate_limit_service, "_store", store), \
              patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
-             patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "127.0.0.1,::1"):
+             patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "127.0.0.1,::1"), \
+             patch("services.audit_service.record_security_event"):
             first = client.post("/limited", headers={"x-forwarded-for": "203.0.113.1"})
             second = client.post("/limited", headers={"x-forwarded-for": "203.0.113.2"})
             response = client.post("/limited", headers={"x-forwarded-for": "203.0.113.3"})
@@ -591,7 +592,9 @@ class SecurityFoundationTests(unittest.TestCase):
 
         client = TestClient(app)
 
-        with patch.object(rate_limit_service, "_store", store),              patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True):
+        with patch.object(rate_limit_service, "_store", store), \
+             patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
+             patch("services.audit_service.record_security_event"):
             self.assertEqual(client.post("/limited").status_code, 200)
             self.assertEqual(client.post("/limited").status_code, 200)
             response = client.post("/limited")

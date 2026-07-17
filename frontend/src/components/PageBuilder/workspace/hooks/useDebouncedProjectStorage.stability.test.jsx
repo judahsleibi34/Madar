@@ -8,11 +8,12 @@ import useDebouncedProjectStorage, {
 
 const STORAGE_KEY = "madar-builder-stability-test";
 
-function StorageProbe({ onReady, project }) {
+function StorageProbe({ onReady, project, recoveryContext = null }) {
   const storage = useDebouncedProjectStorage({
     backupInterval: 120000,
     delay: 7000,
     project,
+    recoveryContext,
     storageKey: STORAGE_KEY,
   });
 
@@ -70,7 +71,65 @@ describe("safe builder draft autosave", () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it("rejects self, stale, duplicate, and wrong-project cross-tab revisions", () => {
+  it("does not persist or mark dirty when only editor selection changes", () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const onReady = vi.fn();
+    const shared = {
+      id: "project-1",
+      defaultPageId: "home",
+      pages: [{ id: "home" }, { id: "page-2" }],
+      forms: [{ id: "form-1", fields: [] }],
+      activePageId: "home",
+      activeFormId: "form-1",
+    };
+    const { rerender } = render(<StorageProbe onReady={onReady} project={shared} />);
+    const storage = onReady.mock.calls.at(-1)[0];
+    act(() => { storage.persistNow(); });
+    setItem.mockClear();
+
+    rerender(<StorageProbe
+      onReady={onReady}
+      project={{ ...shared, activePageId: "page-2", activeFormId: "" }}
+    />);
+    act(() => vi.advanceTimersByTime(7000));
+
+    expect(setItem).not.toHaveBeenCalled();
+    expect(onReady.mock.calls.at(-1)[0].hasUnsavedChanges()).toBe(false);
+  });
+
+  it("marks real shared changes dirty while preserving default and responsive content", () => {
+    let storage;
+    const initial = {
+      id: "project-1",
+      defaultPageId: "home",
+      pages: [{ id: "home", position: { desktop: { x: 0 } } }],
+    };
+    const { rerender } = render(
+      <StorageProbe onReady={(value) => { storage = value; }} project={initial} />
+    );
+    act(() => { storage.persistNow(); });
+
+    rerender(<StorageProbe
+      onReady={(value) => { storage = value; }}
+      project={{
+        ...initial,
+        defaultPageId: "page-2",
+        pages: [
+          { id: "page-2", position: { desktop: { x: 24 } } },
+          initial.pages[0],
+        ],
+      }}
+    />);
+
+    expect(storage.hasUnsavedChanges()).toBe(true);
+    act(() => vi.advanceTimersByTime(7000));
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    expect(persisted.defaultPageId).toBe("page-2");
+    expect(persisted.pages.map((page) => page.id)).toEqual(["page-2", "home"]);
+    expect(persisted.pages[0].position.desktop.x).toBe(24);
+  });
+
+  it("treats cross-tab messages as identity-scoped timestamp advisories", () => {
     const candidate = {
       sourceId: "other-tab",
       revision: 8,
@@ -81,14 +140,60 @@ describe("safe builder draft autosave", () => {
     const context = {
       currentProjectId: "project-a",
       lastPersistedAt: 100,
-      previousRevision: 7,
       sourceId: "this-tab",
     };
 
     expect(isNewerExternalDraftMessage(candidate, context)).toBe(true);
     expect(isNewerExternalDraftMessage({ ...candidate, sourceId: "this-tab" }, context)).toBe(false);
-    expect(isNewerExternalDraftMessage({ ...candidate, revision: 7 }, context)).toBe(false);
+    expect(isNewerExternalDraftMessage({ ...candidate, revision: 7 }, context)).toBe(true);
     expect(isNewerExternalDraftMessage({ ...candidate, timestamp: 100 }, context)).toBe(false);
     expect(isNewerExternalDraftMessage({ ...candidate, projectId: "project-b" }, context)).toBe(false);
+    expect(isNewerExternalDraftMessage(
+      { ...candidate, tenantId: "tenant-b" },
+      { ...context, currentTenantId: "tenant-a" }
+    )).toBe(false);
+    expect(isNewerExternalDraftMessage(
+      { ...candidate, baseDraftRevision: 59 },
+      { ...context, currentBackendRevision: 60 }
+    )).toBe(false);
+  });
+
+  it("writes scoped recovery envelopes and clears them only after cloud acknowledgement", () => {
+    let storage;
+    const recoveryContext = {
+      userId: "user-1",
+      tenantId: "tenant-6",
+      projectId: "project-1",
+      baseDraftRevision: 5,
+    };
+    const project = {
+      id: "project-1",
+      activePageId: "page-2",
+      pages: [{ id: "home" }, { id: "page-2" }],
+    };
+    render(
+      <StorageProbe
+        onReady={(value) => { storage = value; }}
+        project={project}
+        recoveryContext={recoveryContext}
+      />
+    );
+
+    act(() => { storage.persistNow(); });
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const envelope = JSON.parse(raw);
+    expect(envelope).toMatchObject({
+      user_id: "user-1",
+      tenant_id: "tenant-6",
+      project_id: "project-1",
+      base_draft_revision: 5,
+    });
+    expect(envelope.schema.pages).toHaveLength(2);
+    expect(envelope.schema).not.toHaveProperty("activePageId");
+    expect(localStorage.getItem(`${STORAGE_KEY}:backup`)).toBeNull();
+
+    act(() => { storage.acknowledgeCloudSave(project, 6); });
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(storage.hasUnsavedChanges()).toBe(false);
   });
 });

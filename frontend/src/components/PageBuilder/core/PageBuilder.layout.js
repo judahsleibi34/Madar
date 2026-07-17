@@ -1,4 +1,4 @@
-import { viewports, createId } from "./PageBuilder.constants";
+import { viewports } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
 
 export const getSectionElements = (section) => {
@@ -390,9 +390,10 @@ export const mergeSectionsIntoPageCanvas = (page, sections) => {
 
   const fallbackHeight = Math.max(720, ...Object.values(offsets));
   const firstSection = sections[0];
+  const fallbackSectionId = `section_${String(page?.id || "page").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_canvas`;
   const canvasSection = {
-    ...(firstSection || createSection({ rows: [] })),
-    id: firstSection?.id || createId("section"),
+    ...(firstSection || createSection({ id: fallbackSectionId, rows: [] })),
+    id: firstSection?.id || fallbackSectionId,
     name: "Page Canvas",
     isPageCanvas: true,
     mode: "direct",

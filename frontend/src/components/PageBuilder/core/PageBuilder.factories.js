@@ -2,6 +2,8 @@ import { createId, slugify, defaultPermissions, defaultTheme, defaultSiteChrome,
 import { getFactoryContent } from "../../../content/pageBuilder";
 
 const factoryCopy = getFactoryContent("en");
+const createFactoryId = (prefix, overrides = {}) =>
+  Object.hasOwn(overrides, "id") ? String(overrides.id ?? "") : createId(prefix);
 
 export const createPosition = () => ({
   desktop: { x: 56, y: 56, width: 380, height: 96 },
@@ -127,7 +129,7 @@ export const getFormFields = (form) =>
 
 export const createElement = (type = "text", overrides = {}) => {
   const base = {
-    id: createId("element"),
+    id: createFactoryId("element", overrides),
     type,
     name: type,
     content: "",
@@ -393,7 +395,7 @@ export const createElement = (type = "text", overrides = {}) => {
 };
 
 export const createColumn = (elements = [], overrides = {}) => ({
-  id: createId("column"),
+  id: createFactoryId("column", overrides),
   name: factoryCopy.structure.column,
   layout: {
     align: "left",
@@ -403,7 +405,7 @@ export const createColumn = (elements = [], overrides = {}) => ({
 });
 
 export const createRow = (columns = [createColumn()], overrides = {}) => ({
-  id: createId("row"),
+  id: createFactoryId("row", overrides),
   layout: {
     columns: String(columns.length),
     align: "center",
@@ -414,13 +416,14 @@ export const createRow = (columns = [createColumn()], overrides = {}) => ({
 });
 
 export const createSection = ({
+  id,
   name = factoryCopy.structure.section,
   mode = "auto",
   layout = {},
   rows = [createRow()],
   freeElements = [],
 } = {}) => ({
-  id: createId("section"),
+  id: id === undefined ? createId("section") : String(id ?? ""),
   name,
   mode,
   layout: {
@@ -435,13 +438,13 @@ export const createSection = ({
 });
 
 export const createPage = (name = factoryCopy.structure.page, sections = [], overrides = {}) => ({
-  id: createId("page"),
+  id: createFactoryId("page", overrides),
   name,
   slug: name.toLowerCase() === "home" ? "/" : `/${slugify(name)}`,
   isDefault: name.toLowerCase() === "home",
   backgroundColor: "var(--theme-surface)",
   visibility: "public",
-  showInNavigation: name.toLowerCase() === "home",
+  showInNavigation: true,
   pageType: "main",
   sections,
   ...overrides,

@@ -2,7 +2,7 @@ import copy
 import unittest
 from unittest.mock import patch
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
 from classes import BillingCheckoutRequest
@@ -360,6 +360,73 @@ class _ProjectMutationSupabase:
 
 
 class BuilderRevisionSafetyTests(unittest.TestCase):
+    @staticmethod
+    def _contract_request(value=None):
+        headers = []
+        if value is not None:
+            headers.append((b"x-madar-builder-contract", value.encode("ascii")))
+        return Request({
+            "type": "http",
+            "method": "PUT",
+            "path": "/builder/projects/project-1",
+            "headers": headers,
+        })
+
+    def test_current_builder_client_contract_is_accepted(self):
+        supplied = builder_routes.require_supported_builder_client(
+            self._contract_request(builder_routes.BUILDER_CLIENT_CONTRACT)
+        )
+        self.assertEqual(supplied, builder_routes.BUILDER_CLIENT_CONTRACT)
+
+    def test_obsolete_builder_client_is_rejected_before_mutation(self):
+        with self.assertRaises(HTTPException) as raised:
+            builder_routes.require_supported_builder_client(
+                self._contract_request("browser-first-v4")
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(
+            raised.exception.detail["code"],
+            "builder_client_upgrade_required",
+        )
+
+        client = _builder_client()
+        with patch.object(builder_routes, "require_builder_context") as require_context:
+            response = client.put(
+                "/builder/projects/project-1",
+                headers={"X-Madar-Builder-Contract": "browser-first-v4"},
+                json={"draft_schema": {"pages": [{"id": "home"}]}, "expected_revision": 1},
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "builder_client_upgrade_required",
+        )
+        require_context.assert_not_called()
+
+    def test_missing_contract_has_staged_rollout_then_enforcement(self):
+        with patch.dict(
+            "os.environ",
+            {"ENFORCE_BUILDER_CLIENT_CONTRACT": "false"},
+        ):
+            self.assertEqual(
+                builder_routes.require_supported_builder_client(
+                    self._contract_request()
+                ),
+                "",
+            )
+        with patch.dict(
+            "os.environ",
+            {"ENFORCE_BUILDER_CLIENT_CONTRACT": "true"},
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                builder_routes.require_supported_builder_client(
+                    self._contract_request()
+                )
+        self.assertEqual(
+            raised.exception.detail["code"],
+            "builder_client_upgrade_required",
+        )
+
     def test_publish_routing_prefers_home_over_editor_selection_and_form_pages(self):
         schema = {
             "activePageId": "form-page",
@@ -772,6 +839,78 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["project"]["draft_revision"], 5)
         self.assertIn(("draft_revision", 4), fake.query.filters)
+
+    def test_archived_project_update_is_rejected_before_mutation(self):
+        project = {
+            "id": "project-1",
+            "tenant_id": 7,
+            "status": "archived",
+            "draft_schema": {"pages": [{"id": "home"}]},
+            "draft_revision": 4,
+        }
+        fake = _ProjectMutationSupabase(project)
+        client = _builder_client()
+        with patch.object(builder_routes, "service_supabase", fake), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=_builder_context()), \
+             patch.object(builder_routes, "get_project_for_tenant", return_value=project):
+            response = client.put(
+                "/builder/projects/project-1",
+                json={"draft_schema": {"pages": []}, "expected_revision": 4},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"]["code"], "builder_project_archived")
+        self.assertIsNone(fake.query.payload)
+
+    def test_draft_update_replaces_one_page_with_complete_three_page_schema(self):
+        project = {
+            "id": "project-1",
+            "tenant_id": 7,
+            "status": "draft",
+            "draft_schema": {"pages": [{"id": "home", "name": "Home"}]},
+            "draft_revision": 5,
+        }
+        three_pages = {
+            "defaultPageId": "home",
+            "pages": [
+                {"id": "home", "name": "Home"},
+                {"id": "test-2", "name": "Test 2"},
+                {"id": "page-3", "name": "Page 3"},
+            ],
+        }
+        fake = _ProjectMutationSupabase(project)
+        client = _builder_client()
+        with patch.object(builder_routes, "service_supabase", fake), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=_builder_context()), \
+             patch.object(builder_routes, "get_project_for_tenant", return_value=project):
+            response = client.put(
+                "/builder/projects/project-1",
+                json={"draft_schema": three_pages, "expected_revision": 5},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        saved = response.json()["project"]
+        self.assertEqual(saved["draft_revision"], 6)
+        self.assertEqual(len(saved["draft_schema"]["pages"]), 3)
+        self.assertEqual(
+            [page["name"] for page in saved["draft_schema"]["pages"]],
+            ["Home", "Test 2", "Page 3"],
+        )
+
+        second_schema = copy.deepcopy(three_pages)
+        second_schema["pages"][2]["name"] = "Renamed"
+        second_fake = _ProjectMutationSupabase(saved)
+        with patch.object(builder_routes, "service_supabase", second_fake), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=_builder_context()), \
+             patch.object(builder_routes, "get_project_for_tenant", return_value=saved):
+            second = client.put(
+                "/builder/projects/project-1",
+                json={"draft_schema": second_schema, "expected_revision": 6},
+            )
+
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()["project"]["draft_revision"], 7)
+        self.assertEqual(second.json()["project"]["draft_schema"]["pages"][2]["name"], "Renamed")
 
     def test_stale_publish_revision_returns_structured_conflict(self):
         project = {

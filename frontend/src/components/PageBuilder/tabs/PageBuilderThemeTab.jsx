@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { RotateCcw, Save, Wand2 } from "lucide-react";
+import { RotateCcw, Wand2 } from "lucide-react";
 import { defaultTheme } from "../core/PageBuilder.constants";
 
 const websiteColorControls = [
@@ -117,23 +116,10 @@ const applyThemeToSection = (section = {}, sectionIndex = 0) => ({
 export default function PageBuilderThemeTab({
   project,
   updateProject,
-  saveProject,
   variant = "page",
 }) {
-  const [savingTheme, setSavingTheme] = useState(false);
   const websiteTheme = project.theme || {};
   const isSidebar = variant === "sidebar";
-
-  const saveTheme = async () => {
-    if (!saveProject || savingTheme) return;
-
-    setSavingTheme(true);
-    try {
-      await saveProject();
-    } finally {
-      setSavingTheme(false);
-    }
-  };
 
   const resetWebsiteTheme = () => {
     updateProject((prev) => ({
@@ -212,16 +198,6 @@ export default function PageBuilderThemeTab({
           </button>
         </div>
 
-        <button
-          type="button"
-          className="page-primary-action"
-          onClick={saveTheme}
-          disabled={savingTheme || !saveProject}
-        >
-          <Save size={16} aria-hidden="true" />
-          <span>{savingTheme ? "Saving..." : "Save changes"}</span>
-        </button>
-
         <div className="section-component-palette theme-sidebar-palette">
           <span>Theme colors</span>
           <div className="theme-sidebar-grid">
@@ -288,10 +264,6 @@ export default function PageBuilderThemeTab({
             <button type="button" className="theme-action-button" onClick={applyThemeToPageBlocks}>
               <Wand2 size={16} />
               <span>Apply to pages</span>
-            </button>
-            <button type="button" className="theme-save-button" onClick={saveTheme} disabled={savingTheme || !saveProject}>
-              <Save size={16} />
-              <span>{savingTheme ? "Saving..." : "Save changes"}</span>
             </button>
           </div>
         </div>

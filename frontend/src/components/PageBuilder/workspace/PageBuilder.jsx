@@ -74,6 +74,7 @@ import PageBuilderModals from "./PageBuilderModals";
 import PageBuilderStatusBar from "./PageBuilderStatusBar";
 import PageBuilderWorkspaceHeader from "./PageBuilderWorkspaceHeader";
 import PageBuilderMeasuredFrame from "./PageBuilderMeasuredFrame";
+import PageBuilderPageInspector from "./PageBuilderPageInspector";
 import {
   FormsTab,
   ReservationsTab,
@@ -85,10 +86,8 @@ import {
   WorkflowsTab,
 } from "../tabs";
 import {
-  createBuilderProject,
   fetchBuilderProject,
   fetchWebsiteSettings,
-  listBuilderProjects,
   publishBuilderProject,
   unpublishBuilderProject,
   updateBuilderProject,
@@ -102,7 +101,7 @@ import {
   getFormConnectionIssueMessage,
   getBuilderConflictMessage,
   isBuilderError,
-  isBuilderRevisionError,
+  isBuilderTerminalConflictError,
 } from "../core/PageBuilder.errors";
 import {
   applyThemeModeToProject,
@@ -189,6 +188,32 @@ import {
   loadInitialProject,
 } from "../core/PageBuilder.storage";
 import {
+  classifyBuilderRecovery,
+  clearBuilderRecovery,
+  detectLegacyBuilderDraft,
+  getBuilderRecoveryStorageKey,
+  hashBuilderRecoverySchema,
+  readBuilderRecovery,
+} from "../core/PageBuilder.recovery";
+import {
+  BUILDER_SAVE_STATES,
+  canStartBuilderCloudMutation,
+  deriveBuilderCloudSaveState,
+  getAcknowledgedBuilderSaveState,
+  getBuilderSaveStateLabel,
+  stopBuilderSaveScheduling,
+} from "../core/PageBuilder.saveState";
+import {
+  createBuilderSaveCoordinator,
+  createBuilderSaveEntry,
+} from "../core/PageBuilder.saveCoordinator";
+import {
+  getBuilderPublicationLabel,
+  getBuilderPublicationState,
+  prepareBuilderProjectForPublish,
+  runBuilderPublishSingleFlight,
+} from "../core/PageBuilder.publishState";
+import {
   findElementLocationInPage,
   getFieldTypeById,
   createBuilderUrlErrorCollector,
@@ -204,10 +229,36 @@ import {
   persistBuilderProject,
   createBuilderProjectPayload,
   exportBuilderProjectJson,
+  validateBuilderSaveAcknowledgement,
+  validateBuilderSchemaAcknowledgement,
 } from "../core/PageBuilder.persistence";
+import {
+  getPersistableProject,
+  serializePersistableProject,
+} from "../core/PageBuilder.editorState";
+import {
+  mergeBuilderDraftSchemas,
+  resolveBuilderDraftConflicts,
+} from "../core/PageBuilder.merge";
+import {
+  resolveInspectorMode,
+  resolveInspectorPage,
+} from "../core/PageBuilder.inspector";
+import {
+  getBuilderProjectIdFromPath,
+  getBuilderWorkspaceFromPath,
+  getBuilderWorkspacePath,
+} from "../core/PageBuilder.workspaceRouting";
 import useDebouncedProjectStorage, {
   isNewerExternalDraftMessage,
 } from "./hooks/useDebouncedProjectStorage";
+import BuilderRecoveryNotice from "./BuilderRecoveryNotice";
+import BuilderConflictResolution from "./BuilderConflictResolution";
+import {
+  adoptBuilderServerRuntime,
+  prepareBuilderServerAdoption,
+  runBuilderAutomaticRebase,
+} from "../core/PageBuilder.conflict";
 
 import {
   getBuilderElementStyle,
@@ -292,16 +343,17 @@ const inlineTextToolbarButtons = [
 ];
 
 const getBuilderTabFromPath = (pathname = "") => {
-  const match = pathname.match(/^\/page-builder\/([^/?#]+)/);
+  const match = pathname.match(/^\/page-builder\/(?:projects\/[^/?#]+\/)?([^/?#]+)/);
   if (!match) return null;
   return builderTabIdByPathSegment[match[1]] || null;
 };
 
 const getBuilderDesignPanelFromPath = (pathname = "") => {
-  if (/^\/page-builder\/(?:theme|themes|website-theme|site-theme)(?:[/?#]|$)/.test(pathname)) {
+  const builderPath = String(pathname).replace(/^\/page-builder\/projects\/[^/?#]+/, "/page-builder");
+  if (/^\/page-builder\/(?:theme|themes|website-theme|site-theme)(?:[/?#]|$)/.test(builderPath)) {
     return "Themes";
   }
-  const match = pathname.match(/^\/page-builder\/(?:pages|design)\/([^/?#]+)/);
+  const match = builderPath.match(/^\/page-builder\/(?:pages|design)\/([^/?#]+)/);
   if (match?.[1] === "themes") return "Themes";
   if (match?.[1] === "sections") return "Sections";
   return "Pages";
@@ -319,6 +371,26 @@ const isDefaultShowcaseProject = (project = {}) => {
 };
 
 const createCleanBlankProject = () => cleanBuilderProject(createBlankWorkspaceProject());
+
+// Non-content placeholder used only while an existing routed project is being
+// fetched. It is never rendered, persisted, recovered, or published.
+const createHydrationPlaceholder = () => ({
+  id: "",
+  name: "",
+  pages: [],
+  forms: [],
+  workflows: [],
+  roles: [],
+  users: [],
+  collections: [],
+  theme: {},
+  siteChrome: {},
+  publish: {},
+  activePageId: "",
+  activeFormId: "",
+  activeWorkflowId: "",
+  activeRoleId: "",
+});
 
 const getInitialWorkspaceProject = ({ demoMode = false, storageKey = STORAGE_KEY } = {}) => {
   const initialProject = demoMode
@@ -411,21 +483,9 @@ const collectButtonActionIssues = (project) =>
     )
   );
 
-const stripAutosaveMetadata = (project = {}) => {
-  const nextProject = {
-    ...project,
-    publish: {
-      ...(project.publish || {}),
-    },
-  };
+const stripAutosaveMetadata = (project = {}) => getPersistableProject(project);
 
-  delete nextProject.publish.lastSavedAt;
-  delete nextProject.publish.lastPublishedAt;
-
-  return nextProject;
-};
-
-const getAutosaveSnapshot = (project = {}) => JSON.stringify(stripAutosaveMetadata(project));
+const getAutosaveSnapshot = (project = {}) => serializePersistableProject(project);
 
 const resolveLiveSitePath = (subdomain) => `/site/${encodeURIComponent(String(subdomain || "").trim())}/`;
 
@@ -460,7 +520,14 @@ const withDefaultLandingPage = (project = {}) => {
 const getColorInputValue = (value, fallback) =>
   /^#[0-9a-f]{6}$/i.test(String(value || "")) ? value : fallback;
 
-function BuilderSidebarActions({ isSavingProject, onSave, onGoLive }) {
+function BuilderSidebarActions({
+  isSavingProject,
+  lastCloudSavedAt,
+  onSave,
+  onGoLive,
+  publicationState,
+  saveState,
+}) {
   const [isPublishing, setIsPublishing] = useState(false);
 
   const handleGoLive = async () => {
@@ -476,15 +543,28 @@ function BuilderSidebarActions({ isSavingProject, onSave, onGoLive }) {
 
   return (
     <div className="builder-sidebar-save-control">
-      <button
-        type="button"
-        className="page-primary-action builder-sidebar-save-button"
-        disabled={isSavingProject || !onSave}
-        onClick={() => onSave?.()}
-      >
-        <Save size={17} aria-hidden="true" />
-        <span>{isSavingProject ? "Saving..." : "Save changes"}</span>
-      </button>
+      <p className="builder-note" role="status" aria-live="polite">
+        {getBuilderSaveStateLabel(saveState)}
+        {saveState === BUILDER_SAVE_STATES.savedCloud && lastCloudSavedAt
+          ? ` at ${lastCloudSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+          : ""}
+      </p>
+      {saveState === BUILDER_SAVE_STATES.saveFailed && (
+        <button
+          type="button"
+          className="page-secondary-action builder-sidebar-save-button"
+          disabled={isSavingProject || !onSave}
+          onClick={() => onSave?.()}
+        >
+          <Save size={17} aria-hidden="true" />
+          <span>{isSavingProject ? "Retrying..." : "Retry save"}</span>
+        </button>
+      )}
+      <p className="builder-note" data-testid="builder-publication-state">
+        {saveState === BUILDER_SAVE_STATES.conflict
+          ? "Publish blocked by conflict"
+          : getBuilderPublicationLabel(publicationState)}
+      </p>
       <button
         type="button"
         className="page-primary-action builder-sidebar-save-button"
@@ -510,29 +590,50 @@ export default function PageBuilder({
 } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
+  const routeProjectId = getBuilderProjectIdFromPath(location.pathname);
+  const routeWorkspace = getBuilderWorkspaceFromPath(location.pathname);
   const routeTab = getBuilderTabFromPath(location.pathname);
   const routeDesignPanel = getBuilderDesignPanelFromPath(location.pathname);
-  const scopedStorageKey = getBuilderStorageKey(user?.id);
+  const legacyStorageKey = getBuilderStorageKey(user?.id);
+  const recoveryIdentity = useMemo(() => ({
+    userId: user?.id,
+    tenantId: user?.tenant_id ?? user?.tenantId,
+    projectId: routeProjectId,
+  }), [routeProjectId, user?.id, user?.tenantId, user?.tenant_id]);
+  const scopedStorageKey = getBuilderRecoveryStorageKey(recoveryIdentity);
   const [project, setProject] = useState(() =>
-    withDefaultLandingPage(getInitialWorkspaceProject({ demoMode, storageKey: scopedStorageKey }))
+    withDefaultLandingPage(
+      demoMode
+        ? getInitialWorkspaceProject({ demoMode, storageKey: legacyStorageKey })
+        : createHydrationPlaceholder()
+    )
   );
-  const hasProtectedUnreadableDraft = hasUnreadableBuilderDraft(scopedStorageKey);
+  const hasProtectedUnreadableDraft = demoMode && hasUnreadableBuilderDraft(legacyStorageKey);
   const hasUnrecoverableBrowserDraft =
-    getBuilderDraftReadStatus(scopedStorageKey) === "unrecoverable";
+    demoMode && getBuilderDraftReadStatus(legacyStorageKey) === "unrecoverable";
+  const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
+  const [builderProjectLoading, setBuilderProjectLoading] = useState(
+    !demoMode && Boolean(routeProjectId)
+  );
+  const recoveryContext = useMemo(() => ({
+    ...recoveryIdentity,
+    baseDraftRevision: Number(builderProjectRecord?.draft_revision) || 0,
+    baseSchemaHash: hashBuilderRecoverySchema(builderProjectRecord?.draft_schema || {}),
+  }), [builderProjectRecord?.draft_revision, builderProjectRecord?.draft_schema, recoveryIdentity]);
   const {
-    acceptExternalRevision,
+    acknowledgeCloudSave,
+    adoptCloudRevision,
     getLastPersistedAt: getLastLocalDraftPersistedAt,
     hasUnsavedChanges: hasUnsavedLocalDraftChanges,
     persistNow: persistProjectNow,
     sourceId: draftSourceId,
   } = useDebouncedProjectStorage({
-    delay: 7000,
-    disabled: demoMode || hasProtectedUnreadableDraft,
+    delay: 2000,
+    disabled: demoMode || builderProjectLoading || hasProtectedUnreadableDraft,
     project,
+    recoveryContext,
     storageKey: scopedStorageKey,
   });
-  const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
-  const [builderProjectLoading, setBuilderProjectLoading] = useState(!demoMode);
   const [internalActiveTab, setInternalActiveTab] = useState(initialTab || routeTab || "design");
   const activeTab = hideWorkspaceTabs ? internalActiveTab : (routeTab || "design");
   const [designPanel, setDesignPanelState] = useState(routeDesignPanel || "Pages");
@@ -558,6 +659,14 @@ export default function PageBuilder({
   const [runtimeFormLanguages, setRuntimeFormLanguages] = useState({});
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
+  const [recoveryDecision, setRecoveryDecision] = useState(null);
+  const [conflictDetails, setConflictDetails] = useState(null);
+  const [conflictServerCandidate, setConflictServerCandidate] = useState(null);
+  const [conflictMergeState, setConflictMergeState] = useState(null);
+  const [saveState, setSaveState] = useState(
+    demoMode ? BUILDER_SAVE_STATES.clean : BUILDER_SAVE_STATES.loading
+  );
+  const [lastCloudSavedAt, setLastCloudSavedAt] = useState(null);
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [isUnpublishingProject, setIsUnpublishingProject] = useState(false);
   const [liveSitePath, setLiveSitePath] = useState("");
@@ -574,15 +683,21 @@ export default function PageBuilder({
   const [textSelection, setTextSelection] = useState(null);
   const [inlineToolbarPosition, setInlineToolbarPosition] = useState(null);
   const backendAutosaveTimerRef = useRef(null);
-  const backendBackupAutosaveTimerRef = useRef(null);
   const backendProjectSnapshotRef = useRef("");
+  const baseSchemaRef = useRef(getPersistableProject(project));
   const pendingBackendProjectSnapshotRef = useRef("");
   const builderProjectRecordRef = useRef(builderProjectRecord);
+  const currentDraftRevisionRef = useRef(Number(builderProjectRecord?.draft_revision) || 0);
+  const serverAdoptionGenerationRef = useRef(0);
+  const latestAcknowledgedSaveOperationRef = useRef(0);
   const remoteSaveInFlightRef = useRef(false);
   const remoteSaveActiveSnapshotRef = useRef("");
   const remoteSavePromiseRef = useRef(null);
+  const saveCoordinatorRef = useRef(null);
+  const publishPromiseRef = useRef(null);
   const pendingRemoteSaveRef = useRef(null);
-  const externalDraftRevisionsRef = useRef(new Map());
+  const conflictRef = useRef(false);
+  const hydrationCompleteRef = useRef(demoMode);
   const pendingExternalDraftRef = useRef(null);
   const dragStateRef = useRef(dragState);
   const urlValidationToastShownRef = useRef(false);
@@ -603,6 +718,16 @@ export default function PageBuilder({
     window.setTimeout(() => setToast(""), 2200);
   }, []);
 
+  const stopAllCloudScheduling = useCallback(() => {
+    stopBuilderSaveScheduling({
+      autosaveTimerRef: backendAutosaveTimerRef,
+      pendingRequestRef: pendingRemoteSaveRef,
+      pendingSnapshotRef: pendingBackendProjectSnapshotRef,
+      clearTimeoutFn: window.clearTimeout.bind(window),
+      clearIntervalFn: window.clearInterval.bind(window),
+    });
+  }, []);
+
   const setActiveTab = useCallback(
     (nextTab) => {
       if (hideWorkspaceTabs) {
@@ -610,12 +735,14 @@ export default function PageBuilder({
         return;
       }
 
-      const nextPath = builderTabPathById[nextTab];
+      const nextPath = routeProjectId
+        ? getBuilderWorkspacePath(routeProjectId, nextTab, routeWorkspace)
+        : builderTabPathById[nextTab];
       if (nextPath && location.pathname !== nextPath) {
         navigate(nextPath);
       }
     },
-    [hideWorkspaceTabs, location.pathname, navigate]
+    [hideWorkspaceTabs, location.pathname, navigate, routeProjectId, routeWorkspace]
   );
 
   const setDesignPanel = useCallback(
@@ -623,17 +750,51 @@ export default function PageBuilder({
       setDesignPanelState(nextPanel);
       if (hideWorkspaceTabs) return;
 
-      const nextPath = builderDesignPanelPathById[nextPanel] || builderTabPathById.design;
+      const designBasePath = routeProjectId
+        ? getBuilderWorkspacePath(routeProjectId, "design", routeWorkspace)
+        : builderTabPathById.design;
+      const nextPath = routeProjectId
+        ? nextPanel === "Pages"
+          ? designBasePath
+          : `${designBasePath}/${nextPanel.toLowerCase()}`
+        : builderDesignPanelPathById[nextPanel] || builderTabPathById.design;
       if (nextPath && location.pathname !== nextPath) {
         navigate(nextPath);
       }
     },
-    [hideWorkspaceTabs, location.pathname, navigate]
+    [hideWorkspaceTabs, location.pathname, navigate, routeProjectId, routeWorkspace]
   );
 
   useEffect(() => {
     projectRef.current = project;
   }, [project]);
+
+  useEffect(() => () => {
+    serverAdoptionGenerationRef.current += 1;
+    saveCoordinatorRef.current?.invalidate();
+  }, []);
+
+  useEffect(() => {
+    if (
+      demoMode ||
+      builderProjectLoading ||
+      !hydrationCompleteRef.current ||
+      !builderProjectRecordRef.current
+    ) return;
+    const currentSnapshot = getAutosaveSnapshot(project);
+    return deferEffectStateUpdate(() => {
+      setSaveState((current) => deriveBuilderCloudSaveState({
+        hydrated: hydrationCompleteRef.current,
+        conflict: conflictRef.current,
+        saveActive: remoteSaveInFlightRef.current,
+        currentSnapshot,
+        acknowledgedSnapshot: backendProjectSnapshotRef.current,
+        latestFailureRelevant:
+          current === BUILDER_SAVE_STATES.saveFailed &&
+          currentSnapshot !== backendProjectSnapshotRef.current,
+      }));
+    });
+  }, [builderProjectLoading, demoMode, isSavingProject, project, saveState]);
 
   useEffect(() => {
     builderProjectRecordRef.current = builderProjectRecord;
@@ -700,20 +861,19 @@ export default function PageBuilder({
   useEffect(() => {
     if (hideWorkspaceTabs || routeTab) return;
     if (location.pathname === "/page-builder" || location.pathname === "/page-builder/") {
-      navigate(builderTabPathById.design, { replace: true });
+      navigate(
+        routeProjectId
+          ? getBuilderWorkspacePath(routeProjectId, "design", routeWorkspace)
+          : builderTabPathById.design,
+        { replace: true }
+      );
     }
-  }, [hideWorkspaceTabs, location.pathname, navigate, routeTab]);
+  }, [hideWorkspaceTabs, location.pathname, navigate, routeProjectId, routeTab, routeWorkspace]);
 
   useEffect(() => {
+    const layoutVersion = Number(project.directLayoutVersion);
     const requiresLayoutNormalization =
-      project.directLayoutVersion !== 4 ||
-      (project.pages || []).some((page) =>
-        (page.sections || []).some(
-          (section) =>
-            section.mode !== "direct" ||
-            getSectionElements(section).some((element) => element.type === "responsesTable")
-        )
-      );
+      Number.isInteger(layoutVersion) && layoutVersion > 0 && layoutVersion < 4;
 
     if (!requiresLayoutNormalization) return;
 
@@ -725,39 +885,14 @@ export default function PageBuilder({
   useEffect(() => {
     if (demoMode) return undefined;
 
-    const applyExternalDraft = (candidate) => {
-      if (!candidate?.serializedProject) return false;
-      try {
-        const nextProject = cleanBuilderProject(JSON.parse(candidate.serializedProject));
-        const currentProject = projectRef.current;
-        if (candidate.projectId && currentProject?.id && candidate.projectId !== currentProject.id) {
-          return false;
-        }
-        if (JSON.stringify(currentProject) === JSON.stringify(nextProject)) {
-          acceptExternalRevision(candidate.serializedProject, candidate.timestamp, candidate.revision);
-          return true;
-        }
-
-        acceptExternalRevision(candidate.serializedProject, candidate.timestamp, candidate.revision);
-        setProject(nextProject);
-        showToast("A newer draft from another tab was applied.");
-        return true;
-      } catch (error) {
-        if (import.meta.env.DEV) console.warn("Could not sync builder draft from another tab.", error);
-        return false;
-      }
-    };
-
     const considerExternalDraft = (candidate) => {
-      const sourceKey = candidate.sourceId || "storage-fallback";
-      const previousRevision = externalDraftRevisionsRef.current.get(sourceKey) || 0;
       if (!isNewerExternalDraftMessage(candidate, {
-        currentProjectId: projectRef.current?.id || "",
+        currentBackendRevision: currentDraftRevisionRef.current,
+        currentProjectId: recoveryIdentity.projectId,
+        currentTenantId: String(recoveryIdentity.tenantId || ""),
         lastPersistedAt: getLastLocalDraftPersistedAt(),
-        previousRevision,
         sourceId: draftSourceId,
       })) return;
-      if (candidate.revision) externalDraftRevisionsRef.current.set(sourceKey, candidate.revision);
 
       const editorBusy =
         Boolean(dragStateRef.current) ||
@@ -773,20 +908,27 @@ export default function PageBuilder({
         return;
       }
 
-      applyExternalDraft(candidate);
+      showToast("Another tab has unsaved changes for this project. Reload from Madar before choosing which copy to keep.");
     };
 
     const handleDraftStorageUpdate = (event) => {
       if (draftSyncChannel) return;
       if (event.key !== scopedStorageKey || !event.newValue) return;
-      considerExternalDraft({
-        sourceId: "storage-fallback",
-        revision: 0,
-        storageKey: scopedStorageKey,
-        projectId: "",
-        timestamp: Date.now(),
-        serializedProject: event.newValue,
-      });
+      try {
+        const envelope = JSON.parse(event.newValue);
+        considerExternalDraft({
+          baseDraftRevision: Number(envelope?.base_draft_revision) || 0,
+          sourceId: "storage-fallback",
+          revision: 0,
+          storageKey: scopedStorageKey,
+          projectId: String(envelope?.project_id || ""),
+          tenantId: String(envelope?.tenant_id || ""),
+          timestamp: Date.parse(envelope?.saved_at) || Date.now(),
+          serializedProject: envelope?.schema ? serializePersistableProject(envelope.schema) : "",
+        });
+      } catch {
+        // Malformed recovery values are handled by the recovery reader.
+      }
     };
 
     const draftSyncChannel =
@@ -807,11 +949,12 @@ export default function PageBuilder({
       window.removeEventListener("storage", handleDraftStorageUpdate);
     };
   }, [
-    acceptExternalRevision,
     demoMode,
     draftSourceId,
     getLastLocalDraftPersistedAt,
     hasUnsavedLocalDraftChanges,
+    recoveryIdentity.projectId,
+    recoveryIdentity.tenantId,
     scopedStorageKey,
     showToast,
   ]);
@@ -825,27 +968,23 @@ export default function PageBuilder({
       return;
     }
 
-    try {
-      const nextProject = cleanBuilderProject(JSON.parse(pending.serializedProject));
-      if (pending.projectId && project.id && pending.projectId !== project.id) {
-        pendingExternalDraftRef.current = null;
-        return;
-      }
-      acceptExternalRevision(pending.serializedProject, pending.timestamp, pending.revision);
+    if (
+      (pending.projectId && pending.projectId !== recoveryIdentity.projectId) ||
+      (pending.tenantId && String(pending.tenantId) !== String(recoveryIdentity.tenantId || "")) ||
+      Number(pending.baseDraftRevision || 0) < currentDraftRevisionRef.current
+    ) {
       pendingExternalDraftRef.current = null;
-      setProject(nextProject);
-      showToast("The queued draft from another tab was applied.");
-    } catch (error) {
-      pendingExternalDraftRef.current = null;
-      if (import.meta.env.DEV) console.warn("Queued external builder draft was unreadable.", error);
+      return;
     }
+    pendingExternalDraftRef.current = null;
+    showToast("Another tab has a local copy. The current server-backed editor was not changed.");
   }, [
-    acceptExternalRevision,
     dragState,
     getLastLocalDraftPersistedAt,
     hasUnsavedLocalDraftChanges,
     isSavingProject,
-    project,
+    recoveryIdentity.projectId,
+    recoveryIdentity.tenantId,
     showToast,
   ]);
 
@@ -853,31 +992,25 @@ export default function PageBuilder({
     if (demoMode) return;
 
     let cancelled = false;
-    const cacheKey = user?.id || "current";
-    const projectSnapshotAtLoadStart = getAutosaveSnapshot(projectRef.current);
-    let hasLocalDraftAtLoadStart = false;
-
-    try {
-      hasLocalDraftAtLoadStart = Boolean(localStorage.getItem(scopedStorageKey));
-    } catch {
-      // Continue with the backend project when storage is unavailable.
+    if (!routeProjectId) {
+      return undefined;
     }
 
+    const cacheKey = `${user?.id || "current"}:${routeProjectId}`;
     const loadBackendProject = async () => {
+      stopAllCloudScheduling();
+      hydrationCompleteRef.current = false;
+      conflictRef.current = false;
+      setConflictDetails(null);
+      setConflictServerCandidate(null);
       setBuilderProjectLoading(true);
+      setSaveState(BUILDER_SAVE_STATES.loading);
 
       try {
         if (!builderInitialProjectLoadPromises.has(cacheKey)) {
           builderInitialProjectLoadPromises.set(
             cacheKey,
-            (async () => {
-              const projects = await listBuilderProjects();
-              const selectedProject = projects[0] || null;
-
-              if (!selectedProject) return null;
-
-              return fetchBuilderProject(selectedProject.id);
-            })()
+            fetchBuilderProject(routeProjectId)
           );
         }
 
@@ -894,7 +1027,9 @@ export default function PageBuilder({
         if (!fullRecord) {
           if (!cancelled) {
             setBuilderProjectRecord(null);
-            backendProjectSnapshotRef.current = getAutosaveSnapshot(projectRef.current);
+            builderProjectRecordRef.current = null;
+            backendProjectSnapshotRef.current = "";
+            setSaveState(BUILDER_SAVE_STATES.saveFailed);
           }
           return;
         }
@@ -905,26 +1040,73 @@ export default function PageBuilder({
         if (!loadedProject) return;
 
         if (!cancelled) {
-          const nextProject = isDefaultShowcaseProject(loadedProject)
-            ? createCleanBlankProject()
-            : loadedProject;
-          const localProjectChangedWhileLoading =
-            getAutosaveSnapshot(projectRef.current) !== projectSnapshotAtLoadStart;
-
+          const nextProject = loadedProject;
+          const adoption = prepareBuilderServerAdoption({
+            serverRecord: fullRecord,
+            routedProjectId: routeProjectId,
+            normalizeProject: () => nextProject,
+            createSnapshot: getAutosaveSnapshot,
+          });
+          saveCoordinatorRef.current?.invalidate();
+          adoptBuilderServerRuntime({
+            adoption,
+            refs: {
+              builderProjectRecord: builderProjectRecordRef,
+              backendDraftRevision: currentDraftRevisionRef,
+              requestGeneration: serverAdoptionGenerationRef,
+              project: projectRef,
+              baseSchema: baseSchemaRef,
+              acknowledgedSnapshot: backendProjectSnapshotRef,
+              pendingSnapshot: pendingBackendProjectSnapshotRef,
+              pendingRequest: pendingRemoteSaveRef,
+              activeSnapshot: remoteSaveActiveSnapshotRef,
+              savePromise: remoteSavePromiseRef,
+              saveInFlight: remoteSaveInFlightRef,
+              pendingExternalDraft: pendingExternalDraftRef,
+              hydrationComplete: hydrationCompleteRef,
+              conflict: conflictRef,
+            },
+            stopScheduling: stopAllCloudScheduling,
+          });
           setBuilderProjectRecord(fullRecord);
-          backendProjectSnapshotRef.current = loadedResult.repairs.length > 0
-            ? ""
-            : getAutosaveSnapshot(nextProject);
-          // A local draft is the freshest edit source. Hydrating the backend
-          // record must not replace it after the workspace is already visible.
-          if (!hasLocalDraftAtLoadStart && !localProjectChangedWhileLoading) {
-            setProject(nextProject);
-            setSelected({ type: "page", id: nextProject.activePageId });
-            persistProjectNow(nextProject);
-            if (loadedResult.repairs.length > 0) {
-              showToast("Madar repaired duplicate internal block IDs. Save once before going live.");
+          // Hydration, including compatibility normalization, is read-only.
+          // Establish the normalized server draft as the baseline so opening
+          // an editor can never schedule a write by itself.
+          setProject(nextProject);
+          setSelected({ type: "page", id: nextProject.activePageId });
+          adoptCloudRevision(
+            serializePersistableProject(nextProject),
+            Date.parse(fullRecord.updated_at) || Date.now(),
+            Number(fullRecord.draft_revision) || 0
+          );
+          setSaveState(BUILDER_SAVE_STATES.savedCloud);
+
+          const recoveryResult = readBuilderRecovery({
+            ...recoveryIdentity,
+            now: Date.now(),
+          });
+          if (recoveryResult.status === "valid") {
+            const recoverySnapshot = getAutosaveSnapshot(recoveryResult.envelope.schema);
+            if (recoverySnapshot === adoption.snapshot) {
+              clearBuilderRecovery(recoveryIdentity);
+              setRecoveryDecision(null);
+            } else {
+              setRecoveryDecision({
+                kind: classifyBuilderRecovery(
+                  recoveryResult.envelope,
+                  fullRecord.draft_revision
+                ),
+                envelope: recoveryResult.envelope,
+              });
             }
+          } else if (!["missing", "identity_incomplete"].includes(recoveryResult.status)) {
+            setRecoveryDecision({ kind: recoveryResult.status });
+          } else {
+            const legacy = detectLegacyBuilderDraft(user?.id);
+            setRecoveryDecision(legacy.exists ? { kind: "legacy", legacy } : null);
           }
+          // Compatibility normalization is an in-memory read model. It never
+          // schedules a cloud write until the user makes a real content edit.
           if (!isDefaultShowcaseProject(loadedProject)) {
             rememberStarterChoice();
           }
@@ -939,7 +1121,9 @@ export default function PageBuilder({
           console.warn("Could not load builder project from backend.");
         }
         if (!cancelled) {
-          showToast("Your saved work is ready. You can keep editing.");
+          hydrationCompleteRef.current = false;
+          setSaveState(BUILDER_SAVE_STATES.saveFailed);
+          showToast("The cloud project could not be loaded. Local recovery was not applied.");
         }
       } finally {
         if (!cancelled) {
@@ -953,7 +1137,15 @@ export default function PageBuilder({
     return () => {
       cancelled = true;
     };
-  }, [demoMode, persistProjectNow, scopedStorageKey, showToast, user?.id]);
+  }, [
+    adoptCloudRevision,
+    demoMode,
+    recoveryIdentity,
+    routeProjectId,
+    showToast,
+    stopAllCloudScheduling,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (demoMode) {
@@ -1005,16 +1197,6 @@ export default function PageBuilder({
     return deferEffectStateUpdate(() => {
       const nextPath = resolveLiveSitePath(subdomain);
       setLiveSitePath((current) => (current === nextPath ? current : nextPath));
-      setProject((currentProject) => {
-        if (currentProject.publish?.subdomain === subdomain) return currentProject;
-        return {
-          ...currentProject,
-          publish: {
-            ...(currentProject.publish || {}),
-            subdomain,
-          },
-        };
-      });
     });
   }, [demoMode, websiteSettings?.subdomain]);
 
@@ -1036,11 +1218,8 @@ export default function PageBuilder({
   );
 
   const activePage = useMemo(
-    () =>
-      safeProjectPages.find((page) => page.id === project.activePageId) ||
-      safeProjectPages[0] ||
-      null,
-    [safeProjectPages, project.activePageId]
+    () => resolveInspectorPage(project),
+    [project]
   );
 
   const activeForm = useMemo(
@@ -1062,15 +1241,21 @@ export default function PageBuilder({
   );
 
   const openPreviewPage = () => {
-    persistProjectNow(project);
     const activePageSlug = activePage?.slug === "/" ? "" : activePage?.slug || "";
-    window.open(`/page-builder/preview${activePageSlug}`, "_blank", "noopener,noreferrer");
+    window.open(
+      `/page-builder/projects/${encodeURIComponent(routeProjectId)}/preview${activePageSlug}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   const openFormPreviewPage = (formId = activeForm?.id) => {
     if (!formId) return;
-    persistProjectNow(project);
-    window.open(`/page-builder/form-preview/${formId}`, "_blank", "noopener,noreferrer");
+    window.open(
+      `/page-builder/projects/${encodeURIComponent(routeProjectId)}/form-preview/${encodeURIComponent(formId)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   const openPublicFormPage = (formId = activeForm?.id) => {
@@ -1145,6 +1330,14 @@ export default function PageBuilder({
 
     return null;
   }, [activePage, selected]);
+
+  const inspectorMode = resolveInspectorMode({
+    selected,
+    selectedElement,
+    selectedSection,
+    selectedColumn,
+    activePage,
+  });
 
   const reservationBlocks = useMemo(() => {
     const blocks = [];
@@ -1226,6 +1419,21 @@ export default function PageBuilder({
   const updateSections = useCallback((updater) => {
     updateActivePage((page) => ({ ...page, sections: updater(page.sections) }));
   }, [updateActivePage]);
+
+  const updateSelectedSection = useCallback((changes) => {
+    if (!selectedSection) return;
+    updateSections((sections) => sections.map((section) =>
+      section.id === selectedSection.id
+        ? {
+            ...section,
+            ...changes,
+            ...(changes.layout
+              ? { layout: { ...(section.layout || {}), ...changes.layout } }
+              : {}),
+          }
+        : section
+    ));
+  }, [selectedSection, updateSections]);
 
   const updateActiveForm = (updater) => {
     updateProject((prev) => ({
@@ -2032,16 +2240,205 @@ export default function PageBuilder({
       setProject,
       showToast,
       silent: Boolean(options.silent),
+      writeBrowserDraft: demoMode,
     }), [demoMode, scopedStorageKey, showToast]);
+
+  const enterTerminalConflict = useCallback((error, mergeState = null) => {
+    conflictRef.current = true;
+    stopAllCloudScheduling();
+    persistProjectNow(projectRef.current);
+    const recovery = readBuilderRecovery(recoveryIdentity);
+    setConflictServerCandidate(mergeState?.serverRecord || null);
+    setConflictMergeState(mergeState);
+    setConflictDetails({
+      detectedAt: Date.now(),
+      localSavedAt: recovery.envelope?.saved_at || new Date().toISOString(),
+      localBaseRevision: currentDraftRevisionRef.current,
+      serverRevision:
+        Number(mergeState?.serverRecord?.draft_revision) ||
+        Number(error?.context?.current_revision) ||
+        null,
+      serverUpdatedAt: mergeState?.serverRecord?.updated_at || null,
+      conflicts: mergeState?.mergeResult?.conflicts || [],
+    });
+    setRecoveryDecision(null);
+    setSaveState(BUILDER_SAVE_STATES.conflict);
+    showToast(
+      isBuilderError(error, "builder_client_upgrade_required")
+        ? "This Madar editor is out of date. Reload before editing or publishing."
+        : getBuilderConflictMessage(error)
+    );
+  }, [persistProjectNow, recoveryIdentity, showToast, stopAllCloudScheduling]);
+
+  const attemptAutomaticRebase = useCallback(async ({
+    conflictError,
+    localProject,
+    submittedBaseSchema,
+    requestGeneration,
+    operationId,
+    silent,
+  }) => {
+    stopAllCloudScheduling();
+    if (
+      requestGeneration !== serverAdoptionGenerationRef.current ||
+      operationId < latestAcknowledgedSaveOperationRef.current
+    ) return false;
+    setSaveState(BUILDER_SAVE_STATES.savingCloud);
+    showToast("Changes were made in another session. Madar is merging your edits.");
+
+    try {
+      const localSchema = stripAutosaveMetadata(localProject);
+      const baseSchema = stripAutosaveMetadata(submittedBaseSchema || baseSchemaRef.current);
+      const rebaseResult = await runBuilderAutomaticRebase({
+        baseSchema,
+        localSchema,
+        routedProjectId: routeProjectId,
+        fetchServerProject: (projectId) => fetchBuilderProject(projectId, userId),
+        normalizeServerSchema: (record) => stripAutosaveMetadata(getDraftProjectFromRecord(record)),
+        prepareMergedProject: (mergedSchema) => cleanBuilderProject({
+          ...mergedSchema,
+          activePageId: localProject.activePageId,
+          activeFormId: localProject.activeFormId,
+          activeWorkflowId: localProject.activeWorkflowId,
+          activeRoleId: localProject.activeRoleId,
+        }),
+        createRetryPayload: ({ mergedProject, serverRecord, serverRevision }) =>
+          createBuilderProjectPayload({
+            project: mergedProject,
+            builderProjectRecord: { ...serverRecord, draft_revision: serverRevision },
+            getBuilderProjectName,
+            getBuilderProjectSlug,
+          }),
+        updateServerProject: (projectId, payload) => updateBuilderProject(projectId, payload, userId),
+        validateAcknowledgement: validateBuilderSaveAcknowledgement,
+        isCurrent: () =>
+          requestGeneration === serverAdoptionGenerationRef.current &&
+          operationId >= latestAcknowledgedSaveOperationRef.current,
+      });
+      if (
+        requestGeneration !== serverAdoptionGenerationRef.current ||
+        operationId < latestAcknowledgedSaveOperationRef.current
+      ) return false;
+      if (rebaseResult.status === "obsolete") return false;
+      if (rebaseResult.status === "conflict") {
+        enterTerminalConflict(conflictError, {
+          baseSchema: rebaseResult.baseSchema,
+          localSchema: rebaseResult.localSchema,
+          serverSchema: rebaseResult.serverSchema,
+          serverRecord: rebaseResult.serverRecord,
+          mergeResult: rebaseResult.mergeResult,
+        });
+        showToast("Some edits conflict with changes from another session.");
+        return false;
+      }
+      const {
+        mergedProject,
+        savedRecord,
+        savedRevision,
+      } = rebaseResult;
+      const mergedSnapshot = getAutosaveSnapshot(mergedProject);
+      validateBuilderSchemaAcknowledgement({
+        savedRecord,
+        submittedProject: mergedProject,
+      });
+
+      // Edits may continue while the latest server record is fetched and the
+      // merged retry is saving. Rebase those newer editor changes onto the
+      // acknowledged merge instead of replacing them with the submitted copy.
+      const latestEditorProject = projectRef.current;
+      const latestEditorSchema = stripAutosaveMetadata(latestEditorProject);
+      let nextEditorProject = mergedProject;
+      if (getAutosaveSnapshot(latestEditorSchema) !== getAutosaveSnapshot(localSchema)) {
+        const latestMerge = mergeBuilderDraftSchemas({
+          baseSchema: localSchema,
+          localSchema: latestEditorSchema,
+          serverSchema: stripAutosaveMetadata(mergedProject),
+        });
+        if (latestMerge.conflicts.length > 0) {
+          enterTerminalConflict(conflictError, {
+            baseSchema: localSchema,
+            localSchema: latestEditorSchema,
+            serverSchema: stripAutosaveMetadata(mergedProject),
+            serverRecord: savedRecord,
+            mergeResult: latestMerge,
+          });
+          return false;
+        }
+        nextEditorProject = cleanBuilderProject({
+          ...latestMerge.mergedSchema,
+          activePageId: latestEditorProject.activePageId,
+          activeFormId: latestEditorProject.activeFormId,
+          activeWorkflowId: latestEditorProject.activeWorkflowId,
+          activeRoleId: latestEditorProject.activeRoleId,
+        });
+      }
+      const nextEditorSnapshot = getAutosaveSnapshot(nextEditorProject);
+
+      builderProjectRecordRef.current = savedRecord;
+      currentDraftRevisionRef.current = savedRevision;
+      latestAcknowledgedSaveOperationRef.current = operationId;
+      baseSchemaRef.current = stripAutosaveMetadata(savedRecord?.draft_schema || mergedProject);
+      backendProjectSnapshotRef.current = mergedSnapshot;
+      pendingBackendProjectSnapshotRef.current = "";
+      pendingRemoteSaveRef.current = null;
+      remoteSaveActiveSnapshotRef.current = mergedSnapshot;
+      projectRef.current = nextEditorProject;
+      setBuilderProjectRecord(savedRecord);
+      setProject(nextEditorProject);
+      acknowledgeCloudSave(mergedProject, savedRevision);
+      setConflictDetails(null);
+      setConflictServerCandidate(null);
+      setConflictMergeState(null);
+      const hasNewerEditorChanges = nextEditorSnapshot !== mergedSnapshot;
+      if (!hasNewerEditorChanges) clearBuilderRecovery(recoveryIdentity);
+      setSaveState(hasNewerEditorChanges
+        ? BUILDER_SAVE_STATES.dirty
+        : BUILDER_SAVE_STATES.savedCloud);
+      if (!hasNewerEditorChanges) setLastCloudSavedAt(new Date());
+      showToast(hasNewerEditorChanges
+        ? "Changes from another session were merged. Saving your latest edit…"
+        : "Your edits were merged and saved.");
+      return true;
+    } catch (error) {
+      if (
+        requestGeneration !== serverAdoptionGenerationRef.current ||
+        operationId < latestAcknowledgedSaveOperationRef.current
+      ) return false;
+      if (isBuilderTerminalConflictError(error)) {
+        // One automatic rebase PUT is the hard boundary. A second 409 pauses.
+        enterTerminalConflict(error, error.builderMergeState || null);
+      } else {
+        setSaveState(BUILDER_SAVE_STATES.saveFailed);
+        if (!silent) showToast("Your changes are safe here. Please retry when the connection is available.");
+      }
+      return false;
+    }
+  }, [
+    acknowledgeCloudSave,
+    enterTerminalConflict,
+    recoveryIdentity,
+    routeProjectId,
+    showToast,
+    stopAllCloudScheduling,
+    userId,
+  ]);
 
   const saveSingleProjectRevision = useCallback(async ({
     nextProject,
     silent,
     repairs = [],
     successMessage = "",
+    expectedRevision = null,
+    requestGeneration = null,
+    operationId = 0,
   }) => {
+    if (!canStartBuilderCloudMutation({
+      hydrated: hydrationCompleteRef.current,
+      conflict: conflictRef.current,
+    })) return false;
     const urlErrors = collectBuilderUrlErrors(nextProject);
     if (urlErrors.length > 0) {
+      setSaveState(BUILDER_SAVE_STATES.saveFailed);
       if (!silent) showToast(urlErrors[0]);
       return false;
     }
@@ -2051,32 +2448,67 @@ export default function PageBuilder({
       return true;
     }
     if (builderProjectLoading) {
+      setSaveState(BUILDER_SAVE_STATES.saveFailed);
       if (!silent) showToast("Still loading your site. Try saving again in a moment.");
       return false;
     }
 
+    setSaveState(BUILDER_SAVE_STATES.savingLocal);
     if (silent && repairs.length === 0) {
       persistProjectNow(nextProject);
     } else {
       persistProject(nextProject, "Saving your changes...", { silent });
     }
 
+    const activeRequestGeneration = requestGeneration ?? serverAdoptionGenerationRef.current;
+    const isCurrentOperation = () =>
+      activeRequestGeneration === serverAdoptionGenerationRef.current &&
+      operationId >= latestAcknowledgedSaveOperationRef.current;
+    const submittedBaseSchema = baseSchemaRef.current;
     try {
-      const currentRecord = builderProjectRecordRef.current;
+      const currentRecord = {
+        ...(builderProjectRecordRef.current || {}),
+        draft_revision: expectedRevision ?? currentDraftRevisionRef.current,
+      };
+      if (!currentRecord?.id || currentRecord.id !== routeProjectId) {
+        throw new Error("Explicit builder project is not hydrated");
+      }
       const payload = createBuilderProjectPayload({
         project: nextProject,
         builderProjectRecord: currentRecord,
         getBuilderProjectName,
         getBuilderProjectSlug,
       });
-      const savedRecord = currentRecord?.id
-        ? await updateBuilderProject(currentRecord.id, payload, userId)
-        : await createBuilderProject(payload, userId);
+      setSaveState(BUILDER_SAVE_STATES.savingCloud);
+      const savedRecord = await updateBuilderProject(routeProjectId, payload, userId);
+      if (!isCurrentOperation()) return false;
+      const savedRevision = validateBuilderSaveAcknowledgement({
+        projectId: routeProjectId,
+        previousRevision: currentRecord.draft_revision,
+        savedRecord,
+      });
+      validateBuilderSchemaAcknowledgement({
+        savedRecord,
+        submittedProject: nextProject,
+      });
 
       builderProjectRecordRef.current = savedRecord;
+      currentDraftRevisionRef.current = savedRevision;
+      latestAcknowledgedSaveOperationRef.current = operationId;
+      baseSchemaRef.current = stripAutosaveMetadata(savedRecord?.draft_schema || nextProject);
       setBuilderProjectRecord(savedRecord);
       backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
       pendingBackendProjectSnapshotRef.current = "";
+      const latestIsDirty = acknowledgeCloudSave(nextProject, savedRevision) ||
+        getAutosaveSnapshot(projectRef.current) !== backendProjectSnapshotRef.current;
+      setSaveState(getAcknowledgedBuilderSaveState({
+        acknowledgedSnapshot: backendProjectSnapshotRef.current,
+        currentSnapshot: latestIsDirty
+          ? getAutosaveSnapshot(projectRef.current)
+          : backendProjectSnapshotRef.current,
+      }));
+      if (!latestIsDirty) setLastCloudSavedAt(new Date());
+      setRecoveryDecision(null);
       if (!silent) {
         showToast(repairs.length > 0
           ? "Duplicate internal IDs were repaired and your changes are saved."
@@ -2084,33 +2516,61 @@ export default function PageBuilder({
       }
       return true;
     } catch (error) {
+      if (!isCurrentOperation()) return false;
       if (import.meta.env.DEV) {
         console.error("Could not save builder project.");
       }
       if (isLikelySessionFailure(error)) {
+        setSaveState(BUILDER_SAVE_STATES.saveFailed);
         if (!silent) {
           showToast("Please sign in again, then save your changes.");
         }
         return false;
       }
 
-      if (isBuilderRevisionError(error)) {
-        showToast(getBuilderConflictMessage(error));
-        return false;
+      if (isBuilderTerminalConflictError(error)) {
+        return attemptAutomaticRebase({
+          conflictError: error,
+          localProject: nextProject,
+          submittedBaseSchema,
+          requestGeneration: activeRequestGeneration,
+          operationId,
+          silent,
+        });
       }
 
+      setSaveState(BUILDER_SAVE_STATES.saveFailed);
       if (!silent) {
         showToast("Your changes are safe here. Please try saving again.");
       }
       return false;
     }
-  }, [builderProjectLoading, demoMode, persistProject, persistProjectNow, showToast, userId]);
+  }, [
+    acknowledgeCloudSave,
+    attemptAutomaticRebase,
+    builderProjectLoading,
+    demoMode,
+    persistProject,
+    persistProjectNow,
+    routeProjectId,
+    showToast,
+    userId,
+  ]);
 
   const saveProject = useCallback(({
     silent = false,
     projectOverride = null,
     successMessage = "",
   } = {}) => {
+    if (!canStartBuilderCloudMutation({
+      hydrated: hydrationCompleteRef.current,
+      conflict: conflictRef.current,
+    })) {
+      if (!silent && conflictRef.current) {
+        showToast("Resolve the draft conflict before saving again.");
+      }
+      return Promise.resolve(false);
+    }
     if (hasProtectedUnreadableDraft) {
       if (!silent) {
         showToast("The stored draft is unreadable and was preserved. Export your current view before resolving it.");
@@ -2129,231 +2589,308 @@ export default function PageBuilder({
           },
         };
     const repaired = cleanBuilderProjectWithRepairs(nextProject);
-    const request = {
-      nextProject: repaired.project,
+    const request = createBuilderSaveEntry({
+      project: repaired.project,
       silent,
       repairs: repaired.repairs,
       snapshot: getAutosaveSnapshot(repaired.project),
       successMessage,
-    };
+      reason: silent ? "autosave" : "retry",
+    });
 
     if (!silent) setActiveTopbarAction("save");
-    if (remoteSaveInFlightRef.current) {
-      if (
-        silent &&
-        (request.snapshot === remoteSaveActiveSnapshotRef.current ||
-          request.snapshot === pendingRemoteSaveRef.current?.snapshot)
-      ) {
-        return remoteSavePromiseRef.current || Promise.resolve(false);
-      }
-      pendingRemoteSaveRef.current = request;
-      return remoteSavePromiseRef.current || Promise.resolve(false);
+
+    if (!saveCoordinatorRef.current) {
+      saveCoordinatorRef.current = createBuilderSaveCoordinator({
+        getProjectId: () => builderProjectRecordRef.current?.id || "",
+        getGeneration: () => serverAdoptionGenerationRef.current,
+        getRevision: () => currentDraftRevisionRef.current,
+        getAcknowledgedSnapshot: () => backendProjectSnapshotRef.current,
+        getLatestEntry: () => {
+          const latestRepair = cleanBuilderProjectWithRepairs(projectRef.current);
+          return createBuilderSaveEntry({
+            project: latestRepair.project,
+            repairs: latestRepair.repairs,
+            silent: true,
+            snapshot: getAutosaveSnapshot(latestRepair.project),
+            reason: "latest",
+          });
+        },
+        dispatch: async (entry, context) => {
+          remoteSaveActiveSnapshotRef.current = entry.snapshot;
+          const saved = await saveSingleProjectRevision({
+            nextProject: entry.project,
+            silent: entry.silent,
+            repairs: entry.repairs,
+            expectedRevision: context.expectedRevision,
+            requestGeneration: context.generation,
+            operationId: context.operationId,
+            successMessage: entry.successMessage,
+          });
+          if (context.generation !== serverAdoptionGenerationRef.current) {
+            return { status: "obsolete" };
+          }
+          if (saved) return { status: "saved" };
+          return { status: conflictRef.current ? "conflict" : "failed" };
+        },
+      });
     }
 
+    saveCoordinatorRef.current.resume();
+    const operation = saveCoordinatorRef.current.requestSave(request);
     remoteSaveInFlightRef.current = true;
+    remoteSavePromiseRef.current = operation;
     setIsSavingProject(true);
-    remoteSavePromiseRef.current = (async () => {
-      let currentRequest = request;
-      let result = false;
-      while (currentRequest) {
-        pendingRemoteSaveRef.current = null;
-        remoteSaveActiveSnapshotRef.current = currentRequest.snapshot;
-        result = await saveSingleProjectRevision(currentRequest);
-        currentRequest = pendingRemoteSaveRef.current;
-      }
-      return result;
-    })().finally(() => {
+    operation.finally(() => {
+      if (remoteSavePromiseRef.current !== operation) return;
       remoteSaveInFlightRef.current = false;
       remoteSaveActiveSnapshotRef.current = "";
       remoteSavePromiseRef.current = null;
       setIsSavingProject(false);
     });
-
-    return remoteSavePromiseRef.current;
+    return operation.then((result) => result?.status === "saved");
   }, [hasProtectedUnreadableDraft, saveSingleProjectRevision, showToast]);
 
-  useEffect(() => {
-    if (demoMode || builderProjectLoading) return;
-    if (!project) return;
-
-    const currentSnapshot = getAutosaveSnapshot(project);
-    if (!currentSnapshot) return;
-    if (
-      currentSnapshot === backendProjectSnapshotRef.current ||
-      currentSnapshot === pendingBackendProjectSnapshotRef.current
-    ) {
-      return;
+  const resolveOverlappingConflicts = useCallback(async (resolutions) => {
+    const mergeState = conflictMergeState;
+    if (!mergeState?.serverRecord || !mergeState?.mergeResult?.conflicts?.length) return false;
+    if (mergeState.mergeResult.conflicts.some((_, index) => !resolutions?.[index])) {
+      showToast("Choose which version to keep for every conflicting edit.");
+      return false;
     }
 
+    try {
+      const latestRecord = await fetchBuilderProject(routeProjectId, userId);
+      if (!latestRecord?.id || latestRecord.id !== routeProjectId) {
+        throw new Error("The routed project could not be verified");
+      }
+      let currentMergeState = mergeState;
+      if (Number(latestRecord.draft_revision) !== Number(mergeState.serverRecord.draft_revision)) {
+        const latestServerSchema = stripAutosaveMetadata(getDraftProjectFromRecord(latestRecord));
+        const latestMergeResult = mergeBuilderDraftSchemas({
+          baseSchema: mergeState.baseSchema,
+          localSchema: mergeState.localSchema,
+          serverSchema: latestServerSchema,
+        });
+        currentMergeState = {
+          ...mergeState,
+          serverSchema: latestServerSchema,
+          serverRecord: latestRecord,
+          mergeResult: latestMergeResult,
+        };
+        if (latestMergeResult.conflicts.length > 0) {
+          setConflictMergeState(currentMergeState);
+          setConflictServerCandidate(latestRecord);
+          setConflictDetails((current) => ({
+            ...(current || {}),
+            detectedAt: Date.now(),
+            serverRevision: Number(latestRecord.draft_revision),
+            serverUpdatedAt: latestRecord.updated_at || null,
+            conflicts: latestMergeResult.conflicts,
+          }));
+          showToast("The server changed again. Review the updated conflicts before saving.");
+          return false;
+        }
+      }
+
+      const resolvedSchema = resolveBuilderDraftConflicts({
+        mergedSchema: currentMergeState.mergeResult.mergedSchema,
+        conflicts: currentMergeState.mergeResult.conflicts,
+        resolutions,
+      });
+      const resolvedProject = cleanBuilderProject({
+        ...resolvedSchema,
+        activePageId: projectRef.current.activePageId,
+        activeFormId: projectRef.current.activeFormId,
+        activeWorkflowId: projectRef.current.activeWorkflowId,
+        activeRoleId: projectRef.current.activeRoleId,
+      });
+      const serverAdoption = prepareBuilderServerAdoption({
+        serverRecord: currentMergeState.serverRecord,
+        routedProjectId: routeProjectId,
+        normalizeProject: (record) => getDraftProjectFromRecord(record),
+        createSnapshot: getAutosaveSnapshot,
+      });
+      saveCoordinatorRef.current?.invalidate();
+      adoptBuilderServerRuntime({
+        adoption: serverAdoption,
+        refs: {
+          builderProjectRecord: builderProjectRecordRef,
+          backendDraftRevision: currentDraftRevisionRef,
+          requestGeneration: serverAdoptionGenerationRef,
+          project: projectRef,
+          baseSchema: baseSchemaRef,
+          acknowledgedSnapshot: backendProjectSnapshotRef,
+          pendingSnapshot: pendingBackendProjectSnapshotRef,
+          pendingRequest: pendingRemoteSaveRef,
+          activeSnapshot: remoteSaveActiveSnapshotRef,
+          savePromise: remoteSavePromiseRef,
+          saveInFlight: remoteSaveInFlightRef,
+          pendingExternalDraft: pendingExternalDraftRef,
+          hydrationComplete: hydrationCompleteRef,
+          conflict: conflictRef,
+        },
+        stopScheduling: stopAllCloudScheduling,
+      });
+      baseSchemaRef.current = currentMergeState.serverSchema;
+      backendProjectSnapshotRef.current = getAutosaveSnapshot(currentMergeState.serverSchema);
+      projectRef.current = resolvedProject;
+      setBuilderProjectRecord(currentMergeState.serverRecord);
+      setProject(resolvedProject);
+      setConflictMergeState(null);
+      setConflictDetails(null);
+      setConflictServerCandidate(null);
+      setSaveState(BUILDER_SAVE_STATES.dirty);
+
+      const saved = await saveProject({ silent: true, projectOverride: resolvedProject });
+      if (saved) showToast("Your conflict choices were saved.");
+      return saved;
+    } catch (error) {
+      if (isBuilderTerminalConflictError(error)) enterTerminalConflict(error, mergeState);
+      else showToast("The conflict resolution could not be saved. Your local version remains protected.");
+      return false;
+    }
+  }, [
+    conflictMergeState,
+    enterTerminalConflict,
+    routeProjectId,
+    saveProject,
+    showToast,
+    stopAllCloudScheduling,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (demoMode || builderProjectLoading || !canStartBuilderCloudMutation({ hydrated: hydrationCompleteRef.current, conflict: conflictRef.current })) return;
+    if (!project) return;
+
     window.clearTimeout(backendAutosaveTimerRef.current);
-    backendAutosaveTimerRef.current = window.setTimeout(() => {
-      if (dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) return;
-      pendingBackendProjectSnapshotRef.current = currentSnapshot;
-      saveProject({ silent: true, projectOverride: project }).finally(() => {
+    const attemptLatestSave = () => {
+      if (!canStartBuilderCloudMutation({ hydrated: hydrationCompleteRef.current, conflict: conflictRef.current })) return;
+      const latestProject = projectRef.current;
+      const latestSnapshot = getAutosaveSnapshot(latestProject);
+      if (
+        !latestSnapshot ||
+        latestSnapshot === backendProjectSnapshotRef.current ||
+        latestSnapshot === pendingBackendProjectSnapshotRef.current
+      ) return;
+      if (dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) {
+        backendAutosaveTimerRef.current = window.setTimeout(attemptLatestSave, 500);
+        return;
+      }
+      pendingBackendProjectSnapshotRef.current = latestSnapshot;
+      saveProject({ silent: true, projectOverride: latestProject }).finally(() => {
         pendingBackendProjectSnapshotRef.current = "";
       });
-    }, 7000);
+    };
+    backendAutosaveTimerRef.current = window.setTimeout(attemptLatestSave, 2000);
 
     return () => {
       window.clearTimeout(backendAutosaveTimerRef.current);
     };
   }, [builderProjectLoading, demoMode, project, saveProject]);
 
-  useEffect(() => {
-    if (demoMode || builderProjectLoading) return undefined;
-    backendBackupAutosaveTimerRef.current = window.setInterval(() => {
-      const latestProject = projectRef.current;
-      if (!latestProject || dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) return;
-      const latestSnapshot = getAutosaveSnapshot(latestProject);
-      if (latestSnapshot === backendProjectSnapshotRef.current) return;
-      saveProject({ silent: true, projectOverride: latestProject });
-    }, 120000);
-    return () => window.clearInterval(backendBackupAutosaveTimerRef.current);
-  }, [builderProjectLoading, demoMode, saveProject]);
-
-  useEffect(() => {
-    if (demoMode || builderProjectLoading) return undefined;
-    const saveLatestIfSafe = () => {
-      if (dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) return;
-      const latestProject = projectRef.current;
-      if (!latestProject || getAutosaveSnapshot(latestProject) === backendProjectSnapshotRef.current) return;
-      saveProject({ silent: true, projectOverride: latestProject });
-    };
-    const handleVisibility = () => {
-      if (document.visibilityState === "hidden") saveLatestIfSafe();
-    };
-    window.addEventListener("blur", saveLatestIfSafe);
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      window.removeEventListener("blur", saveLatestIfSafe);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [builderProjectLoading, demoMode, saveProject]);
-
-  const saveThemeProject = async () => {
-    setActiveTopbarAction("theme");
-
-    if (hasProtectedUnreadableDraft) {
-      showToast("The stored draft is unreadable and was preserved. Theme saving is paused for safety.");
-      return;
-    }
-
-    const nextProject = {
-      ...project,
-      publish: {
-        ...project.publish,
-        lastSavedAt: new Date().toISOString(),
-      },
-    };
-
-    if (demoMode) {
-      persistProject(nextProject, "Your theme changes are saved.");
-      return;
-    }
-
-    if (builderProjectLoading) {
-      showToast("Your site is still getting ready. Please try again in a moment.");
-      return;
-    }
-
-    persistProject(nextProject, "Saving website theme...");
-
+  const fetchConflictServerCandidate = async () => {
     try {
-      const payload = createBuilderProjectPayload({
-        project: nextProject,
-        builderProjectRecord,
-        getBuilderProjectName,
-        getBuilderProjectSlug,
-      });
-
-      const savedRecord = builderProjectRecord?.id
-        ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
-        : await createBuilderProject(payload, user?.id);
-
-      setBuilderProjectRecord(savedRecord);
-      showToast("Website theme saved.");
+      if (!routeProjectId) throw new Error("An explicit project URL is required");
+      const fullRecord = await fetchBuilderProject(routeProjectId, user?.id);
+      if (!fullRecord || fullRecord.id !== routeProjectId) {
+        throw new Error("The routed project could not be verified");
+      }
+      setConflictServerCandidate(fullRecord);
+      setConflictDetails((current) => ({
+        ...(current || {}),
+        serverRevision: Number(fullRecord.draft_revision) || 0,
+        serverUpdatedAt: fullRecord.updated_at || null,
+      }));
+      return fullRecord;
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Could not save website theme.");
-      }
-      if (isLikelySessionFailure(error)) {
-        showToast("Please sign in again, then save your theme.");
-        return;
-      }
-
-      if (isBuilderRevisionError(error)) {
-        showToast(getBuilderConflictMessage(error));
-        return;
-      }
-
-      showToast("Your theme changes are safe here. Please try saving again.");
+      if (import.meta.env.DEV) console.warn("Could not inspect latest server project.", error);
+      showToast("The latest server metadata could not be loaded. Your local copy remains protected.");
+      return null;
     }
   };
 
-  const loadProject = async () => {
-    if (demoMode) {
-      const freshProject = cleanBuilderProject(createInitialProject());
-      setProject(freshProject);
-      setSelected({ type: "page", id: freshProject.activePageId });
-      showToast("Default demo template loaded.");
-      return;
-    }
-
+  const adoptServerProject = async (candidate = null) => {
+    if (demoMode) return;
     try {
-      const projects = await listBuilderProjects(user?.id);
-      const selectedProject = projects[0] || null;
+      const serverRecord = candidate?.id === routeProjectId
+        ? candidate
+        : await fetchConflictServerCandidate();
+      if (!serverRecord) throw new Error("The server project is unavailable");
+      const adoption = prepareBuilderServerAdoption({
+        serverRecord,
+        routedProjectId: routeProjectId,
+        normalizeProject: (record) => {
+          const loaded = getDraftProjectFromRecord(record);
+          return isDefaultShowcaseProject(loaded) ? createCleanBlankProject() : loaded;
+        },
+        createSnapshot: getAutosaveSnapshot,
+      });
 
-      if (selectedProject) {
-        const fullRecord = await fetchBuilderProject(selectedProject.id, user?.id);
-        const loadedProject = getDraftProjectFromRecord(fullRecord);
-
-        if (loadedProject) {
-          const nextProject = isDefaultShowcaseProject(loadedProject)
-            ? createCleanBlankProject()
-            : loadedProject;
-
-          setBuilderProjectRecord(fullRecord);
-          setProject(nextProject);
-          setSelected({ type: "page", id: nextProject.activePageId });
-          persistProjectNow(nextProject);
-          backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
-
-          showToast(
-            isDefaultShowcaseProject(loadedProject)
-              ? "Blank builder canvas loaded."
-              : "Loaded backend project."
-          );
-          return;
-        }
-      }
-    } catch {
-      if (import.meta.env.DEV) {
-        console.warn("Could not load backend builder project.");
-      }
-    }
-
-    const raw = localStorage.getItem(scopedStorageKey);
-    if (!raw) {
-      alert("No backend project or local draft cache found.");
-      return;
-    }
-
-    try {
-      const loaded = cleanBuilderProject(JSON.parse(raw));
-      const nextProject = isDefaultShowcaseProject(loaded)
-        ? createCleanBlankProject()
-        : loaded;
-      setProject(nextProject);
-      setSelected({ type: "page", id: nextProject.activePageId });
-      showToast(
-        isDefaultShowcaseProject(loaded)
-          ? "Blank builder canvas loaded."
-          : "Your saved site is ready."
+      saveCoordinatorRef.current?.invalidate();
+      adoptBuilderServerRuntime({
+        adoption,
+        refs: {
+          builderProjectRecord: builderProjectRecordRef,
+          backendDraftRevision: currentDraftRevisionRef,
+          requestGeneration: serverAdoptionGenerationRef,
+          project: projectRef,
+          baseSchema: baseSchemaRef,
+          acknowledgedSnapshot: backendProjectSnapshotRef,
+          pendingSnapshot: pendingBackendProjectSnapshotRef,
+          pendingRequest: pendingRemoteSaveRef,
+          activeSnapshot: remoteSaveActiveSnapshotRef,
+          savePromise: remoteSavePromiseRef,
+          saveInFlight: remoteSaveInFlightRef,
+          pendingExternalDraft: pendingExternalDraftRef,
+          hydrationComplete: hydrationCompleteRef,
+          conflict: conflictRef,
+        },
+        stopScheduling: stopAllCloudScheduling,
+      });
+      adoptCloudRevision(
+        serializePersistableProject(adoption.persistableProject),
+        Date.parse(serverRecord.updated_at) || Date.now(),
+        adoption.revision
       );
-      backendProjectSnapshotRef.current = getAutosaveSnapshot(nextProject);
-    } catch {
-      alert("Saved project is not valid JSON.");
+      clearBuilderRecovery(recoveryIdentity);
+      setBuilderProjectRecord(serverRecord);
+      setProject(adoption.project);
+      setSelected({ type: "page", id: adoption.project.activePageId });
+      setRecoveryDecision(null);
+      setConflictDetails(null);
+      setConflictServerCandidate(null);
+      setConflictMergeState(null);
+      setIsSavingProject(false);
+      setSaveState(BUILDER_SAVE_STATES.savedCloud);
+      setLastCloudSavedAt(
+        serverRecord.updated_at ? new Date(serverRecord.updated_at) : new Date()
+      );
+      showToast("Latest server version loaded. Saving will resume after your next edit.");
+      return true;
+    } catch (error) {
+      if (import.meta.env.DEV) console.warn("Could not adopt backend builder project.", error);
+      conflictRef.current = true;
+      hydrationCompleteRef.current = true;
+      setSaveState(BUILDER_SAVE_STATES.conflict);
+      showToast("The latest server version could not be loaded. Your local copy remains protected.");
+      return false;
     }
+  };
+
+  const reloadServerProject = async () => {
+    if (conflictRef.current) {
+      setConflictDetails((current) => current || {
+        localBaseRevision: currentDraftRevisionRef.current,
+      });
+      return false;
+    }
+    if (getAutosaveSnapshot(projectRef.current) !== backendProjectSnapshotRef.current) {
+      showToast("Unsaved local changes are present. Save or resolve them before loading the server version.");
+      return false;
+    }
+    return adoptServerProject();
   };
 
   const publicSiteSubdomain = sanitizeSubdomain(
@@ -2362,23 +2899,62 @@ export default function PageBuilder({
   const canonicalLiveSitePath = publicSiteSubdomain
     ? resolveLiveSitePath(publicSiteSubdomain)
     : liveSitePath;
+  const publicationState = useMemo(
+    () => getBuilderPublicationState(builderProjectRecord),
+    [builderProjectRecord]
+  );
 
   const publishProject = async (skipOverlapCheck = false) => {
-    setActiveTopbarAction("publish");
-    setToast("");
+    return runBuilderPublishSingleFlight(publishPromiseRef, async () => {
+      setActiveTopbarAction("publish");
+      setToast("");
 
     if (hasProtectedUnreadableDraft) {
       showToast("The stored draft is unreadable and was preserved. Publishing is paused for safety.");
-      return;
+      return false;
+    }
+
+    const hadPendingSave = Boolean(remoteSavePromiseRef.current) ||
+      getAutosaveSnapshot(projectRef.current) !== backendProjectSnapshotRef.current;
+    if (hadPendingSave) {
+      showToast("Saving your latest changes before publishing…");
+    }
+
+    const prepared = await prepareBuilderProjectForPublish({
+      getState: () => ({
+        hydrated: hydrationCompleteRef.current,
+        routedProjectId: routeProjectId,
+        loadedProjectId: builderProjectRecordRef.current?.id,
+        draftRevision: currentDraftRevisionRef.current,
+        currentSnapshot: getAutosaveSnapshot(projectRef.current),
+        acknowledgedSnapshot: backendProjectSnapshotRef.current,
+        acknowledgedSchema: baseSchemaRef.current,
+        conflict: conflictRef.current,
+        operationInFlight: Boolean(remoteSavePromiseRef.current),
+      }),
+      getActiveOperation: () => remoteSavePromiseRef.current,
+      flushSave: () => saveProject({ silent: true, projectOverride: projectRef.current }),
+    });
+    if (!prepared.ready) {
+      const messages = {
+        conflict: "Resolve the draft conflict before publishing.",
+        save_failed: "Could not save the latest draft. Retry before publishing.",
+        saving: "Saving latest changes before publishing.",
+        unsaved_changes: "The latest changes are still unsaved. Retry before publishing.",
+        loading: "The exact cloud project is still loading.",
+      };
+      showToast(messages[prepared.reason] || "This draft is not ready to publish.");
+      return false;
     }
 
     if (!publicSiteSubdomain) {
       setActiveTab("publish");
       showToast("Choose your website address before going live.");
-      return;
+      return false;
     }
 
-    const pageRoutingIssues = collectPublicPageRoutingIssues(project);
+    const publishCandidate = projectRef.current;
+    const pageRoutingIssues = collectPublicPageRoutingIssues(publishCandidate);
     if (pageRoutingIssues.length > 0) {
       const issue = pageRoutingIssues[0];
       if (issue.page_id) {
@@ -2388,34 +2964,34 @@ export default function PageBuilder({
       setActiveTab("design");
       setDesignPanel("Pages");
       showToast("Review the homepage and page links before going live.");
-      return;
+      return false;
     }
 
-    const projectIdIssues = collectProjectIdIssues(project);
+    const projectIdIssues = collectProjectIdIssues(publishCandidate);
     if (projectIdIssues.length > 0) {
       showToast(getProjectIdIssueMessage(projectIdIssues[0]));
-      return;
+      return false;
     }
 
-    const formConnectionIssues = collectFormConnectionIssues(project);
+    const formConnectionIssues = collectFormConnectionIssues(publishCandidate);
     if (formConnectionIssues.length > 0) {
       const issue = formConnectionIssues[0];
       const target = getFormConnectionFocusTarget(issue);
-      if (project.activePageId !== target.pageId) {
+      if (publishCandidate.activePageId !== target.pageId) {
         updateProject((prev) => ({ ...prev, activePageId: target.pageId }));
       }
       setSelected(target.selection);
       setActiveTab("design");
       setDesignPanel("Pages");
       showToast(getFormConnectionIssueMessage(issue));
-      return;
+      return false;
     }
 
     const savedAt = new Date().toISOString();
     const draftForPublish = {
-      ...project,
+      ...publishCandidate,
       publish: {
-        ...project.publish,
+        ...publishCandidate.publish,
         lastSavedAt: savedAt,
       },
     };
@@ -2440,59 +3016,57 @@ export default function PageBuilder({
         empty_button_message: "Enter a message for this button before publishing.",
       };
       showToast(messages[issue.issue_type] || "Review this button action before publishing.");
-      return;
+      return false;
     }
     const urlErrors = collectBuilderUrlErrors(publishedProject);
 
     if (urlErrors.length > 0) {
       showToast(urlErrors[0]);
-      return;
+      return false;
     }
 
     const overlapWarnings = getProjectOverlapWarnings(publishedProject);
 
     if (!skipOverlapCheck && overlapWarnings.length > 0) {
       setPublishOverlapWarnings(overlapWarnings);
-      return;
+      return false;
     }
 
     setPublishOverlapWarnings([]);
 
     if (demoMode) {
       persistProject(publishedProject, "Your site is live for this preview.");
-      return;
+      return true;
     }
 
     if (builderProjectLoading) {
       showToast("Your site is still getting ready. Please try Go Live again in a moment.");
-      return;
+      return false;
     }
 
-    persistProject(project, "Getting your site ready...");
-
     try {
-      const payload = createBuilderProjectPayload({
-        project: draftForPublish,
-        builderProjectRecord,
-        getBuilderProjectName,
-        getBuilderProjectSlug,
-      });
+      const savedRecord = builderProjectRecordRef.current;
+      const latestPublicationState = getBuilderPublicationState(savedRecord);
 
-      const savedRecord = builderProjectRecord?.id
-        ? await updateBuilderProject(builderProjectRecord.id, payload, user?.id)
-        : await createBuilderProject(payload, user?.id);
+      if (
+        latestPublicationState.publishedHasMorePages &&
+        !window.confirm(
+          "The saved draft has fewer pages than the currently published site. Continue publishing this smaller draft?"
+        )
+      ) return false;
 
-      setBuilderProjectRecord(savedRecord);
-      backendProjectSnapshotRef.current = getAutosaveSnapshot(draftForPublish);
-
+      showToast("Publishing site…");
       const publishResponse = await publishBuilderProject(
-        savedRecord.id,
-        savedRecord?.draft_revision
+        prepared.projectId,
+        prepared.draftRevision
       );
       const publishedRecord = publishResponse?.project || savedRecord;
+      if (publishedRecord?.id && publishedRecord.id !== prepared.projectId) {
+        throw new Error("Publish acknowledgement did not match the routed project");
+      }
       const publishedSite = publishResponse?.site || {};
       const resolvedPublicSubdomain = sanitizeSubdomain(
-        publishedSite?.subdomain || websiteSettings?.subdomain || project?.publish?.subdomain || ""
+        publishedSite?.subdomain || websiteSettings?.subdomain || publishCandidate?.publish?.subdomain || ""
       );
       const resolvedLiveSitePath = resolvedPublicSubdomain
         ? resolveLiveSitePath(resolvedPublicSubdomain)
@@ -2501,8 +3075,7 @@ export default function PageBuilder({
       // The server publish has already committed at this point. Reflect that
       // durable state even if the optional public-link metadata is incomplete.
       setBuilderProjectRecord(publishedRecord);
-      persistProject(publishedProject, "");
-      backendProjectSnapshotRef.current = getAutosaveSnapshot(publishedProject);
+      builderProjectRecordRef.current = publishedRecord;
       pendingBackendProjectSnapshotRef.current = "";
 
       if (import.meta.env.DEV) {
@@ -2511,27 +3084,30 @@ export default function PageBuilder({
 
       if (!resolvedLiveSitePath) {
         showToast("Your site is live, but its public link could not be loaded. Refresh the Publish page.");
-        return;
+        return false;
       }
 
       setLiveSitePath(resolvedLiveSitePath);
-      showToast("Your site is live. Go to the Publish page to open your website.");
+      showToast(
+        `Your site is live${publishedRecord?.published_version ? ` (version ${publishedRecord.published_version})` : ""}. Go to the Publish page to open your website.`
+      );
+      return true;
     } catch (error) {
       console.error("Could not publish builder project:", error);
 
       if (isLikelySessionFailure(error)) {
         showToast("Please sign in again, then choose Go Live.");
-        return;
+        return false;
       }
 
-      if (isBuilderRevisionError(error)) {
-        showToast(getBuilderConflictMessage(error));
-        return;
+      if (isBuilderTerminalConflictError(error)) {
+        enterTerminalConflict(error);
+        return false;
       }
 
       if (isBuilderError(error, "entitlement_pending")) {
         showToast("Your publishing access is still pending. No changes were lost.");
-        return;
+        return false;
       }
 
       if (
@@ -2539,13 +3115,13 @@ export default function PageBuilder({
         isBuilderError(error, "payment_required")
       ) {
         showToast("Publishing is not active for this workspace. Review your plan; your edits are still saved locally.");
-        return;
+        return false;
       }
 
       if (isBuilderError(error, "publish_validation_failed")) {
         if (String(error.context?.issue_type || "").includes("_id")) {
           showToast(getProjectIdIssueMessage(error.context));
-          return;
+          return false;
         }
         const issue = error.context?.issue_type === "orphaned_form_block"
           ? error.context
@@ -2559,14 +3135,20 @@ export default function PageBuilder({
         } else {
           showToast(error.message || "This draft is not ready to publish. Review the highlighted content.");
         }
-        return;
+        return false;
       }
 
       showToast("We couldn't put your site live. Please try again.");
+      return false;
     }
+    });
   };
 
   const unpublishProject = async () => {
+    if (conflictRef.current) {
+      showToast("Resolve the draft conflict before changing the published site.");
+      return;
+    }
     if (!builderProjectRecord?.id || project.status !== "published") return;
     if (!window.confirm("Take this website offline? The current published content will be preserved for a later republish.")) {
       return;
@@ -2577,7 +3159,7 @@ export default function PageBuilder({
     try {
       const response = await unpublishBuilderProject(
         builderProjectRecord.id,
-        builderProjectRecord.draft_revision
+        currentDraftRevisionRef.current
       );
       const nextRecord = response?.project || builderProjectRecord;
       const unpublishedProject = {
@@ -2592,8 +3174,8 @@ export default function PageBuilder({
     } catch (error) {
       if (isLikelySessionFailure(error)) {
         showToast("Please sign in again before taking this site offline.");
-      } else if (isBuilderRevisionError(error)) {
-        showToast(getBuilderConflictMessage(error));
+      } else if (isBuilderTerminalConflictError(error)) {
+        enterTerminalConflict(error);
       } else if (isBuilderError(error, "project_not_published")) {
         showToast("This website is already offline.");
       } else {
@@ -2605,6 +3187,35 @@ export default function PageBuilder({
   };
 
   const exportProject = () => exportBuilderProjectJson({ project, showToast });
+
+  const discardRecovery = () => {
+    if (recoveryDecision?.kind === "legacy" && recoveryDecision.legacy?.key) {
+      try {
+        localStorage.removeItem(recoveryDecision.legacy.key);
+      } catch {
+        showToast("The legacy browser copy could not be removed.");
+        return;
+      }
+    } else {
+      clearBuilderRecovery(recoveryIdentity);
+    }
+    setRecoveryDecision(null);
+  };
+
+  const exportRecovery = () => {
+    let recoveryProject = recoveryDecision?.envelope?.schema || null;
+    if (!recoveryProject && recoveryDecision?.legacy?.raw) {
+      try {
+        recoveryProject = JSON.parse(recoveryDecision.legacy.raw);
+      } catch {
+        showToast("The legacy browser copy is unreadable and was left untouched.");
+        return;
+      }
+    }
+    if (recoveryProject) {
+      exportBuilderProjectJson({ project: recoveryProject, showToast });
+    }
+  };
 
   const applyStarter = (starterId) => {
     rememberStarterChoice();
@@ -2703,29 +3314,6 @@ export default function PageBuilder({
       maxWidth: `calc(100% - ${edge * 2}px)`,
       transform: `translate3d(${edge}px, ${y}px, 0)`,
     };
-  };
-
-  const restorePreviousDraft = () => {
-    const rawBackup = localStorage.getItem(`${scopedStorageKey}:backup`);
-    if (!rawBackup) {
-      showToast("No previous browser draft was found.");
-      return;
-    }
-
-    if (!window.confirm("Restore the previous browser draft? Your current draft will be kept as the next backup.")) return;
-
-    try {
-      const restoredProject = withDefaultLandingPage(cleanBuilderProject(JSON.parse(rawBackup)));
-      setProject(restoredProject);
-      setSelected({
-        type: restoredProject.forms?.length ? "form" : "page",
-        id: restoredProject.activeFormId || restoredProject.forms?.[0]?.id || restoredProject.activePageId || null,
-      });
-      persistProjectNow(restoredProject);
-      showToast("Previous draft restored. Check your form, then press Save form.");
-    } catch {
-      showToast("The previous browser draft could not be restored.");
-    }
   };
 
   const reconcileDirectFormBlockSize = useCallback((sectionId, elementId, measuredHeight) => {
@@ -3430,10 +4018,6 @@ export default function PageBuilder({
 
     setDragState(null);
     setSelected({ type: "element", id: selectedElement.id });
-    window.setTimeout(() => {
-      const committedProject = projectRef.current;
-      if (committedProject) saveProject({ silent: true, projectOverride: committedProject });
-    }, 0);
   };
 
   const handlePointerCancel = () => {
@@ -3849,8 +4433,11 @@ export default function PageBuilder({
 
               <BuilderSidebarActions
                 isSavingProject={isSavingProject}
+                lastCloudSavedAt={lastCloudSavedAt}
                 onSave={saveProject}
                 onGoLive={publishProject}
+                publicationState={publicationState}
+                saveState={saveState}
               />
 
             {designPanel === "Pages" && (
@@ -4152,53 +4739,32 @@ export default function PageBuilder({
     </div>
   );
 
-  const renderInspector = () => {
-    const showPageInspector =
-      selected.type === "page" || selected.type === "section";
-    const inspectorType = showPageInspector ? "page" : selected.type;
-
-    return (
+  const renderInspector = () => (
     <aside className="builder-inspector">
       <div className="builder-side-panel">
         <div className="inspector-title">
           <h2>Inspector</h2>
-          <span>{inspectorType}</span>
+          <span>{inspectorMode}</span>
         </div>
 
-      {showPageInspector && activePage && (
-        <div className="inspector-group">
-          <h3>Page Settings</h3>
-          <label>Page name<input value={activePage.name} onChange={(event) => updateActivePage((page) => ({ ...page, name: event.target.value }))} /></label>
-          <label>
-            Page link
-            <input
-              value={activePage.slug}
-              disabled={activePage.isDefault === true}
-              onChange={(event) => updateActivePage((page) => ({ ...page, slug: event.target.value }))}
-            />
-          </label>
-          <label className="inspector-toggle-row">
-            <input
-              type="checkbox"
-              checked={activePage.isDefault === true}
-              onChange={() => updateProject((prev) => setProjectDefaultPage(prev, activePage.id))}
-            />
-            <span>Use as homepage</span>
-          </label>
-          {collectPublicPageRoutingIssues(project).some((issue) =>
+      {inspectorMode === "page" && activePage && (
+        <PageBuilderPageInspector
+          page={activePage}
+          hasRoutingIssue={collectPublicPageRoutingIssues(project).some((issue) =>
             issue.page_id === activePage.id ||
             issue.occurrences?.some((page) => page.page_id === activePage.id)
-          ) && (
-            <p className="builder-note" role="alert">Choose a unique, non-reserved page link before publishing.</p>
           )}
-          <label className="inspector-toggle-row">
-            <input type="checkbox" checked={activePage.showInNavigation !== false} onChange={(event) => updateActivePage((page) => ({ ...page, showInNavigation: event.target.checked }))} />
-            <span>Show this page in the header</span>
-          </label>
-        </div>
+          onSetDefault={() => updateProject((prev) => setProjectDefaultPage(prev, activePage.id))}
+          onUpdate={(changes) => updateProject((prev) => ({
+            ...prev,
+            pages: prev.pages.map((page) =>
+              page.id === activePage.id ? { ...page, ...changes } : page
+            ),
+          }))}
+        />
       )}
 
-      {(selected.type === "siteHeader" || selected.type === "siteFooter") && (
+      {(inspectorMode === "siteHeader" || inspectorMode === "siteFooter") && (
         <div className="inspector-group">
           <h3>{selected.type === "siteHeader" ? "Header" : "Footer"}</h3>
           <p className="builder-note">Use the Header & Footer workspace for global site chrome settings.</p>
@@ -4208,14 +4774,35 @@ export default function PageBuilder({
         </div>
       )}
 
-      {selected.type === "column" && selectedColumn && (
+      {inspectorMode === "section" && selectedSection && (
+        <div className="inspector-group">
+          <h3>Section</h3>
+          <label>
+            Section name
+            <input
+              value={selectedSection.name || ""}
+              onChange={(event) => updateSelectedSection({ name: event.target.value })}
+            />
+          </label>
+          <label>
+            Background
+            <input
+              type="color"
+              value={getColorInputValue(selectedSection.layout?.background, "#ffffff")}
+              onChange={(event) => updateSelectedSection({ layout: { background: event.target.value } })}
+            />
+          </label>
+        </div>
+      )}
+
+      {inspectorMode === "column" && selectedColumn && (
         <div className="inspector-group">
           <h3>Column</h3>
           <label>Alignment<select value={selectedColumn.layout.align} onChange={(event) => updateSelectedColumn({ layout: { align: event.target.value } })}>{alignmentOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         </div>
       )}
 
-      {selected.type === "element" && selectedElement && (
+      {inspectorMode === "element" && selectedElement && (
         <div className="inspector-group">
           <h3>{selectedElement.type === "reservationBlock" ? "Reservation" : "Element"}</h3>
           {selectedElement.type !== "reservationBlock" && (
@@ -4599,10 +5186,12 @@ export default function PageBuilder({
           <p className="builder-note">You can also select an element on the canvas and press Delete or Backspace.</p>
         </div>
       )}
+      {inspectorMode === "empty" && (
+        <p className="builder-note">Select or create a page to edit its settings.</p>
+      )}
       </div>
     </aside>
-    );
-  };
+  );
 
   const formatSavedValue = (value) => {
     if (Array.isArray(value) && !value.length) return "-";
@@ -4874,9 +5463,8 @@ export default function PageBuilder({
       addConnectedFormSectionToPage={addConnectedFormSectionToPage}
       renderConnectedForm={renderConnectedForm}
       openFormPreviewPage={openFormPreviewPage}
-      openPreviewPage={openPreviewPage}
       saveProject={saveProject}
-      restorePreviousDraft={restorePreviousDraft}
+      openPreviewPage={openPreviewPage}
       publishProject={publishProject}
       quizOptionsOpen={quizOptionsOpen}
       setQuizOptionsOpen={setQuizOptionsOpen}
@@ -4935,7 +5523,6 @@ export default function PageBuilder({
       project={project}
       updateProject={updateProject}
       setThemeMode={setThemeMode}
-      saveProject={saveThemeProject}
       {...themeTabProps}
     />
   );
@@ -4958,10 +5545,8 @@ export default function PageBuilder({
   const renderPublishTab = () => (
     <PublishTab
       project={project}
-      saveProject={saveProject}
-      loadProject={loadProject}
+      loadProject={reloadServerProject}
       exportProject={exportProject}
-      persistProjectNow={persistProjectNow}
       liveSitePath={canonicalLiveSitePath}
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
@@ -5008,6 +5593,36 @@ export default function PageBuilder({
       ))}
     </nav>
   );
+
+  if (!demoMode && builderProjectLoading) {
+    return (
+      <div className={getPageBuilderThemeClassName({ mode: appThemeMode || "light", renderMode: "editing" })}>
+        <main className="builder-project-loading" aria-busy="true" aria-live="polite">
+          <div className="builder-project-loading-card">
+            <span className="builder-project-loading-spinner" aria-hidden="true" />
+            <h2>Loading project…</h2>
+            <p>Madar is opening the latest saved draft.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!demoMode && !builderProjectRecord) {
+    return (
+      <div className={getPageBuilderThemeClassName({ mode: appThemeMode || "light", renderMode: "editing" })}>
+        <main className="builder-project-loading" role="alert">
+          <div className="builder-project-loading-card">
+            <h2>Project could not be loaded</h2>
+            <p>No browser copy was opened. Reload this page to retry the server request.</p>
+            <button type="button" className="page-primary-action" onClick={() => window.location.reload()}>
+              Retry
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (hasUnrecoverableBrowserDraft && !builderProjectRecord) {
     return (
@@ -5091,13 +5706,28 @@ export default function PageBuilder({
           preview={preview}
           project={project}
           renderWorkspaceNavigator={renderWorkspaceNavigator}
-          saveProject={saveProject}
           setActiveTopbarAction={setActiveTopbarAction}
           setModal={setModal}
           setPreview={setPreview}
           setViewport={setViewport}
           viewport={viewport}
           viewports={viewports}
+        />
+
+        <BuilderRecoveryNotice
+          decision={recoveryDecision}
+          onDiscard={discardRecovery}
+          onExport={exportRecovery}
+          onKeepServer={() => setRecoveryDecision(null)}
+        />
+
+        <BuilderConflictResolution
+          key={conflictDetails?.detectedAt || "no-conflict"}
+          conflict={saveState === BUILDER_SAVE_STATES.conflict ? conflictDetails || {} : null}
+          onDownload={exportProject}
+          onLoadCandidate={fetchConflictServerCandidate}
+          onResolveConflicts={resolveOverlappingConflicts}
+          onUseServer={() => adoptServerProject(conflictServerCandidate)}
         />
 
         {renderActiveTab()}
