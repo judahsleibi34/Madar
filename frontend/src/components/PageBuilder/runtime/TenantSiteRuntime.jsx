@@ -436,6 +436,10 @@ const decodePathSegment = (value) => {
   }
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const getBuilderPreviewBasePath = (projectId) =>
+  `/page-builder/projects/${encodeURIComponent(String(projectId || ""))}/preview`;
+
 export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const params = useParams();
   const { projectId = "", subdomain = "my-site" } = params;
@@ -446,7 +450,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const isPublicRuntime = !draftPreview;
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
   const activePath = location.pathname;
-  const previewBasePath = "/page-builder/preview";
+  const previewBasePath = getBuilderPreviewBasePath(projectId);
   const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
   const directStandaloneFormId = params.formId
     ? decodePathSegment(params.formId)
@@ -732,8 +736,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     () => getRuntimeAuthFlow(pages),
     [pages]
   );
-  const pageRequiresAuthentication = (page) =>
-    runtimePageRequiresAuthentication(page, authDestinationPageIds);
+  const pageRequiresAuthentication = useCallback(
+    (page) => runtimePageRequiresAuthentication(page, authDestinationPageIds),
+    [authDestinationPageIds]
+  );
   const hasBuilderPageForRoute = Boolean(requestedPage);
   const isUnsupportedWorkspaceRoute =
     !hasBuilderPageForRoute &&
@@ -775,7 +781,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const footerBrand = site.footerStoreName || brandName;
   const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || runtimeCopy.runtime.footerInitial;
 
-  const goToPage = (page) => {
+  const goToPage = useCallback((page) => {
     if (!page) {
       navigate(siteHomePath);
       return;
@@ -790,7 +796,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         ? authEntryPage
         : page;
     navigate(getPublicPagePath(runtimeBasePath, destination));
-  };
+  }, [
+    authEntryPage,
+    isPublicRuntime,
+    navigate,
+    pageRequiresAuthentication,
+    runtimeBasePath,
+    siteHomePath,
+    tenantAuth.loading,
+    tenantAuth.user,
+  ]);
 
   useEffect(() => {
     if (
@@ -895,10 +910,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     authLoading: tenantAuth.loading,
     user: tenantAuth.user,
   });
-  const activePageSections = useMemo(
-    () => getRuntimePageSections(activePage),
-    [activePage?.id, activePage?.sections]
-  );
+  const activePageSections = getRuntimePageSections(activePage);
 
   useEffect(() => {
     setPublicActionMessage("");
@@ -918,6 +930,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   }, [
     authEntryPage,
     activePage,
+    isPublicRuntime,
     location.pathname,
     navigate,
     pages,
@@ -948,8 +961,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       pages[currentPageIndex + 1] ||
       pages[0];
 
-    if (destination && destination.id !== activePage.id) goToPage(destination);
-  }, [activePage, pages, tenantAuth.user]);
+    if (destination && destination.id !== activePage.id) {
+      navigate(getPublicPagePath(runtimeBasePath, destination));
+    }
+  }, [activePage, navigate, pages, runtimeBasePath, tenantAuth.user]);
 
   useEffect(() => {
     const syncViewport = () => setRuntimeViewport(getScreenViewport());
@@ -2071,12 +2086,18 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       {draftPreview && (
         <div className="tenant-draft-preview-bar">
           <strong>{runtimeCopy.runtime.draftPreview}</strong>
-          <button type="button" onClick={() => navigate("/page-builder")}>
+          <button
+            type="button"
+            onClick={() => navigate(`/page-builder/projects/${encodeURIComponent(projectId)}`)}
+          >
             {runtimeCopy.runtime.backToBuilder}
           </button>
         </div>
       )}
-      {!standaloneFormId && (draftPreview || isPublicRuntime) && renderHeader()}
+      {!standaloneFormId &&
+        (draftPreview || isPublicRuntime) &&
+        site.showHeader !== false &&
+        renderHeader()}
       {renderMainContent()}
       {publicActionMessage && (
         <div className="tenant-runtime-action-message" role="status" aria-live="polite">
@@ -2084,7 +2105,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           <button type="button" onClick={() => setPublicActionMessage("")} aria-label="Dismiss message">×</button>
         </div>
       )}
-      {!standaloneFormId && (draftPreview || isPublicRuntime) && renderFooter()}
+      {!standaloneFormId &&
+        (draftPreview || isPublicRuntime) &&
+        site.showFooter !== false &&
+        renderFooter()}
     </div>
   );
 }

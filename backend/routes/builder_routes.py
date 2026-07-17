@@ -45,7 +45,9 @@ RESERVATION_STATUSES = {"new", "confirmed", "cancelled", "completed", "rejected"
 SITE_MEMBER_STATUSES = {"active", "disabled"}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
 UNSAFE_BUILDER_ELEMENT_TYPES = {"html", "rawhtml", "script", "iframe"}
-PUBLIC_PAGE_SLUG_PATTERN = re.compile(r"^/[a-z0-9]+(?:-[a-z0-9]+)*$")
+PUBLIC_PAGE_SLUG_PATTERN = re.compile(
+    r"^/[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*$"
+)
 RESERVED_PUBLIC_PAGE_SLUGS = {
     "admin", "api", "auth", "builder", "dashboard", "forgot-password",
     "login", "reset-password", "settings", "signup", "verify-email",

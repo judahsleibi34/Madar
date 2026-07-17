@@ -92,6 +92,23 @@ def builder_schema_with_element(element):
 
 
 class BuilderBackendHardeningTests(unittest.TestCase):
+    def test_publish_validation_preserves_nested_page_routes(self):
+        schema, _ = builder_routes.validate_publish_schema({
+            "defaultPageId": "home",
+            "pages": [
+                {"id": "home", "name": "Home", "slug": "/", "sections": []},
+                {
+                    "id": "team",
+                    "name": "Team",
+                    "slug": "/about/team",
+                    "sections": [],
+                },
+            ],
+            "forms": [],
+        })
+
+        self.assertEqual(schema["pages"][1]["slug"], "/about/team")
+
     def test_publish_accepts_no_body(self):
         fake_supabase = FakeSupabase()
         client = build_client(fake_supabase)
