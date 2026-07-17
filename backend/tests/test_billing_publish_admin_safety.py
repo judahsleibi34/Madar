@@ -939,7 +939,10 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
             "id": "project-1",
             "tenant_id": 7,
             "status": "draft",
-            "draft_schema": {"schema_version": 1, "pages": []},
+            "draft_schema": {
+                "schema_version": 1,
+                "pages": [{"id": "home", "name": "Home"}],
+            },
             "draft_revision": 4,
             "published_version": 2,
             "schema_version": 1,
@@ -966,8 +969,26 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["project"]["published_revision"], 4)
-        self.assertEqual(fake.calls[0][0], "publish_builder_project_atomic")
+        self.assertEqual(fake.calls[0][0], "publish_validated_builder_project_atomic")
         self.assertEqual(fake.calls[0][1]["p_expected_revision"], 4)
+        self.assertEqual(
+            fake.calls[0][1]["p_published_schema"],
+            {
+                "schema_version": 1,
+                "defaultPageId": "home",
+                "pages": [
+                    {
+                        "id": "home",
+                        "name": "Home",
+                        "slug": "/",
+                        "isDefault": True,
+                        "showInNavigation": True,
+                        "order": 0,
+                    }
+                ],
+            },
+        )
+        self.assertNotIn("defaultPageId", project["draft_schema"])
         self.assertIn("p_require_active_entitlement", fake.calls[0][1])
 
     def test_revision_is_required_once_project_supports_concurrency(self):

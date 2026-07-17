@@ -226,7 +226,8 @@ def get_bound_published_project(settings: dict):
         service_supabase.table("builder_projects")
         .select(
             "id, tenant_id, name, slug, status, published_schema, "
-            "published_version, last_published_at, updated_at"
+            "published_version, published_revision, schema_version, "
+            "last_published_at, updated_at"
         )
         .eq("id", project_id)
         .eq("tenant_id", tenant_id)
@@ -361,6 +362,45 @@ def find_published_page(project: dict, page_reference: str) -> tuple[dict, dict,
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
     return schema, page, collect_auth_destination_page_ids(pages)
+
+
+def build_publication_metadata(project: dict, schema: dict) -> dict:
+    canonical_schema = json.dumps(
+        schema,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    schema_hash = hashlib.sha256(canonical_schema.encode("utf-8")).hexdigest()
+    project_id = str(project.get("id") or "")
+    published_version = int(project.get("published_version") or 0)
+    etag = f'"madar-{project_id}-{published_version}-{schema_hash}"'
+    return {
+        "project_id": project_id,
+        "published_version": published_version,
+        "published_at": project.get("last_published_at"),
+        "schema_version": int(
+            project.get("schema_version") or schema.get("schema_version") or 1
+        ),
+        "schema_hash": schema_hash,
+        "etag": etag,
+    }
+
+
+def apply_public_cache_headers(response: Response, metadata: dict, *, private: bool = False) -> None:
+    response.headers["ETag"] = metadata["etag"]
+    response.headers["Cache-Control"] = (
+        "private, no-store" if private else "public, max-age=0, must-revalidate"
+    )
+
+
+def request_etag_matches(request: Request, metadata: dict) -> bool:
+    candidates = {
+        value.strip()
+        for value in str(request.headers.get("if-none-match") or "").split(",")
+        if value.strip()
+    }
+    return metadata["etag"] in candidates or "*" in candidates
 
 
 def get_form_sections(form: dict) -> list[dict]:
@@ -1228,7 +1268,7 @@ def logout_tenant_visitor(subdomain: str, response: Response):
     return {"logged_in": False, "message": "Logged out"}
 
 @router.get("/sites/{subdomain}")
-def get_public_site(subdomain: str, request: Request):
+def get_public_site(subdomain: str, request: Request, response: Response):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
     settings = resolve_website_settings(clean_subdomain)
@@ -1239,14 +1279,30 @@ def get_public_site(subdomain: str, request: Request):
             raise
         project = None
 
+    public_schema = (
+        build_authorized_public_schema(project.get("published_schema") or {})
+        if project
+        else None
+    )
+    metadata = build_publication_metadata(project, public_schema) if project else None
+    if metadata:
+        apply_public_cache_headers(response, metadata)
+        if request_etag_matches(request, metadata):
+            return Response(
+                status_code=304,
+                headers={
+                    "ETag": metadata["etag"],
+                    "Cache-Control": "public, max-age=0, must-revalidate",
+                },
+            )
+
     return {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain),
         "project": (
             {
-                "published_schema": build_authorized_public_schema(
-                    project.get("published_schema") or {}
-                )
+                "published_schema": public_schema,
+                **metadata,
             }
             if project
             else None
@@ -1278,14 +1334,18 @@ def get_member_site_page(
     if page_access_kind(page, auth_destination_ids) == "unsupported_role":
         raise HTTPException(status_code=403, detail="Page access is not configured")
 
+    authorized_schema = build_authorized_public_schema(
+        schema,
+        authorized_page_ids={str(page.get("id") or "")},
+    )
+    metadata = build_publication_metadata(project, authorized_schema)
+    apply_public_cache_headers(response, metadata, private=True)
     return {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain),
         "project": {
-            "published_schema": build_authorized_public_schema(
-                schema,
-                authorized_page_ids={str(page.get("id") or "")},
-            )
+            "published_schema": authorized_schema,
+            **metadata,
         },
     }
 
@@ -1355,7 +1415,7 @@ def submit_public_builder_form(
         "project_id": project.get("id"),
         "form_id": clean_form_id,
         "form_title": form.get("title"),
-        "form_version": project.get("draft_revision"),
+        "form_version": project.get("published_version"),
         "status": "new",
         "answers": cleaned_answers,
         "quiz_result": None,

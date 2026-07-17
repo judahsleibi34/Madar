@@ -286,7 +286,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(saved["project_id"], PROJECT_ID)
         self.assertEqual(saved["form_id"], FORM_ID)
         self.assertEqual(saved["form_title"], "Contact form")
-        self.assertEqual(saved["form_version"], 5)
+        self.assertEqual(saved["form_version"], 4)
         self.assertEqual(saved["user_agent"], "test-agent")
         self.assertEqual(len(saved["field_snapshot"]), 2)
         notify_event.assert_called_once()
@@ -977,21 +977,52 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            body["project"],
-            {
-                "published_schema": public_site_routes.build_authorized_public_schema(
-                    PUBLISHED_SCHEMA
-                )
-            },
+            body["project"]["published_schema"],
+            public_site_routes.build_authorized_public_schema(PUBLISHED_SCHEMA),
         )
+        self.assertEqual(body["project"]["project_id"], PROJECT_ID)
+        self.assertEqual(body["project"]["published_version"], 4)
+        self.assertEqual(body["project"]["published_at"], "2026-06-03T13:00:00+00:00")
+        self.assertEqual(body["project"]["schema_version"], 1)
+        self.assertEqual(len(body["project"]["schema_hash"]), 64)
+        self.assertEqual(response.headers["etag"], body["project"]["etag"])
         self.assertNotIn("tenant_id", body["site"])
         self.assertNotIn("id", body["project"])
         self.assertNotIn("owner_user_id", body["project"])
         self.assertNotIn("draft_schema", body["project"])
         self.assertNotIn("status", body["project"])
-        self.assertNotIn("published_version", body["project"])
+        self.assertNotIn("published_revision", body["project"])
         self.assertNotIn("last_published_at", body["project"])
         self.assertNotIn("draft_schema", str(body))
+
+    def test_public_site_etag_supports_conditional_get(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            first = client.get("/public/sites/tenant-site")
+            second = client.get(
+                "/public/sites/tenant-site",
+                headers={"If-None-Match": first.headers["etag"]},
+            )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 304)
+        self.assertEqual(second.headers["etag"], first.headers["etag"])
+        self.assertEqual(second.content, b"")
+
+    def test_public_site_etag_changes_with_published_version(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            first = client.get("/public/sites/tenant-site")
+            fake_supabase.tables["builder_projects"][0]["published_version"] = 5
+            second = client.get("/public/sites/tenant-site")
+
+        self.assertNotEqual(first.headers["etag"], second.headers["etag"])
 
     def test_public_site_uses_bound_project_when_another_project_is_published_later(self):
         fake_supabase = FakeSupabase()

@@ -1017,11 +1017,12 @@ def publish_project_atomically(
     if callable(rpc):
         try:
             response = rpc(
-                "publish_builder_project_atomic",
+                "publish_validated_builder_project_atomic",
                 {
                     "p_project_id": project_id,
                     "p_tenant_id": tenant_id,
                     "p_expected_revision": expected_revision,
+                    "p_published_schema": project.get("draft_schema") or {},
                     "p_published_at": published_at,
                     "p_schema_version": schema_version,
                     "p_require_active_entitlement": require_active_entitlement,
