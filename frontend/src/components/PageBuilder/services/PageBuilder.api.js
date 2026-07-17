@@ -229,6 +229,15 @@ export const unpublishBuilderProject = async (projectId, expectedRevision = null
   return parseJsonResponse(response);
 };
 
+export const updateBuilderSiteBinding = async (projectId) => {
+  const response = await apiFetch(getApiUrl("/builder/site-binding"), {
+    method: "PUT",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify({ project_id: projectId }),
+  });
+  return parseJsonResponse(response);
+};
+
 export const uploadBuilderAsset = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
