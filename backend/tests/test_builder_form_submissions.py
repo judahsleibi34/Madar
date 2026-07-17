@@ -976,7 +976,14 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 "description": None,
             },
         )
-        self.assertEqual(body["project"], {"published_schema": PUBLISHED_SCHEMA})
+        self.assertEqual(
+            body["project"],
+            {
+                "published_schema": public_site_routes.build_authorized_public_schema(
+                    PUBLISHED_SCHEMA
+                )
+            },
+        )
         self.assertNotIn("tenant_id", body["site"])
         self.assertNotIn("id", body["project"])
         self.assertNotIn("owner_user_id", body["project"])
@@ -1007,8 +1014,108 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             response = client.get("/public/sites/tenant-site")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["project"]["published_schema"], PUBLISHED_SCHEMA)
+        self.assertEqual(
+            response.json()["project"]["published_schema"],
+            public_site_routes.build_authorized_public_schema(PUBLISHED_SCHEMA),
+        )
         self.assertNotIn("later-page", str(response.json()))
+
+    def test_anonymous_site_response_excludes_protected_page_content(self):
+        fake_supabase = FakeSupabase()
+        schema = fake_supabase.tables["builder_projects"][0]["published_schema"]
+        schema["pages"].append(
+            {
+                "id": "member-page",
+                "name": "Member vault",
+                "visibility": "members",
+                "sections": [{"secret": "literal-private-page-content"}],
+            }
+        )
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertNotIn("literal-private-page-content", str(body))
+        self.assertNotIn("Member vault", str(body))
+        self.assertEqual(
+            [page["id"] for page in body["project"]["published_schema"]["pages"]],
+            ["page_home"],
+        )
+
+    def test_active_site_member_can_fetch_bound_protected_page(self):
+        fake_supabase = FakeSupabase()
+        schema = fake_supabase.tables["builder_projects"][0]["published_schema"]
+        schema["pages"].append(
+            {
+                "id": "member-page",
+                "name": "Member vault",
+                "visibility": "members",
+                "sections": [{"secret": "literal-private-page-content"}],
+            }
+        )
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(
+                 public_site_routes,
+                 "require_tenant_visitor",
+                 return_value=({}, {"status": "active"}),
+             ):
+            response = client.get("/public/sites/tenant-site/pages/member-page")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("literal-private-page-content", str(response.json()))
+
+    def test_disabled_site_member_cannot_fetch_protected_page(self):
+        fake_supabase = FakeSupabase()
+        schema = fake_supabase.tables["builder_projects"][0]["published_schema"]
+        schema["pages"].append(
+            {"id": "member-page", "visibility": "members", "sections": []}
+        )
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(
+                 public_site_routes,
+                 "require_tenant_visitor",
+                 side_effect=HTTPException(
+                     status_code=403,
+                     detail="This account does not belong to this website",
+                 ),
+             ):
+            response = client.get("/public/sites/tenant-site/pages/member-page")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_unknown_role_restricted_page_fails_closed(self):
+        fake_supabase = FakeSupabase()
+        schema = fake_supabase.tables["builder_projects"][0]["published_schema"]
+        schema["pages"].append(
+            {
+                "id": "role-page",
+                "visibility": "vip",
+                "sections": [{"secret": "restricted-content"}],
+            }
+        )
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(
+                 public_site_routes,
+                 "require_tenant_visitor",
+                 return_value=({}, {"status": "active"}),
+             ):
+            response = client.get("/public/sites/tenant-site/pages/role-page")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("restricted-content", str(response.json()))
 
     def test_site_binding_requires_published_same_tenant_project(self):
         fake_supabase = FakeSupabase()

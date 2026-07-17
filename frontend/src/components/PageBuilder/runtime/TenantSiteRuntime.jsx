@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
   fetchPublicForm,
   fetchBuilderProject,
+  fetchProtectedSitePage,
   fetchPublicSite,
   getTenantVisitorStatus,
   loginTenantVisitor,
@@ -474,6 +475,29 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [publicActionMessage, setPublicActionMessage] = useState("");
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
   const publicSubmissionStartedAtRef = useRef(Date.now());
+  const protectedPageRequestRef = useRef("");
+
+  const loadProtectedPage = useCallback(async (pageReference) => {
+    const cleanReference = String(pageReference || "").replace(/^\/+/, "");
+    if (draftPreview || !cleanReference) return null;
+    if (protectedPageRequestRef.current === cleanReference) return null;
+
+    protectedPageRequestRef.current = cleanReference;
+    try {
+      const result = await fetchProtectedSitePage(cleanSubdomain, cleanReference);
+      const schema = result?.project?.published_schema;
+      if (!schema || typeof schema !== "object") return null;
+      setProject(schema);
+      setPublicSiteProfile(result?.site || null);
+      setPublicSiteState("ready");
+      return (schema.pages || []).find((page) =>
+        String(page.id || "") === cleanReference ||
+        String(page.slug || "").replace(/^\/+/, "") === cleanReference
+      ) || null;
+    } finally {
+      protectedPageRequestRef.current = "";
+    }
+  }, [cleanSubdomain, draftPreview]);
 
   useEffect(() => {
     if (draftPreview) return;
@@ -547,10 +571,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         if (destination && destination.id !== activePage?.id) goToPage(destination);
       } else if (result?.logged_in) {
         const currentPageIndex = pages.findIndex((page) => page.id === activePage?.id);
-        const destination =
-          pages.find((page) => page.id === authElement?.auth?.successPageId) ||
-          pages[currentPageIndex + 1] ||
-          pages[0];
+        let destination = pages.find(
+          (page) => page.id === authElement?.auth?.successPageId
+        );
+        if (authElement?.auth?.successPageId && !destination) {
+          destination = await loadProtectedPage(authElement.auth.successPageId);
+        }
+        destination ||= pages[currentPageIndex + 1] || pages[0];
         if (destination && destination.id !== activePage?.id) goToPage(destination);
       }
     } catch (error) {
@@ -764,6 +791,28 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         : page;
     navigate(getPublicPagePath(runtimeBasePath, destination));
   };
+
+  useEffect(() => {
+    if (
+      !isPublicRuntime ||
+      publicSiteState !== "ready" ||
+      tenantAuth.loading ||
+      !tenantAuth.user ||
+      requestedPage ||
+      pagePath === "/"
+    ) {
+      return;
+    }
+    loadProtectedPage(pagePath).catch(() => undefined);
+  }, [
+    isPublicRuntime,
+    loadProtectedPage,
+    pagePath,
+    publicSiteState,
+    requestedPage,
+    tenantAuth.loading,
+    tenantAuth.user,
+  ]);
 
   const runPublicButtonAction = (element) => runPublicElementAction({
     element,

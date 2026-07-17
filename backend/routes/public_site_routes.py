@@ -244,6 +244,125 @@ def get_bound_published_project(settings: dict):
     return project
 
 
+PROTECTED_PAGE_VISIBILITIES = {"private", "authenticated", "members"}
+PUBLIC_RUNTIME_PRIVATE_KEYS = {
+    "activeFormId",
+    "activePageId",
+    "activeRoleId",
+    "activeWorkflowId",
+    "collections",
+    "reservations",
+    "roles",
+    "users",
+    "workflows",
+}
+
+
+def collect_auth_destination_page_ids(value: Any) -> set[str]:
+    destinations: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, dict):
+            if str(item.get("type") or "") == "loginBlock":
+                destination = (item.get("auth") or {}).get("successPageId")
+                if destination:
+                    destinations.add(str(destination))
+            for child in item.values():
+                visit(child)
+        elif isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(value)
+    return destinations
+
+
+def page_access_kind(page: dict, auth_destination_ids: set[str]) -> str:
+    page_id = str(page.get("id") or "")
+    visibility = str(page.get("visibility") or "public").strip().lower()
+    if page_id in auth_destination_ids or visibility in PROTECTED_PAGE_VISIBILITIES:
+        return "member"
+    if visibility in {"", "public"}:
+        return "public"
+    return "unsupported_role"
+
+
+def collect_referenced_form_ids(pages: list[dict]) -> set[str]:
+    form_ids: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, dict):
+            for key in ("connectedFormId", "formId"):
+                value = item.get(key)
+                if value:
+                    form_ids.add(str(value))
+            for child in item.values():
+                visit(child)
+        elif isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(pages)
+    return form_ids
+
+
+def build_authorized_public_schema(
+    schema: dict,
+    *,
+    authorized_page_ids: set[str] | None = None,
+) -> dict:
+    source = copy.deepcopy(schema if isinstance(schema, dict) else {})
+    pages = [page for page in source.get("pages", []) if isinstance(page, dict)]
+    auth_destination_ids = collect_auth_destination_page_ids(pages)
+    allowed_ids = authorized_page_ids or set()
+    visible_pages = [
+        page
+        for page in pages
+        if page_access_kind(page, auth_destination_ids) == "public"
+        or str(page.get("id") or "") in allowed_ids
+    ]
+    source["pages"] = visible_pages
+
+    visible_page_ids = {str(page.get("id") or "") for page in visible_pages}
+    default_page_id = str(source.get("defaultPageId") or "")
+    if default_page_id and default_page_id not in visible_page_ids:
+        source["defaultPageId"] = visible_pages[0].get("id") if visible_pages else None
+
+    referenced_form_ids = collect_referenced_form_ids(visible_pages)
+    source["forms"] = [
+        form
+        for form in source.get("forms", [])
+        if isinstance(form, dict) and str(form.get("id") or "") in referenced_form_ids
+    ]
+    for form in source["forms"]:
+        form.pop("responses", None)
+
+    for key in PUBLIC_RUNTIME_PRIVATE_KEYS:
+        source.pop(key, None)
+    return source
+
+
+def find_published_page(project: dict, page_reference: str) -> tuple[dict, dict, set[str]]:
+    schema = project.get("published_schema")
+    if not isinstance(schema, dict):
+        raise HTTPException(status_code=404, detail="Page not found")
+    pages = [page for page in schema.get("pages", []) if isinstance(page, dict)]
+    normalized_reference = str(page_reference or "").strip().strip("/").lower()
+    page = next(
+        (
+            item
+            for item in pages
+            if str(item.get("id") or "").lower() == normalized_reference
+            or str(item.get("slug") or "").strip().strip("/").lower()
+            == normalized_reference
+        ),
+        None,
+    )
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return schema, page, collect_auth_destination_page_ids(pages)
+
+
 def get_form_sections(form: dict) -> list[dict]:
     sections = form.get("sections")
     return sections if isinstance(sections, list) else []
@@ -1124,10 +1243,50 @@ def get_public_site(subdomain: str, request: Request):
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain),
         "project": (
-            {"published_schema": project.get("published_schema") or {}}
+            {
+                "published_schema": build_authorized_public_schema(
+                    project.get("published_schema") or {}
+                )
+            }
             if project
             else None
         ),
+    }
+
+
+@router.get("/sites/{subdomain}/pages/{page_reference:path}")
+def get_member_site_page(
+    subdomain: str,
+    page_reference: str,
+    request: Request,
+    response: Response,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_page_reference = str(page_reference or "").strip()
+    if not clean_page_reference:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    enforce_public_rate_limit(
+        request,
+        "member_page_lookup",
+        f"{clean_subdomain}:{clean_page_reference}",
+    )
+    settings = resolve_website_settings(clean_subdomain)
+    require_tenant_visitor(clean_subdomain, request, response)
+    project = get_bound_published_project(settings)
+    schema, page, auth_destination_ids = find_published_page(project, clean_page_reference)
+    if page_access_kind(page, auth_destination_ids) == "unsupported_role":
+        raise HTTPException(status_code=403, detail="Page access is not configured")
+
+    return {
+        "success": True,
+        "site": build_public_site_profile(settings, clean_subdomain),
+        "project": {
+            "published_schema": build_authorized_public_schema(
+                schema,
+                authorized_page_ids={str(page.get("id") or "")},
+            )
+        },
     }
 
 

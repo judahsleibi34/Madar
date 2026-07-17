@@ -364,6 +364,20 @@ export const fetchPublicSite = async (subdomain) => {
   return data || null;
 };
 
+export const fetchProtectedSitePage = async (subdomain, pageReference) => {
+  const normalizedReference = String(pageReference || "").replace(/^\/+/, "");
+  const response = await apiFetch(
+    getApiUrl(
+      `/public/sites/${subdomain}/pages/${encodeURIComponent(normalizedReference)}`
+    ),
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
+  return parseJsonResponse(response);
+};
+
 export const fetchPublicForm = async (subdomain, formId) => {
   const response = await fetch(
     getApiUrl(`/public/sites/${subdomain}/forms/${encodeURIComponent(formId)}`),
