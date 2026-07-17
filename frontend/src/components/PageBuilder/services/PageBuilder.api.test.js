@@ -6,10 +6,13 @@ import {
   createBuilderSiteMember,
   deleteBuilderSiteMember,
   fetchBuilderProject,
+  fetchProtectedSitePage,
+  listBuilderProjects,
   fetchBuilderSiteMembers,
   publishBuilderProject,
   updateBuilderProject,
   updateBuilderSiteMember,
+  updateBuilderSiteBinding,
 } from "./PageBuilder.api";
 
 vi.mock("../../../utils/apiClient", () => ({
@@ -109,5 +112,59 @@ describe("builder project cloud API", () => {
     expect(apiFetch.mock.calls[1][1].method).toBe("POST");
     expect(apiFetch.mock.calls[2][1].method).toBe("PATCH");
     expect(apiFetch.mock.calls[3][1].method).toBe("DELETE");
+  });
+
+  it("fetches protected pages through the authenticated public-site API", async () => {
+    apiFetch.mockResolvedValueOnce(jsonResponse({
+      project: { published_schema: { pages: [{ id: "member-page" }] } },
+    }));
+
+    const result = await fetchProtectedSitePage("tenant-site", "/member-area");
+
+    expect(result.project.published_schema.pages[0].id).toBe("member-page");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/public/sites/tenant-site/pages/member-area",
+      { method: "GET", cache: "no-store" }
+    );
+  });
+
+  it("preserves builder project pagination metadata", async () => {
+    apiFetch.mockResolvedValueOnce(jsonResponse({
+      projects: [{ id: "project-21" }],
+      pagination: { limit: 20, offset: 20, count: 1, has_more: false },
+    }));
+
+    const result = await listBuilderProjects({ limit: 20, offset: 20 });
+
+    expect(result.projects).toEqual([{ id: "project-21" }]);
+    expect(result.pagination).toEqual({
+      limit: 20,
+      offset: 20,
+      count: 1,
+      has_more: false,
+    });
+    expect(apiFetch.mock.calls[0][0]).toBe(
+      "/api/builder/projects?limit=20&offset=20"
+    );
+  });
+
+  it("sets the explicit live project with the builder client contract", async () => {
+    apiFetch.mockResolvedValueOnce(jsonResponse({
+      binding: { project_id: "project-2" },
+    }));
+
+    const result = await updateBuilderSiteBinding("project-2");
+
+    expect(result.binding.project_id).toBe("project-2");
+    expect(apiFetch.mock.calls[0][0]).toBe("/api/builder/site-binding");
+    expect(apiFetch.mock.calls[0][1]).toMatchObject({
+      method: "PUT",
+      headers: expect.objectContaining({
+        "X-Madar-Builder-Contract": BUILDER_CLIENT_CONTRACT,
+      }),
+    });
+    expect(JSON.parse(apiFetch.mock.calls[0][1].body)).toEqual({
+      project_id: "project-2",
+    });
   });
 });

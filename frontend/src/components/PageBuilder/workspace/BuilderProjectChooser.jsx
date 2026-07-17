@@ -12,18 +12,20 @@ export default function BuilderProjectChooser({ workspace = "page-builder", auto
   const [projects, setProjects] = useState([]);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
+  const [pagination, setPagination] = useState({ limit: 20, offset: 0, has_more: false });
 
   useEffect(() => {
     let cancelled = false;
-    listBuilderProjects()
-      .then((records) => {
+    listBuilderProjects({ limit: 20, offset: 0 })
+      .then(({ projects: records, pagination: nextPagination }) => {
         if (cancelled) return;
-        if (autoOpenSingleProject && records.length === 1) {
+        if (autoOpenSingleProject && records.length === 1 && !nextPagination.has_more) {
           const tab = workspace === "builder-responses" ? "responses" : workspace === "builder-data" ? "data" : "design";
           navigate(getBuilderWorkspacePath(records[0].id, tab, workspace), { replace: true });
           return;
         }
         setProjects(records);
+        setPagination(nextPagination);
         setStatus("ready");
       })
       .catch(() => {
@@ -33,6 +35,29 @@ export default function BuilderProjectChooser({ workspace = "page-builder", auto
       });
     return () => { cancelled = true; };
   }, [autoOpenSingleProject, navigate, workspace]);
+
+  const loadMoreProjects = async () => {
+    if (status === "loading-more" || !pagination.has_more) return;
+    setStatus("loading-more");
+    setError("");
+    try {
+      const nextOffset = pagination.offset + pagination.count;
+      const result = await listBuilderProjects({
+        limit: pagination.limit,
+        offset: nextOffset,
+      });
+      setProjects((current) => {
+        const byId = new Map(current.map((project) => [project.id, project]));
+        result.projects.forEach((project) => byId.set(project.id, project));
+        return [...byId.values()];
+      });
+      setPagination(result.pagination);
+      setStatus("ready");
+    } catch {
+      setError("More projects could not be loaded. Try again.");
+      setStatus("ready");
+    }
+  };
 
   const openProject = (projectId) => {
     const tab = workspace === "builder-responses" ? "responses" : workspace === "builder-data" ? "data" : "design";
@@ -57,7 +82,7 @@ export default function BuilderProjectChooser({ workspace = "page-builder", auto
   };
 
   return (
-    <section className="builder-project-chooser" aria-busy={status === "loading" || status === "creating"}>
+    <section className="builder-project-chooser" aria-busy={["loading", "loading-more", "creating"].includes(status)}>
       <header className="builder-project-chooser-header">
         <p className="builder-project-chooser-eyebrow">
           <span aria-hidden="true" />
@@ -112,6 +137,16 @@ export default function BuilderProjectChooser({ workspace = "page-builder", auto
               <span>{project.status || "draft"}</span>
             </button>
           ))}
+          {pagination.has_more && (
+            <button
+              type="button"
+              onClick={loadMoreProjects}
+              disabled={status === "loading-more"}
+            >
+              <strong>{status === "loading-more" ? "Loading more…" : "Load more projects"}</strong>
+              <span>Show the next projects</span>
+            </button>
+          )}
           {workspace === "page-builder" && (
             <button type="button" onClick={createProject} disabled={status === "creating"}>
               <strong>{status === "creating" ? "Creating…" : "Create a new project"}</strong>

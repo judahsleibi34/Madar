@@ -34,8 +34,14 @@ const slugifyPageSegment = (value = "") => String(value)
 
 export const normalizePublicPageSlug = (value, fallbackName = "page") => {
   if (String(value || "").trim() === "/") return "/";
-  const segment = slugifyPageSegment(value) || slugifyPageSegment(fallbackName) || "page";
-  return `/${segment}`;
+  const segments = String(value || "")
+    .split("/")
+    .map(slugifyPageSegment)
+    .filter(Boolean);
+  const normalizedSegments = segments.length
+    ? segments
+    : [slugifyPageSegment(fallbackName) || "page"];
+  return `/${normalizedSegments.join("/")}`;
 };
 
 export const getDefaultPublicPage = (pages = [], defaultPageId = "") => {

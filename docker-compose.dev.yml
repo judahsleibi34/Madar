@@ -1,0 +1,14 @@
+services:
+  redis:
+    container_name: madar-dev-redis
+    ports: !override []
+
+  backend:
+    container_name: madar-dev-backend
+    ports: !override
+      - "127.0.0.1:8002:8000"
+
+  frontend:
+    container_name: madar-dev-frontend
+    ports: !override
+      - "127.0.0.1:3001:80"

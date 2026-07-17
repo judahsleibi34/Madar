@@ -7,6 +7,7 @@ import {
   getProductionTenantUrl,
   getStandaloneFormPath,
   getPublicPagePath,
+  normalizePublicPageSlug,
   normalizeProjectPageRouting,
   resolvePublicPageByPath,
   setProjectDefaultPage,
@@ -33,6 +34,13 @@ describe("public page routing contract", () => {
     expect(resolvePublicPageByPath(project.pages, "/form", project.defaultPageId)?.id).toBe("form");
     expect(resolvePublicPageByPath(project.pages, "/about", project.defaultPageId)?.id).toBe("about");
     expect(resolvePublicPageByPath(project.pages, "/missing", project.defaultPageId)).toBeNull();
+  });
+
+  it("preserves and resolves nested public page slugs", () => {
+    const pages = [{ id: "team", name: "Team", slug: "/about/team" }];
+    expect(normalizePublicPageSlug("/about/team", "Team")).toBe("/about/team");
+    expect(resolvePublicPageByPath(pages, "/about/team")?.id).toBe("team");
+    expect(getPublicPagePath("/site/acme", pages[0])).toBe("/site/acme/about/team");
   });
 
   it("builds canonical root and direct-page URLs", () => {

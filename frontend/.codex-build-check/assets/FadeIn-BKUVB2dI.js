@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-CV-NfkGo.js";import{t}from"./proxy-BMHqSUjy.js";var n=e();function r({children:e,delay:r=0}){return(0,n.jsx)(t.div,{initial:{opacity:0,y:24},animate:{opacity:1,y:0},transition:{duration:.7,delay:r,ease:[.25,.1,.25,1]},children:e})}export{r as t};

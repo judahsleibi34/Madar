@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
   fetchPublicForm,
   fetchBuilderProject,
+  fetchProtectedSitePage,
   fetchPublicSite,
   getTenantVisitorStatus,
   loginTenantVisitor,
@@ -435,6 +436,10 @@ const decodePathSegment = (value) => {
   }
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const getBuilderPreviewBasePath = (projectId) =>
+  `/page-builder/projects/${encodeURIComponent(String(projectId || ""))}/preview`;
+
 export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const params = useParams();
   const { projectId = "", subdomain = "my-site" } = params;
@@ -445,7 +450,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const isPublicRuntime = !draftPreview;
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
   const activePath = location.pathname;
-  const previewBasePath = "/page-builder/preview";
+  const previewBasePath = getBuilderPreviewBasePath(projectId);
   const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
   const directStandaloneFormId = params.formId
     ? decodePathSegment(params.formId)
@@ -474,6 +479,29 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [publicActionMessage, setPublicActionMessage] = useState("");
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
   const publicSubmissionStartedAtRef = useRef(Date.now());
+  const protectedPageRequestRef = useRef("");
+
+  const loadProtectedPage = useCallback(async (pageReference) => {
+    const cleanReference = String(pageReference || "").replace(/^\/+/, "");
+    if (draftPreview || !cleanReference) return null;
+    if (protectedPageRequestRef.current === cleanReference) return null;
+
+    protectedPageRequestRef.current = cleanReference;
+    try {
+      const result = await fetchProtectedSitePage(cleanSubdomain, cleanReference);
+      const schema = result?.project?.published_schema;
+      if (!schema || typeof schema !== "object") return null;
+      setProject(schema);
+      setPublicSiteProfile(result?.site || null);
+      setPublicSiteState("ready");
+      return (schema.pages || []).find((page) =>
+        String(page.id || "") === cleanReference ||
+        String(page.slug || "").replace(/^\/+/, "") === cleanReference
+      ) || null;
+    } finally {
+      protectedPageRequestRef.current = "";
+    }
+  }, [cleanSubdomain, draftPreview]);
 
   useEffect(() => {
     if (draftPreview) return;
@@ -547,10 +575,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         if (destination && destination.id !== activePage?.id) goToPage(destination);
       } else if (result?.logged_in) {
         const currentPageIndex = pages.findIndex((page) => page.id === activePage?.id);
-        const destination =
-          pages.find((page) => page.id === authElement?.auth?.successPageId) ||
-          pages[currentPageIndex + 1] ||
-          pages[0];
+        let destination = pages.find(
+          (page) => page.id === authElement?.auth?.successPageId
+        );
+        if (authElement?.auth?.successPageId && !destination) {
+          destination = await loadProtectedPage(authElement.auth.successPageId);
+        }
+        destination ||= pages[currentPageIndex + 1] || pages[0];
         if (destination && destination.id !== activePage?.id) goToPage(destination);
       }
     } catch (error) {
@@ -705,8 +736,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     () => getRuntimeAuthFlow(pages),
     [pages]
   );
-  const pageRequiresAuthentication = (page) =>
-    runtimePageRequiresAuthentication(page, authDestinationPageIds);
+  const pageRequiresAuthentication = useCallback(
+    (page) => runtimePageRequiresAuthentication(page, authDestinationPageIds),
+    [authDestinationPageIds]
+  );
   const hasBuilderPageForRoute = Boolean(requestedPage);
   const isUnsupportedWorkspaceRoute =
     !hasBuilderPageForRoute &&
@@ -748,7 +781,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const footerBrand = site.footerStoreName || brandName;
   const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || runtimeCopy.runtime.footerInitial;
 
-  const goToPage = (page) => {
+  const goToPage = useCallback((page) => {
     if (!page) {
       navigate(siteHomePath);
       return;
@@ -763,7 +796,38 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         ? authEntryPage
         : page;
     navigate(getPublicPagePath(runtimeBasePath, destination));
-  };
+  }, [
+    authEntryPage,
+    isPublicRuntime,
+    navigate,
+    pageRequiresAuthentication,
+    runtimeBasePath,
+    siteHomePath,
+    tenantAuth.loading,
+    tenantAuth.user,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isPublicRuntime ||
+      publicSiteState !== "ready" ||
+      tenantAuth.loading ||
+      !tenantAuth.user ||
+      requestedPage ||
+      pagePath === "/"
+    ) {
+      return;
+    }
+    loadProtectedPage(pagePath).catch(() => undefined);
+  }, [
+    isPublicRuntime,
+    loadProtectedPage,
+    pagePath,
+    publicSiteState,
+    requestedPage,
+    tenantAuth.loading,
+    tenantAuth.user,
+  ]);
 
   const runPublicButtonAction = (element) => runPublicElementAction({
     element,
@@ -846,10 +910,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     authLoading: tenantAuth.loading,
     user: tenantAuth.user,
   });
-  const activePageSections = useMemo(
-    () => getRuntimePageSections(activePage),
-    [activePage?.id, activePage?.sections]
-  );
+  const activePageSections = getRuntimePageSections(activePage);
 
   useEffect(() => {
     setPublicActionMessage("");
@@ -869,6 +930,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   }, [
     authEntryPage,
     activePage,
+    isPublicRuntime,
     location.pathname,
     navigate,
     pages,
@@ -899,8 +961,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       pages[currentPageIndex + 1] ||
       pages[0];
 
-    if (destination && destination.id !== activePage.id) goToPage(destination);
-  }, [activePage, pages, tenantAuth.user]);
+    if (destination && destination.id !== activePage.id) {
+      navigate(getPublicPagePath(runtimeBasePath, destination));
+    }
+  }, [activePage, navigate, pages, runtimeBasePath, tenantAuth.user]);
 
   useEffect(() => {
     const syncViewport = () => setRuntimeViewport(getScreenViewport());
@@ -2022,12 +2086,18 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       {draftPreview && (
         <div className="tenant-draft-preview-bar">
           <strong>{runtimeCopy.runtime.draftPreview}</strong>
-          <button type="button" onClick={() => navigate("/page-builder")}>
+          <button
+            type="button"
+            onClick={() => navigate(`/page-builder/projects/${encodeURIComponent(projectId)}`)}
+          >
             {runtimeCopy.runtime.backToBuilder}
           </button>
         </div>
       )}
-      {!standaloneFormId && (draftPreview || isPublicRuntime) && renderHeader()}
+      {!standaloneFormId &&
+        (draftPreview || isPublicRuntime) &&
+        site.showHeader !== false &&
+        renderHeader()}
       {renderMainContent()}
       {publicActionMessage && (
         <div className="tenant-runtime-action-message" role="status" aria-live="polite">
@@ -2035,7 +2105,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           <button type="button" onClick={() => setPublicActionMessage("")} aria-label="Dismiss message">×</button>
         </div>
       )}
-      {!standaloneFormId && (draftPreview || isPublicRuntime) && renderFooter()}
+      {!standaloneFormId &&
+        (draftPreview || isPublicRuntime) &&
+        site.showFooter !== false &&
+        renderFooter()}
     </div>
   );
 }

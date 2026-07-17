@@ -93,6 +93,7 @@ import {
   fetchWebsiteSettings,
   publishBuilderProject,
   unpublishBuilderProject,
+  updateBuilderSiteBinding,
   updateBuilderProject,
   updateBuilderSiteMember,
   uploadBuilderAsset,
@@ -684,6 +685,7 @@ export default function PageBuilder({
   const [lastCloudSavedAt, setLastCloudSavedAt] = useState(null);
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [isUnpublishingProject, setIsUnpublishingProject] = useState(false);
+  const [isBindingPublicProject, setIsBindingPublicProject] = useState(false);
   const [liveSitePath, setLiveSitePath] = useState("");
   const [websiteSettings, setWebsiteSettings] = useState(null);
   const [siteMembers, setSiteMembers] = useState([]);
@@ -1498,22 +1500,6 @@ export default function PageBuilder({
   const updateProject = useCallback((updater) => {
     setProject((prev) => updater(prev));
   }, []);
-
-  useEffect(() => {
-    if (activeTab !== "users") return;
-    if (safeProjectRoles.some((role) => role.id === "customer")) return;
-
-    const customerRole = {
-      ...createRole("Customer"),
-      id: "customer",
-      description: "Default role for people who register on the published site.",
-    };
-    updateProject((current) => ({
-      ...current,
-      roles: [...(current.roles || []), customerRole],
-      activeRoleId: current.activeRoleId || customerRole.id,
-    }));
-  }, [activeTab, safeProjectRoles, updateProject]);
 
   const setThemeMode = (mode) => {
     updateProject((prev) => applyThemeModeToProject(prev, mode));
@@ -3425,6 +3411,12 @@ export default function PageBuilder({
         throw new Error("Publish acknowledgement did not match the routed project");
       }
       const publishedSite = publishResponse?.site || {};
+      if (publishedSite?.published_project_id) {
+        setWebsiteSettings((current) => ({
+          ...(current || {}),
+          published_project_id: publishedSite.published_project_id,
+        }));
+      }
       const resolvedPublicSubdomain = sanitizeSubdomain(
         publishedSite?.subdomain || websiteSettings?.subdomain || publishCandidate?.publish?.subdomain || ""
       );
@@ -3543,6 +3535,24 @@ export default function PageBuilder({
       }
     } finally {
       setIsUnpublishingProject(false);
+    }
+  };
+
+  const makeCurrentProjectLive = async () => {
+    const projectId = builderProjectRecordRef.current?.id;
+    if (!projectId || project.status !== "published" || isBindingPublicProject) return;
+    setIsBindingPublicProject(true);
+    try {
+      const result = await updateBuilderSiteBinding(projectId);
+      setWebsiteSettings((current) => ({
+        ...(current || {}),
+        published_project_id: result?.binding?.project_id || projectId,
+      }));
+      showToast("This project is now live on your public website.");
+    } catch (error) {
+      showToast(error?.message || "The live project could not be changed.");
+    } finally {
+      setIsBindingPublicProject(false);
     }
   };
 
@@ -6031,6 +6041,13 @@ export default function PageBuilder({
       openPublicFormPage={openPublicFormPage}
       onUnpublish={unpublishProject}
       isUnpublishing={isUnpublishingProject}
+      isLiveProject={
+        Boolean(builderProjectRecord?.id) &&
+        String(websiteSettings?.published_project_id || "") ===
+          String(builderProjectRecord?.id || "")
+      }
+      onMakeLive={makeCurrentProjectLive}
+      isMakingLive={isBindingPublicProject}
       lang={lang}
     />
   );

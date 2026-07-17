@@ -216,17 +216,23 @@ def build_cancellation_token(
     return secrets.token_urlsafe(32)
 
 
-def get_latest_published_project_for_tenant(tenant_id: int):
+def get_bound_published_project(settings: dict):
+    tenant_id = resolve_tenant_id(settings)
+    project_id = str(settings.get("published_project_id") or "").strip()
+    if not project_id:
+        raise HTTPException(status_code=404, detail="Published site not found")
+
     project_response = (
         service_supabase.table("builder_projects")
         .select(
             "id, tenant_id, name, slug, status, published_schema, "
-            "published_version, last_published_at, updated_at"
+            "published_version, published_revision, schema_version, "
+            "last_published_at, updated_at"
         )
+        .eq("id", project_id)
         .eq("tenant_id", tenant_id)
         .eq("status", "published")
         .not_.is_("published_schema", "null")
-        .order("last_published_at", desc=True)
         .limit(1)
         .execute()
     )
@@ -237,6 +243,164 @@ def get_latest_published_project_for_tenant(tenant_id: int):
         raise HTTPException(status_code=404, detail="Published site not found")
 
     return project
+
+
+PROTECTED_PAGE_VISIBILITIES = {"private", "authenticated", "members"}
+PUBLIC_RUNTIME_PRIVATE_KEYS = {
+    "activeFormId",
+    "activePageId",
+    "activeRoleId",
+    "activeWorkflowId",
+    "collections",
+    "reservations",
+    "roles",
+    "users",
+    "workflows",
+}
+
+
+def collect_auth_destination_page_ids(value: Any) -> set[str]:
+    destinations: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, dict):
+            if str(item.get("type") or "") == "loginBlock":
+                destination = (item.get("auth") or {}).get("successPageId")
+                if destination:
+                    destinations.add(str(destination))
+            for child in item.values():
+                visit(child)
+        elif isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(value)
+    return destinations
+
+
+def page_access_kind(page: dict, auth_destination_ids: set[str]) -> str:
+    page_id = str(page.get("id") or "")
+    visibility = str(page.get("visibility") or "public").strip().lower()
+    if page_id in auth_destination_ids or visibility in PROTECTED_PAGE_VISIBILITIES:
+        return "member"
+    if visibility in {"", "public"}:
+        return "public"
+    return "unsupported_role"
+
+
+def collect_referenced_form_ids(pages: list[dict]) -> set[str]:
+    form_ids: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, dict):
+            for key in ("connectedFormId", "formId"):
+                value = item.get(key)
+                if value:
+                    form_ids.add(str(value))
+            for child in item.values():
+                visit(child)
+        elif isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(pages)
+    return form_ids
+
+
+def build_authorized_public_schema(
+    schema: dict,
+    *,
+    authorized_page_ids: set[str] | None = None,
+) -> dict:
+    source = copy.deepcopy(schema if isinstance(schema, dict) else {})
+    pages = [page for page in source.get("pages", []) if isinstance(page, dict)]
+    auth_destination_ids = collect_auth_destination_page_ids(pages)
+    allowed_ids = authorized_page_ids or set()
+    visible_pages = [
+        page
+        for page in pages
+        if page_access_kind(page, auth_destination_ids) == "public"
+        or str(page.get("id") or "") in allowed_ids
+    ]
+    source["pages"] = visible_pages
+
+    visible_page_ids = {str(page.get("id") or "") for page in visible_pages}
+    default_page_id = str(source.get("defaultPageId") or "")
+    if default_page_id and default_page_id not in visible_page_ids:
+        source["defaultPageId"] = visible_pages[0].get("id") if visible_pages else None
+
+    referenced_form_ids = collect_referenced_form_ids(visible_pages)
+    source["forms"] = [
+        form
+        for form in source.get("forms", [])
+        if isinstance(form, dict) and str(form.get("id") or "") in referenced_form_ids
+    ]
+    for form in source["forms"]:
+        form.pop("responses", None)
+
+    for key in PUBLIC_RUNTIME_PRIVATE_KEYS:
+        source.pop(key, None)
+    return source
+
+
+def find_published_page(project: dict, page_reference: str) -> tuple[dict, dict, set[str]]:
+    schema = project.get("published_schema")
+    if not isinstance(schema, dict):
+        raise HTTPException(status_code=404, detail="Page not found")
+    pages = [page for page in schema.get("pages", []) if isinstance(page, dict)]
+    normalized_reference = str(page_reference or "").strip().strip("/").lower()
+    page = next(
+        (
+            item
+            for item in pages
+            if str(item.get("id") or "").lower() == normalized_reference
+            or str(item.get("slug") or "").strip().strip("/").lower()
+            == normalized_reference
+        ),
+        None,
+    )
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return schema, page, collect_auth_destination_page_ids(pages)
+
+
+def build_publication_metadata(project: dict, schema: dict) -> dict:
+    canonical_schema = json.dumps(
+        schema,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    schema_hash = hashlib.sha256(canonical_schema.encode("utf-8")).hexdigest()
+    project_id = str(project.get("id") or "")
+    published_version = int(project.get("published_version") or 0)
+    etag = f'"madar-{project_id}-{published_version}-{schema_hash}"'
+    return {
+        "project_id": project_id,
+        "published_version": published_version,
+        "published_at": project.get("last_published_at"),
+        "schema_version": int(
+            project.get("schema_version") or schema.get("schema_version") or 1
+        ),
+        "schema_hash": schema_hash,
+        "etag": etag,
+    }
+
+
+def apply_public_cache_headers(response: Response, metadata: dict, *, private: bool = False) -> None:
+    response.headers["ETag"] = metadata["etag"]
+    response.headers["Cache-Control"] = (
+        "private, no-store" if private else "public, max-age=0, must-revalidate"
+    )
+
+
+def request_etag_matches(request: Request, metadata: dict) -> bool:
+    candidates = {
+        value.strip()
+        for value in str(request.headers.get("if-none-match") or "").split(",")
+        if value.strip()
+    }
+    return metadata["etag"] in candidates or "*" in candidates
 
 
 def get_form_sections(form: dict) -> list[dict]:
@@ -268,31 +432,13 @@ def find_form_in_schema(schema: dict, form_id: str) -> dict:
     raise HTTPException(status_code=404, detail="Form not found")
 
 
-def get_saved_form_for_tenant(tenant_id: int, form_id: str):
-    project_response = (
-        service_supabase.table("builder_projects")
-        .select("id, tenant_id, status, draft_schema, draft_revision, updated_at")
-        .eq("tenant_id", tenant_id)
-        .neq("status", "archived")
-        .not_.is_("draft_schema", "null")
-        .order("updated_at", desc=True)
-        .limit(100)
-        .execute()
-    )
-
-    for project in getattr(project_response, "data", None) or []:
-        draft_schema = project.get("draft_schema")
-        if not isinstance(draft_schema, dict):
-            continue
-        try:
-            form = find_form_in_schema(draft_schema, form_id)
-        except HTTPException as error:
-            if error.status_code == 404:
-                continue
-            raise
-        return project, form, draft_schema
-
-    raise HTTPException(status_code=404, detail="Form not found")
+def get_bound_published_form(settings: dict, form_id: str):
+    project = get_bound_published_project(settings)
+    published_schema = project.get("published_schema")
+    if not isinstance(published_schema, dict):
+        raise HTTPException(status_code=404, detail="Form not found")
+    form = find_form_in_schema(published_schema, form_id)
+    return project, form, published_schema
 
 
 def build_public_site_profile(settings: dict, subdomain: str) -> dict:
@@ -1122,27 +1268,85 @@ def logout_tenant_visitor(subdomain: str, response: Response):
     return {"logged_in": False, "message": "Logged out"}
 
 @router.get("/sites/{subdomain}")
-def get_public_site(subdomain: str, request: Request):
+def get_public_site(subdomain: str, request: Request, response: Response):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
     settings = resolve_website_settings(clean_subdomain)
-    tenant_id = resolve_tenant_id(settings)
-
     try:
-        project = get_latest_published_project_for_tenant(tenant_id)
+        project = get_bound_published_project(settings)
     except HTTPException as error:
         if error.status_code != 404:
             raise
         project = None
 
+    public_schema = (
+        build_authorized_public_schema(project.get("published_schema") or {})
+        if project
+        else None
+    )
+    metadata = build_publication_metadata(project, public_schema) if project else None
+    if metadata:
+        apply_public_cache_headers(response, metadata)
+        if request_etag_matches(request, metadata):
+            return Response(
+                status_code=304,
+                headers={
+                    "ETag": metadata["etag"],
+                    "Cache-Control": "public, max-age=0, must-revalidate",
+                },
+            )
+
     return {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain),
         "project": (
-            {"published_schema": project.get("published_schema") or {}}
+            {
+                "published_schema": public_schema,
+                **metadata,
+            }
             if project
             else None
         ),
+    }
+
+
+@router.get("/sites/{subdomain}/pages/{page_reference:path}")
+def get_member_site_page(
+    subdomain: str,
+    page_reference: str,
+    request: Request,
+    response: Response,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_page_reference = str(page_reference or "").strip()
+    if not clean_page_reference:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    enforce_public_rate_limit(
+        request,
+        "member_page_lookup",
+        f"{clean_subdomain}:{clean_page_reference}",
+    )
+    settings = resolve_website_settings(clean_subdomain)
+    require_tenant_visitor(clean_subdomain, request, response)
+    project = get_bound_published_project(settings)
+    schema, page, auth_destination_ids = find_published_page(project, clean_page_reference)
+    if page_access_kind(page, auth_destination_ids) == "unsupported_role":
+        raise HTTPException(status_code=403, detail="Page access is not configured")
+
+    authorized_schema = build_authorized_public_schema(
+        schema,
+        authorized_page_ids={str(page.get("id") or "")},
+    )
+    metadata = build_publication_metadata(project, authorized_schema)
+    apply_public_cache_headers(response, metadata, private=True)
+    return {
+        "success": True,
+        "site": build_public_site_profile(settings, clean_subdomain),
+        "project": {
+            "published_schema": authorized_schema,
+            **metadata,
+        },
     }
 
 
@@ -1160,15 +1364,14 @@ def get_public_form(subdomain: str, form_id: str, request: Request):
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain)
-    tenant_id = resolve_tenant_id(settings)
-    _, form, draft_schema = get_saved_form_for_tenant(tenant_id, clean_form_id)
+    _, form, published_schema = get_bound_published_form(settings, clean_form_id)
 
     return {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain),
         "form": build_public_form(form),
-        "theme": draft_schema.get("theme") or {},
-        "language": draft_schema.get("language") or draft_schema.get("lang") or "en",
+        "theme": published_schema.get("theme") or {},
+        "language": published_schema.get("language") or published_schema.get("lang") or "en",
     }
 
 
@@ -1198,7 +1401,7 @@ def submit_public_builder_form(
 
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
-    project, form, _ = get_saved_form_for_tenant(tenant_id, clean_form_id)
+    project, form, _ = get_bound_published_form(settings, clean_form_id)
 
     answers = submission.answers or {}
     validate_public_answer_payload_limits(answers)
@@ -1212,7 +1415,7 @@ def submit_public_builder_form(
         "project_id": project.get("id"),
         "form_id": clean_form_id,
         "form_title": form.get("title"),
-        "form_version": project.get("draft_revision"),
+        "form_version": project.get("published_version"),
         "status": "new",
         "answers": cleaned_answers,
         "quiz_result": None,
@@ -1286,7 +1489,7 @@ def submit_public_builder_block_event(
 
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
-    project = get_latest_published_project_for_tenant(tenant_id)
+    project = get_bound_published_project(settings)
 
     if project.get("status") != "published":
         raise HTTPException(status_code=404, detail="Published site not found")

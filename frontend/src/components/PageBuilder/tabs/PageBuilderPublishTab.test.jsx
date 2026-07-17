@@ -67,6 +67,33 @@ describe("PageBuilderPublishTab", () => {
     expect(screen.queryByRole("button", { name: /publish site|go live/i })).toBeNull();
   });
 
+  it("offers an explicit live-project switch for a published non-live project", () => {
+    const onMakeLive = vi.fn();
+    render(
+      <PageBuilderPublishTab
+        project={project}
+        isLiveProject={false}
+        onMakeLive={onMakeLive}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Make this the live project" })
+    );
+    expect(onMakeLive).toHaveBeenCalledOnce();
+  });
+
+  it("identifies the project currently bound to the public website", () => {
+    render(<PageBuilderPublishTab project={project} isLiveProject />);
+
+    expect(screen.getByRole("status").textContent).toContain(
+      "currently shown on your public website"
+    );
+    expect(
+      screen.queryByRole("button", { name: "Make this the live project" })
+    ).toBeNull();
+  });
+
   it("uses the production tenant URL for the published form link", () => {
     render(<PageBuilderPublishTab project={projectWithForm} />);
 

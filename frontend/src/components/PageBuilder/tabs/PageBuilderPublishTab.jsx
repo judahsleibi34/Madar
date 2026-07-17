@@ -45,6 +45,9 @@ export default function PageBuilderPublishTab({
   openPublicFormPage,
   onUnpublish,
   isUnpublishing = false,
+  isLiveProject = false,
+  onMakeLive,
+  isMakingLive = false,
   lang = "en",
 }) {
   const [publicQrVersion, setPublicQrVersion] = useState(1);
@@ -162,6 +165,21 @@ export default function PageBuilderPublishTab({
             >
               {isUnpublishing ? content.unpublishingSite : content.unpublishSite}
             </button>
+          )}
+          {isPublished && !isLiveProject && onMakeLive && (
+            <button
+              type="button"
+              className="primary-action"
+              disabled={isMakingLive}
+              onClick={onMakeLive}
+            >
+              {isMakingLive ? "Making live…" : "Make this the live project"}
+            </button>
+          )}
+          {isPublished && isLiveProject && (
+            <p className="publish-card-note" role="status">
+              This is the project currently shown on your public website.
+            </p>
           )}
         </section>
 

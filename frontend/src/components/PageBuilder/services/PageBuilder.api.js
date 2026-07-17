@@ -98,14 +98,27 @@ export const mapBackendUserToBuilderUser = (backendUser, roleId = "") => ({
   authId: backendUser?.auth_id || backendUser?.authId || "",
 });
 
-export const listBuilderProjects = async () => {
-  const response = await apiFetch(getApiUrl("/builder/projects"), {
+export const listBuilderProjects = async ({ limit = 20, offset = 0 } = {}) => {
+  const query = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  const response = await apiFetch(getApiUrl(`/builder/projects?${query}`), {
     method: "GET",
     cache: "no-store",
   });
 
   const data = await parseJsonResponse(response);
-  return data?.projects || [];
+  const projects = Array.isArray(data?.projects) ? data.projects : [];
+  return {
+    projects,
+    pagination: {
+      limit: Number(data?.pagination?.limit ?? limit),
+      offset: Number(data?.pagination?.offset ?? offset),
+      count: Number(data?.pagination?.count ?? projects.length),
+      has_more: Boolean(data?.pagination?.has_more),
+    },
+  };
 };
 
 export const fetchBuilderProject = async (projectId) => {
@@ -213,6 +226,15 @@ export const unpublishBuilderProject = async (projectId, expectedRevision = null
     ),
   });
 
+  return parseJsonResponse(response);
+};
+
+export const updateBuilderSiteBinding = async (projectId) => {
+  const response = await apiFetch(getApiUrl("/builder/site-binding"), {
+    method: "PUT",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify({ project_id: projectId }),
+  });
   return parseJsonResponse(response);
 };
 
@@ -362,6 +384,20 @@ export const fetchPublicSite = async (subdomain) => {
 
   const data = await parseJsonResponse(response);
   return data || null;
+};
+
+export const fetchProtectedSitePage = async (subdomain, pageReference) => {
+  const normalizedReference = String(pageReference || "").replace(/^\/+/, "");
+  const response = await apiFetch(
+    getApiUrl(
+      `/public/sites/${subdomain}/pages/${encodeURIComponent(normalizedReference)}`
+    ),
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
+  return parseJsonResponse(response);
 };
 
 export const fetchPublicForm = async (subdomain, formId) => {

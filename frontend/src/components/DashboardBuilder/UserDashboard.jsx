@@ -287,8 +287,8 @@ export default function UserDashboard({ user }) {
   useEffect(() => {
     let cancelled = false;
 
-    listBuilderProjects()
-      .then((records) => {
+    listBuilderProjects({ limit: 100 })
+      .then(({ projects: records }) => {
         if (cancelled) return;
         const projects = records.map(parseProjectSchema).filter(Boolean);
         const localProject = getLocalProject();

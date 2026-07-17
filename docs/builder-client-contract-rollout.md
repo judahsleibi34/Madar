@@ -7,9 +7,24 @@ Missing headers are temporarily accepted while `ENFORCE_BUILDER_CLIENT_CONTRACT=
 ## Safe deployment order
 
 1. Deploy the backend with `cloud-draft-v1` support and enforcement disabled.
-2. Deploy the frontend that sends the header on create, update, publish, and unpublish requests.
+2. Deploy the frontend that sends the header on create, update, publish,
+   unpublish, and live-project binding requests.
 3. Verify successful current-client writes and confirm legacy project-less routes redirect to the chooser or an explicit project URL.
 4. Set `ENFORCE_BUILDER_CLIENT_CONTRACT=true` on the backend and restart only through the normal production deployment process.
 5. Verify a missing or obsolete contract receives HTTP 409 with code `builder_client_upgrade_required`, while reads and published public sites remain available.
 
 Do not enable enforcement before the compatible frontend is deployed. Do not leave enforcement disabled after the rollout window, because headerless browser-first clients could otherwise continue writing stale drafts.
+
+## Canonical mutation routes
+
+The contract applies to these browser mutation routes:
+
+- `POST /builder/projects`
+- `PUT /builder/projects/{project_id}`
+- `DELETE /builder/projects/{project_id}` (no current canonical UI caller)
+- `POST /builder/projects/{project_id}/publish`
+- `POST /builder/projects/{project_id}/unpublish`
+- `PUT /builder/site-binding`
+
+Public form, reservation, site-login, and protected-page reads are not builder
+client mutations and must not require this header.

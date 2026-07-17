@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import PageBuilderUsersTab from "./PageBuilderUsersTab";
 
@@ -52,13 +52,16 @@ const renderUsersTab = (overrides = {}) => {
   return props;
 };
 
+afterEach(cleanup);
+
 describe("PageBuilderUsersTab", () => {
   it("shows registered subdomain users and their source", () => {
     renderUsersTab();
     expect(screen.getByText("Registered Person")).toBeTruthy();
     expect(screen.getByText("registered@example.com")).toBeTruthy();
     expect(screen.getByText("Registered on site")).toBeTruthy();
-    expect(screen.getByText("Customer")).toBeTruthy();
+    const usersPanel = screen.getByRole("heading", { name: "Subdomain users" }).closest("section");
+    expect(within(usersPanel).getByText("Customer")).toBeTruthy();
   });
 
   it("creates an admin user through the server-backed callback", async () => {
@@ -71,7 +74,7 @@ describe("PageBuilderUsersTab", () => {
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "created@example.com" },
     });
-    fireEvent.change(screen.getByLabelText("Temporary password"), {
+    fireEvent.change(screen.getByLabelText(/^Temporary password/), {
       target: { value: "safe-password-123" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create user" }));

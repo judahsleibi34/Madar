@@ -92,6 +92,23 @@ def builder_schema_with_element(element):
 
 
 class BuilderBackendHardeningTests(unittest.TestCase):
+    def test_publish_validation_preserves_nested_page_routes(self):
+        schema, _ = builder_routes.validate_publish_schema({
+            "defaultPageId": "home",
+            "pages": [
+                {"id": "home", "name": "Home", "slug": "/", "sections": []},
+                {
+                    "id": "team",
+                    "name": "Team",
+                    "slug": "/about/team",
+                    "sections": [],
+                },
+            ],
+            "forms": [],
+        })
+
+        self.assertEqual(schema["pages"][1]["slug"], "/about/team")
+
     def test_publish_accepts_no_body(self):
         fake_supabase = FakeSupabase()
         client = build_client(fake_supabase)
@@ -437,7 +454,14 @@ class BuilderBackendHardeningTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["site"], {"subdomain": "tenant-site", "tenant_id": 1})
+        self.assertEqual(
+            body["site"],
+            {
+                "subdomain": "tenant-site",
+                "tenant_id": 1,
+                "published_project_id": None,
+            },
+        )
         self.assertEqual(
             body["project"]["published_schema"],
             {
@@ -577,6 +601,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                      "status": "published",
                  },
              ), \
+             patch.object(builder_routes, "get_website_settings_record", return_value=None), \
              patch.object(builder_routes, "record_audit_event") as record_audit:
             response = client.delete("/builder/projects/project-1")
 

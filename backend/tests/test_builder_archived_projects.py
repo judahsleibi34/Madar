@@ -117,7 +117,13 @@ class FakeSupabase:
     def __init__(self):
         self.tables = {
             "website_settings": [
-                {"id": 1, "tenant_id": 1, "user_id": 2, "subdomain": "tenant-site"}
+                {
+                    "id": 1,
+                    "tenant_id": 1,
+                    "user_id": 2,
+                    "subdomain": "tenant-site",
+                    "published_project_id": "project-1",
+                }
             ],
             "builder_projects": [
                 {
@@ -458,10 +464,13 @@ class PublicSiteContractTests(unittest.TestCase):
             response = client.get("/public/sites/tenant-site")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["project"], {"published_schema": published_schema})
+        self.assertEqual(
+            response.json()["project"]["published_schema"],
+            public_site_routes.build_authorized_public_schema(published_schema),
+        )
         self.assertNotIn("draft_schema", response.json()["project"])
 
-    def test_public_site_returns_latest_published_project_and_hides_draft_schema(self):
+    def test_public_site_returns_bound_published_project_and_hides_draft_schema(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"] = [
             {
@@ -489,6 +498,7 @@ class PublicSiteContractTests(unittest.TestCase):
                 "updated_at": "2026-06-02T10:00:00+00:00",
             },
         ]
+        fake_supabase.tables["website_settings"][0]["published_project_id"] = "project-new"
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
@@ -497,10 +507,11 @@ class PublicSiteContractTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(set(body["project"].keys()), {"published_schema"})
+        self.assertEqual(body["project"]["project_id"], "project-new")
+        self.assertEqual(body["project"]["published_version"], 2)
         self.assertEqual(
             body["project"]["published_schema"],
-            {"pages": [{"id": "published-new"}]},
+            {"pages": [{"id": "published-new"}], "forms": []},
         )
         self.assertNotIn("draft_schema", body["project"])
 
@@ -541,6 +552,7 @@ class PublicSiteContractTests(unittest.TestCase):
                 "updated_at": "2026-06-03T13:00:00+00:00",
             }
         ]
+        fake_supabase.tables["website_settings"][0]["published_project_id"] = "project-live"
         client = build_public_client(fake_supabase)
         publish_client = build_builder_client(fake_supabase)
 
@@ -584,7 +596,8 @@ class PublicSiteContractTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(set(body["project"].keys()), {"published_schema"})
+        self.assertEqual(body["project"]["project_id"], "project-live")
+        self.assertEqual(body["project"]["published_version"], 6)
         self.assertEqual(len(body["project"]["published_schema"]["pages"]), 6)
         self.assertIn("FINAL PUBLISH TEST 003", str(body["project"]["published_schema"]))
         self.assertNotIn("draft_schema", body["project"])
