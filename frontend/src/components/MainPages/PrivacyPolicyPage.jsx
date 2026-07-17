@@ -7,6 +7,7 @@ export default function PrivacyPolicyPage({ lang = "en" }) {
 
   return (
     <main
+      id="privacy"
       className="privacy-policy-page"
       dir={currentLang === "ar" ? "rtl" : "ltr"}
       lang={currentLang}

@@ -1,11 +1,12 @@
 import { StrictMode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildProfilePayload } from "./profilePayload";
 import SettingsPage from "./SettingsPage";
 import { apiFetch } from "../../utils/apiClient";
+import { getBuilderStorageKey } from "../PageBuilder/core/PageBuilder.constants";
 
 vi.mock("../../utils/apiClient", () => ({ apiFetch: vi.fn() }));
 vi.mock("../PageBuilder/services/PageBuilder.api", () => ({ uploadBuilderAsset: vi.fn() }));
@@ -77,4 +78,59 @@ describe("SettingsPage canonical email handling", () => {
     expect(apiFetch.mock.calls.filter(([, options]) => options?.method === "PUT")).toHaveLength(1);
     expect(apiFetch.mock.calls.filter(([url]) => String(url).endsWith("/info"))).toHaveLength(1);
   });
+
+  it("does not merge another account's cached website details into backend settings", async () => {
+    const currentUser = {
+      id: 22,
+      tenant_id: 9,
+      first_name: "Judah",
+      last_name: "Sleibi",
+      email: "judah@example.com",
+    };
+    localStorage.setItem(
+      "madar_app_builder_frontend_v4",
+      JSON.stringify({
+        siteChrome: {
+          brand: "Other tenant brand",
+          contactEmail: "other@example.com",
+        },
+      })
+    );
+    localStorage.setItem(
+      getBuilderStorageKey(currentUser.id),
+      JSON.stringify({
+        ...JSON.parse(localStorage.getItem("madar_app_builder_frontend_v4")),
+        publish: { subdomain: "other-tenant" },
+      })
+    );
+    apiFetch.mockImplementation((url) => {
+      if (String(url).includes("/website/settings")) {
+        return Promise.resolve(response({
+          website: {
+            tenant_id: 9,
+            subdomain: "jus",
+            brand: "",
+            contact_email: "",
+          },
+        }));
+      }
+      return Promise.resolve(response({ user: currentUser }));
+    });
+
+    render(
+      <MemoryRouter>
+        <SettingsPage user={currentUser} onUserUpdated={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByLabelText(/subdomain name/i).value).toBe("jus"));
+    expect(screen.getByLabelText(/brand name/i).value).toBe("");
+    expect(screen.getByLabelText(/contact email/i).value).toBe("");
+    expect(screen.queryByDisplayValue("Other tenant brand")).toBeNull();
+    expect(screen.queryByDisplayValue("other@example.com")).toBeNull();
+  });
+});
+
+afterEach(() => {
+  cleanup();
 });

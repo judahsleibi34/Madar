@@ -270,6 +270,7 @@
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
+  justify-content: flex-start !important;
   gap: 9px !important;
   min-height: 32px !important;
   padding: 2px 0 !important;
@@ -279,12 +280,24 @@
   cursor: pointer !important;
 }
 
-.page-builder .builder-inspector .inspector-toggle-row input[type="checkbox"] {
+.page-builder
+  .builder-inspector
+  .inspector-toggle-row
+  :is(input[type="checkbox"], input[type="radio"]) {
   flex: 0 0 17px !important;
   width: 17px !important;
   height: 17px !important;
+  min-width: 17px !important;
+  min-height: 17px !important;
+  padding: 0 !important;
   margin: 0 !important;
   accent-color: var(--pb-accent) !important;
+}
+
+.page-builder .builder-inspector .inspector-toggle-row > span {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: start !important;
 }
 
 .page-builder .builder-inspector :is(.auth-workflow-settings, .carousel-timing-controls, .row-editor-card, .metric-editor-item, .list-editor-item, .option-editor-stack) {

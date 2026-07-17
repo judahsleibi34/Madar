@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getBuilderStorageKey, defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
+  fetchPublicForm,
   fetchPublicSite,
   getTenantVisitorStatus,
   loginTenantVisitor,
@@ -440,6 +441,14 @@ const getSectionCanvasHeight = (section, viewportName) =>
   Number(section?.layout?.minHeight) ||
   560;
 
+const decodePathSegment = (value) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return "";
+  }
+};
+
 export default function TenantSiteRuntime({ draftPreview = false, user = null } = {}) {
   const params = useParams();
   const { subdomain = "my-site" } = params;
@@ -450,6 +459,23 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
   const isPublicRuntime = !draftPreview;
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
   const storageKey = getBuilderStorageKey(user?.id);
+  const activePath = location.pathname;
+  const previewBasePath = "/page-builder/preview";
+  const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
+  const directStandaloneFormId = params.formId
+    ? decodePathSegment(params.formId)
+    : "";
+  const routePagePath = directStandaloneFormId
+    ? `/forms/${params.formId}`
+    : draftPreview
+    ? location.pathname.slice(previewBasePath.length)
+    : `/${params["*"] || ""}`;
+  const standaloneFormMatch = !draftPreview
+    ? routePagePath.match(/^\/forms\/([^/]+)\/?$/)
+    : null;
+  const standaloneFormId = directStandaloneFormId || (standaloneFormMatch
+    ? decodePathSegment(standaloneFormMatch[1])
+    : "");
   const [project, setProject] = useState(() => (draftPreview ? loadDraftPreviewProject(storageKey) : null));
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState(() => (draftPreview ? "ready" : "loading"));
@@ -603,14 +629,36 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     setPublicSiteProfile(null);
     setPublicSiteState("loading");
 
-    const loadBackendPublishedSite = async () => {
+    const loadBackendPublicContent = async () => {
       try {
-        const publicSite = await fetchPublicSite(cleanSubdomain);
-        const publishedProject = publicSite?.project?.published_schema;
+        const publicContent = standaloneFormId
+          ? await fetchPublicForm(cleanSubdomain, standaloneFormId)
+          : await fetchPublicSite(cleanSubdomain);
 
         if (cancelled) return;
 
-        setPublicSiteProfile(publicSite?.site || null);
+        setPublicSiteProfile(publicContent?.site || null);
+
+        if (standaloneFormId) {
+          if (publicContent?.form && typeof publicContent.form === "object") {
+            setProject({
+              forms: [publicContent.form],
+              pages: [],
+              theme: publicContent.theme || {},
+              language: publicContent.language || "en",
+              siteChrome: {},
+              activeFormId: publicContent.form.id,
+            });
+            setPublicSiteState("ready");
+            return;
+          }
+
+          setProject(null);
+          setPublicSiteState("unavailable");
+          return;
+        }
+
+        const publishedProject = publicContent?.project?.published_schema;
 
         if (publishedProject && typeof publishedProject === "object") {
           setProject(publishedProject);
@@ -630,12 +678,12 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
       }
     };
 
-    loadBackendPublishedSite();
+    loadBackendPublicContent();
 
     return () => {
       cancelled = true;
     };
-  }, [cleanSubdomain, draftPreview, storageKey]);
+  }, [cleanSubdomain, draftPreview, standaloneFormId, storageKey]);
   const site = {
     ...defaultSiteChrome,
     ...(publicSiteProfile
@@ -669,12 +717,6 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     () => (project?.pages || []),
     [project?.pages]
   );
-  const activePath = location.pathname;
-  const previewBasePath = "/page-builder/preview";
-  const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
-  const routePagePath = draftPreview
-    ? location.pathname.slice(previewBasePath.length)
-    : `/${params["*"] || ""}`;
   const pagePath = routePagePath && routePagePath !== "/" ? routePagePath : "/";
   const normalizedPagePath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
   const defaultPage = useMemo(
@@ -1730,7 +1772,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     <main className="tenant-runtime-main">
       <section className={`tenant-runtime-card tenant-runtime-status-${state}`}>
         {state === "loading" && <span className="tenant-runtime-loader" aria-hidden="true" />}
-        <p className="tenant-eyebrow">{cleanSubdomain}.madar.app</p>
+        <p className="tenant-eyebrow">madarportal.com/site/{cleanSubdomain}</p>
         <h1>{title}</h1>
         <p>{body}</p>
         {state === "unavailable" && (
@@ -1752,9 +1794,38 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
     }
 
     if (!project) {
+      if (standaloneFormId) {
+        return renderUnavailableState(
+          "Form not found",
+          "This saved form is unavailable. Check the form link and try again."
+        );
+      }
+
       return renderUnavailableState(
         runtimeCopy.runtime.noPublishedTitle,
         runtimeCopy.runtime.noPublishedBody
+      );
+    }
+
+    if (standaloneFormId) {
+      const publishedForm = project.forms?.find(
+        (form) => String(form.id) === String(standaloneFormId)
+      );
+
+      if (!publishedForm) {
+        return renderUnavailableState(
+          "Form not found",
+          "This saved form is unavailable. Check the form link and try again.",
+          "not-found"
+        );
+      }
+
+      return (
+        <main className="tenant-runtime-page tenant-runtime-form-page" data-form-id={publishedForm.id}>
+          <section className="tenant-runtime-standalone-form">
+            {renderConnectedForm(publishedForm.id, "published-form-link")}
+          </section>
+        </main>
       );
     }
 
@@ -1971,7 +2042,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
 
   return (
     <div
-      className={`tenant-site-runtime ${draftPreview ? "tenant-site-draft-preview" : ""}`}
+      className={`tenant-site-runtime ${draftPreview ? "tenant-site-draft-preview" : ""} ${standaloneFormId ? "tenant-site-standalone-form" : ""}`}
       style={getPageBuilderThemeVars(project?.theme)}
     >
       {draftPreview && (
@@ -1982,7 +2053,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
           </button>
         </div>
       )}
-      {(draftPreview || isPublicRuntime) && renderHeader()}
+      {!standaloneFormId && (draftPreview || isPublicRuntime) && renderHeader()}
       {renderMainContent()}
       {publicActionMessage && (
         <div className="tenant-runtime-action-message" role="status" aria-live="polite">
@@ -1990,7 +2061,7 @@ export default function TenantSiteRuntime({ draftPreview = false, user = null } 
           <button type="button" onClick={() => setPublicActionMessage("")} aria-label="Dismiss message">×</button>
         </div>
       )}
-      {(draftPreview || isPublicRuntime) && renderFooter()}
+      {!standaloneFormId && (draftPreview || isPublicRuntime) && renderFooter()}
     </div>
   );
 }

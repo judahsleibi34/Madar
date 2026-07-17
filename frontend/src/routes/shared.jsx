@@ -547,8 +547,10 @@ export function DashboardShell({
   themeMode,
   user,
 }) {
-  const activeLang = shellLang || lang;
-  const isShellRtl = activeLang === "ar";
+  const navigationLang = lang || shellLang;
+  const contentLang = shellLang || lang;
+  const isShellRtl = navigationLang === "ar";
+  const isContentRtl = contentLang === "ar";
   const useCompactBuilderSidebar = isPageBuilderShell || compactSidebar;
 
   const shellRef = useAuthenticatedReferenceScale();
@@ -557,6 +559,7 @@ export function DashboardShell({
       ref={shellRef}
       className={[
         "admin-dashboard-layout",
+        "authenticated-shell",
         useCompactBuilderSidebar ? "admin-dashboard-layout-builder" : "",
         isShellRtl ? "is-rtl" : "is-ltr",
         open ? "sidebar-open" : "",
@@ -585,7 +588,7 @@ export function DashboardShell({
 
       <DashboardSidebar
         id="dashboard-sidebar"
-        lang={activeLang}
+        lang={navigationLang}
         user={user}
         onLogout={onLogout}
         onLanguageChange={hideLanguage ? undefined : onLanguageChange}
@@ -600,11 +603,12 @@ export function DashboardShell({
       <main
         className={[
           "admin-dashboard-page",
+          "authenticated-main",
           isPageBuilderShell ? "page-builder-dashboard-page" : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        dir={isShellRtl ? "rtl" : "ltr"}
+        dir={isContentRtl ? "rtl" : "ltr"}
       >
         {children}
       </main>

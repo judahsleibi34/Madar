@@ -1,5 +1,6 @@
 import logging
 import base64
+import copy
 import hashlib
 import hmac
 import json
@@ -254,8 +255,8 @@ def get_form_fields(form: dict) -> list[dict]:
     return fields
 
 
-def find_published_form(published_schema: dict, form_id: str) -> dict:
-    forms = published_schema.get("forms")
+def find_form_in_schema(schema: dict, form_id: str) -> dict:
+    forms = schema.get("forms")
 
     if not isinstance(forms, list):
         raise HTTPException(status_code=404, detail="Form not found")
@@ -265,6 +266,52 @@ def find_published_form(published_schema: dict, form_id: str) -> dict:
             return form
 
     raise HTTPException(status_code=404, detail="Form not found")
+
+
+def get_saved_form_for_tenant(tenant_id: int, form_id: str):
+    project_response = (
+        service_supabase.table("builder_projects")
+        .select("id, tenant_id, status, draft_schema, draft_revision, updated_at")
+        .eq("tenant_id", tenant_id)
+        .neq("status", "archived")
+        .not_.is_("draft_schema", "null")
+        .order("updated_at", desc=True)
+        .limit(100)
+        .execute()
+    )
+
+    for project in getattr(project_response, "data", None) or []:
+        draft_schema = project.get("draft_schema")
+        if not isinstance(draft_schema, dict):
+            continue
+        try:
+            form = find_form_in_schema(draft_schema, form_id)
+        except HTTPException as error:
+            if error.status_code == 404:
+                continue
+            raise
+        return project, form, draft_schema
+
+    raise HTTPException(status_code=404, detail="Form not found")
+
+
+def build_public_site_profile(settings: dict, subdomain: str) -> dict:
+    return {
+        "subdomain": subdomain,
+        "brand": settings.get("brand"),
+        "footer_store_name": settings.get("footer_store_name"),
+        "logo_url": settings.get("logo_url"),
+        "contact_email": settings.get("contact_email"),
+        "phone": settings.get("phone"),
+        "description": settings.get("description"),
+    }
+
+
+def build_public_form(form: dict) -> dict:
+    public_form = dict(form)
+    public_form.pop("responses", None)
+    public_form.pop("submissions", None)
+    return public_form
 
 
 def iter_section_elements(section: dict):
@@ -1090,20 +1137,38 @@ def get_public_site(subdomain: str, request: Request):
 
     return {
         "success": True,
-        "site": {
-            "subdomain": clean_subdomain,
-            "brand": settings.get("brand"),
-            "footer_store_name": settings.get("footer_store_name"),
-            "logo_url": settings.get("logo_url"),
-            "contact_email": settings.get("contact_email"),
-            "phone": settings.get("phone"),
-            "description": settings.get("description"),
-        },
+        "site": build_public_site_profile(settings, clean_subdomain),
         "project": (
             {"published_schema": project.get("published_schema") or {}}
             if project
             else None
         ),
+    }
+
+
+@router.get("/sites/{subdomain}/forms/{form_id}")
+def get_public_form(subdomain: str, form_id: str, request: Request):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_form_id = (form_id or "").strip()
+
+    if not clean_form_id:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    enforce_public_rate_limit(
+        request,
+        "form_lookup",
+        f"{clean_subdomain}:{clean_form_id}",
+    )
+    settings = resolve_website_settings(clean_subdomain)
+    tenant_id = resolve_tenant_id(settings)
+    _, form, draft_schema = get_saved_form_for_tenant(tenant_id, clean_form_id)
+
+    return {
+        "success": True,
+        "site": build_public_site_profile(settings, clean_subdomain),
+        "form": build_public_form(form),
+        "theme": draft_schema.get("theme") or {},
+        "language": draft_schema.get("language") or draft_schema.get("lang") or "en",
     }
 
 
@@ -1133,25 +1198,12 @@ def submit_public_builder_form(
 
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
-    project = get_latest_published_project_for_tenant(tenant_id)
-
-    if project.get("status") != "published":
-        raise HTTPException(status_code=404, detail="Published site not found")
-
-    published_schema = project.get("published_schema") or {}
-
-    if not isinstance(published_schema, dict):
-        raise HTTPException(status_code=404, detail="Published site not found")
-
-    form = find_published_form(published_schema, clean_form_id)
-
-    if not published_page_contains_form_block(published_schema, clean_form_id):
-        raise HTTPException(status_code=404, detail="Form not found")
+    project, form, _ = get_saved_form_for_tenant(tenant_id, clean_form_id)
 
     answers = submission.answers or {}
     validate_public_answer_payload_limits(answers)
     cleaned_answers = validate_form_answers(form, answers)
-    fields = get_form_fields(form)
+    fields = copy.deepcopy(get_form_fields(form))
     submitter_ip = get_client_ip(request)
     user_agent = request.headers.get("user-agent", "")[:1000]
 
@@ -1160,7 +1212,7 @@ def submit_public_builder_form(
         "project_id": project.get("id"),
         "form_id": clean_form_id,
         "form_title": form.get("title"),
-        "form_version": project.get("published_version"),
+        "form_version": project.get("draft_revision"),
         "status": "new",
         "answers": cleaned_answers,
         "quiz_result": None,

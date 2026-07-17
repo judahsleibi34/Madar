@@ -34,7 +34,7 @@ export default function TeamPage({ lang = "en" }) {
   const t = getTeamContent(lang);
 
   return (
-    <main className="team-page">
+    <main id="team" className="team-page">
       <FadeIn>
         <section className="team-hero">
           <h1><GradientText pauseOnHover>{t.title}</GradientText></h1>

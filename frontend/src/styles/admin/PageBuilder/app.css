@@ -302,7 +302,7 @@
   background: var(--madar-surface-soft);
 }
 
-.inspector-toggle-row input[type="checkbox"] {
+.inspector-toggle-row :is(input[type="checkbox"], input[type="radio"]) {
   flex: 0 0 17px;
   width: 17px !important;
   height: 17px !important;
@@ -312,8 +312,10 @@
 }
 
 .inspector-toggle-row span {
+  flex: 1 1 auto;
   min-width: 0;
   color: var(--madar-text);
+  text-align: start;
 }
 
 .auth-workflow-settings {

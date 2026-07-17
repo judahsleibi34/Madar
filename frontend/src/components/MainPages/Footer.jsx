@@ -11,7 +11,6 @@ import {
 const publicFooterNavItems = [
   ...footerNavigationItems,
   { id: "privacy", labelKey: "privacy", path: "/privacy-policy" },
-  { id: "terms", labelKey: "terms", path: "/terms-and-conditions" },
 ];
 
 export default function Footer({ lang = "en" }) {

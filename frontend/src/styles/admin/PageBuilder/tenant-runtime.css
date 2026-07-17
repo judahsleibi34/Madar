@@ -75,6 +75,26 @@
   align-self: stretch;
 }
 
+.tenant-runtime-form-page {
+  display: grid;
+  min-height: clamp(520px, 70dvh, 900px);
+  padding-block: clamp(32px, 6vw, 80px);
+  padding-inline: clamp(16px, 4vw, 48px);
+  background: var(--form-theme-bg);
+}
+
+.tenant-runtime-standalone-form {
+  width: min(760px, 100%);
+  min-width: 0;
+  height: fit-content;
+  margin-inline: auto;
+  border: 1px solid var(--form-theme-border);
+  border-radius: var(--form-theme-radius);
+  padding: clamp(18px, 4vw, 36px);
+  background: var(--form-theme-surface);
+  box-shadow: 0 18px 48px rgba(var(--theme-shadow-rgb), 0.1);
+}
+
 /* Runtime forms are content, not fixed-size canvas artwork. Let their real
    height participate in page layout so a long or multi-page form always
    pushes the footer below its final field and actions. */

@@ -8,6 +8,7 @@ export default function TermsAndConditionsPage({ lang = "en" }) {
 
   return (
     <main
+      id="terms"
       className="privacy-policy-page terms-and-conditions-page"
       dir={currentLang === "ar" ? "rtl" : "ltr"}
       lang={currentLang}

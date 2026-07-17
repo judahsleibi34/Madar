@@ -9,6 +9,16 @@ const project = {
   forms: [],
 };
 
+const projectWithForm = {
+  ...project,
+  publish: {
+    subdomain: "disco2",
+    siteBaseDomain: "madarportal.com",
+  },
+  forms: [{ id: "form-1", title: "Contact us" }],
+  activeFormId: "form-1",
+};
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -23,7 +33,7 @@ describe("PageBuilderPublishTab", () => {
       />
     );
 
-    expect(screen.getByDisplayValue("http://localhost:3000/site/disco2/")).toBeTruthy();
+    expect(screen.getByDisplayValue("https://madarportal.com/site/disco2/")).toBeTruthy();
     expect(screen.queryByDisplayValue(/project_/)).toBeNull();
   });
 
@@ -39,7 +49,7 @@ describe("PageBuilderPublishTab", () => {
       />
     );
 
-    expect(screen.getByDisplayValue("http://localhost:3000/site/disco2/")).toBeTruthy();
+    expect(screen.getByDisplayValue("https://madarportal.com/site/disco2/")).toBeTruthy();
     expect(screen.queryByDisplayValue(/project_/)).toBeNull();
   });
 
@@ -55,6 +65,55 @@ describe("PageBuilderPublishTab", () => {
     render(<PageBuilderPublishTab project={project} liveSitePath="/site/disco2/" />);
 
     expect(screen.queryByRole("button", { name: /publish site|go live/i })).toBeNull();
+  });
+
+  it("uses the production tenant URL for the published form link", () => {
+    render(<PageBuilderPublishTab project={projectWithForm} />);
+
+    expect(
+      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
+    ).toBeTruthy();
+    expect(screen.queryByDisplayValue(/page-builder\/form-preview/)).toBeNull();
+  });
+
+  it("does not offer a local form link before a subdomain is configured", () => {
+    render(
+      <PageBuilderPublishTab
+        project={{ ...projectWithForm, publish: {} }}
+      />
+    );
+
+    expect(
+      screen.getByPlaceholderText("Configure a workspace address before sharing the live form.")
+    ).toBeTruthy();
+  });
+
+  it("generates a public form URL for a saved draft independently of site publication", () => {
+    render(
+      <PageBuilderPublishTab
+        project={{ ...projectWithForm, status: "draft" }}
+        hasConfiguredSubdomain
+      />
+    );
+
+    expect(
+      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
+    ).toBeTruthy();
+  });
+
+  it("opens the saved public-form runtime from Preview form", () => {
+    const openPublicFormPage = vi.fn();
+
+    render(
+      <PageBuilderPublishTab
+        project={projectWithForm}
+        openPublicFormPage={openPublicFormPage}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /preview form/i }));
+
+    expect(openPublicFormPage).toHaveBeenCalledWith("form-1");
   });
 
   it("preview site persists the project before opening", () => {

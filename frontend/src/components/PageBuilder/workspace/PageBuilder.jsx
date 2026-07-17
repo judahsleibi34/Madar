@@ -64,6 +64,7 @@ import {
 } from "../core/PageBuilder.starters";
 import {
   collectPublicPageRoutingIssues,
+  getStandaloneFormPath,
   normalizeProjectPageRouting,
   sanitizeSubdomain,
   setProjectDefaultPage,
@@ -1072,6 +1073,12 @@ export default function PageBuilder({
     window.open(`/page-builder/form-preview/${formId}`, "_blank", "noopener,noreferrer");
   };
 
+  const openPublicFormPage = (formId = activeForm?.id) => {
+    if (!formId) return;
+    const publicFormPath = getStandaloneFormPath(project, formId);
+    window.open(publicFormPath, "_blank", "noopener,noreferrer");
+  };
+
   const selectedSection = useMemo(() => {
     if (selected.type !== "section") return null;
 
@@ -1311,7 +1318,7 @@ export default function PageBuilder({
       pages: [...prev.pages, page],
       activePageId: page.id,
     }));
-    setSelected({ type: "section", id: canvasSection.id });
+    setSelected({ type: "page", id: page.id });
   };
 
   const duplicatePage = () => {
@@ -2027,7 +2034,12 @@ export default function PageBuilder({
       silent: Boolean(options.silent),
     }), [demoMode, scopedStorageKey, showToast]);
 
-  const saveSingleProjectRevision = useCallback(async ({ nextProject, silent, repairs = [] }) => {
+  const saveSingleProjectRevision = useCallback(async ({
+    nextProject,
+    silent,
+    repairs = [],
+    successMessage = "",
+  }) => {
     const urlErrors = collectBuilderUrlErrors(nextProject);
     if (urlErrors.length > 0) {
       if (!silent) showToast(urlErrors[0]);
@@ -2035,7 +2047,7 @@ export default function PageBuilder({
     }
 
     if (demoMode) {
-      persistProject(nextProject, "Changes saved for this preview.", { silent });
+      persistProject(nextProject, successMessage || "Changes saved for this preview.", { silent });
       return true;
     }
     if (builderProjectLoading) {
@@ -2068,7 +2080,7 @@ export default function PageBuilder({
       if (!silent) {
         showToast(repairs.length > 0
           ? "Duplicate internal IDs were repaired and your changes are saved."
-          : "Your changes are saved.");
+          : successMessage || "Your changes are saved.");
       }
       return true;
     } catch (error) {
@@ -2094,7 +2106,11 @@ export default function PageBuilder({
     }
   }, [builderProjectLoading, demoMode, persistProject, persistProjectNow, showToast, userId]);
 
-  const saveProject = useCallback(({ silent = false, projectOverride = null } = {}) => {
+  const saveProject = useCallback(({
+    silent = false,
+    projectOverride = null,
+    successMessage = "",
+  } = {}) => {
     if (hasProtectedUnreadableDraft) {
       if (!silent) {
         showToast("The stored draft is unreadable and was preserved. Export your current view before resolving it.");
@@ -2118,6 +2134,7 @@ export default function PageBuilder({
       silent,
       repairs: repaired.repairs,
       snapshot: getAutosaveSnapshot(repaired.project),
+      successMessage,
     };
 
     if (!silent) setActiveTopbarAction("save");
@@ -2603,7 +2620,7 @@ export default function PageBuilder({
         pages: [...prev.pages, page],
         activePageId: page.id,
       }));
-      setSelected({ type: "section", id: canvasSection.id });
+      setSelected({ type: "page", id: page.id });
       setActiveTab("design");
       setDesignPanel("Sections");
       setModal(null);
@@ -4135,15 +4152,20 @@ export default function PageBuilder({
     </div>
   );
 
-  const renderInspector = () => (
+  const renderInspector = () => {
+    const showPageInspector =
+      selected.type === "page" || selected.type === "section";
+    const inspectorType = showPageInspector ? "page" : selected.type;
+
+    return (
     <aside className="builder-inspector">
       <div className="builder-side-panel">
         <div className="inspector-title">
           <h2>Inspector</h2>
-          <span>{selected.type}</span>
+          <span>{inspectorType}</span>
         </div>
 
-      {selected.type === "page" && activePage && (
+      {showPageInspector && activePage && (
         <div className="inspector-group">
           <h3>Page Settings</h3>
           <label>Page name<input value={activePage.name} onChange={(event) => updateActivePage((page) => ({ ...page, name: event.target.value }))} /></label>
@@ -4157,8 +4179,7 @@ export default function PageBuilder({
           </label>
           <label className="inspector-toggle-row">
             <input
-              type="radio"
-              name="builder-default-page"
+              type="checkbox"
               checked={activePage.isDefault === true}
               onChange={() => updateProject((prev) => setProjectDefaultPage(prev, activePage.id))}
             />
@@ -4580,7 +4601,8 @@ export default function PageBuilder({
       )}
       </div>
     </aside>
-  );
+    );
+  };
 
   const formatSavedValue = (value) => {
     if (Array.isArray(value) && !value.length) return "-";
@@ -4943,7 +4965,7 @@ export default function PageBuilder({
       liveSitePath={canonicalLiveSitePath}
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
-      openFormPreviewPage={openFormPreviewPage}
+      openPublicFormPage={openPublicFormPage}
       onUnpublish={unpublishProject}
       isUnpublishing={isUnpublishingProject}
       lang={lang}

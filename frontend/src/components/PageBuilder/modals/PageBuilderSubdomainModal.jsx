@@ -29,7 +29,10 @@ const getSuggestedWebsiteName = (project, defaultWebsiteName) => {
 };
 
 const getDomain = (project, defaultDomain) => {
-  return project?.publish?.siteBaseDomain || defaultDomain;
+  const savedDomain = String(project?.publish?.siteBaseDomain || "").trim();
+  return !savedDomain || savedDomain === "madar.app"
+    ? defaultDomain
+    : savedDomain;
 };
 
 export default function PageBuilderSubdomainModal({
@@ -53,7 +56,7 @@ export default function PageBuilderSubdomainModal({
     [websiteName]
   );
 
-  const websiteLink = `${cleanWebsiteName || content.defaultWebsiteName}.${domain}`;
+  const websiteLink = `${domain}/site/${cleanWebsiteName || content.defaultWebsiteName}`;
 
   const handleWebsiteNameChange = (event) => {
     setWebsiteName(sanitizeSubdomain(event.target.value));

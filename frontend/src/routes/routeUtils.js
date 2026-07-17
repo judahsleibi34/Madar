@@ -5,7 +5,7 @@ export function normalizeUserType(value) {
 }
 
 export function isTenantSiteRoutePath(pathname) {
-  return pathname.startsWith("/site/");
+  return pathname.startsWith("/site/") || pathname.startsWith("/forms/");
 }
 
 export function isDashboardRoutePath(pathname) {

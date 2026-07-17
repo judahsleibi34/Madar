@@ -729,7 +729,9 @@ export default function FormsTab({
     if (!saveProject || isSavingForm) return;
     setIsSavingForm(true);
     try {
-      await saveProject();
+      await saveProject({
+        successMessage: "Form saved and published. Its public form link is live.",
+      });
     } finally {
       setIsSavingForm(false);
     }
