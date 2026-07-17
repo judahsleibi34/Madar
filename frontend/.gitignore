@@ -36,3 +36,10 @@ blob-report/
 *.njsproj
 *.sln
 *.sw?
+
+# Local frontend environment overrides
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
