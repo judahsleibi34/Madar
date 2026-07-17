@@ -14,4 +14,3 @@ alter table public.tenant_site_memberships
 alter table public.tenant_site_memberships
   add constraint tenant_site_memberships_source_check
   check (source in ('registered', 'admin'));
-

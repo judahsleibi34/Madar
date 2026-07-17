@@ -47,23 +47,51 @@ SENSITIVE_TABLES = (
     "audit_logs",
 )
 
-UNSAFE_DIRECT_GRANTS = {
-    "contacts": {
-        "anon": {"SELECT", "INSERT", "UPDATE", "DELETE"},
-        "authenticated": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
+    "admin_update_user_type_safely",
+    "apply_billing_webhook_event",
+    "claim_notification_outbox",
+    "claim_password_reset_request",
+    "finish_notification_outbox",
+    "finish_password_reset_request",
+    "increment_ai_usage_daily",
+    "provision_verified_account",
+    "publish_builder_project_atomic",
+    "reserve_ai_usage_daily",
+)
+
+TABLE_CRUD_GRANTS = {"SELECT", "INSERT", "UPDATE", "DELETE"}
+
+# Direct browser access is an explicit allowlist. Tenant-scoped SELECT policies
+# may expose safe reads, but privileged mutations must pass through backend
+# service-role routes where validation, audit, revision and authorization rules
+# are enforced.
+ALLOWED_DIRECT_GRANTS = {
+    "users": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
+    "contacts": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "tenants": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
+    "tenant_memberships": {
+        "anon": set(),
+        "authenticated": {"SELECT"},
+        "service_role": TABLE_CRUD_GRANTS,
     },
-    "audit_logs": {
-        "anon": {"SELECT", "INSERT", "UPDATE", "DELETE"},
-        "authenticated": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    "website_settings": {
+        "anon": set(),
+        "authenticated": {"SELECT"},
+        "service_role": TABLE_CRUD_GRANTS,
     },
-    "features": {
-        "anon": {"SELECT", "INSERT", "UPDATE", "DELETE"},
-        "authenticated": {"INSERT", "UPDATE", "DELETE"},
+    "builder_projects": {
+        "anon": set(),
+        "authenticated": {"SELECT"},
+        "service_role": TABLE_CRUD_GRANTS,
     },
     "builder_form_submissions": {
-        "anon": {"INSERT", "UPDATE", "DELETE"},
-        "authenticated": {"INSERT", "UPDATE", "DELETE"},
+        "anon": set(),
+        "authenticated": {"SELECT"},
+        "service_role": TABLE_CRUD_GRANTS,
     },
+    "features": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
+    "audit_logs": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
 }
 
 EXPECTED_POLICIES: dict[str, dict[str, Callable[[str, str], bool]]] = {
@@ -98,6 +126,13 @@ class TableReport:
     rls_enabled: bool
     unsafe_grants: list[str]
     missing_policies: list[str]
+
+
+@dataclass
+class FunctionReport:
+    signature: str
+    safe_search_path: bool
+    unsafe_execute_roles: list[str]
 
 
 def has_all(value: str, *needles: str) -> bool:
@@ -171,7 +206,14 @@ def redact_known_secrets(value: str) -> str:
     return value
 
 
-def fetch_catalog(connection_url: str) -> tuple[dict[str, dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
+def fetch_catalog(
+    connection_url: str,
+) -> tuple[
+    dict[str, dict[str, str]],
+    list[dict[str, str]],
+    list[dict[str, str]],
+    list[dict[str, str]],
+]:
     table_names = ", ".join(sql_literal(table) for table in SENSITIVE_TABLES)
     tables = run_catalog_query(
         connection_url,
@@ -233,7 +275,40 @@ def fetch_catalog(connection_url: str) -> tuple[dict[str, dict[str, str]], list[
         order by table_name, grantee, privilege_type;
         """,
     )
-    return ({row["table_name"]: row for row in tables}, policies, grants)
+    function_names = ", ".join(sql_literal(name) for name in SENSITIVE_SECURITY_DEFINER_FUNCTIONS)
+    functions = run_catalog_query(
+        connection_url,
+        f"""
+        select
+          p.oid::regprocedure::text as signature,
+          p.proname as function_name,
+          p.prosecdef::text as security_definer,
+          coalesce(array_to_string(p.proconfig, ','), '') as settings,
+          exists (
+            select 1
+            from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+            where acl.grantee = 0 and acl.privilege_type = 'EXECUTE'
+          )::text as public_execute,
+          exists (
+            select 1
+            from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+            join pg_roles role on role.oid = acl.grantee
+            where role.rolname = 'anon' and acl.privilege_type = 'EXECUTE'
+          )::text as anon_execute,
+          exists (
+            select 1
+            from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+            join pg_roles role on role.oid = acl.grantee
+            where role.rolname = 'authenticated' and acl.privilege_type = 'EXECUTE'
+          )::text as authenticated_execute
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname in ({function_names})
+        order by p.proname, p.oid::regprocedure::text;
+        """,
+    )
+    return ({row["table_name"]: row for row in tables}, policies, grants, functions)
 
 
 def sql_literal(value: str) -> str:
@@ -270,13 +345,13 @@ def build_reports(
 
 def find_unsafe_grants(table: str, grants: list[dict[str, str]]) -> list[str]:
     unsafe: list[str] = []
-    unsafe_for_table = UNSAFE_DIRECT_GRANTS.get(table, {})
+    allowed_for_table = ALLOWED_DIRECT_GRANTS.get(table, {})
     for grant in grants:
         grantee = grant["grantee"]
         privilege = grant["privilege_type"]
-        if privilege in unsafe_for_table.get(grantee, set()):
+        if privilege not in allowed_for_table.get(grantee, set()):
             unsafe.append(f"{grantee}:{privilege}")
-    return unsafe
+    return sorted(set(unsafe))
 
 
 def find_missing_policies(table: str, policies: list[dict[str, str]]) -> list[str]:
@@ -302,7 +377,31 @@ def find_missing_policies(table: str, policies: list[dict[str, str]]) -> list[st
     return missing
 
 
-def print_report(reports: list[TableReport], policies: list[dict[str, str]], grants: list[dict[str, str]]) -> None:
+def build_function_reports(functions: list[dict[str, str]]) -> list[FunctionReport]:
+    reports: list[FunctionReport] = []
+    for function in functions:
+        settings = str(function.get("settings") or "").lower().replace(" ", "")
+        unsafe_roles = [
+            role
+            for role in ("public", "anon", "authenticated")
+            if str(function.get(f"{role}_execute") or "").lower() == "true"
+        ]
+        reports.append(
+            FunctionReport(
+                signature=str(function.get("signature") or function.get("function_name") or "unknown"),
+                safe_search_path="search_path=public" in settings,
+                unsafe_execute_roles=unsafe_roles,
+            )
+        )
+    return reports
+
+
+def print_report(
+    reports: list[TableReport],
+    policies: list[dict[str, str]],
+    grants: list[dict[str, str]],
+    function_reports: list[FunctionReport],
+) -> None:
     print("Live Supabase/Postgres RLS and grant verification")
     print("Catalog-only check: pg_class, pg_namespace, pg_policy, information_schema.role_table_grants")
     print()
@@ -331,14 +430,30 @@ def print_report(reports: list[TableReport], policies: list[dict[str, str]], gra
         )
     print(json.dumps(compact_grants, indent=2, sort_keys=True))
 
+    print("\nSensitive SECURITY DEFINER functions:")
+    for report in function_reports:
+        execute = ",".join(report.unsafe_execute_roles) if report.unsafe_execute_roles else "service-only"
+        print(
+            f"- {report.signature}: search_path={'safe' if report.safe_search_path else 'unsafe'} "
+            f"execute={execute}"
+        )
+
     failures = [
         report
         for report in reports
         if not report.exists or not report.rls_enabled or report.unsafe_grants or report.missing_policies
     ]
     print("\nSummary:")
-    if failures:
-        print(f"FAIL: {len(failures)} table(s) need attention.")
+    function_failures = [
+        report
+        for report in function_reports
+        if not report.safe_search_path or report.unsafe_execute_roles
+    ]
+    if failures or function_failures:
+        print(
+            f"FAIL: {len(failures)} table(s) and {len(function_failures)} sensitive function(s) "
+            "need attention."
+        )
         for report in failures:
             reasons = []
             if not report.exists:
@@ -350,8 +465,15 @@ def print_report(reports: list[TableReport], policies: list[dict[str, str]], gra
             if report.missing_policies:
                 reasons.append("missing policies: " + ", ".join(report.missing_policies))
             print(f"- {report.table}: {'; '.join(reasons)}")
+        for report in function_failures:
+            reasons = []
+            if not report.safe_search_path:
+                reasons.append("unsafe search_path")
+            if report.unsafe_execute_roles:
+                reasons.append("unsafe execute: " + ", ".join(report.unsafe_execute_roles))
+            print(f"- {report.signature}: {'; '.join(reasons)}")
     else:
-        print("PASS: all checked tables have RLS enabled, no configured unsafe grants, and expected policies.")
+        print("PASS: all checked tables have RLS enabled, only explicitly allowed grants, and expected policies.")
 
 
 def yes_no(value: bool) -> str:
@@ -369,12 +491,16 @@ def main() -> int:
         print("The value should be a Postgres connection string with catalog read access.", file=sys.stderr)
         return 2
 
-    tables, policies, grants = fetch_catalog(connection_url)
+    tables, policies, grants, functions = fetch_catalog(connection_url)
     reports = build_reports(tables, policies, grants)
-    print_report(reports, policies, grants)
+    function_reports = build_function_reports(functions)
+    print_report(reports, policies, grants, function_reports)
     failed = any(
         not report.exists or not report.rls_enabled or report.unsafe_grants or report.missing_policies
         for report in reports
+    ) or any(
+        not report.safe_search_path or report.unsafe_execute_roles
+        for report in function_reports
     )
     return 1 if failed else 0
 
