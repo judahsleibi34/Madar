@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   collectPublicPageRoutingIssues,
   getDefaultPublicPage,
+  getProductionFormUrl,
+  getProductionTenantUrl,
+  getStandaloneFormPath,
   getPublicPagePath,
   normalizeProjectPageRouting,
   resolvePublicPageByPath,
@@ -36,6 +39,26 @@ describe("public page routing contract", () => {
     const project = normalizeProjectPageRouting(multiPageProject);
     expect(getPublicPagePath("/site/madar", project.pages[0])).toBe("/site/madar/");
     expect(getPublicPagePath("/site/madar", project.pages[1])).toBe("/site/madar/form");
+  });
+
+  it("builds production tenant URLs on the deployed path-based host", () => {
+    expect(
+      getProductionTenantUrl(
+        { publish: { subdomain: "disco2", siteBaseDomain: "madar.app" } },
+        "/forms/form-1"
+      )
+    ).toBe("https://madarportal.com/site/disco2/forms/form-1");
+  });
+
+  it("builds a standalone respondent form link outside the website route", () => {
+    const project = { publish: { subdomain: "disco2" } };
+
+    expect(getStandaloneFormPath(project, "form-1")).toBe(
+      "/forms/disco2/form-1"
+    );
+    expect(getProductionFormUrl(project, "form-1")).toBe(
+      "https://madarportal.com/forms/disco2/form-1"
+    );
   });
 
   it("repairs missing and duplicate slugs deterministically without reordering pages", () => {

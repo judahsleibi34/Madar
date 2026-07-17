@@ -64,6 +64,7 @@ import {
 } from "../core/PageBuilder.starters";
 import {
   collectPublicPageRoutingIssues,
+  getStandaloneFormPath,
   normalizeProjectPageRouting,
   sanitizeSubdomain,
   setProjectDefaultPage,
@@ -1257,6 +1258,12 @@ export default function PageBuilder({
     );
   };
 
+  const openPublicFormPage = (formId = activeForm?.id) => {
+    if (!formId) return;
+    const publicFormPath = getStandaloneFormPath(project, formId);
+    window.open(publicFormPath, "_blank", "noopener,noreferrer");
+  };
+
   const selectedSection = useMemo(() => {
     if (selected.type !== "section") return null;
 
@@ -1519,7 +1526,7 @@ export default function PageBuilder({
       pages: [...prev.pages, page],
       activePageId: page.id,
     }));
-    setSelected({ type: "section", id: canvasSection.id });
+    setSelected({ type: "page", id: page.id });
   };
 
   const duplicatePage = () => {
@@ -2420,6 +2427,7 @@ export default function PageBuilder({
     nextProject,
     silent,
     repairs = [],
+    successMessage = "",
     expectedRevision = null,
     requestGeneration = null,
     operationId = 0,
@@ -2436,7 +2444,7 @@ export default function PageBuilder({
     }
 
     if (demoMode) {
-      persistProject(nextProject, "Changes saved for this preview.", { silent });
+      persistProject(nextProject, successMessage || "Changes saved for this preview.", { silent });
       return true;
     }
     if (builderProjectLoading) {
@@ -2504,7 +2512,7 @@ export default function PageBuilder({
       if (!silent) {
         showToast(repairs.length > 0
           ? "Duplicate internal IDs were repaired and your changes are saved."
-          : "Your changes are saved.");
+          : successMessage || "Your changes are saved.");
       }
       return true;
     } catch (error) {
@@ -2549,7 +2557,11 @@ export default function PageBuilder({
     userId,
   ]);
 
-  const saveProject = useCallback(({ silent = false, projectOverride = null } = {}) => {
+  const saveProject = useCallback(({
+    silent = false,
+    projectOverride = null,
+    successMessage = "",
+  } = {}) => {
     if (!canStartBuilderCloudMutation({
       hydrated: hydrationCompleteRef.current,
       conflict: conflictRef.current,
@@ -2582,6 +2594,7 @@ export default function PageBuilder({
       silent,
       repairs: repaired.repairs,
       snapshot: getAutosaveSnapshot(repaired.project),
+      successMessage,
       reason: silent ? "autosave" : "retry",
     });
 
@@ -2612,6 +2625,7 @@ export default function PageBuilder({
             expectedRevision: context.expectedRevision,
             requestGeneration: context.generation,
             operationId: context.operationId,
+            successMessage: entry.successMessage,
           });
           if (context.generation !== serverAdoptionGenerationRef.current) {
             return { status: "obsolete" };
@@ -3217,7 +3231,7 @@ export default function PageBuilder({
         pages: [...prev.pages, page],
         activePageId: page.id,
       }));
-      setSelected({ type: "section", id: canvasSection.id });
+      setSelected({ type: "page", id: page.id });
       setActiveTab("design");
       setDesignPanel("Sections");
       setModal(null);
@@ -5449,6 +5463,7 @@ export default function PageBuilder({
       addConnectedFormSectionToPage={addConnectedFormSectionToPage}
       renderConnectedForm={renderConnectedForm}
       openFormPreviewPage={openFormPreviewPage}
+      saveProject={saveProject}
       openPreviewPage={openPreviewPage}
       publishProject={publishProject}
       quizOptionsOpen={quizOptionsOpen}
@@ -5535,7 +5550,7 @@ export default function PageBuilder({
       liveSitePath={canonicalLiveSitePath}
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
-      openFormPreviewPage={openFormPreviewPage}
+      openPublicFormPage={openPublicFormPage}
       onUnpublish={unpublishProject}
       isUnpublishing={isUnpublishingProject}
       lang={lang}

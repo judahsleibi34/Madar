@@ -11,7 +11,6 @@ import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
 const publicNavItems = [
   ...primaryNavigationItems,
   { id: "privacy", labelKey: "privacy", path: PUBLIC_ROUTES.privacyPolicy },
-  { id: "terms", labelKey: "terms", path: PUBLIC_ROUTES.termsAndConditions },
 ];
 
 export default function Header({
@@ -64,7 +63,7 @@ export default function Header({
 
   useEffect(() => {
     function handleResize() {
-      if (window.innerWidth > 1400) {
+      if (window.innerWidth > 1024) {
         setMenuOpen(false);
       }
     }

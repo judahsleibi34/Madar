@@ -11,6 +11,7 @@ export default function TenantSiteRoutes() {
   return (
     <RouteSuspense label="Loading site" variant="tenant-runtime">
       <Routes>
+        <Route path="/forms/:subdomain/:formId" element={<TenantSiteRuntime />} />
         <Route path="/site/:subdomain/*" element={<TenantSiteRuntime />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

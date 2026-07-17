@@ -201,6 +201,7 @@ export default function FormsTab({
   addConnectedFormSectionToPage,
   renderConnectedForm,
   openFormPreviewPage,
+  saveProject,
 
   quizOptionsOpen,
   setQuizOptionsOpen,
@@ -212,6 +213,7 @@ export default function FormsTab({
   const [deleteFormCandidate, setDeleteFormCandidate] = useState(null);
   const [deleteFormPageCandidate, setDeleteFormPageCandidate] = useState(null);
   const [importGuideCopied, setImportGuideCopied] = useState(false);
+  const [isSavingForm, setIsSavingForm] = useState(false);
   const activeTextTargetRef = useRef(null);
   const activePageTextTargetRef = useRef("description");
   const formImportInputRef = useRef(null);
@@ -719,6 +721,18 @@ export default function FormsTab({
     setQuizOptionsOpen(false);
   };
 
+  const saveForm = async () => {
+    if (!saveProject || isSavingForm) return;
+    setIsSavingForm(true);
+    try {
+      await saveProject({
+        successMessage: "Form saved and published. Its public form link is live.",
+      });
+    } finally {
+      setIsSavingForm(false);
+    }
+  };
+
   const updateFormThemeValue = (key, value) => {
     updateProject?.((prev) => ({
       ...prev,
@@ -943,6 +957,9 @@ export default function FormsTab({
           <div className="simple-action-groups">
             <section className="simple-action-group forms-form-actions-group">
               <span className="simple-action-group-title">{copy.labels.formActions}</span>
+              <FormButton variant="primary" icon={Save} disabled={isSavingForm} onClick={saveForm}>
+                {isSavingForm ? "Saving..." : "Save form"}
+              </FormButton>
               <FormButton icon={Settings} onClick={() => setQuizOptionsOpen(true)}>
                 {copy.labels.formSettings}
               </FormButton>

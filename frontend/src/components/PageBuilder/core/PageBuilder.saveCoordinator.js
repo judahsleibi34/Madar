@@ -6,12 +6,14 @@ export const createBuilderSaveEntry = ({
   reason = "autosave",
   repairs = [],
   silent = true,
+  successMessage = "",
 } = {}) => ({
   project,
   snapshot: String(snapshot || ""),
   reason,
   repairs,
   silent,
+  successMessage,
   requestedAt: Date.now(),
 });
 

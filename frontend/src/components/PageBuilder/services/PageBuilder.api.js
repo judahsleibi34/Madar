@@ -321,6 +321,19 @@ export const fetchPublicSite = async (subdomain) => {
   return data || null;
 };
 
+export const fetchPublicForm = async (subdomain, formId) => {
+  const response = await fetch(
+    getApiUrl(`/public/sites/${subdomain}/forms/${encodeURIComponent(formId)}`),
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
+
+  const data = await parseJsonResponse(response);
+  return data || null;
+};
+
 export const registerTenantVisitor = async (subdomain, payload) => {
   const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}/auth/register`), {
     method: "POST",

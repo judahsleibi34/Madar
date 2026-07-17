@@ -199,6 +199,8 @@ class FakeSupabase:
                     "name": "Published site",
                     "slug": "published-site",
                     "status": "published",
+                    "draft_schema": copy.deepcopy(PUBLISHED_SCHEMA),
+                    "draft_revision": 5,
                     "published_schema": PUBLISHED_SCHEMA,
                     "published_version": 4,
                     "last_published_at": "2026-06-03T13:00:00+00:00",
@@ -278,7 +280,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(saved["project_id"], PROJECT_ID)
         self.assertEqual(saved["form_id"], FORM_ID)
         self.assertEqual(saved["form_title"], "Contact form")
-        self.assertEqual(saved["form_version"], 4)
+        self.assertEqual(saved["form_version"], 5)
         self.assertEqual(saved["user_agent"], "test-agent")
         self.assertEqual(len(saved["field_snapshot"]), 2)
         notify_event.assert_called_once()
@@ -399,7 +401,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         )
 
 
-    def test_public_submission_rejects_form_only_in_draft_schema(self):
+    def test_public_submission_accepts_saved_form_without_site_publication(self):
         fake_supabase = FakeSupabase()
         project = fake_supabase.tables["builder_projects"][0]
         project["draft_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
@@ -417,14 +419,17 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 json={"answers": {"field_name": "Ada"}},
             )
 
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Form not found")
+        self.assertEqual(response.status_code, 200)
+        saved = fake_supabase.tables["builder_form_submissions"][-1]
+        self.assertEqual(saved["form_title"], "Draft-only contact form")
+        self.assertEqual(saved["form_version"], 5)
 
-    def test_public_submission_rejects_form_without_published_block(self):
+    def test_public_submission_accepts_form_without_builder_placement(self):
         fake_supabase = FakeSupabase()
         project = fake_supabase.tables["builder_projects"][0]
         project["published_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
         project["published_schema"]["pages"] = []
+        project["draft_schema"]["pages"] = []
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
@@ -433,8 +438,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 json={"answers": {"field_name": "Ada"}},
             )
 
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Form not found")
+        self.assertEqual(response.status_code, 200)
 
     def test_public_submission_rejects_archived_project(self):
         fake_supabase = FakeSupabase()
@@ -448,7 +452,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Published site not found")
+        self.assertEqual(response.json()["detail"], "Form not found")
 
     def test_public_submission_rejects_invalid_answers_shape(self):
         fake_supabase = FakeSupabase()
@@ -462,10 +466,11 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
 
-    def test_public_submission_field_snapshot_is_based_on_published_form(self):
+    def test_public_submission_field_snapshot_is_based_on_saved_form(self):
         fake_supabase = FakeSupabase()
         project = fake_supabase.tables["builder_projects"][0]
         project["draft_schema"] = copy.deepcopy(PUBLISHED_SCHEMA)
+        project["draft_schema"]["forms"][0]["sections"][0]["fields"][0]["label"] = "Saved full name"
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
@@ -478,12 +483,12 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         saved = fake_supabase.tables["builder_form_submissions"][-1]
-        expected_snapshot = copy.deepcopy(PUBLISHED_SCHEMA["forms"][0]["sections"][0]["fields"])
+        expected_snapshot = copy.deepcopy(project["draft_schema"]["forms"][0]["sections"][0]["fields"])
         self.assertEqual(saved["field_snapshot"], expected_snapshot)
 
         project["draft_schema"]["forms"][0]["sections"][0]["fields"][0]["label"] = "Changed in draft"
         self.assertEqual(saved["field_snapshot"], expected_snapshot)
-        self.assertEqual(saved["field_snapshot"][0]["label"], "Full name")
+        self.assertEqual(saved["field_snapshot"][0]["label"], "Saved full name")
     def test_unknown_form_id_fails(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
@@ -977,7 +982,29 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertNotIn("last_published_at", body["project"])
         self.assertNotIn("draft_schema", str(body))
 
-    def test_public_submission_rejects_unpublished_project(self):
+    def test_public_form_returns_saved_form_without_other_forms_or_responses(self):
+        fake_supabase = FakeSupabase()
+        project = fake_supabase.tables["builder_projects"][0]
+        project["status"] = "draft"
+        project["draft_schema"]["forms"].append(
+            {"id": "another-form", "title": "Private sibling form", "sections": []}
+        )
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get(f"/public/sites/tenant-site/forms/{FORM_ID}")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["form"]["id"], FORM_ID)
+        self.assertNotIn("responses", body["form"])
+        self.assertNotIn("project", body)
+        self.assertNotIn("pages", body)
+        self.assertNotIn("another-form", str(body))
+        self.assertNotIn("sample", str(body))
+
+    def test_public_submission_accepts_saved_form_from_draft_project(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"][0]["status"] = "draft"
         client = build_public_client(fake_supabase)
@@ -989,8 +1016,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 json={"answers": {"field_name": "Ada"}},
             )
 
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Published site not found")
+        self.assertEqual(response.status_code, 200)
 
     def test_public_reservation_event_creates_notification(self):
         fake_supabase = FakeSupabase()

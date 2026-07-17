@@ -1363,10 +1363,12 @@
 }
 
 .ecommerce-style-footer {
+  container-type: inline-size;
   background: var(--theme-surface);
   border-top: 1px solid var(--madar-border);
   padding: 36px 5% 22px;
   color: var(--madar-text);
+  min-width: 0;
 }
 
 .ecommerce-footer-grid {
@@ -1374,8 +1376,8 @@
   width: 100%;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(260px, 1fr) minmax(190px, 0.85fr);
-  gap: clamp(24px, 4vw, 48px);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: clamp(18px, 3vw, 40px);
   align-items: start;
 }
 
@@ -1486,8 +1488,10 @@
 
 .ecommerce-footer-links-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(110px, 1fr));
-  gap: 8px 28px;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px clamp(12px, 2vw, 28px);
   justify-items: center;
 }
 

@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { ImagePlus, KeyRound, Save, X } from "lucide-react";
 import SmartLink from "../SmartLink";
 import {
-  STORAGE_KEY,
   defaultSiteChrome,
+  getBuilderStorageKey,
 } from "../PageBuilder/core/PageBuilder.constants";
 import { createInitialProject } from "../PageBuilder/core/PageBuilder.starters";
 import {
@@ -42,9 +42,9 @@ const deferEffectStateUpdate = (callback) => {
   };
 };
 
-const readBuilderProject = () => {
+const readBuilderProject = (storageKey) => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : createInitialProject();
   } catch {
     return createInitialProject();
@@ -195,7 +195,9 @@ export default function SettingsPage({
     getInitialAccountForm(user)
   );
 
-  const [project, setProject] = useState(readBuilderProject);
+  const userId = user?.id;
+  const scopedStorageKey = getBuilderStorageKey(userId);
+  const [project, setProject] = useState(() => readBuilderProject(scopedStorageKey));
   const [fieldErrors, setFieldErrors] = useState({});
   const [notification, setNotification] = useState(null);
 
@@ -219,7 +221,12 @@ export default function SettingsPage({
       }
     : t;
   const onUserUpdatedRef = useRef(onUserUpdated);
-  const userId = user?.id;
+
+  useEffect(() => {
+    return deferEffectStateUpdate(() => {
+      setProject(readBuilderProject(scopedStorageKey));
+    });
+  }, [scopedStorageKey]);
 
   useEffect(() => {
     onUserUpdatedRef.current = onUserUpdated;
@@ -461,24 +468,28 @@ export default function SettingsPage({
         const website = data.website || {};
 
         if (!cancelled) {
-          setProject((prev) => ({
-            ...prev,
-            publish: {
-              ...(prev.publish || {}),
-              subdomain: sanitizeSubdomain(website.subdomain || ""),
-            },
-            siteChrome: {
-              ...defaultSiteChrome,
-              ...(prev.siteChrome || {}),
-              brand: website.brand || prev.siteChrome?.brand || "",
-              footerStoreName:
-                website.footer_store_name || prev.siteChrome?.footerStoreName || "",
-              logoUrl: website.logo_url || prev.siteChrome?.logoUrl || "",
-              contactEmail: website.contact_email || prev.siteChrome?.contactEmail || "",
-              phone: website.phone || prev.siteChrome?.phone || "",
-              description: website.description || prev.siteChrome?.description || "",
-            },
-          }));
+          setProject((prev) => {
+            const nextProject = {
+              ...prev,
+              publish: {
+                ...(prev.publish || {}),
+                subdomain: sanitizeSubdomain(website.subdomain || ""),
+              },
+              siteChrome: {
+                ...defaultSiteChrome,
+                ...(prev.siteChrome || {}),
+                brand: website.brand || "",
+                footerStoreName: website.footer_store_name || "",
+                logoUrl: website.logo_url || "",
+                contactEmail: website.contact_email || "",
+                phone: website.phone || "",
+                description: website.description || "",
+              },
+            };
+
+            localStorage.setItem(scopedStorageKey, JSON.stringify(nextProject));
+            return nextProject;
+          });
         }
       } catch {
         // Keep local settings visible if the backend settings request fails.
@@ -490,7 +501,7 @@ export default function SettingsPage({
     return () => {
       cancelled = true;
     };
-  }, [accountOnly]);
+  }, [accountOnly, scopedStorageKey]);
 
   const uploadWebsiteLogo = async (event) => {
     const file = event.target.files?.[0];
@@ -691,7 +702,7 @@ export default function SettingsPage({
         },
       };
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
+      localStorage.setItem(scopedStorageKey, JSON.stringify(savedProject));
       setProject(savedProject);
       showNotification("success", data.message || t.websiteSaved);
     } catch (error) {

@@ -61,6 +61,7 @@ def save_settings_for_tenant(tenant_id: int, user_id: int, update_payload: dict)
             service_supabase.table("website_settings")
             .update(update_payload)
             .eq("id", existing_website["id"])
+            .eq("tenant_id", tenant_id)
             .execute()
         )
     else:

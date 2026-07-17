@@ -1,7 +1,7 @@
 export const subdomainModalContent = {
   en: {
     defaultWebsiteName: "my-website",
-    defaultDomain: "madar.app",
+    defaultDomain: "madarportal.com",
     logoFallback: "M",
     errors: {
       required: "Add a website name first.",
@@ -19,7 +19,7 @@ export const subdomainModalContent = {
   },
   ar: {
     defaultWebsiteName: "my-website",
-    defaultDomain: "madar.app",
+    defaultDomain: "madarportal.com",
     logoFallback: "م",
     errors: {
       required: "أضف اسم الموقع أولا.",

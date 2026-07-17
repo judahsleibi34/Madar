@@ -16,6 +16,20 @@ const PrivacyPolicyPage = lazy(() => import("../components/MainPages/PrivacyPoli
 const TermsAndConditionsPage = lazy(() => import("../components/MainPages/TermsAndConditionsPage"));
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
 
+const AboutTeamPage = ({ lang }) => (
+  <>
+    <AboutSection key={`about-${lang}`} lang={lang} />
+    <TeamPage key={`team-${lang}`} lang={lang} />
+  </>
+);
+
+const PrivacyAndTermsPage = ({ lang }) => (
+  <>
+    <PrivacyPolicyPage key={`privacy-policy-${lang}`} lang={lang} />
+    <TermsAndConditionsPage key={`terms-and-conditions-${lang}`} lang={lang} />
+  </>
+);
+
 const LoginPage = lazy(() => import("../components/AuthPages/LoginPage"));
 const SignUpPage = lazy(() => import("../components/AuthPages/SignUpPage"));
 const ForgotPasswordPage = lazy(() => import("../components/AuthPages/ForgotPasswordPage"));
@@ -125,12 +139,12 @@ export default function PublicRoutes({
 
         <Route
           path="team"
-          element={<TeamPage key={`team-${lang}`} lang={lang} />}
+          element={<Navigate to="/about#team" replace />}
         />
 
         <Route
           path="about"
-          element={<AboutSection key={`about-${lang}`} lang={lang} />}
+          element={<AboutTeamPage key={`about-team-${lang}`} lang={lang} />}
         />
 
           <Route
@@ -140,12 +154,12 @@ export default function PublicRoutes({
 
           <Route
             path="privacy-policy"
-            element={<PrivacyPolicyPage key={`privacy-policy-${lang}`} lang={lang} />}
+            element={<PrivacyAndTermsPage key={`privacy-terms-${lang}`} lang={lang} />}
           />
 
           <Route
             path="terms-and-conditions"
-            element={<TermsAndConditionsPage key={`terms-and-conditions-${lang}`} lang={lang} />}
+            element={<Navigate to="/privacy-policy#terms" replace />}
           />
 
           <Route

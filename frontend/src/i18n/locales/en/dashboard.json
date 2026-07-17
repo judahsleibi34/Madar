@@ -1,5 +1,7 @@
 {
   "sidebar": {
+    "workspace": "Workspace",
+    "language": "Language",
     "brand": "Madar",
     "subtitle": "Admin Panel",
     "aria": "Dashboard sidebar",

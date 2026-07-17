@@ -5,16 +5,17 @@ import {
   Home,
   Archive,
   LayoutDashboard,
-  Grid2X2,
+  PanelsTopLeft,
   ClipboardList,
   Database,
   CreditCard,
   ShieldCheck,
   Settings,
   LogOut,
-  UsersRound,
-  KeyRound,
   Search,
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 import LanguageSwitcher from "../LanguageSwitcher";
@@ -76,6 +77,44 @@ function getUserRole(user) {
   return "user";
 }
 
+function SidebarRow({
+  active = false,
+  activeClassName = "active",
+  controls,
+  expanded,
+  icon: Icon,
+  label,
+  onClick,
+  path,
+}) {
+  const expandable = typeof expanded === "boolean";
+
+  return (
+    <button
+      type="button"
+      className={`admin-sidebar-row ${
+        active ? activeClassName : ""
+      }`.trim()}
+      onClick={onClick}
+      title={label}
+      aria-current={!expandable && active ? "page" : undefined}
+      aria-expanded={expandable ? expanded : undefined}
+      aria-controls={expandable ? controls : undefined}
+      data-sidebar-path={path}
+    >
+      <Icon className="admin-sidebar-row-icon" size={18} aria-hidden="true" />
+      <span className="admin-sidebar-row-label">{label}</span>
+      {expandable && (
+        <ChevronDown
+          className="admin-sidebar-chevron"
+          size={17}
+          aria-hidden="true"
+        />
+      )}
+    </button>
+  );
+}
+
 export default function DashboardSidebar({
   id,
   lang = "en",
@@ -84,16 +123,17 @@ export default function DashboardSidebar({
   onLanguageChange,
   onNavigate,
   hideLanguage = false,
-  compact = false,
   themeMode,
   onThemeModeChange,
   showNotifications = false,
 }) {
-  const { t } = useTranslation(["dashboard"]);
+  const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isRtl = lang === "ar";
+  const activeSidebarLanguage =
+    i18n?.resolvedLanguage?.split("-")[0] || lang;
+  const isRtl = activeSidebarLanguage === "ar";
   const sidebarDir = isRtl ? "rtl" : "ltr";
 
   const [internalThemeMode, setInternalThemeMode] = useState(() => {
@@ -104,6 +144,38 @@ export default function DashboardSidebar({
     return readStoredThemeMode();
   });
   const [navSearch, setNavSearch] = useState("");
+
+  const workspaceRouteActive = [
+    DASHBOARD_ROUTES.pageBuilder,
+    DASHBOARD_ROUTES.builderResponses,
+    DASHBOARD_ROUTES.builderData,
+    DASHBOARD_ROUTES.archive,
+  ].some(
+    (path) =>
+      location.pathname === path ||
+      location.pathname.startsWith(`${path}/`),
+  );
+  const securityRouteActive =
+    location.pathname === DASHBOARD_ROUTES.settingsSecurity ||
+    location.pathname.startsWith(
+      `${DASHBOARD_ROUTES.settingsSecurity}/`,
+    );
+  const settingsRouteActive =
+    !securityRouteActive &&
+    (location.pathname === DASHBOARD_ROUTES.settings ||
+      location.pathname.startsWith(`${DASHBOARD_ROUTES.settings}/`));
+  const [workspaceExpansion, setWorkspaceExpansion] = useState({
+    open: workspaceRouteActive,
+    pathname: location.pathname,
+  });
+  const [settingsExpansion, setSettingsExpansion] = useState({
+    open: settingsRouteActive,
+    pathname: location.pathname,
+  });
+  const [workspaceSidebarCollapsed, setWorkspaceSidebarCollapsed] =
+    useState(true);
+  const isWorkspaceSidebarCollapsed =
+    workspaceRouteActive && workspaceSidebarCollapsed;
 
   const activeThemeMode =
     themeMode === "dark" || themeMode === "light"
@@ -118,7 +190,7 @@ export default function DashboardSidebar({
 
   const avatarLetter = displayName.trim().slice(0, 1).toUpperCase() || "M";
 
-  const adminNavItemsTop = [
+  const primaryNavItems = [
     {
       label: t("sidebar.home"),
       path: PUBLIC_ROUTES.home,
@@ -130,34 +202,22 @@ export default function DashboardSidebar({
       icon: LayoutDashboard,
     },
     {
-      label: t("sidebar.userManagement"),
-      path: DASHBOARD_ROUTES.adminUsers,
-      icon: UsersRound,
+      label: t("sidebar.myPlan"),
+      path: DASHBOARD_ROUTES.myPlan,
+      icon: CreditCard,
     },
     {
-      label: t("sidebar.accountAccess", {
-        defaultValue: "Account Access",
-      }),
-      path: DASHBOARD_ROUTES.adminAccountAccess,
-      icon: KeyRound,
+      label: t("sidebar.security"),
+      path: DASHBOARD_ROUTES.settingsSecurity,
+      icon: ShieldCheck,
     },
   ];
 
-  const userNavItemsTop = [
-    {
-      label: t("sidebar.home"),
-      path: PUBLIC_ROUTES.home,
-      icon: Home,
-    },
-    {
-      label: t("sidebar.dashboard"),
-      path: DASHBOARD_ROUTES.dashboard,
-      icon: LayoutDashboard,
-    },
+  const workspaceItems = [
     {
       label: t("sidebar.pageBuilder"),
       path: DASHBOARD_ROUTES.pageBuilder,
-      icon: Grid2X2,
+      icon: PanelsTopLeft,
     },
     {
       label: t("sidebar.submissions"),
@@ -170,27 +230,38 @@ export default function DashboardSidebar({
       icon: Database,
     },
     {
-      label: t("sidebar.archive", {
-        defaultValue: "Archive",
-      }),
+      label: t("sidebar.archive", { defaultValue: "Archive" }),
       path: DASHBOARD_ROUTES.archive,
       icon: Archive,
     },
-    {
-      label: t("sidebar.myPlan"),
-      path: DASHBOARD_ROUTES.myPlan,
-      icon: CreditCard,
-    },
   ];
-
-  const visibleNavItemsTop = isAdminUser ? adminNavItemsTop : userNavItemsTop;
   const normalizedNavSearch = navSearch.trim().toLowerCase();
-  const filteredNavItemsTop = normalizedNavSearch
-    ? visibleNavItemsTop.filter((item) =>
+  const filteredPrimaryNavItems = normalizedNavSearch
+    ? primaryNavItems.filter((item) =>
         item.label.toLowerCase().includes(normalizedNavSearch),
       )
-    : visibleNavItemsTop;
-  const showSettingsLink = true;
+    : primaryNavItems;
+  const filteredWorkspaceItems = normalizedNavSearch
+    ? workspaceItems.filter((item) =>
+        item.label.toLowerCase().includes(normalizedNavSearch),
+      )
+    : workspaceItems;
+  const workspaceLabel = t("sidebar.workspace", {
+    defaultValue: "Workspace",
+  });
+  const showWorkspace =
+    !normalizedNavSearch ||
+    workspaceLabel.toLowerCase().includes(normalizedNavSearch) ||
+    filteredWorkspaceItems.length > 0;
+  const workspaceIsExpanded =
+    (workspaceExpansion.pathname === location.pathname
+      ? workspaceExpansion.open
+      : workspaceRouteActive) ||
+    (Boolean(normalizedNavSearch) && filteredWorkspaceItems.length > 0);
+  const settingsIsExpanded =
+    settingsExpansion.pathname === location.pathname
+      ? settingsExpansion.open
+      : settingsRouteActive;
 
   useEffect(() => {
     applyThemeMode(activeThemeMode);
@@ -259,28 +330,57 @@ export default function DashboardSidebar({
   return (
     <aside
       id={id || "dashboard-sidebar"}
-      className={`admin-sidebar dashboard-sidebar ${
-        compact ? "is-compact" : ""
-      } ${isRtl ? "is-rtl" : "is-ltr"}`}
+      className={`admin-sidebar dashboard-sidebar global-sidebar ${
+        isRtl ? "is-rtl" : "is-ltr"
+      } ${isWorkspaceSidebarCollapsed ? "is-workspace-collapsed" : ""}`.trim()}
       dir={sidebarDir}
       aria-label={t("sidebar.aria")}
       data-user-role={userRole}
     >
       <div className="admin-sidebar-top">
-        <button
-          type="button"
-          className="admin-sidebar-brand"
-          onClick={() => goTo(DASHBOARD_ROUTES.dashboard)}
-          title={t("sidebar.brand")}
-        >
-          <span className="admin-sidebar-icon" aria-hidden="true">
-            M
-          </span>
+        <div className="admin-sidebar-brand-row">
+          <button
+            type="button"
+            className="admin-sidebar-brand"
+            onClick={() => goTo(DASHBOARD_ROUTES.dashboard)}
+            title={t("sidebar.brand")}
+          >
+            <span className="admin-sidebar-icon" aria-hidden="true">
+              M
+            </span>
 
-          <span className="admin-sidebar-brand-text">
-            <strong>{t("sidebar.brand")}</strong>
-          </span>
-        </button>
+            <span className="admin-sidebar-brand-text">
+              <strong>{t("sidebar.brand")}</strong>
+            </span>
+          </button>
+
+          {workspaceRouteActive && (
+            <button
+              type="button"
+              className="admin-sidebar-workspace-collapse"
+              onClick={() =>
+                setWorkspaceSidebarCollapsed((collapsed) => !collapsed)
+              }
+              aria-label={
+                isWorkspaceSidebarCollapsed
+                  ? t("sidebar.expand", { defaultValue: "Expand sidebar" })
+                  : t("sidebar.collapse", { defaultValue: "Collapse sidebar" })
+              }
+              aria-expanded={!isWorkspaceSidebarCollapsed}
+              title={
+                isWorkspaceSidebarCollapsed
+                  ? t("sidebar.expand", { defaultValue: "Expand sidebar" })
+                  : t("sidebar.collapse", { defaultValue: "Collapse sidebar" })
+              }
+            >
+              {isWorkspaceSidebarCollapsed ? (
+                <PanelLeftOpen size={17} aria-hidden="true" />
+              ) : (
+                <PanelLeftClose size={17} aria-hidden="true" />
+              )}
+            </button>
+          )}
+        </div>
 
         <label className="admin-sidebar-search">
           <Search size={16} aria-hidden="true" />
@@ -297,90 +397,163 @@ export default function DashboardSidebar({
           />
         </label>
 
-        {showNotifications && (
-          <NotificationBell
-            compact={compact}
-            className="admin-sidebar-notifications"
-            onNavigate={onNavigate}
-          />
-        )}
-
         <nav className="admin-sidebar-nav" aria-label={t("sidebar.navigation")}>
-          {filteredNavItemsTop.map((item) => {
-            const Icon = item.icon;
+          {showNotifications && (
+            <NotificationBell
+              className="admin-sidebar-notifications"
+              onNavigate={onNavigate}
+            />
+          )}
+
+          {filteredPrimaryNavItems.slice(0, 2).map((item) => {
+            const active = isActive(item.path);
 
             return (
-              <button
-                type="button"
+              <SidebarRow
                 key={item.path}
-                className={isActive(item.path) ? "active" : ""}
+                active={active}
+                icon={item.icon}
+                label={item.label}
                 onClick={() => goTo(item.path)}
-                title={item.label}
-              >
-                <Icon size={18} aria-hidden="true" />
-                <span>{item.label}</span>
-              </button>
+                path={item.path}
+              />
             );
           })}
 
-          <button
-            type="button"
-            className={isActive(DASHBOARD_ROUTES.settingsSecurity) ? "active" : ""}
-            onClick={() => goTo(DASHBOARD_ROUTES.settingsSecurity)}
-            title={t("sidebar.security")}
-          >
-            <ShieldCheck size={18} aria-hidden="true" />
-            <span>{t("sidebar.security")}</span>
-          </button>
+          {showWorkspace && (
+            <div className="admin-sidebar-group">
+              <SidebarRow
+                active={workspaceRouteActive}
+                activeClassName="active-parent"
+                controls="dashboard-sidebar-workspace"
+                expanded={workspaceIsExpanded}
+                icon={PanelsTopLeft}
+                label={workspaceLabel}
+                onClick={() =>
+                  setWorkspaceExpansion({
+                    open: !workspaceIsExpanded,
+                    pathname: location.pathname,
+                  })
+                }
+              />
+
+              {workspaceIsExpanded && (
+                <div
+                  className="admin-sidebar-subnav"
+                  id="dashboard-sidebar-workspace"
+                >
+                  {filteredWorkspaceItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.path);
+
+                    return (
+                      <button
+                        type="button"
+                        key={item.path}
+                        className={active ? "active" : ""}
+                        onClick={() => goTo(item.path)}
+                        title={item.label}
+                        aria-current={active ? "page" : undefined}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {filteredPrimaryNavItems.slice(2).map((item) => {
+            const active = isActive(item.path);
+
+            return (
+              <SidebarRow
+                key={item.path}
+                active={active}
+                icon={item.icon}
+                label={item.label}
+                onClick={() => goTo(item.path)}
+                path={item.path}
+              />
+            );
+          })}
         </nav>
       </div>
 
       <div className="admin-sidebar-bottom">
-        {!hideLanguage && typeof onLanguageChange === "function" && (
-          <LanguageSwitcher
-            current={lang}
-            onChange={onLanguageChange}
-            compact={compact}
-            className="admin-sidebar-lang-switcher"
+        <div className="admin-sidebar-group admin-sidebar-settings-group">
+          <SidebarRow
+            active={settingsRouteActive}
+            activeClassName="active-parent"
+            controls="dashboard-sidebar-settings"
+            expanded={settingsIsExpanded}
+            icon={Settings}
+            label={t("sidebar.settings")}
+            onClick={() =>
+              setSettingsExpansion({
+                open: !settingsIsExpanded,
+                pathname: location.pathname,
+              })
+            }
           />
-        )}
 
-        <button
-          type="button"
-          className="admin-sidebar-logout"
-          onClick={onLogout}
-          title={t("sidebar.logout")}
-        >
-          <LogOut size={18} aria-hidden="true" />
-          <span>{t("sidebar.logout")}</span>
-        </button>
+          {settingsIsExpanded && (
+            <div
+              className="admin-sidebar-subnav admin-sidebar-settings-subnav"
+              id="dashboard-sidebar-settings"
+            >
+              {!hideLanguage && typeof onLanguageChange === "function" && (
+                <div className="admin-sidebar-language-item">
+                  <LanguageSwitcher
+                    current={activeSidebarLanguage}
+                    onChange={onLanguageChange}
+                    className="admin-sidebar-lang-switcher"
+                  />
+                  <span
+                    className="admin-sidebar-language-label"
+                    aria-hidden="true"
+                  >
+                    {t("sidebar.language", { defaultValue: "Language" })}
+                  </span>
+                </div>
+              )}
 
-        {showSettingsLink && (
-          <button
-            type="button"
-            className={`admin-sidebar-utility ${
-              isActive(DASHBOARD_ROUTES.settings) &&
-              !isActive(DASHBOARD_ROUTES.settingsSecurity)
-                ? "active"
-                : ""
-            }`}
-            onClick={() => goTo(DASHBOARD_ROUTES.settings)}
-            title={t("sidebar.settings")}
-          >
-            <Settings size={18} aria-hidden="true" />
-            <span>{t("sidebar.settings")}</span>
-          </button>
-        )}
+              <button
+                type="button"
+                className={`admin-sidebar-utility ${
+                  settingsRouteActive ? "active" : ""
+                }`}
+                onClick={() => goTo(DASHBOARD_ROUTES.settings)}
+                title={t("sidebar.settings")}
+                aria-current={settingsRouteActive ? "page" : undefined}
+              >
+                <Settings size={16} aria-hidden="true" />
+                <span>{t("sidebar.settings")}</span>
+              </button>
 
-        <ThemeToggle
-          mode={activeThemeMode}
-          onChange={handleThemeChange}
-          label={t("sidebar.themeMode")}
-          compact={compact}
-          showLabel
-          showSwitch={!compact}
-          className="admin-sidebar-theme-row"
-        />
+              <ThemeToggle
+                mode={activeThemeMode}
+                onChange={handleThemeChange}
+                label={t("sidebar.themeMode")}
+                showLabel
+                showSwitch
+                className="admin-sidebar-theme-row"
+              />
+
+              <button
+                type="button"
+                className="admin-sidebar-logout"
+                onClick={onLogout}
+                title={t("sidebar.logout")}
+              >
+                <LogOut size={16} aria-hidden="true" />
+                <span>{t("sidebar.logout")}</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="admin-sidebar-user" title={displayName}>
           {user?.avatar ? (
@@ -394,31 +567,30 @@ export default function DashboardSidebar({
           )}
 
           <div className="admin-sidebar-user-info">
-            <div className="admin-sidebar-user-meta-row">
-              {isAdminUser ? (
-                <span
-                  className="admin-sidebar-admin-badge"
-                  title={t("sidebar.admin")}
-                >
-                  <ShieldCheck size={12} aria-hidden="true" />
-                  {t("sidebar.admin")}
-                </span>
-              ) : (
-                <span
-                  className="admin-sidebar-admin-badge"
-                  title={t("sidebar.userRole", {
-                    defaultValue: "User",
-                  })}
-                >
-                  {t("sidebar.userRole", {
-                    defaultValue: "User",
-                  })}
-                </span>
-              )}
-            </div>
-
             <div className="admin-sidebar-user-title-row">
               <strong>{displayName}</strong>
+              <div className="admin-sidebar-user-meta-row">
+                {isAdminUser ? (
+                  <span
+                    className="admin-sidebar-admin-badge"
+                    title={t("sidebar.admin")}
+                  >
+                    <ShieldCheck size={12} aria-hidden="true" />
+                    {t("sidebar.admin")}
+                  </span>
+                ) : (
+                  <span
+                    className="admin-sidebar-admin-badge"
+                    title={t("sidebar.userRole", {
+                      defaultValue: "User",
+                    })}
+                  >
+                    {t("sidebar.userRole", {
+                      defaultValue: "User",
+                    })}
+                  </span>
+                )}
+              </div>
             </div>
 
             {displayEmail && <span>{displayEmail}</span>}

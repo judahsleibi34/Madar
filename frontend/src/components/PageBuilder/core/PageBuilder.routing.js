@@ -153,9 +153,13 @@ export const getLocalTenantPath = (project, path = "/") => {
   return `/site/${subdomain}${cleanPath}`;
 };
 
+export const getProductionAppOrigin = () =>
+  String(import.meta.env.VITE_PUBLIC_APP_URL || "https://madarportal.com")
+    .trim()
+    .replace(/\/+$/, "");
+
 export const getProductionTenantUrl = (project, path = "/") => {
   const subdomain = getProjectSubdomain(project);
-  const baseDomain = project?.publish?.siteBaseDomain || "madar.app";
   const customDomain = project?.publish?.customDomain;
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
 
@@ -163,8 +167,16 @@ export const getProductionTenantUrl = (project, path = "/") => {
     return `https://${customDomain}${cleanPath}`;
   }
 
-  return `https://${subdomain}.${baseDomain}${cleanPath}`;
+  return `${getProductionAppOrigin()}/site/${subdomain}${cleanPath}`;
 };
+
+export const getStandaloneFormPath = (project, formId) => {
+  const subdomain = getProjectSubdomain(project);
+  return `/forms/${subdomain}/${encodeURIComponent(String(formId || ""))}`;
+};
+
+export const getProductionFormUrl = (project, formId) =>
+  `${getProductionAppOrigin()}${getStandaloneFormPath(project, formId)}`;
 
 export const getTenantLoginTarget = (project) => {
   const loginPath = project?.siteChrome?.authPageSlug || "/login";

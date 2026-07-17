@@ -2702,10 +2702,14 @@ body.theme-dark .forms-loading-shimmer,
   color: var(--madar-red);
 }
 
-.forms-section-stack,
-.questions-stack {
+.forms-section-stack {
   display: grid;
   gap: 12px;
+}
+
+.questions-stack {
+  display: grid;
+  gap: 18px;
 }
 
 .forms-section-sheet {
