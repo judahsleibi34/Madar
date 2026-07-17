@@ -7,6 +7,7 @@ import {
   deleteBuilderSiteMember,
   fetchBuilderProject,
   fetchProtectedSitePage,
+  listBuilderProjects,
   fetchBuilderSiteMembers,
   publishBuilderProject,
   updateBuilderProject,
@@ -123,6 +124,26 @@ describe("builder project cloud API", () => {
     expect(apiFetch).toHaveBeenCalledWith(
       "/api/public/sites/tenant-site/pages/member-area",
       { method: "GET", cache: "no-store" }
+    );
+  });
+
+  it("preserves builder project pagination metadata", async () => {
+    apiFetch.mockResolvedValueOnce(jsonResponse({
+      projects: [{ id: "project-21" }],
+      pagination: { limit: 20, offset: 20, count: 1, has_more: false },
+    }));
+
+    const result = await listBuilderProjects({ limit: 20, offset: 20 });
+
+    expect(result.projects).toEqual([{ id: "project-21" }]);
+    expect(result.pagination).toEqual({
+      limit: 20,
+      offset: 20,
+      count: 1,
+      has_more: false,
+    });
+    expect(apiFetch.mock.calls[0][0]).toBe(
+      "/api/builder/projects?limit=20&offset=20"
     );
   });
 });

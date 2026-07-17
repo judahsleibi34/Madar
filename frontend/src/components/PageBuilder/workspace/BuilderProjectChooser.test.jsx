@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,10 +31,13 @@ describe("BuilderProjectChooser", () => {
   });
 
   it("keeps two backend projects explicit and opens the selected one", async () => {
-    listBuilderProjects.mockResolvedValue([
-      { id: "project-a", name: "Alpha", status: "draft" },
-      { id: "project-b", name: "Beta", status: "published" },
-    ]);
+    listBuilderProjects.mockResolvedValue({
+      projects: [
+        { id: "project-a", name: "Alpha", status: "draft" },
+        { id: "project-b", name: "Beta", status: "published" },
+      ],
+      pagination: { limit: 20, offset: 0, count: 2, has_more: false },
+    });
     render(
       <MemoryRouter initialEntries={["/page-builder"]}>
         <BuilderProjectChooser />
@@ -47,14 +50,20 @@ describe("BuilderProjectChooser", () => {
   });
 
   it("does not expose archived projects omitted by the tenant-scoped backend list", async () => {
-    listBuilderProjects.mockResolvedValue([{ id: "active", name: "Active", status: "draft" }]);
+    listBuilderProjects.mockResolvedValue({
+      projects: [{ id: "active", name: "Active", status: "draft" }],
+      pagination: { limit: 20, offset: 0, count: 1, has_more: false },
+    });
     render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
     expect(await screen.findByText("Active")).toBeTruthy();
     expect(screen.queryByText("Archived")).toBeNull();
   });
 
   it("redirects a legacy route with one project to its explicit URL", async () => {
-    listBuilderProjects.mockResolvedValue([{ id: "only-project", name: "Only", status: "draft" }]);
+    listBuilderProjects.mockResolvedValue({
+      projects: [{ id: "only-project", name: "Only", status: "draft" }],
+      pagination: { limit: 20, offset: 0, count: 1, has_more: false },
+    });
     render(
       <MemoryRouter initialEntries={["/page-builder/pages"]}>
         <BuilderProjectChooser autoOpenSingleProject />
@@ -64,5 +73,48 @@ describe("BuilderProjectChooser", () => {
     expect((await screen.findByTestId("location")).textContent)
       .toBe("/page-builder/projects/only-project/pages");
     expect(screen.queryByText("Only")).toBeNull();
+  });
+
+  it("loads projects beyond the first twenty without duplicating records", async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) => ({
+      id: `project-${index + 1}`,
+      name: `Project ${index + 1}`,
+      status: "draft",
+    }));
+    listBuilderProjects
+      .mockResolvedValueOnce({
+        projects: firstPage,
+        pagination: { limit: 20, offset: 0, count: 20, has_more: true },
+      })
+      .mockResolvedValueOnce({
+        projects: [firstPage[19], { id: "project-21", name: "Project 21", status: "draft" }],
+        pagination: { limit: 20, offset: 20, count: 2, has_more: false },
+      });
+
+    render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
+    fireEvent.click(await screen.findByText("Load more projects"));
+
+    expect(await screen.findByText("Project 21")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText("Load more projects")).toBeNull());
+    expect(screen.getAllByText("Project 20")).toHaveLength(1);
+    expect(listBuilderProjects).toHaveBeenNthCalledWith(1, { limit: 20, offset: 0 });
+    expect(listBuilderProjects).toHaveBeenNthCalledWith(2, { limit: 20, offset: 20 });
+  });
+
+  it("keeps loaded projects visible when loading another page fails", async () => {
+    listBuilderProjects
+      .mockResolvedValueOnce({
+        projects: [{ id: "project-1", name: "Project 1", status: "draft" }],
+        pagination: { limit: 20, offset: 0, count: 1, has_more: true },
+      })
+      .mockRejectedValueOnce(new Error("network"));
+
+    render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
+    fireEvent.click(await screen.findByText("Load more projects"));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "More projects could not be loaded"
+    );
+    expect(screen.getByText("Project 1")).toBeTruthy();
   });
 });
