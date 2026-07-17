@@ -668,6 +668,10 @@ class BuilderProjectUnpublish(BaseModel):
     expected_revision: Optional[int] = Field(default=None, ge=0)
 
 
+class BuilderPublicProjectBindingUpdate(BaseModel):
+    project_id: str = Field(..., min_length=1, max_length=80)
+
+
 class BuilderFormSubmissionStatusUpdate(BaseModel):
     status: str = Field(..., min_length=1)
 
@@ -820,6 +824,120 @@ def get_project_for_tenant(project_id: str, tenant_id: int):
         raise HTTPException(status_code=404, detail="Builder project not found")
 
     return project
+
+
+def get_website_settings_record(tenant_id: int) -> dict | None:
+    response = (
+        service_supabase.table("website_settings")
+        .select("*")
+        .eq("tenant_id", tenant_id)
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    return rows[0] if rows else None
+
+
+def get_public_project_binding(tenant_id: int, user_id: int) -> tuple[dict, dict | None]:
+    settings = get_website_settings_record(tenant_id) or {
+        "tenant_id": tenant_id,
+        "user_id": user_id,
+        "published_project_id": None,
+    }
+    project_id = str(settings.get("published_project_id") or "").strip()
+    if not project_id:
+        return settings, None
+
+    project_response = (
+        service_supabase.table("builder_projects")
+        .select("id, tenant_id, name, slug, status, published_version, last_published_at")
+        .eq("id", project_id)
+        .eq("tenant_id", tenant_id)
+        .eq("status", "published")
+        .limit(1)
+        .execute()
+    )
+    projects = getattr(project_response, "data", None) or []
+    return settings, projects[0] if projects else None
+
+
+def format_public_project_binding(settings: dict, project: dict | None) -> dict:
+    public_project = None
+    if project:
+        public_project = {
+            key: project.get(key)
+            for key in (
+                "id",
+                "name",
+                "slug",
+                "status",
+                "published_version",
+                "last_published_at",
+            )
+        }
+    return {
+        "project_id": project.get("id") if project else None,
+        "project": public_project,
+        "subdomain": settings.get("subdomain"),
+    }
+
+
+def reject_bound_project_transition(project_id: str, tenant_id: int) -> None:
+    settings = get_website_settings_record(tenant_id)
+    if settings and str(settings.get("published_project_id") or "") == str(project_id):
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "public_project_bound",
+                "Select another live project before changing this project's published state.",
+            ),
+        )
+
+
+def bind_first_published_project_if_unbound(
+    *, settings: dict, project: dict, tenant_id: int
+) -> tuple[dict, bool]:
+    if settings.get("published_project_id"):
+        return settings, False
+
+    if not settings.get("id"):
+        return settings, False
+
+    project_id = str(project.get("id") or "")
+    existing_response = (
+        service_supabase.table("builder_projects")
+        .select("id")
+        .eq("tenant_id", tenant_id)
+        .eq("status", "published")
+        .not_.is_("published_schema", "null")
+        .limit(2)
+        .execute()
+    )
+    other_projects = [
+        row
+        for row in (getattr(existing_response, "data", None) or [])
+        if str(row.get("id") or "") != project_id
+    ]
+    if other_projects:
+        return settings, False
+
+    update_response = (
+        service_supabase.table("website_settings")
+        .update({"published_project_id": project_id})
+        .eq("id", settings.get("id"))
+        .eq("tenant_id", tenant_id)
+        .execute()
+    )
+    rows = getattr(update_response, "data", None) or []
+    if not rows:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "public_project_binding_conflict",
+                "The live project selection changed. Reload and try again.",
+            ),
+        )
+    return rows[0], True
 
 def format_form_submission(row: dict):
     return {
@@ -1142,6 +1260,90 @@ def update_builder_reservation_status(
         )
 
     return {"success": True, "reservation": format_reservation(reservation)}
+
+
+@router.get("/builder/site-binding")
+def get_builder_site_binding(request: Request, response: Response):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    settings, project = get_public_project_binding(context.tenant_id, context.user_id)
+    return {
+        "success": True,
+        "binding": format_public_project_binding(settings, project),
+    }
+
+
+@router.put("/builder/site-binding")
+def update_builder_site_binding(
+    binding: BuilderPublicProjectBindingUpdate,
+    request: Request,
+    response: Response,
+):
+    require_supported_builder_client(request)
+    context = require_builder_context(request, response, require_builder_admin_access)
+    project = get_project_for_tenant(binding.project_id, context.tenant_id)
+    if (
+        str(project.get("status") or "").lower() != "published"
+        or not isinstance(project.get("published_schema"), dict)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "public_project_not_published",
+                "Publish this project before making it live.",
+            ),
+        )
+
+    settings = get_website_settings_record(context.tenant_id)
+    if not settings:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "website_settings_required",
+                "Configure website settings before selecting a live project.",
+            ),
+        )
+    previous_project_id = settings.get("published_project_id")
+    try:
+        update_response = (
+            service_supabase.table("website_settings")
+            .update({"published_project_id": project.get("id")})
+            .eq("id", settings.get("id"))
+            .eq("tenant_id", context.tenant_id)
+            .execute()
+        )
+    except Exception as error:
+        if "public_project_binding_invalid" in str(error).lower():
+            raise HTTPException(
+                status_code=409,
+                detail=error_detail(
+                    "public_project_binding_invalid",
+                    "The selected project cannot be made live.",
+                ),
+            )
+        raise
+    rows = getattr(update_response, "data", None) or []
+    if not rows:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "public_project_binding_conflict",
+                "The live project selection changed. Reload and try again.",
+            ),
+        )
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.public_project_bound",
+        target_type="builder_project",
+        target_id=str(project.get("id") or ""),
+        metadata={"previous_project_id": previous_project_id},
+    )
+    return {
+        "success": True,
+        "binding": format_public_project_binding(rows[0], project),
+    }
 
 
 @router.get("/users/{user_id}/builder/projects", include_in_schema=False)
@@ -1563,6 +1765,7 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
     require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_admin_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
+    reject_bound_project_transition(project_id, context.tenant_id)
 
     archive_query = (
         service_supabase.table("builder_projects")
@@ -1804,6 +2007,11 @@ def publish_builder_project(
             entitlement.get("enforced") and entitlement.get("source") == "feature"
         ),
     )
+    website_settings, binding_created = bind_first_published_project_if_unbound(
+        settings=website_settings,
+        project=published_project,
+        tenant_id=context.tenant_id,
+    )
 
     logger.info(
         "builder.project_published",
@@ -1820,6 +2028,7 @@ def publish_builder_project(
             "project_slug": project.get("slug"),
             "project_name": project.get("name"),
             "published_version": published_project.get("published_version"),
+            "public_binding_created": binding_created,
         },
     )
 
@@ -1829,6 +2038,7 @@ def publish_builder_project(
         "site": {
             "subdomain": website_settings.get("subdomain"),
             "tenant_id": website_settings.get("tenant_id"),
+            "published_project_id": website_settings.get("published_project_id"),
         },
     }
 
@@ -1844,6 +2054,7 @@ def unpublish_builder_project(
     require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_write_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
+    reject_bound_project_transition(project_id, context.tenant_id)
     current_revision = _project_revision(project)
     requested_revision = getattr(unpublish, "expected_revision", None) if unpublish else None
     if "draft_revision" in project and requested_revision is None:

@@ -216,17 +216,22 @@ def build_cancellation_token(
     return secrets.token_urlsafe(32)
 
 
-def get_latest_published_project_for_tenant(tenant_id: int):
+def get_bound_published_project(settings: dict):
+    tenant_id = resolve_tenant_id(settings)
+    project_id = str(settings.get("published_project_id") or "").strip()
+    if not project_id:
+        raise HTTPException(status_code=404, detail="Published site not found")
+
     project_response = (
         service_supabase.table("builder_projects")
         .select(
             "id, tenant_id, name, slug, status, published_schema, "
             "published_version, last_published_at, updated_at"
         )
+        .eq("id", project_id)
         .eq("tenant_id", tenant_id)
         .eq("status", "published")
         .not_.is_("published_schema", "null")
-        .order("last_published_at", desc=True)
         .limit(1)
         .execute()
     )
@@ -268,31 +273,13 @@ def find_form_in_schema(schema: dict, form_id: str) -> dict:
     raise HTTPException(status_code=404, detail="Form not found")
 
 
-def get_saved_form_for_tenant(tenant_id: int, form_id: str):
-    project_response = (
-        service_supabase.table("builder_projects")
-        .select("id, tenant_id, status, draft_schema, draft_revision, updated_at")
-        .eq("tenant_id", tenant_id)
-        .neq("status", "archived")
-        .not_.is_("draft_schema", "null")
-        .order("updated_at", desc=True)
-        .limit(100)
-        .execute()
-    )
-
-    for project in getattr(project_response, "data", None) or []:
-        draft_schema = project.get("draft_schema")
-        if not isinstance(draft_schema, dict):
-            continue
-        try:
-            form = find_form_in_schema(draft_schema, form_id)
-        except HTTPException as error:
-            if error.status_code == 404:
-                continue
-            raise
-        return project, form, draft_schema
-
-    raise HTTPException(status_code=404, detail="Form not found")
+def get_bound_published_form(settings: dict, form_id: str):
+    project = get_bound_published_project(settings)
+    published_schema = project.get("published_schema")
+    if not isinstance(published_schema, dict):
+        raise HTTPException(status_code=404, detail="Form not found")
+    form = find_form_in_schema(published_schema, form_id)
+    return project, form, published_schema
 
 
 def build_public_site_profile(settings: dict, subdomain: str) -> dict:
@@ -1126,10 +1113,8 @@ def get_public_site(subdomain: str, request: Request):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
     settings = resolve_website_settings(clean_subdomain)
-    tenant_id = resolve_tenant_id(settings)
-
     try:
-        project = get_latest_published_project_for_tenant(tenant_id)
+        project = get_bound_published_project(settings)
     except HTTPException as error:
         if error.status_code != 404:
             raise
@@ -1160,15 +1145,14 @@ def get_public_form(subdomain: str, form_id: str, request: Request):
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain)
-    tenant_id = resolve_tenant_id(settings)
-    _, form, draft_schema = get_saved_form_for_tenant(tenant_id, clean_form_id)
+    _, form, published_schema = get_bound_published_form(settings, clean_form_id)
 
     return {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain),
         "form": build_public_form(form),
-        "theme": draft_schema.get("theme") or {},
-        "language": draft_schema.get("language") or draft_schema.get("lang") or "en",
+        "theme": published_schema.get("theme") or {},
+        "language": published_schema.get("language") or published_schema.get("lang") or "en",
     }
 
 
@@ -1198,7 +1182,7 @@ def submit_public_builder_form(
 
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
-    project, form, _ = get_saved_form_for_tenant(tenant_id, clean_form_id)
+    project, form, _ = get_bound_published_form(settings, clean_form_id)
 
     answers = submission.answers or {}
     validate_public_answer_payload_limits(answers)
@@ -1286,7 +1270,7 @@ def submit_public_builder_block_event(
 
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
-    project = get_latest_published_project_for_tenant(tenant_id)
+    project = get_bound_published_project(settings)
 
     if project.get("status") != "published":
         raise HTTPException(status_code=404, detail="Published site not found")

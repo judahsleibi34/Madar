@@ -1027,6 +1027,7 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
         with patch.object(builder_routes, "service_supabase", fake), \
              patch.object(builder_routes, "require_builder_write_access", return_value=_builder_context()), \
              patch.object(builder_routes, "get_project_for_tenant", return_value=project), \
+             patch.object(builder_routes, "get_website_settings_record", return_value=None), \
              patch.object(builder_routes, "record_audit_event"):
             response = client.post(
                 "/builder/projects/project-1/unpublish",

@@ -101,6 +101,7 @@ class FakeSupabase:
                     "user_id": 3,
                     "subdomain": "fresh-site",
                     "brand": "Fresh Brand",
+                    "published_project_id": "project-1",
                 }
             ],
             "builder_projects": [
