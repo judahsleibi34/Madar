@@ -7,6 +7,7 @@ export const createBuilderSaveEntry = ({
   repairs = [],
   silent = true,
   successMessage = "",
+  force = false,
 } = {}) => ({
   project,
   snapshot: String(snapshot || ""),
@@ -14,6 +15,7 @@ export const createBuilderSaveEntry = ({
   repairs,
   silent,
   successMessage,
+  force: Boolean(force),
   requestedAt: Date.now(),
 });
 
@@ -58,7 +60,7 @@ export const createBuilderSaveCoordinator = ({
 
     while (entry) {
       if (!isCurrent(generation, projectId)) return { status: "obsolete" };
-      if (entry.snapshot === getAcknowledgedSnapshot?.()) {
+      if (entry.snapshot === getAcknowledgedSnapshot?.() && !entry.force) {
         entry = reconcileQueue();
         continue;
       }
@@ -93,7 +95,7 @@ export const createBuilderSaveCoordinator = ({
   const requestSave = (entry) => {
     if (!entry?.snapshot) return Promise.resolve({ status: "failed" });
     invalidated = false;
-    if (entry.snapshot === getAcknowledgedSnapshot?.() && !activePromise) {
+    if (entry.snapshot === getAcknowledgedSnapshot?.() && !entry.force && !activePromise) {
       return Promise.resolve(savedResult({
         revision: Number(getRevision?.()),
         snapshot: entry.snapshot,

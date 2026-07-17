@@ -34,6 +34,7 @@
 @import "./admin/dashboard/index.css";
 @import "./admin/MyPlanPage.css";
 @import "./admin/PageBuilder/index.css";
+@import "/src/styles/admin/PageBuilder/project-chooser.css";
 @import "./theme-refinement.css";
 @import "./route-refinement.css";
 @import "/src/styles/dark-compact-summaries.css";
@@ -42,6 +43,7 @@
 @import "/src/styles/theme-transition.css";
 /* Canonical Page Builder geometry must follow legacy route refinements. */
 @import "./admin/PageBuilder/workspace-stability.css";
+@import "/src/styles/admin/PageBuilder/footer-responsive.css";
 
 /* ============================================================
    TEMP: Builder demo route styles

@@ -83,16 +83,63 @@
   background: var(--form-theme-bg);
 }
 
-.tenant-runtime-standalone-form {
-  width: min(760px, 100%);
+.tenant-site-standalone-form {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page {
+  width: min(760px, calc(100% - 32px));
   min-width: 0;
-  height: fit-content;
+  min-height: clamp(520px, 70dvh, 900px);
   margin-inline: auto;
-  border: 1px solid var(--form-theme-border);
-  border-radius: var(--form-theme-radius);
-  padding: clamp(18px, 4vw, 36px);
-  background: var(--form-theme-surface);
-  box-shadow: 0 18px 48px rgba(var(--theme-shadow-rgb), 0.1);
+  padding: 0 !important;
+  place-items: stretch;
+  background: transparent !important;
+}
+
+.tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page > .runtime-form {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  gap: 0;
+  overflow: hidden;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+.tenant-site-runtime.tenant-site-standalone-form
+  .tenant-runtime-form-page > .runtime-form > .runtime-form-header:empty {
+  display: none;
+}
+
+/* Standalone published forms use one continuous white surface. Keep this
+   scoped away from the page-builder canvas so saved editor theme previews
+   remain unchanged. */
+.tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page,
+.tenant-site-runtime.tenant-site-standalone-form
+  .tenant-runtime-form-page > .runtime-form,
+.tenant-site-runtime.tenant-site-standalone-form
+  .tenant-runtime-form-page .runtime-form-header,
+.tenant-site-runtime.tenant-site-standalone-form
+  .tenant-runtime-form-page .runtime-form-section,
+.tenant-site-runtime.tenant-site-standalone-form
+  .tenant-runtime-form-page .runtime-form-section-header,
+.tenant-site-runtime.tenant-site-standalone-form
+  .tenant-runtime-form-page .runtime-question,
+.tenant-site-runtime.tenant-site-standalone-form
+  .tenant-runtime-form-page .runtime-form-pagination {
+  background: white !important;
+}
+
+.tenant-site-runtime.tenant-site-standalone-form
+  .runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.tenant-site-runtime.tenant-site-standalone-form .runtime-question textarea,
+.tenant-site-runtime.tenant-site-standalone-form .runtime-question select {
+  background: white !important;
 }
 
 /* Runtime forms are content, not fixed-size canvas artwork. Let their real

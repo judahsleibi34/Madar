@@ -68,6 +68,36 @@ describe("builder save coordinator", () => {
     expect(h.revision()).toBe(90);
   });
 
+  it("forces an explicit manual save through to the server even when already acknowledged", async () => {
+    const h = harness({ revision: 89, snapshot: "base" });
+    const manualEntry = createBuilderSaveEntry({
+      project: { value: "base" },
+      snapshot: "base",
+      reason: "manual",
+      silent: false,
+      force: true,
+    });
+
+    await h.coordinator.requestSave(manualEntry);
+
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.dispatches[0].entry).toMatchObject({ force: true, reason: "manual" });
+    expect(h.dispatches[0].context.expectedRevision).toBe(89);
+    expect(h.revision()).toBe(90);
+  });
+
+  it("continues to deduplicate unchanged autosaves", async () => {
+    const h = harness({ revision: 89, snapshot: "base" });
+
+    await h.coordinator.requestSave(createBuilderSaveEntry({
+      project: { value: "base" },
+      snapshot: "base",
+    }));
+
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.revision()).toBe(89);
+  });
+
   it("coalesces callers and serializes only the newest edit", async () => {
     const h = harness();
     const first = deferred();

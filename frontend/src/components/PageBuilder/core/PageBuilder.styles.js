@@ -1,3 +1,5 @@
+import { clampElementToBounds } from "./PageBuilder.bounds";
+
 export const getBuilderElementStyle = ({
   element,
   selected,
@@ -51,6 +53,7 @@ export const getBuilderFreeElementStyle = ({
   getSectionCanvasHeight,
   getMetricMinimumHeight,
   getDirectElementMinimumSize,
+  canvasScale = 1,
 }) => {
   const pos = element.position?.[viewport] || createPosition()[viewport];
   const location = findElementLocation(element.id);
@@ -58,37 +61,35 @@ export const getBuilderFreeElementStyle = ({
   const viewportWidth = viewports[viewport] || viewports.desktop;
   const sectionHeight = getSectionCanvasHeight(section, viewport);
   const minimumSize = getDirectElementMinimumSize(element);
-  const x = Math.max(
-    0,
-    Math.min(
-      Number(pos.x) || 0,
-      viewportWidth - Math.min(minimumSize.width, viewportWidth)
-    )
+  const clamped = clampElementToBounds(
+    {
+      ...pos,
+      width: Number(pos.width) || 240,
+      height: Number(pos.height) || 80,
+    },
+    { x: 0, y: 0, width: viewportWidth, height: sectionHeight },
+    {
+      minWidth: minimumSize.width,
+      minHeight: minimumSize.height,
+      allowBottomOverflow: true,
+    }
   );
-  const y = Math.max(0, Math.min(Number(pos.y) || 0, sectionHeight));
-  const width = Math.max(
-    1,
-    Math.min(
-      Math.max(Number(pos.width) || 240, minimumSize.width),
-      viewportWidth - x
-    )
-  );
-  const height = Math.max(minimumSize.height, Number(pos.height) || 80);
+  const { x, y, width, height } = clamped;
 
   return {
     position: "absolute",
     left: 0,
     top: 0,
-    width: `${width}px`,
-    height: `${height}px`,
+    width: `${width * canvasScale}px`,
+    height: `${height * canvasScale}px`,
     minHeight:
       element.type === "metric" || element.type === "list"
-        ? `${getMetricMinimumHeight(element)}px`
+        ? `${getMetricMinimumHeight(element) * canvasScale}px`
         : element.type === "reservationBlock"
-          ? `${getDirectElementMinimumSize(element).height}px`
+          ? `${getDirectElementMinimumSize(element).height * canvasScale}px`
         : undefined,
-    maxWidth: `${Math.max(1, viewportWidth - x)}px`,
-    transform: `translate3d(${x}px, ${y}px, 0)`,
+    maxWidth: `${Math.max(1, viewportWidth - x) * canvasScale}px`,
+    transform: `translate3d(${x * canvasScale}px, ${y * canvasScale}px, 0)`,
   };
 };
 

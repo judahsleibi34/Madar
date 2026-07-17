@@ -44,14 +44,14 @@ export default function PageBuilderModals({
 
       {userPendingDelete && (
         <PageDeleteConfirmModal
-          title="Delete this user?"
+          title="Remove website access?"
           message={
             <>
-              <strong>"{userPendingDelete.name || userPendingDelete.email}"</strong> will be removed from this builder project. This cannot be undone.
+              <strong>"{userPendingDelete.name || userPendingDelete.email}"</strong> will no longer be able to sign in to this subdomain. Their global account will not be deleted.
             </>
           }
           cancelLabel="Keep user"
-          confirmLabel="Delete user"
+          confirmLabel="Remove access"
           onCancel={() => setUserPendingDelete(null)}
           onConfirm={confirmDeletePendingUser}
         />

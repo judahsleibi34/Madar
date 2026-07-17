@@ -13,7 +13,7 @@ const sections = [{
 }];
 
 describe("direct interaction commit safety", () => {
-  it("keeps pointer previews transient and commits geometry and height once on release", () => {
+  it("commits geometry and persists downward canvas growth on release", () => {
     const updateSections = vi.fn((updater) => updater(sections));
     let transientFrame = originalFrame;
 

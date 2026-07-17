@@ -1,5 +1,6 @@
 import { viewports } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
+import { clampElementToBounds } from "./PageBuilder.bounds";
 
 export const getSectionElements = (section) => {
   const autoElements = (section.rows || []).flatMap((row) =>
@@ -472,42 +473,38 @@ export const getDragCandidatePosition = ({
   selectedElement,
   canvasWidth,
   canvasHeight,
+  bounds = {
+    x: 0,
+    y: 0,
+    width: canvasWidth,
+    height: canvasHeight,
+  },
+  allowBottomOverflow = false,
   snapToGrid,
 }) => {
   const minimumSize = getDirectElementMinimumSize(selectedElement);
   const roundPixel = (value) => Math.round(Number(value) || 0);
-
-  return dragState.interaction === "resize"
-    ? (() => {
-        const availableWidth = Math.max(0, canvasWidth - dragState.startX);
-        const nextWidth = Math.max(
-          Math.min(minimumSize.width, availableWidth),
-          roundPixel(dragState.startWidth + dragState.deltaX)
-        );
-        const nextHeight = Math.max(
-          minimumSize.height,
-          roundPixel(dragState.startHeight + dragState.deltaY)
-        );
-
-        return {
+  const resizing = dragState.interaction === "resize";
+  const candidate = resizing
+    ? {
         x: dragState.startX,
         y: dragState.startY,
-        width: Math.min(availableWidth, nextWidth),
-        height: nextHeight,
-      };
-    })()
+        width: roundPixel(dragState.startWidth + dragState.deltaX),
+        height: roundPixel(dragState.startHeight + dragState.deltaY),
+      }
     : {
-        x: Math.min(
-          canvasWidth - dragState.startWidth,
-          Math.max(0, snapToGrid(dragState.startX + dragState.deltaX))
-        ),
-        y: Math.min(
-          canvasHeight - dragState.startHeight,
-          Math.max(0, snapToGrid(dragState.startY + dragState.deltaY))
-        ),
+        x: snapToGrid(dragState.startX + dragState.deltaX),
+        y: snapToGrid(dragState.startY + dragState.deltaY),
         width: dragState.startWidth,
         height: dragState.startHeight,
       };
+
+  return clampElementToBounds(candidate, bounds, {
+    minWidth: minimumSize.width,
+    minHeight: minimumSize.height,
+    mode: resizing ? "resize" : "move",
+    allowBottomOverflow,
+  });
 };
 
 export const getMovedElementPosition = ({
@@ -516,6 +513,9 @@ export const getMovedElementPosition = ({
   viewport,
   event,
   frameRect,
+  canvasScale = 1,
+  activeBounds = null,
+  activePoint = null,
   viewports,
   createPosition,
   getSectionCanvasHeight,
@@ -527,31 +527,41 @@ export const getMovedElementPosition = ({
     const canvasWidth = viewports[viewportName] || viewports.desktop;
     const canvasHeight = getSectionCanvasHeight(targetSection, viewportName);
     const width = Math.min(Number(current.width) || 240, canvasWidth);
-    const height = Math.min(Number(current.height) || 80, canvasHeight);
+    const height = Number(current.height) || 80;
 
-    nextPosition[viewportName] = {
-      ...current,
-      width,
-      height,
-      x: Math.max(0, Math.min(Number(current.x) || 0, canvasWidth - width)),
-      y: Math.max(0, Math.min(Number(current.y) || 0, canvasHeight - height)),
-    };
+    nextPosition[viewportName] = clampElementToBounds(
+      { ...current, width, height },
+      { x: 0, y: 0, width: canvasWidth, height: canvasHeight },
+      {
+        minWidth: getDirectElementMinimumSize(selectedElement).width,
+        minHeight: getDirectElementMinimumSize(selectedElement).height,
+        allowBottomOverflow: true,
+      }
+    );
   });
 
   const activePosition = nextPosition[viewport];
-  activePosition.x = Math.max(
-    0,
-    Math.min(
-      Math.round(event.clientX - frameRect.left - activePosition.width / 2),
-      (viewports[viewport] || viewports.desktop) - activePosition.width
-    )
-  );
-  activePosition.y = Math.max(
-    0,
-    Math.min(
-      Math.round(event.clientY - frameRect.top - activePosition.height / 2),
-      getSectionCanvasHeight(targetSection, viewport) - activePosition.height
-    )
+  const pointer = activePoint || {
+    x: (event.clientX - frameRect.left) / canvasScale,
+    y: (event.clientY - frameRect.top) / canvasScale,
+  };
+  nextPosition[viewport] = clampElementToBounds(
+    {
+      ...activePosition,
+      x: Math.round(pointer.x - activePosition.width / 2),
+      y: Math.round(pointer.y - activePosition.height / 2),
+    },
+    activeBounds || {
+      x: 0,
+      y: 0,
+      width: viewports[viewport] || viewports.desktop,
+      height: getSectionCanvasHeight(targetSection, viewport),
+    },
+    {
+      minWidth: getDirectElementMinimumSize(selectedElement).width,
+      minHeight: getDirectElementMinimumSize(selectedElement).height,
+      allowBottomOverflow: true,
+    }
   );
 
   return nextPosition;

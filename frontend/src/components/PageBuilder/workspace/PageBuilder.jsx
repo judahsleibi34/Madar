@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlignCenter,
@@ -86,11 +86,15 @@ import {
   WorkflowsTab,
 } from "../tabs";
 import {
+  createBuilderSiteMember,
+  deleteBuilderSiteMember,
   fetchBuilderProject,
+  fetchBuilderSiteMembers,
   fetchWebsiteSettings,
   publishBuilderProject,
   unpublishBuilderProject,
   updateBuilderProject,
+  updateBuilderSiteMember,
   uploadBuilderAsset,
 } from "../services/PageBuilder.api";
 import {
@@ -149,7 +153,6 @@ import {
   directElementHeight,
   estimateFormBlockHeight,
   getMetricItems,
-  getMinimumBuilderSectionHeight,
   getMetricMinimumHeight,
   getDirectElementMinimumSize,
   getSectionCanvasHeight,
@@ -162,6 +165,12 @@ import {
   createMovedFreeElement,
   commitDirectElementInteraction,
 } from "../core/PageBuilder.layout";
+import {
+  clampElementToBounds,
+  clientPointToCanvasLocal,
+  getCanvasLocalGeometry,
+  getImmediateParentCanvasGeometry,
+} from "../core/PageBuilder.bounds";
 import {
   buildFormConnectionUpdate,
   cleanBuilderProject,
@@ -520,12 +529,13 @@ const withDefaultLandingPage = (project = {}) => {
 const getColorInputValue = (value, fallback) =>
   /^#[0-9a-f]{6}$/i.test(String(value || "")) ? value : fallback;
 
-function BuilderSidebarActions({
+export function BuilderSidebarActions({
   isSavingProject,
   lastCloudSavedAt,
   onSave,
   onGoLive,
   publicationState,
+  saveDisabled = false,
   saveState,
 }) {
   const [isPublishing, setIsPublishing] = useState(false);
@@ -549,17 +559,21 @@ function BuilderSidebarActions({
           ? ` at ${lastCloudSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
           : ""}
       </p>
-      {saveState === BUILDER_SAVE_STATES.saveFailed && (
-        <button
-          type="button"
-          className="page-secondary-action builder-sidebar-save-button"
-          disabled={isSavingProject || !onSave}
-          onClick={() => onSave?.()}
-        >
-          <Save size={17} aria-hidden="true" />
-          <span>{isSavingProject ? "Retrying..." : "Retry save"}</span>
-        </button>
-      )}
+      <button
+        type="button"
+        className="page-primary-action builder-sidebar-save-button"
+        disabled={isSavingProject || saveDisabled || !onSave}
+        onClick={() => onSave?.()}
+      >
+        <Save size={17} aria-hidden="true" />
+        <span>
+          {isSavingProject
+            ? "Saving..."
+            : saveState === BUILDER_SAVE_STATES.saveFailed
+              ? "Retry save"
+              : "Save"}
+        </span>
+      </button>
       <p className="builder-note" data-testid="builder-publication-state">
         {saveState === BUILDER_SAVE_STATES.conflict
           ? "Publish blocked by conflict"
@@ -639,6 +653,7 @@ export default function PageBuilder({
   const [designPanel, setDesignPanelState] = useState(routeDesignPanel || "Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
+  const [canvasScale, setCanvasScale] = useState(1);
   const [selected, setSelected] = useState(() => ({
     type: "page",
     id: getDefaultBuilderPageId(project) || null,
@@ -671,11 +686,16 @@ export default function PageBuilder({
   const [isUnpublishingProject, setIsUnpublishingProject] = useState(false);
   const [liveSitePath, setLiveSitePath] = useState("");
   const [websiteSettings, setWebsiteSettings] = useState(null);
+  const [siteMembers, setSiteMembers] = useState([]);
+  const [siteMembersLoading, setSiteMembersLoading] = useState(false);
+  const [siteMembersError, setSiteMembersError] = useState("");
+  const [siteMemberMutationId, setSiteMemberMutationId] = useState("");
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
   const projectRef = useRef(project);
+  const canvasShellRef = useRef(null);
   const dragPreviewFrameRef = useRef(null);
   const pendingDragPreviewRef = useRef(null);
   const recentMetricAddRef = useRef(null);
@@ -717,6 +737,31 @@ export default function PageBuilder({
     setToast(message);
     window.setTimeout(() => setToast(""), 2200);
   }, []);
+
+  const loadSiteMembers = useCallback(async () => {
+    if (demoMode) {
+      setSiteMembers(Array.isArray(projectRef.current?.users) ? projectRef.current.users : []);
+      setSiteMembersError("");
+      return;
+    }
+    if (!routeProjectId) return;
+
+    setSiteMembersLoading(true);
+    setSiteMembersError("");
+    try {
+      const members = await fetchBuilderSiteMembers(routeProjectId);
+      setSiteMembers(Array.isArray(members) ? members : []);
+    } catch (error) {
+      setSiteMembersError(error?.message || "Could not load subdomain users.");
+    } finally {
+      setSiteMembersLoading(false);
+    }
+  }, [demoMode, routeProjectId]);
+
+  useEffect(() => {
+    if (activeTab !== "users") return;
+    loadSiteMembers();
+  }, [activeTab, loadSiteMembers]);
 
   const stopAllCloudScheduling = useCallback(() => {
     stopBuilderSaveScheduling({
@@ -769,6 +814,44 @@ export default function PageBuilder({
     projectRef.current = project;
   }, [project]);
 
+  useLayoutEffect(() => {
+    const shell = canvasShellRef.current;
+    if (!shell || activeTab !== "design") return undefined;
+
+    const updateCanvasScale = () => {
+      if (preview && viewport === "desktop") {
+        setCanvasScale(1);
+        return;
+      }
+
+      const computedStyle = window.getComputedStyle(shell);
+      const horizontalPadding =
+        (Number.parseFloat(computedStyle.paddingLeft) || 0) +
+        (Number.parseFloat(computedStyle.paddingRight) || 0);
+      const availableWidth = Math.max(0, shell.clientWidth - horizontalPadding);
+      const viewportWidth = Number(viewports[viewport] || viewports.desktop) || 1;
+
+      if (!availableWidth) return;
+
+      const nextScale = Math.min(1, Math.max(0.25, availableWidth / viewportWidth));
+      setCanvasScale((current) =>
+        Math.abs(current - nextScale) > 0.001 ? nextScale : current
+      );
+    };
+
+    updateCanvasScale();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateCanvasScale);
+      return () => window.removeEventListener("resize", updateCanvasScale);
+    }
+
+    const observer = new ResizeObserver(updateCanvasScale);
+    observer.observe(shell);
+
+    return () => observer.disconnect();
+  }, [activeTab, preview, viewport]);
+
   useEffect(() => () => {
     serverAdoptionGenerationRef.current += 1;
     saveCoordinatorRef.current?.invalidate();
@@ -803,6 +886,19 @@ export default function PageBuilder({
   useEffect(() => {
     dragStateRef.current = dragState;
   }, [dragState]);
+
+  useEffect(() => {
+    if (selected.type !== "element" || !selected.id) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      const elementFrame = canvasShellRef.current?.querySelector(
+        `[data-builder-element-id="${CSS.escape(String(selected.id))}"]`
+      );
+      elementFrame?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [selected.id, selected.type, viewport]);
 
   useEffect(() => {
     const pending = recentMetricAddRef.current;
@@ -1403,6 +1499,22 @@ export default function PageBuilder({
     setProject((prev) => updater(prev));
   }, []);
 
+  useEffect(() => {
+    if (activeTab !== "users") return;
+    if (safeProjectRoles.some((role) => role.id === "customer")) return;
+
+    const customerRole = {
+      ...createRole("Customer"),
+      id: "customer",
+      description: "Default role for people who register on the published site.",
+    };
+    updateProject((current) => ({
+      ...current,
+      roles: [...(current.roles || []), customerRole],
+      activeRoleId: current.activeRoleId || customerRole.id,
+    }));
+  }, [activeTab, safeProjectRoles, updateProject]);
+
   const setThemeMode = (mode) => {
     updateProject((prev) => applyThemeModeToProject(prev, mode));
   };
@@ -1419,6 +1531,154 @@ export default function PageBuilder({
   const updateSections = useCallback((updater) => {
     updateActivePage((page) => ({ ...page, sections: updater(page.sections) }));
   }, [updateActivePage]);
+
+  const getFrameGeometry = useCallback(
+    (frame) => getCanvasLocalGeometry(frame, { coordinateScale: canvasScale }),
+    [canvasScale]
+  );
+
+  const getElementParentGeometry = useCallback((elementId) => {
+    const elementFrame = canvasShellRef.current?.querySelector(
+      `[data-builder-element-id="${CSS.escape(String(elementId))}"]`
+    );
+    return getImmediateParentCanvasGeometry(elementFrame, {
+      coordinateScale: canvasScale,
+    });
+  }, [canvasScale]);
+
+  useLayoutEffect(() => {
+    if (activeTab !== "design" || !canvasShellRef.current) return undefined;
+
+    let animationFrame = null;
+    const revalidateProjectGeometry = () => {
+      const liveBoundsBySection = new Map(
+        Array.from(
+          canvasShellRef.current?.querySelectorAll(".direct-layout-frame[data-section-id]") || []
+        ).map((frame) => [
+          frame.dataset.sectionId,
+          (() => {
+            const bounds = getFrameGeometry(frame)?.bounds;
+            return bounds?.width > 0 && bounds?.height > 0 ? bounds : null;
+          })(),
+        ])
+      );
+
+      updateProject((currentProject) => {
+        let projectChanged = false;
+        const pages = (currentProject.pages || []).map((page) => {
+          let pageChanged = false;
+          const sections = (page.sections || []).map((section) => {
+            if (section.mode !== "direct" || !(section.freeElements || []).length) return section;
+
+            let sectionChanged = false;
+            const freeElements = section.freeElements.map((element) => {
+              const minimumSize = getDirectElementMinimumSize(element);
+              let positionChanged = false;
+              const position = { ...(element.position || {}) };
+
+              ["desktop", "tablet", "mobile"].forEach((viewportName) => {
+                if (!element.position?.[viewportName]) return;
+                const current = element.position?.[viewportName] || createPosition()[viewportName];
+                const liveBounds =
+                  page.id === currentProject.activePageId && viewportName === viewport
+                    ? liveBoundsBySection.get(section.id)
+                    : null;
+                const bounds = liveBounds || {
+                  x: 0,
+                  y: 0,
+                  width: viewports[viewportName] || viewports.desktop,
+                  height: getSectionCanvasHeight(section, viewportName),
+                };
+                const clamped = clampElementToBounds(current, bounds, {
+                  minWidth: minimumSize.width,
+                  minHeight: minimumSize.height,
+                  allowBottomOverflow: true,
+                });
+                const changed = ["x", "y", "width", "height"].some(
+                  (key) => Math.abs((Number(current[key]) || 0) - clamped[key]) > 0.001
+                );
+                if (!changed) return;
+                position[viewportName] = clamped;
+                positionChanged = true;
+              });
+
+              if (!positionChanged) return element;
+              sectionChanged = true;
+              return { ...element, position };
+            });
+
+            const minHeightByViewport = { ...(section.layout?.minHeightByViewport || {}) };
+            let layoutChanged = false;
+            ["desktop", "tablet", "mobile"].forEach((viewportName) => {
+              const currentHeight = getSectionCanvasHeight(section, viewportName);
+              const requiredHeight = freeElements.reduce((maximum, element) => {
+                const position = element.position?.[viewportName];
+                if (!position) return maximum;
+                return Math.max(
+                  maximum,
+                  (Number(position.y) || 0) + (Number(position.height) || 0) + 48
+                );
+              }, currentHeight);
+              if (requiredHeight <= currentHeight) return;
+              minHeightByViewport[viewportName] = requiredHeight;
+              layoutChanged = true;
+            });
+
+            if (!sectionChanged && !layoutChanged) return section;
+            pageChanged = true;
+            return {
+              ...section,
+              ...(layoutChanged
+                ? {
+                    layout: {
+                      ...(section.layout || {}),
+                      minHeight: minHeightByViewport.desktop,
+                      minHeightByViewport,
+                    },
+                  }
+                : {}),
+              freeElements,
+            };
+          });
+
+          if (!pageChanged) return page;
+          projectChanged = true;
+          return { ...page, sections };
+        });
+
+        return projectChanged ? { ...currentProject, pages } : currentProject;
+      });
+    };
+
+    const scheduleRevalidation = () => {
+      if (animationFrame !== null) return;
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = null;
+        revalidateProjectGeometry();
+      });
+    };
+
+    revalidateProjectGeometry();
+    const frames = Array.from(
+      canvasShellRef.current.querySelectorAll(".direct-layout-frame[data-section-id]")
+    );
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", scheduleRevalidation);
+      return () => {
+        window.removeEventListener("resize", scheduleRevalidation);
+        if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+      };
+    }
+
+    const observer = new ResizeObserver(scheduleRevalidation);
+    frames.forEach((frame) => observer.observe(frame));
+    observer.observe(canvasShellRef.current);
+
+    return () => {
+      observer.disconnect();
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+    };
+  }, [activePage, activeTab, canvasScale, getFrameGeometry, updateProject, viewport]);
 
   const updateSelectedSection = useCallback((changes) => {
     if (!selectedSection) return;
@@ -1658,6 +1918,7 @@ export default function PageBuilder({
     ["desktop", "tablet", "mobile"].forEach((viewportName) => {
       const base = element.position?.[viewportName] || createPosition()[viewportName];
       const canvasWidth = viewports[viewportName] || viewports.desktop;
+      const canvasHeight = getSectionCanvasHeight(targetSection, viewportName);
       const nextY = (targetSection.freeElements || []).reduce((bottom, item) => {
         const position = item.position?.[viewportName] || createPosition()[viewportName];
         return Math.max(bottom, (Number(position.y) || 0) + (Number(position.height) || 80));
@@ -1671,19 +1932,29 @@ export default function PageBuilder({
         ? estimateFormBlockHeight(connectedForm, viewportName)
         : directElementHeight(element);
 
-      nextPosition[viewportName] = {
+      const requestedPosition = {
         ...base,
         width,
         height,
         x: useDropPoint
-          ? Math.max(0, Math.min(dropPoint.x - width / 2, canvasWidth - width))
+          ? dropPoint.x - width / 2
           : 24,
-        y: useDropPoint ? Math.max(0, dropPoint.y - height / 2) : nextY,
+        y: useDropPoint ? dropPoint.y - height / 2 : nextY,
       };
+      nextPosition[viewportName] = clampElementToBounds(
+        requestedPosition,
+        useDropPoint && dropPoint.bounds
+          ? dropPoint.bounds
+          : { x: 0, y: 0, width: canvasWidth, height: canvasHeight },
+        {
+          minWidth: getDirectElementMinimumSize(element).width,
+          minHeight: getDirectElementMinimumSize(element).height,
+          allowBottomOverflow: true,
+        }
+      );
       requiredHeights[viewportName] = Math.max(
-        getSectionCanvasHeight(targetSection, viewportName),
-        getMinimumBuilderSectionHeight(),
-        nextPosition[viewportName].y + height + 24
+        canvasHeight,
+        nextPosition[viewportName].y + nextPosition[viewportName].height + 48
       );
     });
 
@@ -1730,6 +2001,33 @@ export default function PageBuilder({
     event.dataTransfer.setData("text/plain", type);
   };
 
+  const getVisibleCanvasInsertPoint = (sectionId = "") => {
+    const shell = canvasShellRef.current;
+    if (!shell) return null;
+
+    const selector = sectionId
+      ? `.direct-layout-frame[data-section-id="${CSS.escape(String(sectionId))}"]`
+      : ".direct-layout-frame";
+    const frame = shell.querySelector(selector);
+    if (!frame) return null;
+
+    const shellRect = shell.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const visibleLeft = Math.max(shellRect.left, frameRect.left);
+    const visibleRight = Math.min(shellRect.right, frameRect.right);
+    const visibleTop = Math.max(shellRect.top, frameRect.top);
+    const visibleBottom = Math.min(shellRect.bottom, frameRect.bottom);
+
+    if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+
+    return clientPointToCanvasLocal(
+      frame,
+      (visibleLeft + visibleRight) / 2,
+      (visibleTop + visibleBottom) / 2,
+      { coordinateScale: canvasScale }
+    );
+  };
+
   const handlePaletteDrop = (event, section) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1738,11 +2036,13 @@ export default function PageBuilder({
       event.dataTransfer.getData("text/plain");
     if (!elementTypes.some((item) => item.id === type)) return;
 
-    const rect = event.currentTarget.getBoundingClientRect();
-    addComponentToSection(type, section.id, {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
+    const localPoint = clientPointToCanvasLocal(
+      event.currentTarget,
+      event.clientX,
+      event.clientY,
+      { coordinateScale: canvasScale }
+    );
+    addComponentToSection(type, section.id, localPoint);
   };
 
   const updateSelectedElement = useCallback((updates) => {
@@ -2032,21 +2332,91 @@ export default function PageBuilder({
     showToast("Element deleted.");
   };
 
-  const confirmDeletePendingUser = () => {
+  const confirmDeletePendingUser = async () => {
     if (!userPendingDelete?.id) return;
-    const userId = userPendingDelete.id;
+    const membershipId = userPendingDelete.id;
+    setSiteMemberMutationId(String(membershipId));
+    try {
+      if (!demoMode) {
+        await deleteBuilderSiteMember(routeProjectId, membershipId);
+      }
+      setSiteMembers((current) =>
+        current.filter((member) => String(member.id) !== String(membershipId))
+      );
+      if (selected.type === "user" && String(selected.id) === String(membershipId)) {
+        setSelected({ type: "page", id: activePage?.id || project.activePageId || null });
+      }
+      setUserPendingDelete(null);
+      showToast("Website access removed.");
+    } catch (error) {
+      setSiteMembersError(error?.message || "Could not remove website access.");
+      showToast("Could not remove website access.");
+    } finally {
+      setSiteMemberMutationId("");
+    }
+  };
 
-    updateProject((prev) => ({
-      ...prev,
-      users: (prev.users || []).filter((item) => item.id !== userId),
-    }));
-
-    if (selected.type === "user" && selected.id === userId) {
-      setSelected({ type: "page", id: activePage?.id || project.activePageId || null });
+  const addSiteUser = async (payload) => {
+    if (demoMode) {
+      const fallbackUser = {
+        ...createUser(),
+        name: payload.full_name,
+        email: payload.email,
+        roleId: payload.role_id,
+        status: payload.status === "disabled" ? "Disabled" : "Active",
+        source: "admin",
+      };
+      setSiteMembers((current) => [fallbackUser, ...current]);
+      showToast("User added.");
+      return fallbackUser;
     }
 
-    setUserPendingDelete(null);
-    showToast("User deleted.");
+    const member = await createBuilderSiteMember(routeProjectId, payload);
+    if (!member) throw new Error("The server did not return the new user.");
+    setSiteMembers((current) => [member, ...current]);
+    setSelected({ type: "user", id: member.id });
+    showToast("User created on the server.");
+    return member;
+  };
+
+  const updateSiteUser = async (membershipId, updates) => {
+    setSiteMemberMutationId(String(membershipId));
+    setSiteMembersError("");
+    try {
+      if (demoMode) {
+        setSiteMembers((current) =>
+          current.map((member) =>
+            String(member.id) === String(membershipId) ? { ...member, ...updates } : member
+          )
+        );
+        return;
+      }
+
+      const member = await updateBuilderSiteMember(routeProjectId, membershipId, {
+        ...(updates.roleId !== undefined ? { role_id: updates.roleId } : {}),
+        ...(updates.status !== undefined ? { status: updates.status.toLowerCase() } : {}),
+      });
+      if (!member) throw new Error("The server did not return the updated user.");
+      setSiteMembers((current) =>
+        current.map((item) =>
+          String(item.id) === String(membershipId) ? member : item
+        )
+      );
+      showToast("User access updated.");
+    } catch (error) {
+      setSiteMembersError(error?.message || "Could not update this user.");
+      showToast("Could not update this user.");
+      await loadSiteMembers();
+    } finally {
+      setSiteMemberMutationId("");
+    }
+  };
+
+  const requestDeleteSiteUser = (membershipId) => {
+    const member = siteMembers.find(
+      (item) => String(item.id) === String(membershipId)
+    );
+    if (member) setUserPendingDelete(member);
   };
 
   const findElementLocation = useCallback(
@@ -2055,9 +2425,6 @@ export default function PageBuilder({
   );
 
   const {
-    addUser,
-    updateUser,
-    deleteUser,
     addRole,
     updateRole,
   } = useMemo(
@@ -2579,15 +2946,7 @@ export default function PageBuilder({
     }
 
     const sourceProject = projectOverride || projectRef.current;
-    const nextProject = silent
-      ? sourceProject
-      : {
-          ...sourceProject,
-          publish: {
-            ...(sourceProject.publish || {}),
-            lastSavedAt: new Date().toISOString(),
-          },
-        };
+    const nextProject = sourceProject;
     const repaired = cleanBuilderProjectWithRepairs(nextProject);
     const request = createBuilderSaveEntry({
       project: repaired.project,
@@ -2595,7 +2954,8 @@ export default function PageBuilder({
       repairs: repaired.repairs,
       snapshot: getAutosaveSnapshot(repaired.project),
       successMessage,
-      reason: silent ? "autosave" : "retry",
+      reason: silent ? "autosave" : "manual",
+      force: !silent,
     });
 
     if (!silent) setActiveTopbarAction("save");
@@ -3289,7 +3649,8 @@ export default function PageBuilder({
       getSectionCanvasHeight,
       getMetricMinimumHeight,
       getDirectElementMinimumSize,
-    }), [activePage, findElementLocation, viewport]);
+      canvasScale,
+    }), [activePage, canvasScale, findElementLocation, viewport]);
 
   const getDirectElementFrameStyle = (element) => {
     const previewPosition = dragState?.elementId === element.id ? dragState.previewPosition : null;
@@ -3299,27 +3660,17 @@ export default function PageBuilder({
           position: { ...(element.position || {}), [viewport]: previewPosition },
         }
       : element;
-    const style = getFreeElementStyle(renderedElement);
-
-    if (element.type !== "formBlock") return style;
-
-    const edge = viewport === "mobile" ? 12 : 24;
-    const position = renderedElement.position?.[viewport] || createPosition()[viewport];
-    const y = Math.max(0, Number(position.y) || 0);
-
-    return {
-      ...style,
-      width: `calc(100% - ${edge * 2}px)`,
-      height: "auto",
-      maxWidth: `calc(100% - ${edge * 2}px)`,
-      transform: `translate3d(${edge}px, ${y}px, 0)`,
-    };
+    return getFreeElementStyle(renderedElement);
   };
 
   const reconcileDirectFormBlockSize = useCallback((sectionId, elementId, measuredHeight) => {
     if (!measuredHeight || dragState?.elementId === elementId) return;
 
-    const canvasWidth = viewports[viewport] || viewports.desktop;
+    const frame = canvasShellRef.current?.querySelector(
+      `.direct-layout-frame[data-section-id="${CSS.escape(String(sectionId))}"]`
+    );
+    const liveBounds = frame ? getFrameGeometry(frame)?.bounds : null;
+    const canvasWidth = liveBounds?.width || viewports[viewport] || viewports.desktop;
     const edge = viewport === "mobile" ? 12 : 24;
     const nextWidth = Math.max(120, canvasWidth - edge * 2);
 
@@ -3332,14 +3683,27 @@ export default function PageBuilder({
         const sections = page.sections.map((section) => {
           if (section.id !== sectionId) return section;
 
-          let formY = 0;
           let geometryChanged = false;
           const freeElements = (section.freeElements || []).map((item) => {
             if (item.id !== elementId || item.type !== "formBlock") return item;
 
             const current = item.position?.[viewport] || createPosition()[viewport];
-            formY = Number(current.y) || 0;
-            const nextPosition = { ...current, x: edge, width: nextWidth, height: measuredHeight };
+            const bounds = liveBounds || {
+              x: 0,
+              y: 0,
+              width: canvasWidth,
+              height: getSectionCanvasHeight(section, viewport),
+            };
+            const minimumSize = getDirectElementMinimumSize(item);
+            const nextPosition = clampElementToBounds(
+              { ...current, x: edge, width: nextWidth, height: measuredHeight },
+              bounds,
+              {
+                minWidth: minimumSize.width,
+                minHeight: minimumSize.height,
+                allowBottomOverflow: true,
+              }
+            );
             const changed =
               Math.abs((Number(current.x) || 0) - nextPosition.x) > 1 ||
               Math.abs((Number(current.width) || 0) - nextPosition.width) > 1 ||
@@ -3354,7 +3718,12 @@ export default function PageBuilder({
           });
 
           const currentSectionHeight = getSectionCanvasHeight(section, viewport);
-          const nextSectionHeight = Math.max(currentSectionHeight, formY + measuredHeight + edge);
+          const formPosition = freeElements.find((item) => item.id === elementId)
+            ?.position?.[viewport];
+          const nextSectionHeight = Math.max(
+            currentSectionHeight,
+            (Number(formPosition?.y) || 0) + (Number(formPosition?.height) || 0) + edge
+          );
           if (!geometryChanged && nextSectionHeight === currentSectionHeight) return section;
 
           pageChanged = true;
@@ -3379,7 +3748,7 @@ export default function PageBuilder({
 
       return projectChanged ? { ...prev, pages } : prev;
     });
-  }, [activePage?.id, dragState?.elementId, updateProject, viewport]);
+  }, [activePage?.id, dragState?.elementId, getFrameGeometry, updateProject, viewport]);
 
   const {
     handleSelectedElementImageUpload,
@@ -3456,7 +3825,31 @@ export default function PageBuilder({
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
 
-    const current = element.position?.[viewport] || createPosition()[viewport];
+    const elementFrame = event.currentTarget.closest?.(".direct-element-frame");
+    const parentGeometry = getImmediateParentCanvasGeometry(elementFrame, {
+      coordinateScale: canvasScale,
+    });
+    const immediateParent = parentGeometry?.parent;
+    const pointer = immediateParent
+      ? clientPointToCanvasLocal(
+          immediateParent,
+          event.clientX,
+          event.clientY,
+          { coordinateScale: canvasScale }
+        )
+      : null;
+    if (!immediateParent || !pointer) return;
+
+    const minimumSize = getDirectElementMinimumSize(element);
+    const current = clampElementToBounds(
+      element.position?.[viewport] || createPosition()[viewport],
+      pointer.bounds,
+      {
+        minWidth: minimumSize.width,
+        minHeight: minimumSize.height,
+        allowBottomOverflow: true,
+      }
+    );
 
     setSelected({ type: "element", id: element.id });
     setDragState({
@@ -3467,12 +3860,15 @@ export default function PageBuilder({
       startY: current.y || 0,
       startWidth: current.width || 240,
       startHeight: current.height || 80,
+      startPointerLocalX: pointer.x,
+      startPointerLocalY: pointer.y,
+      parentSectionId: immediateParent.dataset?.sectionId || "",
       pointerId: event.pointerId,
       previewPosition: { ...current },
       previewSectionHeight: 0,
       interaction,
     });
-  }, [preview, viewport]);
+  }, [canvasScale, preview, viewport]);
 
   const captureTextSelection = (event, field, itemIndex = null) => {
     setTextSelection(
@@ -3895,6 +4291,29 @@ export default function PageBuilder({
     );
   };
 
+  const expandActiveSectionToHeight = useCallback((sectionId, requiredHeight) => {
+    const nextRequiredHeight = Math.ceil(Number(requiredHeight) || 0);
+    if (!sectionId || !nextRequiredHeight) return;
+
+    updateSections((sections) => sections.map((section) => {
+      if (section.id !== sectionId) return section;
+      const currentHeight = getSectionCanvasHeight(section, viewport);
+      if (nextRequiredHeight <= currentHeight) return section;
+
+      return {
+        ...section,
+        layout: {
+          ...(section.layout || {}),
+          minHeight: viewport === "desktop" ? nextRequiredHeight : section.layout?.minHeight,
+          minHeightByViewport: {
+            ...(section.layout?.minHeightByViewport || {}),
+            [viewport]: nextRequiredHeight,
+          },
+        },
+      };
+    }));
+  }, [updateSections, viewport]);
+
   const handlePointerMove = (event) => {
     if (
       !dragState ||
@@ -3903,22 +4322,29 @@ export default function PageBuilder({
       (dragState.pointerId !== undefined && event.pointerId !== dragState.pointerId)
     ) return;
 
-    const deltaX = event.clientX - dragState.startClientX;
-    const deltaY = event.clientY - dragState.startClientY;
     const section = getElementSection(selectedElement.id);
     if (!section) return;
+    const parentGeometry = getElementParentGeometry(selectedElement.id);
+    const localPointer = parentGeometry?.parent
+      ? clientPointToCanvasLocal(
+          parentGeometry.parent,
+          event.clientX,
+          event.clientY,
+          { coordinateScale: canvasScale }
+        )
+      : null;
+    if (!parentGeometry?.geometry || !localPointer) return;
 
-    const canvasWidth = viewports[viewport] || viewports.desktop;
-    const canvasHeight = getSectionCanvasHeight(section, viewport);
-    const expandableCanvasHeight = Math.max(
-      canvasHeight,
-      (Number(dragState.startY) || 0) + Math.max(0, deltaY) + (Number(dragState.startHeight) || 0) + 48
-    );
+    const bounds = parentGeometry.geometry.bounds;
+    const deltaX = localPointer.x - dragState.startPointerLocalX;
+    const deltaY = localPointer.y - dragState.startPointerLocalY;
+    const canvasWidth = bounds.width;
+    const canvasHeight = bounds.height;
     const candidate = getDragCandidatePosition({
       dragState: { ...dragState, deltaX, deltaY },
       selectedElement,
-      canvasWidth,
-      canvasHeight: expandableCanvasHeight,
+      bounds,
+      allowBottomOverflow: true,
       snapToGrid,
     });
     const constrainedCandidate = dragState.interaction === "resize"
@@ -3945,8 +4371,20 @@ export default function PageBuilder({
             return clamped;
           }, candidate)
       : candidate;
-    const current = selectedElement.position?.[viewport] || createPosition()[viewport];
-    const previewPosition = { ...current, ...constrainedCandidate };
+    const minimumSize = getDirectElementMinimumSize(selectedElement);
+    const previewPosition = clampElementToBounds(
+      {
+        ...(selectedElement.position?.[viewport] || createPosition()[viewport]),
+        ...constrainedCandidate,
+      },
+      bounds,
+      {
+        minWidth: minimumSize.width,
+        minHeight: minimumSize.height,
+        mode: dragState.interaction === "resize" ? "resize" : "move",
+        allowBottomOverflow: true,
+      }
+    );
     const dropFrame = dragState.interaction === "move"
       ? getDirectFrameAtPoint(event.clientX, event.clientY)
       : null;
@@ -3956,7 +4394,11 @@ export default function PageBuilder({
       previewPosition,
       previewSectionHeight: Math.max(
         canvasHeight,
-        snapToGrid((Number(previewPosition.y) || 0) + (Number(previewPosition.height) || 0) + 48)
+        Math.ceil(
+          (Number(previewPosition.y) || 0) +
+          (Number(previewPosition.height) || 0) +
+          48
+        )
       ),
       dropSectionId: dropSectionId && dropSectionId !== section.id ? dropSectionId : "",
     };
@@ -3967,6 +4409,7 @@ export default function PageBuilder({
       const previewUpdate = pendingDragPreviewRef.current;
       if (!previewUpdate) return;
       setDragState((currentState) => currentState ? { ...currentState, ...previewUpdate } : currentState);
+      expandActiveSectionToHeight(section.id, previewUpdate.previewSectionHeight);
     });
   };
 
@@ -3987,12 +4430,21 @@ export default function PageBuilder({
 
     if (targetFrame && targetSection && sourceLocation && sourceLocation.sectionId !== targetSection.id) {
       const frameRect = targetFrame.getBoundingClientRect();
+      const targetPoint = clientPointToCanvasLocal(
+        targetFrame,
+        event.clientX,
+        event.clientY,
+        { coordinateScale: canvasScale }
+      );
       const nextPosition = getMovedElementPosition({
         selectedElement,
         targetSection,
         viewport,
         event,
         frameRect,
+        canvasScale,
+        activeBounds: targetPoint?.bounds,
+        activePoint: targetPoint,
         viewports,
         createPosition,
         getSectionCanvasHeight,
@@ -4434,9 +4886,14 @@ export default function PageBuilder({
               <BuilderSidebarActions
                 isSavingProject={isSavingProject}
                 lastCloudSavedAt={lastCloudSavedAt}
-                onSave={saveProject}
+                onSave={() => saveProject({ successMessage: "Changes saved." })}
                 onGoLive={publishProject}
                 publicationState={publicationState}
+                saveDisabled={
+                  builderProjectLoading ||
+                  hasProtectedUnreadableDraft ||
+                  saveState === BUILDER_SAVE_STATES.conflict
+                }
                 saveState={saveState}
               />
 
@@ -4519,7 +4976,14 @@ export default function PageBuilder({
                           draggable
                           key={item.id}
                           onDragStart={(event) => handlePaletteDragStart(event, item.id)}
-                          onClick={() => addComponentToSection(item.id, selectedSection?.id || "")}
+                          onClick={() => {
+                            const targetSectionId = selectedSection?.id || "";
+                            addComponentToSection(
+                              item.id,
+                              targetSectionId,
+                              getVisibleCanvasInsertPoint(targetSectionId)
+                            );
+                          }}
                         >
                           <strong>{item.label}</strong>
                           <small>Drag into a section</small>
@@ -4544,6 +5008,7 @@ export default function PageBuilder({
 
       <main
         className="builder-canvas-shell"
+        ref={canvasShellRef}
         onClick={() => {
           if (!preview) {
             setInlineToolbarPosition(null);
@@ -4557,7 +5022,11 @@ export default function PageBuilder({
           style={{
             ...getPageBuilderThemeVars(project.theme),
             ...getPreviewCanvasStyle(viewport, preview, viewports),
+            "--builder-canvas-fit-width": preview && viewport === "desktop"
+              ? "100%"
+              : `${(Number(viewports[viewport] || viewports.desktop) || 1) * canvasScale}px`,
           }}
+          data-canvas-scale={canvasScale.toFixed(4)}
         >
           {renderSiteHeader()}
 
@@ -4572,7 +5041,10 @@ export default function PageBuilder({
                 <section
                   key={section.id}
                   className={`site-section direct-layout-section width-${section.layout.width} ${isSelected ? "is-selected" : ""} ${dragState?.dropSectionId === section.id || paletteDropSectionId === section.id ? "is-drop-target" : ""}`}
-                  style={{ backgroundColor: section.layout.background, minHeight: renderedSectionHeight }}
+                  style={{
+                    backgroundColor: section.layout.background,
+                    minHeight: renderedSectionHeight * canvasScale,
+                  }}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (!preview) {
@@ -4581,8 +5053,8 @@ export default function PageBuilder({
                       setInsertTarget({
                         sectionId: section.id,
                         mode: "direct",
-                        x: rect ? Math.max(0, Math.round(event.clientX - rect.left)) : 40,
-                        y: rect ? Math.max(0, Math.round(event.clientY - rect.top)) : 40,
+                        x: rect ? Math.max(0, Math.round((event.clientX - rect.left) / canvasScale)) : 40,
+                        y: rect ? Math.max(0, Math.round((event.clientY - rect.top) / canvasScale)) : 40,
                       });
                       setSelected({ type: "section", id: section.id });
                     }
@@ -4591,7 +5063,7 @@ export default function PageBuilder({
                   <div
                     className="direct-layout-frame"
                     data-section-id={section.id}
-                    style={{ width: `min(100%, ${viewports[viewport]}px)`, minHeight: `${renderedSectionHeight}px` }}
+                    style={{ width: "100%", minHeight: `${renderedSectionHeight * canvasScale}px` }}
                     onDragOver={(event) => {
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "copy";
@@ -4616,10 +5088,11 @@ export default function PageBuilder({
                                 measureEnabled: !preview && dragState?.elementId !== element.id,
                                 measurementKey: `${element.id}:${viewport}`,
                                 onMeasuredHeight: (height) =>
-                                  reconcileDirectFormBlockSize(section.id, element.id, height),
+                                  reconcileDirectFormBlockSize(section.id, element.id, height / canvasScale),
                               }
                             : {})}
                           className={`direct-element-frame direct-element-frame-${element.type} ${elementSelected ? "is-selected" : ""}`}
+                          data-builder-element-id={element.id}
                           style={getDirectElementFrameStyle(element)}
                           tabIndex={-1}
                           onPointerDownCapture={(event) => {
@@ -5506,14 +5979,19 @@ export default function PageBuilder({
   const renderUsersTab = () => (
     <UsersTab
       project={project}
+      users={siteMembers}
+      usersLoading={siteMembersLoading}
+      usersError={siteMembersError}
+      userMutationId={siteMemberMutationId}
       selected={selected}
       selectedRole={selectedRole}
       permissionGroups={permissionGroups}
-      addUser={addUser}
+      addUser={addSiteUser}
       addRole={addRole}
-      updateUser={updateUser}
+      updateUser={updateSiteUser}
       updateRole={updateRole}
-      deleteUser={deleteUser}
+      deleteUser={requestDeleteSiteUser}
+      reloadUsers={loadSiteMembers}
       setSelected={setSelected}
     />
   );
@@ -5597,13 +6075,11 @@ export default function PageBuilder({
   if (!demoMode && builderProjectLoading) {
     return (
       <div className={getPageBuilderThemeClassName({ mode: appThemeMode || "light", renderMode: "editing" })}>
-        <main className="builder-project-loading" aria-busy="true" aria-live="polite">
-          <div className="builder-project-loading-card">
-            <span className="builder-project-loading-spinner" aria-hidden="true" />
-            <h2>Loading project…</h2>
-            <p>Madar is opening the latest saved draft.</p>
-          </div>
-        </main>
+        <main
+          className="builder-project-loading builder-project-loading-silent"
+          aria-busy="true"
+          aria-label="Loading project"
+        />
       </div>
     );
   }

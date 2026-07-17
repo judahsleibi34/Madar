@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -132,9 +132,34 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
     builderInitialProjectLoadPromises.clear();
+  });
+
+  it("sends an explicit sidebar Save click to the backend even when the draft is already acknowledged", async () => {
+    render(
+      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+
+    expect((await screen.findByLabelText("Page name")).value).toBe("Home");
+    await waitFor(() => expect(screen.getAllByText(/^Saved$/).length).toBeGreaterThan(0));
+    expect(apiMocks.updateBuilderProject).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+
+    await waitFor(() => expect(apiMocks.updateBuilderProject).toHaveBeenCalledTimes(1));
+    expect(apiMocks.updateBuilderProject).toHaveBeenCalledWith(
+      projectId,
+      expect.objectContaining({
+        expected_revision: 100,
+        draft_schema: expect.objectContaining({ id: schemaA.id }),
+      }),
+      user.id
+    );
   });
 
   it("accepts a recursively reordered jsonb acknowledgement and publishes without another draft save", async () => {

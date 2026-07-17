@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "../../../utils/apiClient";
 import {
   BUILDER_CLIENT_CONTRACT,
+  createBuilderSiteMember,
+  deleteBuilderSiteMember,
   fetchBuilderProject,
+  fetchBuilderSiteMembers,
   publishBuilderProject,
   updateBuilderProject,
+  updateBuilderSiteMember,
 } from "./PageBuilder.api";
 
 vi.mock("../../../utils/apiClient", () => ({
@@ -67,5 +71,43 @@ describe("builder project cloud API", () => {
       "X-Madar-Builder-Contract": BUILDER_CLIENT_CONTRACT,
     });
     expect(JSON.parse(apiFetch.mock.calls[0][1].body)).toEqual({ expected_revision: 9 });
+  });
+
+  it("lists, creates, updates, and removes server-backed site members", async () => {
+    const projectId = "project-1";
+    const member = {
+      id: "21",
+      name: "Site Member",
+      roleId: "customer",
+      status: "Active",
+    };
+    apiFetch
+      .mockResolvedValueOnce(jsonResponse({ members: [member] }))
+      .mockResolvedValueOnce(jsonResponse({ member }, { status: 201 }))
+      .mockResolvedValueOnce(jsonResponse({ member: { ...member, roleId: "vip" } }))
+      .mockResolvedValueOnce(jsonResponse({ removed: true }));
+
+    expect(await fetchBuilderSiteMembers(projectId)).toEqual([member]);
+    expect(await createBuilderSiteMember(projectId, {
+      full_name: "Site Member",
+      email: "member@example.com",
+      password: "safe-password",
+      role_id: "customer",
+      status: "active",
+    })).toEqual(member);
+    expect(await updateBuilderSiteMember(projectId, member.id, {
+      role_id: "vip",
+    })).toMatchObject({ roleId: "vip" });
+    expect(await deleteBuilderSiteMember(projectId, member.id)).toEqual({ removed: true });
+
+    expect(apiFetch.mock.calls.map(([url]) => url)).toEqual([
+      `/api/builder/projects/${projectId}/site-members`,
+      `/api/builder/projects/${projectId}/site-members`,
+      `/api/builder/projects/${projectId}/site-members/${member.id}`,
+      `/api/builder/projects/${projectId}/site-members/${member.id}`,
+    ]);
+    expect(apiFetch.mock.calls[1][1].method).toBe("POST");
+    expect(apiFetch.mock.calls[2][1].method).toBe("PATCH");
+    expect(apiFetch.mock.calls[3][1].method).toBe("DELETE");
   });
 });

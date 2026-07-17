@@ -319,6 +319,12 @@ export default function DashboardSidebar({
     }
   };
 
+  const expandWorkspaceSidebar = () => {
+    if (isWorkspaceSidebarCollapsed) {
+      setWorkspaceSidebarCollapsed(false);
+    }
+  };
+
   const isActive = (path) => {
     if (path === PUBLIC_ROUTES.home) {
       return location.pathname === PUBLIC_ROUTES.home;
@@ -382,7 +388,7 @@ export default function DashboardSidebar({
           )}
         </div>
 
-        <label className="admin-sidebar-search">
+        <label className="admin-sidebar-search" onClick={expandWorkspaceSidebar}>
           <Search size={16} aria-hidden="true" />
           <input
             type="search"
@@ -397,7 +403,11 @@ export default function DashboardSidebar({
           />
         </label>
 
-        <nav className="admin-sidebar-nav" aria-label={t("sidebar.navigation")}>
+        <nav
+          className="admin-sidebar-nav"
+          aria-label={t("sidebar.navigation")}
+          onClickCapture={expandWorkspaceSidebar}
+        >
           {showNotifications && (
             <NotificationBell
               className="admin-sidebar-notifications"
@@ -483,7 +493,10 @@ export default function DashboardSidebar({
       </div>
 
       <div className="admin-sidebar-bottom">
-        <div className="admin-sidebar-group admin-sidebar-settings-group">
+        <div
+          className="admin-sidebar-group admin-sidebar-settings-group"
+          onClickCapture={expandWorkspaceSidebar}
+        >
           <SidebarRow
             active={settingsRouteActive}
             activeClassName="active-parent"

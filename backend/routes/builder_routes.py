@@ -9,7 +9,7 @@ from typing import Any, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, File, HTTPException, Query, Request, Response, UploadFile
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from postgrest.exceptions import APIError
 
 from database import service_supabase
@@ -42,6 +42,7 @@ SUBMISSION_STATUS_LABELS = {
 }
 SUBMISSION_STATUS_VALUES = {label.lower(): value for value, label in SUBMISSION_STATUS_LABELS.items()}
 RESERVATION_STATUSES = {"new", "confirmed", "cancelled", "completed", "rejected"}
+SITE_MEMBER_STATUSES = {"active", "disabled"}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
 UNSAFE_BUILDER_ELEMENT_TYPES = {"html", "rawhtml", "script", "iframe"}
 PUBLIC_PAGE_SLUG_PATTERN = re.compile(r"^/[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -675,6 +676,19 @@ class BuilderReservationStatusUpdate(BaseModel):
     status: str = Field(..., min_length=1)
 
 
+class BuilderSiteMemberCreate(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=160)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=200)
+    role_id: Optional[str] = Field(default=None, max_length=160)
+    status: str = Field(default="active", min_length=1, max_length=32)
+
+
+class BuilderSiteMemberUpdate(BaseModel):
+    role_id: Optional[str] = Field(default=None, max_length=160)
+    status: Optional[str] = Field(default=None, min_length=1, max_length=32)
+
+
 def normalize_submission_status(value: str) -> str:
     status = (value or "").strip().lower()
     db_status = SUBMISSION_STATUS_VALUES.get(status) or (status if status in SUBMISSION_STATUS_LABELS else None)
@@ -697,6 +711,70 @@ def normalize_reservation_status(value: str) -> str:
         return status
 
     raise HTTPException(status_code=400, detail="Invalid reservation status")
+
+
+def normalize_site_member_status(value: str) -> str:
+    status = (value or "").strip().lower()
+    if status in SITE_MEMBER_STATUSES:
+        return status
+    raise HTTPException(status_code=400, detail="Invalid site member status")
+
+
+def normalize_site_member_role(_project: dict, value: str | None) -> str:
+    role = str(value or "").strip()
+    if not role:
+        return "customer"
+    if len(role) > 160:
+        raise HTTPException(status_code=400, detail="Selected role is invalid")
+    return role
+
+
+def format_site_member(membership: dict, user: dict | None) -> dict:
+    user = user or {}
+    first_name = str(user.get("first_name") or "").strip()
+    last_name = str(user.get("last_name") or "").strip()
+    full_name = " ".join(part for part in (first_name, last_name) if part).strip()
+    status = str(membership.get("status") or "active").strip().lower()
+    return {
+        "id": str(membership.get("id") or ""),
+        "userId": user.get("id") or membership.get("user_id"),
+        "authId": str(user.get("auth_id") or membership.get("auth_id") or ""),
+        "name": full_name or str(user.get("email") or "Site member"),
+        "email": str(user.get("email") or ""),
+        "roleId": str(membership.get("role") or "customer"),
+        "status": "Disabled" if status == "disabled" else "Active",
+        "source": str(membership.get("source") or "registered"),
+        "createdAt": membership.get("created_at"),
+        "updatedAt": membership.get("updated_at"),
+    }
+
+
+def get_site_members_for_tenant(tenant_id: int) -> list[dict]:
+    membership_response = (
+        service_supabase.table("tenant_site_memberships")
+        .select("*")
+        .eq("tenant_id", tenant_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    memberships = getattr(membership_response, "data", None) or []
+    user_ids = [membership.get("user_id") for membership in memberships if membership.get("user_id") is not None]
+    users_by_id = {}
+    if user_ids:
+        users_response = (
+            service_supabase.table("users")
+            .select("id, auth_id, first_name, last_name, email, account_status, email_verified")
+            .in_("id", user_ids)
+            .execute()
+        )
+        users_by_id = {
+            str(user.get("id")): user
+            for user in (getattr(users_response, "data", None) or [])
+        }
+    return [
+        format_site_member(membership, users_by_id.get(str(membership.get("user_id"))))
+        for membership in memberships
+    ]
 
 
 def format_reservation(row: dict):
@@ -1140,6 +1218,241 @@ def get_builder_project(project_id: str, request: Request, response: Response):
         "success": True,
         "project": get_project_for_tenant(project_id, context.tenant_id),
     }
+
+
+@router.get("/builder/projects/{project_id}/site-members")
+def list_builder_site_members(project_id: str, request: Request, response: Response):
+    context = require_builder_context(request, response, require_builder_admin_access)
+    get_project_for_tenant(project_id, context.tenant_id)
+    return {
+        "success": True,
+        "members": get_site_members_for_tenant(context.tenant_id),
+    }
+
+
+@router.post("/builder/projects/{project_id}/site-members", status_code=201)
+def create_builder_site_member(
+    project_id: str,
+    member: BuilderSiteMemberCreate,
+    request: Request,
+    response: Response,
+):
+    context = require_builder_context(request, response, require_builder_admin_access)
+    project = get_project_for_tenant(project_id, context.tenant_id)
+    clean_email = str(member.email).strip().lower()
+    clean_name = member.full_name.strip()
+    name_parts = clean_name.split(None, 1)
+    first_name = name_parts[0]
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+    role = normalize_site_member_role(project, member.role_id)
+    status = normalize_site_member_status(member.status)
+
+    existing_user_response = (
+        service_supabase.table("users")
+        .select("id, auth_id, first_name, last_name, email")
+        .eq("email", clean_email)
+        .limit(1)
+        .execute()
+    )
+    existing_users = getattr(existing_user_response, "data", None) or []
+    local_user = existing_users[0] if existing_users else None
+    auth_user_id = str((local_user or {}).get("auth_id") or "")
+    created_auth_user = False
+    created_local_user = False
+
+    if local_user:
+        existing_membership_response = (
+            service_supabase.table("tenant_site_memberships")
+            .select("id")
+            .eq("tenant_id", context.tenant_id)
+            .eq("user_id", local_user.get("id"))
+            .limit(1)
+            .execute()
+        )
+        if getattr(existing_membership_response, "data", None):
+            raise HTTPException(status_code=409, detail="This user already belongs to the website")
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists. Use a different email.",
+        )
+    else:
+        try:
+            auth_response = service_supabase.auth.admin.create_user(
+                {
+                    "email": clean_email,
+                    "password": member.password,
+                    "email_confirm": True,
+                    "user_metadata": {
+                        "first_name": first_name,
+                        "last_name": last_name,
+                    },
+                }
+            )
+        except Exception as error:
+            logger.warning(
+                "builder.site_member_auth_create_failed",
+                extra={"tenant_id": context.tenant_id, "error_type": type(error).__name__},
+            )
+            raise HTTPException(status_code=409, detail="Could not create this user account") from error
+
+        auth_user = getattr(auth_response, "user", None)
+        auth_user_id = str(getattr(auth_user, "id", "") or "")
+        if not auth_user_id:
+            raise HTTPException(status_code=500, detail="Could not create this user account")
+        created_auth_user = True
+
+        try:
+            local_user_response = service_supabase.table("users").insert(
+                {
+                    "auth_id": auth_user_id,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "email": clean_email,
+                    "tenant_id": None,
+                    "account_kind": "site_visitor",
+                    "account_status": "active",
+                    "email_verified": True,
+                    "email_verified_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).execute()
+            local_users = getattr(local_user_response, "data", None) or []
+            local_user = local_users[0] if local_users else None
+            if not local_user:
+                raise RuntimeError("Local user row was not returned")
+            created_local_user = True
+        except Exception as error:
+            try:
+                service_supabase.auth.admin.delete_user(auth_user_id)
+            except Exception:
+                pass
+            raise HTTPException(status_code=500, detail="Could not save this user account") from error
+
+    try:
+        membership_response = service_supabase.table("tenant_site_memberships").insert(
+            {
+                "tenant_id": context.tenant_id,
+                "user_id": local_user["id"],
+                "auth_id": auth_user_id,
+                "role": role,
+                "status": status,
+                "source": "admin",
+            }
+        ).execute()
+        memberships = getattr(membership_response, "data", None) or []
+        membership = memberships[0] if memberships else None
+        if not membership:
+            raise RuntimeError("Membership row was not returned")
+    except Exception as error:
+        if created_local_user:
+            try:
+                service_supabase.table("users").delete().eq("id", local_user["id"]).execute()
+            except Exception:
+                pass
+        if created_auth_user:
+            try:
+                service_supabase.auth.admin.delete_user(auth_user_id)
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail="Could not add this user to the website") from error
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.site_member_created",
+        target_type="tenant_site_membership",
+        target_id=str(membership.get("id") or ""),
+        metadata={"project_id": project_id, "role": role, "status": status},
+    )
+    return {
+        "success": True,
+        "member": format_site_member(membership, local_user),
+    }
+
+
+@router.patch("/builder/projects/{project_id}/site-members/{membership_id}")
+def update_builder_site_member(
+    project_id: str,
+    membership_id: int,
+    update: BuilderSiteMemberUpdate,
+    request: Request,
+    response: Response,
+):
+    context = require_builder_context(request, response, require_builder_admin_access)
+    project = get_project_for_tenant(project_id, context.tenant_id)
+    update_payload = {}
+    if update.role_id is not None:
+        update_payload["role"] = normalize_site_member_role(project, update.role_id)
+    if update.status is not None:
+        update_payload["status"] = normalize_site_member_status(update.status)
+    if not update_payload:
+        raise HTTPException(status_code=400, detail="No member changes were provided")
+
+    membership_response = (
+        service_supabase.table("tenant_site_memberships")
+        .update({**update_payload, "updated_at": datetime.now(timezone.utc).isoformat()})
+        .eq("id", membership_id)
+        .eq("tenant_id", context.tenant_id)
+        .execute()
+    )
+    memberships = getattr(membership_response, "data", None) or []
+    if not memberships:
+        raise HTTPException(status_code=404, detail="Site member not found")
+    membership = memberships[0]
+    user_response = (
+        service_supabase.table("users")
+        .select("id, auth_id, first_name, last_name, email")
+        .eq("id", membership.get("user_id"))
+        .limit(1)
+        .execute()
+    )
+    users = getattr(user_response, "data", None) or []
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.site_member_updated",
+        target_type="tenant_site_membership",
+        target_id=str(membership_id),
+        metadata={"project_id": project_id, **update_payload},
+    )
+    return {
+        "success": True,
+        "member": format_site_member(membership, users[0] if users else None),
+    }
+
+
+@router.delete("/builder/projects/{project_id}/site-members/{membership_id}")
+def delete_builder_site_member(
+    project_id: str,
+    membership_id: int,
+    request: Request,
+    response: Response,
+):
+    context = require_builder_context(request, response, require_builder_admin_access)
+    get_project_for_tenant(project_id, context.tenant_id)
+    delete_response = (
+        service_supabase.table("tenant_site_memberships")
+        .delete()
+        .eq("id", membership_id)
+        .eq("tenant_id", context.tenant_id)
+        .execute()
+    )
+    deleted = getattr(delete_response, "data", None) or []
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Site member not found")
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action="builder.site_member_removed",
+        target_type="tenant_site_membership",
+        target_id=str(membership_id),
+        metadata={"project_id": project_id},
+    )
+    return {"success": True, "removed": True}
 
 
 @router.put("/users/{user_id}/builder/projects/{project_id}", include_in_schema=False)

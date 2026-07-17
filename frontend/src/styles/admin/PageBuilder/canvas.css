@@ -6,7 +6,8 @@
   position: relative;
   min-width: 0;
   padding: 18px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: transparent;
 }
 
@@ -1252,7 +1253,8 @@
   overflow: hidden;
 }
 
-.direct-element-frame-formBlock {
+.preview-mode .direct-element-frame-formBlock,
+.tenant-runtime-page .direct-element-frame-formBlock {
   height: auto !important;
 }
 

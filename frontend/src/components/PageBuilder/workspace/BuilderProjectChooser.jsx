@@ -58,14 +58,52 @@ export default function BuilderProjectChooser({ workspace = "page-builder", auto
 
   return (
     <section className="builder-project-chooser" aria-busy={status === "loading" || status === "creating"}>
-      <header>
-        <p>Page Builder</p>
+      <header className="builder-project-chooser-header">
+        <p className="builder-project-chooser-eyebrow">
+          <span aria-hidden="true" />
+          Page Builder
+        </p>
         <h1>Choose a project</h1>
         <span>Each project opens with its own cloud draft and recovery copy.</span>
       </header>
-      {error && <p role="alert">{error}</p>}
+      {error && <p className="builder-project-chooser-error" role="alert">{error}</p>}
       {status === "loading" ? (
-        <p role="status">Loading projects…</p>
+        <div className="builder-project-chooser-loading" role="status" aria-live="polite">
+          <div className="builder-project-loading-heading">
+            <div className="builder-project-loading-mark" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div>
+              <strong>Loading your projects</strong>
+              <span>Retrieving your cloud drafts and recovery copies.</span>
+            </div>
+          </div>
+
+          <div className="builder-project-loading-progress" aria-hidden="true">
+            <span />
+          </div>
+
+          <div className="builder-project-loading-list" aria-hidden="true">
+            {[0, 1, 2].map((item) => (
+              <div className="builder-project-loading-row" key={item}>
+                <span className="builder-project-loading-icon" />
+                <span className="builder-project-loading-copy">
+                  <span />
+                  <span />
+                </span>
+                <span className="builder-project-loading-status" />
+              </div>
+            ))}
+          </div>
+
+          <p className="builder-project-loading-note">
+            <span aria-hidden="true" />
+            Your workspace is being prepared securely.
+          </p>
+          <span className="builder-project-loading-announcement">Loading projects...</span>
+        </div>
       ) : (
         <div className="builder-project-chooser-list">
           {projects.map((project) => (

@@ -31,8 +31,7 @@ export default function PageBuilderPageInspector({
       </label>
       <label className="inspector-toggle-row">
         <input
-          type="radio"
-          name="builder-default-page"
+          type="checkbox"
           checked={page.isDefault === true}
           onChange={onSetDefault}
         />
