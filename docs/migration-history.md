@@ -21,9 +21,14 @@ July 17, 2026:
   `REFERENCES`, `TRIGGER`, and `TRUNCATE` privileges still granted to
   `authenticated` on `public.builder_projects`. Migration 050 revoked DML but
   did not reset these residual privileges.
-- `053_remove_residual_authenticated_privileges.sql` is the pending corrective
-  migration. It has not been applied by Codex and must not be described as
-  applied until an operator verifies the production ledger.
+- `053_remove_residual_authenticated_privileges.sql` is part of the current
+  operator-reported production baseline. This repository task did not query or
+  change the production ledger.
+- `054_add_form_submission_idempotency.sql`,
+  `055_create_builder_asset_registry.sql`,
+  `056_add_storage_quota_accounting.sql`, and
+  `057_add_project_site_permissions.sql` are repository-only pending migrations.
+  They were not applied to production or any shared database by this task.
 
 The role migration was originally introduced with the conflicting
 prefix `047`. Because notification outbox owns the verified production identity
