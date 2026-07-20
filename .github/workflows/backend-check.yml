@@ -24,9 +24,15 @@ jobs:
       - name: Run backend tests
         run: |
           docker run --rm \
+            --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
             --volume "$PWD/scripts:/scripts:ro" \
             --volume "$PWD/database:/app/database:ro" \
             --volume "$PWD/supabase:/app/supabase:ro" \
+            --volume "$PWD/backend/Dockerfile:/test-repository/backend/Dockerfile:ro" \
+            --volume "$PWD/frontend/Dockerfile:/test-repository/frontend/Dockerfile:ro" \
+            --volume "$PWD/frontend/security_headers.conf.template:/test-repository/frontend/security_headers.conf.template:ro" \
+            --volume "$PWD/docker-compose.yml:/test-repository/docker-compose.yml:ro" \
+            --volume "$PWD/docker-compose.dev.yml:/test-repository/docker-compose.dev.yml:ro" \
             madar-backend-test python -m unittest discover -s tests -v
 
       - name: Verify installed dependency consistency

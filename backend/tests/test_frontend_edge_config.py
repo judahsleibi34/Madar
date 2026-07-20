@@ -1,8 +1,9 @@
+import os
 import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT", Path(__file__).resolve().parents[2]))
 
 
 class FrontendEdgeConfigTests(unittest.TestCase):

@@ -10,7 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt \
 COPY . .
 
 # Keep repo-root style script paths working in the backend container.
-RUN python scripts/verify_installed_constraints.py \
+RUN mkdir -p /test-repository/backend /test-repository/frontend \
+    && python scripts/verify_installed_constraints.py \
     && ln -s . backend
 
 USER 65534:65534
