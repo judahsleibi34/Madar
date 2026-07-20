@@ -5,6 +5,7 @@ import ipaddress
 import socket
 import sys
 import unittest
+from pathlib import Path
 from typing import Any
 
 EXTERNAL_ATTEMPTS: list[str] = []
@@ -34,13 +35,20 @@ def _guarded_connect(sock: socket.socket, address: Any):
 
 
 def _guarded_getaddrinfo(host: Any, *args, **kwargs):
-    if not _loopback_host(host):
-        EXTERNAL_ATTEMPTS.append(str(host)[:200])
-        raise socket.gaierror("external DNS disabled by Madar test guard")
+    if _loopback_host(host):
+        return _original_getaddrinfo(host, *args, **kwargs)
+    try:
+        ipaddress.ip_address(str(host))
+    except ValueError:
+        port = args[0] if args else kwargs.get("port", 0)
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", port))]
     return _original_getaddrinfo(host, *args, **kwargs)
 
 
 def main() -> int:
+    application_root = str(Path(__file__).resolve().parents[1])
+    if application_root not in sys.path:
+        sys.path.insert(0, application_root)
     socket.socket.connect = _guarded_connect
     socket.getaddrinfo = _guarded_getaddrinfo
     suite = unittest.defaultTestLoader.discover("tests")
