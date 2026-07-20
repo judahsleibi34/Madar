@@ -1,5 +1,7 @@
 import os
 import re
+import logging
+import time
 
 from pathlib import Path
 
@@ -36,6 +38,12 @@ from routes.website_routes import router as website_router
 
 from services.auth_service import get_authenticated_user_row, require_regular_user
 from services.request_body_limits import RequestBodyLimitMiddleware
+from services.observability_service import (
+    CORRELATION_ID,
+    configure_structured_logging,
+    correlation_id,
+    record_request,
+)
 from services.request_security import (
     CSRF_HEADER_NAME,
     add_cors_headers_for_allowed_origin,
@@ -53,6 +61,8 @@ from services.upload_config import (
     validate_private_uploads_not_publicly_mounted,
 )
 
+configure_structured_logging()
+logger = logging.getLogger(__name__)
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestBodyLimitMiddleware)
@@ -100,7 +110,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=[CSRF_HEADER_NAME],
+    expose_headers=[CSRF_HEADER_NAME, "X-Request-ID"],
 )
 
 ALLOWED_CSRF_ORIGINS = get_allowed_origins(FRONTEND_URLS)
@@ -127,6 +137,36 @@ async def csrf_origin_middleware(request: Request, call_next):
         )
 
     return await call_next(request)
+
+
+@app.middleware("http")
+async def observability_middleware(request: Request, call_next):
+    request_id = correlation_id(request.headers.get("X-Request-ID"))
+    context_token = CORRELATION_ID.set(request_id)
+    started = time.monotonic()
+    try:
+        response = await call_next(request)
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        elapsed = time.monotonic() - started
+        record_request(
+            method=request.method,
+            route=route,
+            status_code=response.status_code,
+            elapsed_seconds=elapsed,
+        )
+        response.headers["X-Request-ID"] = request_id
+        return response
+    except Exception as error:
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        elapsed = time.monotonic() - started
+        record_request(method=request.method, route=route, status_code=500, elapsed_seconds=elapsed)
+        logger.error(
+            "http.request_unhandled",
+            extra={"method": request.method, "route": route, "status_code": 500, "error_type": type(error).__name__},
+        )
+        raise
+    finally:
+        CORRELATION_ID.reset(context_token)
 
 
 @app.get("/")

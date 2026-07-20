@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from services.notification_delivery_service import DeliveryError, deliver_notification
 from services.notification_outbox_service import claim_notifications, get_queue_metrics, mark_notification_result
+from services.observability_service import configure_structured_logging
 
 logger = logging.getLogger(__name__)
 STOP_EVENT = threading.Event()
@@ -94,14 +95,15 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def main() -> int:
+    configure_structured_logging()
     if os.getenv("NOTIFICATION_WORKER_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         logger.info("notification_worker.disabled")
         return 0
-    logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s")
     for selected_signal in (signal.SIGINT, signal.SIGTERM):
         signal.signal(selected_signal, lambda *_args: STOP_EVENT.set())
     port = int(os.getenv("NOTIFICATION_WORKER_HEALTH_PORT", "8090"))
-    server = ThreadingHTTPServer(("127.0.0.1", port), HealthHandler)
+    host = os.getenv("NOTIFICATION_WORKER_HEALTH_HOST", "127.0.0.1").strip()
+    server = ThreadingHTTPServer((host, port), HealthHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     batch_size = max(1, min(int(os.getenv("NOTIFICATION_WORKER_BATCH_SIZE", "25")), 100))
     concurrency = max(1, min(int(os.getenv("NOTIFICATION_WORKER_CONCURRENCY", "2")), 16))

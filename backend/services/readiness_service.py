@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 import tempfile
 import time
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from shutil import disk_usage
 from threading import Lock
 
 import requests
@@ -14,6 +16,8 @@ from services.upload_config import (
     get_private_charts_dir,
     get_public_uploads_dir,
 )
+from services.storage_quota_service import DEFAULT_DISK_FREE_FLOOR_BYTES
+from services.notification_outbox_service import get_queue_metrics
 
 try:
     import redis
@@ -172,7 +176,68 @@ def _directory_accessible(path: Path) -> bool:
 
 def check_storage() -> str:
     paths = (get_public_uploads_dir(), get_data_upload_dir(), get_private_charts_dir())
-    return "ok" if all(_directory_accessible(path) for path in paths) else "unavailable"
+    if not all(_directory_accessible(path) for path in paths):
+        return "unavailable"
+    try:
+        floor = int(os.getenv("STORAGE_DISK_FREE_FLOOR_BYTES", str(DEFAULT_DISK_FREE_FLOOR_BYTES)))
+        if floor <= 0:
+            return "misconfigured"
+        if any(disk_usage(path).free < floor for path in paths):
+            return "low_disk"
+    except (OSError, ValueError):
+        return "unavailable"
+    return "ok"
+
+
+def check_notification_worker() -> str:
+    if not _env_bool("NOTIFICATION_WORKER_REQUIRED", False):
+        return "disabled"
+    if not _env_bool("NOTIFICATION_WORKER_ENABLED", False):
+        return "misconfigured"
+    url = os.getenv("NOTIFICATION_WORKER_HEALTH_URL", "").strip()
+    if not url:
+        return "misconfigured"
+    try:
+        response = requests.get(url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False)
+        return "ok" if response.status_code == 200 else "unavailable"
+    except requests.RequestException:
+        return "unavailable"
+
+
+def check_notification_queue() -> str:
+    if not _env_bool("NOTIFICATION_WORKER_REQUIRED", False):
+        return "disabled"
+    try:
+        metrics = get_queue_metrics()
+        maximum_depth = int(os.getenv("NOTIFICATION_QUEUE_MAX_DEPTH", "1000"))
+        maximum_age = int(os.getenv("NOTIFICATION_QUEUE_MAX_AGE_SECONDS", "900"))
+        maximum_dead = int(os.getenv("NOTIFICATION_QUEUE_MAX_DEAD", "0"))
+        if min(maximum_depth, maximum_age, maximum_dead) < 0:
+            return "misconfigured"
+        if (
+            metrics.get("queue_depth", 0) > maximum_depth
+            or metrics.get("oldest_pending_age_seconds", 0) > maximum_age
+            or metrics.get("dead", 0) > maximum_dead
+        ):
+            return "backlogged"
+        return "ok"
+    except Exception:
+        return "unavailable"
+
+
+def check_backup_freshness() -> str:
+    required = _env_bool("BACKUP_FRESHNESS_REQUIRED", False)
+    marker = os.getenv("BACKUP_FRESHNESS_MARKER", "").strip()
+    if not marker:
+        return "missing" if required else "disabled"
+    try:
+        maximum_age = int(os.getenv("BACKUP_MAX_AGE_SECONDS", "129600"))
+        if maximum_age <= 0:
+            return "misconfigured"
+        age = datetime.now(timezone.utc).timestamp() - Path(marker).stat().st_mtime
+        return "ok" if 0 <= age <= maximum_age else "stale"
+    except (OSError, ValueError):
+        return "missing" if required else "unavailable"
 
 
 def check_admin_mfa_policy() -> str:
@@ -210,7 +275,7 @@ def _is_required_state_ready(component: str, state: str) -> bool:
         return True
     if component == "admin_mfa_policy" and state == "not_required":
         return True
-    if component in {"ai_execution_guard", "remote_ingestion_guard"} and state == "disabled":
+    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "backup_freshness"} and state == "disabled":
         return True
     if component == "parser_isolation" and state == "development":
         return True
@@ -228,6 +293,9 @@ def compute_readiness() -> dict:
         "ai_execution_guard": check_ai_execution_guard,
         "remote_ingestion_guard": check_remote_ingestion_guard,
         "parser_isolation": check_parser_isolation,
+        "notification_worker": check_notification_worker,
+        "notification_queue": check_notification_queue,
+        "backup_freshness": check_backup_freshness,
     }
     def safe_check(check) -> str:
         try:
@@ -245,7 +313,7 @@ def compute_readiness() -> dict:
         _is_required_state_ready(component, state)
         for component, state in components.items()
     )
-    return {"ready": ready, "components": components}
+    return {"ready": ready, "status": "ready" if ready else "degraded", "components": components}
 
 
 def get_readiness(*, use_cache: bool = True) -> dict:

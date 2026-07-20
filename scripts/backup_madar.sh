@@ -64,4 +64,11 @@ EOF
   find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum >SHA256SUMS
 )
 log "backup.complete destination=$backup_path"
+if [[ -n "${MADAR_BACKUP_FRESHNESS_MARKER:-}" ]]; then
+  [[ "$MADAR_BACKUP_FRESHNESS_MARKER" = /* ]] || die "MADAR_BACKUP_FRESHNESS_MARKER must be an absolute path"
+  mkdir -p "$(dirname "$MADAR_BACKUP_FRESHNESS_MARKER")"
+  marker_tmp="${MADAR_BACKUP_FRESHNESS_MARKER}.tmp.$$"
+  printf '%s %s\n' "$timestamp" "$backup_path" >"$marker_tmp"
+  mv "$marker_tmp" "$MADAR_BACKUP_FRESHNESS_MARKER"
+fi
 printf '%s\n' "$backup_path"
