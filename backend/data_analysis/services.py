@@ -497,8 +497,6 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
         extra={
             "tenant_id": tenant_id,
             "user_id": user_id,
-            "filename": Path(filename).name,
-            "dataset_id": file_path.name,
             "file_size": int(file_size),
             "processing_mode": response.get("processing_mode"),
             "rows": response.get("rows"),
