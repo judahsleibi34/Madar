@@ -13,8 +13,6 @@
     "test": "vitest run --environment jsdom src",
     "test:e2e": "playwright test",
     "test:e2e:safety": "node --test e2e/safety.test.mjs",
-    "test:e2e:responsive-auth": "playwright test e2e/responsive-auth.spec.mjs",
-    "test:e2e:responsive-visual": "playwright test e2e/responsive-visual.spec.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug"
