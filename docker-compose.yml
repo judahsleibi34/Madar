@@ -103,6 +103,7 @@ services:
       - ./backend/private_generated_charts:/app/private_generated_charts
       - ./database:/app/database:ro
       - ./supabase:/app/supabase:ro
+      - ./scripts:/scripts:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
       interval: 15s

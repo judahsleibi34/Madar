@@ -1,0 +1,33 @@
+name: Backend Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify dependency and migration locks
+        run: |
+          python3 scripts/check_dependency_locks.py
+          python3 scripts/check_migrations.py
+
+      - name: Build locked backend image
+        run: docker build -t madar-backend-test backend
+
+      - name: Run backend tests
+        run: |
+          docker run --rm \
+            --volume "$PWD/scripts:/scripts:ro" \
+            --volume "$PWD/database:/app/database:ro" \
+            --volume "$PWD/supabase:/app/supabase:ro" \
+            madar-backend-test python -m unittest discover -s tests -v
+
+      - name: Verify installed dependency consistency
+        run: docker run --rm madar-backend-test python -m pip check
