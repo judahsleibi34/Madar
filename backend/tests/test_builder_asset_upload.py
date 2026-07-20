@@ -76,6 +76,11 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 "enforce_builder_asset_upload_rate_limit",
                 return_value=None,
             ),
+            patch.object(
+                builder_routes,
+                "register_builder_asset",
+                return_value={"id": "asset-registry-1"},
+            ),
         ]
 
         for item in self.patches:

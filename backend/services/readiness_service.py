@@ -35,6 +35,8 @@ REQUIRED_SCHEMA_SELECTS = {
     "billing_webhook_events": "id,provider_event_id,tenant_id,provider_occurred_at,status",
     "notification_outbox": "id,channel,status,deduplication_key",
     "builder_form_submissions": "id,idempotency_key_hash,request_hash",
+    "builder_assets": "id,tenant_id,status,size_bytes,retention_until",
+    "builder_asset_references": "asset_id,project_id,reference_path",
 }
 
 _cache_lock = Lock()

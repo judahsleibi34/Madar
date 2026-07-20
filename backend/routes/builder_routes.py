@@ -13,6 +13,10 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from postgrest.exceptions import APIError
 
 from database import service_supabase
+from services.asset_registry_service import (
+    reconcile_project_asset_references,
+    register_builder_asset,
+)
 from services.audit_service import hash_audit_identifier, record_audit_event
 from services.api_errors import error_detail
 from services.billing_service import require_publish_entitlement
@@ -1139,6 +1143,29 @@ async def upload_builder_asset(
     target_path.write_bytes(content)
 
     asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
+    try:
+        registered_asset = register_builder_asset(
+            tenant_id=context.tenant_id,
+            uploader_user_id=context.user_id,
+            storage_key=f"{tenant_dir}/builder_assets/{filename}",
+            original_filename=file.filename or "asset",
+            managed_filename=filename,
+            mime_type=detected_content_type,
+            content=content,
+        )
+    except Exception as error:
+        target_path.unlink(missing_ok=True)
+        logger.error(
+            "builder.asset_registry_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Asset storage is temporarily unavailable",
+        ) from error
 
     record_audit_event(
         request=request,
@@ -1160,6 +1187,7 @@ async def upload_builder_asset(
         "asset_url": asset_url,
         "url": asset_url,
         "content_type": detected_content_type,
+        "asset_id": registered_asset.get("id"),
     }
 
 
@@ -1756,6 +1784,26 @@ def update_builder_project(
     if not (getattr(update_response, "data", None) or []):
         _raise_revision_conflict(project_id, context.tenant_id)
 
+    if project.draft_schema is not None:
+        try:
+            reconcile_project_asset_references(
+                project_id=project_id,
+                tenant_id=context.tenant_id,
+                schema=update_payload["draft_schema"],
+            )
+        except Exception as error:
+            # The canonical project save has already committed. Keep the upload
+            # grace period intact and let the bounded reconciliation job repair
+            # registry metadata; never report the committed save as failed.
+            logger.error(
+                "builder.asset_reconciliation_failed",
+                extra={
+                    "tenant_id": context.tenant_id,
+                    "project_id": project_id,
+                    "error_type": type(error).__name__,
+                },
+            )
+
     return {
         "success": True,
         "project": first_row(update_response),
@@ -1783,6 +1831,21 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
     archive_rows = getattr(archive_response, "data", None) or []
     if not archive_rows:
         _raise_revision_conflict(project_id, context.tenant_id)
+    try:
+        reconcile_project_asset_references(
+            project_id=project_id,
+            tenant_id=context.tenant_id,
+            schema={},
+        )
+    except Exception as error:
+        logger.error(
+            "builder.asset_archive_reconciliation_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "project_id": project_id,
+                "error_type": type(error).__name__,
+            },
+        )
     archived_project = archive_rows[0]
 
     record_audit_event(

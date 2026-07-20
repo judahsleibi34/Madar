@@ -65,6 +65,7 @@ class DataUploadPrivacyTests(unittest.TestCase):
             patch.object(data_routes, "enforce_data_workspace_rate_limit", return_value=None),
             patch.object(builder_routes, "BUILDER_ASSET_UPLOAD_DIR", self.public_dir),
             patch.object(builder_routes, "BUILDER_ASSET_MAX_BYTES", 5 * 1024 * 1024),
+            patch.object(builder_routes, "register_builder_asset", return_value={"id": "asset-1"}),
             patch.object(
                 builder_routes,
                 "require_builder_write_access",

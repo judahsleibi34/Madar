@@ -43,6 +43,7 @@ SENSITIVE_TABLES = (
     "website_settings",
     "builder_projects",
     "builder_form_submissions",
+    "builder_assets",
     "features",
     "audit_logs",
 )
@@ -90,6 +91,11 @@ ALLOWED_DIRECT_GRANTS = {
     "builder_form_submissions": {
         "anon": set(),
         "authenticated": {"SELECT"},
+        "service_role": TABLE_CRUD_GRANTS,
+    },
+    "builder_assets": {
+        "anon": set(),
+        "authenticated": set(),
         "service_role": TABLE_CRUD_GRANTS,
     },
     "features": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
