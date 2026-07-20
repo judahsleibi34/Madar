@@ -9,6 +9,20 @@ class ReadinessServiceTests(unittest.TestCase):
     def tearDown(self):
         readiness_service.clear_readiness_cache()
 
+    def test_generated_execution_requires_isolated_worker(self):
+        with patch.dict("os.environ", {"AI_ALLOW_LOCAL_EXEC": "true", "AI_ISOLATED_WORKER_ENABLED": "false"}, clear=False):
+            self.assertEqual(readiness_service.check_ai_execution_guard(), "insecure")
+        with patch.dict("os.environ", {"AI_ALLOW_LOCAL_EXEC": "true", "AI_ISOLATED_WORKER_ENABLED": "true"}, clear=False):
+            self.assertEqual(readiness_service.check_ai_execution_guard(), "ok")
+
+    def test_remote_ingestion_requires_enforced_egress(self):
+        with patch.dict("os.environ", {"ALLOW_REMOTE_DATASET_URLS": "true", "REMOTE_INGESTION_EGRESS_ENFORCED": "false"}, clear=False):
+            self.assertEqual(readiness_service.check_remote_ingestion_guard(), "insecure")
+
+    def test_production_parser_stays_gated_until_isolated(self):
+        with patch.dict("os.environ", {"APP_ENV": "production"}, clear=False):
+            self.assertEqual(readiness_service.check_parser_isolation(), "in_process")
+
     def test_all_required_components_ready(self):
         with patch.object(readiness_service, "check_database", return_value="ok"), patch.object(
             readiness_service, "check_redis", return_value="ok"
@@ -19,6 +33,10 @@ class ReadinessServiceTests(unittest.TestCase):
                 readiness_service,
                 "check_admin_mfa_policy",
                 return_value="not_required",
+            ), patch.object(
+                readiness_service, "check_ai_execution_guard", return_value="disabled"
+            ), patch.object(
+                readiness_service, "check_remote_ingestion_guard", return_value="disabled"
             ):
                 result = readiness_service.get_readiness(use_cache=False)
 
@@ -30,7 +48,11 @@ class ReadinessServiceTests(unittest.TestCase):
         ), patch.object(readiness_service, "check_auth", return_value="ok"), patch.object(
             readiness_service, "check_storage", return_value="ok"
         ), patch.object(readiness_service, "check_schema", return_value="ok"):
-            with patch.object(readiness_service, "check_admin_mfa_policy", return_value="ok"):
+            with patch.object(readiness_service, "check_admin_mfa_policy", return_value="ok"), patch.object(
+                readiness_service, "check_ai_execution_guard", return_value="disabled"
+            ), patch.object(
+                readiness_service, "check_remote_ingestion_guard", return_value="disabled"
+            ):
                 result = readiness_service.get_readiness(use_cache=False)
 
         self.assertIs(result["ready"], False)
@@ -41,7 +63,11 @@ class ReadinessServiceTests(unittest.TestCase):
         ), patch.object(readiness_service, "check_auth", return_value="ok"), patch.object(
             readiness_service, "check_storage", return_value="ok"
         ), patch.object(readiness_service, "check_schema", return_value="ok"):
-            with patch.object(readiness_service, "check_admin_mfa_policy", return_value="ok"):
+            with patch.object(readiness_service, "check_admin_mfa_policy", return_value="ok"), patch.object(
+                readiness_service, "check_ai_execution_guard", return_value="disabled"
+            ), patch.object(
+                readiness_service, "check_remote_ingestion_guard", return_value="disabled"
+            ):
                 result = readiness_service.get_readiness(use_cache=False)
 
         self.assertIs(result["ready"], True)

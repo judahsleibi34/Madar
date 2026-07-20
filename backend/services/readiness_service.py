@@ -184,10 +184,33 @@ def check_admin_mfa_policy() -> str:
     )
 
 
+def check_ai_execution_guard() -> str:
+    local_exec = _env_bool("AI_ALLOW_LOCAL_EXEC", False)
+    isolated = _env_bool("AI_ISOLATED_WORKER_ENABLED", False)
+    if not local_exec:
+        return "disabled"
+    return "ok" if isolated else "insecure"
+
+
+def check_remote_ingestion_guard() -> str:
+    enabled = _env_bool("ALLOW_REMOTE_DATASET_URLS", False)
+    if not enabled:
+        return "disabled"
+    return "ok" if _env_bool("REMOTE_INGESTION_EGRESS_ENFORCED", False) else "insecure"
+
+
+def check_parser_isolation() -> str:
+    return "in_process" if _app_env() in {"prod", "production"} else "development"
+
+
 def _is_required_state_ready(component: str, state: str) -> bool:
     if component == "redis" and state in {"disabled", "optional_unavailable"}:
         return True
     if component == "admin_mfa_policy" and state == "not_required":
+        return True
+    if component in {"ai_execution_guard", "remote_ingestion_guard"} and state == "disabled":
+        return True
+    if component == "parser_isolation" and state == "development":
         return True
     return state == "ok"
 
@@ -200,6 +223,9 @@ def compute_readiness() -> dict:
         "storage": check_storage,
         "schema": check_schema,
         "admin_mfa_policy": check_admin_mfa_policy,
+        "ai_execution_guard": check_ai_execution_guard,
+        "remote_ingestion_guard": check_remote_ingestion_guard,
+        "parser_isolation": check_parser_isolation,
     }
     def safe_check(check) -> str:
         try:
