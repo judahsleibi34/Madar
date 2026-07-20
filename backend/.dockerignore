@@ -1,0 +1,9 @@
+__pycache__
+*.py[cod]
+.pytest_cache
+.coverage
+avatar_uploads/*
+uploads/*
+private_uploads/*
+private_generated_charts/*
+.env*
