@@ -13,11 +13,22 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from postgrest.exceptions import APIError
 
 from database import service_supabase
+from services.asset_registry_service import (
+    reconcile_project_asset_references,
+    register_builder_asset,
+)
 from services.audit_service import hash_audit_identifier, record_audit_event
 from services.api_errors import error_detail
 from services.billing_service import require_publish_entitlement
 from services.notification_outbox_service import enqueue_notification
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
+from services.site_permission_service import assign_project_role, project_role_keys
+from services.storage_quota_service import (
+    StorageSafetyError,
+    finish_storage,
+    get_tenant_storage_usage,
+    reserve_storage,
+)
 from services.website_settings_service import require_public_subdomain
 from services.url_validation import validate_builder_schema_urls, validate_public_url
 from services.tenant_service import (
@@ -726,11 +737,11 @@ def normalize_site_member_status(value: str) -> str:
     raise HTTPException(status_code=400, detail="Invalid site member status")
 
 
-def normalize_site_member_role(_project: dict, value: str | None) -> str:
+def normalize_site_member_role(project: dict, value: str | None) -> str:
     role = str(value or "").strip()
     if not role:
         return "customer"
-    if len(role) > 160:
+    if role not in project_role_keys(project):
         raise HTTPException(status_code=400, detail="Selected role is invalid")
     return role
 
@@ -755,15 +766,45 @@ def format_site_member(membership: dict, user: dict | None) -> dict:
     }
 
 
-def get_site_members_for_tenant(tenant_id: int) -> list[dict]:
+def get_site_members_for_project(tenant_id: int, project_id: str) -> list[dict]:
+    assignment_response = (
+        service_supabase.table("tenant_site_project_role_assignments")
+        .select("membership_id,role_id")
+        .eq("project_id", project_id)
+        .execute()
+    )
+    assignments = getattr(assignment_response, "data", None) or []
+    membership_ids = [row.get("membership_id") for row in assignments if row.get("membership_id") is not None]
+    if not membership_ids:
+        return []
     membership_response = (
         service_supabase.table("tenant_site_memberships")
         .select("*")
         .eq("tenant_id", tenant_id)
+        .in_("id", membership_ids)
         .order("created_at", desc=True)
         .execute()
     )
     memberships = getattr(membership_response, "data", None) or []
+    role_ids = [row.get("role_id") for row in assignments if row.get("role_id") is not None]
+    role_keys_by_id = {}
+    if role_ids:
+        roles_response = (
+            service_supabase.table("tenant_site_project_roles")
+            .select("id,role_key,deleted_at")
+            .eq("project_id", project_id)
+            .in_("id", role_ids)
+            .execute()
+        )
+        role_keys_by_id = {
+            str(role.get("id")): role.get("role_key")
+            for role in (getattr(roles_response, "data", None) or [])
+            if not role.get("deleted_at")
+        }
+    role_by_membership_id = {
+        str(row.get("membership_id")): role_keys_by_id.get(str(row.get("role_id")))
+        for row in assignments
+    }
     user_ids = [membership.get("user_id") for membership in memberships if membership.get("user_id") is not None]
     users_by_id = {}
     if user_ids:
@@ -778,8 +819,12 @@ def get_site_members_for_tenant(tenant_id: int) -> list[dict]:
             for user in (getattr(users_response, "data", None) or [])
         }
     return [
-        format_site_member(membership, users_by_id.get(str(membership.get("user_id"))))
+        format_site_member(
+            {**membership, "role": role_by_membership_id.get(str(membership.get("id"))) or "customer"},
+            users_by_id.get(str(membership.get("user_id"))),
+        )
         for membership in memberships
+        if role_by_membership_id.get(str(membership.get("id")))
     ]
 
 
@@ -1135,10 +1180,66 @@ async def upload_builder_asset(
     filename = f"{uuid4().hex}{extension}"
     target_dir, target_path, tenant_dir = get_builder_asset_target(context.tenant_id, filename)
 
+    try:
+        storage_reservation_id = reserve_storage(
+            tenant_id=context.tenant_id,
+            user_id=context.user_id,
+            category="builder_asset",
+            size_bytes=len(content),
+            storage_root=BUILDER_ASSET_UPLOAD_DIR,
+        )
+    except StorageSafetyError as error:
+        raise HTTPException(
+            status_code=507,
+            detail=error_detail(error.code, "Storage capacity is unavailable."),
+        ) from error
+
     target_dir.mkdir(parents=True, exist_ok=True)
-    target_path.write_bytes(content)
+    try:
+        target_path.write_bytes(content)
+    except Exception:
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        raise
 
     asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
+    try:
+        registered_asset = register_builder_asset(
+            tenant_id=context.tenant_id,
+            uploader_user_id=context.user_id,
+            storage_key=f"{tenant_dir}/builder_assets/{filename}",
+            original_filename=file.filename or "asset",
+            managed_filename=filename,
+            mime_type=detected_content_type,
+            content=content,
+        )
+    except Exception as error:
+        target_path.unlink(missing_ok=True)
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        logger.error(
+            "builder.asset_registry_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Asset storage is temporarily unavailable",
+        ) from error
+    try:
+        finish_storage(
+            reservation_id=storage_reservation_id,
+            succeeded=True,
+            storage_key=f"{tenant_dir}/builder_assets/{filename}",
+            content=content,
+        )
+    except Exception as error:
+        target_path.unlink(missing_ok=True)
+        logger.error(
+            "builder.asset_accounting_failed",
+            extra={"tenant_id": context.tenant_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(status_code=503, detail="Asset accounting is temporarily unavailable") from error
 
     record_audit_event(
         request=request,
@@ -1160,7 +1261,14 @@ async def upload_builder_asset(
         "asset_url": asset_url,
         "url": asset_url,
         "content_type": detected_content_type,
+        "asset_id": registered_asset.get("id"),
     }
+
+
+@router.get("/builder/storage/usage")
+def get_builder_storage_usage(request: Request, response: Response):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    return {"success": True, "storage": get_tenant_storage_usage(context.tenant_id)}
 
 
 @router.get("/builder/reservations")
@@ -1431,7 +1539,7 @@ def list_builder_site_members(project_id: str, request: Request, response: Respo
     get_project_for_tenant(project_id, context.tenant_id)
     return {
         "success": True,
-        "members": get_site_members_for_tenant(context.tenant_id),
+        "members": get_site_members_for_project(context.tenant_id, project_id),
     }
 
 
@@ -1547,7 +1655,20 @@ def create_builder_site_member(
         membership = memberships[0] if memberships else None
         if not membership:
             raise RuntimeError("Membership row was not returned")
+        assign_project_role(
+            membership_id=int(membership["id"]),
+            tenant_id=context.tenant_id,
+            project=project,
+            role_key=role,
+            actor_user_id=context.user_id,
+            client=service_supabase,
+        )
     except Exception as error:
+        if 'membership' in locals() and membership:
+            try:
+                service_supabase.table("tenant_site_memberships").delete().eq("id", membership["id"]).eq("tenant_id", context.tenant_id).execute()
+            except Exception:
+                pass
         if created_local_user:
             try:
                 service_supabase.table("users").delete().eq("id", local_user["id"]).execute()
@@ -1586,16 +1707,21 @@ def update_builder_site_member(
     context = require_builder_context(request, response, require_builder_admin_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
     update_payload = {}
+    role = None
     if update.role_id is not None:
-        update_payload["role"] = normalize_site_member_role(project, update.role_id)
+        role = normalize_site_member_role(project, update.role_id)
     if update.status is not None:
         update_payload["status"] = normalize_site_member_status(update.status)
-    if not update_payload:
+    if not update_payload and role is None:
         raise HTTPException(status_code=400, detail="No member changes were provided")
 
+    membership_query = service_supabase.table("tenant_site_memberships")
+    if update_payload:
+        membership_query = membership_query.update({**update_payload, "updated_at": datetime.now(timezone.utc).isoformat()})
+    else:
+        membership_query = membership_query.select("*")
     membership_response = (
-        service_supabase.table("tenant_site_memberships")
-        .update({**update_payload, "updated_at": datetime.now(timezone.utc).isoformat()})
+        membership_query
         .eq("id", membership_id)
         .eq("tenant_id", context.tenant_id)
         .execute()
@@ -1604,6 +1730,19 @@ def update_builder_site_member(
     if not memberships:
         raise HTTPException(status_code=404, detail="Site member not found")
     membership = memberships[0]
+    if role is not None:
+        try:
+            assign_project_role(
+                membership_id=membership_id,
+                tenant_id=context.tenant_id,
+                project=project,
+                role_key=role,
+                actor_user_id=context.user_id,
+                client=service_supabase,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail="Selected role is invalid") from error
+        membership = {**membership, "role": role}
     user_response = (
         service_supabase.table("users")
         .select("id, auth_id, first_name, last_name, email")
@@ -1620,7 +1759,7 @@ def update_builder_site_member(
         action="builder.site_member_updated",
         target_type="tenant_site_membership",
         target_id=str(membership_id),
-        metadata={"project_id": project_id, **update_payload},
+        metadata={"project_id": project_id, **update_payload, **({"role": role} if role else {})},
     )
     return {
         "success": True,
@@ -1637,11 +1776,21 @@ def delete_builder_site_member(
 ):
     context = require_builder_context(request, response, require_builder_admin_access)
     get_project_for_tenant(project_id, context.tenant_id)
-    delete_response = (
+    membership_response = (
         service_supabase.table("tenant_site_memberships")
-        .delete()
+        .select("id")
         .eq("id", membership_id)
         .eq("tenant_id", context.tenant_id)
+        .limit(1)
+        .execute()
+    )
+    if not (getattr(membership_response, "data", None) or []):
+        raise HTTPException(status_code=404, detail="Site member not found")
+    delete_response = (
+        service_supabase.table("tenant_site_project_role_assignments")
+        .delete()
+        .eq("membership_id", membership_id)
+        .eq("project_id", project_id)
         .execute()
     )
     deleted = getattr(delete_response, "data", None) or []
@@ -1756,6 +1905,27 @@ def update_builder_project(
     if not (getattr(update_response, "data", None) or []):
         _raise_revision_conflict(project_id, context.tenant_id)
 
+    if project.draft_schema is not None:
+        try:
+            reconcile_project_asset_references(
+                project_id=project_id,
+                tenant_id=context.tenant_id,
+                schema=update_payload["draft_schema"],
+                client=service_supabase,
+            )
+        except Exception as error:
+            # The canonical project save has already committed. Keep the upload
+            # grace period intact and let the bounded reconciliation job repair
+            # registry metadata; never report the committed save as failed.
+            logger.error(
+                "builder.asset_reconciliation_failed",
+                extra={
+                    "tenant_id": context.tenant_id,
+                    "project_id": project_id,
+                    "error_type": type(error).__name__,
+                },
+            )
+
     return {
         "success": True,
         "project": first_row(update_response),
@@ -1783,6 +1953,22 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
     archive_rows = getattr(archive_response, "data", None) or []
     if not archive_rows:
         _raise_revision_conflict(project_id, context.tenant_id)
+    try:
+        reconcile_project_asset_references(
+            project_id=project_id,
+            tenant_id=context.tenant_id,
+            schema={},
+            client=service_supabase,
+        )
+    except Exception as error:
+        logger.error(
+            "builder.asset_archive_reconciliation_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "project_id": project_id,
+                "error_type": type(error).__name__,
+            },
+        )
     archived_project = archive_rows[0]
 
     record_audit_event(

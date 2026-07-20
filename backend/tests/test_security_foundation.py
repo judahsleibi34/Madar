@@ -694,6 +694,23 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertNotIn("for insert", submissions_sql.split("create policy", 1)[-1])
         self.assertNotIn("for update", submissions_sql.split("create policy", 1)[-1])
 
+    def test_form_idempotency_rpc_is_service_role_only_and_concurrency_safe(self):
+        migrations_dir = self.get_migrations_dir()
+        sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "add_form_submission_idempotency.sql",
+        )
+        self.assertIn("pg_advisory_xact_lock", sql)
+        self.assertIn("builder_form_submissions_idempotency_unique_idx", sql)
+        self.assertIn("idempotency_conflict", sql)
+        self.assertIn("set search_path = public", sql)
+        self.assertIn(
+            "revoke all on function public.create_builder_form_submission_safe",
+            sql,
+        )
+        self.assertIn("from public, anon, authenticated", sql)
+        self.assertIn("to service_role", sql)
+
     def test_website_settings_rls_cleanup_removes_user_id_compatibility(self):
         migrations_dir = self.get_migrations_dir()
         website_settings_sql = self.read_migration_by_suffix(

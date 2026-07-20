@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { defineConfig } from "@playwright/test";
+import { assertIsolatedE2EEnvironment } from "./e2e/safety.mjs";
 
 const configDirectory = path.dirname(fileURLToPath(import.meta.url));
 const testEnvironmentPath = path.resolve(configDirectory, "../.env.test.local");
@@ -18,11 +19,13 @@ if (environmentResult.error) {
   throw new Error("Authenticated Playwright testing requires the repository-root .env.test.local file.");
 }
 
-for (const variableName of ["TEST_USER_EMAIL", "TEST_USER_PASSWORD"]) {
+for (const variableName of ["TEST_USER_EMAIL", "TEST_USER_PASSWORD", "PUBLISHED_FORM_PATH"]) {
   if (!process.env[variableName]?.trim()) {
     throw new Error(`Authenticated Playwright testing requires ${variableName}.`);
   }
 }
+
+const isolatedEnvironment = assertIsolatedE2EEnvironment(process.env);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -36,7 +39,7 @@ export default defineConfig({
   preserveOutput: "always",
   reporter: "line",
   use: {
-    baseURL: process.env.RESPONSIVE_AUDIT_URL || "http://127.0.0.1:5173",
+    baseURL: isolatedEnvironment.baseUrl,
     channel: "chrome",
     headless: true,
     screenshot: "off",

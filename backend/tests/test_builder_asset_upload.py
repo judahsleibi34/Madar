@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from routes import builder_routes
 from services.tenant_service import TenantContext
+from services.storage_quota_service import StorageSafetyError
 from services.url_validation import validate_public_url
 
 
@@ -76,6 +77,13 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 "enforce_builder_asset_upload_rate_limit",
                 return_value=None,
             ),
+            patch.object(
+                builder_routes,
+                "register_builder_asset",
+                return_value={"id": "asset-registry-1"},
+            ),
+            patch.object(builder_routes, "reserve_storage", return_value="reservation-1"),
+            patch.object(builder_routes, "finish_storage", return_value="object-1"),
         ]
 
         for item in self.patches:
@@ -215,6 +223,18 @@ class BuilderAssetUploadTests(unittest.TestCase):
             response = self.post_asset(PNG_BYTES, "asset.png", "image/png")
 
         self.assertEqual(response.status_code, 413)
+
+    def test_quota_rejection_writes_no_file(self):
+        with patch.object(
+            builder_routes,
+            "reserve_storage",
+            side_effect=StorageSafetyError("tenant_storage_quota_exceeded"),
+        ):
+            response = self.post_asset(PNG_BYTES)
+        self.assertEqual(response.status_code, 507)
+        self.assertEqual(response.json()["detail"]["code"], "tenant_storage_quota_exceeded")
+        asset_dir = self.upload_dir / "tenant_1" / "builder_assets"
+        self.assertFalse(asset_dir.exists())
 
     def test_path_traversal_filename_does_not_affect_storage_path(self):
         response = self.post_asset(PNG_BYTES, "../../evil.png", "image/png")

@@ -11,4 +11,6 @@ services:
   frontend:
     container_name: madar-dev-frontend
     ports: !override
-      - "127.0.0.1:3001:80"
+      - "127.0.0.1:3001:8080"
+    environment:
+      MADAR_CSP_CONNECT_SRC: http://127.0.0.1:8002

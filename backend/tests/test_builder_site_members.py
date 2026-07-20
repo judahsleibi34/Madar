@@ -44,6 +44,10 @@ class FakeQuery:
         self.in_filters.append((field, set(values)))
         return self
 
+    def is_(self, field, value):
+        self.filters.append((field, None if value == "null" else value))
+        return self
+
     def limit(self, value):
         self.limit_count = value
         return self
@@ -118,6 +122,30 @@ class FakeSupabase:
     def table(self, name):
         return FakeQuery(self, name)
 
+    def rpc(self, name, payload):
+        if name != "assign_tenant_site_project_role":
+            raise AssertionError(f"Unexpected RPC: {name}")
+        roles = self.tables.setdefault("tenant_site_project_roles", [])
+        role = next((row for row in roles if row.get("project_id") == payload["target_project_id"] and row.get("role_key") == payload["target_role_key"]), None)
+        if role is None:
+            role = {
+                "id": f"role-{len(roles) + 1}",
+                "tenant_id": payload["target_tenant_id"],
+                "project_id": payload["target_project_id"],
+                "role_key": payload["target_role_key"],
+                "capabilities": ["view_protected_page", "submit_protected_form", "make_reservation"],
+                "deleted_at": None,
+            }
+            roles.append(role)
+        assignments = self.tables.setdefault("tenant_site_project_role_assignments", [])
+        assignment = next((row for row in assignments if row.get("membership_id") == payload["target_membership_id"] and row.get("project_id") == payload["target_project_id"]), None)
+        value = {"membership_id": payload["target_membership_id"], "project_id": payload["target_project_id"], "role_id": role["id"]}
+        if assignment is None:
+            assignments.append(value)
+        else:
+            assignment.update(value)
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=role["id"]))
+
     def next_id(self, table_name):
         ids = [row.get("id") for row in self.tables.get(table_name, [])]
         numeric_ids = [value for value in ids if isinstance(value, int)]
@@ -161,6 +189,13 @@ class BuilderSiteMemberTests(unittest.TestCase):
                         "source": "registered",
                         "created_at": "2026-01-01T00:00:00Z",
                     }
+                ],
+                "tenant_site_project_roles": [
+                    {"id": "role-customer", "tenant_id": 7, "project_id": "project-1", "role_key": "customer", "capabilities": ["view_protected_page", "submit_protected_form", "make_reservation"], "deleted_at": None},
+                    {"id": "role-vip", "tenant_id": 7, "project_id": "project-1", "role_key": "vip", "capabilities": ["view_protected_page", "submit_protected_form", "make_reservation"], "deleted_at": None},
+                ],
+                "tenant_site_project_role_assignments": [
+                    {"membership_id": 21, "project_id": "project-1", "role_id": "role-customer"}
                 ],
             }
         )
@@ -224,8 +259,22 @@ class BuilderSiteMemberTests(unittest.TestCase):
 
         delete_response = self.client.delete("/builder/projects/project-1/site-members/21")
         self.assertEqual(delete_response.status_code, 200)
-        self.assertEqual(self.supabase.tables["tenant_site_memberships"], [])
+        self.assertEqual(len(self.supabase.tables["tenant_site_memberships"]), 1)
+        self.assertEqual(self.supabase.tables["tenant_site_project_role_assignments"], [])
         self.assertEqual(len(self.supabase.tables["users"]), 1)
+
+    def test_role_is_scoped_to_the_selected_project(self):
+        self.supabase.tables["tenant_site_project_roles"].append(
+            {"id": "role-other", "tenant_id": 7, "project_id": "project-2", "role_key": "customer", "capabilities": ["view_protected_page"], "deleted_at": None}
+        )
+        self.supabase.tables["tenant_site_project_role_assignments"].append(
+            {"membership_id": 21, "project_id": "project-2", "role_id": "role-other"}
+        )
+        response = self.client.delete("/builder/projects/project-1/site-members/21")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.supabase.tables["tenant_site_project_role_assignments"], [
+            {"membership_id": 21, "project_id": "project-2", "role_id": "role-other"}
+        ])
 
     def test_non_admin_cannot_list_site_members(self):
         with patch.object(
@@ -235,6 +284,14 @@ class BuilderSiteMemberTests(unittest.TestCase):
         ):
             response = self.client.get("/builder/projects/project-1/site-members")
         self.assertEqual(response.status_code, 403)
+
+    def test_unknown_project_role_is_rejected(self):
+        response = self.client.patch(
+            "/builder/projects/project-1/site-members/21",
+            json={"role_id": "invented-role"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Selected role is invalid")
 
 
 if __name__ == "__main__":

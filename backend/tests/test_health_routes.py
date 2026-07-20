@@ -67,6 +67,21 @@ class HealthRouteTests(unittest.TestCase):
         self.assertIs(response.json()["ready"], False)
         self.assertEqual(response.json()["components"]["redis"], "unavailable")
 
+    def test_metrics_endpoint_is_hidden_when_token_is_wrong(self):
+        client = build_client()
+        with patch.dict("os.environ", {"METRICS_TOKEN": "correct-token"}, clear=False):
+            response = client.get("/health/metrics", headers={"Authorization": "Bearer wrong-token"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_metrics_endpoint_returns_prometheus_with_token(self):
+        client = build_client()
+        with patch.dict("os.environ", {"METRICS_TOKEN": "correct-token"}, clear=False), patch.object(
+            health_routes, "prometheus_metrics", return_value="madar_http_requests_total 1\n"
+        ):
+            response = client.get("/health/metrics", headers={"Authorization": "Bearer correct-token"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("madar_http_requests_total", response.text)
+
 
 if __name__ == "__main__":
     unittest.main()

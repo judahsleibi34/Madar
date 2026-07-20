@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import PageSkeleton from "./components/common/PageSkeleton";
+import RouteErrorBoundary from "./components/common/RouteErrorBoundary";
 import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
 import { DashboardLoadingElement } from "./routes/shared";
+import { getRouteErrorSurface } from "./routes/routeErrorSurface";
 import {
   getSafePostLoginPath,
   isDashboardRoutePath,
@@ -49,6 +51,7 @@ export default function App() {
   const isAdminUser = normalizedUserType === "admin";
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
+  const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
 
   const getCurrentReturnTo = () =>
     encodeURIComponent(
@@ -619,7 +622,15 @@ export default function App() {
     <>
       <ScrollToTop />
       <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page">
-        {routeContent}
+        <RouteErrorBoundary
+          key={errorSurface}
+          surface={errorSurface}
+          resetKey={location.pathname}
+          homePath={isDashboardRoute ? "/dashboard" : "/"}
+          homeLabel={isDashboardRoute ? "Return to dashboard" : "Return home"}
+        >
+          {routeContent}
+        </RouteErrorBoundary>
       </RouteSuspense>
     </>
   );

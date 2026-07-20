@@ -22,6 +22,13 @@ from data_analysis.io.data_reading import DataReadingNormal, RemoteDatasetUrlsDi
 from data_analysis.router import AnalysisRouter
 from data_analysis.visualization.visualization import DataVisualization
 from services.spreadsheet_security import sanitize_spreadsheet_dataframe
+from services.storage_quota_service import (
+    StorageSafetyError,
+    ensure_disk_capacity,
+    finish_storage,
+    reserve_storage,
+    sha256_file,
+)
 from services.upload_config import (
     assert_path_within_root,
     get_data_upload_dir,
@@ -425,11 +432,29 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
     validate_upload_content_type(file.content_type)
 
     unique_filename = f"{uuid4().hex}{file_extension}"
-    file_path = get_user_upload_dir(tenant_id, user_id) / unique_filename
+    upload_dir = get_user_upload_dir(tenant_id, user_id)
+    try:
+        ensure_disk_capacity(upload_dir, incoming_bytes=min(MAX_DATASET_UPLOAD_BYTES, MAX_UPLOAD_BYTES))
+    except StorageSafetyError as error:
+        raise HTTPException(status_code=507, detail={"code": error.code, "message": "Storage capacity is unavailable."}) from error
+    file_path = upload_dir / unique_filename
     file_size = await stream_upload_to_private_file(file, file_path)
+
+    try:
+        storage_reservation_id = reserve_storage(
+            tenant_id=int(tenant_id),
+            user_id=int(user_id),
+            category="dataset",
+            size_bytes=file_size,
+            storage_root=upload_dir,
+        )
+    except StorageSafetyError as error:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=507, detail={"code": error.code, "message": "Storage quota is unavailable."}) from error
 
     if file_extension in {".xls", ".xlsx"} and file_size > MAX_EXCEL_UPLOAD_BYTES:
         file_path.unlink(missing_ok=True)
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
         raise HTTPException(
             status_code=413,
             detail=(
@@ -452,15 +477,26 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
             )
     except HTTPException:
         file_path.unlink(missing_ok=True)
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
         raise
+
+    try:
+        finish_storage(
+            reservation_id=storage_reservation_id,
+            succeeded=True,
+            storage_key=f"tenant_{tenant_id}/user_{user_id}/{unique_filename}",
+            sha256_hex=sha256_file(file_path),
+        )
+    except Exception as error:
+        file_path.unlink(missing_ok=True)
+        logger.error("data.upload.accounting_failed", extra={"tenant_id": tenant_id, "user_id": user_id, "error_type": type(error).__name__})
+        raise HTTPException(status_code=503, detail="Storage accounting is temporarily unavailable.") from error
 
     logger.info(
         "data.upload.accepted",
         extra={
             "tenant_id": tenant_id,
             "user_id": user_id,
-            "filename": Path(filename).name,
-            "dataset_id": file_path.name,
             "file_size": int(file_size),
             "processing_mode": response.get("processing_mode"),
             "rows": response.get("rows"),
@@ -781,6 +817,35 @@ def create_visualization(
         if returned_chart_id
         else None
     )
+
+    generated_paths = [Path(path) for path in (chart_path, explorer_path) if path]
+    reservations: list[str] = []
+    try:
+        for generated_path in generated_paths:
+            size = generated_path.stat().st_size
+            reservation_id = reserve_storage(
+                tenant_id=int(tenant_id),
+                user_id=int(user_id),
+                category="generated_artifact",
+                size_bytes=size,
+                storage_root=chart_storage_dir,
+            )
+            reservations.append(reservation_id)
+            finish_storage(
+                reservation_id=reservation_id,
+                succeeded=True,
+                storage_key=f"tenant_{tenant_id}/user_{user_id}/{generated_path.name}",
+                sha256_hex=sha256_file(generated_path),
+                retention_until=None,
+            )
+    except (OSError, StorageSafetyError, RuntimeError) as error:
+        for generated_path in generated_paths:
+            generated_path.unlink(missing_ok=True)
+        logger.error(
+            "data.visualization.accounting_failed",
+            extra={"tenant_id": tenant_id, "user_id": user_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(status_code=507, detail="Generated artifact storage is unavailable.") from error
 
     return sanitize_for_json(
         {

@@ -1,0 +1,52 @@
+name: Backend Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify dependency and migration locks
+        run: |
+          python3 scripts/check_dependency_locks.py
+          python3 scripts/check_migrations.py
+
+      - name: Build locked backend image
+        run: docker build -t madar-backend-test backend
+
+      - name: Run backend tests
+        run: |
+          docker run --rm \
+            --env APP_ENV=test \
+            --env SUPABASE_URL=http://127.0.0.1:54321 \
+            --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
+            --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
+            --env PUBLIC_UPLOADS_DIR=/tmp/madar-ci/public/uploads \
+            --env DATA_UPLOAD_DIR=/tmp/madar-ci/private/uploads \
+            --env PRIVATE_CHARTS_DIR=/tmp/madar-ci/private/generated-artifacts \
+            --env MADAR_UPLOAD_WORKSPACE_DIR=/tmp/madar-ci/parser \
+            --env MPLCONFIGDIR=/tmp/madar-ci/cache/matplotlib \
+            --env XDG_CACHE_HOME=/tmp/madar-ci/cache/xdg \
+            --env PYGWALKER_TELEMETRY_ENABLED=false \
+            --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
+            --tmpfs /tmp:rw,nosuid,nodev,size=1g,mode=1777 \
+            --volume "$PWD/scripts:/scripts:ro" \
+            --volume "$PWD/database:/app/database:ro" \
+            --volume "$PWD/supabase:/app/supabase:ro" \
+            --volume "$PWD/.github/workflows/backend-check.yml:/test-repository/.github/workflows/backend-check.yml:ro" \
+            --volume "$PWD/backend/Dockerfile:/test-repository/backend/Dockerfile:ro" \
+            --volume "$PWD/frontend/Dockerfile:/test-repository/frontend/Dockerfile:ro" \
+            --volume "$PWD/frontend/security_headers.conf.template:/test-repository/frontend/security_headers.conf.template:ro" \
+            --volume "$PWD/docker-compose.yml:/test-repository/docker-compose.yml:ro" \
+            --volume "$PWD/docker-compose.dev.yml:/test-repository/docker-compose.dev.yml:ro" \
+            madar-backend-test python scripts/run_tests_no_external_network.py
+
+      - name: Verify installed dependency consistency
+        run: docker run --rm madar-backend-test python -m pip check

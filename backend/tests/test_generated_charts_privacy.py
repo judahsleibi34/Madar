@@ -7,6 +7,7 @@ from unittest.mock import patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from data_analysis import services as data_services
 from data_analysis.routes import visualization_routes
 from services.upload_config import validate_private_charts_not_publicly_mounted
 
@@ -56,6 +57,8 @@ class GeneratedChartsPrivacyTests(unittest.TestCase):
                 "enforce_visualization_generation_rate_limit",
                 return_value=None,
             ),
+            patch.object(data_services, "reserve_storage", return_value="reservation-1"),
+            patch.object(data_services, "finish_storage", return_value="object-1"),
         ]
 
         for item in self.patches:
