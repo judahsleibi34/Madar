@@ -1,10 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-const DEFAULT_PUBLISHED_FORM_PATH =
-  "/forms/jus/form_1f38be21-0601-4169-bfe1-d47fe088e094";
-
 test("published form fills its preview card within one pixel", async ({ page }) => {
-  const publishedFormUrl = process.env.PUBLISHED_FORM_URL || DEFAULT_PUBLISHED_FORM_PATH;
+  const publishedFormUrl = process.env.PUBLISHED_FORM_PATH;
   await page.goto(publishedFormUrl, { waitUntil: "networkidle" });
 
   const form = page.locator("main.tenant-runtime-form-page form.runtime-form");
@@ -93,7 +90,7 @@ test("published form fills its preview card within one pixel", async ({ page }) 
 });
 
 test("published standalone form surfaces are consistently white", async ({ page }) => {
-  const publishedFormUrl = process.env.PUBLISHED_FORM_URL || DEFAULT_PUBLISHED_FORM_PATH;
+  const publishedFormUrl = process.env.PUBLISHED_FORM_PATH;
   await page.goto(publishedFormUrl, { waitUntil: "networkidle" });
 
   const surfaceSelectors = [
