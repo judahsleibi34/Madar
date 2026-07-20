@@ -64,6 +64,7 @@ import {
 } from "../core/PageBuilder.starters";
 import {
   collectPublicPageRoutingIssues,
+  createUniquePublicPageSlug,
   getStandaloneFormPath,
   normalizeProjectPageRouting,
   sanitizeSubdomain,
@@ -71,6 +72,7 @@ import {
 } from "../core/PageBuilder.routing";
 import { parseCarouselSlides, serializeCarouselSlides } from "../ui/PageBuilderCarousel.utils";
 import PageBuilderModals from "./PageBuilderModals";
+import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
 import PageBuilderStatusBar from "./PageBuilderStatusBar";
 import PageBuilderWorkspaceHeader from "./PageBuilderWorkspaceHeader";
 import PageBuilderMeasuredFrame from "./PageBuilderMeasuredFrame";
@@ -129,6 +131,8 @@ import {
   splitLines,
   getListItems,
   getCanvasTextSelectionRange,
+  createDomTextRange,
+  getFloatingToolbarPlacement,
   createInputTextSelection,
 } from "../core/PageBuilder.text";
 import {
@@ -156,6 +160,7 @@ import {
   getMetricItems,
   getMetricMinimumHeight,
   getDirectElementMinimumSize,
+  reconcileMeasuredFormBlockPosition,
   getSectionCanvasHeight,
   convertSectionToDirectLayout,
   positionsOverlap,
@@ -198,12 +203,9 @@ import {
   loadInitialProject,
 } from "../core/PageBuilder.storage";
 import {
-  classifyBuilderRecovery,
   clearBuilderRecovery,
-  detectLegacyBuilderDraft,
   getBuilderRecoveryStorageKey,
   hashBuilderRecoverySchema,
-  readBuilderRecovery,
 } from "../core/PageBuilder.recovery";
 import {
   BUILDER_SAVE_STATES,
@@ -211,8 +213,13 @@ import {
   deriveBuilderCloudSaveState,
   getAcknowledgedBuilderSaveState,
   getBuilderSaveStateLabel,
+  shouldBlockBuilderUnload,
   stopBuilderSaveScheduling,
 } from "../core/PageBuilder.saveState";
+import {
+  isBuilderReloadShortcut,
+  requestBuilderUnloadWarning,
+} from "../core/PageBuilder.unloadGuard";
 import {
   createBuilderSaveCoordinator,
   createBuilderSaveEntry,
@@ -262,7 +269,6 @@ import {
 import useDebouncedProjectStorage, {
   isNewerExternalDraftMessage,
 } from "./hooks/useDebouncedProjectStorage";
-import BuilderRecoveryNotice from "./BuilderRecoveryNotice";
 import BuilderConflictResolution from "./BuilderConflictResolution";
 import {
   adoptBuilderServerRuntime,
@@ -282,6 +288,7 @@ import {
 } from "../core/PageBuilder.userHandlers";
 import {
   createUploadHandlers,
+  getBuilderAssetFileName,
 } from "../core/PageBuilder.uploadHandlers";
 import {
   createRuntimeFormRenderers,
@@ -289,6 +296,9 @@ import {
 import {
   createElementRenderer,
 } from "../core/PageBuilder.elementRenderer";
+import {
+  resolveReservationBlockValue,
+} from "../core/PageBuilder.reservations";
 import {
   createSiteChromeRenderers,
 } from "../core/PageBuilder.siteChrome";
@@ -645,6 +655,7 @@ export default function PageBuilder({
   } = useDebouncedProjectStorage({
     delay: 2000,
     disabled: demoMode || builderProjectLoading || hasProtectedUnreadableDraft,
+    enableBrowserPersistence: demoMode,
     project,
     recoveryContext,
     storageKey: scopedStorageKey,
@@ -665,6 +676,7 @@ export default function PageBuilder({
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
   const [userPendingDelete, setUserPendingDelete] = useState(null);
   const [pagePendingDelete, setPagePendingDelete] = useState(null);
+  const [homepageOverridePending, setHomepageOverridePending] = useState(null);
   const [previewOverlapWarnings, setPreviewOverlapWarnings] = useState([]);
   const [publishOverlapWarnings, setPublishOverlapWarnings] = useState([]);
   const [isPhoneDevice, setIsPhoneDevice] = useState(isPhysicalPhoneDevice);
@@ -675,7 +687,7 @@ export default function PageBuilder({
   const [runtimeFormLanguages, setRuntimeFormLanguages] = useState({});
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
-  const [recoveryDecision, setRecoveryDecision] = useState(null);
+  const [reloadConfirmationOpen, setReloadConfirmationOpen] = useState(false);
   const [conflictDetails, setConflictDetails] = useState(null);
   const [conflictServerCandidate, setConflictServerCandidate] = useState(null);
   const [conflictMergeState, setConflictMergeState] = useState(null);
@@ -703,7 +715,10 @@ export default function PageBuilder({
   const recentMetricAddRef = useRef(null);
   const userId = user?.id;
   const [textSelection, setTextSelection] = useState(null);
+  const [inlineFontSizeDraft, setInlineFontSizeDraft] = useState(null);
   const [inlineToolbarPosition, setInlineToolbarPosition] = useState(null);
+  const inlineToolbarRef = useRef(null);
+  const inlineToolbarInteractionRef = useRef(false);
   const backendAutosaveTimerRef = useRef(null);
   const backendProjectSnapshotRef = useRef("");
   const baseSchemaRef = useRef(getPersistableProject(project));
@@ -723,6 +738,7 @@ export default function PageBuilder({
   const pendingExternalDraftRef = useRef(null);
   const dragStateRef = useRef(dragState);
   const urlValidationToastShownRef = useRef(false);
+  const allowNextUnloadRef = useRef(false);
 
   const showToast = useCallback((message) => {
     const isUrlValidationMessage =
@@ -880,6 +896,31 @@ export default function PageBuilder({
       }));
     });
   }, [builderProjectLoading, demoMode, isSavingProject, project, saveState]);
+
+  useEffect(() => {
+    if (demoMode) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      if (allowNextUnloadRef.current) return;
+      requestBuilderUnloadWarning(event, shouldBlockBuilderUnload(saveState));
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [demoMode, saveState]);
+
+  useEffect(() => {
+    if (demoMode || !shouldBlockBuilderUnload(saveState)) return undefined;
+
+    const handleReloadShortcut = (event) => {
+      if (!isBuilderReloadShortcut(event)) return;
+      event.preventDefault();
+      setReloadConfirmationOpen(true);
+    };
+
+    window.addEventListener("keydown", handleReloadShortcut, true);
+    return () => window.removeEventListener("keydown", handleReloadShortcut, true);
+  }, [demoMode, saveState]);
 
   useEffect(() => {
     builderProjectRecordRef.current = builderProjectRecord;
@@ -1179,30 +1220,9 @@ export default function PageBuilder({
           );
           setSaveState(BUILDER_SAVE_STATES.savedCloud);
 
-          const recoveryResult = readBuilderRecovery({
-            ...recoveryIdentity,
-            now: Date.now(),
-          });
-          if (recoveryResult.status === "valid") {
-            const recoverySnapshot = getAutosaveSnapshot(recoveryResult.envelope.schema);
-            if (recoverySnapshot === adoption.snapshot) {
-              clearBuilderRecovery(recoveryIdentity);
-              setRecoveryDecision(null);
-            } else {
-              setRecoveryDecision({
-                kind: classifyBuilderRecovery(
-                  recoveryResult.envelope,
-                  fullRecord.draft_revision
-                ),
-                envelope: recoveryResult.envelope,
-              });
-            }
-          } else if (!["missing", "identity_incomplete"].includes(recoveryResult.status)) {
-            setRecoveryDecision({ kind: recoveryResult.status });
-          } else {
-            const legacy = detectLegacyBuilderDraft(user?.id);
-            setRecoveryDecision(legacy.exists ? { kind: "legacy", legacy } : null);
-          }
+          // The server draft is authoritative. Remove any obsolete browser recovery
+          // for this project instead of offering it as an alternate version.
+          clearBuilderRecovery(recoveryIdentity);
           // Compatibility normalization is an in-memory read model. It never
           // schedules a cloud write until the user makes a real content edit.
           if (!isDefaultShowcaseProject(loadedProject)) {
@@ -1465,31 +1485,34 @@ export default function PageBuilder({
     return blocks;
   }, [project.pages]);
 
-  const reservationFormOptions = useMemo(
-    () =>
-      reservationBlocks.map((block, index) => {
-        const reservation = block.element.reservation || {};
-        const title = reservation.title || block.element.name || `Reservation ${index + 1}`;
-        const modeLabel = reservation.bookingMode === "flexible" ? "Date request" : "Fixed slots";
-
-        return {
-          id: block.element.id,
-          label: `${index + 1}. ${title}`,
-          meta: `${modeLabel} - ${block.page.name}`,
-        };
-      }),
+  const reservationDefinitions = useMemo(
+    () => reservationBlocks.filter(({ element }) => {
+      const sourceId = element.connectedReservationBlockId;
+      return !sourceId || sourceId === element.id;
+    }),
     [reservationBlocks]
   );
 
-  const getReservationBlockValue = useCallback(
-    (element) => {
-      const sourceId = element?.connectedReservationBlockId;
-      if (!sourceId || sourceId === element?.id) return element?.reservation || null;
+  const reservationFormOptions = useMemo(
+    () =>
+      reservationDefinitions.map((block, index) => {
+        const reservation = block.element.reservation || {};
+        const title = reservation.title || block.element.name || `Reservation ${index + 1}`;
+        const mode = reservation.bookingMode === "flexible" ? "flexible" : "restricted";
+        const modeLabel = mode === "flexible" ? "Date request" : "Fixed slots";
 
-      const source = reservationBlocks.find((block) => block.element.id === sourceId)?.element;
-      return source?.reservation || element?.reservation || null;
-    },
-    [reservationBlocks]
+        return {
+          id: block.element.id,
+          label: title,
+          meta: `${modeLabel} - ${block.page.name}`,
+          mode,
+        };
+      }),
+    [reservationDefinitions]
+  );
+  const getReservationBlockValue = useCallback(
+    (element) => resolveReservationBlockValue(element, project.pages),
+    [project.pages]
   );
 
   const selectedRole = useMemo(() => {
@@ -1879,13 +1902,50 @@ export default function PageBuilder({
   };
 
   const addComponentToSection = (type, requestedSectionId = "", dropPoint = null, overrides = {}) => {
+    const reservationPlacementMode = type === "reservationRequest"
+      ? "flexible"
+      : type === "reservationFixedSlots"
+        ? "restricted"
+        : "";
+    const elementType = reservationPlacementMode ? "reservationBlock" : type;
+    const preferredReservationDefinition = reservationPlacementMode
+      ? reservationDefinitions.find(({ element: candidate }) => {
+          const candidateMode = candidate.reservation?.bookingMode === "flexible" ? "flexible" : "restricted";
+          return candidateMode === reservationPlacementMode;
+        })?.element
+      : null;
     const element = createElement(
-      type,
-      type === "formBlock"
+      elementType,
+      elementType === "formBlock"
         ? { connectedFormId: project.activeFormId }
         : {}
     );
-    const nextElementConnectedFormId = overrides.connectedFormId || element.connectedFormId;
+    const reservationPlacementOverrides = reservationPlacementMode
+      ? {
+          name: reservationPlacementMode === "flexible" ? "Date request" : "Fixed slots",
+          reservationPlacementType: reservationPlacementMode,
+          ...(preferredReservationDefinition
+            ? {
+                connectedReservationBlockId: preferredReservationDefinition.id,
+                reservation: preferredReservationDefinition.reservation,
+              }
+            : {
+                reservation: {
+                  ...(element.reservation || {}),
+                  bookingMode: reservationPlacementMode,
+                  title: reservationPlacementMode === "flexible"
+                    ? "Request an appointment"
+                    : "Book an available slot",
+                  description: reservationPlacementMode === "flexible"
+                    ? "Choose the service, date, and time that works for you."
+                    : "Choose one of the available dates and times.",
+                  submitLabel: reservationPlacementMode === "flexible" ? "Send request" : "Book slot",
+                },
+              }),
+        }
+      : {};
+    const resolvedOverrides = { ...reservationPlacementOverrides, ...overrides };
+    const nextElementConnectedFormId = resolvedOverrides.connectedFormId || element.connectedFormId;
     const existingTarget =
       activePage?.sections.find((section) => section.id === requestedSectionId) ||
       selectedSection ||
@@ -1910,11 +1970,14 @@ export default function PageBuilder({
         return Math.max(bottom, (Number(position.y) || 0) + (Number(position.height) || 80));
       }, 8) + 16;
       const useDropPoint = viewportName === viewport && dropPoint;
-      const width = Math.min(Number(base.width) || 380, canvasWidth - 24);
-      const connectedForm = type === "formBlock"
+      const responsiveEdge = viewportName === "mobile" ? 12 : 24;
+      const width = elementType === "formBlock"
+        ? canvasWidth - responsiveEdge * 2
+        : Math.min(Number(base.width) || 380, canvasWidth - 24);
+      const connectedForm = elementType === "formBlock"
         ? project.forms.find((form) => form.id === nextElementConnectedFormId)
         : null;
-      const height = type === "formBlock"
+      const height = elementType === "formBlock"
         ? estimateFormBlockHeight(connectedForm, viewportName)
         : directElementHeight(element);
 
@@ -1924,7 +1987,7 @@ export default function PageBuilder({
         height,
         x: useDropPoint
           ? dropPoint.x - width / 2
-          : 24,
+          : responsiveEdge,
         y: useDropPoint ? dropPoint.y - height / 2 : nextY,
       };
       nextPosition[viewportName] = clampElementToBounds(
@@ -1944,7 +2007,7 @@ export default function PageBuilder({
       );
     });
 
-    const nextElement = { ...element, ...overrides, mode: "direct", position: nextPosition };
+    const nextElement = { ...element, ...resolvedOverrides, mode: "direct", position: nextPosition };
     const updateTarget = (section) => ({
       ...section,
       layout: {
@@ -1965,7 +2028,7 @@ export default function PageBuilder({
             ),
       };
 
-      if (type === "metric") {
+      if (elementType === "metric") {
         recentMetricAddRef.current = {
           pageId: page.id,
           elementId: nextElement.id,
@@ -2112,6 +2175,12 @@ export default function PageBuilder({
       styles: { ...element.styles, ...(updates.styles || {}) },
       action: { ...element.action, ...(updates.action || {}) },
     });
+    const target = reservationBlocks.find((block) => block.element.id === elementId)?.element;
+    const sourceId = target?.connectedReservationBlockId || elementId;
+    const shouldUpdate = (element) =>
+      element.id === elementId ||
+      element.id === sourceId ||
+      element.connectedReservationBlockId === sourceId;
 
     updateProject((prev) => ({
       ...prev,
@@ -2122,7 +2191,7 @@ export default function PageBuilder({
             return {
               ...section,
               freeElements: (section.freeElements || []).map((element) =>
-                element.id === elementId ? merge(element) : element
+                shouldUpdate(element) ? merge(element) : element
               ),
             };
           }
@@ -2134,7 +2203,7 @@ export default function PageBuilder({
               columns: (row.columns || []).map((column) => ({
                 ...column,
                 elements: (column.elements || []).map((element) =>
-                  element.id === elementId ? merge(element) : element
+                  shouldUpdate(element) ? merge(element) : element
                 ),
               })),
             })),
@@ -2143,7 +2212,6 @@ export default function PageBuilder({
       })),
     }));
   };
-
   const selectReservationBlock = (elementId, pageId) => {
     updateProject((prev) => ({ ...prev, activePageId: pageId || prev.activePageId }));
     setSelected({ type: "element", id: elementId });
@@ -2600,12 +2668,11 @@ export default function PageBuilder({
     conflictRef.current = true;
     stopAllCloudScheduling();
     persistProjectNow(projectRef.current);
-    const recovery = readBuilderRecovery(recoveryIdentity);
     setConflictServerCandidate(mergeState?.serverRecord || null);
     setConflictMergeState(mergeState);
     setConflictDetails({
       detectedAt: Date.now(),
-      localSavedAt: recovery.envelope?.saved_at || new Date().toISOString(),
+      localSavedAt: new Date().toISOString(),
       localBaseRevision: currentDraftRevisionRef.current,
       serverRevision:
         Number(mergeState?.serverRecord?.draft_revision) ||
@@ -2614,14 +2681,13 @@ export default function PageBuilder({
       serverUpdatedAt: mergeState?.serverRecord?.updated_at || null,
       conflicts: mergeState?.mergeResult?.conflicts || [],
     });
-    setRecoveryDecision(null);
     setSaveState(BUILDER_SAVE_STATES.conflict);
     showToast(
       isBuilderError(error, "builder_client_upgrade_required")
         ? "This Madar editor is out of date. Reload before editing or publishing."
         : getBuilderConflictMessage(error)
     );
-  }, [persistProjectNow, recoveryIdentity, showToast, stopAllCloudScheduling]);
+  }, [persistProjectNow, showToast, stopAllCloudScheduling]);
 
   const attemptAutomaticRebase = useCallback(async ({
     conflictError,
@@ -2861,7 +2927,6 @@ export default function PageBuilder({
           : backendProjectSnapshotRef.current,
       }));
       if (!latestIsDirty) setLastCloudSavedAt(new Date());
-      setRecoveryDecision(null);
       if (!silent) {
         showToast(repairs.length > 0
           ? "Duplicate internal IDs were repaired and your changes are saved."
@@ -3204,7 +3269,6 @@ export default function PageBuilder({
       setBuilderProjectRecord(serverRecord);
       setProject(adoption.project);
       setSelected({ type: "page", id: adoption.project.activePageId });
-      setRecoveryDecision(null);
       setConflictDetails(null);
       setConflictServerCandidate(null);
       setConflictMergeState(null);
@@ -3558,35 +3622,6 @@ export default function PageBuilder({
 
   const exportProject = () => exportBuilderProjectJson({ project, showToast });
 
-  const discardRecovery = () => {
-    if (recoveryDecision?.kind === "legacy" && recoveryDecision.legacy?.key) {
-      try {
-        localStorage.removeItem(recoveryDecision.legacy.key);
-      } catch {
-        showToast("The legacy browser copy could not be removed.");
-        return;
-      }
-    } else {
-      clearBuilderRecovery(recoveryIdentity);
-    }
-    setRecoveryDecision(null);
-  };
-
-  const exportRecovery = () => {
-    let recoveryProject = recoveryDecision?.envelope?.schema || null;
-    if (!recoveryProject && recoveryDecision?.legacy?.raw) {
-      try {
-        recoveryProject = JSON.parse(recoveryDecision.legacy.raw);
-      } catch {
-        showToast("The legacy browser copy is unreadable and was left untouched.");
-        return;
-      }
-    }
-    if (recoveryProject) {
-      exportBuilderProjectJson({ project: recoveryProject, showToast });
-    }
-  };
-
   const applyStarter = (starterId) => {
     rememberStarterChoice();
 
@@ -3673,7 +3708,7 @@ export default function PageBuilder({
     return getFreeElementStyle(renderedElement);
   };
 
-  const reconcileDirectFormBlockSize = useCallback((sectionId, elementId, measuredHeight) => {
+  const reconcileDirectContentBlockSize = useCallback((sectionId, elementId, measuredHeight) => {
     if (!measuredHeight || dragState?.elementId === elementId) return;
 
     const frame = canvasShellRef.current?.querySelector(
@@ -3681,9 +3716,6 @@ export default function PageBuilder({
     );
     const liveBounds = frame ? getFrameGeometry(frame)?.bounds : null;
     const canvasWidth = liveBounds?.width || viewports[viewport] || viewports.desktop;
-    const edge = viewport === "mobile" ? 12 : 24;
-    const nextWidth = Math.max(120, canvasWidth - edge * 2);
-
     updateProject((prev) => {
       let projectChanged = false;
       const pages = prev.pages.map((page) => {
@@ -3695,7 +3727,7 @@ export default function PageBuilder({
 
           let geometryChanged = false;
           const freeElements = (section.freeElements || []).map((item) => {
-            if (item.id !== elementId || item.type !== "formBlock") return item;
+            if (item.id !== elementId || !["formBlock", "reservationBlock"].includes(item.type)) return item;
 
             const current = item.position?.[viewport] || createPosition()[viewport];
             const bounds = liveBounds || {
@@ -3705,15 +3737,12 @@ export default function PageBuilder({
               height: getSectionCanvasHeight(section, viewport),
             };
             const minimumSize = getDirectElementMinimumSize(item);
-            const nextPosition = clampElementToBounds(
-              { ...current, x: edge, width: nextWidth, height: measuredHeight },
+            const nextPosition = reconcileMeasuredFormBlockPosition({
+              current,
+              measuredHeight,
               bounds,
-              {
-                minWidth: minimumSize.width,
-                minHeight: minimumSize.height,
-                allowBottomOverflow: true,
-              }
-            );
+              minimumSize,
+            });
             const changed =
               Math.abs((Number(current.x) || 0) - nextPosition.x) > 1 ||
               Math.abs((Number(current.width) || 0) - nextPosition.width) > 1 ||
@@ -3732,7 +3761,7 @@ export default function PageBuilder({
             ?.position?.[viewport];
           const nextSectionHeight = Math.max(
             currentSectionHeight,
-            (Number(formPosition?.y) || 0) + (Number(formPosition?.height) || 0) + edge
+            (Number(formPosition?.y) || 0) + (Number(formPosition?.height) || 0) + (viewport === "mobile" ? 12 : 24)
           );
           if (!geometryChanged && nextSectionHeight === currentSectionHeight) return section;
 
@@ -3892,24 +3921,113 @@ export default function PageBuilder({
     );
   };
 
-  const positionInlineToolbarNear = useCallback((target) => {
+  const shouldIgnoreInlineTextBlur = useCallback(
+    () => inlineToolbarInteractionRef.current,
+    []
+  );
+  const clearCanvasTextSelectionHighlight = useCallback(() => {
+    globalThis.CSS?.highlights?.delete?.("builder-text-selection");
+  }, []);
+  const preserveCanvasTextSelectionHighlight = useCallback((range) => {
+    const highlights = globalThis.CSS?.highlights;
+    const HighlightConstructor = globalThis.Highlight;
+    if (!range || !highlights || typeof HighlightConstructor !== "function") return;
+
+    try {
+      const documentRef = range.startContainer?.ownerDocument || globalThis.document;
+      if (documentRef?.head && !documentRef.getElementById("builder-text-selection-style")) {
+        const style = documentRef.createElement("style");
+        style.id = "builder-text-selection-style";
+        style.textContent =
+          "::highlight(builder-text-selection){color:inherit;background:rgba(133,44,33,.24)}";
+        documentRef.head.append(style);
+      }
+      highlights.set("builder-text-selection", new HighlightConstructor(range.cloneRange()));
+    } catch {
+      // Native selection remains the fallback on browsers without CSS Highlights.
+    }
+  }, []);
+  const positionInlineToolbarNear = useCallback((target, preferredRect = null) => {
     if (!target || typeof window === "undefined") return;
 
-    const rect = target.getBoundingClientRect();
-    const left = Math.min(Math.max(rect.left + rect.width / 2, 18), window.innerWidth - 18);
-    const top = Math.min(Math.max(rect.top - 34, 84), window.innerHeight - 18);
+    const targetRect = target.getBoundingClientRect();
+    const sourceRect = preferredRect
+      && Number.isFinite(preferredRect.top)
+      && (preferredRect.width > 0 || preferredRect.height > 0)
+        ? preferredRect
+        : targetRect;
+    const canvasRect = canvasShellRef.current?.getBoundingClientRect();
+    const margin = 12;
+    const horizontalBounds = {
+      left: Math.max(margin, (canvasRect?.left || 0) + margin),
+      right: Math.min(
+        window.innerWidth - margin,
+        (canvasRect?.right || window.innerWidth) - margin
+      ),
+    };
+    const anchorRect = {
+      left: sourceRect.left,
+      top: sourceRect.top,
+      right: sourceRect.right,
+      bottom: sourceRect.bottom,
+      width: sourceRect.width,
+      height: sourceRect.height,
+    };
 
-    setInlineToolbarPosition({ left, top });
+    setInlineToolbarPosition({
+      anchorRect,
+      horizontalBounds,
+      left: anchorRect.left,
+      top: anchorRect.bottom + 10,
+      maxWidth: Math.max(1, horizontalBounds.right - horizontalBounds.left),
+      placement: "below",
+    });
   }, []);
 
+  useLayoutEffect(() => {
+    const toolbar = inlineToolbarRef.current;
+    if (!toolbar || !inlineToolbarPosition?.anchorRect) return;
+
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const placement = getFloatingToolbarPlacement({
+      anchorRect: inlineToolbarPosition.anchorRect,
+      toolbarRect,
+      horizontalBounds: inlineToolbarPosition.horizontalBounds,
+      viewportHeight: window.innerHeight,
+    });
+
+    setInlineToolbarPosition((current) => {
+      if (
+        !current ||
+        (Math.abs(current.left - placement.left) < 0.5 &&
+          Math.abs(current.top - placement.top) < 0.5 &&
+          current.placement === placement.placement)
+      ) return current;
+
+      return { ...current, ...placement };
+    });
+  }, [
+    inlineToolbarPosition?.anchorRect,
+    inlineToolbarPosition?.horizontalBounds,
+    inlineToolbarPosition?.maxWidth,
+  ]);
   const captureCanvasTextSelection = useCallback((event, field, itemIndex = null, elementId = selectedElement?.id) => {
     const range = getCanvasTextSelectionRange(event);
 
     if (!range) return;
 
-    positionInlineToolbarNear(event.currentTarget);
+    const browserSelection = window.getSelection();
+    const browserRange = !range.collapsed && browserSelection?.rangeCount
+      ? browserSelection.getRangeAt(0)
+      : null;
+    const selectedRangeRect = browserRange
+      ? browserRange.getBoundingClientRect?.()
+      : null;
+    positionInlineToolbarNear(event.currentTarget, selectedRangeRect);
+    setInlineFontSizeDraft(null);
 
     if (range.collapsed) {
+      clearCanvasTextSelectionHighlight();
       setTextSelection({
         elementId,
         field,
@@ -3920,6 +4038,8 @@ export default function PageBuilder({
       return;
     }
 
+    preserveCanvasTextSelectionHighlight(browserRange);
+
     setTextSelection({
       elementId,
       field,
@@ -3927,7 +4047,30 @@ export default function PageBuilder({
       start: range.start,
       end: range.end,
     });
-  }, [positionInlineToolbarNear, selectedElement?.id]);
+  }, [
+    clearCanvasTextSelectionHighlight,
+    positionInlineToolbarNear,
+    preserveCanvasTextSelectionHighlight,
+    selectedElement?.id,
+  ]);
+
+  useEffect(() => clearCanvasTextSelectionHighlight,
+    [clearCanvasTextSelectionHighlight, selectedElement?.id]
+  );
+
+  useLayoutEffect(() => {
+    if (
+      !selectedElement?.id ||
+      textSelection?.elementId !== selectedElement.id ||
+      Number(textSelection.start) === Number(textSelection.end)
+    ) return;
+
+    const selector = '[data-builder-element-id="' + CSS.escape(String(selectedElement.id)) + '"]';
+    const frame = canvasShellRef.current?.querySelector(selector);
+    const editable = frame?.querySelector('[contenteditable="true"]');
+    const range = createDomTextRange(editable, textSelection.start, textSelection.end);
+    preserveCanvasTextSelectionHighlight(range);
+  }, [preserveCanvasTextSelectionHighlight, selectedElement, textSelection]);
 
   const getSelectedTextTargetValue = () => {
     if (!selectedElement || textSelection?.elementId !== selectedElement.id) return "";
@@ -3966,6 +4109,9 @@ export default function PageBuilder({
     textSelection?.elementId === selectedElement.id &&
     (textSelection.field === "listTitle" || textSelection.field === "listItem");
 
+  const hasExplicitSelectedTextRange = () =>
+    textSelection?.elementId === selectedElement?.id &&
+    Number(textSelection.start) !== Number(textSelection.end);
   const getSelectedTextRangeStyle = (property) => {
     const selectedRange = getSelectedTextRange();
     if (!selectedElement || !selectedRange) return "";
@@ -4004,6 +4150,24 @@ export default function PageBuilder({
     window.getSelection()?.removeAllRanges();
   };
 
+  const applyTextBackgroundColor = (backgroundColor) => {
+    const selectedRange = hasExplicitSelectedTextRange()
+      ? getSelectedTextRange()
+      : null;
+
+    if (!selectedRange) {
+      updateSelectedElement({ styles: { backgroundColor } });
+      return;
+    }
+
+    updateSelectedElement({
+      richTextColors: [
+        ...(selectedElement.richTextColors || []),
+        { ...selectedRange, backgroundColor },
+      ],
+    });
+    window.getSelection()?.removeAllRanges();
+  };
   const getSelectedElementFontSizeNumber = () => {
     const rawSize = String(selectedElement?.styles?.fontSize || "").trim();
     const parsed = Number.parseInt(rawSize, 10);
@@ -4093,20 +4257,40 @@ export default function PageBuilder({
       return;
     }
 
-    if (action === "bold") {
-      if (selectedTextTargetIsListPart()) {
+    const applySelectedRangeStyle = (
+      property,
+      activeValue,
+      inactiveValue,
+      isActive
+    ) => {
+      if (hasExplicitSelectedTextRange() || selectedTextTargetIsListPart()) {
         const selectedRange = getSelectedTextRange();
-        if (!selectedRange) return;
+        if (!selectedRange) return false;
+        const currentValue = getSelectedTextRangeStyle(property);
 
         updateSelectedElement({
           richTextStyles: [
             ...(selectedElement.richTextStyles || []),
-            { ...selectedRange, fontWeight: "700" },
+            {
+              ...selectedRange,
+              [property]: isActive(currentValue) ? inactiveValue : activeValue,
+            },
           ],
         });
         window.getSelection()?.removeAllRanges();
-        return;
+        return true;
       }
+
+      return false;
+    };
+
+    if (action === "bold") {
+      if (applySelectedRangeStyle(
+        "fontWeight",
+        "700",
+        "400",
+        (value) => String(value).includes("700") || String(value).includes("bold")
+      )) return;
 
       updateSelectedElement({
         styles: {
@@ -4121,19 +4305,12 @@ export default function PageBuilder({
     }
 
     if (action === "italic") {
-      if (selectedTextTargetIsListPart()) {
-        const selectedRange = getSelectedTextRange();
-        if (!selectedRange) return;
-
-        updateSelectedElement({
-          richTextStyles: [
-            ...(selectedElement.richTextStyles || []),
-            { ...selectedRange, fontStyle: "italic" },
-          ],
-        });
-        window.getSelection()?.removeAllRanges();
-        return;
-      }
+      if (applySelectedRangeStyle(
+        "fontStyle",
+        "italic",
+        "normal",
+        (value) => value === "italic"
+      )) return;
 
       updateSelectedElement({
         styles: {
@@ -4144,19 +4321,12 @@ export default function PageBuilder({
     }
 
     if (action === "underline") {
-      if (selectedTextTargetIsListPart()) {
-        const selectedRange = getSelectedTextRange();
-        if (!selectedRange) return;
-
-        updateSelectedElement({
-          richTextStyles: [
-            ...(selectedElement.richTextStyles || []),
-            { ...selectedRange, textDecoration: "underline" },
-          ],
-        });
-        window.getSelection()?.removeAllRanges();
-        return;
-      }
+      if (applySelectedRangeStyle(
+        "textDecoration",
+        "underline",
+        "none",
+        (value) => value === "underline"
+      )) return;
 
       updateSelectedElement({
         styles: {
@@ -4166,7 +4336,6 @@ export default function PageBuilder({
       });
       return;
     }
-
     if (action === "bullets" || action === "numbers") {
       updateSelectedElementTextFormat(action);
       return;
@@ -4182,6 +4351,7 @@ export default function PageBuilder({
     if (!selectedElementSupportsInlineTextToolbar || !inlineToolbarPosition) return null;
 
     const selectedRangeFontSize = getSelectedTextRangeStyle("fontSize");
+    const selectedRangeBackgroundColor = getSelectedTextRangeStyle("backgroundColor");
     const toolbarFontSize = Number.parseInt(
       selectedRangeFontSize ||
         selectedElement.styles?.selectedTextFontSize ||
@@ -4193,14 +4363,28 @@ export default function PageBuilder({
     return (
       <div
         className="builder-inline-text-toolbar is-floating"
+        ref={inlineToolbarRef}
+        data-placement={inlineToolbarPosition.placement}
         style={{
           left: `${inlineToolbarPosition.left}px`,
           top: `${inlineToolbarPosition.top}px`,
+          maxWidth: `${inlineToolbarPosition.maxWidth}px`,
         }}
         role="toolbar"
         aria-label="Text formatting"
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
+        onPointerDownCapture={() => {
+          inlineToolbarInteractionRef.current = true;
+        }}
+        onPointerUpCapture={() => {
+          window.setTimeout(() => {
+            inlineToolbarInteractionRef.current = false;
+          }, 0);
+        }}
+        onPointerCancelCapture={() => {
+          inlineToolbarInteractionRef.current = false;
+        }}
       >
         <select
           aria-label="Text style"
@@ -4226,8 +4410,20 @@ export default function PageBuilder({
             min="8"
             max="120"
             step="1"
-            value={toolbarFontSize}
-            onChange={(event) => applyTextFontSize(event.target.value)}
+            value={inlineFontSizeDraft ?? toolbarFontSize}
+            onFocus={() => setInlineFontSizeDraft(String(toolbarFontSize))}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setInlineFontSizeDraft(nextValue);
+              const parsedValue = Number.parseInt(nextValue, 10);
+              if (Number.isFinite(parsedValue) && parsedValue >= 8 && parsedValue <= 120) {
+                applyTextFontSize(nextValue);
+              }
+            }}
+            onBlur={(event) => {
+              if (event.target.value.trim()) applyTextFontSize(event.target.value);
+              setInlineFontSizeDraft(null);
+            }}
           />
         </label>
         {inlineTextToolbarButtons.map((item) => {
@@ -4293,8 +4489,8 @@ export default function PageBuilder({
           <Highlighter size={16} aria-hidden="true" />
           <input
             type="color"
-            value={selectedElement.styles?.backgroundColor || "#fffdfa"}
-            onChange={(event) => updateSelectedElement({ styles: { backgroundColor: event.target.value } })}
+            value={selectedRangeBackgroundColor || selectedElement.styles?.backgroundColor || "#fffdfa"}
+            onChange={(event) => applyTextBackgroundColor(event.target.value)}
           />
         </label>
       </div>
@@ -4634,7 +4830,7 @@ export default function PageBuilder({
       setInsertTarget,
       setSelected,
       captureCanvasTextSelection,
-      textSelection,
+      shouldIgnoreInlineTextBlur,
       updateElementInlineText,
       runElementAction,
       renderConnectedForm,
@@ -4648,7 +4844,7 @@ export default function PageBuilder({
       startDrag,
       findElementLocation,
       captureCanvasTextSelection,
-      textSelection,
+      shouldIgnoreInlineTextBlur,
       updateElementInlineText,
       runElementAction,
       renderConnectedForm,
@@ -5088,17 +5284,18 @@ export default function PageBuilder({
                   >
                     {(section.freeElements || []).map((element) => {
                       const elementSelected = selected.type === "element" && selected.id === element.id;
-                      const DirectFrame = element.type === "formBlock" ? PageBuilderMeasuredFrame : "div";
+                      const hasResponsiveContentHeight = ["formBlock", "reservationBlock"].includes(element.type);
+                      const DirectFrame = hasResponsiveContentHeight ? PageBuilderMeasuredFrame : "div";
 
                       return (
                         <DirectFrame
                           key={element.id}
-                          {...(element.type === "formBlock"
+                          {...(hasResponsiveContentHeight
                             ? {
                                 measureEnabled: !preview && dragState?.elementId !== element.id,
                                 measurementKey: `${element.id}:${viewport}`,
                                 onMeasuredHeight: (height) =>
-                                  reconcileDirectFormBlockSize(section.id, element.id, height / canvasScale),
+                                  reconcileDirectContentBlockSize(section.id, element.id, height / canvasScale),
                               }
                             : {})}
                           className={`direct-element-frame direct-element-frame-${element.type} ${elementSelected ? "is-selected" : ""}`}
@@ -5237,13 +5434,43 @@ export default function PageBuilder({
             issue.page_id === activePage.id ||
             issue.occurrences?.some((page) => page.page_id === activePage.id)
           )}
-          onSetDefault={() => updateProject((prev) => setProjectDefaultPage(prev, activePage.id))}
-          onUpdate={(changes) => updateProject((prev) => ({
-            ...prev,
-            pages: prev.pages.map((page) =>
-              page.id === activePage.id ? { ...page, ...changes } : page
-            ),
-          }))}
+          onSetDefault={(checked) => {
+            if (!checked) {
+              showToast("Every site needs a homepage. Choose another page to replace this one.");
+              return;
+            }
+
+            const currentHomepage = project.pages.find((page) => page.isDefault === true);
+            if (!currentHomepage) {
+              updateProject((prev) => setProjectDefaultPage(prev, activePage.id));
+              return;
+            }
+            if (currentHomepage.id === activePage.id) return;
+
+            setHomepageOverridePending({
+              pageId: activePage.id,
+              pageName: activePage.name || "This page",
+              currentHomepageName: currentHomepage.name || "Current homepage",
+            });
+          }}
+          onUpdate={(changes) => updateProject((prev) => {
+            const currentPage = prev.pages.find((page) => page.id === activePage.id);
+            const nextChanges = { ...changes };
+            if (Object.prototype.hasOwnProperty.call(changes, "name")) {
+              nextChanges.slug = createUniquePublicPageSlug({
+                name: changes.name,
+                pages: prev.pages,
+                currentPageId: activePage.id,
+                isDefault: currentPage?.isDefault === true,
+              });
+            }
+            return {
+              ...prev,
+              pages: prev.pages.map((page) =>
+                page.id === activePage.id ? { ...page, ...nextChanges } : page
+              ),
+            };
+          })}
         />
       )}
 
@@ -5465,7 +5692,8 @@ export default function PageBuilder({
             selectedElement.type !== "metric" &&
             selectedElement.type !== "reservationBlock" &&
             selectedElement.type !== "loginBlock" &&
-            selectedElement.type !== "registrationBlock" && (
+            selectedElement.type !== "registrationBlock" &&
+            selectedElement.type !== "image" && (
             <label>Content<textarea value={selectedElement.content} onSelect={(event) => captureTextSelection(event, "content")} onChange={(event) => updateSelectedElement({ content: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "content") })} /></label>
           )}
           {selectedElement.type === "metric" && (
@@ -5605,43 +5833,62 @@ export default function PageBuilder({
             <label>Connected form<select value={normalizeFormReference(selectedElement.connectedFormId)} onChange={(event) => updateSelectedElement(buildFormConnectionUpdate(event.target.value))}><option value="">Choose a form</option>{project.forms.map((form) => <option key={form.id} value={String(form.id)}>{form.title}</option>)}</select></label>
           )}
 
-          {selectedElement.type === "reservationBlock" && (
-            <div className="reservation-form-picker">
-              <span>Reservation forms</span>
-              <div className="reservation-form-picker-list">
-                {reservationFormOptions.length === 0 && (
-                  <p className="builder-note">Create a reservation block first.</p>
+          {selectedElement.type === "reservationBlock" && (() => {
+            const selectedReservationId = selectedElement.connectedReservationBlockId || selectedElement.id;
+            const compatibleOptions = reservationFormOptions.filter((option) =>
+              !selectedElement.reservationPlacementType ||
+              option.mode === selectedElement.reservationPlacementType ||
+              option.id === selectedReservationId
+            );
+
+            return (
+              <div className="reservation-form-picker">
+                <label>
+                  Reservation form
+                  <select
+                    value={selectedReservationId}
+                    onChange={(event) => {
+                      const source = reservationDefinitions.find(
+                        (block) => block.element.id === event.target.value
+                      )?.element;
+                      if (!source) return;
+                      updateSelectedElement({
+                        connectedReservationBlockId: source.id,
+                        reservation: source.reservation,
+                      });
+                    }}
+                  >
+                    {compatibleOptions.length === 0 && (
+                      <option value="">Create a compatible reservation form first</option>
+                    )}
+                    {compatibleOptions.map((option) => (
+                      <option value={option.id} key={option.id}>
+                        {option.label} - {option.meta}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {compatibleOptions.length > 1 && (
+                  <p className="builder-note">Choose which reservation form this section should use.</p>
                 )}
-                {reservationFormOptions.map((option) => {
-                  const isSelected = (selectedElement.connectedReservationBlockId || selectedElement.id) === option.id;
-
-                  return (
-                    <button
-                      type="button"
-                      key={option.id}
-                      className={`reservation-form-picker-item ${isSelected ? "is-selected" : ""}`}
-                      onClick={() => {
-                        const source = reservationBlocks.find((block) => block.element.id === option.id)?.element;
-                        updateSelectedElement({
-                          connectedReservationBlockId: option.id,
-                          ...(source ? { reservation: source.reservation } : {}),
-                        });
-                      }}
-                    >
-                      <strong>{option.label}</strong>
-                      <small>{option.meta}</small>
-                    </button>
-                  );
-                })}
               </div>
-            </div>
-          )}
-
+            );
+          })()}
           {selectedElement.type === "image" && (
-            <label className="upload-image-button">
-              {assetUploadBusy ? "Uploading..." : "Upload image"}
-              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSelectedElementImageUpload} />
-            </label>
+            <>
+              <label>
+                File name
+                <input
+                  readOnly
+                  value={selectedElement.assetFileName || getBuilderAssetFileName(selectedElement.content)}
+                  placeholder="No image selected"
+                />
+              </label>
+              <label className="upload-image-button">
+                {assetUploadBusy ? "Uploading..." : "Upload image"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSelectedElementImageUpload} />
+              </label>
+            </>
           )}
 
           {selectedElement.type === "button" && (
@@ -5944,7 +6191,6 @@ export default function PageBuilder({
       getQuizSettings={getQuizSettings}
       getFormPlacements={getFormPlacements}
       addConnectedFormSectionToPage={addConnectedFormSectionToPage}
-      renderConnectedForm={renderConnectedForm}
       openFormPreviewPage={openFormPreviewPage}
       saveProject={saveProject}
       openPreviewPage={openPreviewPage}
@@ -5956,10 +6202,10 @@ export default function PageBuilder({
 
   const renderReservationsTab = () => (
     <ReservationsTab
-      reservationBlocks={reservationBlocks}
+      reservationBlocks={reservationDefinitions}
       activeReservationId={
         selected.type === "element" && selectedElement?.type === "reservationBlock"
-          ? selected.id
+          ? selectedElement.connectedReservationBlockId || selected.id
           : ""
       }
       onAddReservationBlock={(reservationOverrides = {}) =>
@@ -6207,12 +6453,6 @@ export default function PageBuilder({
           viewports={viewports}
         />
 
-        <BuilderRecoveryNotice
-          decision={recoveryDecision}
-          onDiscard={discardRecovery}
-          onExport={exportRecovery}
-          onKeepServer={() => setRecoveryDecision(null)}
-        />
 
         <BuilderConflictResolution
           key={conflictDetails?.detectedAt || "no-conflict"}
@@ -6257,6 +6497,40 @@ export default function PageBuilder({
         templateLang={templateLang}
         userPendingDelete={userPendingDelete}
       />
+
+      {homepageOverridePending && (
+        <PageDeleteConfirmModal
+          title="Replace the homepage?"
+          message={
+            <>
+              <strong>{homepageOverridePending.currentHomepageName}</strong> is currently the homepage. Make{" "}
+              <strong>{homepageOverridePending.pageName}</strong> the new homepage instead?
+            </>
+          }
+          cancelLabel="Keep current homepage"
+          confirmLabel="Replace homepage"
+          onCancel={() => setHomepageOverridePending(null)}
+          onConfirm={() => {
+            updateProject((prev) => setProjectDefaultPage(prev, homepageOverridePending.pageId));
+            setHomepageOverridePending(null);
+          }}
+        />
+      )}
+
+      {reloadConfirmationOpen && (
+        <PageDeleteConfirmModal
+          title="Reload this page?"
+          message="Your latest changes have not finished saving. Reloading now will discard them."
+          cancelLabel="Keep editing"
+          confirmLabel="Reload page"
+          onCancel={() => setReloadConfirmationOpen(false)}
+          onConfirm={() => {
+            allowNextUnloadRef.current = true;
+            setReloadConfirmationOpen(false);
+            window.location.reload();
+          }}
+        />
+      )}
 
       <PageBuilderStatusBar toast={toast} />
     </div>

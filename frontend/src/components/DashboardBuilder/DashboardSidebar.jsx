@@ -439,12 +439,21 @@ export default function DashboardSidebar({
                 expanded={workspaceIsExpanded}
                 icon={PanelsTopLeft}
                 label={workspaceLabel}
-                onClick={() =>
+                onClick={() => {
+                  const nextOpen = !workspaceIsExpanded;
+
                   setWorkspaceExpansion({
-                    open: !workspaceIsExpanded,
+                    open: nextOpen,
                     pathname: location.pathname,
-                  })
-                }
+                  });
+
+                  if (nextOpen) {
+                    setSettingsExpansion({
+                      open: false,
+                      pathname: location.pathname,
+                    });
+                  }
+                }}
               />
 
               {workspaceIsExpanded && (
@@ -504,12 +513,21 @@ export default function DashboardSidebar({
             expanded={settingsIsExpanded}
             icon={Settings}
             label={t("sidebar.settings")}
-            onClick={() =>
+            onClick={() => {
+              const nextOpen = !settingsIsExpanded;
+
               setSettingsExpansion({
-                open: !settingsIsExpanded,
+                open: nextOpen,
                 pathname: location.pathname,
-              })
-            }
+              });
+
+              if (nextOpen) {
+                setWorkspaceExpansion({
+                  open: false,
+                  pathname: location.pathname,
+                });
+              }
+            }}
           />
 
           {settingsIsExpanded && (

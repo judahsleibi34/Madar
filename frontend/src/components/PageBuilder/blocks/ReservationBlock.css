@@ -10,7 +10,7 @@
     "header footer";
   gap: 18px 24px;
   align-items: start;
-  color: var(--madar-text, var(--theme-text));
+  color: var(--form-theme-text, var(--madar-text, var(--theme-text)));
   overflow: hidden;
 }
 
@@ -48,7 +48,7 @@
 .reservation-block-header h3 {
   max-width: 100%;
   margin: 0;
-  color: var(--madar-text, var(--theme-text));
+  color: var(--form-theme-text, var(--madar-text, var(--theme-text)));
   font-size: clamp(20px, 3.6cqw, 30px);
   line-height: 1.15;
   overflow-wrap: anywhere;
@@ -67,7 +67,7 @@
   border: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
   border-radius: 10px;
   padding: 11px 12px;
-  background: rgba(var(--theme-shadow-rgb), 0.025);
+  background: var(--form-theme-input, var(--form-theme-surface, var(--theme-surface)));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -101,6 +101,10 @@
 
 .reservation-field {
   grid-column: span 4;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .reservation-field-notes {
@@ -117,7 +121,7 @@
   min-width: 0;
   display: grid;
   gap: 7px;
-  color: var(--madar-text, var(--theme-text));
+  color: var(--form-theme-text, var(--madar-text, var(--theme-text)));
   font-size: 12px;
   font-weight: 950;
 }
@@ -127,15 +131,15 @@
 .reservation-block textarea {
   min-width: 0;
   width: 100%;
-  border: 1px solid rgba(var(--theme-shadow-rgb), 0.13);
+  border: 1px solid var(--form-theme-border, var(--theme-border));
   border-radius: 8px;
   padding: 10px 12px;
-  background: rgba(var(--theme-text-inverse-rgb), 0.94);
-  color: var(--madar-text, var(--theme-text));
+  background: var(--form-theme-input, var(--form-theme-surface, var(--theme-surface)));
+  color: var(--form-theme-text, var(--madar-text, var(--theme-text)));
   font: inherit;
   font-size: 13px;
   font-weight: 800;
-  box-shadow: inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.8);
+  box-shadow: none;
 }
 
 .reservation-block input::placeholder,
@@ -166,8 +170,9 @@
 .reservation-block input:disabled,
 .reservation-block select:disabled,
 .reservation-block textarea:disabled {
-  background: rgba(var(--theme-text-inverse-rgb), 0.66);
-  color: rgba(var(--theme-shadow-rgb), 0.66);
+  background: color-mix(in srgb, var(--form-theme-input, var(--theme-surface)) 92%, var(--form-theme-muted, var(--theme-text-soft)) 8%);
+  color: var(--form-theme-muted, var(--theme-text-soft));
+  -webkit-text-fill-color: var(--form-theme-muted, var(--theme-text-soft));
 }
 
 .reservation-block label strong {
@@ -230,7 +235,7 @@
   }
 
   .reservation-block-header {
-    grid-template-columns: minmax(0, 1fr) minmax(96px, 150px);
+    grid-template-columns: 1fr;
     align-items: stretch;
   }
 
@@ -311,131 +316,340 @@
   }
 }
 
-:root[data-theme="dark"] .reservation-block,
-html.theme-dark .reservation-block,
-body.theme-dark .reservation-block {
-  color: var(--theme-text);
+/* Visitor date-request form. */
+.reservation-block.is-date-request {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "header"
+    "fields"
+    "footer";
+  height: auto;
+  min-height: 100%;
+  gap: 24px;
+  overflow: visible;
 }
 
-:root[data-theme="dark"] .reservation-block-header span,
-html.theme-dark .reservation-block-header span,
-body.theme-dark .reservation-block-header span,
-:root[data-theme="dark"] .reservation-block .reservation-summary strong,
-html.theme-dark .reservation-block .reservation-summary strong,
-body.theme-dark .reservation-block .reservation-summary strong,
-:root[data-theme="dark"] .reservation-block label strong,
-html.theme-dark .reservation-block label strong,
-body.theme-dark .reservation-block label strong {
-  color: var(--theme-primary-hover);
+.reservation-block.is-date-request .reservation-block-header {
+  justify-items: center;
+  text-align: center;
 }
 
-:root[data-theme="dark"] .reservation-block-header span,
-html.theme-dark .reservation-block-header span,
-body.theme-dark .reservation-block-header span {
-  background: rgba(var(--theme-primary-rgb), 0.18);
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
+.reservation-block.is-date-request .reservation-block-header p {
+  max-width: 52ch;
 }
 
-:root[data-theme="dark"] .reservation-block-header h3,
-html.theme-dark .reservation-block-header h3,
-body.theme-dark .reservation-block-header h3,
-:root[data-theme="dark"] .reservation-block label,
-html.theme-dark .reservation-block label,
-body.theme-dark .reservation-block label {
-  color: var(--theme-text);
+.reservation-request-form {
+  grid-area: fields;
+  display: grid;
+  gap: 22px;
 }
 
-:root[data-theme="dark"] .reservation-block-header p,
-html.theme-dark .reservation-block-header p,
-body.theme-dark .reservation-block-header p,
-:root[data-theme="dark"] .reservation-block .reservation-summary small,
-html.theme-dark .reservation-block .reservation-summary small,
-body.theme-dark .reservation-block .reservation-summary small,
-:root[data-theme="dark"] .reservation-helper,
-html.theme-dark .reservation-helper,
-body.theme-dark .reservation-helper {
-  color: var(--theme-text-muted);
+.reservation-request-section {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding-top: 20px;
+  border-top: 1px solid var(--form-theme-border, var(--theme-border));
+  background: transparent;
 }
 
-:root[data-theme="dark"] .reservation-block .reservation-summary,
-html.theme-dark .reservation-block .reservation-summary,
-body.theme-dark .reservation-block .reservation-summary {
-  border-color: rgba(244, 240, 232, 0.18);
-  background:
-    linear-gradient(180deg, rgba(16, 28, 45, 0.94), rgba(7, 17, 31, 0.9)),
-    rgba(var(--theme-primary-rgb), 0.08);
+.reservation-request-section:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
-:root[data-theme="dark"] .reservation-block input,
-:root[data-theme="dark"] .reservation-block select,
-:root[data-theme="dark"] .reservation-block textarea,
-html.theme-dark .reservation-block input,
-html.theme-dark .reservation-block select,
-html.theme-dark .reservation-block textarea,
-body.theme-dark .reservation-block input,
-body.theme-dark .reservation-block select,
-body.theme-dark .reservation-block textarea {
-  border-color: rgba(244, 240, 232, 0.2);
-  background: rgba(7, 17, 31, 0.82);
-  color: var(--theme-text);
-  box-shadow: inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.06);
+.reservation-request-heading {
+  display: grid;
+  gap: 4px;
 }
 
-:root[data-theme="dark"] .reservation-block input::placeholder,
-:root[data-theme="dark"] .reservation-block textarea::placeholder,
-html.theme-dark .reservation-block input::placeholder,
-html.theme-dark .reservation-block textarea::placeholder,
-body.theme-dark .reservation-block input::placeholder,
-body.theme-dark .reservation-block textarea::placeholder {
-  color: rgba(184, 197, 214, 0.72);
+.reservation-request-heading h4,
+.reservation-request-heading p {
+  margin: 0;
 }
 
-:root[data-theme="dark"] .reservation-block input:focus,
-:root[data-theme="dark"] .reservation-block select:focus,
-:root[data-theme="dark"] .reservation-block textarea:focus,
-html.theme-dark .reservation-block input:focus,
-html.theme-dark .reservation-block select:focus,
-html.theme-dark .reservation-block textarea:focus,
-body.theme-dark .reservation-block input:focus,
-body.theme-dark .reservation-block select:focus,
-body.theme-dark .reservation-block textarea:focus {
-  border-color: rgba(var(--theme-primary-rgb), 0.48);
-  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.14);
+.reservation-request-heading h4 {
+  color: var(--form-theme-text, var(--theme-text));
+  font-size: clamp(17px, 2.2cqw, 22px);
+  line-height: 1.2;
 }
 
-:root[data-theme="dark"] .reservation-block input:disabled,
-:root[data-theme="dark"] .reservation-block select:disabled,
-:root[data-theme="dark"] .reservation-block textarea:disabled,
-html.theme-dark .reservation-block input:disabled,
-html.theme-dark .reservation-block select:disabled,
-html.theme-dark .reservation-block textarea:disabled,
-body.theme-dark .reservation-block input:disabled,
-body.theme-dark .reservation-block select:disabled,
-body.theme-dark .reservation-block textarea:disabled {
-  background: rgba(16, 28, 45, 0.68);
-  color: rgba(184, 197, 214, 0.7);
+.reservation-request-heading p {
+  color: var(--form-theme-muted, var(--theme-text-soft));
+  font-size: 12px;
+  line-height: 1.45;
 }
 
-:root[data-theme="dark"] .reservation-block .has-error input,
-:root[data-theme="dark"] .reservation-block .has-error select,
-html.theme-dark .reservation-block .has-error input,
-html.theme-dark .reservation-block .has-error select,
-body.theme-dark .reservation-block .has-error input,
-body.theme-dark .reservation-block .has-error select {
-  border-color: rgba(var(--theme-primary-rgb), 0.54);
-  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.14);
+.reservation-request-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-:root[data-theme="dark"] .reservation-submit,
-html.theme-dark .reservation-submit,
-body.theme-dark .reservation-submit {
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-hover));
-  color: var(--theme-text-inverse);
-  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.22);
+.reservation-request-grid .reservation-field {
+  grid-column: auto;
 }
 
-:root[data-theme="dark"] .reservation-submit:not(:disabled):hover,
-html.theme-dark .reservation-submit:not(:disabled):hover,
-body.theme-dark .reservation-submit:not(:disabled):hover {
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-hover));
+.reservation-request-schedule .reservation-field-service,
+.reservation-request-notes .reservation-field-notes {
+  grid-column: 1 / -1;
+}
+
+.reservation-block.is-date-request :is(input, select) {
+  min-height: 50px;
+}
+
+.reservation-block.is-date-request textarea {
+  min-height: 112px;
+}
+
+.reservation-block.is-date-request .reservation-footer {
+  justify-content: flex-end;
+}
+
+@container (max-width: 560px) {
+  .reservation-block.is-date-request {
+    gap: 18px;
+  }
+
+  .reservation-block.is-date-request .reservation-block-header {
+    justify-items: start;
+    text-align: start;
+  }
+
+  .reservation-request-form {
+    gap: 18px;
+  }
+
+  .reservation-request-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reservation-request-grid .reservation-field {
+    grid-column: 1;
+  }
+}
+/* Fixed-slot agenda experience. */
+.reservation-block.is-fixed-slots {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "header"
+    "slots"
+    "fields"
+    "footer";
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+.reservation-block.is-fixed-slots .reservation-block-header {
+  grid-template-columns: 1fr;
+  align-items: center;
+}
+
+.reservation-block.is-fixed-slots :is(.reservation-field-name, .reservation-field-contact) {
+  grid-column: span 6;
+}
+
+.fixed-slot-picker {
+  grid-area: slots;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fixed-slot-picker legend {
+  padding: 0;
+  color: var(--form-theme-text, var(--madar-text, var(--theme-text)));
+  font-size: clamp(18px, 2.4cqw, 24px);
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.fixed-slot-picker > p {
+  margin: 0 0 10px;
+  color: var(--form-theme-muted, var(--madar-muted, var(--theme-text-soft)));
+  font-size: 13px;
+}
+
+.fixed-slot-agenda {
+  display: grid;
+  gap: 12px;
+}
+
+.fixed-slot-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  border: 1px solid var(--form-theme-border, var(--theme-border));
+  border-radius: var(--form-theme-radius, 18px);
+  overflow: hidden;
+  background: var(--form-theme-surface, var(--theme-surface));
+  box-shadow: 0 12px 28px rgba(var(--theme-shadow-rgb), 0.08);
+}
+
+.fixed-slot-date {
+  min-height: 112px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  padding: 14px 10px;
+  border-inline-end: 1px solid color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 28%, transparent);
+  background: color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 18%, var(--form-theme-surface, var(--theme-surface)));
+  color: var(--form-theme-accent, var(--theme-primary));
+  text-align: center;
+}
+
+.fixed-slot-date span,
+.fixed-slot-date small {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fixed-slot-date strong {
+  font-size: clamp(32px, 5cqw, 46px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.fixed-slot-times {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 16px 18px;
+  background: var(--form-theme-input, var(--theme-surface));
+}
+
+.fixed-slot-times > span {
+  color: var(--form-theme-text, var(--theme-text));
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fixed-slot-times > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fixed-slot-times button {
+  min-width: 78px;
+  min-height: 38px;
+  border: 1px solid var(--form-theme-border, var(--theme-border));
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: var(--form-theme-surface, var(--theme-surface));
+  color: var(--form-theme-text, var(--theme-text));
+  font-size: 12px;
+  font-weight: 850;
+  box-shadow: none;
+}
+
+.fixed-slot-times button:hover:not(:disabled) {
+  border-color: var(--form-theme-accent, var(--theme-primary));
+  background: color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 9%, var(--form-theme-surface, var(--theme-surface)));
+  color: var(--form-theme-accent, var(--theme-primary));
+}
+
+.fixed-slot-times button.is-selected {
+  border-color: var(--form-theme-accent, var(--theme-primary));
+  background: var(--form-theme-accent, var(--theme-primary));
+  color: var(--form-theme-button-text, var(--theme-text-inverse));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 22%, transparent);
+}
+
+.fixed-slot-times button:focus-visible {
+  outline: 0;
+  border-color: var(--form-theme-accent, var(--theme-primary));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 14%, transparent);
+}
+
+.fixed-slot-empty {
+  padding: 20px;
+  border: 1px dashed var(--form-theme-border, var(--theme-border));
+  border-radius: var(--form-theme-field-radius, 12px);
+  background: var(--form-theme-input, var(--theme-surface));
+  color: var(--form-theme-muted, var(--theme-text-soft));
+  text-align: center;
+}
+
+.fixed-slot-error {
+  margin-top: 2px;
+  color: var(--theme-danger, var(--form-theme-accent));
+  font-size: 12px;
+}
+
+@container (max-width: 640px) {
+  .reservation-block.is-fixed-slots .reservation-block-header {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (max-width: 460px) {
+  .reservation-block.is-fixed-slots .reservation-block-header {
+    grid-template-columns: 1fr;
+  }
+
+  .fixed-slot-row {
+    grid-template-columns: 82px minmax(0, 1fr);
+    border-radius: var(--form-theme-field-radius, 12px);
+  }
+
+  .fixed-slot-date {
+    min-height: 104px;
+    padding: 12px 6px;
+  }
+
+  .fixed-slot-date strong {
+    font-size: 32px;
+  }
+
+  .fixed-slot-times {
+    padding: 12px;
+  }
+
+  .fixed-slot-times button {
+    min-width: 68px;
+    min-height: 36px;
+    padding-inline: 10px;
+  }
+}
+@container (max-width: 340px) {
+  .fixed-slot-row {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .fixed-slot-date {
+    padding-inline: 5px;
+  }
+
+  .fixed-slot-date strong {
+    font-size: 28px;
+  }
+
+  .fixed-slot-times {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .fixed-slot-times > div {
+    gap: 6px;
+  }
+
+  .fixed-slot-times button {
+    min-width: 58px;
+    min-height: 34px;
+    padding-inline: 8px;
+    font-size: 11px;
+  }
 }

@@ -104,7 +104,6 @@
 .page-builder .form-import-guide,
 .page-builder .connected-placement-list,
 .page-builder .forms-theme-shape-grid > *,
-.page-builder .reservation-field,
 .page-builder .toggle-field,
 .page-builder .publish-subdomain-warning {
   background: var(--pb-surface-muted) !important;
@@ -256,8 +255,12 @@
 }
 
 .page-builder .builder-inspector textarea {
-  min-height: 96px !important;
-  resize: vertical !important;
+  field-sizing: content;
+  height: auto !important;
+  min-height: 72px !important;
+  max-height: none !important;
+  overflow-y: hidden !important;
+  resize: none !important;
 }
 
 .page-builder .builder-inspector :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
@@ -650,7 +653,7 @@
   .builder-modal,
   .template-picker-modal,
   .quiz-options-drawer
-) button:not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger) {
+) button:not(.builder-element-button):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger) {
   border-color: var(--pb-border) !important;
   background: var(--pb-surface-raised) !important;
   color: var(--pb-text) !important;
@@ -668,7 +671,7 @@
   .builder-modal,
   .template-picker-modal,
   .quiz-options-drawer
-) button:not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger):hover {
+) button:not(.builder-element-button):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger):hover {
   border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
   background: var(--pb-accent-soft) !important;
   color: var(--pb-accent) !important;
@@ -1239,7 +1242,6 @@
   .form-import-guide,
   .connected-placement-list,
   .inspector-toggle-row,
-  .reservation-field,
   .toggle-field,
   .publish-subdomain-warning,
   .form-info-grid > *,
@@ -1661,7 +1663,7 @@ html.theme-dark body .page-builder nav.workspace-tabs > button.active {
 .page-builder .builder-inspector .carousel-slide-card > summary .carousel-slide-edit-hint.primary-action {
   min-height: 40px !important;
   padding: 10px 18px !important;
-  background: var(--action-primary, #9b2f25) !important;
+  background: var(--action-primary, var(--theme-primary)) !important;
   background-image: none !important;
   border: 0 !important;
   border-radius: 8px !important;
@@ -1682,7 +1684,7 @@ html.theme-dark body .page-builder nav.workspace-tabs > button.active {
 .page-builder .builder-inspector .carousel-slide-editor > .primary-action:not(:disabled):hover,
 .page-builder .builder-inspector .carousel-slide-image-control .upload-image-button:hover,
 .page-builder .builder-inspector .carousel-slide-card > summary:hover .carousel-slide-edit-hint.primary-action {
-  background: var(--action-primary-hover, #84271f) !important;
+  background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
 }
@@ -1776,4 +1778,273 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
   background-image: none !important;
   border: 0 !important;
   box-shadow: none !important;
+}
+/* Reservations workspace: global Page Builder theme alignment. */
+.page-builder .reservations-workspace {
+  --reservation-accent: var(--pb-accent);
+  --reservation-accent-dark: color-mix(in srgb, var(--pb-accent) 82%, var(--pb-text));
+  --reservation-accent-soft: var(--pb-accent-soft);
+  --reservation-accent-border: color-mix(in srgb, var(--pb-accent) 34%, var(--pb-border));
+  color: var(--pb-text) !important;
+}
+
+.page-builder .reservations-workspace :is(
+  .reservation-block-list,
+  .reservation-editor-card,
+  .reservation-settings-section,
+  .reservation-calendar-popover,
+  .reservation-date-card,
+  .reservation-bullet-row
+) {
+  border-color: var(--pb-border) !important;
+  color: var(--pb-text) !important;
+}
+
+.page-builder .reservations-workspace :is(.reservation-block-list, .reservation-editor-card) {
+  border-radius: var(--pb-radius-lg) !important;
+  background: var(--pb-surface) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .reservations-workspace .reservation-settings-section {
+  border-radius: var(--pb-radius) !important;
+  background: var(--pb-surface-muted) !important;
+}
+
+.page-builder .reservations-workspace :is(.reservation-date-card, .reservation-bullet-row) {
+  border-radius: var(--pb-radius-sm) !important;
+  background: var(--pb-surface-raised) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .reservations-workspace :is(
+  .reservation-date-heading p,
+  .reservation-date-card small,
+  .reservation-step-actions > span,
+  .reservation-calendar-weekdays span,
+  .reservation-calendar-trigger small
+) {
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+}
+
+.page-builder .reservations-workspace :is(
+  .reservation-date-heading-icon,
+  .reservation-date-card-icon,
+  .reservation-calendar-trigger-icon
+) {
+  background: var(--pb-accent-soft) !important;
+  color: var(--pb-accent) !important;
+}
+
+.page-builder .reservations-workspace :is(
+  .reservation-calendar-trigger,
+  .reservation-calendar-toolbar button,
+  .reservation-step-actions button,
+  .reservation-list-heading button
+) {
+  border-color: var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  background: var(--pb-surface-raised) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .reservations-workspace :is(
+  .reservation-calendar-trigger,
+  .reservation-calendar-toolbar button,
+  .reservation-step-actions button,
+  .reservation-list-heading button
+):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
+  background: var(--pb-accent-soft) !important;
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+}
+
+.page-builder .reservations-workspace .reservation-setup-steps button {
+  border-color: var(--pb-border) !important;
+  border-radius: var(--pb-radius-sm) !important;
+  background: var(--pb-surface-muted) !important;
+  color: var(--pb-muted) !important;
+  -webkit-text-fill-color: var(--pb-muted) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .reservations-workspace .reservation-setup-steps button > span {
+  background: var(--pb-surface-raised) !important;
+  color: var(--pb-text) !important;
+}
+
+.page-builder .reservations-workspace .reservation-setup-steps button.is-active,
+.page-builder .reservations-workspace .object-list.reservation-block-list button.is-active {
+  border-color: var(--pb-accent) !important;
+  background: var(--pb-accent-soft) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  box-shadow: inset 3px 0 0 var(--pb-accent) !important;
+}
+
+.page-builder .reservations-workspace .reservation-setup-steps button.is-active > span,
+.page-builder .reservations-workspace .reservation-step-actions button.primary-action {
+  border-color: var(--pb-accent) !important;
+  background: var(--pb-accent) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .reservations-workspace .reservation-calendar-popover {
+  border-radius: var(--pb-radius-lg) !important;
+  background: var(--pb-surface-raised) !important;
+  box-shadow: var(--pb-shadow) !important;
+}
+
+.page-builder .reservations-workspace .reservation-calendar-days button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+}
+
+.page-builder .reservations-workspace .reservation-calendar-days button:hover:not(:disabled) {
+  border-color: var(--pb-border) !important;
+  background: var(--pb-accent-soft) !important;
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+}
+
+.page-builder .reservations-workspace .reservation-calendar-days button.is-today {
+  border-color: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+}
+
+.page-builder .reservations-workspace .reservation-calendar-days button.is-selected {
+  border-color: var(--pb-accent) !important;
+  background: var(--pb-accent) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .reservations-workspace .reservation-calendar-footer button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+}
+
+.page-builder .reservations-workspace .reservation-bullet-row input {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .reservations-workspace :is(
+  .reservation-delete-block,
+  .reservation-date-card > button,
+  .reservation-bullet-row > button
+) {
+  border-color: color-mix(in srgb, var(--pb-danger) 34%, var(--pb-border)) !important;
+  background: color-mix(in srgb, var(--pb-danger) 10%, var(--pb-surface)) !important;
+  color: var(--pb-danger) !important;
+  -webkit-text-fill-color: var(--pb-danger) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .reservations-workspace :is(
+  .reservation-delete-block,
+  .reservation-date-card > button,
+  .reservation-bullet-row > button
+):hover:not(:disabled) {
+  border-color: var(--pb-danger) !important;
+  background: var(--pb-danger) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .reservations-workspace :is(button, input, textarea):focus-visible {
+  outline: 0 !important;
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 3px var(--pb-accent-soft) !important;
+}
+/* Reservations date and time value typography. */
+.page-builder .reservations-workspace :is(
+  .reservation-date-card strong,
+  .reservation-time-editor input[type="time"]
+) {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.35 !important;
+}
+/* Reservation editor grows with its content. */
+.page-builder .reservations-workspace .reservation-editor-card {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Canvas reservation components use the tenant theme, not the editor chrome. */
+.page-builder .builder-canvas .reservation-block {
+  color: var(--form-theme-text, var(--theme-text)) !important;
+}
+
+.page-builder .builder-canvas .reservation-block :is(h3, h4, label, legend) {
+  color: var(--form-theme-text, var(--theme-text)) !important;
+  -webkit-text-fill-color: var(--form-theme-text, var(--theme-text)) !important;
+}
+
+.page-builder .builder-canvas .reservation-block :is(p, small) {
+  color: var(--form-theme-muted, var(--theme-text-soft)) !important;
+  -webkit-text-fill-color: var(--form-theme-muted, var(--theme-text-soft)) !important;
+}
+
+.page-builder .builder-canvas .reservation-block :is(input, textarea, select) {
+  border-color: var(--form-theme-border, var(--theme-border)) !important;
+  background: var(--form-theme-input, var(--form-theme-surface, var(--theme-surface))) !important;
+  color: var(--form-theme-text, var(--theme-text)) !important;
+  -webkit-text-fill-color: var(--form-theme-text, var(--theme-text)) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-canvas .reservation-block :is(input, textarea)::placeholder {
+  color: var(--form-theme-muted, var(--theme-text-soft)) !important;
+  -webkit-text-fill-color: var(--form-theme-muted, var(--theme-text-soft)) !important;
+}
+
+.page-builder .builder-canvas .reservation-block :is(input, textarea, select):focus {
+  border-color: var(--form-theme-accent, var(--theme-primary)) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 12%, transparent) !important;
+}
+
+.page-builder .builder-canvas .reservation-block .reservation-summary {
+  border-color: var(--form-theme-border, var(--theme-border)) !important;
+  background: var(--form-theme-input, var(--form-theme-surface, var(--theme-surface))) !important;
+  color: var(--form-theme-text, var(--theme-text)) !important;
+}
+
+.page-builder .builder-canvas .reservation-block .reservation-summary strong {
+  color: var(--form-theme-accent, var(--theme-primary)) !important;
+  -webkit-text-fill-color: var(--form-theme-accent, var(--theme-primary)) !important;
+}
+/* Canvas content buttons are site content, not neutral workspace controls. */
+.page-builder .workspace-page .builder-canvas .builder-element-button,
+.page-builder .workspace-page .direct-element-frame-button .builder-element-button {
+  background: var(--action-primary, var(--theme-primary)) !important;
+  background-color: var(--action-primary, var(--theme-primary)) !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  border-radius: 8px !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.page-builder .workspace-page .builder-canvas .builder-element-button:hover,
+.page-builder .workspace-page .direct-element-frame-button .builder-element-button:hover {
+  background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
+  background-color: var(--action-primary-hover, var(--theme-primary-hover)) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
 }

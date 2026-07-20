@@ -1027,7 +1027,7 @@
 
 .builder-inline-text-toolbar {
   position: fixed;
-  transform: translate(-50%, -100%);
+  transform: none;
   z-index: 80;
   width: max-content;
   max-width: min(calc(100vw - 32px), 980px);
@@ -1041,6 +1041,7 @@
   border-radius: 8px;
   background: var(--theme-surface);
   box-shadow: 0 18px 40px rgba(var(--theme-shadow-rgb), 0.12);
+  transition: left 120ms ease, top 120ms ease;
 }
 
 .builder-inline-text-toolbar select,

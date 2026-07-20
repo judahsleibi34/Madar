@@ -44,6 +44,33 @@ export const normalizePublicPageSlug = (value, fallbackName = "page") => {
   return `/${normalizedSegments.join("/")}`;
 };
 
+export const createUniquePublicPageSlug = ({
+  name,
+  pages = [],
+  currentPageId = "",
+  isDefault = false,
+} = {}) => {
+  if (isDefault) return "/";
+
+  let baseSlug = normalizePublicPageSlug("", name || "page");
+  const segment = baseSlug.replace(/^\//, "");
+  if (RESERVED_PUBLIC_PAGE_SLUGS.has(segment)) {
+    baseSlug = `/${segment}-page`;
+  }
+
+  const usedSlugs = new Set(
+    pages
+      .filter((page) => String(page?.id || "") !== String(currentPageId || ""))
+      .map((page) => normalizePublicPageSlug(page?.slug, page?.name))
+  );
+  let slug = baseSlug;
+  let suffix = 2;
+  while (usedSlugs.has(slug)) {
+    slug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+  return slug;
+};
 export const getDefaultPublicPage = (pages = [], defaultPageId = "") => {
   const explicitId = String(defaultPageId || "").trim();
   return (

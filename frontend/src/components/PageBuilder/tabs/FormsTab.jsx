@@ -42,7 +42,6 @@ import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
 import { getFormsTabContent } from "../../../content/pageBuilder";
 import FormButton from "./FormsTab/FormButton";
 import FormsEmptyState from "./FormsTab/FormsEmptyState";
-import FormPreview from "./FormsTab/FormPreview";
 
 const defaultFormsCopy = getFormsTabContent("en");
 
@@ -199,7 +198,6 @@ export default function FormsTab({
   getQuizSettings,
   getFormPlacements,
   addConnectedFormSectionToPage,
-  renderConnectedForm,
   openFormPreviewPage,
   saveProject,
 
@@ -1742,12 +1740,6 @@ export default function FormsTab({
         </div>
         </main>
 
-        <FormPreview
-          activeForm={activeForm}
-          copy={copy}
-          placements={placements}
-          renderConnectedForm={renderConnectedForm}
-        />
       </div>
 
       {quizOptionsOpen && (

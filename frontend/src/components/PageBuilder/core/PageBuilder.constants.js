@@ -113,7 +113,8 @@ export const elementTypes = [
   { id: "metric", label: "Metric", group: "Dashboard" },
   { id: "loginBlock", label: "Login Form", group: "Auth" },
   { id: "registrationBlock", label: "Registration Form", group: "Auth" },
-  { id: "reservationBlock", label: "Reservation", group: "Bookings" },
+  { id: "reservationRequest", label: "Date request", group: "Bookings" },
+  { id: "reservationFixedSlots", label: "Fixed slots", group: "Bookings" },
   { id: "formBlock", label: "Form Block", group: "Connected" },
 ];
 

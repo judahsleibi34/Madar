@@ -111,6 +111,24 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
   });
 
+  it("keeps only one expandable sidebar section open at a time", () => {
+    renderSidebar();
+
+    const workspace = screen.getByRole("button", { name: "Workspace" });
+    const settings = screen.getByRole("button", { name: "Settings" });
+
+    fireEvent.click(workspace);
+    expect(workspace.getAttribute("aria-expanded")).toBe("true");
+    expect(settings.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(settings);
+    expect(workspace.getAttribute("aria-expanded")).toBe("false");
+    expect(settings.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(workspace);
+    expect(workspace.getAttribute("aria-expanded")).toBe("true");
+    expect(settings.getAttribute("aria-expanded")).toBe("false");
+  });
   it("opens workspace for its active route and highlights only the child", () => {
     renderSidebar("/builder-data");
 

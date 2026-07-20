@@ -33,14 +33,13 @@ describe("RouteErrorBoundary", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Return home" }).getAttribute("href")).toBe("/");
     expect(screen.queryByText(/private customer detail/i)).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "route_render_error",
-      expect.objectContaining({ surface: "public", event_id: expect.any(String) })
-    );
+    expect(consoleSpy).toHaveBeenCalledWith("route_render_error", { surface: "public" });
     expect(JSON.stringify(consoleSpy.mock.calls)).not.toContain("private customer detail");
+    expect(screen.queryByText(/reference:/i)).toBeNull();
+    expect(screen.queryByText(/[0-9a-f]{8}-[0-9a-f-]{27,}/i)).toBeNull();
   });
 
-  it("retries without reloading and preserves builder recovery messaging", () => {
+  it("retries without reloading and keeps builder recovery messaging simple", () => {
     render(
       <RouteErrorBoundary
         surface="page-builder"
@@ -51,7 +50,7 @@ describe("RouteErrorBoundary", () => {
       </RouteErrorBoundary>
     );
 
-    expect(screen.getByText(/recovery drafts are preserved/i)).toBeTruthy();
+    expect(screen.getByText(/last saved version is safe/i)).toBeTruthy();
     shouldThrow = false;
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(screen.getByText("Recovered route")).toBeTruthy();

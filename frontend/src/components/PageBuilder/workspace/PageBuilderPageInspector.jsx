@@ -14,14 +14,6 @@ export default function PageBuilderPageInspector({
         <input value={page.name || ""} onChange={(event) => onUpdate({ name: event.target.value })} />
       </label>
       <label>
-        Page link
-        <input
-          value={page.slug || ""}
-          disabled={page.isDefault === true}
-          onChange={(event) => onUpdate({ slug: event.target.value })}
-        />
-      </label>
-      <label>
         Navigation label
         <input
           value={page.navigationLabel || ""}
@@ -33,12 +25,12 @@ export default function PageBuilderPageInspector({
         <input
           type="checkbox"
           checked={page.isDefault === true}
-          onChange={onSetDefault}
+          onChange={(event) => onSetDefault(event.target.checked)}
         />
         <span>Use as homepage</span>
       </label>
       {hasRoutingIssue && (
-        <p className="builder-note" role="alert">Choose a unique, non-reserved page link before publishing.</p>
+        <p className="builder-note" role="alert">Rename this page to create a valid, unique address.</p>
       )}
       <label className="inspector-toggle-row">
         <input

@@ -63,6 +63,10 @@ export const getDirectElementMinimumSize = (element) => {
     return { width: 360, height: 770 };
   }
 
+  if (element?.type === "button") {
+    return { width: 80, height: 42 };
+  }
+
   if (element?.type === "metric" || element?.type === "list") {
     return { width: 160, height: getMetricMinimumHeight(element) };
   }
@@ -78,13 +82,32 @@ export const getDirectElementMinimumSize = (element) => {
   return { width: 80, height: 48 };
 };
 
+export const reconcileMeasuredFormBlockPosition = ({
+  current,
+  measuredHeight,
+  bounds,
+  minimumSize = { width: 80, height: 48 },
+}) =>
+  clampElementToBounds(
+    {
+      ...current,
+      height: Math.max(Number(current?.height) || 0, Number(measuredHeight) || 0),
+    },
+    bounds,
+    {
+      minWidth: minimumSize.width,
+      minHeight: minimumSize.height,
+      allowBottomOverflow: true,
+    }
+  );
+
 export const directElementHeight = (element) => {
   if (element?.type === "metric") return getMetricMinimumHeight(element);
 
   const heights = {
     heading: 112,
     text: 104,
-    button: 58,
+    button: 42,
     image: 260,
     card: 390,
     list: 170,
@@ -485,12 +508,13 @@ export const getDragCandidatePosition = ({
   const minimumSize = getDirectElementMinimumSize(selectedElement);
   const roundPixel = (value) => Math.round(Number(value) || 0);
   const resizing = dragState.interaction === "resize";
+  const resizeSensitivity = selectedElement?.type === "heading" ? 0.45 : 1;
   const candidate = resizing
     ? {
         x: dragState.startX,
         y: dragState.startY,
-        width: roundPixel(dragState.startWidth + dragState.deltaX),
-        height: roundPixel(dragState.startHeight + dragState.deltaY),
+        width: roundPixel(dragState.startWidth + dragState.deltaX * resizeSensitivity),
+        height: roundPixel(dragState.startHeight + dragState.deltaY * resizeSensitivity),
       }
     : {
         x: snapToGrid(dragState.startX + dragState.deltaX),

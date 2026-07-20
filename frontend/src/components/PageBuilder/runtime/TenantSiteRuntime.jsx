@@ -26,8 +26,10 @@ import {
 } from "../core/PageBuilder.localization";
 import "../../../styles/admin/PageBuilder/index.css";
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
+import AutoFitDirectText from "../core/PageBuilder.autoFitText";
 import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
+import { resolveReservationBlockValue } from "../core/PageBuilder.reservations";
 import { resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
 import { getReservationErrorMessage } from "./reservationSubmission";
@@ -1631,9 +1633,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       style: getElementStyle(element, isFree, section),
     };
 
-    if (element.type === "heading") return <h1 key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</h1>;
-    if (element.type === "text") return <p key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</p>;
-    if (element.type === "button") return <button key={element.id} type="button" {...props} onClick={() => runPublicButtonAction(element)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</button>;
+    if (element.type === "heading") return <AutoFitDirectText as="h1" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
+    if (element.type === "text") return <AutoFitDirectText as="p" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
+    if (element.type === "button") return <AutoFitDirectText as="button" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} type="button" {...props} onClick={() => runPublicButtonAction(element)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
     if (element.type === "image") {
       const imageSrc = resolveMediaUrl(element.content);
       return imageSrc ? (
@@ -1779,7 +1781,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     }
     if (element.type === "formBlock") return <div key={element.id} {...props}>{renderConnectedForm(element.connectedFormId, element.id)}</div>;
     if (element.type === "reservationBlock") {
-      const reservation = element.reservation || {};
+      const reservation = resolveReservationBlockValue(element, project?.pages) || {};
       const status = reservationStatus[element.id] || {};
 
       return (
@@ -1789,11 +1791,14 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             description={reservation.description}
             services={reservation.services}
             fields={reservation.fields}
+            bookingMode={reservation.bookingMode}
+            availableDates={reservation.availableDates}
+            timeSlots={reservation.timeSlots}
             submitLabel={reservation.submitLabel}
             disabled={Boolean(status.submitting)}
             onSubmit={(values, idempotencyKey, honeypot, submissionElapsedMs) =>
               submitRuntimeReservation(
-                element,
+                { ...element, reservation },
                 values,
                 idempotencyKey,
                 honeypot,

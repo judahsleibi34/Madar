@@ -156,14 +156,10 @@
 }
 
 .tenant-runtime-page .direct-element-frame-formBlock {
-  position: relative !important;
-  inset: auto !important;
-  width: 100% !important;
   max-width: 100% !important;
   height: auto !important;
   min-height: 0 !important;
-  transform: none !important;
-  container-type: normal;
+  container-type: inline-size;
 }
 
 .tenant-runtime-page .direct-element-frame-formBlock .direct-element-content,
@@ -172,6 +168,14 @@
   height: auto !important;
   max-height: none !important;
   overflow: visible !important;
+}
+
+@media (max-width: 720px) {
+  .tenant-runtime-page .direct-element-frame-formBlock {
+    left: 12px !important;
+    width: calc(100% - 24px) !important;
+    max-width: calc(100% - 24px) !important;
+  }
 }
 
 .tenant-runtime-loader {
@@ -602,8 +606,13 @@ body.theme-dark .tenant-site-runtime .tenant-site-cta,
 html.theme-dark .tenant-site-runtime .builder-element-button,
 body.theme-dark .tenant-site-runtime .builder-element-button,
 .tenant-site-runtime .builder-element-button {
-  background: var(--theme-primary) !important;
+  background: var(--action-primary, var(--theme-primary)) !important;
   color: var(--theme-text-inverse) !important;
+}
+
+.tenant-site-runtime .builder-element-button:hover {
+  background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
+  color: #fff !important;
 }
 
 /* Component-level color boundary for tenant pages embedded in the dark builder shell. */
