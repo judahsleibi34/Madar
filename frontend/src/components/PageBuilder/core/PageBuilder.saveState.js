@@ -23,6 +23,13 @@ export const BUILDER_SAVE_STATE_LABELS = Object.freeze({
 export const getBuilderSaveStateLabel = (state) =>
   BUILDER_SAVE_STATE_LABELS[state] || BUILDER_SAVE_STATE_LABELS.dirty;
 
+export const shouldBlockBuilderUnload = (state) =>
+  ![
+    BUILDER_SAVE_STATES.loading,
+    BUILDER_SAVE_STATES.clean,
+    BUILDER_SAVE_STATES.savedCloud,
+  ].includes(state);
+
 export const shouldDeferBuilderCloudSave = ({ dragActive = false, textEditing = false } = {}) =>
   Boolean(dragActive || textEditing);
 

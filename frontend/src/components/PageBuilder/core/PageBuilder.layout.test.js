@@ -1,8 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { getMovedElementPosition } from "./PageBuilder.layout";
+import {
+  getMovedElementPosition,
+  reconcileMeasuredFormBlockPosition,
+} from "./PageBuilder.layout";
 
 describe("page builder scaled canvas coordinates", () => {
+  it("preserves a resized form width while expanding it to fit its content", () => {
+    const result = reconcileMeasuredFormBlockPosition({
+      current: { x: 72, y: 40, width: 420, height: 300 },
+      measuredHeight: 560,
+      bounds: { x: 0, y: 0, width: 1200, height: 700 },
+      minimumSize: { width: 80, height: 48 },
+    });
+
+    expect(result).toMatchObject({
+      x: 72,
+      y: 40,
+      width: 420,
+      height: 560,
+    });
+  });
   it("maps pointer coordinates back into the unscaled canvas", () => {
     const position = { x: 0, y: 0, width: 100, height: 80 };
     const result = getMovedElementPosition({
@@ -70,5 +88,25 @@ describe("page builder scaled canvas coordinates", () => {
     });
 
     expect(result).toMatchObject({ x: 220, y: 370, width: 100, height: 80 });
+  });
+  it("resizes headings gradually for precise pointer control", async () => {
+    const { getDragCandidatePosition } = await import("./PageBuilder.layout");
+    const result = getDragCandidatePosition({
+      dragState: {
+        interaction: "resize",
+        startX: 40,
+        startY: 20,
+        startWidth: 300,
+        startHeight: 120,
+        deltaX: 100,
+        deltaY: 100,
+      },
+      selectedElement: { type: "heading" },
+      canvasWidth: 800,
+      canvasHeight: 600,
+      snapToGrid: (value) => value,
+    });
+
+    expect(result).toMatchObject({ width: 345, height: 165 });
   });
 });

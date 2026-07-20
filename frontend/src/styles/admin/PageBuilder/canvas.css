@@ -372,9 +372,43 @@
 }
 
 .builder-element-button {
-  padding: 13px 20px;
-  border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.2);
+  appearance: none;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  border: 1px solid transparent !important;
+  border-radius: 8px;
+  background: var(--action-primary, var(--theme-primary)) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  box-shadow: 0 6px 14px rgba(var(--theme-primary-rgb), 0.16);
+  font-weight: 850;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.builder-element-button:hover {
+  background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
+  box-shadow: 0 9px 18px rgba(var(--theme-primary-rgb), 0.2);
+  transform: translateY(-1px);
+}
+
+.builder-element-button:active {
+  box-shadow: 0 4px 10px rgba(var(--theme-primary-rgb), 0.14);
+  transform: translateY(0);
+}
+
+.builder-element-button:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 3px rgba(155, 47, 37, 0.28),
+    0 10px 22px rgba(155, 47, 37, 0.22);
 }
 
 .builder-element-image {
@@ -430,6 +464,8 @@
   overflow: hidden;
   container-name: reservation-block;
   container-type: inline-size;
+  background: transparent !important;
+  box-shadow: none;
 }
 
 .builder-auth-component {
@@ -1214,6 +1250,11 @@
   overflow: hidden;
 }
 
+.direct-element-frame-button .direct-element-content {
+  display: flex;
+  align-items: center;
+}
+
 .direct-element-frame-heading .builder-element-heading,
 .direct-element-frame-text .builder-element-text,
 .direct-element-frame-button .builder-element-button {
@@ -1228,23 +1269,24 @@
 
 .direct-element-frame-heading .builder-element-heading {
   display: block;
-  font-size: var(--builder-element-font-size, 46px) !important;
+  font-size: var(--builder-fitted-font-size, var(--builder-element-font-size, 46px)) !important;
   line-height: var(--builder-element-line-height, 1.08) !important;
   text-wrap: balance;
 }
 
 .direct-element-frame-text .builder-element-text {
   display: block;
-  font-size: var(--builder-element-font-size, 17px) !important;
+  font-size: var(--builder-fitted-font-size, var(--builder-element-font-size, 17px)) !important;
   line-height: var(--builder-element-line-height, 1.5) !important;
 }
 
 .direct-element-frame-button .builder-element-button {
-  width: fit-content !important;
+  width: 100% !important;
   max-width: 100% !important;
-  min-height: 0;
+  height: 42px !important;
+  min-height: 42px;
   padding: clamp(7px, min(2.4cqw, 5cqh), 13px) clamp(10px, min(4cqw, 7cqh), 20px);
-  font-size: var(--builder-element-font-size, 15px) !important;
+  font-size: var(--builder-fitted-font-size, var(--builder-element-font-size, 15px)) !important;
   line-height: 1.2 !important;
   white-space: normal;
 }
@@ -1259,15 +1301,26 @@
 }
 
 .direct-element-frame-formBlock .direct-element-content,
-.direct-element-frame-formBlock .direct-element-content > .builder-element-formBlock {
+.direct-element-frame-formBlock .direct-element-content > .builder-element-formBlock,
+.direct-element-frame-reservationBlock .direct-element-content,
+.direct-element-frame-reservationBlock .direct-element-content > .builder-element-reservationBlock {
   height: auto;
   min-height: 0;
+  overflow: visible;
+}
+
+.direct-element-frame-reservationBlock .builder-element-reservationBlock {
+  width: 100%;
   overflow: visible;
 }
 
 .direct-element-frame-formBlock .builder-element-formBlock,
 .direct-element-frame-formBlock .runtime-form {
   width: 100%;
+}
+
+.direct-element-frame-formBlock {
+  container-type: inline-size;
 }
 
 .direct-element-frame-formBlock .builder-element-formBlock {
@@ -1302,6 +1355,28 @@
   padding-bottom: 16px;
 }
 
+@container (max-width: 520px) {
+  .direct-element-frame-formBlock .runtime-form {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .direct-element-frame-formBlock .runtime-form-header,
+  .direct-element-frame-formBlock .runtime-form-section,
+  .direct-element-frame-formBlock .runtime-form-pagination,
+  .direct-element-frame-formBlock .builder-note {
+    min-width: 0;
+    padding-inline: 0;
+  }
+
+  .direct-element-frame-formBlock .runtime-form-pagination {
+    grid-template-columns: 1fr;
+  }
+
+  .direct-element-frame-formBlock .runtime-form-page-count {
+    justify-self: start;
+  }
+}
 .direct-resize-handle {
   position: absolute;
   right: -7px;

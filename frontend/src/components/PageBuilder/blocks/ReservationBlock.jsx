@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getReservationContent } from "../../../content/pageBuilder";
 import { createReservationIdempotencyKey } from "../runtime/reservationSubmission";
+import FixedSlotPicker from "./FixedSlotPicker";
 import "./ReservationBlock.css";
 
 const reservationDefaults = getReservationContent("en");
@@ -31,6 +32,9 @@ export default function ReservationBlock({
   description = reservationDefaults.description,
   services = defaultServices,
   fields = defaultFields,
+  bookingMode = "flexible",
+  availableDates = [],
+  timeSlots = [],
   disabled = false,
   submitLabel = reservationDefaults.submitLabel,
   lang = "en",
@@ -43,6 +47,7 @@ export default function ReservationBlock({
     () => (Array.isArray(fields) && fields.length > 0 ? fields : defaultFields),
     [fields]
   );
+  const isFixedSlots = bookingMode !== "flexible";
   const [values, setValues] = useState(() => initialValues(serviceOptions[0]));
   const [errors, setErrors] = useState({});
   const [idempotencyKey, setIdempotencyKey] = useState(createReservationIdempotencyKey);
@@ -62,6 +67,16 @@ export default function ReservationBlock({
     setErrors((prev) => {
       const next = { ...prev };
       delete next[key];
+      return next;
+    });
+  };
+
+  const selectFixedSlot = (date, time) => {
+    setValues((prev) => ({ ...prev, date, time }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.date;
+      delete next.time;
       return next;
     });
   };
@@ -108,6 +123,7 @@ export default function ReservationBlock({
   const renderField = (key) => {
     const meta = fieldMeta[key];
     if (!meta || !enabledFields.includes(key)) return null;
+    if (isFixedSlots && ["date", "time", "service", "guests"].includes(key)) return null;
 
     if (key === "service") {
       return (
@@ -168,7 +184,7 @@ export default function ReservationBlock({
   };
 
   return (
-    <form className="reservation-block" onSubmit={submitReservation}>
+    <form className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"}`} onSubmit={submitReservation}>
       <label className="runtime-honeypot" aria-hidden="true">
         Website
         <input
@@ -182,20 +198,67 @@ export default function ReservationBlock({
       </label>
       <div className="reservation-block-header">
         <div>
-          <span>{content.kicker}</span>
           <h3>{title}</h3>
           <p>{description}</p>
         </div>
 
-        <div className="reservation-summary">
-          <strong>{serviceOptions.length}</strong>
-          <small>{content.servicesLabel}</small>
-        </div>
       </div>
 
-      <div className="reservation-grid">
-        {defaultFields.map((key) => renderField(key))}
-      </div>
+      {isFixedSlots && (
+        <FixedSlotPicker
+          dates={availableDates}
+          times={timeSlots}
+          selectedDate={values.date}
+          selectedTime={values.time}
+          disabled={submissionDisabled}
+          error={errors.date || errors.time || ""}
+          lang={lang}
+          onSelect={selectFixedSlot}
+        />
+      )}
+
+      {isFixedSlots ? (
+        <div className="reservation-grid">
+          {defaultFields.map((key) => renderField(key))}
+        </div>
+      ) : (
+        <div className="reservation-request-form">
+          <section className="reservation-request-section">
+            <div className="reservation-request-heading">
+              <h4>Your details</h4>
+              <p>Tell us how to contact you.</p>
+            </div>
+            <div className="reservation-request-grid reservation-request-contact">
+              {renderField("name")}
+              {renderField("contact")}
+            </div>
+          </section>
+
+          <section className="reservation-request-section">
+            <div className="reservation-request-heading">
+              <h4>Appointment details</h4>
+              <p>Choose what you need and when you prefer to visit.</p>
+            </div>
+            <div className="reservation-request-grid reservation-request-schedule">
+              {renderField("service")}
+              {renderField("date")}
+              {renderField("time")}
+            </div>
+          </section>
+
+          {enabledFields.includes("notes") && (
+            <section className="reservation-request-section">
+              <div className="reservation-request-heading">
+                <h4>Additional notes</h4>
+                <p>Share anything that will help us prepare.</p>
+              </div>
+              <div className="reservation-request-grid reservation-request-notes">
+                {renderField("notes")}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
 
       <div className="reservation-footer">
         <button type="submit" className="reservation-submit" disabled={submissionDisabled}>

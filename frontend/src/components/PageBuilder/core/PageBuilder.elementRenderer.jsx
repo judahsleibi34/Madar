@@ -1,8 +1,10 @@
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
+import AutoFitDirectText from "./PageBuilder.autoFitText";
 import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
+  collapseAccidentalTextDuplication,
   getListItems,
   getRichTextRanges,
   renderRichText,
@@ -28,36 +30,14 @@ export const createElementRenderer = ({
   setInsertTarget,
   setSelected,
   captureCanvasTextSelection,
-  textSelection,
+  shouldIgnoreInlineTextBlur,
   updateElementInlineText,
   runElementAction,
   renderConnectedForm,
   getReservationBlockValue,
 }) => {
-  const getTextRanges = (element, field, itemIndex = null) => {
-    const ranges = getRichTextRanges(element, field, itemIndex);
-
-    if (
-      !preview &&
-      textSelection?.elementId === element.id &&
-      textSelection.field === field &&
-      (textSelection.itemIndex ?? null) === itemIndex &&
-      textSelection.start !== textSelection.end
-    ) {
-      return [
-        ...ranges,
-        {
-          field,
-          itemIndex,
-          start: textSelection.start,
-          end: textSelection.end,
-          highlight: true,
-        },
-      ];
-    }
-
-    return ranges;
-  };
+  const getTextRanges = (element, field, itemIndex = null) =>
+    getRichTextRanges(element, field, itemIndex);
 
   const getEditableTextProps = (element, field = "content", itemIndex = null) => {
     if (preview) return {};
@@ -70,8 +50,40 @@ export const createElementRenderer = ({
       onKeyDown: (event) => {
         event.stopPropagation();
       },
+      onFocus: (event) => {
+        event.currentTarget.dataset.builderTextEdited = "false";
+        if (field !== "content") return;
+
+        const currentText = String(element.content || "");
+        const repairedText = collapseAccidentalTextDuplication(currentText);
+        if (repairedText === currentText) return;
+
+        updateElementInlineText?.(element.id, {
+          content: repairedText,
+          richTextColors: (element.richTextColors || []).filter(
+            (range) => range.field !== "content"
+          ),
+          richTextSizes: (element.richTextSizes || []).filter(
+            (range) => range.field !== "content"
+          ),
+          richTextStyles: (element.richTextStyles || []).filter(
+            (range) => range.field !== "content"
+          ),
+        });
+      },
+      onInput: (event) => {
+        event.currentTarget.dataset.builderTextEdited = "true";
+      },
       onBlur: (event) => {
-        const nextText = event.currentTarget.textContent || "";
+        const wasEdited = event.currentTarget.dataset.builderTextEdited === "true";
+        if (shouldIgnoreInlineTextBlur?.(event) && !wasEdited) return;
+        if (!wasEdited) return;
+        event.currentTarget.dataset.builderTextEdited = "false";
+
+        const rawText = event.currentTarget.textContent || "";
+        const nextText = field === "content"
+          ? collapseAccidentalTextDuplication(rawText)
+          : rawText;
 
         if (field === "listTitle") {
           if (nextText === (element.listTitle || "")) return;
@@ -149,16 +161,18 @@ export const createElementRenderer = ({
     };
 
     if (element.type === "heading") {
-      return <h1 key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getTextRanges(element, "content"))}</h1>;
+      return <AutoFitDirectText as="h1" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "text") {
-      return <p key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getTextRanges(element, "content"))}</p>;
+      return <AutoFitDirectText as="p" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "button") {
       return (
-        <button
+        <AutoFitDirectText
+          as="button"
+          fitKey={`${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`}
           key={element.id}
           type="button"
           {...commonProps}
@@ -169,7 +183,7 @@ export const createElementRenderer = ({
           {...getEditableTextProps(element)}
         >
           {renderRichText(element.content, getTextRanges(element, "content"))}
-        </button>
+        </AutoFitDirectText>
       );
     }
 
@@ -304,6 +318,10 @@ export const createElementRenderer = ({
             title={reservation.title}
             description={reservation.description}
             services={reservation.services}
+            fields={reservation.fields}
+            bookingMode={reservation.bookingMode}
+            availableDates={reservation.availableDates}
+            timeSlots={reservation.timeSlots}
             submitLabel={reservation.submitLabel}
             disabled={!preview}
           />

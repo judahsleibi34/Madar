@@ -12,25 +12,6 @@
   text-align: center;
 }
 
-.builder-project-chooser-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0 0 14px;
-  color: var(--theme-primary);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.builder-project-chooser-eyebrow > span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--theme-primary);
-  box-shadow: 0 0 0 5px rgba(var(--theme-primary-rgb), 0.1);
-}
 
 .builder-project-chooser-header h1 {
   margin: 0;

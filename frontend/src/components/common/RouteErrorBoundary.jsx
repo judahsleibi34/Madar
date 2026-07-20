@@ -2,39 +2,30 @@ import { Component, Fragment } from "react";
 
 import "./RouteErrorBoundary.css";
 
-function createEventId() {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return `route-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function reportRouteRenderError(surface, eventId) {
-  console.error("route_render_error", {
-    event_id: eventId,
-    surface,
-  });
+function reportRouteRenderError(surface) {
+  console.error("route_render_error", { surface });
 }
 
 export default class RouteErrorBoundary extends Component {
-  state = { error: null, eventId: null, retryCount: 0 };
+  state = { error: null, retryCount: 0 };
 
   static getDerivedStateFromError(error) {
-    return { error, eventId: createEventId() };
+    return { error };
   }
 
   componentDidCatch() {
-    reportRouteRenderError(this.props.surface, this.state.eventId);
+    reportRouteRenderError(this.props.surface);
   }
 
   componentDidUpdate(previousProps) {
     if (this.state.error && previousProps.resetKey !== this.props.resetKey) {
-      this.setState({ error: null, eventId: null });
+      this.setState({ error: null });
     }
   }
 
   retry = () => {
     this.setState(({ retryCount }) => ({
       error: null,
-      eventId: null,
       retryCount: retryCount + 1,
     }));
   };
@@ -49,19 +40,11 @@ export default class RouteErrorBoundary extends Component {
       <main className="route-error" role="alert" aria-live="assertive">
         <section className="route-error__card" aria-labelledby="route-error-title">
           <p className="route-error__eyebrow">Madar</p>
-          <h1 id="route-error-title">This page could not be displayed</h1>
-          <p>
-            Your account data was not changed. Try this page again, or return to a safe
-            starting point.
-          </p>
+          <h1 id="route-error-title">We could not open this page</h1>
+          <p>Something interrupted the page while it was loading. You can try again safely.</p>
           {isBuilder ? (
-            <p className="route-error__note">
-              Saved work and browser recovery drafts are preserved.
-            </p>
+            <p className="route-error__note">Your last saved version is safe.</p>
           ) : null}
-          <p className="route-error__reference">
-            Reference: <code>{this.state.eventId}</code>
-          </p>
           <div className="route-error__actions">
             <button type="button" onClick={this.retry} autoFocus>
               Try again

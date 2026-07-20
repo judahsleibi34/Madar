@@ -855,7 +855,6 @@ body.theme-dark .mobile-menu .mobile-menu-lang .language-toggle-animation {
 .daw-cleaning-tool,
 .daw-report-block,
 .daw-analysis-generator,
-.reservation-block,
 .reservation-component,
 .reservation-editor-preview-block,
 .reservation-settings-section {
@@ -936,7 +935,6 @@ body.theme-dark .mobile-menu .mobile-menu-lang .language-toggle-animation {
 .reservation-calendar,
 .reservation-form-preview,
 .reservation-summary,
-.reservation-field,
 .reservation-calendar-mode-preview,
 .reservation-bullet-row {
   background: var(--theme-surface-2) !important;
@@ -1006,8 +1004,7 @@ body.theme-dark .page-builder {
 .page-builder .daw-cleaning-tool,
 .page-builder .daw-report-block,
 .page-builder .daw-analysis-generator,
-.page-builder .reservation-block,
-.page-builder .reservation-component,
+.page-builder .page-builder .reservation-component,
 .page-builder .reservation-editor-preview-block,
 .page-builder .reservation-settings-section,
 .page-builder .panel-mode-select,
@@ -1040,7 +1037,6 @@ body.theme-dark .page-builder {
 .page-builder .daw-report-generated-table-wrap,
 .page-builder .daw-compact-table-scroll,
 .page-builder .reservation-summary,
-.page-builder .reservation-field,
 .page-builder .reservation-calendar-mode-preview,
 .page-builder .reservation-bullet-row {
   background: var(--builder-surface-raised) !important;

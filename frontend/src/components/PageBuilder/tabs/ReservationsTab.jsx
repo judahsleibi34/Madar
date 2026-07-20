@@ -1,4 +1,5 @@
-import { CalendarDays, Clock, Eye, ListPlus, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, ListPlus, Plus, Trash2 } from "lucide-react";
 
 const fallbackReservation = {
   title: "Book an appointment",
@@ -28,14 +29,149 @@ const getEditableList = (items, fallback) => {
 const formatDateLabel = (dateValue) => {
   const [year, month, day] = String(dateValue).split("-");
   if (!year || !month || !day) return dateValue;
-  return `${day}/${month}/${year}`;
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(Number(year), Number(month) - 1, Number(day), 12));
 };
 
+const calendarMonthFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "long",
+  year: "numeric",
+});
+
+const calendarDayFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+const toCalendarValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getCalendarMonthDays = (visibleMonth) => {
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const dayCount = new Date(year, month + 1, 0).getDate();
+  return [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: dayCount }, (_, index) => new Date(year, month, index + 1, 12)),
+  ];
+};
+
+function ReservationDatePicker({ availableDates, onSelect }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const pickerRef = useRef(null);
+  const todayValue = toCalendarValue(new Date());
+  const monthDays = getCalendarMonthDays(visibleMonth);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const closeOnOutsideClick = (event) => {
+      if (!pickerRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
+  const changeMonth = (offset) => {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1, 12));
+  };
+
+  const showToday = () => {
+    const today = new Date();
+    setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1, 12));
+  };
+
+  return (
+    <div className="reservation-calendar-picker" ref={pickerRef}>
+      <button
+        type="button"
+        className="reservation-calendar-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        <span className="reservation-calendar-trigger-icon" aria-hidden="true">
+          <CalendarDays size={18} />
+        </span>
+        <span>
+          <small>Choose a date</small>
+          <strong>Open calendar</strong>
+        </span>
+        <ChevronDown size={17} aria-hidden="true" />
+      </button>
+
+      {isOpen && (
+        <div className="reservation-calendar-popover" role="dialog" aria-label="Choose an available date">
+          <div className="reservation-calendar-toolbar">
+            <strong>{calendarMonthFormatter.format(visibleMonth)}</strong>
+            <div>
+              <button type="button" aria-label="Previous month" onClick={() => changeMonth(-1)}>
+                <ChevronLeft size={17} aria-hidden="true" />
+              </button>
+              <button type="button" aria-label="Next month" onClick={() => changeMonth(1)}>
+                <ChevronRight size={17} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <div className="reservation-calendar-weekdays" aria-hidden="true">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="reservation-calendar-days" role="grid">
+            {monthDays.map((date, index) => {
+              if (!date) return <span className="is-empty" key={`empty_${index}`} />;
+              const dateValue = toCalendarValue(date);
+              const isSelected = availableDates.includes(dateValue);
+              return (
+                <button
+                  type="button"
+                  key={dateValue}
+                  className={`${dateValue === todayValue ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`.trim()}
+                  aria-label={calendarDayFormatter.format(date)}
+                  aria-pressed={isSelected}
+                  disabled={isSelected}
+                  onClick={() => {
+                    onSelect(dateValue);
+                    setIsOpen(false);
+                  }}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          <div className="reservation-calendar-footer">
+            <button type="button" onClick={showToday}>Today</button>
+            <button type="button" onClick={() => setIsOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 export default function ReservationsTab({
   reservationBlocks,
   activeReservationId,
   onAddReservationBlock,
-  onOpenReservationBlock,
   onSelectReservationBlock,
   onUpdateReservationBlock,
   onDeleteReservationBlock,
@@ -85,6 +221,28 @@ export default function ReservationsTab({
   const availableDates = getEditableList(reservation.availableDates, fallbackReservation.availableDates);
   const timeSlots = getEditableList(reservation.timeSlots, fallbackReservation.timeSlots);
   const isRestricted = reservation.bookingMode !== "flexible";
+  const [stepSelection, setStepSelection] = useState({ reservationId: "", step: "details" });
+  const selectedReservationId = String(activeElement?.id || "");
+  const selectedStep = stepSelection.reservationId === selectedReservationId
+    ? stepSelection.step
+    : "details";
+  const activeStep = selectedStep === "services" || (!isRestricted && selectedStep === "availability")
+    ? "details"
+    : selectedStep;
+  const setActiveStep = (step) => {
+    setStepSelection({ reservationId: selectedReservationId, step });
+  };
+  const reservationSteps = [
+    { id: "details", label: "Details", helper: "Name and public text" },
+    ...(isRestricted
+      ? [{ id: "availability", label: "Availability", helper: "Dates and time slots" }]
+      : []),
+  ];
+  const activeStepIndex = Math.max(
+    0,
+    reservationSteps.findIndex((step) => step.id === activeStep)
+  );
+
   const nextBlockNumber = reservationBlocks.length + 1;
   const addFlexibleBlock = () =>
     onAddReservationBlock({
@@ -118,6 +276,7 @@ export default function ReservationsTab({
           <p>Set what visitors can book, when they can book it, and how the booking form appears.</p>
         </div>
       </header>
+
 
       <div className="reservation-editor-layout">
         <aside className="object-list reservation-block-list" aria-label="Reservation blocks">
@@ -169,7 +328,7 @@ export default function ReservationsTab({
           ))}
         </aside>
 
-        <section className={`form-editor reservation-editor-card ${activeElement ? "" : "is-empty"}`}>
+        <section className={`form-editor reservation-editor-card ${activeElement ? (isRestricted ? "is-restricted" : "is-flexible") : "is-empty"}`}>
           {activeElement ? (
             <>
               <div className="editor-card-header">
@@ -178,10 +337,6 @@ export default function ReservationsTab({
                   <h2>Configure booking block</h2>
                 </div>
                 <div className="reservation-editor-actions">
-                  <button type="button" onClick={() => onOpenReservationBlock(activeElement.id, activeItem.page.id)}>
-                    <Eye size={16} aria-hidden="true" />
-                    Open on page
-                  </button>
                   <button
                     type="button"
                     className="reservation-delete-block"
@@ -193,35 +348,55 @@ export default function ReservationsTab({
                 </div>
               </div>
 
-              <div className="reservation-settings-section">
+              <nav className="reservation-setup-steps" aria-label="Reservation setup steps">
+                {reservationSteps.map((step, index) => (
+                  <button
+                    type="button"
+                    key={step.id}
+                    className={activeStep === step.id ? "is-active" : ""}
+                    aria-current={activeStep === step.id ? "step" : undefined}
+                    onClick={() => setActiveStep(step.id)}
+                  >
+                    <span>{index + 1}</span>
+                    <div>
+                      <strong>{step.label}</strong>
+                      <small>{step.helper}</small>
+                    </div>
+                  </button>
+                ))}
+              </nav>
+
+              {activeStep === "details" && (
+                <>
+                  <div className="reservation-settings-section reservation-copy-section">
                 <div>
-                  <span className="workspace-kicker">Visitor copy</span>
-                  <h4>Block copy</h4>
+                  <span className="workspace-kicker">Booking details</span>
+                  <h3>What visitors will see</h3>
                 </div>
                 <div className="reservation-copy-grid">
                   <label>
-                    Internal name
+                    Name for your reference
                     <input
                       value={activeElement.name || ""}
                       onChange={(event) => onUpdateReservationBlock(activeElement.id, { name: event.target.value })}
                     />
                   </label>
                   <label>
-                    Public title
+                    Booking page heading
                     <input
                       value={reservation.title}
                       onChange={(event) => updateReservation({ title: event.target.value })}
                     />
                   </label>
                   <label className="reservation-wide-field">
-                    Description
+                    Instructions for visitors
                     <textarea
                       value={reservation.description}
                       onChange={(event) => updateReservation({ description: event.target.value })}
                     />
                   </label>
                   <label>
-                    Button text
+                    Booking button label
                     <input
                       value={reservation.submitLabel}
                       onChange={(event) => updateReservation({ submitLabel: event.target.value })}
@@ -230,114 +405,63 @@ export default function ReservationsTab({
                 </div>
               </div>
 
-              <div className="reservation-settings-section">
-                <div className="reservation-mode-card">
-                  <div>
-                    <span className="workspace-kicker">Booking mode</span>
-                    <h4>{isRestricted ? "Fixed reservation slots" : "Visitor enters date and time"}</h4>
-                    <p>
-                      {isRestricted
-                        ? "Visitors choose from the dates and time slots you publish."
-                        : "Visitors type or pick the date and time they want. You confirm it later."}
-                    </p>
-                  </div>
-                  <div className="reservation-mode-switch" role="group" aria-label="Reservation booking mode">
-                    <button
-                      type="button"
-                      className={!isRestricted ? "active" : ""}
-                      onClick={() => updateReservation({ bookingMode: "flexible" })}
-                    >
-                      Visitor date
-                    </button>
-                    <button
-                      type="button"
-                      className={isRestricted ? "active" : ""}
-                      onClick={() => updateReservation({ bookingMode: "restricted" })}
-                    >
-                      Fixed slots
-                    </button>
-                  </div>
-                </div>
-              </div>
 
-              <div className="reservation-settings-section">
-                <div className="reservation-list-heading">
-                  <div>
-                    <span className="workspace-kicker">Options</span>
-                    <h4>Services</h4>
-                  </div>
-                  <button type="button" onClick={() => addReservationListItem("services", `Service ${services.length + 1}`)}>
-                    <Plus size={15} aria-hidden="true" />
-                    Add service
-                  </button>
-                </div>
-                <div className="reservation-bullet-editor">
-                  {services.map((service, index) => (
-                    <div className="reservation-bullet-row" key={`service_${index}`}>
-                      <span className="reservation-bullet-dot" aria-hidden="true" />
-                      <input
-                        value={service}
-                        placeholder={`Service ${index + 1}`}
-                        onBlur={() => cleanReservationList("services")}
-                        onChange={(event) => updateReservationListItem("services", index, event.target.value)}
-                      />
-                      <button
-                        type="button"
-                        aria-label="Remove service"
-                        disabled={services.length <= 1}
-                        onClick={() => removeReservationListItem("services", index)}
-                      >
-                        <Trash2 size={15} aria-hidden="true" />
-                      </button>
+                </>
+              )}
+
+              {activeStep === "availability" && isRestricted && (
+                <div className="reservation-settings-section reservation-schedule-section reservation-date-section">
+                  <div className="reservation-date-heading">
+                    <span className="reservation-date-heading-icon" aria-hidden="true">
+                      <CalendarDays size={20} />
+                    </span>
+                    <div>
+                      <span className="workspace-kicker">Calendar</span>
+                      <h3>Available dates</h3>
+                      <p>Choose the days visitors can book.</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {isRestricted && (
-                <div className="reservation-settings-section">
-                  <div>
-                    <span className="workspace-kicker">Calendar</span>
-                    <h4>Available dates</h4>
                   </div>
-                    <label className="reservation-date-add">
-                      Add available date
-                      <input
-                        type="date"
-                        onChange={(event) => {
-                          const nextDate = event.target.value;
-                          if (!nextDate || availableDates.includes(nextDate)) return;
-                          updateReservation({ availableDates: [...availableDates, nextDate].sort() });
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-                    <div className="reservation-date-picker-grid" aria-label="Selected available dates">
-                      {availableDates.map((date) => (
+                  <ReservationDatePicker
+                    availableDates={availableDates}
+                    onSelect={(nextDate) => {
+                      if (availableDates.includes(nextDate)) return;
+                      updateReservation({ availableDates: [...availableDates, nextDate].sort() });
+                    }}
+                  />
+                  <div className="reservation-date-picker-grid" aria-label="Selected available dates">
+                    {availableDates.length > 0 ? availableDates.map((date) => (
+                      <div className="reservation-date-card" key={date}>
+                        <span className="reservation-date-card-icon" aria-hidden="true">
+                          <CalendarDays size={17} />
+                        </span>
+                        <div>
+                          <small>Available</small>
+                          <strong>{formatDateLabel(date)}</strong>
+                        </div>
                         <button
                           type="button"
-                          key={date}
+                          aria-label={`Remove ${formatDateLabel(date)}`}
                           onClick={() =>
                             updateReservation({
                               availableDates: availableDates.filter((item) => item !== date),
                             })
                           }
                         >
-                          <CalendarDays size={15} aria-hidden="true" />
-                          <span>{formatDateLabel(date)}</span>
                           <Trash2 size={14} aria-hidden="true" />
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                    )) : (
+                      <p className="reservation-date-empty">No available dates added yet.</p>
+                    )}
+                  </div>
                 </div>
               )}
-
-              {isRestricted && (
-                <div className="reservation-settings-section">
+              {activeStep === "availability" && isRestricted && (
+                <div className="reservation-settings-section reservation-schedule-section">
                 <div className="reservation-list-heading">
                   <div>
                     <span className="workspace-kicker">Schedule</span>
-                    <h4>Time slots</h4>
+                    <h3>Time slots</h3>
                   </div>
                   <button type="button" onClick={() => addReservationListItem("timeSlots", "16:30")}>
                     <Plus size={15} aria-hidden="true" />
@@ -368,6 +492,26 @@ export default function ReservationsTab({
                 </div>
               </div>
               )}
+
+              <footer className="reservation-step-actions">
+                <button
+                  type="button"
+                  disabled={activeStepIndex === 0}
+                  onClick={() => setActiveStep(reservationSteps[activeStepIndex - 1]?.id || "details")}
+                >
+                  Back
+                </button>
+                <span>Changes save automatically</span>
+                {activeStepIndex < reservationSteps.length - 1 && (
+                  <button
+                    type="button"
+                    className="primary-action"
+                    onClick={() => setActiveStep(reservationSteps[activeStepIndex + 1].id)}
+                  >
+                    Continue
+                  </button>
+                )}
+              </footer>
             </>
           ) : (
             <div className="reservation-editor-empty">

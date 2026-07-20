@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import resource
 import subprocess
 import sys
 import tempfile
@@ -15,6 +14,11 @@ from data_analysis.ai.code_validator import validate_generated_code
 from data_analysis.ai.result_validator import validate_analysis_result
 from data_analysis.ai.settings import is_local_ai_exec_allowed
 
+if os.name == "posix":
+    import resource
+else:
+    resource = None
+
 
 class SandboxExecutionError(RuntimeError):
     pass
@@ -26,6 +30,9 @@ SANDBOX_MEMORY_BYTES = int(os.getenv("AI_SANDBOX_MEMORY_BYTES", str(1024 * 1024 
 
 
 def _limit_child() -> None:
+    if resource is None:
+        return
+
     resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
     resource.setrlimit(resource.RLIMIT_AS, (SANDBOX_MEMORY_BYTES, SANDBOX_MEMORY_BYTES))
     resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_SANDBOX_OUTPUT_BYTES, MAX_SANDBOX_OUTPUT_BYTES))

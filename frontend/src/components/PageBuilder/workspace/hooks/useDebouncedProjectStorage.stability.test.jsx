@@ -8,10 +8,11 @@ import useDebouncedProjectStorage, {
 
 const STORAGE_KEY = "madar-builder-stability-test";
 
-function StorageProbe({ onReady, project, recoveryContext = null }) {
+function StorageProbe({ enableBrowserPersistence = true, onReady, project, recoveryContext = null }) {
   const storage = useDebouncedProjectStorage({
     backupInterval: 120000,
     delay: 7000,
+    enableBrowserPersistence,
     project,
     recoveryContext,
     storageKey: STORAGE_KEY,
@@ -156,6 +157,30 @@ describe("safe builder draft autosave", () => {
       { ...candidate, baseDraftRevision: 59 },
       { ...context, currentBackendRevision: 60 }
     )).toBe(false);
+  });
+
+  it("keeps cloud drafts dirty without writing browser recovery", () => {
+    let storage;
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    render(
+      <StorageProbe
+        enableBrowserPersistence={false}
+        onReady={(value) => { storage = value; }}
+        project={{ id: "server-project", title: "Unsaved edit" }}
+        recoveryContext={{
+          userId: "user-1",
+          tenantId: "tenant-1",
+          projectId: "server-project",
+          baseDraftRevision: 4,
+        }}
+      />
+    );
+
+    act(() => vi.advanceTimersByTime(120000));
+
+    expect(setItem).not.toHaveBeenCalled();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(storage.hasUnsavedChanges()).toBe(true);
   });
 
   it("writes scoped recovery envelopes and clears them only after cloud acknowledgement", () => {

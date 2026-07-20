@@ -10,9 +10,22 @@ import {
   getBuilderSaveStateLabel,
   stopBuilderSaveScheduling,
   shouldDeferBuilderCloudSave,
+  shouldBlockBuilderUnload,
 } from "./PageBuilder.saveState";
 
 describe("cloud save state labels", () => {
+  it.each([
+    [BUILDER_SAVE_STATES.dirty, true],
+    [BUILDER_SAVE_STATES.savingLocal, true],
+    [BUILDER_SAVE_STATES.savingCloud, true],
+    [BUILDER_SAVE_STATES.saveFailed, true],
+    [BUILDER_SAVE_STATES.conflict, true],
+    [BUILDER_SAVE_STATES.savedCloud, false],
+    [BUILDER_SAVE_STATES.clean, false],
+    [BUILDER_SAVE_STATES.loading, false],
+  ])("uses the visible %s save block for unload protection", (state, expected) => {
+    expect(shouldBlockBuilderUnload(state)).toBe(expected);
+  });
   it.each([
     [BUILDER_SAVE_STATES.dirty, "Unsaved changes"],
     [BUILDER_SAVE_STATES.savingLocal, "Saving…"],

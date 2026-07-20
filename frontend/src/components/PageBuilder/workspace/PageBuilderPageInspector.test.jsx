@@ -8,11 +8,12 @@ afterEach(cleanup);
 describe("PageBuilderPageInspector", () => {
   it("renders the active page and updates persisted page fields", () => {
     const onUpdate = vi.fn();
+    const onSetDefault = vi.fn();
     render(
       <PageBuilderPageInspector
         page={{ id: "page-2", name: "Page 2", slug: "/page-2", showInNavigation: false }}
         hasRoutingIssue={false}
-        onSetDefault={vi.fn()}
+        onSetDefault={onSetDefault}
         onUpdate={onUpdate}
       />
     );
@@ -20,9 +21,12 @@ describe("PageBuilderPageInspector", () => {
     expect(screen.getByDisplayValue("Page 2")).toBeTruthy();
     expect(screen.getByLabelText("Use as homepage").type).toBe("checkbox");
     expect(screen.getByLabelText("Show this page in the header").type).toBe("checkbox");
-    fireEvent.change(screen.getByLabelText("Page link"), { target: { value: "/services" } });
+    expect(screen.queryByLabelText("Page address")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Page name"), { target: { value: "Our Services" } });
+    fireEvent.click(screen.getByLabelText("Use as homepage"));
     fireEvent.click(screen.getByLabelText("Show this page in the header"));
-    expect(onUpdate).toHaveBeenCalledWith({ slug: "/services" });
+    expect(onUpdate).toHaveBeenCalledWith({ name: "Our Services" });
+    expect(onSetDefault).toHaveBeenCalledWith(true);
     expect(onUpdate).toHaveBeenCalledWith({ showInNavigation: true });
   });
 

@@ -267,22 +267,22 @@
   border-radius: 10px !important;
 }
 
-/* Free-positioned text keeps the author's typography at every size.
-   Resizing changes line wrapping and placement, never the font size. */
+/* Free-positioned text keeps the author's font size as its maximum.
+   Smaller frames auto-fit the text so resizing never clips content. */
 .page-builder .builder-canvas.viewport-mobile .direct-element-frame-heading .builder-element-heading {
-  font-size: var(--builder-element-font-size, 46px) !important;
+  font-size: var(--builder-fitted-font-size, var(--builder-element-font-size, 46px)) !important;
   line-height: var(--builder-element-line-height, 1.08) !important;
   text-align: var(--builder-element-text-align, inherit) !important;
 }
 
 .page-builder .builder-canvas.viewport-mobile .direct-element-frame-text .builder-element-text {
-  font-size: var(--builder-element-font-size, 17px) !important;
+  font-size: var(--builder-fitted-font-size, var(--builder-element-font-size, 17px)) !important;
   line-height: var(--builder-element-line-height, 1.5) !important;
   text-align: var(--builder-element-text-align, inherit) !important;
 }
 
 .page-builder .builder-canvas.viewport-mobile .direct-element-frame-button .builder-element-button {
-  font-size: var(--builder-element-font-size, 15px) !important;
+  font-size: var(--builder-fitted-font-size, var(--builder-element-font-size, 15px)) !important;
 }
 
 .page-builder .builder-canvas.viewport-mobile .builder-element {

@@ -1,5 +1,14 @@
-export const createUploadHandlers = ({
-  selectedElement,
+export const getBuilderAssetFileName = (value) => {
+  const cleanValue = String(value || "").split(/[?#]/, 1)[0].replace(/\\/g, "/");
+  const encodedName = cleanValue.slice(cleanValue.lastIndexOf("/") + 1);
+  try {
+    return decodeURIComponent(encodedName);
+  } catch {
+    return encodedName;
+  }
+};
+
+export const createUploadHandlers = ({  selectedElement,
   carouselElementTypes,
   defaultSiteChrome,
   builderAssetMimeTypes,
@@ -76,6 +85,7 @@ export const createUploadHandlers = ({
 
     updateSelectedElement({
       content: assetUrl,
+      assetFileName: file.name || getBuilderAssetFileName(assetUrl),
       name: selectedElement.name || file.name || "Image",
     });
 

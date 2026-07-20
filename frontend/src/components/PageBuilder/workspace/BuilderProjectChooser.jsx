@@ -84,10 +84,6 @@ export default function BuilderProjectChooser({ workspace = "page-builder", auto
   return (
     <section className="builder-project-chooser" aria-busy={["loading", "loading-more", "creating"].includes(status)}>
       <header className="builder-project-chooser-header">
-        <p className="builder-project-chooser-eyebrow">
-          <span aria-hidden="true" />
-          Page Builder
-        </p>
         <h1>Choose a project</h1>
         <span>Each project opens with its own cloud draft and recovery copy.</span>
       </header>

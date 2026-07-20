@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectPublicPageRoutingIssues,
+  createUniquePublicPageSlug,
   getDefaultPublicPage,
   getProductionFormUrl,
   getProductionTenantUrl,
@@ -24,6 +25,30 @@ const multiPageProject = {
 };
 
 describe("public page routing contract", () => {
+  it("generates a safe unique address from a non-technical page name", () => {
+    const pages = [
+      { id: "home", name: "Home", slug: "/" },
+      { id: "services", name: "Services", slug: "/our-services" },
+    ];
+
+    expect(createUniquePublicPageSlug({
+      name: "Our Services",
+      pages,
+      currentPageId: "new-page",
+    })).toBe("/our-services-2");
+    expect(createUniquePublicPageSlug({
+      name: "Login",
+      pages,
+      currentPageId: "new-page",
+    })).toBe("/login-page");
+    expect(createUniquePublicPageSlug({
+      name: "Anything",
+      pages,
+      currentPageId: "home",
+      isDefault: true,
+    })).toBe("/");
+  });
+
   it("keeps Home as root regardless of the editor-selected page", () => {
     const project = normalizeProjectPageRouting(multiPageProject);
 

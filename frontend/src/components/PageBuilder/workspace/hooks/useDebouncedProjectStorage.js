@@ -36,6 +36,7 @@ export default function useDebouncedProjectStorage({
   backupInterval = 120000,
   delay = 7000,
   disabled = false,
+  enableBrowserPersistence = true,
   project,
   recoveryContext = null,
   storageKey,
@@ -98,7 +99,7 @@ export default function useDebouncedProjectStorage({
 
   const persistNow = useCallback(
     (nextProject = latestProjectRef.current) => {
-      if (disabled || !storageKey || !nextProject) return false;
+      if (disabled || !enableBrowserPersistence || !storageKey || !nextProject) return false;
 
       try {
         const persistableProject = getPersistableProject(nextProject);
@@ -144,7 +145,7 @@ export default function useDebouncedProjectStorage({
         return false;
       }
     },
-    [disabled, recoveryContext, sourceId, storageKey]
+    [disabled, enableBrowserPersistence, recoveryContext, sourceId, storageKey]
   );
 
   const acknowledgeCloudSave = useCallback((savedProject, baseDraftRevision = null) => {
@@ -164,7 +165,13 @@ export default function useDebouncedProjectStorage({
       ? serializePersistableProject(latestProjectRef.current)
       : acknowledged;
     dirtyRef.current = latest !== acknowledged;
-    if (dirtyRef.current && storageKey && recoveryContext && latestProjectRef.current) {
+    if (
+      enableBrowserPersistence &&
+      dirtyRef.current &&
+      storageKey &&
+      recoveryContext &&
+      latestProjectRef.current
+    ) {
       try {
         localStorage.setItem(
           storageKey,
@@ -181,7 +188,7 @@ export default function useDebouncedProjectStorage({
       }
     }
     return dirtyRef.current;
-  }, [recoveryContext, storageKey]);
+  }, [enableBrowserPersistence, recoveryContext, storageKey]);
 
   const adoptCloudRevision = useCallback((serializedProject, timestamp = Date.now(), revision = 0) => {
     if (!serializedProject) return;
@@ -202,7 +209,7 @@ export default function useDebouncedProjectStorage({
   const hasUnsavedChanges = useCallback(() => dirtyRef.current, []);
 
   useEffect(() => {
-    if (disabled || !storageKey || !project) {
+    if (disabled || !enableBrowserPersistence || !storageKey || !project) {
       clearPersistTimer();
       return undefined;
     }
@@ -211,18 +218,18 @@ export default function useDebouncedProjectStorage({
     if (!dirtyRef.current) return undefined;
     timerRef.current = window.setTimeout(() => persistNow(project), delay);
     return clearPersistTimer;
-  }, [clearPersistTimer, delay, disabled, persistNow, project, storageKey]);
+  }, [clearPersistTimer, delay, disabled, enableBrowserPersistence, persistNow, project, storageKey]);
 
   useEffect(() => {
-    if (disabled || !backupInterval) return undefined;
+    if (disabled || !enableBrowserPersistence || !backupInterval) return undefined;
     const intervalId = window.setInterval(() => {
       if (dirtyRef.current) persistNow(latestProjectRef.current);
     }, backupInterval);
     return () => window.clearInterval(intervalId);
-  }, [backupInterval, disabled, persistNow]);
+  }, [backupInterval, disabled, enableBrowserPersistence, persistNow]);
 
   useEffect(() => {
-    if (disabled) return undefined;
+    if (disabled || !enableBrowserPersistence) return undefined;
     const persistLatest = () => persistNow(latestProjectRef.current);
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") persistLatest();
@@ -235,7 +242,7 @@ export default function useDebouncedProjectStorage({
       window.removeEventListener("pagehide", persistLatest);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [disabled, persistNow]);
+  }, [disabled, enableBrowserPersistence, persistNow]);
 
   useEffect(() => clearPersistTimer, [clearPersistTimer]);
 

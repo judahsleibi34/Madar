@@ -176,8 +176,10 @@ export const createElement = (type = "text", overrides = {}) => {
       action: createAction("goToPage"),
       styles: {
         ...base.styles,
-        color: "var(--theme-text-inverse)",
-        backgroundColor: "var(--theme-primary)",
+        color: "#ffffff",
+        backgroundColor: "var(--action-primary, var(--theme-primary))",
+        borderRadius: "8px",
+        fontSize: "14px",
         fontWeight: "900",
       },
     },
