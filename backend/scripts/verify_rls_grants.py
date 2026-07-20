@@ -52,6 +52,7 @@ SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
     "apply_billing_webhook_event",
     "claim_notification_outbox",
     "claim_password_reset_request",
+    "create_builder_form_submission_safe",
     "finish_notification_outbox",
     "finish_password_reset_request",
     "increment_ai_usage_daily",

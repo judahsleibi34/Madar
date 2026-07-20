@@ -34,6 +34,7 @@ REQUIRED_SCHEMA_SELECTS = {
     "password_reset_requests": "id,nonce_hash,status,processing_started_at",
     "billing_webhook_events": "id,provider_event_id,tenant_id,provider_occurred_at,status",
     "notification_outbox": "id,channel,status,deduplication_key",
+    "builder_form_submissions": "id,idempotency_key_hash,request_hash",
 }
 
 _cache_lock = Lock()

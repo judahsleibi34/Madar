@@ -60,6 +60,7 @@ class PublicFormSubmissionCreate(BaseModel):
     form_element_id: Optional[str] = None
     honeypot: Optional[str] = Field(default=None, max_length=200)
     submission_elapsed_ms: Optional[int] = Field(default=None, ge=0, le=86_400_000)
+    idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=200)
 
     @field_validator("answers")
     @classmethod
@@ -157,7 +158,7 @@ def reject_suspicious_public_submission(
     )
 
 
-def normalize_idempotency_key(event: PublicBuilderBlockEventCreate, request: Request) -> str | None:
+def normalize_idempotency_key(event: Any, request: Request) -> str | None:
     body_key = (event.idempotency_key or "").strip()
     header_key = (request.headers.get("idempotency-key") or "").strip()
     if body_key and header_key and not hmac.compare_digest(body_key, header_key):
@@ -186,6 +187,88 @@ def canonical_request_hash(payload: dict[str, Any]) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _form_submission_storage_error(error: Exception) -> HTTPException:
+    text = str(error).lower()
+    if "idempotency_conflict" in text:
+        return api_error(
+            409,
+            "idempotency_conflict",
+            "This idempotency key was already used for a different request.",
+        )
+    if "idempotency_key_invalid" in text or "form_submission_payload_invalid" in text:
+        return api_error(400, "idempotency_key_invalid", "The idempotency key is invalid.")
+    return api_error(
+        503,
+        "dependency_unavailable",
+        "The form submission could not be saved. Try again shortly.",
+    )
+
+
+def insert_builder_form_submission(
+    payload: dict[str, Any],
+    *,
+    idempotency_key_hash: str | None,
+    request_hash: str,
+) -> tuple[dict[str, Any], bool]:
+    try:
+        rpc = getattr(service_supabase, "rpc", None)
+        if callable(rpc):
+            response = rpc(
+                "create_builder_form_submission_safe",
+                {
+                    "p_submission": payload,
+                    "p_idempotency_key_hash": idempotency_key_hash,
+                    "p_request_hash": request_hash,
+                },
+            ).execute()
+            data = getattr(response, "data", None)
+            result = data[0] if isinstance(data, list) and data else data
+            if not isinstance(result, dict) or not isinstance(result.get("submission"), dict):
+                raise RuntimeError("form_submission_rpc_empty_result")
+            return result["submission"], bool(result.get("duplicate"))
+
+        # Test-only in-memory clients do not implement RPC. Production always
+        # uses the transaction-scoped database function above.
+        if idempotency_key_hash:
+            existing_response = (
+                service_supabase.table("builder_form_submissions")
+                .select("*")
+                .eq("tenant_id", payload["tenant_id"])
+                .eq("project_id", payload["project_id"])
+                .eq("form_id", payload["form_id"])
+                .eq("idempotency_key_hash", idempotency_key_hash)
+                .limit(1)
+                .execute()
+            )
+            existing = first_row(existing_response)
+            if existing:
+                if existing.get("request_hash") != request_hash:
+                    raise RuntimeError("idempotency_conflict")
+                return existing, True
+        response = service_supabase.table("builder_form_submissions").insert({
+            **payload,
+            "idempotency_key_hash": idempotency_key_hash,
+            "request_hash": request_hash,
+        }).execute()
+        saved = first_row(response)
+        if not saved:
+            raise RuntimeError("form_submission_empty_result")
+        return saved, False
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.warning(
+            "public.form_submission_failed",
+            extra={
+                "tenant_id": payload.get("tenant_id"),
+                "project_id": payload.get("project_id"),
+                "form_id": payload.get("form_id"),
+                "error_type": type(error).__name__,
+            },
+        )
+        raise _form_submission_storage_error(error)
 
 
 def build_cancellation_token(
@@ -1384,6 +1467,7 @@ def submit_public_builder_form(
 ):
     clean_subdomain = normalize_subdomain(subdomain)
     clean_form_id = (form_id or "").strip()
+    idempotency_key = normalize_idempotency_key(submission, request)
 
     if not clean_form_id:
         raise HTTPException(status_code=404, detail="Form not found")
@@ -1423,17 +1507,23 @@ def submit_public_builder_form(
         "submitter_ip": submitter_ip,
         "user_agent": user_agent,
     }
-
-    try:
-        insert_response = service_supabase.table("builder_form_submissions").insert(payload).execute()
-    except Exception as error:
-        logger.warning("public.form_submission_failed", extra={"tenant_id": tenant_id, "project_id": project.get("id"), "form_id": clean_form_id, "error_type": type(error).__name__})
-        raise HTTPException(status_code=500, detail="Could not submit form")
-
-    saved_submission = first_row(insert_response)
-
-    if not saved_submission:
-        raise HTTPException(status_code=500, detail="Could not submit form")
+    request_hash = canonical_request_hash({
+        "tenant_id": tenant_id,
+        "project_id": project.get("id"),
+        "form_id": clean_form_id,
+        "form_version": project.get("published_version"),
+        "answers": cleaned_answers,
+    })
+    idempotency_key_hash = (
+        hash_public_identifier(f"form-idempotency:{idempotency_key}")
+        if idempotency_key
+        else None
+    )
+    saved_submission, duplicate = insert_builder_form_submission(
+        payload,
+        idempotency_key_hash=idempotency_key_hash,
+        request_hash=request_hash,
+    )
 
     logger.info(
         "public.form_submission_created",
@@ -1442,24 +1532,26 @@ def submit_public_builder_form(
             "project_id": project.get("id"),
             "form_id": clean_form_id,
             "submission_id": saved_submission.get("id"),
+            "idempotent_replay": duplicate,
         },
     )
 
-    create_builder_block_event_notification(
-        tenant_id=tenant_id,
-        event_type="builder.form_submitted",
-        block_type="form",
-        source_id=str(saved_submission.get("id") or clean_form_id),
-        title="New form submission",
-        body=f"{form.get('title') or 'A published form'} received a new response.",
-        data={
-            "project_id": project.get("id"),
-            "form_id": clean_form_id,
-            "form_title": form.get("title"),
-            "submission_id": saved_submission.get("id"),
-            "subdomain": clean_subdomain,
-        },
-    )
+    if not duplicate:
+        create_builder_block_event_notification(
+            tenant_id=tenant_id,
+            event_type="builder.form_submitted",
+            block_type="form",
+            source_id=str(saved_submission.get("id") or clean_form_id),
+            title="New form submission",
+            body=f"{form.get('title') or 'A published form'} received a new response.",
+            data={
+                "project_id": project.get("id"),
+                "form_id": clean_form_id,
+                "form_title": form.get("title"),
+                "submission_id": saved_submission.get("id"),
+                "subdomain": clean_subdomain,
+            },
+        )
 
     return format_submission(saved_submission)
 

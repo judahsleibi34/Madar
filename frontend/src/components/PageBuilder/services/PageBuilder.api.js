@@ -339,13 +339,25 @@ export const updateBuilderFormSubmissionStatus = async (
   return data?.submission || null;
 };
 
-export const submitPublicFormSubmission = async (subdomain, formId, payload) => {
+export const submitPublicFormSubmission = async (
+  subdomain,
+  formId,
+  payload,
+  { idempotencyKey = "" } = {}
+) => {
+  const cleanKey = String(idempotencyKey || "").slice(0, 128);
   const response = await fetch(
     getApiUrl(`/public/sites/${subdomain}/forms/${formId}/submissions`),
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+        ...(cleanKey ? { "Idempotency-Key": cleanKey } : {}),
+      },
+      body: JSON.stringify({
+        ...payload,
+        ...(cleanKey ? { idempotency_key: cleanKey } : {}),
+      }),
     }
   );
 

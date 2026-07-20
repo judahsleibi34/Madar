@@ -13,6 +13,7 @@ import {
   submitPublicBuilderEvent,
   submitPublicFormSubmission,
 } from "../services/PageBuilder.api";
+import { createFormIdempotencyKey } from "./formSubmission";
 import { getFormSections } from "../core/PageBuilder.factories";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import {
@@ -479,6 +480,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [publicActionMessage, setPublicActionMessage] = useState("");
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
   const publicSubmissionStartedAtRef = useRef(Date.now());
+  const formIdempotencyKeysRef = useRef({});
   const protectedPageRequestRef = useRef("");
 
   const loadProtectedPage = useCallback(async (pageReference) => {
@@ -1172,6 +1174,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       [instanceKey]: { submitting: true, success: "", error: "" },
     }));
 
+    const idempotencyKey = formIdempotencyKeysRef.current[instanceKey]
+      || createFormIdempotencyKey();
+    formIdempotencyKeysRef.current[instanceKey] = idempotencyKey;
+
     try {
       await submitPublicFormSubmission(cleanSubdomain, form.id, {
         answers,
@@ -1181,8 +1187,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           86_400_000,
           Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
         ),
-      });
+      }, { idempotencyKey });
 
+      delete formIdempotencyKeysRef.current[instanceKey];
       setFormAnswers((prev) => ({ ...prev, [instanceKey]: {} }));
       setFormHoneypots((prev) => ({ ...prev, [instanceKey]: "" }));
       setFormPages((prev) => ({ ...prev, [instanceKey]: 0 }));
@@ -1195,6 +1202,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         },
       }));
     } catch (error) {
+      if (error?.code === "idempotency_conflict") {
+        delete formIdempotencyKeysRef.current[instanceKey];
+      }
       setFormStatus((prev) => ({
         ...prev,
         [instanceKey]: {

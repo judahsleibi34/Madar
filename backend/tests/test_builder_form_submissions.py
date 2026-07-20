@@ -262,6 +262,98 @@ def build_builder_client(fake_supabase):
 
 
 class BuilderFormSubmissionTests(unittest.TestCase):
+    def test_public_submission_replay_returns_original_and_notifies_once(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        initial_count = len(fake_supabase.tables["builder_form_submissions"])
+        body = {
+            "answers": {"field_name": "Ada"},
+            "idempotency_key": "madar-form-replay-0001",
+        }
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification") as notify:
+            first = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json=body,
+                headers={"Idempotency-Key": body["idempotency_key"]},
+            )
+            replay = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json=body,
+                headers={"Idempotency-Key": body["idempotency_key"]},
+            )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(replay.status_code, 200)
+        self.assertEqual(first.json()["id"], replay.json()["id"])
+        self.assertEqual(len(fake_supabase.tables["builder_form_submissions"]), initial_count + 1)
+        notify.assert_called_once()
+        saved = fake_supabase.tables["builder_form_submissions"][-1]
+        self.assertRegex(saved["idempotency_key_hash"], r"^[0-9a-f]{64}$")
+        self.assertNotIn(body["idempotency_key"], str(saved))
+
+    def test_public_submission_same_key_different_payload_conflicts(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        key = "madar-form-conflict-0001"
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "create_builder_block_event_notification"):
+            first = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}, "idempotency_key": key},
+            )
+            conflict = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Grace"}, "idempotency_key": key},
+            )
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.json()["detail"]["code"], "idempotency_conflict")
+
+    def test_public_submission_rejects_invalid_or_mismatched_key(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            invalid = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}, "idempotency_key": "bad key!"},
+            )
+            mismatch = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}, "idempotency_key": "madar-form-body-0001"},
+                headers={"Idempotency-Key": "madar-form-header-0001"},
+            )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["detail"]["code"], "idempotency_key_invalid")
+        self.assertEqual(mismatch.status_code, 409)
+        self.assertEqual(mismatch.json()["detail"]["code"], "idempotency_conflict")
+
+    def test_form_idempotency_scope_includes_form_and_project(self):
+        fake_supabase = FakeSupabase()
+        key_hash = "a" * 64
+        base = {
+            "tenant_id": 1,
+            "project_id": PROJECT_ID,
+            "form_id": FORM_ID,
+            "status": "new",
+            "answers": {},
+            "field_snapshot": [],
+        }
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            first, _ = public_site_routes.insert_builder_form_submission(
+                base, idempotency_key_hash=key_hash, request_hash="b" * 64
+            )
+            other_form, duplicate = public_site_routes.insert_builder_form_submission(
+                {**base, "form_id": "another-form"},
+                idempotency_key_hash=key_hash,
+                request_hash="c" * 64,
+            )
+        self.assertFalse(duplicate)
+        self.assertNotEqual(first["form_id"], other_form["form_id"])
+
     def test_public_submission_succeeds_for_published_form(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
