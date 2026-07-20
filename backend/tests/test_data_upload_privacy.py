@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.testclient import TestClient
 
+from data_analysis import services as data_services
 from data_analysis.routes import data_routes
 from routes import builder_routes
 from services.tenant_service import TenantContext
@@ -63,9 +64,14 @@ class DataUploadPrivacyTests(unittest.TestCase):
             ),
             patch.object(data_routes, "require_active_tenant_user_id", side_effect=fake_user_scope),
             patch.object(data_routes, "enforce_data_workspace_rate_limit", return_value=None),
+            patch.object(data_services, "ensure_disk_capacity", return_value=10**12),
+            patch.object(data_services, "reserve_storage", return_value="reservation-1"),
+            patch.object(data_services, "finish_storage", return_value="object-1"),
             patch.object(builder_routes, "BUILDER_ASSET_UPLOAD_DIR", self.public_dir),
             patch.object(builder_routes, "BUILDER_ASSET_MAX_BYTES", 5 * 1024 * 1024),
             patch.object(builder_routes, "register_builder_asset", return_value={"id": "asset-1"}),
+            patch.object(builder_routes, "reserve_storage", return_value="reservation-1"),
+            patch.object(builder_routes, "finish_storage", return_value="object-1"),
             patch.object(
                 builder_routes,
                 "require_builder_write_access",

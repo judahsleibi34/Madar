@@ -44,6 +44,9 @@ SENSITIVE_TABLES = (
     "builder_projects",
     "builder_form_submissions",
     "builder_assets",
+    "storage_accounts",
+    "storage_reservations",
+    "storage_objects",
     "features",
     "audit_logs",
 )
@@ -61,6 +64,9 @@ SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
     "publish_builder_project_atomic",
     "publish_validated_builder_project_atomic",
     "reserve_ai_usage_daily",
+    "reserve_storage_bytes",
+    "finish_storage_reservation",
+    "release_storage_object",
 )
 
 TABLE_CRUD_GRANTS = {"SELECT", "INSERT", "UPDATE", "DELETE"}
@@ -98,6 +104,9 @@ ALLOWED_DIRECT_GRANTS = {
         "authenticated": set(),
         "service_role": TABLE_CRUD_GRANTS,
     },
+    "storage_accounts": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "storage_reservations": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "storage_objects": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "features": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
     "audit_logs": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
 }

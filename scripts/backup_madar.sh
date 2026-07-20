@@ -24,7 +24,7 @@ backup_path="${MADAR_BACKUP_DIR%/}/madar-${timestamp}"
 paths=(
   "builder-assets:${MADAR_BUILDER_ASSETS_DIR:-/app/builder-assets}"
   "private-uploads:${MADAR_PRIVATE_UPLOADS_DIR:-/app/private-uploads}"
-  "generated-artifacts:${MADAR_GENERATED_ARTIFACTS_DIR:-/app/generated-artifacts}"
+  "generated-artifacts:${MADAR_GENERATED_ARTIFACTS_DIR:-/app/private_generated_charts}"
   "avatars:${MADAR_AVATARS_DIR:-/app/avatars}"
 )
 

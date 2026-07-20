@@ -22,6 +22,12 @@ from services.api_errors import error_detail
 from services.billing_service import require_publish_entitlement
 from services.notification_outbox_service import enqueue_notification
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
+from services.storage_quota_service import (
+    StorageSafetyError,
+    finish_storage,
+    get_tenant_storage_usage,
+    reserve_storage,
+)
 from services.website_settings_service import require_public_subdomain
 from services.url_validation import validate_builder_schema_urls, validate_public_url
 from services.tenant_service import (
@@ -1139,8 +1145,26 @@ async def upload_builder_asset(
     filename = f"{uuid4().hex}{extension}"
     target_dir, target_path, tenant_dir = get_builder_asset_target(context.tenant_id, filename)
 
+    try:
+        storage_reservation_id = reserve_storage(
+            tenant_id=context.tenant_id,
+            user_id=context.user_id,
+            category="builder_asset",
+            size_bytes=len(content),
+            storage_root=BUILDER_ASSET_UPLOAD_DIR,
+        )
+    except StorageSafetyError as error:
+        raise HTTPException(
+            status_code=507,
+            detail=error_detail(error.code, "Storage capacity is unavailable."),
+        ) from error
+
     target_dir.mkdir(parents=True, exist_ok=True)
-    target_path.write_bytes(content)
+    try:
+        target_path.write_bytes(content)
+    except Exception:
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        raise
 
     asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
     try:
@@ -1155,6 +1179,7 @@ async def upload_builder_asset(
         )
     except Exception as error:
         target_path.unlink(missing_ok=True)
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
         logger.error(
             "builder.asset_registry_failed",
             extra={
@@ -1166,6 +1191,20 @@ async def upload_builder_asset(
             status_code=503,
             detail="Asset storage is temporarily unavailable",
         ) from error
+    try:
+        finish_storage(
+            reservation_id=storage_reservation_id,
+            succeeded=True,
+            storage_key=f"{tenant_dir}/builder_assets/{filename}",
+            content=content,
+        )
+    except Exception as error:
+        target_path.unlink(missing_ok=True)
+        logger.error(
+            "builder.asset_accounting_failed",
+            extra={"tenant_id": context.tenant_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(status_code=503, detail="Asset accounting is temporarily unavailable") from error
 
     record_audit_event(
         request=request,
@@ -1189,6 +1228,12 @@ async def upload_builder_asset(
         "content_type": detected_content_type,
         "asset_id": registered_asset.get("id"),
     }
+
+
+@router.get("/builder/storage/usage")
+def get_builder_storage_usage(request: Request, response: Response):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    return {"success": True, "storage": get_tenant_storage_usage(context.tenant_id)}
 
 
 @router.get("/builder/reservations")

@@ -8,6 +8,7 @@ from typing import Any
 
 from database import service_supabase
 from services.upload_config import assert_path_within_root
+from services.storage_quota_service import release_storage
 
 ASSET_URL_PATTERN = re.compile(r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp))$")
 
@@ -77,7 +78,7 @@ def reconcile_project_asset_references(*, project_id: str, tenant_id: int, schem
 
 def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_run: bool = True, client=None) -> dict[str, int]:
     database_client = client or service_supabase
-    response = database_client.table("builder_assets").select("id,storage_key,sha256").eq("status", "unreferenced").lte("retention_until", _now().isoformat()).limit(max(1, min(int(limit), 500))).execute()
+    response = database_client.table("builder_assets").select("id,tenant_id,storage_key,sha256").eq("status", "unreferenced").lte("retention_until", _now().isoformat()).limit(max(1, min(int(limit), 500))).execute()
     eligible = deleted = skipped = 0
     for row in getattr(response, "data", None) or []:
         eligible += 1
@@ -87,6 +88,12 @@ def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_
         if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() != row["sha256"]: skipped += 1; continue
         if not dry_run:
             if path.is_file(): path.unlink()
+            release_storage(
+                tenant_id=int(row["tenant_id"]),
+                category="builder_asset",
+                storage_key=row["storage_key"],
+                client=database_client,
+            )
             database_client.table("builder_assets").update({"status": "soft_deleted", "deleted_at": _now().isoformat(), "reference_count": 0}).eq("id", row["id"]).execute()
             deleted += 1
     return {"eligible": eligible, "deleted": deleted, "skipped": skipped}

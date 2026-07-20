@@ -37,6 +37,9 @@ REQUIRED_SCHEMA_SELECTS = {
     "builder_form_submissions": "id,idempotency_key_hash,request_hash",
     "builder_assets": "id,tenant_id,status,size_bytes,retention_until",
     "builder_asset_references": "asset_id,project_id,reference_path",
+    "storage_accounts": "tenant_id,scope_key,used_bytes,reserved_bytes,quota_bytes",
+    "storage_reservations": "id,status,bytes,expires_at",
+    "storage_objects": "id,tenant_id,category,size_bytes,status",
 }
 
 _cache_lock = Lock()
