@@ -40,6 +40,8 @@ REQUIRED_SCHEMA_SELECTS = {
     "storage_accounts": "tenant_id,scope_key,used_bytes,reserved_bytes,quota_bytes",
     "storage_reservations": "id,status,bytes,expires_at",
     "storage_objects": "id,tenant_id,category,size_bytes,status",
+    "tenant_site_project_roles": "id,tenant_id,project_id,role_key,capabilities,deleted_at",
+    "tenant_site_project_role_assignments": "membership_id,project_id,role_id",
 }
 
 _cache_lock = Lock()

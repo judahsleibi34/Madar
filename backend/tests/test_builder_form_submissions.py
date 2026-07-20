@@ -1186,6 +1186,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
              patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(public_site_routes, "has_project_permission", return_value=True), \
              patch.object(
                  public_site_routes,
                  "require_tenant_visitor",
@@ -1195,6 +1196,25 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("literal-private-page-content", str(response.json()))
+
+    def test_site_member_without_project_permission_cannot_fetch_protected_page(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"][0]["published_schema"]["pages"].append(
+            {"id": "member-page", "visibility": "members", "sections": []}
+        )
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(public_site_routes, "has_project_permission", return_value=False), \
+             patch.object(
+                 public_site_routes,
+                 "require_tenant_visitor",
+                 return_value=({}, {"id": 19, "status": "active", "_access_kind": "site"}),
+             ):
+            response = client.get("/public/sites/tenant-site/pages/member-page")
+
+        self.assertEqual(response.status_code, 403)
 
     def test_disabled_site_member_cannot_fetch_protected_page(self):
         fake_supabase = FakeSupabase()

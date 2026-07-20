@@ -47,12 +47,15 @@ SENSITIVE_TABLES = (
     "storage_accounts",
     "storage_reservations",
     "storage_objects",
+    "tenant_site_project_roles",
+    "tenant_site_project_role_assignments",
     "features",
     "audit_logs",
 )
 
 SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
     "admin_update_user_type_safely",
+    "assign_tenant_site_project_role",
     "apply_billing_webhook_event",
     "claim_notification_outbox",
     "claim_password_reset_request",
@@ -107,6 +110,8 @@ ALLOWED_DIRECT_GRANTS = {
     "storage_accounts": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "storage_reservations": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "storage_objects": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "tenant_site_project_roles": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "tenant_site_project_role_assignments": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "features": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
     "audit_logs": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
 }

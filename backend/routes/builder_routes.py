@@ -22,6 +22,7 @@ from services.api_errors import error_detail
 from services.billing_service import require_publish_entitlement
 from services.notification_outbox_service import enqueue_notification
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
+from services.site_permission_service import assign_project_role, project_role_keys
 from services.storage_quota_service import (
     StorageSafetyError,
     finish_storage,
@@ -736,11 +737,11 @@ def normalize_site_member_status(value: str) -> str:
     raise HTTPException(status_code=400, detail="Invalid site member status")
 
 
-def normalize_site_member_role(_project: dict, value: str | None) -> str:
+def normalize_site_member_role(project: dict, value: str | None) -> str:
     role = str(value or "").strip()
     if not role:
         return "customer"
-    if len(role) > 160:
+    if role not in project_role_keys(project):
         raise HTTPException(status_code=400, detail="Selected role is invalid")
     return role
 
@@ -765,15 +766,45 @@ def format_site_member(membership: dict, user: dict | None) -> dict:
     }
 
 
-def get_site_members_for_tenant(tenant_id: int) -> list[dict]:
+def get_site_members_for_project(tenant_id: int, project_id: str) -> list[dict]:
+    assignment_response = (
+        service_supabase.table("tenant_site_project_role_assignments")
+        .select("membership_id,role_id")
+        .eq("project_id", project_id)
+        .execute()
+    )
+    assignments = getattr(assignment_response, "data", None) or []
+    membership_ids = [row.get("membership_id") for row in assignments if row.get("membership_id") is not None]
+    if not membership_ids:
+        return []
     membership_response = (
         service_supabase.table("tenant_site_memberships")
         .select("*")
         .eq("tenant_id", tenant_id)
+        .in_("id", membership_ids)
         .order("created_at", desc=True)
         .execute()
     )
     memberships = getattr(membership_response, "data", None) or []
+    role_ids = [row.get("role_id") for row in assignments if row.get("role_id") is not None]
+    role_keys_by_id = {}
+    if role_ids:
+        roles_response = (
+            service_supabase.table("tenant_site_project_roles")
+            .select("id,role_key,deleted_at")
+            .eq("project_id", project_id)
+            .in_("id", role_ids)
+            .execute()
+        )
+        role_keys_by_id = {
+            str(role.get("id")): role.get("role_key")
+            for role in (getattr(roles_response, "data", None) or [])
+            if not role.get("deleted_at")
+        }
+    role_by_membership_id = {
+        str(row.get("membership_id")): role_keys_by_id.get(str(row.get("role_id")))
+        for row in assignments
+    }
     user_ids = [membership.get("user_id") for membership in memberships if membership.get("user_id") is not None]
     users_by_id = {}
     if user_ids:
@@ -788,8 +819,12 @@ def get_site_members_for_tenant(tenant_id: int) -> list[dict]:
             for user in (getattr(users_response, "data", None) or [])
         }
     return [
-        format_site_member(membership, users_by_id.get(str(membership.get("user_id"))))
+        format_site_member(
+            {**membership, "role": role_by_membership_id.get(str(membership.get("id"))) or "customer"},
+            users_by_id.get(str(membership.get("user_id"))),
+        )
         for membership in memberships
+        if role_by_membership_id.get(str(membership.get("id")))
     ]
 
 
@@ -1504,7 +1539,7 @@ def list_builder_site_members(project_id: str, request: Request, response: Respo
     get_project_for_tenant(project_id, context.tenant_id)
     return {
         "success": True,
-        "members": get_site_members_for_tenant(context.tenant_id),
+        "members": get_site_members_for_project(context.tenant_id, project_id),
     }
 
 
@@ -1620,7 +1655,20 @@ def create_builder_site_member(
         membership = memberships[0] if memberships else None
         if not membership:
             raise RuntimeError("Membership row was not returned")
+        assign_project_role(
+            membership_id=int(membership["id"]),
+            tenant_id=context.tenant_id,
+            project=project,
+            role_key=role,
+            actor_user_id=context.user_id,
+            client=service_supabase,
+        )
     except Exception as error:
+        if 'membership' in locals() and membership:
+            try:
+                service_supabase.table("tenant_site_memberships").delete().eq("id", membership["id"]).eq("tenant_id", context.tenant_id).execute()
+            except Exception:
+                pass
         if created_local_user:
             try:
                 service_supabase.table("users").delete().eq("id", local_user["id"]).execute()
@@ -1659,16 +1707,21 @@ def update_builder_site_member(
     context = require_builder_context(request, response, require_builder_admin_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
     update_payload = {}
+    role = None
     if update.role_id is not None:
-        update_payload["role"] = normalize_site_member_role(project, update.role_id)
+        role = normalize_site_member_role(project, update.role_id)
     if update.status is not None:
         update_payload["status"] = normalize_site_member_status(update.status)
-    if not update_payload:
+    if not update_payload and role is None:
         raise HTTPException(status_code=400, detail="No member changes were provided")
 
+    membership_query = service_supabase.table("tenant_site_memberships")
+    if update_payload:
+        membership_query = membership_query.update({**update_payload, "updated_at": datetime.now(timezone.utc).isoformat()})
+    else:
+        membership_query = membership_query.select("*")
     membership_response = (
-        service_supabase.table("tenant_site_memberships")
-        .update({**update_payload, "updated_at": datetime.now(timezone.utc).isoformat()})
+        membership_query
         .eq("id", membership_id)
         .eq("tenant_id", context.tenant_id)
         .execute()
@@ -1677,6 +1730,19 @@ def update_builder_site_member(
     if not memberships:
         raise HTTPException(status_code=404, detail="Site member not found")
     membership = memberships[0]
+    if role is not None:
+        try:
+            assign_project_role(
+                membership_id=membership_id,
+                tenant_id=context.tenant_id,
+                project=project,
+                role_key=role,
+                actor_user_id=context.user_id,
+                client=service_supabase,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail="Selected role is invalid") from error
+        membership = {**membership, "role": role}
     user_response = (
         service_supabase.table("users")
         .select("id, auth_id, first_name, last_name, email")
@@ -1693,7 +1759,7 @@ def update_builder_site_member(
         action="builder.site_member_updated",
         target_type="tenant_site_membership",
         target_id=str(membership_id),
-        metadata={"project_id": project_id, **update_payload},
+        metadata={"project_id": project_id, **update_payload, **({"role": role} if role else {})},
     )
     return {
         "success": True,
@@ -1710,11 +1776,21 @@ def delete_builder_site_member(
 ):
     context = require_builder_context(request, response, require_builder_admin_access)
     get_project_for_tenant(project_id, context.tenant_id)
-    delete_response = (
+    membership_response = (
         service_supabase.table("tenant_site_memberships")
-        .delete()
+        .select("id")
         .eq("id", membership_id)
         .eq("tenant_id", context.tenant_id)
+        .limit(1)
+        .execute()
+    )
+    if not (getattr(membership_response, "data", None) or []):
+        raise HTTPException(status_code=404, detail="Site member not found")
+    delete_response = (
+        service_supabase.table("tenant_site_project_role_assignments")
+        .delete()
+        .eq("membership_id", membership_id)
+        .eq("project_id", project_id)
         .execute()
     )
     deleted = getattr(delete_response, "data", None) or []

@@ -33,6 +33,7 @@ from services.notification_service import create_builder_block_event_notificatio
 from services.notification_outbox_service import enqueue_notification
 from services.api_errors import api_error
 from services.account_lifecycle_service import synchronize_verified_account
+from services.site_permission_service import has_project_permission
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -1171,17 +1172,23 @@ def get_tenant_site_access(settings: dict, user_row: dict):
     user_id = user_row.get("id")
     site_membership = get_active_tenant_membership(tenant_id, user_id)
     if site_membership:
-        return site_membership
+        return {**site_membership, "_access_kind": "site"}
 
     staff_membership = get_tenant_staff_membership(tenant_id, user_id)
     if staff_membership:
-        return staff_membership
+        return {**staff_membership, "_access_kind": "staff"}
 
     if (
         str(settings.get("user_id") or "") == str(user_id or "")
         or str(user_row.get("tenant_id") or "") == str(tenant_id)
     ):
-        return {"tenant_id": tenant_id, "user_id": user_id, "role": "owner", "status": "active"}
+        return {
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "role": "owner",
+            "status": "active",
+            "_access_kind": "staff",
+        }
 
     return None
 
@@ -1411,8 +1418,15 @@ def get_member_site_page(
         f"{clean_subdomain}:{clean_page_reference}",
     )
     settings = resolve_website_settings(clean_subdomain)
-    require_tenant_visitor(clean_subdomain, request, response)
+    _, membership = require_tenant_visitor(clean_subdomain, request, response)
     project = get_bound_published_project(settings)
+    if not has_project_permission(
+        membership=membership,
+        project_id=str(project.get("id") or ""),
+        capability="view_protected_page",
+        client=service_supabase,
+    ):
+        raise HTTPException(status_code=403, detail="This account cannot view this page")
     schema, page, auth_destination_ids = find_published_page(project, clean_page_reference)
     if page_access_kind(page, auth_destination_ids) == "unsupported_role":
         raise HTTPException(status_code=403, detail="Page access is not configured")
