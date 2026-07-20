@@ -1911,6 +1911,7 @@ def update_builder_project(
                 project_id=project_id,
                 tenant_id=context.tenant_id,
                 schema=update_payload["draft_schema"],
+                client=service_supabase,
             )
         except Exception as error:
             # The canonical project save has already committed. Keep the upload
@@ -1957,6 +1958,7 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
             project_id=project_id,
             tenant_id=context.tenant_id,
             schema={},
+            client=service_supabase,
         )
     except Exception as error:
         logger.error(
