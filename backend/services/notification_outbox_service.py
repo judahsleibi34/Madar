@@ -186,3 +186,44 @@ def claim_notifications(*, limit: int = 25) -> list[dict[str, Any]]:
     if isinstance(data, dict):
         return [data]
     return [row for row in (data or []) if isinstance(row, dict)]
+
+
+def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, int]:
+    database_client = client or service_supabase
+    response = (
+        database_client.table("notification_outbox")
+        .select("status,created_at")
+        .in_("status", ["pending", "failed", "processing", "dead", "sent"])
+        .limit(5000)
+        .execute()
+    )
+    rows = [
+        row
+        for row in (getattr(response, "data", None) or [])
+        if isinstance(row, dict)
+    ]
+    counts = {
+        status: sum(row.get("status") == status for row in rows)
+        for status in ("pending", "failed", "processing", "dead", "sent")
+    }
+    pending_dates = []
+    for row in rows:
+        if row.get("status") not in {"pending", "failed"} or not row.get("created_at"):
+            continue
+        try:
+            pending_dates.append(
+                datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00"))
+            )
+        except ValueError:
+            continue
+    current = now or _now()
+    oldest_age = (
+        max(0, int((current - min(pending_dates)).total_seconds()))
+        if pending_dates
+        else 0
+    )
+    return {
+        "queue_depth": counts["pending"] + counts["failed"],
+        "oldest_pending_age_seconds": oldest_age,
+        **counts,
+    }

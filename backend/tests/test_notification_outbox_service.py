@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timezone
 
 from services import notification_outbox_service
 
@@ -34,6 +35,10 @@ class FakeQuery:
         self.filters.append((key, None if value == "null" else value))
         return self
 
+    def in_(self, key, values):
+        self.filters.append((key, tuple(values)))
+        return self
+
     def limit(self, _limit):
         return self
 
@@ -58,7 +63,10 @@ class FakeQuery:
 
         rows = list(self.client.rows)
         for key, value in self.filters:
-            rows = [row for row in rows if row.get(key) == value]
+            if isinstance(value, tuple):
+                rows = [row for row in rows if row.get(key) in value]
+            else:
+                rows = [row for row in rows if row.get(key) == value]
         if self.update_payload is not None:
             for row in rows:
                 row.update(self.update_payload)
@@ -76,6 +84,23 @@ class FakeClient:
 
 
 class NotificationOutboxServiceTests(unittest.TestCase):
+    def test_queue_metrics_include_backlog_age_and_terminal_counts(self):
+        client = FakeClient()
+        client.rows.extend([
+            {"status": "pending", "created_at": "2026-07-20T00:00:00+00:00"},
+            {"status": "failed", "created_at": "2026-07-20T00:01:00+00:00"},
+            {"status": "dead", "created_at": "2026-07-20T00:02:00+00:00"},
+            {"status": "sent", "created_at": "2026-07-20T00:03:00+00:00"},
+        ])
+        metrics = notification_outbox_service.get_queue_metrics(
+            client=client,
+            now=datetime(2026, 7, 20, 0, 5, tzinfo=timezone.utc),
+        )
+        self.assertEqual(metrics["queue_depth"], 2)
+        self.assertEqual(metrics["oldest_pending_age_seconds"], 300)
+        self.assertEqual(metrics["dead"], 1)
+        self.assertEqual(metrics["sent"], 1)
+
     def test_enqueue_is_deduplicated_and_tenant_scoped(self):
         client = FakeClient()
         first = notification_outbox_service.enqueue_notification(

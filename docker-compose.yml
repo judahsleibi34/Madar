@@ -64,6 +64,31 @@ services:
       - ./database:/app/database:ro
       - ./supabase:/app/supabase:ro
 
+  notification-worker:
+    build:
+      context: ./backend
+    container_name: madar-notification-worker
+    restart: unless-stopped
+    profiles: ["workers"]
+    env_file:
+      - .env
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      NOTIFICATION_WORKER_ENABLED: ${NOTIFICATION_WORKER_ENABLED:-false}
+      NOTIFICATION_WORKER_BATCH_SIZE: ${NOTIFICATION_WORKER_BATCH_SIZE:-25}
+      NOTIFICATION_WORKER_CONCURRENCY: ${NOTIFICATION_WORKER_CONCURRENCY:-2}
+      NOTIFICATION_WORKER_POLL_SECONDS: ${NOTIFICATION_WORKER_POLL_SECONDS:-5}
+    command: ["python", "-m", "workers.notification_worker"]
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   frontend:
     build:
       context: ./frontend
