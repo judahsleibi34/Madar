@@ -4,6 +4,11 @@ export const splitLines = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+export const splitEditableLines = (value) => {
+  const text = String(value ?? "");
+  return text === "" ? [""] : text.split("\n");
+};
+
 export const getListItems = (element) =>
   Array.isArray(element?.listItems) && element.listItems.length
     ? element.listItems

@@ -125,12 +125,13 @@ export default function PageBuilderPublishTab({
         </section>
       )}
 
-      <div className="workspace-header publish-site-header">
+      <header className="workspace-header publish-site-header">
         <div>
+          <span className="workspace-kicker">Publish</span>
           <h2>{content.title}</h2>
           <p>{content.description}</p>
         </div>
-      </div>
+      </header>
 
       <div className="publish-console">
         <section className="publish-panel publish-status-panel">

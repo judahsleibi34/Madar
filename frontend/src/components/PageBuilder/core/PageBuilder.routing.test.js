@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectPublicPageRoutingIssues,
+  createNextGeneratedPageName,
+  createUniqueBuilderPageName,
   createUniquePublicPageSlug,
   getDefaultPublicPage,
   getProductionFormUrl,
@@ -47,6 +49,21 @@ describe("public page routing contract", () => {
       currentPageId: "home",
       isDefault: true,
     })).toBe("/");
+  });
+
+  it("generates unique page names after deletion and repairs existing duplicates", () => {
+    const pages = [
+      { id: "home", name: "Home", slug: "/" },
+      { id: "page-3", name: "Page 3", slug: "/page-3" },
+    ];
+    expect(createNextGeneratedPageName(pages)).toBe("Page 4");
+    expect(createUniqueBuilderPageName({ name: "Page 3", pages })).toBe("Page 4");
+
+    const normalized = normalizeProjectPageRouting({
+      pages: [...pages, { id: "duplicate", name: "Page 3", slug: "/page-3-2" }],
+    });
+    expect(normalized.pages.map((page) => page.name)).toEqual(["Home", "Page 3", "Page 4"]);
+    expect(normalized.pages.map((page) => page.slug)).toEqual(["/", "/page-3", "/page-3-2"]);
   });
 
   it("keeps Home as root regardless of the editor-selected page", () => {

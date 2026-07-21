@@ -8,6 +8,7 @@ import {
   getBuilderPublishBlockReason,
   getBuilderSaveRetryDelay,
   getBuilderSaveStateLabel,
+  isNewerBuilderCloudSaveMessage,
   stopBuilderSaveScheduling,
   shouldDeferBuilderCloudSave,
   shouldBlockBuilderUnload,
@@ -39,8 +40,26 @@ describe("cloud save state labels", () => {
 
   it("defers cloud saves during focused editing, dragging, or resizing", () => {
     expect(shouldDeferBuilderCloudSave({ textEditing: true })).toBe(true);
+    expect(shouldDeferBuilderCloudSave({ activeTab: "chrome", textEditing: true })).toBe(false);
     expect(shouldDeferBuilderCloudSave({ dragActive: true })).toBe(true);
+    expect(shouldDeferBuilderCloudSave({ activeTab: "chrome", dragActive: true })).toBe(true);
     expect(shouldDeferBuilderCloudSave()).toBe(false);
+  });
+
+  it("accepts only newer cloud revisions from another tab for the same project", () => {
+    const context = { currentRevision: 8, projectId: "project-1", sourceId: "tab-a", tenantId: "4" };
+    expect(isNewerBuilderCloudSaveMessage({
+      type: "cloud_saved", sourceId: "tab-b", projectId: "project-1", tenantId: "4", revision: 9,
+    }, context)).toBe(true);
+    expect(isNewerBuilderCloudSaveMessage({
+      type: "cloud_saved", sourceId: "tab-a", projectId: "project-1", tenantId: "4", revision: 9,
+    }, context)).toBe(false);
+    expect(isNewerBuilderCloudSaveMessage({
+      type: "cloud_saved", sourceId: "tab-b", projectId: "project-2", tenantId: "4", revision: 9,
+    }, context)).toBe(false);
+    expect(isNewerBuilderCloudSaveMessage({
+      type: "cloud_saved", sourceId: "tab-b", projectId: "project-1", tenantId: "4", revision: 8,
+    }, context)).toBe(false);
   });
 
   it("uses bounded retry backoff", () => {

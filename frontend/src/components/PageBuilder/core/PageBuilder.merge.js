@@ -311,3 +311,19 @@ export const resolveBuilderDraftConflicts = ({ mergedSchema, conflicts = [], res
   });
   return resolved;
 };
+
+export const resolveBuilderDraftConflictsPreferLocal = ({ mergeResult, pathPrefix } = {}) => {
+  const conflicts = Array.isArray(mergeResult?.conflicts) ? mergeResult.conflicts : [];
+  const prefix = String(pathPrefix || "").trim();
+  if (
+    !prefix ||
+    conflicts.length === 0 ||
+    conflicts.some(({ path }) => path !== prefix && !String(path || "").startsWith(`${prefix}.`))
+  ) return null;
+
+  return resolveBuilderDraftConflicts({
+    mergedSchema: mergeResult.mergedSchema,
+    conflicts,
+    resolutions: Object.fromEntries(conflicts.map((_, index) => [index, "local"])),
+  });
+};

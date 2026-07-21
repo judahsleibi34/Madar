@@ -58,6 +58,7 @@ export const runBuilderAutomaticRebase = async ({
   createRetryPayload,
   updateServerProject,
   validateAcknowledgement,
+  resolveConflicts,
   isCurrent = () => true,
 } = {}) => {
   const serverRecord = await fetchServerProject(routedProjectId);
@@ -72,11 +73,14 @@ export const runBuilderAutomaticRebase = async ({
   const serverSchema = getPersistableProject(normalizeServerSchema(serverRecord));
   const mergeResult = mergeBuilderDraftSchemas({ baseSchema, localSchema, serverSchema });
   const mergeState = { baseSchema, localSchema, serverSchema, serverRecord, mergeResult };
+  let mergedSchema = mergeResult.mergedSchema;
   if (mergeResult.conflicts.length > 0) {
-    return { status: "conflict", ...mergeState };
+    const resolvedSchema = resolveConflicts?.(mergeState);
+    if (!resolvedSchema) return { status: "conflict", ...mergeState };
+    mergedSchema = getPersistableProject(resolvedSchema);
   }
 
-  const mergedProject = prepareMergedProject(mergeResult.mergedSchema);
+  const mergedProject = prepareMergedProject(mergedSchema);
   const payload = createRetryPayload({ mergedProject, serverRecord, serverRevision });
   try {
     if (!isCurrent()) return { status: "obsolete" };

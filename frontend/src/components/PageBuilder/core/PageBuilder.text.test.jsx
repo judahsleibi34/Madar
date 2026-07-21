@@ -6,11 +6,18 @@ import {
   createDomTextRange,
   getFloatingToolbarPlacement,
   renderRichText,
+  splitEditableLines,
 } from "./PageBuilder.text";
 
 afterEach(cleanup);
 
 describe("renderRichText", () => {
+  it("preserves intentionally added blank editor rows", () => {
+    expect(splitEditableLines("")).toEqual([""]);
+    expect(splitEditableLines("\n")).toEqual(["", ""]);
+    expect(splitEditableLines("Facebook\n")).toEqual(["Facebook", ""]);
+  });
+
   it("rebuilds a selected word range across formatted spans", () => {
     const { container } = render(
       <p>Design <span>pages</span>, collect responses</p>

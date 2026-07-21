@@ -72,9 +72,9 @@
   contain: layout;
 }
 
-.page-builder nav.workspace-tabs > button,
-.page-builder nav.workspace-tabs > button:hover,
-.page-builder nav.workspace-tabs > button.active {
+.page-builder nav.workspace-tabs > :is(button, a),
+.page-builder nav.workspace-tabs > :is(button, a):hover,
+.page-builder nav.workspace-tabs > :is(button, a).active {
   flex: 0 0 auto;
   min-width: 0;
   min-height: 38px;
@@ -86,30 +86,152 @@
   box-shadow: none !important;
   transform: none !important;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
   transition: color 120ms ease, background-color 120ms ease, box-shadow 120ms ease !important;
 }
 
-.page-builder nav.workspace-tabs > button {
+.page-builder nav.workspace-tabs > :is(button, a) {
   color: var(--theme-text-soft) !important;
   -webkit-text-fill-color: var(--theme-text-soft) !important;
 }
 
-.page-builder nav.workspace-tabs > button:hover {
+.page-builder nav.workspace-tabs > :is(button, a):hover {
   background: rgba(var(--theme-primary-rgb), 0.09) !important;
   color: var(--theme-primary-hover) !important;
   -webkit-text-fill-color: var(--theme-primary-hover) !important;
 }
 
-.page-builder nav.workspace-tabs > button.active {
+.page-builder nav.workspace-tabs > :is(button, a).active {
   background: var(--theme-primary) !important;
   color: var(--theme-text-inverse) !important;
   -webkit-text-fill-color: var(--theme-text-inverse) !important;
   box-shadow: 0 4px 12px rgba(var(--theme-primary-rgb), 0.22) !important;
 }
 
-.page-builder nav.workspace-tabs > button:focus-visible {
+.page-builder nav.workspace-tabs > :is(button, a):focus-visible {
   outline: 3px solid rgba(var(--theme-primary-rgb), 0.22) !important;
   outline-offset: 2px;
+}
+
+.page-builder.theme-light .site-chrome-workspace > .workspace-header h2 {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+}
+
+.page-builder.theme-dark .site-chrome-workspace > .workspace-header h2 {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+/* Match the clear Responses page heading hierarchy across the management
+   workspaces. */
+.page-builder :is(
+  .reservations-workspace,
+  .site-chrome-workspace,
+  .users-workspace-page,
+  .publish-workspace
+) > .workspace-header {
+  align-items: flex-start !important;
+  min-height: 0 !important;
+  margin: 0 0 14px !important;
+  padding: 0 0 10px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.page-builder :is(
+  .reservations-workspace,
+  .site-chrome-workspace,
+  .users-workspace-page,
+  .publish-workspace
+) > .workspace-header .workspace-kicker {
+  margin: 0 0 6px !important;
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+.page-builder :is(
+  .reservations-workspace,
+  .site-chrome-workspace,
+  .users-workspace-page,
+  .publish-workspace
+) > .workspace-header :is(h1, h2) {
+  margin: 0 !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  font-size: clamp(24px, 2.2vw, 32px) !important;
+  font-weight: 900 !important;
+  line-height: 1.1 !important;
+  letter-spacing: 0 !important;
+}
+
+.page-builder :is(
+  .reservations-workspace,
+  .site-chrome-workspace,
+  .users-workspace-page,
+  .publish-workspace
+) > .workspace-header p {
+  max-width: 680px !important;
+  margin: 6px 0 0 !important;
+  color: var(--theme-text-soft) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.page-builder .site-chrome-workspace .site-chrome-form-grid textarea {
+  field-sizing: content;
+  height: auto !important;
+  min-height: 104px !important;
+  max-height: none !important;
+  overflow-y: hidden;
+  resize: none;
+}
+
+.page-builder .reservations-workspace .reservation-wide-field textarea {
+  field-sizing: content;
+  height: auto !important;
+  min-height: 82px !important;
+  max-height: none !important;
+  overflow-y: hidden;
+  resize: none;
+}
+
+/* Keep both logo actions comfortably inside their own columns. Global action
+   padding is wider than the original fixed tracks, which otherwise crowds the
+   right edge of “Apply URL”. */
+.page-builder .site-chrome-workspace .site-chrome-logo-control {
+  grid-template-columns: minmax(0, 1fr) 100px 110px;
+  column-gap: 10px;
+}
+
+.page-builder .site-chrome-workspace :is(
+  .site-chrome-logo-apply,
+  .site-chrome-logo-upload
+) {
+  box-sizing: border-box;
+  padding-inline: 14px !important;
+  overflow: hidden;
+}
+
+@media (max-width: 760px) {
+  .page-builder .site-chrome-workspace .site-chrome-logo-control {
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+  }
 }
 
 /* The authoring canvas follows the center column's live width. Direct element

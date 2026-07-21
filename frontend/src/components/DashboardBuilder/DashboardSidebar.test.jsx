@@ -173,6 +173,17 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(false);
   });
 
+  it("collapses the expanded workspace sidebar when clicking outside it", () => {
+    renderSidebar("/page-builder/projects/project-1/pages");
+
+    const sidebar = screen.getByLabelText("Dashboard sidebar");
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(false);
+
+    fireEvent.pointerDown(document.body);
+    expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
+  });
+
   it("keeps settings above the account and reuses all utility actions", () => {
     const props = renderSidebar("/settings");
     const settings = screen.getAllByRole("button", { name: "Settings" })[0];

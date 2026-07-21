@@ -4,6 +4,7 @@ import {
   builderValuesEqual,
   mergeBuilderDraftSchemas,
   resolveBuilderDraftConflicts,
+  resolveBuilderDraftConflictsPreferLocal,
 } from "./PageBuilder.merge";
 
 const project = () => ({
@@ -219,6 +220,28 @@ describe("builder draft three-way merge", () => {
     });
     expect(resolved.defaultPageId).toBe("local");
     expect(resolved.pages.some(({ id }) => id === "about")).toBe(false);
+  });
+
+  it("prefers local values only when every conflict belongs to the requested path", () => {
+    const base = { ...project(), siteChrome: { footerSocialLinks: "Facebook" } };
+    const local = { ...base, siteChrome: { footerSocialLinks: "" } };
+    const server = {
+      ...base,
+      siteChrome: { footerSocialLinks: "Facebook LinkedIn" },
+      theme: { colors: { ...base.theme.colors, primary: "#222222" } },
+    };
+    const result = merge(base, local, server);
+    const resolved = resolveBuilderDraftConflictsPreferLocal({
+      mergeResult: result,
+      pathPrefix: "siteChrome",
+    });
+
+    expect(resolved.siteChrome.footerSocialLinks).toBe("");
+    expect(resolved.theme.colors.primary).toBe("#222222");
+    expect(resolveBuilderDraftConflictsPreferLocal({
+      mergeResult: merge(base, { ...local, defaultPageId: "local" }, { ...server, defaultPageId: "server" }),
+      pathPrefix: "siteChrome",
+    })).toBeNull();
   });
 
   it("strips editor-only state before comparison", () => {

@@ -555,7 +555,7 @@ body.theme-dark .register-card input:focus,
 
 .auth-toast {
   position: fixed;
-  top: 88px;
+  top: 116px;
   right: 28px;
   z-index: 9999;
   width: min(360px, calc(100vw - 56px));

@@ -1087,6 +1087,256 @@
   padding: 20px;
 }
 
+/* Header & Footer follows the shared builder type scale and surface hierarchy. */
+.page-builder .site-chrome-layout,
+.page-builder .site-chrome-editor {
+  gap: 20px;
+}
+
+.page-builder .site-chrome-card {
+  padding: 22px;
+  background: var(--pb-surface) !important;
+  border-color: var(--pb-border) !important;
+  box-shadow: var(--pb-shadow) !important;
+}
+
+.page-builder .site-chrome-card-header {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--pb-border);
+}
+
+.page-builder .site-chrome-card-header span,
+.page-builder .site-chrome-pane-heading span,
+.page-builder .site-chrome-list-editor-header span {
+  color: var(--pb-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+}
+
+.page-builder .site-chrome-card-header h3 {
+  margin-top: 4px;
+  color: var(--pb-text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.page-builder .site-chrome-toggle-grid,
+.page-builder .site-chrome-horizontal-settings,
+.page-builder .site-chrome-footer-title-row,
+.page-builder .site-chrome-footer-panel-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.page-builder .site-chrome-horizontal-settings {
+  align-items: stretch;
+}
+
+.page-builder .site-chrome-horizontal-settings > .site-chrome-pane {
+  height: 100%;
+}
+
+.page-builder .site-chrome-workspace .toggle-field {
+  min-height: 82px;
+  padding: 16px;
+  border-color: var(--pb-border);
+  border-radius: var(--pb-radius);
+  background: var(--pb-surface-raised);
+}
+
+.page-builder .site-chrome-workspace .toggle-field:hover {
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  background: var(--pb-hover);
+}
+
+.page-builder .site-chrome-workspace .toggle-field strong {
+  color: var(--pb-text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.page-builder .site-chrome-workspace .toggle-field small {
+  color: var(--pb-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.page-builder .site-chrome-pane,
+.page-builder .site-chrome-list-editor {
+  padding: 18px;
+  border-color: var(--pb-border);
+  border-radius: var(--pb-radius);
+  background: var(--pb-surface-raised);
+}
+
+.page-builder .site-chrome-pane {
+  gap: 18px;
+}
+
+.page-builder .site-chrome-pane-heading {
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--pb-border);
+}
+
+.page-builder .site-chrome-pane-heading strong {
+  color: var(--pb-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.page-builder .site-chrome-form-grid,
+.page-builder .site-chrome-form-grid.compact {
+  gap: 16px 14px;
+}
+
+.page-builder .site-chrome-form-grid label,
+.page-builder .site-chrome-footer-title-row > label,
+.page-builder .site-chrome-field-title {
+  gap: 7px;
+  color: var(--pb-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.page-builder .site-chrome-form-grid input,
+.page-builder .site-chrome-form-grid select,
+.page-builder .site-chrome-form-grid textarea,
+.page-builder .site-chrome-footer-title-row > label input,
+.page-builder .site-chrome-list-row input,
+.page-builder .site-chrome-list-row select {
+  min-height: 42px;
+  border-color: var(--pb-border-strong);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface);
+  color: var(--pb-text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.page-builder .site-chrome-form-grid textarea {
+  min-height: 104px;
+}
+
+.page-builder .site-chrome-form-grid input::placeholder,
+.page-builder .site-chrome-list-row input::placeholder,
+.page-builder .site-chrome-footer-title-row > label input::placeholder {
+  color: var(--pb-muted);
+  opacity: 0.82;
+}
+
+.page-builder .site-chrome-field-help,
+.page-builder .site-chrome-logo-row small {
+  margin-top: 1px;
+  color: var(--pb-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.page-builder .site-chrome-footer-structure {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.page-builder .site-chrome-footer-panel-row .site-chrome-list-editor {
+  align-self: stretch;
+}
+
+.page-builder .site-chrome-list-editor {
+  gap: 12px;
+}
+
+.page-builder .site-chrome-list-editor-header button {
+  min-height: 34px;
+  padding-inline: 11px;
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-accent-soft);
+  color: var(--pb-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.page-builder .site-chrome-list-rows {
+  gap: 8px;
+}
+
+.page-builder .site-chrome-list-row {
+  grid-template-columns: 8px minmax(0, 1fr) 36px;
+  gap: 8px;
+}
+
+.page-builder .site-chrome-list-bullet {
+  width: 6px;
+  height: 6px;
+  margin-left: 0;
+  background: var(--pb-accent);
+}
+
+.page-builder .site-chrome-list-row button {
+  width: 36px;
+  min-height: 36px;
+  border-color: var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface);
+  color: var(--pb-muted);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.page-builder .site-chrome-list-row button:hover {
+  border-color: rgba(var(--theme-danger-rgb, var(--theme-primary-rgb)), 0.38);
+  background: rgba(var(--theme-danger-rgb, var(--theme-primary-rgb)), 0.09);
+  color: var(--pb-danger);
+}
+
+.page-builder .site-chrome-workspace .site-chrome-logo-apply,
+.page-builder .site-chrome-workspace .site-chrome-logo-upload {
+  min-height: 42px;
+  border-radius: var(--pb-radius-sm);
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+@media (max-width: 1180px) {
+  .page-builder .site-chrome-horizontal-settings,
+  .page-builder .site-chrome-footer-title-row,
+  .page-builder .site-chrome-footer-panel-row {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .site-chrome-footer-panel-row .site-chrome-list-editor {
+    align-self: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .page-builder .site-chrome-workspace {
+    padding-inline: 16px;
+  }
+
+  .page-builder .site-chrome-card {
+    padding: 18px;
+  }
+
+  .page-builder .site-chrome-toggle-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .page-builder :is(.users-panel-heading, .reservation-panel-heading, .publish-panel-title) {
   min-height: 0;
   align-items: flex-start;
