@@ -140,43 +140,22 @@ export const workflowStepTypes = [
 
 export const permissionGroups = [
   {
-    title: "Design",
+    title: "Site access",
     permissions: [
-      { key: "editPages", label: "Edit pages" },
-      { key: "editTheme", label: "Edit theme" },
-    ],
-  },
-  {
-    title: "Data",
-    permissions: [
-      { key: "editCollections", label: "Edit collections" },
-      { key: "viewResponses", label: "View responses" },
-      { key: "exportData", label: "Export data" },
-    ],
-  },
-  {
-    title: "Operations",
-    permissions: [
-      { key: "editWorkflows", label: "Edit workflows" },
-      { key: "approveResponses", label: "Approve responses" },
-      { key: "manageUsers", label: "Manage users" },
-      { key: "publish", label: "Publish" },
+      { key: "viewProtectedPages", label: "View allowed protected pages" },
+      { key: "submitForms", label: "Submit allowed forms" },
+      { key: "makeReservations", label: "Book allowed reservations" },
+
     ],
   },
 ];
 
 export const defaultPermissions = {
-  editPages: false,
-  editTheme: false,
-  editCollections: false,
-  viewResponses: false,
-  exportData: false,
-  editWorkflows: false,
-  approveResponses: false,
-  manageUsers: false,
-  publish: false,
-};
+  viewProtectedPages: false,
+  submitForms: false,
+  makeReservations: false,
 
+};
 export const defaultTheme = {
   mode: "light",
   name: "Madar Light",

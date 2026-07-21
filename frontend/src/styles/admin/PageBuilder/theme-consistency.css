@@ -1045,6 +1045,11 @@
   line-height: 1.15;
 }
 
+.page-builder .users-workspace-header h2 {
+  color: var(--builder-text) !important;
+  -webkit-text-fill-color: var(--builder-text) !important;
+}
+
 .page-builder .workspace-header p {
   max-width: 760px;
   line-height: 1.5;
@@ -1062,15 +1067,47 @@
 }
 
 .page-builder .users-header-actions {
+  width: 190px;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
 }
 
 .page-builder .users-header-actions button {
+  width: 100%;
   min-height: 42px;
+  justify-content: flex-start;
   padding-inline: 16px;
+}
+
+.page-builder .users-header-actions .primary-action {
+  justify-content: center;
+  border-color: var(--pb-accent) !important;
+  background: var(--pb-accent) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: var(--app-primary-shadow) !important;
+}
+
+.page-builder .users-header-actions button:not(.primary-action) {
+  border-color: var(--pb-border) !important;
+  background: var(--pb-surface-raised) !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
+  box-shadow: none !important;
+}
+
+.page-builder .users-header-actions button:not(.primary-action):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
+  background: var(--pb-accent-soft) !important;
+  color: var(--pb-accent) !important;
+  -webkit-text-fill-color: var(--pb-accent) !important;
+}
+
+.page-builder .users-header-actions button svg {
+  color: inherit !important;
+  stroke: currentColor;
 }
 
 .page-builder :is(.users-management-grid, .reservation-editor-layout, .publish-console, .site-chrome-layout) {
@@ -1371,7 +1408,7 @@
   }
 
   .page-builder .users-header-actions {
-    justify-content: flex-start;
+    width: 100%;
   }
 }
 

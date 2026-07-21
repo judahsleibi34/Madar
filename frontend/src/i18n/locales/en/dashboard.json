@@ -1,4 +1,4 @@
-{
+﻿{
   "sidebar": {
     "workspace": "Workspace",
     "language": "Language",
@@ -11,10 +11,11 @@
     "pageBuilder": "Page Builder",
     "submissions": "Submissions",
     "dataLogs": "Data Logs",
+    "calendar": "Calendar",
     "archive": "Archive",
     "myPlan": "My Plan",
     "settings": "Settings",
-    "languageSwitch": "العربية",
+    "languageSwitch": "ط§ظ„ط¹ط±ط¨ظٹط©",
     "logout": "Log out",
     "themeMode": "Theme",
     "userManagement": "User Management",
@@ -27,6 +28,7 @@
     "pageBuilder": "Loading page builder",
     "submissions": "Loading submissions",
     "dataLogs": "Loading data logs",
+    "calendar": "Loading calendar",
     "archive": "Loading archive",
     "myPlan": "Loading my plan",
     "userManagement": "Loading user management",

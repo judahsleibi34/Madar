@@ -1,4 +1,4 @@
-import { lazy } from "react";
+﻿import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
@@ -10,7 +10,6 @@ const AdminAccountAccessPage = lazy(() =>
   import("../components/DashboardBuilder/AdminAccountAccessPage")
 );
 const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
-const SecurityMfaPage = lazy(() => import("../components/DashboardBuilder/SecurityMfaPage"));
 const NotificationsPage = lazy(() =>
   import("../components/DashboardBuilder/NotificationsPage")
 );
@@ -127,7 +126,16 @@ export default function AdminRoutes({
 
         <Route
           path="/settings/security/*"
-          element={renderShell(<SecurityMfaPage lang={lang} />)}
+          element={renderShell(
+            <SettingsPage
+              lang={lang}
+              user={user}
+              onUserUpdated={onUserUpdated}
+              accountOnly
+              accountApiBasePath="/admin/profile"
+              initialTab="security"
+            />
+          )}
         />
 
         <Route
@@ -148,3 +156,4 @@ export default function AdminRoutes({
     </RouteSuspense>
   );
 }
+

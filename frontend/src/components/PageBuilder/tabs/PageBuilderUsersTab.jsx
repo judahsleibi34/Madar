@@ -1,6 +1,9 @@
 import { useState } from "react";
 import {
+  ChevronDown,
+  ChevronUp,
   RefreshCw,
+  Save,
   Settings,
   ShieldCheck,
   UserPlus,
@@ -19,9 +22,39 @@ const getRoleForUser = (roles, user) =>
       }
     : null);
 
-const countEnabledPermissions = (role) =>
-  Object.values(role?.permissions || {}).filter(Boolean).length;
+const SITE_PERMISSION_KEYS = [
+  "viewProtectedPages",
+  "submitForms",
+  "makeReservations",
+];
 
+const isPermissionEnabled = (role, key) => {
+  if (Object.hasOwn(role?.permissions || {}, key)) return Boolean(role.permissions[key]);
+  return SITE_PERMISSION_KEYS.includes(key);
+};
+
+const countEnabledPermissions = (role) =>
+  SITE_PERMISSION_KEYS.filter((key) => isPermissionEnabled(role, key)).length;
+
+const collectReservationBlocks = (pages = []) => {
+  const items = [];
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    if (value.type === "reservationBlock" && value.id) {
+      items.push({
+        id: String(value.id),
+        name: value.name || value.reservation?.title || "Reservation",
+      });
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(pages);
+  return Array.from(new Map(items.map((item) => [item.id, item])).values());
+};
 export default function PageBuilderUsersTab({
   project,
   users,
@@ -38,6 +71,10 @@ export default function PageBuilderUsersTab({
   deleteUser,
   reloadUsers,
   setSelected,
+  isSavingProject = false,
+  onSave,
+  saveDisabled = false,
+  saveState = "clean",
 }) {
   const siteUsers = Array.isArray(users) ? users : [];
   const roles = Array.isArray(project.roles) ? project.roles : [];
@@ -45,6 +82,7 @@ export default function PageBuilderUsersTab({
   const disabledUsers = siteUsers.filter((user) => user.status === "Disabled").length;
   const editableRole = selectedRole || roles[0] || null;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isRoleEditorCollapsed, setIsRoleEditorCollapsed] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createBusy, setCreateBusy] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -55,6 +93,15 @@ export default function PageBuilderUsersTab({
     status: "Active",
   });
   const editableRolePermissions = countEnabledPermissions(editableRole);
+  const pageResources = (project.pages || []).map((page) => ({
+    id: String(page.id),
+    name: page.name || page.title || "Page",
+  }));
+  const formResources = (project.forms || []).map((form) => ({
+    id: String(form.id),
+    name: form.name || form.title || "Form",
+  }));
+  const reservationResources = collectReservationBlocks(project.pages || []);
   const totalPermissions = permissionGroups.reduce(
     (total, group) => total + group.permissions.length,
     0
@@ -63,6 +110,21 @@ export default function PageBuilderUsersTab({
     ? roles
     : [{ id: "customer", name: "Customer" }, ...roles];
 
+  const updateResourceAccess = (key, resourceId, checked) => {
+    if (!editableRole) return;
+    const current = Array.isArray(editableRole.resourceAccess?.[key])
+      ? editableRole.resourceAccess[key].map(String)
+      : [];
+    const next = checked
+      ? Array.from(new Set([...current, String(resourceId)]))
+      : current.filter((id) => id !== String(resourceId));
+    updateRole(editableRole.id, {
+      resourceAccess: {
+        ...(editableRole.resourceAccess || {}),
+        [key]: next,
+      },
+    });
+  };
   const openCreateUser = () => {
     setCreateError("");
     setNewUser({
@@ -125,7 +187,22 @@ export default function PageBuilderUsersTab({
         </div>
 
         <div className="header-actions users-header-actions">
-          <button type="button" className="primary-action" onClick={openCreateUser}>
+
+          <button
+            type="button"
+            className="primary-action"
+            onClick={onSave}
+            disabled={isSavingProject || saveDisabled || !onSave}
+          >
+            <Save size={17} />
+            {isSavingProject
+              ? "Saving…"
+              : saveState === "save_failed"
+                ? "Retry save"
+                : "Save now"}
+          </button>
+
+          <button type="button" onClick={openCreateUser}>
             <UserPlus size={17} />
             Add user
           </button>
@@ -293,7 +370,10 @@ export default function PageBuilderUsersTab({
                 type="button"
                 className={editableRole?.id === role.id ? "active" : ""}
                 key={role.id}
-                onClick={() => setSelected({ type: "role", id: role.id })}
+onClick={() => {
+                  setSelected({ type: "role", id: role.id });
+                  setIsRoleEditorCollapsed(false);
+                }}
               >
                 <strong>{role.name}</strong>
                 <span>
@@ -304,15 +384,28 @@ export default function PageBuilderUsersTab({
           </div>
 
           {editableRole && (
-            <div className="role-editor-card">
+            <div className={`role-editor-card${isRoleEditorCollapsed ? " is-collapsed" : ""}`}>
               <div className="role-editor-summary">
                 <div>
                   <span>Editing role</span>
                   <strong>{editableRole.name}</strong>
                 </div>
-                <em>{editableRolePermissions}/{totalPermissions}</em>
+                <div className="role-editor-summary-actions">
+                  <em>{editableRolePermissions}/{totalPermissions}</em>
+                  <button
+                    type="button"
+                    className="role-editor-collapse-button"
+                    aria-expanded={!isRoleEditorCollapsed}
+                    aria-label={isRoleEditorCollapsed ? "Expand role editor" : "Minimize role editor"}
+                    title={isRoleEditorCollapsed ? "Expand role editor" : "Minimize role editor"}
+                    onClick={() => setIsRoleEditorCollapsed((current) => !current)}
+                  >
+                    {isRoleEditorCollapsed ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+                  </button>
+                </div>
               </div>
 
+              {!isRoleEditorCollapsed && <>
               <div className="role-editor-fields-grid">
                 <label className="role-editor-field">
                   <span>Role name</span>
@@ -336,30 +429,89 @@ export default function PageBuilderUsersTab({
                 </label>
               </div>
 
-              <div className="permissions-matrix">
-                {permissionGroups.map((group) => (
-                  <section className="permission-group" key={group.title}>
-                    <strong>{group.title}</strong>
+              <section className="role-access-section">
+                <div className="role-access-section-heading">
+                  <div>
+                    <strong>Site access</strong>
+                    <p>Choose what members with this role can do.</p>
+                  </div>
+                  <span>{editableRolePermissions} enabled</span>
+                </div>
 
-                    {group.permissions.map((permission) => (
-                      <label className="checkbox-control" key={permission.key}>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(editableRole.permissions?.[permission.key])}
-                          onChange={(event) =>
-                            updateRole(editableRole.id, {
-                              permissions: {
-                                [permission.key]: event.target.checked,
-                              },
-                            })
-                          }
-                        />
-                        {permission.label}
-                      </label>
-                    ))}
-                  </section>
-                ))}
-              </div>
+                <div className="role-capabilities-grid">
+                  {permissionGroups.map((group) => (
+                    <section
+                      className="permission-group permission-capability-group"
+                      key={group.title}
+                    >
+                      <strong>{group.title}</strong>
+
+                      {group.permissions.map((permission) => (
+                        <label className="checkbox-control" key={permission.key}>
+                          <input
+                            type="checkbox"
+                            checked={isPermissionEnabled(editableRole, permission.key)}
+                            onChange={(event) =>
+                              updateRole(editableRole.id, {
+                                permissions: {
+                                  [permission.key]: event.target.checked,
+                                },
+                              })
+                            }
+                          />
+                          {permission.label}
+                        </label>
+                      ))}
+                    </section>
+                  ))}
+                </div>
+              </section>
+
+              <section className="role-resource-access">
+                <div className="role-access-section-heading">
+                  <div>
+                    <strong>Allowed resources</strong>
+                    <p>Selecting a resource for any role makes it members-only.</p>
+                  </div>
+                </div>
+
+                <div className="role-resources-grid">
+                  {[
+                    { title: "Pages", key: "pageIds", items: pageResources },
+                    { title: "Forms", key: "formIds", items: formResources },
+                    { title: "Reservations", key: "reservationBlockIds", items: reservationResources },
+                  ].map((group) => {
+                    const selectedCount = (
+                      editableRole.resourceAccess?.[group.key] || []
+                    ).length;
+                    return (
+                      <section
+                        className="permission-group resource-permission-group"
+                        key={group.key}
+                      >
+                        <div className="resource-group-heading">
+                          <strong>{group.title}</strong>
+                          <span>{selectedCount}/{group.items.length}</span>
+                        </div>
+                        {group.items.length === 0 && <small>None created</small>}
+                        {group.items.map((item) => (
+                          <label className="checkbox-control" key={item.id}>
+                            <input
+                              type="checkbox"
+                              checked={(editableRole.resourceAccess?.[group.key] || []).map(String).includes(item.id)}
+                              onChange={(event) =>
+                                updateResourceAccess(group.key, item.id, event.target.checked)
+                              }
+                            />
+                            {item.name}
+                          </label>
+                        ))}
+                      </section>
+                    );
+                  })}
+                </div>
+              </section>
+              </>}
             </div>
           )}
         </aside>

@@ -482,6 +482,11 @@ export const createRole = (name = factoryCopy.structure.role, permissions = {}) 
     ...defaultPermissions,
     ...permissions,
   },
+  resourceAccess: {
+    pageIds: [],
+    formIds: [],
+    reservationBlockIds: [],
+  },
 });
 
 export const createUser = (name = factoryCopy.structure.user, email = factoryCopy.structure.userEmail, roleId = "") => ({

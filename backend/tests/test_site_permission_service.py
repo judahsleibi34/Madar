@@ -30,7 +30,7 @@ class Client:
                 {"membership_id": 9, "project_id": "project-b", "role_id": "role-b"},
             ],
             "tenant_site_project_roles": [
-                {"id": "role-a", "project_id": "project-a", "capabilities": ["view_protected_page"], "deleted_at": None},
+                {"id": "role-a", "project_id": "project-a", "role_key": "customer", "capabilities": ["view_protected_page", "submit_protected_form", "make_reservation"], "deleted_at": None},
                 {"id": "role-b", "project_id": "project-b", "capabilities": [], "deleted_at": None},
                 {"id": "deleted", "project_id": "project-a", "capabilities": ["view_protected_page"], "deleted_at": "2026-01-01T00:00:00Z"},
             ],
@@ -48,6 +48,63 @@ class SitePermissionTests(unittest.TestCase):
         self.assertTrue(has_project_permission(membership=self.membership, project_id="project-a", capability="view_protected_page", client=self.client))
         self.assertFalse(has_project_permission(membership=self.membership, project_id="project-b", capability="view_protected_page", client=self.client))
 
+    def test_resource_allowlists_are_role_scoped(self):
+        project = {
+            "id": "project-a",
+            "published_schema": {
+                "roles": [
+                    {
+                        "id": "customer",
+                        "permissions": {"viewProtectedPages": True},
+                        "resourceAccess": {"pageIds": ["page-a"]},
+                    },
+                    {
+                        "id": "other",
+                        "permissions": {"viewProtectedPages": True},
+                        "resourceAccess": {"pageIds": ["page-b"]},
+                    },
+                ]
+            },
+        }
+        self.assertTrue(has_project_permission(
+            membership=self.membership,
+            project_id="project-a",
+            capability="view_protected_page",
+            project=project,
+            resource_type="page",
+            resource_id="page-a",
+            client=self.client,
+        ))
+        self.assertFalse(has_project_permission(
+            membership=self.membership,
+            project_id="project-a",
+            capability="view_protected_page",
+            project=project,
+            resource_type="page",
+            resource_id="page-b",
+            client=self.client,
+        ))
+
+    def test_explicit_capability_switch_can_deny_database_default(self):
+        project = {
+            "id": "project-a",
+            "published_schema": {
+                "roles": [{
+                    "id": "customer",
+                    "permissions": {"submitForms": False},
+                    "resourceAccess": {"formIds": ["private-form"]},
+                }]
+            },
+        }
+        self.assertFalse(has_project_permission(
+            membership=self.membership,
+            project_id="project-a",
+            capability="submit_protected_form",
+            project=project,
+            resource_type="form",
+            resource_id="private-form",
+            client=self.client,
+        ))
     def test_disabled_membership_overrides_assignment(self):
         membership = {**self.membership, "status": "disabled"}
         self.assertFalse(has_project_permission(membership=membership, project_id="project-a", capability="view_protected_page", client=self.client))

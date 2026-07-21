@@ -7,6 +7,7 @@ import {
   deleteBuilderSiteMember,
   fetchBuilderProject,
   fetchProtectedSitePage,
+  fetchPublicSite,
   listBuilderProjects,
   fetchBuilderSiteMembers,
   publishBuilderProject,
@@ -114,6 +115,19 @@ describe("builder project cloud API", () => {
     expect(apiFetch.mock.calls[3][1].method).toBe("DELETE");
   });
 
+  it("fetches the public site through the authenticated API client", async () => {
+    apiFetch.mockResolvedValueOnce(jsonResponse({
+      project: { published_schema: { pages: [{ id: "home" }] } },
+    }));
+
+    const result = await fetchPublicSite("tenant-site");
+
+    expect(result.project.published_schema.pages[0].id).toBe("home");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/public/sites/tenant-site",
+      { method: "GET", cache: "no-store" }
+    );
+  });
   it("fetches protected pages through the authenticated public-site API", async () => {
     apiFetch.mockResolvedValueOnce(jsonResponse({
       project: { published_schema: { pages: [{ id: "member-page" }] } },

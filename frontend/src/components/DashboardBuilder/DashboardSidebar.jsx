@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -7,12 +7,12 @@ import {
   LayoutDashboard,
   PanelsTopLeft,
   ClipboardList,
+  CalendarDays,
   Database,
   CreditCard,
   ShieldCheck,
   Settings,
   LogOut,
-  Search,
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
@@ -144,27 +144,21 @@ export default function DashboardSidebar({
 
     return readStoredThemeMode();
   });
-  const [navSearch, setNavSearch] = useState("");
 
   const workspaceRouteActive = [
     DASHBOARD_ROUTES.pageBuilder,
     DASHBOARD_ROUTES.builderResponses,
     DASHBOARD_ROUTES.builderData,
+    DASHBOARD_ROUTES.calendar,
     DASHBOARD_ROUTES.archive,
   ].some(
     (path) =>
       location.pathname === path ||
       location.pathname.startsWith(`${path}/`),
   );
-  const securityRouteActive =
-    location.pathname === DASHBOARD_ROUTES.settingsSecurity ||
-    location.pathname.startsWith(
-      `${DASHBOARD_ROUTES.settingsSecurity}/`,
-    );
   const settingsRouteActive =
-    !securityRouteActive &&
-    (location.pathname === DASHBOARD_ROUTES.settings ||
-      location.pathname.startsWith(`${DASHBOARD_ROUTES.settings}/`));
+    location.pathname === DASHBOARD_ROUTES.settings ||
+    location.pathname.startsWith(DASHBOARD_ROUTES.settings + "/");
   const [workspaceExpansion, setWorkspaceExpansion] = useState({
     open: workspaceRouteActive,
     pathname: location.pathname,
@@ -221,12 +215,7 @@ export default function DashboardSidebar({
       path: DASHBOARD_ROUTES.myPlan,
       icon: CreditCard,
     },
-    {
-      label: t("sidebar.security"),
-      path: DASHBOARD_ROUTES.settingsSecurity,
-      icon: ShieldCheck,
-    },
-  ];
+];
 
   const workspaceItems = [
     {
@@ -245,34 +234,23 @@ export default function DashboardSidebar({
       icon: Database,
     },
     {
+      label: t("sidebar.calendar", { defaultValue: "Calendar" }),
+      path: DASHBOARD_ROUTES.calendar,
+      icon: CalendarDays,
+    },
+    {
       label: t("sidebar.archive", { defaultValue: "Archive" }),
       path: DASHBOARD_ROUTES.archive,
       icon: Archive,
     },
   ];
-  const normalizedNavSearch = navSearch.trim().toLowerCase();
-  const filteredPrimaryNavItems = normalizedNavSearch
-    ? primaryNavItems.filter((item) =>
-        item.label.toLowerCase().includes(normalizedNavSearch),
-      )
-    : primaryNavItems;
-  const filteredWorkspaceItems = normalizedNavSearch
-    ? workspaceItems.filter((item) =>
-        item.label.toLowerCase().includes(normalizedNavSearch),
-      )
-    : workspaceItems;
   const workspaceLabel = t("sidebar.workspace", {
     defaultValue: "Workspace",
   });
-  const showWorkspace =
-    !normalizedNavSearch ||
-    workspaceLabel.toLowerCase().includes(normalizedNavSearch) ||
-    filteredWorkspaceItems.length > 0;
   const workspaceIsExpanded =
-    (workspaceExpansion.pathname === location.pathname
+    workspaceExpansion.pathname === location.pathname
       ? workspaceExpansion.open
-      : workspaceRouteActive) ||
-    (Boolean(normalizedNavSearch) && filteredWorkspaceItems.length > 0);
+      : workspaceRouteActive;
   const settingsIsExpanded =
     settingsExpansion.pathname === location.pathname
       ? settingsExpansion.open
@@ -404,21 +382,6 @@ export default function DashboardSidebar({
           )}
         </div>
 
-        <label className="admin-sidebar-search" onClick={expandWorkspaceSidebar}>
-          <Search size={16} aria-hidden="true" />
-          <input
-            type="search"
-            value={navSearch}
-            onChange={(event) => setNavSearch(event.target.value)}
-            placeholder={t("sidebar.search", {
-              defaultValue: "Search...",
-            })}
-            aria-label={t("sidebar.search", {
-              defaultValue: "Search",
-            })}
-          />
-        </label>
-
         <nav
           className="admin-sidebar-nav"
           aria-label={t("sidebar.navigation")}
@@ -431,7 +394,7 @@ export default function DashboardSidebar({
             />
           )}
 
-          {filteredPrimaryNavItems.slice(0, 2).map((item) => {
+          {primaryNavItems.slice(0, 2).map((item) => {
             const active = isActive(item.path);
 
             return (
@@ -446,9 +409,8 @@ export default function DashboardSidebar({
             );
           })}
 
-          {showWorkspace && (
-            <div className="admin-sidebar-group">
-              <SidebarRow
+          <div className="admin-sidebar-group">
+            <SidebarRow
                 active={workspaceRouteActive}
                 activeClassName="active-parent"
                 controls="dashboard-sidebar-workspace"
@@ -472,12 +434,12 @@ export default function DashboardSidebar({
                 }}
               />
 
-              {workspaceIsExpanded && (
+            {workspaceIsExpanded && (
                 <div
                   className="admin-sidebar-subnav"
                   id="dashboard-sidebar-workspace"
                 >
-                  {filteredWorkspaceItems.map((item) => {
+                  {workspaceItems.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
 
@@ -497,10 +459,9 @@ export default function DashboardSidebar({
                   })}
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
-          {filteredPrimaryNavItems.slice(2).map((item) => {
+          {primaryNavItems.slice(2).map((item) => {
             const active = isActive(item.path);
 
             return (

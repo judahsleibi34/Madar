@@ -322,7 +322,7 @@ export default function ReservationsTab({
               className={`reservation-list-item ${activeItem?.element.id === item.element.id ? "is-active" : ""}`}
               onClick={() => onSelectReservationBlock(item.element.id, item.page.id)}
             >
-              <strong>{item.element.reservation?.title || item.element.name || "Reservation block"}</strong>
+              <strong>{item.element.name || item.element.reservation?.title || "Reservation block"}</strong>
               <span>{item.page.name} / {item.section.name}</span>
             </button>
           ))}
@@ -371,11 +371,12 @@ export default function ReservationsTab({
                   <div className="reservation-settings-section reservation-copy-section">
                 <div>
                   <span className="workspace-kicker">Booking details</span>
-                  <h3>What visitors will see</h3>
+                  <h3>{activeElement.name || "Reservation block"}</h3>
+                  <p>What visitors will see</p>
                 </div>
                 <div className="reservation-copy-grid">
                   <label>
-                    Name for your reference
+                    Reservation name
                     <input
                       value={activeElement.name || ""}
                       onChange={(event) => onUpdateReservationBlock(activeElement.id, { name: event.target.value })}

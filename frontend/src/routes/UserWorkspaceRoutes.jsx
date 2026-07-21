@@ -1,4 +1,4 @@
-import { lazy } from "react";
+﻿import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
@@ -7,12 +7,14 @@ import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
 const ChangePasswordPage = lazy(() => import("../components/DashboardBuilder/ChangePasswordPage"));
-const SecurityMfaPage = lazy(() => import("../components/DashboardBuilder/SecurityMfaPage"));
 const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
 const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDashboard"));
 const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
 const NotificationsPage = lazy(() => import("../components/DashboardBuilder/NotificationsPage"));
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
+const ReservationCalendarPage = lazy(() =>
+  import("../components/DashboardBuilder/ReservationCalendarPage")
+);
 const BuilderFormPreviewPage = lazy(() =>
   import("../components/PageBuilder/preview/BuilderFormPreviewPage")
 );
@@ -44,6 +46,7 @@ export default function UserWorkspaceRoutes({
     location.pathname.startsWith("/page-builder") ||
     location.pathname.startsWith("/builder-responses") ||
     location.pathname.startsWith("/builder-data") ||
+    location.pathname.startsWith("/calendar") ||
     location.pathname.startsWith("/archive");
 
   const renderShell = (children, options = {}) => (
@@ -161,6 +164,11 @@ export default function UserWorkspaceRoutes({
         )}
       />
 
+
+      <Route
+        path="/calendar/*"
+        element={renderShell(<ReservationCalendarPage />)}
+      />
       <Route
         path="/archive/*"
         element={renderShell(<ArchivePage user={user} />, { compactSidebar: true })}
@@ -183,7 +191,14 @@ export default function UserWorkspaceRoutes({
 
       <Route
         path="/settings/security/*"
-        element={renderShell(<SecurityMfaPage lang={lang} />)}
+        element={renderShell(
+          <SettingsPage
+            lang={lang}
+            user={user}
+            onUserUpdated={onUserUpdated}
+            initialTab="security"
+          />
+        )}
       />
 
       <Route

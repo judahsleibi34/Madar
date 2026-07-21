@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   fetchBuilderFormSubmissionsPage,
   updateBuilderFormSubmissionStatus,
@@ -11,6 +11,12 @@ import {
   normalizeStatus,
   uniqueByNormalizedStatus,
 } from "../utils/responsesUtils";
+import {
+  createResponsesCacheKey,
+  getOrCreateResponsesRequest,
+  readResponsesCache,
+  writeResponsesCache,
+} from "../utils/responsesCache";
 
 const deferEffectStateUpdate = (callback) => {
   let cancelled = false;
@@ -35,8 +41,26 @@ export function useBuilderResponsesData({
   const selectedForm = activeForm || project.forms?.[0];
   const selectedFormId = selectedForm?.id || "";
   const allForms = project.forms || [];
-  const [backendResponsesByForm, setBackendResponsesByForm] = useState({});
-  const [backendPaginationByForm, setBackendPaginationByForm] = useState({});
+  const userScope =
+    user?.id || user?.auth_id || user?.authId || user?.email || "authenticated";
+  const [initialCache] = useState(() => {
+    if (!builderProjectId || !selectedFormId) return null;
+    return readResponsesCache(
+      createResponsesCacheKey({
+        userScope,
+        projectId: builderProjectId,
+        formId: selectedFormId,
+        limit: RESPONSE_PAGE_SIZE,
+        offset: 0,
+      })
+    );
+  });
+  const [backendResponsesByForm, setBackendResponsesByForm] = useState(() =>
+    initialCache ? { [selectedFormId]: initialCache.responses } : {}
+  );
+  const [backendPaginationByForm, setBackendPaginationByForm] = useState(() =>
+    initialCache ? { [selectedFormId]: initialCache.pagination } : {}
+  );
   const [responsePageByForm, setResponsePageByForm] = useState({});
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responsesError, setResponsesError] = useState("");
@@ -48,6 +72,16 @@ export function useBuilderResponsesData({
   const [refreshKey, setRefreshKey] = useState(0);
   const selectedPage = responsePageByForm[selectedFormId] || 0;
   const selectedOffset = selectedPage * RESPONSE_PAGE_SIZE;
+  const selectedCacheKey =
+    builderProjectId && selectedFormId
+      ? createResponsesCacheKey({
+          userScope,
+          projectId: builderProjectId,
+          formId: selectedFormId,
+          limit: RESPONSE_PAGE_SIZE,
+          offset: selectedOffset,
+        })
+      : "";
 
   useEffect(() => {
     if (!builderProjectId || !selectedFormId) {
@@ -58,32 +92,56 @@ export function useBuilderResponsesData({
     }
 
     let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        setResponsesLoading(true);
-        setResponsesError("");
-      }
-    });
+    const cached = readResponsesCache(selectedCacheKey);
 
-    fetchBuilderFormSubmissionsPage(builderProjectId, {
-      form_id: selectedFormId,
-      limit: RESPONSE_PAGE_SIZE,
-      offset: selectedOffset,
-      user_id: user?.id,
-    })
-      .then(({ submissions, pagination }) => {
-        if (cancelled) return;
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      if (cached) {
         setBackendResponsesByForm((current) => ({
           ...current,
-          [selectedFormId]: submissions.map(normalizeBackendResponse),
+          [selectedFormId]: cached.responses,
+        }));
+        setBackendPaginationByForm((current) => ({
+          ...current,
+          [selectedFormId]: cached.pagination,
+        }));
+      }
+
+      setResponsesLoading(!cached);
+      setResponsesError("");
+    });
+
+    getOrCreateResponsesRequest(selectedCacheKey, () =>
+      fetchBuilderFormSubmissionsPage(builderProjectId, {
+        form_id: selectedFormId,
+        limit: RESPONSE_PAGE_SIZE,
+        offset: selectedOffset,
+        user_id: user?.id,
+      })
+    )
+      .then(({ submissions, pagination }) => {
+        if (cancelled) return;
+
+        const normalizedResponses = submissions.map(normalizeBackendResponse);
+        setBackendResponsesByForm((current) => ({
+          ...current,
+          [selectedFormId]: normalizedResponses,
         }));
         setBackendPaginationByForm((current) => ({
           ...current,
           [selectedFormId]: pagination,
         }));
+        writeResponsesCache(
+          selectedCacheKey,
+          normalizedResponses,
+          pagination
+        );
       })
       .catch((error) => {
-        if (!cancelled) setResponsesError(getResponseLoadMessage(error, t));
+        if (!cancelled && !cached) {
+          setResponsesError(getResponseLoadMessage(error, t));
+        }
       })
       .finally(() => {
         if (!cancelled) setResponsesLoading(false);
@@ -92,7 +150,15 @@ export function useBuilderResponsesData({
     return () => {
       cancelled = true;
     };
-  }, [builderProjectId, selectedFormId, selectedOffset, refreshKey, t, user?.id]);
+  }, [
+    builderProjectId,
+    refreshKey,
+    selectedCacheKey,
+    selectedFormId,
+    selectedOffset,
+    t,
+    user?.id,
+  ]);
 
   const getDisplayResponsesForForm = (form) => {
     if (!form) return [];
@@ -241,12 +307,24 @@ export function useBuilderResponsesData({
       );
       const normalizedSubmission = normalizeBackendResponse(updatedSubmission);
 
-      setBackendResponsesByForm((current) => ({
-        ...current,
-        [selectedFormId]: (current[selectedFormId] || []).map((submission) =>
+      setBackendResponsesByForm((current) => {
+        const nextResponses = (current[selectedFormId] || []).map((submission) =>
           submission.id === submissionId ? normalizedSubmission : submission
-        ),
-      }));
+        );
+
+        if (selectedPagination) {
+          writeResponsesCache(
+            selectedCacheKey,
+            nextResponses,
+            selectedPagination
+          );
+        }
+
+        return {
+          ...current,
+          [selectedFormId]: nextResponses,
+        };
+      });
     } catch (error) {
       showToast?.(error?.message || t.updateStatusFailed);
     } finally {

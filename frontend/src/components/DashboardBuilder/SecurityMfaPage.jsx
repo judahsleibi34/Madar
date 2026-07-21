@@ -1,10 +1,34 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { KeyRound, QrCode, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { apiFetch } from "../../utils/apiClient";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
+const MFA_STATUS_CACHE_TTL_MS = 60_000;
+const mfaStatusCache = new Map();
+const mfaStatusRequests = new Map();
+
+const getMfaCacheKey = (cacheKey) => String(cacheKey || "current");
+
+const readCachedMfaStatus = (cacheKey) => {
+  const cached = mfaStatusCache.get(getMfaCacheKey(cacheKey));
+  if (!cached || Date.now() - cached.cachedAt >= MFA_STATUS_CACHE_TTL_MS) {
+    return null;
+  }
+  return cached.value;
+};
+
+const writeCachedMfaStatus = (cacheKey, value) => {
+  mfaStatusCache.set(getMfaCacheKey(cacheKey), {
+    cachedAt: Date.now(),
+    value,
+  });
+};
+
+const clearCachedMfaStatus = (cacheKey) => {
+  mfaStatusCache.delete(getMfaCacheKey(cacheKey));
+};
 
 const getApiErrorMessage = (detail, fallback) => {
   if (typeof detail === "string" && detail.trim()) return detail;
@@ -44,15 +68,15 @@ const getFactorLabel = (factor, fallback) => {
   return factor?.friendly_name || factor?.factor_type?.toUpperCase?.() || fallback;
 };
 
-export default function SecurityMfaPage({ lang = "en" }) {
+export default function SecurityMfaPage({ lang = "en", embedded = false, cacheKey = "current" }) {
   const { t } = useTranslation("dashboard");
   const isArabic = lang === "ar";
 
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState(() => readCachedMfaStatus(cacheKey));
   const [enrollment, setEnrollment] = useState(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [friendlyName, setFriendlyName] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !readCachedMfaStatus(cacheKey));
   const [busyAction, setBusyAction] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -76,33 +100,51 @@ export default function SecurityMfaPage({ lang = "en" }) {
     return data;
   }, [t]);
 
-  const loadStatus = useCallback(async ({ showSpinner = false } = {}) => {
+  const loadStatus = useCallback(async ({ showSpinner = false, force = false } = {}) => {
+    const cachedStatus = force ? null : readCachedMfaStatus(cacheKey);
+    if (cachedStatus) {
+      setStatus(cachedStatus);
+      setLoading(false);
+      return cachedStatus;
+    }
+
     if (showSpinner) setLoading(true);
     setError("");
 
     try {
-      const response = await apiFetch(`${API_URL}/auth/mfa/status`, {
-        method: "GET",
-        cache: "no-store",
-      });
-      const data = await readResponse(response);
+      const requestKey = getMfaCacheKey(cacheKey);
+      let request = mfaStatusRequests.get(requestKey);
+
+      if (!request) {
+        request = apiFetch(API_URL + "/auth/mfa/status", {
+          method: "GET",
+          cache: "no-store",
+        })
+          .then(readResponse)
+          .finally(() => mfaStatusRequests.delete(requestKey));
+        mfaStatusRequests.set(requestKey, request);
+      }
+
+      const data = await request;
       setStatus(data);
+      writeCachedMfaStatus(cacheKey, data);
+      return data;
     } catch (loadError) {
       setError(loadError.message || t("securityMfa.errors.load"));
     } finally {
       if (showSpinner) setLoading(false);
     }
-  }, [readResponse, t]);
+  }, [cacheKey, readResponse, t]);
 
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) loadStatus({ showSpinner: true });
+      if (!cancelled) loadStatus({ showSpinner: !readCachedMfaStatus(cacheKey) });
     });
     return () => {
       cancelled = true;
     };
-  }, [loadStatus]);
+  }, [cacheKey, loadStatus]);
 
   const startEnrollment = async () => {
     setBusyAction("enroll");
@@ -119,7 +161,8 @@ export default function SecurityMfaPage({ lang = "en" }) {
       setEnrollment(data);
       setVerificationCode("");
       setSuccess(t("securityMfa.messages.enrollStarted"));
-      await loadStatus();
+      clearCachedMfaStatus(cacheKey);
+      await loadStatus({ force: true });
     } catch (enrollError) {
       setError(enrollError.message || t("securityMfa.errors.enroll"));
     } finally {
@@ -151,7 +194,8 @@ export default function SecurityMfaPage({ lang = "en" }) {
       setVerificationCode("");
       setFriendlyName("");
       setSuccess(t("securityMfa.messages.verified"));
-      await loadStatus();
+      clearCachedMfaStatus(cacheKey);
+      await loadStatus({ force: true });
     } catch (verifyError) {
       setError(verifyError.message || t("securityMfa.errors.verify"));
     } finally {
@@ -173,7 +217,8 @@ export default function SecurityMfaPage({ lang = "en" }) {
       );
       await readResponse(response);
       setSuccess(t("securityMfa.messages.removed"));
-      await loadStatus();
+      clearCachedMfaStatus(cacheKey);
+      await loadStatus({ force: true });
     } catch (removeError) {
       setError(removeError.message || t("securityMfa.errors.remove"));
     } finally {
@@ -209,11 +254,13 @@ export default function SecurityMfaPage({ lang = "en" }) {
 
   return (
     <section className="security-mfa-page" dir={isArabic ? "rtl" : "ltr"}>
-      <header className="security-mfa-header">
-        <span>{t("securityMfa.eyebrow")}</span>
-        <h1>{t("securityMfa.title")}</h1>
-        <p>{t("securityMfa.subtitle")}</p>
-      </header>
+      {!embedded && (
+        <header className="security-mfa-header">
+          <span>{t("securityMfa.eyebrow")}</span>
+          <h1>{t("securityMfa.title")}</h1>
+          <p>{t("securityMfa.subtitle")}</p>
+        </header>
+      )}
 
       {loading ? (
         <div className="security-mfa-panel security-mfa-loading" role="status">
@@ -356,3 +403,5 @@ export default function SecurityMfaPage({ lang = "en" }) {
     </section>
   );
 }
+
+

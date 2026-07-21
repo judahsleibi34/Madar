@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+﻿import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,7 +14,9 @@ vi.mock("../components/DashboardBuilder/SecurityMfaPage", () => ({
   default: () => <div>Dedicated security page</div>,
 }));
 vi.mock("../components/DashboardBuilder/SettingsPage", () => ({
-  default: () => <div>General settings page</div>,
+  default: ({ initialTab }) => (
+    <div>{initialTab === "security" ? "Tabbed security settings" : "General settings page"}</div>
+  ),
 }));
 vi.mock("../components/PageBuilder", () => ({
   default: () => <div>Explicit project editor</div>,
@@ -37,15 +39,15 @@ const routeProps = {
 };
 
 describe("workspace settings routes", () => {
-  it("keeps the dedicated security route on direct navigation/refresh", async () => {
+  it("opens the Security tab on direct navigation/refresh", async () => {
     render(
       <MemoryRouter initialEntries={["/settings/security"]}>
         <UserWorkspaceRoutes {...routeProps} />
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Dedicated security page")).toBeTruthy();
-    expect(screen.queryByText("General settings page")).toBeNull();
+    expect(await screen.findByText("Tabbed security settings")).toBeTruthy();
+    expect(screen.queryByText("Dedicated security page")).toBeNull();
   });
 
   it("does not mount the editor at a legacy project-less builder URL", async () => {
@@ -68,3 +70,4 @@ describe("workspace settings routes", () => {
     expect(screen.queryByText("Project chooser")).toBeNull();
   });
 });
+

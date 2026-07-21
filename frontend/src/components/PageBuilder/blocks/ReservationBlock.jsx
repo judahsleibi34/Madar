@@ -24,14 +24,14 @@ const normalizeServices = (services) => {
     .map((service) => String(service || "").trim())
     .filter(Boolean);
 
-  return cleanServices.length > 0 ? cleanServices : defaultServices;
+  return Array.isArray(services) ? cleanServices : defaultServices;
 };
 
 export default function ReservationBlock({
   title = reservationDefaults.title,
   description = reservationDefaults.description,
-  services = defaultServices,
-  fields = defaultFields,
+  services,
+  fields,
   bookingMode = "flexible",
   availableDates = [],
   timeSlots = [],
@@ -43,11 +43,15 @@ export default function ReservationBlock({
   const content = getReservationContent(lang);
   const fieldMeta = content.fieldMeta;
   const serviceOptions = useMemo(() => normalizeServices(services), [services]);
-  const enabledFields = useMemo(
-    () => (Array.isArray(fields) && fields.length > 0 ? fields : defaultFields),
-    [fields]
-  );
   const isFixedSlots = bookingMode !== "flexible";
+  const enabledFields = useMemo(
+    () => Array.isArray(fields)
+      ? fields
+      : defaultFields.filter((key) => isFixedSlots || !["service", "guests"].includes(key)),
+    [fields, isFixedSlots]
+  );
+  const hasContactFields = ["name", "contact"].some((key) => enabledFields.includes(key));
+  const hasScheduleFields = ["date", "time"].some((key) => enabledFields.includes(key));
   const [values, setValues] = useState(() => initialValues(serviceOptions[0]));
   const [errors, setErrors] = useState({});
   const [idempotencyKey, setIdempotencyKey] = useState(createReservationIdempotencyKey);
@@ -85,11 +89,14 @@ export default function ReservationBlock({
     event.preventDefault();
 
     const nextErrors = {};
-    requiredFields.filter((key) => enabledFields.includes(key)).forEach((key) => {
-      if (!String(values[key] || "").trim()) {
-        nextErrors[key] = content.required;
-      }
-    });
+    requiredFields
+      .filter((key) => enabledFields.includes(key))
+      .filter((key) => key !== "service" || serviceOptions.length > 0)
+      .forEach((key) => {
+        if (!String(values[key] || "").trim()) {
+          nextErrors[key] = content.required;
+        }
+      });
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -124,6 +131,7 @@ export default function ReservationBlock({
     const meta = fieldMeta[key];
     if (!meta || !enabledFields.includes(key)) return null;
     if (isFixedSlots && ["date", "time", "service", "guests"].includes(key)) return null;
+    if (key === "service" && serviceOptions.length === 0) return null;
 
     if (key === "service") {
       return (
@@ -223,7 +231,7 @@ export default function ReservationBlock({
         </div>
       ) : (
         <div className="reservation-request-form">
-          <section className="reservation-request-section">
+          {hasContactFields && <section className="reservation-request-section">
             <div className="reservation-request-heading">
               <h4>Your details</h4>
               <p>Tell us how to contact you.</p>
@@ -232,19 +240,18 @@ export default function ReservationBlock({
               {renderField("name")}
               {renderField("contact")}
             </div>
-          </section>
+          </section>}
 
-          <section className="reservation-request-section">
+          {hasScheduleFields && <section className="reservation-request-section">
             <div className="reservation-request-heading">
               <h4>Appointment details</h4>
-              <p>Choose what you need and when you prefer to visit.</p>
+              <p>Choose when you prefer to visit.</p>
             </div>
             <div className="reservation-request-grid reservation-request-schedule">
-              {renderField("service")}
               {renderField("date")}
               {renderField("time")}
             </div>
-          </section>
+          </section>}
 
           {enabledFields.includes("notes") && (
             <section className="reservation-request-section">

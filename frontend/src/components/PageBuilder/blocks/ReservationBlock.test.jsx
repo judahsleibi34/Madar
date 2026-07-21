@@ -53,7 +53,27 @@ describe("ReservationBlock fixed slots", () => {
     expect(screen.getByRole("heading", { name: "Your details" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Appointment details" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Additional notes" })).toBeTruthy();
+    expect(screen.queryByLabelText("Service")).toBeNull();
     expect(screen.queryByLabelText("Guests")).toBeNull();
     expect(container.querySelector(".reservation-summary")).toBeNull();
+  });
+
+  it("renders only explicitly configured appointment fields", () => {
+    render(
+      <ReservationBlock
+        bookingMode="flexible"
+        fields={["service", "date"]}
+        services={["Planning session"]}
+      />
+    );
+
+    expect(screen.queryByLabelText("Service")).toBeNull();
+    expect(screen.getByLabelText("Date")).toBeTruthy();
+    expect(screen.queryByLabelText("Name")).toBeNull();
+    expect(screen.queryByLabelText("Contact")).toBeNull();
+    expect(screen.queryByLabelText("Time")).toBeNull();
+    expect(screen.queryByLabelText("Notes")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Your details" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Additional notes" })).toBeNull();
   });
 });

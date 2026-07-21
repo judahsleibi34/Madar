@@ -6418,6 +6418,14 @@ export default function PageBuilder({
       deleteUser={requestDeleteSiteUser}
       reloadUsers={loadSiteMembers}
       setSelected={setSelected}
+      isSavingProject={isSavingProject}
+      onSave={() => publishProject()}
+      saveDisabled={
+        builderProjectLoading ||
+        hasProtectedUnreadableDraft ||
+        saveState === BUILDER_SAVE_STATES.conflict
+      }
+      saveState={saveState}
     />
   );
 

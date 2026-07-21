@@ -13,12 +13,19 @@ const renderUsersTab = (overrides = {}) => {
   const props = {
     project: {
       activePageId: "home",
+      pages: [{
+        id: "home",
+        name: "Home",
+        sections: [{ freeElements: [{ id: "booking", type: "reservationBlock", name: "Consultation booking" }] }],
+      }],
+      forms: [{ id: "intake", name: "Intake form" }],
       roles: [
         {
           id: "customer",
           name: "Customer",
           description: "Published site customer",
           permissions: { view: true },
+          resourceAccess: { pageIds: [], formIds: [], reservationBlockIds: [] },
         },
       ],
     },
@@ -45,6 +52,10 @@ const renderUsersTab = (overrides = {}) => {
     deleteUser: vi.fn(),
     reloadUsers: vi.fn(),
     setSelected: vi.fn(),
+    isSavingProject: false,
+    onSave: vi.fn(),
+    saveDisabled: false,
+    saveState: "dirty",
     ...overrides,
   };
 
@@ -55,6 +66,13 @@ const renderUsersTab = (overrides = {}) => {
 afterEach(cleanup);
 
 describe("PageBuilderUsersTab", () => {
+  it("allows an immediate manual save without an inline notification card", () => {
+    const props = renderUsersTab();
+    expect(screen.queryByRole("status")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save now" }));
+    expect(props.onSave).toHaveBeenCalledTimes(1);
+  });
+
   it("shows registered subdomain users and their source", () => {
     renderUsersTab();
     expect(screen.getByText("Registered Person")).toBeTruthy();
@@ -64,6 +82,29 @@ describe("PageBuilderUsersTab", () => {
     expect(within(usersPanel).getByText("Customer")).toBeTruthy();
   });
 
+  it("minimizes and restores the role editor", () => {
+    renderUsersTab();
+
+    fireEvent.click(screen.getByRole("button", { name: "Minimize role editor" }));
+    expect(screen.queryByLabelText("Intake form")).toBeNull();
+    expect(screen.getByRole("button", { name: "Expand role editor" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand role editor" }));
+    expect(screen.getByLabelText("Intake form")).toBeTruthy();
+  });
+  it("updates resource allowlists for the selected role", () => {
+    const props = renderUsersTab();
+    fireEvent.click(screen.getByLabelText("Intake form"));
+    expect(props.updateRole).toHaveBeenCalledWith("customer", {
+      resourceAccess: {
+        pageIds: [],
+        formIds: ["intake"],
+        reservationBlockIds: [],
+      },
+    });
+    expect(screen.getByLabelText("Home")).toBeTruthy();
+    expect(screen.getByLabelText("Consultation booking")).toBeTruthy();
+  });
   it("creates an admin user through the server-backed callback", async () => {
     const props = renderUsersTab();
     fireEvent.click(screen.getByRole("button", { name: "Add user" }));
