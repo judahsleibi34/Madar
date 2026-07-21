@@ -1,19 +1,23 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import TenantSiteRuntime, { getBuilderPreviewBasePath } from "./TenantSiteRuntime";
 import {
   fetchBuilderProject,
+  fetchProtectedSitePage,
   fetchPublicSite,
   getTenantVisitorStatus,
+  loginTenantVisitor,
 } from "../services/PageBuilder.api";
 
 vi.mock("../services/PageBuilder.api", async () => ({
   ...(await vi.importActual("../services/PageBuilder.api")),
   fetchBuilderProject: vi.fn(),
+  fetchProtectedSitePage: vi.fn(),
   fetchPublicSite: vi.fn(),
   getTenantVisitorStatus: vi.fn(),
+  loginTenantVisitor: vi.fn(),
 }));
 
 const PROJECT_ID = "3023144a-6f48-46ee-90ed-fe712f51283a";
@@ -54,14 +58,19 @@ const renderPreview = ({ showHeader = true, showFooter = true } = {}) => {
   );
 };
 
-const renderPublic = ({ showHeader = true, showFooter = true } = {}) => {
+const renderPublic = ({
+  showHeader = true,
+  showFooter = true,
+  footerShopLinks = "",
+  footerHelpLinks = "",
+} = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSite.mockResolvedValue({
     site: { subdomain: "tenant-site" },
     project: {
       published_schema: {
         defaultPageId: "home",
-        siteChrome: { showHeader, showFooter, brand: "Route Test" },
+        siteChrome: { showHeader, showFooter, brand: "Route Test", footerShopLinks, footerHelpLinks },
         theme: {},
         forms: [],
         pages: [
@@ -134,4 +143,156 @@ describe("TenantSiteRuntime explicit project preview", () => {
       expect(Boolean(document.querySelector(".tenant-site-footer"))).toBe(expectsFooter);
     }
   );
+
+  it("hides unresolved internal page ids from the footer", async () => {
+    renderPublic({
+      footerShopLinks: "page_restricted-12345678",
+      footerHelpLinks: "About Us",
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
+    });
+
+    expect(screen.queryByText("page_restricted-12345678")).toBeNull();
+    expect(screen.getByText("About Us")).toBeTruthy();
+  });
+});
+
+const protectedLoginPage = {
+  id: "home",
+  name: "Home",
+  slug: "/",
+  isDefault: true,
+  sections: [{
+    id: "login-section",
+    mode: "free",
+    layout: {
+      width: "large",
+      paddingY: "small",
+      background: "transparent",
+      minHeight: 320,
+    },
+    rows: [],
+    freeElements: [{
+      id: "login-block",
+      type: "loginBlock",
+      auth: {},
+      styles: {},
+    }],
+  }],
+};
+
+const protectedMembersPage = {
+  id: "members",
+  name: "Members",
+  slug: "/members",
+  sections: [],
+};
+
+const RuntimeLocation = () => {
+  const current = useLocation();
+  return (
+    <output data-testid="runtime-location">
+      {current.pathname}{current.search}
+    </output>
+  );
+};
+
+const renderProtectedPublic = () => {
+  getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
+  fetchPublicSite.mockResolvedValue({
+    site: { subdomain: "tenant-site" },
+    project: {
+      published_schema: {
+        defaultPageId: "home",
+        siteChrome: { brand: "Protected Route Test" },
+        theme: {},
+        forms: [],
+        pages: [protectedLoginPage],
+      },
+    },
+  });
+
+  return render(
+    <MemoryRouter initialEntries={["/site/tenant-site/members"]}>
+      <Routes>
+        <Route
+          path="/site/:subdomain/*"
+          element={(
+            <>
+              <TenantSiteRuntime />
+              <RuntimeLocation />
+            </>
+          )}
+        />
+      </Routes>
+    </MemoryRouter>
+  );
+};
+
+describe("TenantSiteRuntime protected page login redirect", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => cleanup());
+
+  it("redirects an anonymous protected-page request to login with a safe return path", async () => {
+    fetchProtectedSitePage.mockRejectedValue(
+      Object.assign(new Error("Log in to access this resource"), { status: 401 })
+    );
+
+    renderProtectedPublic();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("runtime-location").textContent).toBe(
+        "/site/tenant-site/?returnTo=%2Fmembers"
+      );
+    });
+    expect(fetchProtectedSitePage).toHaveBeenCalledWith("tenant-site", "members");
+    expect(document.querySelector('input[name="email"]')).toBeTruthy();
+  });
+
+  it("returns to the protected page after a successful login", async () => {
+    fetchProtectedSitePage
+      .mockRejectedValueOnce(
+        Object.assign(new Error("Log in to access this resource"), { status: 401 })
+      )
+      .mockResolvedValueOnce({
+        site: { subdomain: "tenant-site" },
+        project: {
+          published_schema: {
+            defaultPageId: "home",
+            siteChrome: { brand: "Protected Route Test" },
+            theme: {},
+            forms: [],
+            pages: [protectedLoginPage, protectedMembersPage],
+          },
+        },
+      });
+    loginTenantVisitor.mockResolvedValue({
+      logged_in: true,
+      user: { id: 7, email: "member@example.com" },
+      message: "Logged in",
+    });
+
+    renderProtectedPublic();
+
+    await waitFor(() => {
+      expect(document.querySelector('input[name="email"]')).toBeTruthy();
+    });
+    fireEvent.change(document.querySelector('input[name="email"]'), {
+      target: { value: "member@example.com" },
+    });
+    fireEvent.change(document.querySelector('input[name="password"]'), {
+      target: { value: "password123" },
+    });
+    fireEvent.submit(document.querySelector('input[name="email"]').closest("form"));
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-page-id="members"]')).toBeTruthy();
+    });
+    expect(screen.getByTestId("runtime-location").textContent).toBe(
+      "/site/tenant-site/members"
+    );
+    expect(fetchProtectedSitePage).toHaveBeenCalledTimes(2);
+  });
 });

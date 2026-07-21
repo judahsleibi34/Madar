@@ -1,4 +1,4 @@
-@import "./shell.css";
+﻿@import "./shell.css";
 @import "./layout.css";
 @import "./sidebar.css";
 @import "./overview-cards.css";
@@ -14,3 +14,4 @@
 @import "./user-dashboard.css";
 @import "./restricted-access.css";
 @import "./archive.css";
+@import "./reservation-calendar.css";

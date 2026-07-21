@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+﻿import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -123,6 +123,8 @@ describe("SettingsPage canonical email handling", () => {
       </MemoryRouter>
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: /website/i }));
+
     await waitFor(() => expect(screen.getByLabelText(/subdomain name/i).value).toBe("jus"));
     expect(screen.getByLabelText(/brand name/i).value).toBe("");
     expect(screen.getByLabelText(/contact email/i).value).toBe("");
@@ -134,3 +136,4 @@ describe("SettingsPage canonical email handling", () => {
 afterEach(() => {
   cleanup();
 });
+

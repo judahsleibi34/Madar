@@ -1,4 +1,4 @@
-import { apiFetch, createApiError } from "../../../utils/apiClient";
+﻿import { apiFetch, createApiError } from "../../../utils/apiClient";
 import { getPersistableProject } from "../core/PageBuilder.editorState";
 
 export const BUILDER_CLIENT_CONTRACT = "cloud-draft-v1";
@@ -121,6 +121,58 @@ export const listBuilderProjects = async ({ limit = 20, offset = 0 } = {}) => {
   };
 };
 
+export const fetchBuilderStorageUsage = async () => {
+  const response = await apiFetch(getApiUrl("/builder/storage/usage"), {
+    method: "GET",
+    cache: "no-store",
+  });
+  const data = await parseJsonResponse(response);
+  return (
+    data?.storage || {
+      used_bytes: 0,
+      reserved_bytes: 0,
+      quota_bytes: 0,
+    }
+  );
+};
+
+export const listBuilderReservations = async ({
+  status = "",
+  projectId = "",
+  limit = 100,
+  offset = 0,
+} = {}) => {
+  const query = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (status) query.set("status", status);
+  if (projectId) query.set("project_id", projectId);
+
+  const response = await apiFetch(
+    getApiUrl("/builder/reservations?" + query.toString()),
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
+  const data = await parseJsonResponse(response);
+  const reservations = Array.isArray(data?.reservations)
+    ? data.reservations
+    : Array.isArray(data?.items)
+      ? data.items
+      : [];
+
+  return {
+    reservations,
+    pagination: {
+      limit: Number(data?.pagination?.limit ?? limit),
+      offset: Number(data?.pagination?.offset ?? offset),
+      count: Number(data?.pagination?.count ?? reservations.length),
+      has_more: Boolean(data?.pagination?.has_more),
+    },
+  };
+};
 export const fetchBuilderProject = async (projectId) => {
   const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}`), {
     method: "GET",
@@ -346,7 +398,7 @@ export const submitPublicFormSubmission = async (
   { idempotencyKey = "" } = {}
 ) => {
   const cleanKey = String(idempotencyKey || "").slice(0, 128);
-  const response = await fetch(
+  const response = await apiFetch(
     getApiUrl(`/public/sites/${subdomain}/forms/${formId}/submissions`),
     {
       method: "POST",
@@ -370,7 +422,7 @@ export const submitPublicBuilderEvent = async (
   { idempotencyKey = "" } = {}
 ) => {
   const cleanKey = String(idempotencyKey || "").slice(0, 128);
-  const response = await fetch(
+  const response = await apiFetch(
     getApiUrl(`/public/sites/${subdomain}/events`),
     {
       method: "POST",
@@ -389,7 +441,7 @@ export const submitPublicBuilderEvent = async (
 };
 
 export const fetchPublicSite = async (subdomain) => {
-  const response = await fetch(getApiUrl(`/public/sites/${subdomain}`), {
+  const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}`), {
     method: "GET",
     cache: "no-store",
   });
@@ -413,7 +465,7 @@ export const fetchProtectedSitePage = async (subdomain, pageReference) => {
 };
 
 export const fetchPublicForm = async (subdomain, formId) => {
-  const response = await fetch(
+  const response = await apiFetch(
     getApiUrl(`/public/sites/${subdomain}/forms/${encodeURIComponent(formId)}`),
     {
       method: "GET",

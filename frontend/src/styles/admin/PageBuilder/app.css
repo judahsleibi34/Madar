@@ -1564,7 +1564,7 @@ summary {
 }
 
 .users-management-grid {
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  grid-template-columns: minmax(340px, 0.9fr) minmax(520px, 1.1fr);
   align-items: start;
   gap: 14px;
 }
@@ -1580,12 +1580,8 @@ summary {
 }
 
 .users-roles-panel {
-  position: sticky;
-  top: 12px;
-  max-height: calc(100vh - 150px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
+  position: static;
+  overflow: visible;
 }
 
 .users-panel-heading {
@@ -1873,6 +1869,35 @@ summary {
   gap: 12px;
 }
 
+.role-editor-card.is-collapsed {
+  gap: 0;
+}
+
+.role-editor-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-editor-collapse-button {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 1px solid var(--madar-border) !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  box-shadow: none !important;
+}
+
+.role-editor-collapse-button:hover {
+  border-color: var(--madar-red) !important;
+  color: var(--madar-red) !important;
+}
+
 .role-editor-summary span,
 .role-editor-field span {
   display: block;
@@ -1944,6 +1969,93 @@ summary {
   border: 1px solid var(--madar-border);
   border-radius: 8px;
   padding: 10px;
+  background: var(--madar-surface);
+}
+
+.role-access-section,
+.role-resource-access {
+  display: grid;
+  gap: 12px;
+}
+
+.role-access-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.role-access-section-heading strong {
+  color: var(--madar-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.role-access-section-heading p {
+  margin: 3px 0 0;
+  color: var(--madar-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.role-access-section-heading > span,
+.resource-group-heading span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--madar-muted);
+  background: rgba(var(--theme-shadow-rgb), 0.07);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.role-capabilities-grid,
+.role-resources-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.role-resources-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.role-editor-card .permission-group {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--madar-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--madar-surface);
+}
+
+.role-editor-card .checkbox-control {
+  min-height: 36px;
+  border-radius: 7px;
+  padding: 7px 8px;
+  line-height: 1.25;
+}
+
+.role-editor-card .checkbox-control:hover {
+  background: rgba(var(--theme-primary-rgb), 0.06);
+}
+
+.resource-permission-group {
+  align-content: start;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.resource-group-heading {
+  position: sticky;
+  top: -12px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -2px -2px 2px;
+  padding: 2px;
   background: var(--madar-surface);
 }
 
@@ -2835,6 +2947,8 @@ summary {
   .user-settings-panel,
   .role-editor-fields-grid,
   .permissions-matrix,
+  .role-capabilities-grid,
+  .role-resources-grid,
   .user-create-form-grid {
     grid-template-columns: 1fr;
   }

@@ -5,7 +5,7 @@ from unittest.mock import patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from routes import builder_routes
+from routes import builder_routes, public_site_routes
 from services.tenant_service import TenantContext
 
 
@@ -114,10 +114,20 @@ class FakeAuthAdmin:
         self.deleted.append(auth_id)
 
 
+class FakeAuth:
+    def __init__(self):
+        self.admin = FakeAuthAdmin()
+        self.signed_up = []
+
+    def sign_up(self, payload):
+        self.signed_up.append(dict(payload))
+        return SimpleNamespace(user=SimpleNamespace(id=f"signup-auth-{len(self.signed_up)}"))
+
+
 class FakeSupabase:
     def __init__(self, tables=None):
         self.tables = {name: [dict(row) for row in rows] for name, rows in (tables or {}).items()}
-        self.auth = SimpleNamespace(admin=FakeAuthAdmin())
+        self.auth = FakeAuth()
 
     def table(self, name):
         return FakeQuery(self, name)
@@ -155,6 +165,7 @@ class FakeSupabase:
 def build_client():
     app = FastAPI()
     app.include_router(builder_routes.router)
+    app.include_router(public_site_routes.router)
     return TestClient(app)
 
 
@@ -230,6 +241,37 @@ class BuilderSiteMemberTests(unittest.TestCase):
             }
         ])
 
+    def test_self_registered_user_is_assigned_and_listed_for_the_project(self):
+        with patch.object(public_site_routes, "service_supabase", self.supabase), \
+             patch.object(public_site_routes, "supabase", self.supabase), \
+             patch.object(public_site_routes, "resolve_website_settings", return_value={"tenant_id": 7, "published_project_id": "project-1"}), \
+             patch.object(public_site_routes, "get_bound_published_project", return_value=self.project), \
+             patch.object(public_site_routes, "enforce_auth_rate_limit"):
+            register_response = self.client.post(
+                "/public/sites/tenant-site/auth/register",
+                json={
+                    "full_name": "New Member",
+                    "email": "new-member@example.com",
+                    "password": "safe-password-123",
+                },
+            )
+
+        self.assertEqual(register_response.status_code, 200)
+        membership = self.supabase.tables["tenant_site_memberships"][-1]
+        self.assertEqual(membership["source"], "registered")
+        self.assertIn(
+            {
+                "membership_id": membership["id"],
+                "project_id": "project-1",
+                "role_id": "role-customer",
+            },
+            self.supabase.tables["tenant_site_project_role_assignments"],
+        )
+
+        list_response = self.client.get("/builder/projects/project-1/site-members")
+        self.assertEqual(list_response.status_code, 200)
+        listed_emails = {member["email"] for member in list_response.json()["members"]}
+        self.assertIn("new-member@example.com", listed_emails)
     def test_admin_created_user_is_saved_to_auth_users_and_memberships(self):
         response = self.client.post(
             "/builder/projects/project-1/site-members",

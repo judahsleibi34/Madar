@@ -55,6 +55,9 @@ const splitLines = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const isInternalPageReference = (value) =>
+  /^page_[a-z0-9-]{8,}$/i.test(String(value || "").trim());
+
 const getListItems = (element) =>
   Array.isArray(element?.listItems) && element.listItems.length
     ? element.listItems
@@ -188,7 +191,7 @@ const getPageAuthElements = (page) =>
 export const getRuntimeAuthFlow = (pages = []) => ({
   entryPage:
     pages.find((page) =>
-      getPageAuthElements(page).some((element) => element.type === "loginBlock")
+      getPageAuthElements(page).length > 0
     ) || null,
   destinationPageIds: new Set(
     pages.flatMap((page) =>
@@ -199,6 +202,14 @@ export const getRuntimeAuthFlow = (pages = []) => ({
     )
   ),
 });
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getSafeProtectedReturnPath = (search = "") => {
+  const value = new URLSearchParams(search).get("returnTo") || "";
+  return value.startsWith("/") && !value.startsWith("//") && value.length <= 2048
+    ? value.replace(/\/+$/, "") || "/"
+    : "";
+};
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const runtimePageRequiresAuthentication = (page, destinationPageIds = new Set()) =>
@@ -484,6 +495,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const publicSubmissionStartedAtRef = useRef(Date.now());
   const formIdempotencyKeysRef = useRef({});
   const protectedPageRequestRef = useRef("");
+  const pendingProtectedPageRef = useRef("");
 
   const loadProtectedPage = useCallback(async (pageReference) => {
     const cleanReference = String(pageReference || "").replace(/^\/+/, "");
@@ -578,6 +590,27 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           pages[currentPageIndex + 1];
         if (destination && destination.id !== activePage?.id) goToPage(destination);
       } else if (result?.logged_in) {
+        const returnPath =
+          pendingProtectedPageRef.current ||
+          getSafeProtectedReturnPath(location.search);
+        if (returnPath) {
+          try {
+            const destination = await loadProtectedPage(returnPath);
+            pendingProtectedPageRef.current = "";
+            if (destination) {
+              navigate(getPublicPagePath(runtimeBasePath, destination), { replace: true });
+              return;
+            }
+          } catch (error) {
+            pendingProtectedPageRef.current = "";
+            if (error?.status === 403) {
+              setPublicActionMessage("Your role cannot access this page.");
+              navigate(getPublicPagePath(runtimeBasePath, authEntryPage), { replace: true });
+              return;
+            }
+            throw error;
+          }
+        }
         const currentPageIndex = pages.findIndex((page) => page.id === activePage?.id);
         let destination = pages.find(
           (page) => page.id === authElement?.auth?.successPageId
@@ -758,6 +791,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const helpLinks = splitLines(site.footerHelpLinks || runtimeCopy.runtime.footerHelpLinks);
   const socialLinks = splitLines(site.footerSocialLinks || runtimeCopy.runtime.footerSocialLinks);
   const footerLinks = [...pageLinks, ...helpLinks].filter((item) => {
+    if (isInternalPageReference(item)) {
+      return pages.some((page) => String(page.id || "") === String(item));
+    }
     if (!isUnsupportedWorkspacePath(item)) return true;
 
     const normalizedItem = String(item || "").toLowerCase().trim();
@@ -818,19 +854,30 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       !isPublicRuntime ||
       publicSiteState !== "ready" ||
       tenantAuth.loading ||
-      !tenantAuth.user ||
       requestedPage ||
       pagePath === "/"
     ) {
       return;
     }
-    loadProtectedPage(pagePath).catch(() => undefined);
+    loadProtectedPage(pagePath).catch((error) => {
+      if (error?.status !== 401 || !authEntryPage || tenantAuth.user) return;
+      pendingProtectedPageRef.current = normalizedPagePath;
+      const loginPath = getPublicPagePath(runtimeBasePath, authEntryPage);
+      navigate(
+        loginPath + "?returnTo=" + encodeURIComponent(normalizedPagePath),
+        { replace: true }
+      );
+    });
   }, [
+    authEntryPage,
     isPublicRuntime,
     loadProtectedPage,
+    navigate,
+    normalizedPagePath,
     pagePath,
     publicSiteState,
     requestedPage,
+    runtimeBasePath,
     tenantAuth.loading,
     tenantAuth.user,
   ]);
@@ -972,6 +1019,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   useEffect(() => {
     if (!tenantAuth.user || !activePage) return;
+    if (pendingProtectedPageRef.current || getSafeProtectedReturnPath(location.search)) return;
 
     const loginElement = (activePage.sections || [])
       .flatMap((section) => [
@@ -993,7 +1041,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     if (destination && destination.id !== activePage.id) {
       navigate(getPublicPagePath(runtimeBasePath, destination));
     }
-  }, [activePage, navigate, pages, runtimeBasePath, tenantAuth.user]);
+  }, [activePage, location.search, navigate, pages, runtimeBasePath, tenantAuth.user]);
 
   useEffect(() => {
     const syncViewport = () => setRuntimeViewport(getScreenViewport());
@@ -1762,6 +1810,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                 <h3>Welcome, {tenantAuth.user.first_name || tenantAuth.user.email}</h3>
                 <p>You are signed in to this website.</p>
               </div>
+
               <button type="button" className="runtime-submit" disabled={tenantAuth.loading} onClick={logOutTenantVisitor}>
                 {tenantAuth.loading ? "Please wait…" : "Log out"}
               </button>

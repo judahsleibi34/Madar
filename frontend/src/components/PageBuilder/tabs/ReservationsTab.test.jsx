@@ -40,6 +40,10 @@ describe("ReservationsTab structure", () => {
     );
 
     expect(screen.getByLabelText("Reservation setup steps")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Appointments/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Book an appointment/ })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Appointments" })).toBeTruthy();
+    expect(screen.getByLabelText("Reservation name").value).toBe("Appointments");
     expect(container.querySelector(".reservation-editor-card.is-restricted")).toBeTruthy();
     expect(container.querySelector(".reservation-copy-section")).toBeTruthy();
     expect(screen.queryByLabelText("Reservation booking mode")).toBeNull();

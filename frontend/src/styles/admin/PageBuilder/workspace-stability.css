@@ -119,12 +119,14 @@
   outline-offset: 2px;
 }
 
-.page-builder.theme-light .site-chrome-workspace > .workspace-header h2 {
+.page-builder.theme-light .site-chrome-workspace > .workspace-header h2,
+.page-builder.theme-light .users-workspace-page > .workspace-header h2 {
   color: #000 !important;
   -webkit-text-fill-color: #000 !important;
 }
 
-.page-builder.theme-dark .site-chrome-workspace > .workspace-header h2 {
+.page-builder.theme-dark .site-chrome-workspace > .workspace-header h2,
+.page-builder.theme-dark .users-workspace-page > .workspace-header h2 {
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
 }

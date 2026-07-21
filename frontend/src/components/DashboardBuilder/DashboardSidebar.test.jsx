@@ -1,4 +1,4 @@
-import {
+﻿import {
   cleanup,
   fireEvent,
   render,
@@ -23,6 +23,7 @@ const labels = {
   "sidebar.pageBuilder": "Page Builder",
   "sidebar.submissions": "Submissions",
   "sidebar.dataLogs": "Data Logs",
+  "sidebar.calendar": "Calendar",
   "sidebar.archive": "Archive",
   "sidebar.myPlan": "My Plan",
   "sidebar.security": "Security",
@@ -100,7 +101,6 @@ describe("DashboardSidebar navigation hierarchy", () => {
       "Dashboard",
       "Workspace",
       "My Plan",
-      "Security",
     ]);
 
     const workspace = screen.getByRole("button", { name: "Workspace" });
@@ -108,6 +108,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     fireEvent.click(workspace);
     expect(workspace.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: "Page Builder" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Calendar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
   });
 

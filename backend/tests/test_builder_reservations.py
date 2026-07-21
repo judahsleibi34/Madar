@@ -72,6 +72,54 @@ def seed_reservations(fake_supabase):
 
 
 class PublicBuilderReservationTests(unittest.TestCase):
+    def test_role_restricted_reservation_requires_login(self):
+        fake_supabase = FakeSupabase()
+        add_published_reservation_block(fake_supabase)
+        fake_supabase.tables["builder_projects"][0]["published_schema"]["roles"] = [{
+            "id": "customer",
+            "permissions": {"makeReservations": True},
+            "resourceAccess": {"reservationBlockIds": [RESERVATION_BLOCK_ID]},
+        }]
+        client = build_public_client(fake_supabase)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "get_optional_tenant_visitor", return_value=None):
+            response = client.post(
+                "/public/sites/tenant-site/events",
+                json={
+                    "block_type": "reservationBlock",
+                    "block_id": RESERVATION_BLOCK_ID,
+                    "payload": {"name": "Ada", "date": "2026-07-10", "time": "19:00", "timezone": "Asia/Jerusalem"},
+                },
+            )
+        self.assertEqual(response.status_code, 401)
+
+    def test_logged_in_reservation_records_member_ownership(self):
+        fake_supabase = FakeSupabase()
+        add_published_reservation_block(fake_supabase)
+        client = build_public_client(fake_supabase)
+        identity = ({"id": 31}, {"id": 41, "status": "active"})
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "authorize_site_resource", return_value=identity), \
+             patch.object(public_site_routes, "create_builder_block_event_notification"):
+            response = client.post(
+                "/public/sites/tenant-site/events",
+                json={
+                    "block_type": "reservationBlock",
+                    "block_id": RESERVATION_BLOCK_ID,
+                    "payload": {"name": "Ada", "date": "2026-07-10", "time": "19:00", "timezone": "Asia/Jerusalem"},
+                },
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        saved = fake_supabase.tables["builder_reservations"][-1]
+        self.assertEqual(saved["site_user_id"], 31)
+        self.assertEqual(saved["site_membership_id"], 41)
+
+    def test_member_reservations_endpoint_is_not_exposed(self):
+        client = build_public_client(FakeSupabase())
+        response = client.get("/public/sites/tenant-site/me/reservations")
+        self.assertEqual(response.status_code, 404)
     def test_public_reservation_event_creates_durable_row_and_notification(self):
         fake_supabase = FakeSupabase()
         add_published_reservation_block(fake_supabase)

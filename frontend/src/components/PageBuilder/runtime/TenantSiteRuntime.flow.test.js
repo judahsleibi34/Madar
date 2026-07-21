@@ -3,6 +3,7 @@ import {
   getRuntimeAuthFlow,
   getRuntimeNavigationPages,
   getRuntimePageSections,
+  getSafeProtectedReturnPath,
   resolveRuntimePage,
   runtimePageRequiresAuthentication,
 } from "./TenantSiteRuntime";
@@ -29,6 +30,11 @@ const formPage = {
 };
 
 describe("tenant runtime page flow", () => {
+  it("accepts only internal protected-page return paths", () => {
+    expect(getSafeProtectedReturnPath("?returnTo=%2Fmembers%2F")).toBe("/members");
+    expect(getSafeProtectedReturnPath("?returnTo=%2F%2Fevil.example")).toBe("");
+    expect(getSafeProtectedReturnPath("?returnTo=https%3A%2F%2Fevil.example")).toBe("");
+  });
   it("keeps block collections scoped to the selected page", () => {
     const home = { id: "home", sections: [{ freeElements: [{ id: "heading", type: "heading" }] }] };
     const form = { id: "form", sections: [{ freeElements: [{ id: "form-block", type: "formBlock", connectedFormId: "form-1" }] }] };

@@ -262,6 +262,46 @@ def build_builder_client(fake_supabase):
 
 
 class BuilderFormSubmissionTests(unittest.TestCase):
+    def test_role_restricted_form_requires_login(self):
+        fake_supabase = FakeSupabase()
+        restricted_schema = copy.deepcopy(fake_supabase.tables["builder_projects"][0]["published_schema"])
+        fake_supabase.tables["builder_projects"][0]["published_schema"] = restricted_schema
+        restricted_schema["roles"] = [{
+            "id": "customer",
+            "permissions": {"submitForms": True},
+            "resourceAccess": {"formIds": [FORM_ID]},
+        }]
+        client = build_public_client(fake_supabase)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "get_optional_tenant_visitor", return_value=None):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+        self.assertEqual(response.status_code, 401)
+
+    def test_logged_in_form_submission_records_member_ownership(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        identity = ({"id": 31}, {"id": 41, "status": "active"})
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "authorize_site_resource", return_value=identity), \
+             patch.object(public_site_routes, "create_builder_block_event_notification"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+        self.assertEqual(response.status_code, 200)
+        saved = fake_supabase.tables["builder_form_submissions"][-1]
+        self.assertEqual(saved["site_user_id"], 31)
+        self.assertEqual(saved["site_membership_id"], 41)
+
+    def test_member_submissions_endpoint_is_not_exposed(self):
+        client = build_public_client(FakeSupabase())
+        response = client.get("/public/sites/tenant-site/me/submissions")
+        self.assertEqual(response.status_code, 404)
     def test_public_submission_replay_returns_original_and_notifies_once(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
@@ -1171,6 +1211,41 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             ["page_home"],
         )
 
+    def test_authenticated_admin_receives_protected_pages_from_site_root(self):
+        fake_supabase = FakeSupabase()
+        schema = fake_supabase.tables["builder_projects"][0]["published_schema"]
+        schema["roles"] = [{
+            "id": "customer",
+            "permissions": {"viewProtectedPages": True},
+            "resourceAccess": {"pageIds": ["member-page"]},
+        }]
+        schema["pages"].append(
+            {
+                "id": "member-page",
+                "name": "Member vault",
+                "visibility": "public",
+                "sections": [{"content": "authorized-content"}],
+            }
+        )
+        client = build_public_client(fake_supabase)
+        staff_identity = (
+            {"id": 77},
+            {"status": "active", "_access_kind": "staff"},
+        )
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(public_site_routes, "get_optional_tenant_visitor", return_value=staff_identity):
+            response = client.get("/public/sites/tenant-site")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("authorized-content", str(body))
+        self.assertEqual(
+            {page["id"] for page in body["project"]["published_schema"]["pages"]},
+            {"page_home", "member-page"},
+        )
+        self.assertEqual(response.headers["cache-control"], "private, no-store")
     def test_active_site_member_can_fetch_bound_protected_page(self):
         fake_supabase = FakeSupabase()
         schema = fake_supabase.tables["builder_projects"][0]["published_schema"]

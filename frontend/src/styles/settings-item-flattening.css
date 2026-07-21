@@ -99,3 +99,686 @@ body.theme-dark .page-builder .forms-form-actions-group .form-command-button {
   color: var(--theme-danger) !important;
   -webkit-text-fill-color: var(--theme-danger) !important;
 }
+
+/* Calm Settings workspace -------------------------------------------------- */
+.admin-dashboard-page:has(.settings-page) {
+  background: var(--theme-bg) !important;
+  background-image: none !important;
+}
+
+.admin-dashboard-page .settings-page,
+.admin-dashboard-page .settings-page * {
+  background-image: none !important;
+}
+
+.admin-dashboard-page .settings-page {
+  width: min(1120px, 100%);
+  gap: 18px;
+  color: var(--theme-text);
+}
+
+.admin-dashboard-page .settings-header {
+  gap: 5px;
+  padding: 4px 0 2px;
+}
+
+.admin-dashboard-page .settings-header p {
+  color: var(--theme-primary) !important;
+}
+
+.admin-dashboard-page .settings-header h1 {
+  color: var(--theme-text) !important;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  letter-spacing: -0.04em;
+}
+
+.admin-dashboard-page .settings-header span {
+  max-width: 720px;
+  color: var(--theme-text-muted) !important;
+  background: transparent !important;
+}
+
+.admin-dashboard-page .settings-grid {
+  gap: 16px;
+}
+
+.admin-dashboard-page .settings-page .settings-card {
+  overflow: hidden;
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.06) !important;
+}
+
+.admin-dashboard-page .settings-profile-cover {
+  min-height: 116px;
+  padding: 22px 26px;
+  background: var(--theme-surface-2) !important;
+  border-bottom: 1px solid var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-page .settings-profile-cover span {
+  color: var(--theme-primary) !important;
+}
+
+.admin-dashboard-page .settings-profile-cover strong {
+  color: var(--theme-text) !important;
+  font-size: clamp(1.7rem, 3vw, 2.1rem);
+}
+
+.admin-dashboard-page .settings-profile-summary {
+  margin: 0 26px;
+  padding-top: 18px;
+  gap: 16px;
+}
+
+.admin-dashboard-page .settings-profile-avatar {
+  flex-basis: 96px;
+  width: 96px;
+  height: 96px;
+  margin-top: -52px;
+  padding: 5px;
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 20px;
+  box-shadow: 0 6px 18px rgba(var(--theme-shadow-rgb), 0.1) !important;
+}
+
+.admin-dashboard-page .settings-profile-avatar span {
+  background: rgba(var(--theme-primary-rgb), 0.12) !important;
+  color: var(--theme-primary) !important;
+  border-radius: 15px;
+}
+
+.admin-dashboard-page .settings-profile-avatar img {
+  background: var(--theme-surface-2) !important;
+  border-radius: 15px;
+}
+
+.admin-dashboard-page .settings-profile-copy h2 {
+  color: var(--theme-text) !important;
+  font-size: 1.45rem;
+}
+
+.admin-dashboard-page .settings-profile-copy p,
+.admin-dashboard-page .settings-field small {
+  color: var(--theme-text-muted) !important;
+}
+
+.admin-dashboard-page .settings-file-button {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-primary) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 10px;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-page .settings-profile-body {
+  gap: 12px;
+  padding: 22px 26px 0;
+}
+
+.admin-dashboard-page .settings-field {
+  gap: 6px;
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-page .settings-field input,
+.admin-dashboard-page .settings-field textarea {
+  min-height: 44px;
+  padding: 11px 13px;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 10px;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-page .settings-field input:focus,
+.admin-dashboard-page .settings-field textarea:focus {
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+.admin-dashboard-page .settings-profile-actions {
+  margin: 20px 26px 24px;
+  padding-top: 18px;
+  border-top-color: var(--theme-border) !important;
+}
+
+.admin-dashboard-page .settings-reset-button {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 10px;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-page .settings-save-button {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  border: 1px solid var(--theme-primary) !important;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+.admin-dashboard-page .settings-file-button:hover,
+.admin-dashboard-page .settings-reset-button:hover,
+.admin-dashboard-page .settings-save-button:hover {
+  transform: none !important;
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard-page .settings-header h1 {
+    font-size: 1.9rem;
+  }
+
+  .admin-dashboard-page .settings-profile-cover {
+    min-height: 96px;
+    padding: 18px;
+  }
+
+  .admin-dashboard-page .settings-profile-summary {
+    margin: 0 18px;
+  }
+
+  .admin-dashboard-page .settings-profile-avatar {
+    flex-basis: 82px;
+    width: 82px;
+    height: 82px;
+    margin-top: -44px;
+  }
+
+  .admin-dashboard-page .settings-profile-body {
+    padding: 18px 18px 0;
+  }
+
+  .admin-dashboard-page .settings-profile-actions {
+    margin: 18px 18px 20px;
+  }
+}
+
+
+/* Dark mode must beat the legacy Settings selectors that use !important. */
+:root[data-theme="dark"] .admin-dashboard-page .settings-page,
+:root[data-theme="dark"] .admin-dashboard-page .settings-page *,
+body.theme-dark .admin-dashboard-page .settings-page,
+body.theme-dark .admin-dashboard-page .settings-page * {
+  background-image: none !important;
+}
+
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-profile-cover,
+body.theme-dark .admin-dashboard-page .settings-page .settings-profile-cover {
+  background: var(--theme-surface-2) !important;
+  border-bottom-color: var(--theme-border) !important;
+}
+
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-header span,
+body.theme-dark .admin-dashboard-page .settings-page .settings-header span {
+  background: transparent !important;
+  color: var(--theme-text-muted) !important;
+}
+
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-profile-avatar,
+body.theme-dark .admin-dashboard-page .settings-page .settings-profile-avatar {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: 0 6px 18px rgba(var(--theme-shadow-rgb), 0.18) !important;
+}
+
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-profile-avatar span,
+body.theme-dark .admin-dashboard-page .settings-page .settings-profile-avatar span {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary-hover) !important;
+}
+
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-field input,
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-field textarea,
+body.theme-dark .admin-dashboard-page .settings-page .settings-field input,
+body.theme-dark .admin-dashboard-page .settings-page .settings-field textarea {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-border) !important;
+}
+
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-file-button,
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-reset-button,
+body.theme-dark .admin-dashboard-page .settings-page .settings-file-button,
+body.theme-dark .admin-dashboard-page .settings-page .settings-reset-button {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .admin-dashboard-page .settings-page .settings-save-button,
+body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 6px 16px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+/* Profile card alignment and neutral secondary action. */
+.admin-dashboard-page .settings-page .settings-profile-summary {
+  grid-template-columns: 96px minmax(0, 1fr) 180px;
+  align-items: center;
+  column-gap: 16px;
+}
+
+.admin-dashboard-page .settings-page .settings-profile-summary > div:nth-child(2) {
+  align-self: center;
+}
+
+.admin-dashboard-page .settings-page .settings-profile-upload {
+  width: 180px;
+  min-width: 180px;
+  min-height: 48px;
+  justify-self: end;
+  align-self: center;
+  padding: 0 16px;
+}
+
+.admin-dashboard-page .settings-page .settings-form-grid {
+  column-gap: 14px;
+  row-gap: 16px;
+  align-items: start;
+}
+
+.admin-dashboard-page .settings-page .settings-form-grid > label {
+  align-self: start;
+}
+
+.admin-dashboard-page .settings-page .settings-form-grid input {
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  align-self: start;
+}
+
+.admin-dashboard-page .settings-page .settings-profile-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-dashboard-page .settings-page .settings-reset-password-button {
+  grid-column: 1;
+  min-height: 48px;
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-page .settings-page .settings-reset-password-button:hover {
+  transform: none !important;
+  background: var(--theme-surface-3) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-border-strong) !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-page .settings-page .settings-profile-actions .settings-save-button {
+  grid-column: 2;
+  min-height: 48px;
+}
+
+@media (max-width: 900px) {
+  .admin-dashboard-page .settings-page .settings-profile-summary {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .admin-dashboard-page .settings-page .settings-profile-upload {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard-page .settings-page .settings-profile-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard-page .settings-page .settings-profile-upload {
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-dashboard-page .settings-page .settings-profile-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard-page .settings-page .settings-reset-password-button,
+  .admin-dashboard-page .settings-page .settings-profile-actions .settings-save-button {
+    grid-column: 1;
+    width: 100%;
+  }
+}
+
+/* Match the password action to the primary Save profile treatment. */
+.admin-dashboard-page .settings-page .settings-reset-password-button {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 6px 16px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+.admin-dashboard-page .settings-page .settings-reset-password-button:hover {
+  background: var(--theme-primary-hover) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: var(--theme-primary-hover) !important;
+  box-shadow: 0 6px 16px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+/* Match profile and logo upload actions to the primary treatment. */
+.admin-dashboard-page .settings-page .settings-file-button {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 6px 16px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+.admin-dashboard-page .settings-page .settings-file-button:hover {
+  background: var(--theme-primary-hover) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: var(--theme-primary-hover) !important;
+  box-shadow: 0 6px 16px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+/* Tabbed Settings sections ------------------------------------------------- */
+.admin-dashboard-page .settings-page .settings-tabs {
+  width: 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px;
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(var(--theme-shadow-rgb), 0.05);
+}
+
+.admin-dashboard-page .settings-page .settings-tab {
+  min-width: 0;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 18px;
+  background: transparent !important;
+  color: var(--theme-text-muted) !important;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none !important;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.admin-dashboard-page .settings-page .settings-tab:hover {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-page .settings-page .settings-tab.is-active {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: var(--theme-primary);
+  box-shadow: 0 5px 14px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+.admin-dashboard-page .settings-page .settings-tab:focus-visible {
+  outline: 3px solid rgba(var(--theme-primary-rgb), 0.2);
+  outline-offset: 2px;
+}
+
+.admin-dashboard-page .settings-page .settings-tab-panel,
+.admin-dashboard-page .settings-page .settings-security-panel {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-page {
+  width: 100%;
+  gap: 0;
+  padding: 0;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-grid {
+  gap: 16px;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-panel {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.06) !important;
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard-page .settings-page .settings-tabs {
+    grid-auto-columns: minmax(140px, 1fr);
+    overflow-x: auto;
+  }
+
+  .admin-dashboard-page .settings-page .settings-tab {
+    padding-inline: 14px;
+  }
+}
+
+/* Content-sized Website description field. */
+.admin-dashboard-page .settings-page .settings-wide-field textarea {
+  min-height: 48px !important;
+  max-height: 240px;
+  resize: none;
+  overflow-y: hidden;
+  transition: height 120ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+/* Security tab alignment --------------------------------------------------- */
+.admin-dashboard-page .settings-page .settings-security-panel
+  .security-mfa-grid > .security-mfa-panel:not(.security-mfa-enroll-panel) {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel
+  .security-mfa-grid > .security-mfa-panel:not(.security-mfa-enroll-panel)
+  .security-mfa-panel-heading {
+  min-height: 96px;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-factor-list {
+  flex: 1;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-empty {
+  margin: 0;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-factor-counts {
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-enroll-form {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(220px, 280px);
+  align-items: end;
+  gap: 12px;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel .security-mfa-enroll-form label {
+  min-width: 0;
+}
+
+.admin-dashboard-page .settings-page .settings-security-panel
+  .security-mfa-enroll-form .security-mfa-primary {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .admin-dashboard-page .settings-page .settings-security-panel
+    .security-mfa-grid > .security-mfa-panel:not(.security-mfa-enroll-panel)
+    .security-mfa-panel-heading {
+    min-height: 0;
+  }
+
+  .admin-dashboard-page .settings-page .settings-security-panel .security-mfa-enroll-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+/* Focused workspace metrics dashboard ------------------------------------ */
+.admin-dashboard-page .user-dashboard-page {
+  width: min(100%, 1480px);
+  margin: 0 auto;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-hero {
+  margin-bottom: 28px;
+  background: transparent !important;
+  background-image: none !important;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-hero h1 {
+  color: var(--theme-text) !important;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card {
+  grid-column: span 3;
+  min-width: 0;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 22px;
+  color: var(--theme-text);
+  background: var(--theme-surface) !important;
+  background-image: none !important;
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.05);
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:nth-child(n + 5) {
+  grid-column: span 4;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card--accent {
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-primary);
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
+  border-radius: 12px;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-label {
+  color: var(--theme-text-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-value {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--theme-text);
+  font-size: clamp(1.75rem, 2.3vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-note {
+  min-height: 1.35em;
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: var(--theme-text-muted);
+  font-size: 0.87rem;
+  font-weight: 600;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-storage-track {
+  height: 7px;
+  margin-top: 16px;
+  overflow: hidden;
+  background: var(--theme-surface-elevated);
+  border-radius: 999px;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-storage-track > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--theme-primary);
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+@media (max-width: 1100px) {
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card,
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:nth-child(n + 5) {
+    grid-column: span 1;
+  }
+
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card,
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:nth-child(n + 5),
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:last-child {
+    grid-column: 1;
+  }
+
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card {
+    min-height: 168px;
+    padding: 18px;
+  }
+}

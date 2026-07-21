@@ -33,7 +33,11 @@ from services.notification_service import create_builder_block_event_notificatio
 from services.notification_outbox_service import enqueue_notification
 from services.api_errors import api_error
 from services.account_lifecycle_service import synchronize_verified_account
-from services.site_permission_service import has_project_permission
+from services.site_permission_service import (
+    assign_project_role,
+    has_project_permission,
+    resource_is_role_restricted,
+)
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -403,7 +407,14 @@ def build_authorized_public_schema(
     visible_pages = [
         page
         for page in pages
-        if page_access_kind(page, auth_destination_ids) == "public"
+        if (
+            page_access_kind(page, auth_destination_ids) == "public"
+            and not resource_is_role_restricted(
+                project={"published_schema": source},
+                resource_type="page",
+                resource_id=str(page.get("id") or ""),
+            )
+        )
         or str(page.get("id") or "") in allowed_ids
     ]
     source["pages"] = visible_pages
@@ -1204,6 +1215,72 @@ def require_tenant_visitor(subdomain: str, request: Request, response: Response)
     return user_row, membership
 
 
+def get_optional_tenant_visitor(subdomain: str, request: Request, response: Response):
+    try:
+        return require_tenant_visitor(subdomain, request, response)
+    except HTTPException as error:
+        if error.status_code in {401, 403}:
+            return None
+        raise
+
+
+def authorize_site_resource(
+    *,
+    subdomain: str,
+    request: Request,
+    response: Response,
+    project: dict,
+    capability: str,
+    resource_type: str,
+    resource_id: str,
+    always_require_member: bool = False,
+):
+    restricted = always_require_member or resource_is_role_restricted(
+        project=project,
+        resource_type=resource_type,
+        resource_id=resource_id,
+    )
+    identity = (
+        require_tenant_visitor(subdomain, request, response)
+        if always_require_member
+        else get_optional_tenant_visitor(subdomain, request, response)
+    )
+    if not restricted:
+        return identity
+    if not identity:
+        raise HTTPException(status_code=401, detail="Log in to access this resource")
+    _, membership = identity
+    if not has_project_permission(
+        membership=membership,
+        project_id=str(project.get("id") or ""),
+        capability=capability,
+        client=service_supabase,
+        project=project,
+        resource_type=resource_type,
+        resource_id=resource_id,
+    ):
+        raise HTTPException(status_code=403, detail="Your role cannot access this resource")
+    return identity
+
+
+def attach_site_record_owner(table_name: str, row: dict, identity):
+    if not identity or not row:
+        return row
+    user_row, membership = identity
+    update = {
+        "site_user_id": user_row.get("id"),
+        "site_membership_id": membership.get("id"),
+    }
+    response = (
+        service_supabase.table(table_name)
+        .update(update)
+        .eq("id", row.get("id"))
+        .eq("tenant_id", row.get("tenant_id"))
+        .eq("project_id", row.get("project_id"))
+        .execute()
+    )
+    return first_row(response) or {**row, **update}
+
 @router.post("/sites/{subdomain}/auth/register")
 def register_tenant_visitor(
     subdomain: str,
@@ -1213,6 +1290,7 @@ def register_tenant_visitor(
     clean_subdomain = normalize_subdomain(subdomain)
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
+    project = get_bound_published_project(settings)
     clean_email = normalize_email(payload.email)
     name_parts = payload.full_name.strip().split(None, 1)
     first_name = name_parts[0]
@@ -1259,15 +1337,28 @@ def register_tenant_visitor(
             raise HTTPException(status_code=400, detail="Could not create account")
         local_user_id = local_user["id"]
 
-        service_supabase.table("tenant_site_memberships").insert(
+        membership_result = service_supabase.table("tenant_site_memberships").insert(
             {
                 "tenant_id": tenant_id,
                 "user_id": local_user["id"],
                 "auth_id": auth_user_id,
                 "role": "customer",
                 "status": "active",
+                "source": "registered",
             }
         ).execute()
+        membership = first_row(membership_result)
+        if not membership:
+            raise HTTPException(status_code=400, detail="Could not create account")
+
+        assign_project_role(
+            membership_id=int(membership["id"]),
+            tenant_id=tenant_id,
+            project=project,
+            role_key="customer",
+            actor_user_id=None,
+            client=service_supabase,
+        )
 
         return {
             "message": "Account created. Check your email, then log in.",
@@ -1369,15 +1460,35 @@ def get_public_site(subdomain: str, request: Request, response: Response):
             raise
         project = None
 
+    identity = get_optional_tenant_visitor(clean_subdomain, request, response) if project else None
+    authorized_page_ids: set[str] = set()
+    if project and identity:
+        _, membership = identity
+        for page in (project.get("published_schema") or {}).get("pages", []):
+            page_id = str(page.get("id") or "") if isinstance(page, dict) else ""
+            if page_id and has_project_permission(
+                membership=membership,
+                project_id=str(project.get("id") or ""),
+                capability="view_protected_page",
+                client=service_supabase,
+                project=project,
+                resource_type="page",
+                resource_id=page_id,
+            ):
+                authorized_page_ids.add(page_id)
+
     public_schema = (
-        build_authorized_public_schema(project.get("published_schema") or {})
+        build_authorized_public_schema(
+            project.get("published_schema") or {},
+            authorized_page_ids=authorized_page_ids,
+        )
         if project
         else None
     )
     metadata = build_publication_metadata(project, public_schema) if project else None
     if metadata:
-        apply_public_cache_headers(response, metadata)
-        if request_etag_matches(request, metadata):
+        apply_public_cache_headers(response, metadata, private=bool(identity))
+        if not identity and request_etag_matches(request, metadata):
             return Response(
                 status_code=304,
                 headers={
@@ -1418,18 +1529,20 @@ def get_member_site_page(
         f"{clean_subdomain}:{clean_page_reference}",
     )
     settings = resolve_website_settings(clean_subdomain)
-    _, membership = require_tenant_visitor(clean_subdomain, request, response)
     project = get_bound_published_project(settings)
-    if not has_project_permission(
-        membership=membership,
-        project_id=str(project.get("id") or ""),
-        capability="view_protected_page",
-        client=service_supabase,
-    ):
-        raise HTTPException(status_code=403, detail="This account cannot view this page")
     schema, page, auth_destination_ids = find_published_page(project, clean_page_reference)
     if page_access_kind(page, auth_destination_ids) == "unsupported_role":
         raise HTTPException(status_code=403, detail="Page access is not configured")
+    authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="view_protected_page",
+        resource_type="page",
+        resource_id=str(page.get("id") or ""),
+        always_require_member=True,
+    )
 
     authorized_schema = build_authorized_public_schema(
         schema,
@@ -1448,7 +1561,7 @@ def get_member_site_page(
 
 
 @router.get("/sites/{subdomain}/forms/{form_id}")
-def get_public_form(subdomain: str, form_id: str, request: Request):
+def get_public_form(subdomain: str, form_id: str, request: Request, response: Response):
     clean_subdomain = normalize_subdomain(subdomain)
     clean_form_id = (form_id or "").strip()
 
@@ -1461,7 +1574,16 @@ def get_public_form(subdomain: str, form_id: str, request: Request):
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain)
-    _, form, published_schema = get_bound_published_form(settings, clean_form_id)
+    project, form, published_schema = get_bound_published_form(settings, clean_form_id)
+    authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="submit_protected_form",
+        resource_type="form",
+        resource_id=clean_form_id,
+    )
 
     return {
         "success": True,
@@ -1478,6 +1600,7 @@ def submit_public_builder_form(
     form_id: str,
     submission: PublicFormSubmissionCreate,
     request: Request,
+    response: Response,
 ):
     clean_subdomain = normalize_subdomain(subdomain)
     clean_form_id = (form_id or "").strip()
@@ -1500,6 +1623,19 @@ def submit_public_builder_form(
     settings = resolve_website_settings(clean_subdomain)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_bound_published_form(settings, clean_form_id)
+    identity = authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="submit_protected_form",
+        resource_type="form",
+        resource_id=clean_form_id,
+    )
+
+    identity_user, identity_membership = identity or ({}, {})
+    site_user_id = identity_user.get("id")
+    site_membership_id = identity_membership.get("id")
 
     answers = submission.answers or {}
     validate_public_answer_payload_limits(answers)
@@ -1520,6 +1656,8 @@ def submit_public_builder_form(
         "field_snapshot": fields,
         "submitter_ip": submitter_ip,
         "user_agent": user_agent,
+        "site_user_id": site_user_id,
+        "site_membership_id": site_membership_id,
     }
     request_hash = canonical_request_hash({
         "tenant_id": tenant_id,
@@ -1527,6 +1665,8 @@ def submit_public_builder_form(
         "form_id": clean_form_id,
         "form_version": project.get("published_version"),
         "answers": cleaned_answers,
+        "site_user_id": site_user_id,
+        "site_membership_id": site_membership_id,
     })
     idempotency_key_hash = (
         hash_public_identifier(f"form-idempotency:{idempotency_key}")
@@ -1537,6 +1677,9 @@ def submit_public_builder_form(
         payload,
         idempotency_key_hash=idempotency_key_hash,
         request_hash=request_hash,
+    )
+    saved_submission = attach_site_record_owner(
+        "builder_form_submissions", saved_submission, identity
     )
 
     logger.info(
@@ -1575,6 +1718,7 @@ def submit_public_builder_block_event(
     subdomain: str,
     event: PublicBuilderBlockEventCreate,
     request: Request,
+    response: Response,
 ):
     clean_subdomain = normalize_subdomain(subdomain)
     block_type = normalize_public_block_type(event.block_type)
@@ -1610,6 +1754,21 @@ def submit_public_builder_block_event(
     if not block:
         raise HTTPException(status_code=404, detail="Block not found")
 
+    resource_block_id = str(block_id or block.get("id") or "")
+    identity = (
+        authorize_site_resource(
+            subdomain=clean_subdomain,
+            request=request,
+            response=response,
+            project=project,
+            capability="make_reservation",
+            resource_type="reservation",
+            resource_id=resource_block_id,
+        )
+        if block_type == "reservationBlock"
+        else get_optional_tenant_visitor(clean_subdomain, request, response)
+    )
+
     payload = event.payload or {}
     validate_public_event_payload_limits(payload)
     cleaned_payload = {
@@ -1630,6 +1789,8 @@ def submit_public_builder_block_event(
         title = event.title or "New site event"
         body = f"{block_type} triggered an event on the published site."
 
+    identity_user, identity_membership = identity or ({}, {})
+
     reservation_payload = build_builder_reservation_payload(
         tenant_id=tenant_id,
         project=project,
@@ -1642,6 +1803,8 @@ def submit_public_builder_block_event(
         request=request,
         timing=timing,
     )
+    reservation_payload["site_user_id"] = identity_user.get("id")
+    reservation_payload["site_membership_id"] = identity_membership.get("id")
     stable_request_payload = {
         key: value
         for key, value in reservation_payload.items()
@@ -1675,6 +1838,9 @@ def submit_public_builder_block_event(
         exclusive_slot=(
             block_type == "reservationBlock" and reservation_block_is_exclusive(block)
         ),
+    )
+    saved_reservation = attach_site_record_owner(
+        "builder_reservations", saved_reservation, identity
     )
     reservation_id = str(saved_reservation.get("id") or "")
 

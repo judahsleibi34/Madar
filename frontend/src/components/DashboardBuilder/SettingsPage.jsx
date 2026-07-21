@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ImagePlus, KeyRound, Save, X } from "lucide-react";
+import { Globe2, ImagePlus, KeyRound, Save, ShieldCheck, UserRound, X } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import SmartLink from "../SmartLink";
 import {
   defaultSiteChrome,
@@ -16,6 +17,7 @@ import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
 import { getSettingsContent } from "../../content";
 import { buildProfilePayload } from "./profilePayload";
+import SecurityMfaPage from "./SecurityMfaPage";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -112,6 +114,16 @@ const getApiErrorMessage = (detail, fallback) => {
   return fallback;
 };
 
+const resizeTextareaToContent = (textarea) => {
+  if (!textarea) return;
+
+  const minimumHeight = 48;
+  const maximumHeight = 240;
+  textarea.style.height = "auto";
+  const contentHeight = Math.max(textarea.scrollHeight, minimumHeight);
+  textarea.style.height = String(Math.min(contentHeight, maximumHeight)) + "px";
+  textarea.style.overflowY = contentHeight > maximumHeight ? "auto" : "hidden";
+};
 const isValidEmail = (value) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 };
@@ -190,7 +202,10 @@ export default function SettingsPage({
   onUserUpdated,
   accountOnly = false,
   accountApiBasePath = "",
+  initialTab = "profile",
 }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [accountForm, setAccountForm] = useState(() =>
     getInitialAccountForm(user)
   );
@@ -219,8 +234,50 @@ export default function SettingsPage({
         profileTitle: "Admin profile",
         profileDescription: "These details are used for the admin dashboard and your account identity.",
       }
-    : t;
+    : {
+        ...t,
+        title: isArabic ? "الإعدادات" : "Settings",
+        subtitle: isArabic
+          ? "أدر ملفك الشخصي وتفاصيل الموقع وأمان الحساب من مكان واحد."
+          : "Manage your profile, website details, and account security in one place.",
+      };
+  const requestedTab = new URLSearchParams(location.search).get("tab");
+  const initialAllowedTab =
+    initialTab === "security" || (initialTab === "website" && !accountOnly)
+      ? initialTab
+      : "profile";
+  const activeTab = location.pathname.startsWith("/settings/security")
+    ? "security"
+    : requestedTab === "security"
+      ? "security"
+      : requestedTab === "website" && !accountOnly
+        ? "website"
+        : initialAllowedTab;
+  const tabLabels = isArabic
+    ? { profile: "الملف الشخصي", website: "الموقع", security: "الأمان" }
+    : { profile: "Profile", website: "Website", security: "Security" };
+  const settingsTabs = [
+    { id: "profile", label: tabLabels.profile, icon: UserRound },
+    ...(!accountOnly
+      ? [{ id: "website", label: tabLabels.website, icon: Globe2 }]
+      : []),
+    { id: "security", label: tabLabels.security, icon: ShieldCheck },
+  ];
+  const selectSettingsTab = (tabId) => {
+    if (tabId === "security") {
+      navigate("/settings/security");
+      return;
+    }
+
+    if (tabId === "website") {
+      navigate("/settings?tab=website");
+      return;
+    }
+
+    navigate("/settings");
+  };
   const onUserUpdatedRef = useRef(onUserUpdated);
+  const descriptionTextareaRef = useRef(null);
 
   useEffect(() => {
     return deferEffectStateUpdate(() => {
@@ -276,6 +333,10 @@ export default function SettingsPage({
       siteChrome.phone,
     ]
   );
+
+  useEffect(() => {
+    resizeTextareaToContent(descriptionTextareaRef.current);
+  }, [siteForm.description]);
 
   const canShowLogoImage = isDirectImageUrl(siteForm.logoUrl);
 
@@ -729,7 +790,30 @@ export default function SettingsPage({
         </div>
       </header>
 
-      <div className="settings-grid">
+      <nav className="settings-tabs" role="tablist" aria-label={isArabic ? "أقسام الإعدادات" : "Settings sections"}>
+        {settingsTabs.map(({ id, label, icon: TabIcon }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            className={activeTab === id ? "settings-tab is-active" : "settings-tab"}
+            aria-selected={activeTab === id}
+            aria-controls={"settings-panel-" + id}
+            onClick={() => selectSettingsTab(id)}
+          >
+            <TabIcon size={18} aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div
+        className="settings-grid settings-tab-panel"
+        id={"settings-panel-" + activeTab}
+        role="tabpanel"
+        aria-label={tabLabels[activeTab]}
+      >
+        {activeTab === "profile" && (
         <form
           className="settings-card settings-profile-card"
           onSubmit={saveAccount}
@@ -858,8 +942,9 @@ export default function SettingsPage({
             </button>
           </div>
         </form>
+        )}
 
-        {!accountOnly && (
+        {activeTab === "website" && !accountOnly && (
           <form
             className="settings-card settings-profile-card settings-website-card"
             onSubmit={saveSiteSettings}
@@ -1007,10 +1092,16 @@ export default function SettingsPage({
               <label className="settings-wide-field">
                 {t.websiteDescriptionLabel}
                 <textarea
+                  ref={(textarea) => {
+                    descriptionTextareaRef.current = textarea;
+                    resizeTextareaToContent(textarea);
+                  }}
+                  rows={1}
                   value={siteForm.description}
-                  onChange={(event) =>
-                    updateSiteField("description", event.target.value)
-                  }
+                  onChange={(event) => {
+                    resizeTextareaToContent(event.currentTarget);
+                    updateSiteField("description", event.target.value);
+                  }}
                 />
               </label>
             </div>
@@ -1030,7 +1121,17 @@ export default function SettingsPage({
           </div>
           </form>
         )}
+
+        {activeTab === "security" && (
+          <div className="settings-security-panel">
+            <SecurityMfaPage lang={lang} embedded cacheKey={user?.id} />
+          </div>
+        )}
       </div>
     </section>
   );
 }
+
+
+
+
