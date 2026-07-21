@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
 from routes import builder_routes
@@ -20,6 +21,13 @@ SVG_BYTES = b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"
 
 def build_client():
     app = FastAPI()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://madarportal.com"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(builder_routes.router)
     return TestClient(app)
 
@@ -100,10 +108,11 @@ class BuilderAssetUploadTests(unittest.TestCase):
 
         self.temp_dir.cleanup()
 
-    def post_asset(self, content, filename="asset.png", content_type="image/png"):
+    def post_asset(self, content, filename="asset.png", content_type="image/png", headers=None):
         return self.client.post(
             "/builder/assets/upload",
             files={"file": (filename, content, content_type)},
+            headers=headers,
         )
 
     def test_unauthenticated_upload_is_rejected(self):
@@ -172,6 +181,31 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
             )
             self.assertTrue((self.upload_dir / asset_url.removeprefix("/uploads/")).exists())
+
+    def test_upload_creates_missing_tenant_directory(self):
+        tenant_asset_dir = self.upload_dir / "tenant_1" / "builder_assets"
+        self.assertFalse(tenant_asset_dir.exists())
+
+        response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(tenant_asset_dir.is_dir())
+        asset_url = response.json()["asset_url"]
+        self.assertTrue((self.upload_dir / asset_url.removeprefix("/uploads/")).is_file())
+
+    def test_unwritable_storage_returns_controlled_cors_error(self):
+        with patch.object(Path, "write_bytes", side_effect=PermissionError("denied")):
+            response = self.post_asset(
+                PNG_BYTES,
+                headers={"Origin": "https://madarportal.com"},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "asset_storage_unavailable")
+        self.assertEqual(
+            response.headers.get("access-control-allow-origin"),
+            "https://madarportal.com",
+        )
 
 
     def test_successful_upload_records_audit_event(self):

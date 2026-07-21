@@ -99,7 +99,11 @@ services:
       - "127.0.0.1:8001:8000"
     volumes:
       - ./backend/avatar_uploads:/app/avatar_uploads
-      - ./backend/uploads:/app/uploads
+      - type: bind
+        source: ./backend/uploads
+        target: /app/uploads
+        bind:
+          create_host_path: false
       - ./backend/private_uploads:/app/private_uploads
       - ./backend/private_generated_charts:/app/private_generated_charts
       - ./database:/app/database:ro

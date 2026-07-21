@@ -1194,12 +1194,34 @@ async def upload_builder_asset(
             detail=error_detail(error.code, "Storage capacity is unavailable."),
         ) from error
 
-    target_dir.mkdir(parents=True, exist_ok=True)
     try:
+        target_dir.mkdir(parents=True, exist_ok=True)
         target_path.write_bytes(content)
-    except Exception:
-        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
-        raise
+    except OSError as error:
+        try:
+            finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        except Exception as accounting_error:
+            logger.error(
+                "builder.asset_reservation_release_failed",
+                extra={
+                    "tenant_id": context.tenant_id,
+                    "error_type": type(accounting_error).__name__,
+                },
+            )
+        logger.error(
+            "builder.asset_write_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail(
+                "asset_storage_unavailable",
+                "Image storage is temporarily unavailable.",
+            ),
+        ) from error
 
     asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
     try:
