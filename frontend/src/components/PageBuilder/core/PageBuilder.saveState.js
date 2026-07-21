@@ -30,8 +30,24 @@ export const shouldBlockBuilderUnload = (state) =>
     BUILDER_SAVE_STATES.savedCloud,
   ].includes(state);
 
-export const shouldDeferBuilderCloudSave = ({ dragActive = false, textEditing = false } = {}) =>
-  Boolean(dragActive || textEditing);
+export const shouldDeferBuilderCloudSave = ({
+  activeTab = "",
+  dragActive = false,
+  textEditing = false,
+} = {}) => Boolean(dragActive || (textEditing && activeTab !== "chrome"));
+
+export const isNewerBuilderCloudSaveMessage = (message, {
+  currentRevision = 0,
+  projectId = "",
+  sourceId = "",
+  tenantId = "",
+} = {}) => Boolean(
+  message?.type === "cloud_saved" &&
+  message.sourceId !== sourceId &&
+  message.projectId === projectId &&
+  (!message.tenantId || message.tenantId === String(tenantId || "")) &&
+  Number(message.revision || 0) > Number(currentRevision || 0)
+);
 
 export const getBuilderSaveRetryDelay = (attempt) =>
   Math.min(30000, 2000 * (2 ** Math.max(0, Number(attempt) || 0)));

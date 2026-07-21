@@ -5,6 +5,7 @@ import {
   prepareBuilderServerAdoption,
   runBuilderAutomaticRebase,
 } from "./PageBuilder.conflict";
+import { resolveBuilderDraftConflicts } from "./PageBuilder.merge";
 import { createBuilderProjectPayload } from "./PageBuilder.persistence";
 
 const ref = (current) => ({ current });
@@ -232,6 +233,47 @@ describe("automatic builder conflict rebase", () => {
     expect(result.status).toBe("conflict");
     expect(result.mergeResult.conflicts[0].path).toBe("pages[id=home].navigationLabel");
     expect(updateServerProject).not.toHaveBeenCalled();
+  });
+
+  it("can resolve an allowed conflict and save it against the newest server revision", async () => {
+    const updateServerProject = vi.fn().mockImplementation(async (_projectId, payload) => ({
+      id: "project-1",
+      draft_revision: 72,
+      draft_schema: payload.draft_schema,
+    }));
+    const base = { ...baseSchema, siteChrome: { footerSocialLinks: "Facebook" } };
+    const local = { ...baseSchema, siteChrome: { footerSocialLinks: "" } };
+    const server = { ...baseSchema, siteChrome: { footerSocialLinks: "Facebook LinkedIn" } };
+    const result = await runBuilderAutomaticRebase({
+      baseSchema: base,
+      localSchema: local,
+      routedProjectId: "project-1",
+      fetchServerProject: vi.fn().mockResolvedValue({
+        id: "project-1",
+        draft_revision: 71,
+        draft_schema: server,
+      }),
+      normalizeServerSchema: (record) => record.draft_schema,
+      createRetryPayload: ({ mergedProject, serverRevision }) => ({
+        expected_revision: serverRevision,
+        draft_schema: mergedProject,
+      }),
+      updateServerProject,
+      resolveConflicts: ({ mergeResult }) => resolveBuilderDraftConflicts({
+        mergedSchema: mergeResult.mergedSchema,
+        conflicts: mergeResult.conflicts,
+        resolutions: { 0: "local" },
+      }),
+      validateAcknowledgement: ({ previousRevision, savedRecord }) => {
+        expect(savedRecord.draft_revision).toBe(previousRevision + 1);
+        return savedRecord.draft_revision;
+      },
+    });
+
+    expect(result.status).toBe("saved");
+    expect(updateServerProject).toHaveBeenCalledTimes(1);
+    expect(updateServerProject.mock.calls[0][1].expected_revision).toBe(71);
+    expect(updateServerProject.mock.calls[0][1].draft_schema.siteChrome.footerSocialLinks).toBe("");
   });
 
   it("stops after one merged retry if the server advances again", async () => {

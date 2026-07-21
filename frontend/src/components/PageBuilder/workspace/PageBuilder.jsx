@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlignCenter,
   AlignJustify,
@@ -64,6 +64,8 @@ import {
 } from "../core/PageBuilder.starters";
 import {
   collectPublicPageRoutingIssues,
+  createNextGeneratedPageName,
+  createUniqueBuilderPageName,
   createUniquePublicPageSlug,
   getStandaloneFormPath,
   normalizeProjectPageRouting,
@@ -129,6 +131,7 @@ import {
 } from "../core/PageBuilder.url";
 import {
   splitLines,
+  splitEditableLines,
   getListItems,
   getCanvasTextSelectionRange,
   createDomTextRange,
@@ -213,6 +216,8 @@ import {
   deriveBuilderCloudSaveState,
   getAcknowledgedBuilderSaveState,
   getBuilderSaveStateLabel,
+  isNewerBuilderCloudSaveMessage,
+  shouldDeferBuilderCloudSave,
   shouldBlockBuilderUnload,
   stopBuilderSaveScheduling,
 } from "../core/PageBuilder.saveState";
@@ -256,6 +261,7 @@ import {
 import {
   mergeBuilderDraftSchemas,
   resolveBuilderDraftConflicts,
+  resolveBuilderDraftConflictsPreferLocal,
 } from "../core/PageBuilder.merge";
 import {
   resolveInspectorMode,
@@ -345,6 +351,7 @@ const builderTabIdByPathSegment = {
 
 const STARTER_MODAL_DISMISSED_KEY = `${STORAGE_KEY}:starter-template-selected`;
 const BUILDER_DRAFT_SYNC_CHANNEL = "madar-builder-draft-sync";
+const BUILDER_CLOUD_SYNC_CHANNEL = "madar-builder-cloud-sync";
 
 const inlineTextElementTypes = new Set(["heading", "text", "button", "list"]);
 
@@ -708,6 +715,7 @@ export default function PageBuilder({
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
+  const [logoUrlDraftEdited, setLogoUrlDraftEdited] = useState(false);
   const projectRef = useRef(project);
   const canvasShellRef = useRef(null);
   const dragPreviewFrameRef = useRef(null);
@@ -734,6 +742,8 @@ export default function PageBuilder({
   const publishPromiseRef = useRef(null);
   const pendingRemoteSaveRef = useRef(null);
   const conflictRef = useRef(false);
+  const siteChromeConflictResolutionRef = useRef(false);
+  const cloudSyncChannelRef = useRef(null);
   const hydrationCompleteRef = useRef(demoMode);
   const pendingExternalDraftRef = useRef(null);
   const dragStateRef = useRef(dragState);
@@ -755,6 +765,19 @@ export default function PageBuilder({
     setToast(message);
     window.setTimeout(() => setToast(""), 2200);
   }, []);
+
+  const broadcastCloudSave = useCallback((savedRecord) => {
+    const revision = Number(savedRecord?.draft_revision) || 0;
+    if (!revision) return;
+    cloudSyncChannelRef.current?.postMessage({
+      type: "cloud_saved",
+      sourceId: draftSourceId,
+      projectId: routeProjectId,
+      tenantId: String(recoveryIdentity.tenantId || ""),
+      revision,
+      timestamp: Date.parse(savedRecord?.updated_at) || Date.now(),
+    });
+  }, [draftSourceId, recoveryIdentity.tenantId, routeProjectId]);
 
   const loadSiteMembers = useCallback(async () => {
     if (demoMode) {
@@ -1020,6 +1043,18 @@ export default function PageBuilder({
       setProject((currentProject) => cleanBuilderProject(currentProject));
     });
   }, [project]);
+
+  useEffect(() => {
+    const pages = Array.isArray(project.pages) ? project.pages : [];
+    const normalizedNames = pages.map((page) =>
+      String(page?.name || page?.title || "Untitled page").trim().toLowerCase()
+    );
+    if (new Set(normalizedNames).size === normalizedNames.length) return;
+
+    return deferEffectStateUpdate(() => {
+      setProject((currentProject) => normalizeProjectPageRouting(currentProject));
+    });
+  }, [project.pages]);
 
   useEffect(() => {
     if (demoMode) return undefined;
@@ -1787,7 +1822,7 @@ export default function PageBuilder({
 
   const addPage = () => {
     const canvasSection = createBlankCanvasSection();
-    const page = createPage(`Page ${project.pages.length + 1}`, [canvasSection], {
+    const page = createPage(createNextGeneratedPageName(project.pages), [canvasSection], {
       canvasLayoutVersion: 1,
     });
     updateProject((prev) => normalizeProjectPageRouting({
@@ -2730,6 +2765,10 @@ export default function PageBuilder({
           }),
         updateServerProject: (projectId, payload) => updateBuilderProject(projectId, payload, userId),
         validateAcknowledgement: validateBuilderSaveAcknowledgement,
+        resolveConflicts: ({ mergeResult }) => resolveBuilderDraftConflictsPreferLocal({
+          mergeResult,
+          pathPrefix: "siteChrome",
+        }),
         isCurrent: () =>
           requestGeneration === serverAdoptionGenerationRef.current &&
           operationId >= latestAcknowledgedSaveOperationRef.current,
@@ -2773,7 +2812,13 @@ export default function PageBuilder({
           localSchema: latestEditorSchema,
           serverSchema: stripAutosaveMetadata(mergedProject),
         });
-        if (latestMerge.conflicts.length > 0) {
+        const latestResolvedSchema = latestMerge.conflicts.length > 0
+          ? resolveBuilderDraftConflictsPreferLocal({
+              mergeResult: latestMerge,
+              pathPrefix: "siteChrome",
+            })
+          : latestMerge.mergedSchema;
+        if (!latestResolvedSchema) {
           enterTerminalConflict(conflictError, {
             baseSchema: localSchema,
             localSchema: latestEditorSchema,
@@ -2784,7 +2829,7 @@ export default function PageBuilder({
           return false;
         }
         nextEditorProject = cleanBuilderProject({
-          ...latestMerge.mergedSchema,
+          ...latestResolvedSchema,
           activePageId: latestEditorProject.activePageId,
           activeFormId: latestEditorProject.activeFormId,
           activeWorkflowId: latestEditorProject.activeWorkflowId,
@@ -2814,6 +2859,7 @@ export default function PageBuilder({
         ? BUILDER_SAVE_STATES.dirty
         : BUILDER_SAVE_STATES.savedCloud);
       if (!hasNewerEditorChanges) setLastCloudSavedAt(new Date());
+      broadcastCloudSave(savedRecord);
       showToast(hasNewerEditorChanges
         ? "Changes from another session were merged. Saving your latest edit…"
         : "Your edits were merged and saved.");
@@ -2834,6 +2880,7 @@ export default function PageBuilder({
     }
   }, [
     acknowledgeCloudSave,
+    broadcastCloudSave,
     enterTerminalConflict,
     recoveryIdentity,
     routeProjectId,
@@ -2927,6 +2974,7 @@ export default function PageBuilder({
           : backendProjectSnapshotRef.current,
       }));
       if (!latestIsDirty) setLastCloudSavedAt(new Date());
+      broadcastCloudSave(savedRecord);
       if (!silent) {
         showToast(repairs.length > 0
           ? "Duplicate internal IDs were repaired and your changes are saved."
@@ -2966,6 +3014,7 @@ export default function PageBuilder({
   }, [
     acknowledgeCloudSave,
     attemptAutomaticRebase,
+    broadcastCloudSave,
     builderProjectLoading,
     demoMode,
     persistProject,
@@ -3071,6 +3120,7 @@ export default function PageBuilder({
     }
 
     try {
+      let activeResolutions = resolutions;
       const latestRecord = await fetchBuilderProject(routeProjectId, userId);
       if (!latestRecord?.id || latestRecord.id !== routeProjectId) {
         throw new Error("The routed project could not be verified");
@@ -3090,24 +3140,33 @@ export default function PageBuilder({
           mergeResult: latestMergeResult,
         };
         if (latestMergeResult.conflicts.length > 0) {
-          setConflictMergeState(currentMergeState);
-          setConflictServerCandidate(latestRecord);
-          setConflictDetails((current) => ({
-            ...(current || {}),
-            detectedAt: Date.now(),
-            serverRevision: Number(latestRecord.draft_revision),
-            serverUpdatedAt: latestRecord.updated_at || null,
-            conflicts: latestMergeResult.conflicts,
-          }));
-          showToast("The server changed again. Review the updated conflicts before saving.");
-          return false;
+          const isSiteChromeOnly = latestMergeResult.conflicts.every(
+            ({ path }) => path === "siteChrome" || String(path || "").startsWith("siteChrome.")
+          );
+          if (activeTab === "chrome" && isSiteChromeOnly) {
+            activeResolutions = Object.fromEntries(
+              latestMergeResult.conflicts.map((_, index) => [index, "local"])
+            );
+          } else {
+            setConflictMergeState(currentMergeState);
+            setConflictServerCandidate(latestRecord);
+            setConflictDetails((current) => ({
+              ...(current || {}),
+              detectedAt: Date.now(),
+              serverRevision: Number(latestRecord.draft_revision),
+              serverUpdatedAt: latestRecord.updated_at || null,
+              conflicts: latestMergeResult.conflicts,
+            }));
+            showToast("The server changed again. Review the updated conflicts before saving.");
+            return false;
+          }
         }
       }
 
       const resolvedSchema = resolveBuilderDraftConflicts({
         mergedSchema: currentMergeState.mergeResult.mergedSchema,
         conflicts: currentMergeState.mergeResult.conflicts,
-        resolutions,
+        resolutions: activeResolutions,
       });
       const resolvedProject = cleanBuilderProject({
         ...resolvedSchema,
@@ -3162,6 +3221,7 @@ export default function PageBuilder({
       return false;
     }
   }, [
+    activeTab,
     conflictMergeState,
     enterTerminalConflict,
     routeProjectId,
@@ -3170,6 +3230,26 @@ export default function PageBuilder({
     stopAllCloudScheduling,
     userId,
   ]);
+
+  useEffect(() => {
+    const conflicts = conflictMergeState?.mergeResult?.conflicts || [];
+    const isSiteChromeOnly = conflicts.length > 0 && conflicts.every(
+      ({ path }) => path === "siteChrome" || String(path || "").startsWith("siteChrome.")
+    );
+    if (
+      activeTab !== "chrome" ||
+      saveState !== BUILDER_SAVE_STATES.conflict ||
+      !isSiteChromeOnly ||
+      siteChromeConflictResolutionRef.current
+    ) return;
+
+    siteChromeConflictResolutionRef.current = true;
+    const resolutions = Object.fromEntries(conflicts.map((_, index) => [index, "local"]));
+    showToast("Saving your latest Header & Footer changes to Madar.");
+    resolveOverlappingConflicts(resolutions).finally(() => {
+      siteChromeConflictResolutionRef.current = false;
+    });
+  }, [activeTab, conflictMergeState, resolveOverlappingConflicts, saveState, showToast]);
 
   useEffect(() => {
     if (demoMode || builderProjectLoading || !canStartBuilderCloudMutation({ hydrated: hydrationCompleteRef.current, conflict: conflictRef.current })) return;
@@ -3185,7 +3265,11 @@ export default function PageBuilder({
         latestSnapshot === backendProjectSnapshotRef.current ||
         latestSnapshot === pendingBackendProjectSnapshotRef.current
       ) return;
-      if (dragStateRef.current || isBuilderTextEditingTarget(document.activeElement)) {
+      if (shouldDeferBuilderCloudSave({
+        activeTab,
+        dragActive: Boolean(dragStateRef.current),
+        textEditing: isBuilderTextEditingTarget(document.activeElement),
+      })) {
         backendAutosaveTimerRef.current = window.setTimeout(attemptLatestSave, 500);
         return;
       }
@@ -3199,12 +3283,12 @@ export default function PageBuilder({
     return () => {
       window.clearTimeout(backendAutosaveTimerRef.current);
     };
-  }, [builderProjectLoading, demoMode, project, saveProject]);
+  }, [activeTab, builderProjectLoading, demoMode, project, saveProject]);
 
-  const fetchConflictServerCandidate = async () => {
+  const fetchConflictServerCandidate = useCallback(async () => {
     try {
       if (!routeProjectId) throw new Error("An explicit project URL is required");
-      const fullRecord = await fetchBuilderProject(routeProjectId, user?.id);
+      const fullRecord = await fetchBuilderProject(routeProjectId, userId);
       if (!fullRecord || fullRecord.id !== routeProjectId) {
         throw new Error("The routed project could not be verified");
       }
@@ -3220,9 +3304,12 @@ export default function PageBuilder({
       showToast("The latest server metadata could not be loaded. Your local copy remains protected.");
       return null;
     }
-  };
+  }, [routeProjectId, showToast, userId]);
 
-  const adoptServerProject = async (candidate = null) => {
+  const adoptServerProject = useCallback(async (candidate = null, {
+    preserveSelection = false,
+    successMessage = "Latest server version loaded. Saving will resume after your next edit.",
+  } = {}) => {
     if (demoMode) return;
     try {
       const serverRecord = candidate?.id === routeProjectId
@@ -3268,7 +3355,9 @@ export default function PageBuilder({
       clearBuilderRecovery(recoveryIdentity);
       setBuilderProjectRecord(serverRecord);
       setProject(adoption.project);
-      setSelected({ type: "page", id: adoption.project.activePageId });
+      if (!preserveSelection) {
+        setSelected({ type: "page", id: adoption.project.activePageId });
+      }
       setConflictDetails(null);
       setConflictServerCandidate(null);
       setConflictMergeState(null);
@@ -3277,7 +3366,7 @@ export default function PageBuilder({
       setLastCloudSavedAt(
         serverRecord.updated_at ? new Date(serverRecord.updated_at) : new Date()
       );
-      showToast("Latest server version loaded. Saving will resume after your next edit.");
+      if (successMessage) showToast(successMessage);
       return true;
     } catch (error) {
       if (import.meta.env.DEV) console.warn("Could not adopt backend builder project.", error);
@@ -3287,7 +3376,68 @@ export default function PageBuilder({
       showToast("The latest server version could not be loaded. Your local copy remains protected.");
       return false;
     }
-  };
+  }, [
+    adoptCloudRevision,
+    demoMode,
+    fetchConflictServerCandidate,
+    recoveryIdentity,
+    routeProjectId,
+    showToast,
+    stopAllCloudScheduling,
+  ]);
+
+  useEffect(() => {
+    if (demoMode || typeof BroadcastChannel === "undefined") return undefined;
+    const channel = new BroadcastChannel(BUILDER_CLOUD_SYNC_CHANNEL);
+    cloudSyncChannelRef.current = channel;
+    let adopting = false;
+
+    const handleCloudSave = async ({ data } = {}) => {
+      if (
+        adopting ||
+        !isNewerBuilderCloudSaveMessage(data, {
+          currentRevision: currentDraftRevisionRef.current,
+          projectId: routeProjectId,
+          sourceId: draftSourceId,
+          tenantId: recoveryIdentity.tenantId,
+        })
+      ) return;
+
+      const localIsBusy =
+        remoteSaveInFlightRef.current ||
+        Boolean(dragStateRef.current) ||
+        isBuilderTextEditingTarget(document.activeElement) ||
+        getAutosaveSnapshot(projectRef.current) !== backendProjectSnapshotRef.current;
+      if (localIsBusy) {
+        showToast("A newer saved version is available from another tab. Finish your current edit before reloading it.");
+        return;
+      }
+
+      adopting = true;
+      try {
+        await adoptServerProject(null, {
+          preserveSelection: true,
+          successMessage: "Updated from another open Madar tab.",
+        });
+      } finally {
+        adopting = false;
+      }
+    };
+
+    channel.addEventListener("message", handleCloudSave);
+    return () => {
+      channel.removeEventListener("message", handleCloudSave);
+      channel.close();
+      if (cloudSyncChannelRef.current === channel) cloudSyncChannelRef.current = null;
+    };
+  }, [
+    adoptServerProject,
+    demoMode,
+    draftSourceId,
+    recoveryIdentity.tenantId,
+    routeProjectId,
+    showToast,
+  ]);
 
   const reloadServerProject = async () => {
     if (conflictRef.current) {
@@ -3627,7 +3777,7 @@ export default function PageBuilder({
 
     if (starterId === "blankPage") {
       const canvasSection = createBlankCanvasSection();
-      const page = createPage(`Page ${project.pages.length + 1}`, [canvasSection], {
+      const page = createPage(createNextGeneratedPageName(project.pages), [canvasSection], {
         canvasLayoutVersion: 1,
       });
 
@@ -4882,11 +5032,13 @@ export default function PageBuilder({
   useEffect(() => {
     return deferEffectStateUpdate(() => {
       setLogoUrlDraft(siteChrome.logoUrl || "");
+      setLogoUrlDraftEdited(false);
     });
   }, [siteChrome.logoUrl]);
 
   const applyLogoUrl = useCallback(() => {
     updateSiteChrome({ logoUrl: logoUrlDraft.trim() });
+    setLogoUrlDraftEdited(false);
     showToast("Logo URL applied.");
   }, [logoUrlDraft, showToast, updateSiteChrome]);
 
@@ -4930,9 +5082,7 @@ export default function PageBuilder({
 
   const getSiteChromeListItems = useCallback(
     (fieldKey) => {
-      const value = String(siteChrome[fieldKey] || "");
-      const items = value.split("\n");
-      return items.length && items.some((item) => item.trim()) ? items : [""];
+      return splitEditableLines(siteChrome[fieldKey]);
     },
     [siteChrome]
   );
@@ -5457,8 +5607,13 @@ export default function PageBuilder({
             const currentPage = prev.pages.find((page) => page.id === activePage.id);
             const nextChanges = { ...changes };
             if (Object.prototype.hasOwnProperty.call(changes, "name")) {
-              nextChanges.slug = createUniquePublicPageSlug({
+              nextChanges.name = createUniqueBuilderPageName({
                 name: changes.name,
+                pages: prev.pages,
+                currentPageId: activePage.id,
+              });
+              nextChanges.slug = createUniquePublicPageSlug({
+                name: nextChanges.name,
                 pages: prev.pages,
                 currentPageId: activePage.id,
                 isDefault: currentPage?.isDefault === true,
@@ -6011,7 +6166,15 @@ export default function PageBuilder({
                   <div className="span-2 site-chrome-logo-row">
                     <label className="site-chrome-field-title" htmlFor="site-chrome-logo-url">Logo</label>
                     <span className="site-chrome-logo-control">
-                      <input id="site-chrome-logo-url" value={logoUrlDraft} placeholder="Image URL" onChange={(event) => setLogoUrlDraft(event.target.value)} />
+                      <input
+                        id="site-chrome-logo-url"
+                        value={logoUrlDraftEdited ? logoUrlDraft : getBuilderAssetFileName(logoUrlDraft)}
+                        placeholder="Image URL"
+                        onChange={(event) => {
+                          setLogoUrlDraftEdited(true);
+                          setLogoUrlDraft(event.target.value);
+                        }}
+                      />
                       <button type="button" className="upload-image-button site-chrome-logo-apply" onClick={applyLogoUrl}>
                         Apply URL
                       </button>
@@ -6056,13 +6219,19 @@ export default function PageBuilder({
                 <h3>Columns and social items</h3>
               </div>
             </div>
-            <div className="site-chrome-form-grid">
-              <label>Pages column title<input value={siteChrome.footerShopTitle || ""} onChange={(event) => updateSiteChrome({ footerShopTitle: event.target.value })} /></label>
-              <label>Help column title<input value={siteChrome.footerHelpTitle || ""} onChange={(event) => updateSiteChrome({ footerHelpTitle: event.target.value })} /></label>
-              {renderFooterPageLinksEditor()}
-              {renderFooterListEditor("footerHelpLinks", "Help links", "Help item")}
-              {renderFooterListEditor("footerSocialLinks", "Social links", "Social channel")}
-              {renderFooterListEditor("footerPaymentMethods", "Payment labels", "Payment label")}
+            <div className="site-chrome-footer-structure">
+              <div className="site-chrome-footer-title-row">
+                <label>Pages column title<input value={siteChrome.footerShopTitle || ""} onChange={(event) => updateSiteChrome({ footerShopTitle: event.target.value })} /></label>
+                <label>Help column title<input value={siteChrome.footerHelpTitle || ""} onChange={(event) => updateSiteChrome({ footerHelpTitle: event.target.value })} /></label>
+              </div>
+              <div className="site-chrome-footer-panel-row">
+                {renderFooterPageLinksEditor()}
+                {renderFooterListEditor("footerHelpLinks", "Help links", "Help item")}
+              </div>
+              <div className="site-chrome-footer-panel-row">
+                {renderFooterListEditor("footerSocialLinks", "Social links", "Social channel")}
+                {renderFooterListEditor("footerPaymentMethods", "Payment labels", "Payment label")}
+              </div>
             </div>
           </article>
         </div>
@@ -6322,16 +6491,22 @@ export default function PageBuilder({
             ? visibleTabIds.includes(tab.id)
             : !mainBuilderHiddenTabs.includes(tab.id)
         )
-        .map((tab) => (
-        <button
-          type="button"
-          key={tab.id}
-          className={activeTab === tab.id ? "active" : ""}
-          onClick={() => setActiveTab(tab.id)}
-        >
-          {builderCopy.tabs[tab.id]?.label || tab.label}
-        </button>
-      ))}
+        .map((tab) => {
+          const tabPath = routeProjectId
+            ? getBuilderWorkspacePath(routeProjectId, tab.id, routeWorkspace)
+            : builderTabPathById[tab.id];
+
+          return (
+            <Link
+              key={tab.id}
+              to={tabPath}
+              className={activeTab === tab.id ? "active" : ""}
+              aria-current={activeTab === tab.id ? "page" : undefined}
+            >
+              {builderCopy.tabs[tab.id]?.label || tab.label}
+            </Link>
+          );
+        })}
     </nav>
   );
 

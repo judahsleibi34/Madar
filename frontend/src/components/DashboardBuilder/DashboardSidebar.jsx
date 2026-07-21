@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -130,6 +130,7 @@ export default function DashboardSidebar({
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarRef = useRef(null);
 
   const activeSidebarLanguage =
     i18n?.resolvedLanguage?.split("-")[0] || lang;
@@ -176,6 +177,20 @@ export default function DashboardSidebar({
     useState(true);
   const isWorkspaceSidebarCollapsed =
     workspaceRouteActive && workspaceSidebarCollapsed;
+
+  useEffect(() => {
+    if (!workspaceRouteActive || isWorkspaceSidebarCollapsed) return undefined;
+
+    const handleOutsidePointerDown = (event) => {
+      if (sidebarRef.current?.contains(event.target)) return;
+      setWorkspaceSidebarCollapsed(true);
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+    };
+  }, [isWorkspaceSidebarCollapsed, workspaceRouteActive]);
 
   const activeThemeMode =
     themeMode === "dark" || themeMode === "light"
@@ -335,6 +350,7 @@ export default function DashboardSidebar({
 
   return (
     <aside
+      ref={sidebarRef}
       id={id || "dashboard-sidebar"}
       className={`admin-sidebar dashboard-sidebar global-sidebar ${
         isRtl ? "is-rtl" : "is-ltr"

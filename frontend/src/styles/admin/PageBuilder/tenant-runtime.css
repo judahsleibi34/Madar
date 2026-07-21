@@ -34,7 +34,7 @@
   font-weight: 950;
 }
 
-.tenant-draft-preview-bar button {
+.tenant-draft-preview-bar :is(button, a) {
   min-height: 36px;
   border: 1px solid var(--theme-border);
   border-radius: 8px;
@@ -42,6 +42,32 @@
   background: var(--theme-surface);
   color: var(--theme-text);
   font-weight: 900;
+  text-decoration: none;
+}
+
+.tenant-site-runtime .tenant-site-nav a {
+  color: var(--theme-text) !important;
+}
+
+.tenant-site-runtime .tenant-site-nav a:hover,
+.tenant-site-runtime .tenant-site-nav a.active {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary-hover) !important;
+}
+
+.tenant-site-runtime .tenant-footer-column a,
+.tenant-site-runtime .tenant-footer-bottom a {
+  color: var(--theme-text-soft) !important;
+}
+
+.tenant-site-runtime .tenant-footer-column a:hover,
+.tenant-site-runtime .tenant-footer-bottom a:hover {
+  background: var(--theme-primary-soft) !important;
+  color: var(--theme-primary-hover) !important;
+}
+
+.tenant-site-runtime a.builder-element-button {
+  text-decoration: none;
 }
 
 .tenant-login-card {

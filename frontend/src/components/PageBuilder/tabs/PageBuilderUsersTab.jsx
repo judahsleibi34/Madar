@@ -97,7 +97,7 @@ export default function PageBuilderUsersTab({
 
   return (
     <div className="workspace-page users-workspace-page">
-      <div className="workspace-header users-workspace-header">
+      <header className="workspace-header users-workspace-header">
         <div>
           <span className="workspace-kicker">Access control</span>
           <h2>Users and roles</h2>
@@ -134,7 +134,7 @@ export default function PageBuilderUsersTab({
             Add role
           </button>
         </div>
-      </div>
+      </header>
 
       <div className="users-grid users-management-grid">
         <section className="dashboard-panel users-panel">

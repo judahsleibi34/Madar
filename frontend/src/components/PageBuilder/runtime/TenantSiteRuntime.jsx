@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
   fetchPublicForm,
@@ -43,7 +43,7 @@ import {
   getNavigablePages,
   getPageNavigationLabel,
 } from "../core/PageBuilder.navigation";
-import { runPublicElementAction } from "../core/PageBuilder.actions";
+import { normalizeElementAction, runPublicElementAction } from "../core/PageBuilder.actions";
 import { getStoredUrlError } from "../core/PageBuilder.url";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
@@ -785,10 +785,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const footerBrand = site.footerStoreName || brandName;
   const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || runtimeCopy.runtime.footerInitial;
 
-  const goToPage = useCallback((page) => {
+  const getPageDestinationPath = useCallback((page) => {
     if (!page) {
-      navigate(siteHomePath);
-      return;
+      return siteHomePath;
     }
 
     const destination =
@@ -799,17 +798,20 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       authEntryPage
         ? authEntryPage
         : page;
-    navigate(getPublicPagePath(runtimeBasePath, destination));
+    return getPublicPagePath(runtimeBasePath, destination);
   }, [
     authEntryPage,
     isPublicRuntime,
-    navigate,
     pageRequiresAuthentication,
     runtimeBasePath,
     siteHomePath,
     tenantAuth.loading,
     tenantAuth.user,
   ]);
+
+  const goToPage = useCallback((page) => {
+    navigate(getPageDestinationPath(page));
+  }, [getPageDestinationPath, navigate]);
 
   useEffect(() => {
     if (
@@ -848,6 +850,29 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     showMessage: setPublicActionMessage,
     showUnavailable: setPublicActionMessage,
   });
+
+  const getPublicButtonLink = (element) => {
+    const action = normalizeElementAction(element?.action);
+
+    if (action.type === "goToPage") {
+      const targetPage = pages.find((page) => String(page?.id || "") === action.pageId);
+      return targetPage ? { to: getPageDestinationPath(targetPage) } : null;
+    }
+
+    if (action.type === "openUrl" && !getStoredUrlError(action.url, {
+      fieldName: "Button action URL",
+      allowRelative: false,
+      allowEmpty: false,
+    })) {
+      return {
+        href: action.url,
+        target: action.openInNewTab === false ? undefined : "_blank",
+        rel: action.openInNewTab === false ? undefined : "noopener noreferrer",
+      };
+    }
+
+    return null;
+  };
 
   const resolveFooterPageLink = (value) => {
     const normalizedValue = String(value || "")
@@ -1635,7 +1660,15 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
     if (element.type === "heading") return <AutoFitDirectText as="h1" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
     if (element.type === "text") return <AutoFitDirectText as="p" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
-    if (element.type === "button") return <AutoFitDirectText as="button" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} type="button" {...props} onClick={() => runPublicButtonAction(element)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
+    if (element.type === "button") {
+      const link = getPublicButtonLink(element);
+      const fitKey = `${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`;
+      const content = renderRichText(element.content, getRichTextRanges(element, "content"));
+
+      if (link?.to) return <AutoFitDirectText as={Link} fitKey={fitKey} key={element.id} {...props} to={link.to}>{content}</AutoFitDirectText>;
+      if (link?.href) return <AutoFitDirectText as="a" fitKey={fitKey} key={element.id} {...props} {...link}>{content}</AutoFitDirectText>;
+      return <AutoFitDirectText as="button" fitKey={fitKey} key={element.id} type="button" {...props} onClick={() => runPublicButtonAction(element)}>{content}</AutoFitDirectText>;
+    }
     if (element.type === "image") {
       const imageSrc = resolveMediaUrl(element.content);
       return imageSrc ? (
@@ -1963,11 +1996,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const renderHeader = () => (
     <header className="tenant-site-header">
       <div className="tenant-site-header-inner">
-        <button
-          type="button"
-          className="tenant-site-brand"
-          onClick={() => navigate(siteHomePath)}
-        >
+        <Link className="tenant-site-brand" to={siteHomePath}>
           {resolveMediaUrl(site.logoUrl) ? (
             <img src={resolveMediaUrl(site.logoUrl)} alt={runtimeCopy.runtime.logoAlt.replace("{brand}", brandName)} />
           ) : (
@@ -1977,7 +2006,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           )}
 
           <span>{brandName}</span>
-        </button>
+        </Link>
 
         <nav className="tenant-site-nav">
           {getNavigablePages(pages, {
@@ -1991,21 +2020,30 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             const pagePath = getPublicPagePath(runtimeBasePath, page);
 
             return (
-              <button
-                type="button"
+              <Link
                 key={page.id}
                 className={activePath.replace(/\/+$/, "") === pagePath.replace(/\/+$/, "") ? "active" : ""}
-                onClick={() => goToPage(page)}
+                to={getPageDestinationPath(page)}
+                aria-current={activePath.replace(/\/+$/, "") === pagePath.replace(/\/+$/, "") ? "page" : undefined}
               >
                 {getPageNavigationLabel(page)}
-              </button>
+              </Link>
             );
           })}
         </nav>
 
-        <button type="button" className="tenant-site-cta" onClick={goToHeaderButton}>
-          {site.headerButtonLabel || runtimeCopy.runtime.contact}
-        </button>
+        {findPageByNavigationReference(pages, site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel) ? (
+          <Link
+            className="tenant-site-cta"
+            to={getPageDestinationPath(findPageByNavigationReference(pages, site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel))}
+          >
+            {site.headerButtonLabel || runtimeCopy.runtime.contact}
+          </Link>
+        ) : (
+          <button type="button" className="tenant-site-cta" onClick={goToHeaderButton}>
+            {site.headerButtonLabel || runtimeCopy.runtime.contact}
+          </button>
+        )}
       </div>
     </header>
   );
@@ -2048,15 +2086,21 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           <h4>{runtimeCopy.runtime.links}</h4>
 
           <div className="tenant-footer-links-grid">
-            {footerLinks.map((item) => (
-              <button
-                type="button"
-                key={item}
-                onClick={() => goToFooterLink(item)}
-              >
-                {resolveFooterPageLink(item)?.name || item}
-              </button>
-            ))}
+            {footerLinks.map((item) => {
+              const targetPage = resolveFooterPageLink(item);
+              const normalizedItem = item.toLowerCase().trim();
+              const targetPath = targetPage
+                ? getPageDestinationPath(targetPage)
+                : normalizedItem === "home" || isUnsupportedWorkspacePath(normalizedItem)
+                  ? siteHomePath
+                  : "";
+
+              return targetPath ? (
+                <Link key={item} to={targetPath}>{targetPage?.name || item}</Link>
+              ) : (
+                <button type="button" key={item} onClick={() => goToFooterLink(item)}>{item}</button>
+              );
+            })}
           </div>
         </div>
 
@@ -2078,9 +2122,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           {runtimeCopy.runtime.copyright} 2026 {footerBrand}. {site.rights || runtimeCopy.runtime.rights}
         </p>
 
-        <button type="button" onClick={() => { window.location.href = MADAR_ATTRIBUTION_URL; }}>
+        <a href={MADAR_ATTRIBUTION_URL}>
           {runtimeCopy.runtime.poweredBy}
-        </button>
+        </a>
       </div>
     </footer>
   );
@@ -2101,12 +2145,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       {draftPreview && (
         <div className="tenant-draft-preview-bar">
           <strong>{runtimeCopy.runtime.draftPreview}</strong>
-          <button
-            type="button"
-            onClick={() => navigate(`/page-builder/projects/${encodeURIComponent(projectId)}`)}
-          >
+          <Link to={`/page-builder/projects/${encodeURIComponent(projectId)}`}>
             {runtimeCopy.runtime.backToBuilder}
-          </button>
+          </Link>
         </div>
       )}
       {!standaloneFormId &&

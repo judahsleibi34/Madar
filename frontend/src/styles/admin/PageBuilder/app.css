@@ -681,6 +681,8 @@
 
 .site-chrome-list-editor {
   display: grid;
+  align-self: start;
+  align-content: start;
   gap: 10px;
   min-width: 0;
   padding: 12px;

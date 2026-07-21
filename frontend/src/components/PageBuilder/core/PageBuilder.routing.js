@@ -71,6 +71,40 @@ export const createUniquePublicPageSlug = ({
   }
   return slug;
 };
+
+export const createNextGeneratedPageName = (pages = []) => {
+  const names = (Array.isArray(pages) ? pages : [])
+    .map((page) => String(page?.name || page?.title || "").trim())
+    .filter(Boolean);
+  const usedNames = new Set(names.map((name) => name.toLowerCase()));
+  const generatedNumbers = names
+    .map((name) => /^page\s+(\d+)$/i.exec(name)?.[1])
+    .filter(Boolean)
+    .map(Number);
+  let nextNumber = Math.max(2, names.length + 1, ...generatedNumbers.map((number) => number + 1));
+  while (usedNames.has(`page ${nextNumber}`)) nextNumber += 1;
+  return `Page ${nextNumber}`;
+};
+
+export const createUniqueBuilderPageName = ({ name, pages = [], currentPageId = "" } = {}) => {
+  const baseName = String(name || "Untitled page").trim() || "Untitled page";
+  const otherPages = (Array.isArray(pages) ? pages : []).filter(
+    (page) => String(page?.id || "") !== String(currentPageId || "")
+  );
+  const usedNames = new Set(
+    otherPages.map((page) => String(page?.name || page?.title || "").trim().toLowerCase())
+  );
+  if (!usedNames.has(baseName.toLowerCase())) return baseName;
+  if (/^page\s+\d+$/i.test(baseName)) return createNextGeneratedPageName(otherPages);
+
+  let suffix = 2;
+  let candidate = `${baseName} ${suffix}`;
+  while (usedNames.has(candidate.toLowerCase())) {
+    suffix += 1;
+    candidate = `${baseName} ${suffix}`;
+  }
+  return candidate;
+};
 export const getDefaultPublicPage = (pages = [], defaultPageId = "") => {
   const explicitId = String(defaultPageId || "").trim();
   return (
@@ -85,10 +119,20 @@ export const getDefaultPublicPage = (pages = [], defaultPageId = "") => {
 
 export const normalizeProjectPageRouting = (project = {}) => {
   const sourcePages = Array.isArray(project.pages) ? project.pages : [];
-  const defaultPage = getDefaultPublicPage(sourcePages, project.defaultPageId);
+  const namedPages = [];
+  sourcePages.forEach((page) => {
+    namedPages.push({
+      ...page,
+      name: createUniqueBuilderPageName({
+        name: page?.name || page?.title,
+        pages: namedPages,
+      }),
+    });
+  });
+  const defaultPage = getDefaultPublicPage(namedPages, project.defaultPageId);
   const defaultPageId = String(defaultPage?.id || "");
   const usedSlugs = new Set(["/"]);
-  const pages = sourcePages.map((page, index) => {
+  const pages = namedPages.map((page, index) => {
     const isDefault = String(page?.id || "") === defaultPageId;
     if (isDefault) {
       return { ...page, slug: "/", isDefault: true, order: index };
