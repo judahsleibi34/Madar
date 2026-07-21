@@ -177,7 +177,7 @@ services:
       - /var/cache/nginx:rw,noexec,nosuid,uid=101,gid=101,size=32m
       - /etc/nginx/conf.d:rw,noexec,nosuid,uid=101,gid=101,size=1m
     environment:
-      MADAR_CSP_CONNECT_SRC: ${MADAR_CSP_CONNECT_SRC:-http://127.0.0.1:8001}
+      MADAR_CSP_CONNECT_SRC: ${MADAR_CSP_CONNECT_SRC:-https://api.madarportal.com}
       MADAR_HSTS: ${MADAR_HSTS:-}
     ports:
       - "127.0.0.1:3000:8080"
