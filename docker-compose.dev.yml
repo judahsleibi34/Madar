@@ -7,6 +7,21 @@ services:
     container_name: madar-dev-backend
     ports: !override
       - "127.0.0.1:8002:8000"
+    environment:
+      APP_ENV: development
+      CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-true}
+      PUBLIC_API_URL: http://127.0.0.1:8002
+      FRONTEND_PRIMARY_URL: http://127.0.0.1:3001
+
+  notification-worker:
+    environment:
+      APP_ENV: development
+
+  calendar-sync-worker:
+    environment:
+      APP_ENV: development
+      PUBLIC_API_URL: http://127.0.0.1:8002
+      FRONTEND_PRIMARY_URL: http://127.0.0.1:3001
 
   frontend:
     container_name: madar-dev-frontend

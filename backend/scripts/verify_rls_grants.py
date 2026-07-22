@@ -51,6 +51,19 @@ SENSITIVE_TABLES = (
     "tenant_site_project_role_assignments",
     "features",
     "audit_logs",
+    "calendars",
+    "calendar_memberships",
+    "calendar_events",
+    "calendar_event_attendees",
+    "calendar_event_reminders",
+    "calendar_event_changes",
+    "calendar_tasks",
+    "calendar_task_dependencies",
+    "calendar_task_reminders",
+    "calendar_sync_connections",
+    "calendar_sync_conflicts",
+    "calendar_invitation_reviews",
+    "calendar_oauth_states",
 )
 
 SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
@@ -70,6 +83,7 @@ SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
     "reserve_storage_bytes",
     "finish_storage_reservation",
     "release_storage_object",
+    "consume_calendar_oauth_state",
 )
 
 TABLE_CRUD_GRANTS = {"SELECT", "INSERT", "UPDATE", "DELETE"}
@@ -114,6 +128,19 @@ ALLOWED_DIRECT_GRANTS = {
     "tenant_site_project_role_assignments": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "features": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
     "audit_logs": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendars": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_memberships": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_events": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_event_attendees": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_event_reminders": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_event_changes": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_tasks": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_task_dependencies": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_task_reminders": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_sync_connections": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_sync_conflicts": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_invitation_reviews": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_oauth_states": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
 }
 
 # These backend-owned tables have an intentionally narrower browser contract

@@ -37,6 +37,7 @@ services:
     env_file:
       - .env
     environment:
+      APP_ENV: production
       FRONTEND_URLS: ${FRONTEND_URLS}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-none}
@@ -92,6 +93,15 @@ services:
       NOTIFICATION_QUEUE_MAX_DEAD: ${NOTIFICATION_QUEUE_MAX_DEAD:-0}
       MPLCONFIGDIR: /tmp/matplotlib
       XDG_CACHE_HOME: /tmp/.cache
+      CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-false}
+      CALENDAR_SYNC_REQUIRED: ${CALENDAR_SYNC_REQUIRED:-false}
+      CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
+      GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
+      GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
+      MICROSOFT_CALENDAR_CLIENT_ID: ${MICROSOFT_CALENDAR_CLIENT_ID:-}
+      MICROSOFT_CALENDAR_CLIENT_SECRET: ${MICROSOFT_CALENDAR_CLIENT_SECRET:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      FRONTEND_PRIMARY_URL: ${FRONTEND_PRIMARY_URL:-}
     depends_on:
       redis:
         condition: service_healthy
@@ -141,6 +151,7 @@ services:
     env_file:
       - .env
     environment:
+      APP_ENV: production
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       NOTIFICATION_WORKER_ENABLED: "true"
@@ -180,9 +191,10 @@ services:
     env_file:
       - .env
     environment:
+      APP_ENV: production
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
-      CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET}
+      CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
       CALENDAR_SYNC_WORKER_ENABLED: ${CALENDAR_SYNC_WORKER_ENABLED:-false}
       CALENDAR_SYNC_BATCH_SIZE: ${CALENDAR_SYNC_BATCH_SIZE:-10}
       CALENDAR_SYNC_CONCURRENCY: ${CALENDAR_SYNC_CONCURRENCY:-2}
@@ -191,7 +203,8 @@ services:
       GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
       MICROSOFT_CALENDAR_CLIENT_ID: ${MICROSOFT_CALENDAR_CLIENT_ID:-}
       MICROSOFT_CALENDAR_CLIENT_SECRET: ${MICROSOFT_CALENDAR_CLIENT_SECRET:-}
-      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      FRONTEND_PRIMARY_URL: ${FRONTEND_PRIMARY_URL:-}
       STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
     command: ["python", "-m", "workers.calendar_sync_worker"]
     depends_on:
@@ -219,6 +232,7 @@ services:
       - /var/cache/nginx:rw,noexec,nosuid,uid=101,gid=101,size=32m
       - /etc/nginx/conf.d:rw,noexec,nosuid,uid=101,gid=101,size=1m
     environment:
+      APP_ENV: production
       MADAR_CSP_CONNECT_SRC: ${MADAR_CSP_CONNECT_SRC:-https://api.madarportal.com}
       MADAR_HSTS: ${MADAR_HSTS:-}
     ports:

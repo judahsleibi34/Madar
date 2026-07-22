@@ -1,17 +1,23 @@
 # Production operations, recovery, and release runbook
 
-This is an operator checklist, not evidence of deployment. Repository migrations 054-057 are pending, no production restore drill was run, no real notification was sent, and no shared database was changed during the hardening phase.
+This is an operator checklist, not evidence of deployment. Migrations 054–057
+are operator-verified as manually applied in the current production database;
+manual SQL Editor execution may not appear in the Supabase CLI ledger.
+Migrations 058–065 remain environment-specific deployment candidates with no
+production application claim in this repository task. No production restore
+drill was run, no real notification was sent, and no shared database was changed.
 
 ## Release and migration gate
 
 1. Record the release commit, current image digests, current migration ledger, and rollback owner.
 2. Approve RPO/RTO and complete a fresh backup with `scripts/backup_madar.sh`; verify it with `scripts/verify_backup.sh` and copy it to encrypted off-host storage.
 3. Restore that backup into a disposable isolated target following `backup-restore-runbook.md`. Do not proceed until readiness, tenant isolation, private-artifact access, file checksums, and representative application workflows pass.
-4. Apply migrations 054, 055, 056, and 057 in order to isolated staging from the matching tree. Run `python3 scripts/check_migrations.py` before and after. Never edit an applied migration.
+4. Apply every migration missing from the isolated staging ledger in order. For the current repository this may include 058–065; verify the actual schema as well as the ledger. Run `python3 scripts/check_migrations.py` before and after. Never edit an applied migration.
 5. Run `python3 backend/scripts/verify_rls_grants.py` with a read-only staging catalog connection. Confirm exact service-role function execution, safe `search_path`, authenticated privileged writes denied, and cross-tenant paths denied.
 6. Run backend tests and `pip check` in the locked image; run frontend lock check, lint, tests, build, theme audit, edge audit, runtime-only dependency audit, and the isolated E2E safety guard.
 7. Run the staging workflow inventory in `isolated-full-stack-testing.md`. Preserve redacted evidence and delete the disposable fixture boundary afterward.
 8. Review readiness degradation causes. Production must not enable local generated execution without the isolated guard, remote ingestion without enforced pinned egress, or in-process parsing as if it were isolated.
+9. Set `APP_ENV=production` explicitly. Enable calendar routes only with `CALENDAR_FEATURE_ENABLED=true` after migrations 061–065 and the calendar RLS verifier pass. Enable provider sync only with exact HTTPS `PUBLIC_API_URL` and `FRONTEND_PRIMARY_URL`, a protected calendar credential secret, configured provider credentials, and the sync worker.
 9. Approve the release, migration window, forward-fix owner, rollback decision deadline, and customer communications plan.
 
 ## Deployment order
@@ -50,6 +56,12 @@ Review counts and database/storage health before scheduling the corresponding `-
 ## Parsing, generated execution, and remote ingestion
 
 Generated code is disabled by default and requires `AI_ISOLATED_WORKER_ENABLED=true`; the subprocess worker has resource and protocol controls. Spreadsheet/CSV/JSON parsing remains bounded but in the web process. `PARSER_ISOLATED_WORKER_ENABLED` is therefore not a deployable completion flag until a real worker service exists, and production readiness must remain degraded for this gap. Remote URL ingestion stays disabled unless an egress layer pins validated DNS resolution, revalidates redirects, blocks private/reserved ranges, and sets `REMOTE_INGESTION_EGRESS_ENFORCED=true`. Do not override either guard to make readiness green.
+
+The generated worker forces OpenBLAS, OpenMP, MKL, NumExpr, VecLib, and BLIS
+to one thread before numerical imports. It keeps a sanitized structured protocol,
+bounded stderr, CPU/address-space/file/process limits, a temporary working
+directory, and an environment allowlist. A dedicated worker UID/container is
+still recommended before broad production enablement.
 
 ## Credential rotation
 

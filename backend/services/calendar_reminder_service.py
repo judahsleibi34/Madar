@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 from typing import Any
 
 from dateutil.rrule import rrulestr
 
 from database import service_supabase
 from services.notification_outbox_service import enqueue_notification
+
+
+logger = logging.getLogger(__name__)
 
 
 def _rows(response) -> list[dict[str, Any]]:
@@ -120,6 +124,35 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
         configured_channel = str(reminder.get("channel") or "in_app")
         outbox_channel = "internal" if configured_channel == "in_app" else configured_channel
         user_id = task.get("owner_user_id")
+        active_owner = []
+        if user_id is not None:
+            active_owner = _rows(
+                database_client.table("tenant_memberships")
+                .select("user_id")
+                .eq("tenant_id", reminder.get("tenant_id"))
+                .eq("user_id", user_id)
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
+        if not active_owner:
+            database_client.table("calendar_task_reminders").update(
+                {"delivery_status": "cancelled", "failure_code": "owner_inactive"}
+            ).eq("id", reminder.get("id")).execute()
+            continue
+        try:
+            occurrence_start = _datetime(reminder.get("scheduled_for")) + timedelta(
+                minutes=int(reminder.get("minutes_before") or 0)
+            )
+        except (TypeError, ValueError, OverflowError):
+            database_client.table("calendar_task_reminders").update(
+                {"delivery_status": "failed", "failure_code": "reminder_time_invalid"}
+            ).eq("id", reminder.get("id")).execute()
+            logger.warning(
+                "calendar_task_reminder.invalid",
+                extra={"error_code": "reminder_time_invalid"},
+            )
+            continue
         payload = {
             "event_type": "calendar_task_reminder",
             "source_type": "calendar_task",

@@ -27,6 +27,15 @@ class SandboxExecutionError(RuntimeError):
 MAX_SANDBOX_INPUT_BYTES = int(os.getenv("AI_SANDBOX_MAX_INPUT_BYTES", str(5 * 1024 * 1024)))
 MAX_SANDBOX_OUTPUT_BYTES = int(os.getenv("AI_SANDBOX_MAX_OUTPUT_BYTES", str(1024 * 1024)))
 SANDBOX_MEMORY_BYTES = int(os.getenv("AI_SANDBOX_MEMORY_BYTES", str(1024 * 1024 * 1024)))
+MAX_SANDBOX_STDERR_BYTES = 8192
+WORKER_THREAD_ENV = {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+    "BLIS_NUM_THREADS": "1",
+}
 
 
 def _limit_child() -> None:
@@ -72,13 +81,14 @@ def run_generated_code_locally(
             "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),
             "PYTHONIOENCODING": "utf-8",
             "MPLCONFIGDIR": str(Path(workdir) / "mpl"),
+            **WORKER_THREAD_ENV,
         }
         try:
             process = subprocess.run(
                 [sys.executable, "-I", str(worker)],
                 input=payload,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 cwd=workdir,
                 env=env,
                 timeout=timeout,
@@ -90,10 +100,12 @@ def run_generated_code_locally(
             raise SandboxExecutionError("Generated code timed out") from error
     if len(process.stdout) > MAX_SANDBOX_OUTPUT_BYTES:
         raise SandboxExecutionError("Generated code output is too large")
+    if len(process.stderr or b"") > MAX_SANDBOX_STDERR_BYTES:
+        raise SandboxExecutionError("worker_stderr_too_large")
     try:
         response = json.loads(process.stdout.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise SandboxExecutionError("Generated code worker returned an invalid result") from error
+        raise SandboxExecutionError("worker_protocol_invalid") from error
     if process.returncode != 0 or not response.get("success"):
         raise SandboxExecutionError(str(response.get("code") or "Generated code failed"))
     return validate_analysis_result(response.get("result"))

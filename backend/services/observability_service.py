@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import time
+from urllib.parse import urlsplit
 from collections import defaultdict
 from pathlib import Path
 from shutil import disk_usage
@@ -157,7 +158,39 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
 
 
+class SafeAccessLogFilter(logging.Filter):
+    """Remove query strings and suppress only successful liveness noise."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 5:
+            sanitized = list(args)
+            path = urlsplit(str(sanitized[2])).path or "/"
+            sanitized[2] = path
+            record.args = tuple(sanitized)
+            try:
+                status_code = int(sanitized[4])
+            except (TypeError, ValueError):
+                status_code = 0
+            if path == "/health/live" and 200 <= status_code < 400:
+                return False
+        return True
+
+
+def configure_access_logging() -> None:
+    access_logger = logging.getLogger("uvicorn.access")
+    for handler in access_logger.handlers:
+        if not any(isinstance(item, SafeAccessLogFilter) for item in handler.filters):
+            handler.addFilter(SafeAccessLogFilter())
+
+
 def configure_structured_logging() -> None:
+    third_party_level = os.getenv("THIRD_PARTY_HTTP_LOG_LEVEL", "WARNING").strip().upper()
+    if third_party_level not in {"WARNING", "ERROR", "CRITICAL"}:
+        third_party_level = "WARNING"
+    logging.getLogger("httpx").setLevel(third_party_level)
+    logging.getLogger("httpcore").setLevel(third_party_level)
+    configure_access_logging()
     if os.getenv("STRUCTURED_LOGS", "true").strip().lower() not in {"1", "true", "yes", "on"}:
         return
     root = logging.getLogger()

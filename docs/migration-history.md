@@ -24,11 +24,13 @@ July 17, 2026:
 - `053_remove_residual_authenticated_privileges.sql` is part of the current
   operator-reported production baseline. This repository task did not query or
   change the production ledger.
-- `054_add_form_submission_idempotency.sql`,
-  `055_create_builder_asset_registry.sql`,
-  `056_add_storage_quota_accounting.sql`, and
-  `057_add_project_site_permissions.sql` are repository-only pending migrations.
-  They were not applied to production or any shared database by this task.
+- `054_add_form_submission_idempotency.sql` through
+  `057_add_project_site_permissions.sql` were manually applied and are
+  operator-verified in the current production database. SQL Editor execution
+  may not appear in the Supabase CLI migration ledger; every new environment
+  must still apply and verify these migrations independently.
+- `058` through `065` exist in the repository. There is no operator evidence in
+  this task that they are applied in production.
 
 The role migration was originally introduced with the conflicting
 prefix `047`. Because notification outbox owns the verified production identity

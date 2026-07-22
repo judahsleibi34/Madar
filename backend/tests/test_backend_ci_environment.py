@@ -60,6 +60,18 @@ def _docker_environment(command: str) -> dict[str, str]:
 
 
 class BackendCiEnvironmentTests(unittest.TestCase):
+    def test_compose_declares_environment_classification_explicitly(self):
+        production = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        development = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")
+        backend_section = production.split("\n  backend:", 1)[1].split("\n  notification-worker:", 1)[0]
+        notification_section = production.split("\n  notification-worker:", 1)[1].split("\n  calendar-sync-worker:", 1)[0]
+        calendar_section = production.split("\n  calendar-sync-worker:", 1)[1].split("\n  frontend:", 1)[0]
+        for name, section in (("backend", backend_section), ("notification", notification_section), ("calendar", calendar_section)):
+            with self.subTest(service=name):
+                self.assertIn("APP_ENV: production", section)
+        self.assertIn("APP_ENV: development", development)
+        self.assertNotIn("PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost", production)
+
     def test_backend_ci_uses_safe_complete_hermetic_environment(self):
         command = _named_run_command(WORKFLOW, "Run backend tests")
         tokens = shlex.split(command)

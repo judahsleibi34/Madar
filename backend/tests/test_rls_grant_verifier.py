@@ -13,6 +13,58 @@ def grant(table, grantee, privilege):
 
 
 class RlsGrantVerifierTests(unittest.TestCase):
+    def test_calendar_tables_are_service_role_only_and_oauth_rpc_is_protected(self):
+        calendar_tables = {
+            "calendars", "calendar_memberships", "calendar_events",
+            "calendar_event_attendees", "calendar_event_reminders",
+            "calendar_event_changes", "calendar_tasks", "calendar_task_dependencies",
+            "calendar_task_reminders", "calendar_sync_connections",
+            "calendar_sync_conflicts", "calendar_invitation_reviews", "calendar_oauth_states",
+        }
+        self.assertTrue(calendar_tables.issubset(set(verify_rls_grants.SENSITIVE_TABLES)))
+        for table in calendar_tables:
+            with self.subTest(table=table):
+                self.assertEqual(verify_rls_grants.ALLOWED_DIRECT_GRANTS[table]["anon"], set())
+                self.assertEqual(verify_rls_grants.ALLOWED_DIRECT_GRANTS[table]["authenticated"], set())
+                self.assertEqual(verify_rls_grants.ALLOWED_DIRECT_GRANTS[table]["service_role"], verify_rls_grants.TABLE_CRUD_GRANTS)
+        self.assertIn("consume_calendar_oauth_state", verify_rls_grants.SENSITIVE_SECURITY_DEFINER_FUNCTIONS)
+
+    def test_calendar_oauth_migration_matches_and_has_fixed_search_path(self):
+        root = next(parent for parent in Path(__file__).resolve().parents if (parent / "database/migrations").is_dir())
+        relative = "065_secure_calendar_oauth_state.sql"
+        database_sql = (root / "database/migrations" / relative).read_text(encoding="utf-8")
+        supabase_sql = (root / "supabase/migrations" / relative).read_text(encoding="utf-8")
+        self.assertEqual(database_sql, supabase_sql)
+        normalized = " ".join(database_sql.lower().split())
+        self.assertIn("security definer set search_path = public", normalized)
+        self.assertIn("from public, anon, authenticated", normalized)
+        self.assertIn("to service_role", normalized)
+
+    def test_calendar_migrations_061_through_064_match_and_preserve_backend_only_access(self):
+        root = next(parent for parent in Path(__file__).resolve().parents if (parent / "database/migrations").is_dir())
+        names = (
+            "061_create_calendar_platform.sql",
+            "062_add_calendar_task_reminders.sql",
+            "063_backfill_calendar_task_reminders.sql",
+            "064_add_calendar_task_recurrence.sql",
+        )
+        texts = {}
+        for name in names:
+            database_sql = (root / "database/migrations" / name).read_text(encoding="utf-8")
+            supabase_sql = (root / "supabase/migrations" / name).read_text(encoding="utf-8")
+            self.assertEqual(database_sql, supabase_sql, name)
+            texts[name] = " ".join(database_sql.lower().split())
+        platform = texts[names[0]]
+        self.assertIn("enable row level security", platform)
+        self.assertIn("revoke all on table public.%i from anon, authenticated", platform)
+        self.assertIn("grant select, insert, update, delete on table public.%i to service_role", platform)
+        reminders = texts[names[1]]
+        self.assertIn("alter table public.calendar_task_reminders enable row level security", reminders)
+        self.assertIn("revoke all on table public.calendar_task_reminders from anon, authenticated", reminders)
+        self.assertIn("to service_role", reminders)
+        self.assertIn("on conflict (task_id, channel) do nothing", texts[names[2]])
+        self.assertIn("calendar_tasks_recurrence_rule_check", texts[names[3]])
+
     def test_privileged_write_migration_revokes_browser_dml_in_both_trees(self):
         test_path = Path(__file__).resolve()
         root = next(

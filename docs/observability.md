@@ -8,6 +8,15 @@ Madar exposes three separate operational signals:
 
 The metrics endpoint uses route templates, HTTP method, and status class only. It also reports bounded queue counts, expired-asset cleanup backlog, active quota reservations, disk usage, backup age, and parser/AI guard state. Operational database counts are capped at 5,000 per scrape. Do not add tenant IDs, user IDs, email addresses, filenames, subdomains, raw URLs, or exception messages as labels. JSON application logs use a validated correlation ID and an allowlist of operational fields; arbitrary log messages are redacted.
 
+Production/test logging keeps `httpx` and `httpcore` at `WARNING`. Successful
+`/health/live` access entries are filtered, while failed health checks remain
+visible. Access logging removes every query string before formatting, including
+calendar OAuth callbacks. Uvicorn startup/error output, security events,
+correlation IDs, worker failures, and the durable database audit trail remain
+enabled. Unexpected application exceptions return a sanitized JSON 500 with an
+`X-Request-ID`; internal exception types are logged once without bodies, query
+values, cookies, tokens, or authorization headers.
+
 ## Required production configuration
 
 Set `NOTIFICATION_WORKER_REQUIRED=true`, `NOTIFICATION_WORKER_ENABLED=true`, and an internal-only `NOTIFICATION_WORKER_HEALTH_URL` when the worker is deployed. Set `BACKUP_FRESHNESS_REQUIRED=true`, `BACKUP_FRESHNESS_MARKER` to the marker written by the verified backup job, and choose an operator-approved `BACKUP_MAX_AGE_SECONDS`. Protect metrics with a randomly generated `METRICS_TOKEN` and keep it out of images and source control.

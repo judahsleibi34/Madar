@@ -47,6 +47,22 @@ REQUIRED_SCHEMA_SELECTS = {
     "tenant_site_project_roles": "id,tenant_id,project_id,role_key,capabilities,deleted_at",
     "tenant_site_project_role_assignments": "membership_id,project_id,role_id",
 }
+CALENDAR_SCHEMA_SELECTS = {
+    "calendars": "id,tenant_id,owner_user_id,visibility",
+    "calendar_memberships": "calendar_id,tenant_id,user_id,role",
+    "calendar_events": "id,tenant_id,calendar_id,project_id,version",
+    "calendar_event_attendees": "id,event_id,tenant_id",
+    "calendar_event_reminders": "id,event_id,tenant_id,delivery_status",
+    "calendar_event_changes": "id,event_id,tenant_id,changed_by",
+    "calendar_tasks": "id,tenant_id,calendar_id,project_id,owner_user_id,recurrence_rule",
+    "calendar_task_dependencies": "task_id,depends_on_task_id,tenant_id",
+    "calendar_task_reminders": "id,task_id,tenant_id,delivery_status",
+    "calendar_sync_connections": "id,tenant_id,user_id,local_calendar_id,provider,status",
+    "calendar_sync_conflicts": "id,tenant_id,connection_id,event_id,status",
+    "calendar_invitation_reviews": "id,tenant_id,event_id,disposition",
+    "calendar_oauth_states": "nonce_hash,connection_id,tenant_id,user_id,calendar_id,consumed_at",
+}
+CALENDAR_SCHEMA_FUNCTIONS = ("consume_calendar_oauth_state",)
 
 _cache_lock = Lock()
 _cached_at = 0.0
@@ -67,6 +83,11 @@ def _app_env() -> str:
         or os.getenv("ENV")
         or "development"
     ).strip().lower()
+
+
+def check_environment() -> str:
+    value = os.getenv("APP_ENV", "").strip().lower()
+    return "ok" if value in {"development", "test", "prod", "production"} else "misconfigured"
 
 
 def _supabase_headers() -> dict[str, str]:
@@ -126,10 +147,30 @@ def check_schema() -> str:
             )
             return 200 <= response.status_code < 300
 
-        schema_items = tuple(REQUIRED_SCHEMA_SELECTS.items())
+        required_selects = dict(REQUIRED_SCHEMA_SELECTS)
+        if _env_bool("CALENDAR_FEATURE_ENABLED", False):
+            required_selects.update(CALENDAR_SCHEMA_SELECTS)
+        schema_items = tuple(required_selects.items())
         with ThreadPoolExecutor(max_workers=min(4, len(schema_items))) as executor:
             table_states = tuple(executor.map(check_table, schema_items))
-        return "ok" if all(table_states) else "missing"
+        if not all(table_states):
+            return "missing"
+        if _env_bool("CALENDAR_FEATURE_ENABLED", False):
+            response = requests.get(
+                _supabase_url("/rest/v1/"),
+                headers=_supabase_headers(),
+                timeout=READINESS_TIMEOUT_SECONDS,
+                allow_redirects=False,
+            )
+            if not 200 <= response.status_code < 300:
+                return "unavailable"
+            try:
+                paths = (response.json() or {}).get("paths") or {}
+            except (ValueError, TypeError):
+                return "unavailable"
+            if not all(f"/rpc/{name}" in paths for name in CALENDAR_SCHEMA_FUNCTIONS):
+                return "missing"
+        return "ok"
     except requests.RequestException:
         return "unavailable"
 
@@ -266,6 +307,29 @@ def check_remote_ingestion_guard() -> str:
     return "ok" if _env_bool("REMOTE_INGESTION_EGRESS_ENFORCED", False) else "insecure"
 
 
+def check_calendar_configuration() -> str:
+    if not _env_bool("CALENDAR_FEATURE_ENABLED", False):
+        return "disabled"
+    if not _env_bool("CALENDAR_SYNC_REQUIRED", False):
+        return "ok"
+    if not _env_bool("CALENDAR_SYNC_WORKER_ENABLED", False):
+        return "misconfigured"
+    if len(os.getenv("CALENDAR_CREDENTIALS_SECRET", "").strip()) < 24:
+        return "misconfigured"
+    from urllib.parse import urlparse
+    for name in ("PUBLIC_API_URL", "FRONTEND_PRIMARY_URL"):
+        parsed = urlparse(os.getenv(name, "").strip())
+        if parsed.scheme != "https" or not parsed.netloc or parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+            return "misconfigured"
+    providers = (
+        ("GOOGLE_CALENDAR_CLIENT_ID", "GOOGLE_CALENDAR_CLIENT_SECRET"),
+        ("MICROSOFT_CALENDAR_CLIENT_ID", "MICROSOFT_CALENDAR_CLIENT_SECRET"),
+    )
+    if not any(all(os.getenv(name, "").strip() for name in pair) for pair in providers):
+        return "misconfigured"
+    return "ok"
+
+
 def check_parser_isolation() -> str:
     return "in_process" if _app_env() in {"prod", "production"} else "development"
 
@@ -275,7 +339,7 @@ def _is_required_state_ready(component: str, state: str) -> bool:
         return True
     if component == "admin_mfa_policy" and state == "not_required":
         return True
-    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "backup_freshness"} and state == "disabled":
+    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "backup_freshness", "calendar_configuration"} and state == "disabled":
         return True
     if component == "parser_isolation" and state == "development":
         return True
@@ -284,6 +348,7 @@ def _is_required_state_ready(component: str, state: str) -> bool:
 
 def compute_readiness() -> dict:
     checks = {
+        "environment": check_environment,
         "database": check_database,
         "redis": check_redis,
         "auth": check_auth,
@@ -292,6 +357,7 @@ def compute_readiness() -> dict:
         "admin_mfa_policy": check_admin_mfa_policy,
         "ai_execution_guard": check_ai_execution_guard,
         "remote_ingestion_guard": check_remote_ingestion_guard,
+        "calendar_configuration": check_calendar_configuration,
         "parser_isolation": check_parser_isolation,
         "notification_worker": check_notification_worker,
         "notification_queue": check_notification_queue,
