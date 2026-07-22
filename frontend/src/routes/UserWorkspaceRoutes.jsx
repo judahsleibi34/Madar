@@ -167,7 +167,7 @@ export default function UserWorkspaceRoutes({
 
       <Route
         path="/calendar/*"
-        element={renderShell(<ReservationCalendarPage />)}
+        element={renderShell(<ReservationCalendarPage user={user} />)}
       />
       <Route
         path="/archive/*"

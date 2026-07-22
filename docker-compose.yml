@@ -139,7 +139,7 @@ services:
     environment:
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
-      NOTIFICATION_WORKER_ENABLED: ${NOTIFICATION_WORKER_ENABLED:-false}
+      NOTIFICATION_WORKER_ENABLED: "true"
       NOTIFICATION_WORKER_BATCH_SIZE: ${NOTIFICATION_WORKER_BATCH_SIZE:-25}
       NOTIFICATION_WORKER_CONCURRENCY: ${NOTIFICATION_WORKER_CONCURRENCY:-2}
       NOTIFICATION_WORKER_POLL_SECONDS: ${NOTIFICATION_WORKER_POLL_SECONDS:-5}
@@ -155,6 +155,44 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+    cpus: 1.00
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  calendar-sync-worker:
+    build:
+      context: ./backend
+    container_name: madar-calendar-sync-worker
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    profiles: ["workers"]
+    env_file:
+      - .env
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET}
+      CALENDAR_SYNC_WORKER_ENABLED: ${CALENDAR_SYNC_WORKER_ENABLED:-false}
+      CALENDAR_SYNC_BATCH_SIZE: ${CALENDAR_SYNC_BATCH_SIZE:-10}
+      CALENDAR_SYNC_CONCURRENCY: ${CALENDAR_SYNC_CONCURRENCY:-2}
+      CALENDAR_SYNC_INTERVAL_SECONDS: ${CALENDAR_SYNC_INTERVAL_SECONDS:-300}
+      GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
+      GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
+      MICROSOFT_CALENDAR_CLIENT_ID: ${MICROSOFT_CALENDAR_CLIENT_ID:-}
+      MICROSOFT_CALENDAR_CLIENT_SECRET: ${MICROSOFT_CALENDAR_CLIENT_SECRET:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
+    command: ["python", "-m", "workers.calendar_sync_worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
     cpus: 1.00
     mem_limit: 512m
     logging:

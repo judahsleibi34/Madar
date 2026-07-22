@@ -173,6 +173,149 @@ export const listBuilderReservations = async ({
     },
   };
 };
+
+export const fetchCalendarWorkspace = async ({ start, end }) => {
+  const query = new URLSearchParams({ start, end });
+  const response = await apiFetch(
+    getApiUrl("/calendar/bootstrap?" + query.toString()),
+    { method: "GET", cache: "no-store" }
+  );
+  return parseJsonResponse(response);
+};
+
+export const createCalendar = async (calendar) => {
+  const response = await apiFetch(getApiUrl("/calendar/calendars"), {
+    method: "POST",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify(calendar),
+  });
+  return (await parseJsonResponse(response))?.calendar;
+};
+
+export const createCalendarEvent = async (event) => {
+  const response = await apiFetch(getApiUrl("/calendar/events"), {
+    method: "POST",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify(event),
+  });
+  return parseJsonResponse(response);
+};
+
+export const updateCalendarEvent = async (
+  eventId,
+  event,
+  scope = "event",
+  occurrenceStart = ""
+) => {
+  const query = new URLSearchParams({ scope });
+  if (occurrenceStart) query.set("occurrence_start", occurrenceStart);
+  const response = await apiFetch(
+    getApiUrl(`/calendar/events/${encodeURIComponent(eventId)}?${query}`),
+    {
+      method: "PUT",
+      headers: builderWriteHeaders(),
+      body: JSON.stringify(event),
+    }
+  );
+  return parseJsonResponse(response);
+};
+
+export const deleteCalendarEvent = async (
+  eventId,
+  expectedVersion,
+  scope = "event",
+  occurrenceStart = ""
+) => {
+  const query = new URLSearchParams({
+    expected_version: String(expectedVersion),
+    scope,
+  });
+  if (occurrenceStart) query.set("occurrence_start", occurrenceStart);
+  const response = await apiFetch(
+    getApiUrl(`/calendar/events/${encodeURIComponent(eventId)}?${query}`),
+    { method: "DELETE", headers: builderWriteHeaders() }
+  );
+  return parseJsonResponse(response);
+};
+
+export const fetchCalendarEventHistory = async (eventId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/events/${encodeURIComponent(eventId)}/history`),
+    { method: "GET", cache: "no-store" }
+  );
+  return (await parseJsonResponse(response))?.history || [];
+};
+
+export const createCalendarTask = async (task) => {
+  const response = await apiFetch(getApiUrl("/calendar/tasks"), {
+    method: "POST",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify(task),
+  });
+  return (await parseJsonResponse(response))?.task;
+};
+
+export const updateCalendarTask = async (taskId, task, expectedVersion) => {
+  const query = new URLSearchParams({ expected_version: String(expectedVersion) });
+  const response = await apiFetch(
+    getApiUrl(`/calendar/tasks/${encodeURIComponent(taskId)}?${query}`),
+    {
+      method: "PUT",
+      headers: builderWriteHeaders(),
+      body: JSON.stringify(task),
+    }
+  );
+  return (await parseJsonResponse(response))?.task;
+};
+
+export const createCalendarConnection = async (connection) => {
+  const response = await apiFetch(getApiUrl("/calendar/connections"), {
+    method: "POST",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify(connection),
+  });
+  return parseJsonResponse(response);
+};
+
+export const authorizeCalendarConnection = async (connectionId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}/authorize`),
+    { method: "POST", headers: builderWriteHeaders() }
+  );
+  return (await parseJsonResponse(response))?.authorization_url || "";
+};
+
+export const syncCalendarConnection = async (connectionId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}/sync`),
+    { method: "POST", headers: builderWriteHeaders() }
+  );
+  return parseJsonResponse(response);
+};
+
+export const getCalendarExportUrl = ({ start, end, calendarId = "" }) => {
+  const query = new URLSearchParams({ start, end });
+  if (calendarId) query.set("calendar_id", calendarId);
+  return getApiUrl("/calendar/export.ics?" + query.toString());
+};
+
+export const importCalendarIcs = async ({ calendarId, content }) => {
+  const response = await apiFetch(getApiUrl("/calendar/import.ics"), {
+    method: "POST",
+    headers: builderWriteHeaders(),
+    body: JSON.stringify({ calendar_id: calendarId, content }),
+  });
+  return parseJsonResponse(response);
+};
+
+export const resolveCalendarInvitation = async (reviewId, disposition) => {
+  const query = new URLSearchParams({ disposition });
+  const response = await apiFetch(
+    getApiUrl(`/calendar/invitation-reviews/${encodeURIComponent(reviewId)}?${query}`),
+    { method: "POST", headers: builderWriteHeaders() }
+  );
+  return parseJsonResponse(response);
+};
 export const fetchBuilderProject = async (projectId) => {
   const response = await apiFetch(getApiUrl(`/builder/projects/${projectId}`), {
     method: "GET",

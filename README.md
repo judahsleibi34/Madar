@@ -82,6 +82,16 @@ Common security and session settings:
 - `ADMIN_MFA_LOGIN_ENFORCEMENT`
 - `TRUSTED_PROXY_IPS`
 
+Calendar integrations and workers:
+
+- `CALENDAR_CREDENTIALS_SECRET` (a dedicated high-entropy secret used to encrypt provider tokens)
+- `PUBLIC_API_URL` and `FRONTEND_PRIMARY_URL` (must match the registered OAuth redirect hosts)
+- `GOOGLE_CALENDAR_CLIENT_ID` and `GOOGLE_CALENDAR_CLIENT_SECRET`
+- `MICROSOFT_CALENDAR_CLIENT_ID` and `MICROSOFT_CALENDAR_CLIENT_SECRET`
+- `CALENDAR_SYNC_WORKER_ENABLED`
+- `CALENDAR_SYNC_INTERVAL_SECONDS`
+- `NOTIFICATION_WORKER_ENABLED` (also dispatches scheduled calendar reminders)
+
 Rate limiting and request-size controls:
 
 - `REDIS_URL`

@@ -318,6 +318,26 @@ export default function DashboardSidebar({
     }
   };
 
+  const toggleSettings = () => {
+    const nextOpen = isWorkspaceSidebarCollapsed || !settingsIsExpanded;
+
+    if (isWorkspaceSidebarCollapsed) {
+      setWorkspaceSidebarCollapsed(false);
+    }
+
+    setSettingsExpansion({
+      open: nextOpen,
+      pathname: location.pathname,
+    });
+
+    if (nextOpen) {
+      setWorkspaceExpansion({
+        open: false,
+        pathname: location.pathname,
+      });
+    }
+  };
+
   const isActive = (path) => {
     if (path === PUBLIC_ROUTES.home) {
       return location.pathname === PUBLIC_ROUTES.home;
@@ -481,7 +501,6 @@ export default function DashboardSidebar({
       <div className="admin-sidebar-bottom">
         <div
           className="admin-sidebar-group admin-sidebar-settings-group"
-          onClickCapture={expandWorkspaceSidebar}
         >
           <SidebarRow
             active={settingsRouteActive}
@@ -490,21 +509,7 @@ export default function DashboardSidebar({
             expanded={settingsIsExpanded}
             icon={Settings}
             label={t("sidebar.settings")}
-            onClick={() => {
-              const nextOpen = !settingsIsExpanded;
-
-              setSettingsExpansion({
-                open: nextOpen,
-                pathname: location.pathname,
-              });
-
-              if (nextOpen) {
-                setWorkspaceExpansion({
-                  open: false,
-                  pathname: location.pathname,
-                });
-              }
-            }}
+            onClick={toggleSettings}
           />
 
           {settingsIsExpanded && (
