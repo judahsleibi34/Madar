@@ -13,6 +13,129 @@ def grant(table, grantee, privilege):
 
 
 class RlsGrantVerifierTests(unittest.TestCase):
+    def test_acl_normalization_migration_matches_and_covers_complete_contract(self):
+        root = next(parent for parent in Path(__file__).resolve().parents if (parent / "database/migrations").is_dir())
+        name = "066_normalize_sensitive_object_privileges.sql"
+        database_sql = (root / "database/migrations" / name).read_text(encoding="utf-8")
+        supabase_sql = (root / "supabase/migrations" / name).read_text(encoding="utf-8")
+        self.assertEqual(database_sql, supabase_sql)
+        normalized = " ".join(database_sql.lower().split())
+        self.assertIn("revoke all privileges on table public.%i from public, anon, authenticated, service_role", normalized)
+        self.assertIn("grant select, insert, update, delete on table public.%i to service_role", normalized)
+        self.assertIn("grant usage, select on sequence %i.%i to service_role", normalized)
+        self.assertIn("alter default privileges for role postgres in schema public", normalized)
+        self.assertIn("revoke all privileges on functions from public, anon, authenticated, service_role", normalized)
+        self.assertIn("publish_builder_project_atomic", normalized)
+        self.assertIn("calendar_oauth_states", normalized)
+
+    def test_exact_table_acl_detects_unexpected_and_missing_privileges(self):
+        rows = [
+            grant("builder_form_submissions", "authenticated", "SELECT"),
+            grant("builder_form_submissions", "anon", "TRUNCATE"),
+            grant("builder_form_submissions", "service_role", "SELECT"),
+            grant("builder_form_submissions", "service_role", "INSERT"),
+            grant("builder_form_submissions", "service_role", "UPDATE"),
+        ]
+        self.assertEqual(
+            verify_rls_grants.find_grant_mismatches("builder_form_submissions", rows),
+            [
+                "anon:unexpected:TRUNCATE",
+                "service_role:missing:DELETE",
+            ],
+        )
+
+    def test_exact_acl_rejects_authenticated_references_and_trigger(self):
+        rows = [
+            grant("builder_projects", "authenticated", "SELECT"),
+            grant("builder_projects", "authenticated", "REFERENCES"),
+            grant("builder_projects", "authenticated", "TRIGGER"),
+        ] + [grant("builder_projects", "service_role", privilege) for privilege in verify_rls_grants.TABLE_CRUD_GRANTS]
+        self.assertEqual(
+            verify_rls_grants.find_grant_mismatches("builder_projects", rows),
+            ["authenticated:unexpected:REFERENCES", "authenticated:unexpected:TRIGGER"],
+        )
+
+    def test_exact_acl_rejects_unexpected_service_role_privilege(self):
+        rows = [grant("audit_logs", "service_role", privilege) for privilege in (
+            "SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"
+        )]
+        self.assertEqual(
+            verify_rls_grants.find_grant_mismatches("audit_logs", rows),
+            ["service_role:unexpected:TRUNCATE"],
+        )
+
+    def test_sequence_acl_is_exact(self):
+        rows = [
+            {"sequence_name": "users_id_seq", "owner_name": "postgres", "grantee": "service_role", "privilege_type": "USAGE"},
+            {"sequence_name": "users_id_seq", "owner_name": "postgres", "grantee": "service_role", "privilege_type": "SELECT"},
+            {"sequence_name": "users_id_seq", "owner_name": "postgres", "grantee": "authenticated", "privilege_type": "UPDATE"},
+        ]
+        self.assertEqual(
+            verify_rls_grants.find_sequence_mismatches(rows),
+            ["role=authenticated sequence=public.users_id_seq unexpected=UPDATE expected=none"],
+        )
+
+    def test_default_acl_detects_public_execute(self):
+        rows = [
+            {"object_type": "tables", "grantee": "service_role", "privilege_type": privilege}
+            for privilege in verify_rls_grants.TABLE_CRUD_GRANTS
+        ] + [
+            {"object_type": "sequences", "grantee": "service_role", "privilege_type": privilege}
+            for privilege in verify_rls_grants.SEQUENCE_SERVICE_GRANTS
+        ] + [
+            {"object_type": "functions", "grantee": "service_role", "privilege_type": "EXECUTE"},
+            {"object_type": "functions", "grantee": "public", "privilege_type": "EXECUTE"},
+        ]
+        self.assertEqual(
+            verify_rls_grants.find_default_acl_mismatches(rows),
+            ["default=functions role=public unexpected=EXECUTE expected=none"],
+        )
+
+    def test_environment_contract_rejects_schema_create_and_role_inheritance(self):
+        schema = [
+            {"role_name": "anon", "has_usage": "true", "has_create": "true"},
+            {"role_name": "authenticated", "has_usage": "true", "has_create": "false"},
+            {"role_name": "service_role", "has_usage": "true", "has_create": "false"},
+        ]
+        memberships = [{"member_role": "authenticated", "granted_role": "service_role"}]
+        self.assertEqual(
+            verify_rls_grants.find_environment_mismatches(schema, memberships),
+            [
+                "role=anon schema=public unexpected=CREATE expected=USAGE",
+                "role=authenticated inherits=service_role invalidates_direct_acl_contract",
+            ],
+        )
+
+    def test_missing_rls_is_reported(self):
+        table = "audit_logs"
+        grants = [grant(table, "service_role", privilege) for privilege in verify_rls_grants.TABLE_CRUD_GRANTS]
+        report = next(
+            item for item in verify_rls_grants.build_reports(
+                {table: {"table_name": table, "rls_enabled": "false", "owner_name": "postgres"}},
+                [],
+                grants,
+            ) if item.table == table
+        )
+        self.assertFalse(report.rls_enabled)
+
+    def test_function_contract_rejects_public_execute_and_unsafe_search_path(self):
+        functions = [
+            {
+                "signature": "public.consume_calendar_oauth_state(text)",
+                "function_name": "consume_calendar_oauth_state",
+                "settings": "search_path=$user,public",
+                "owner_name": "postgres",
+                "security_definer": "true",
+                "public_execute": "true",
+                "anon_execute": "false",
+                "authenticated_execute": "false",
+                "service_role_execute": "true",
+            }
+        ]
+        mismatches = verify_rls_grants.find_function_mismatches(functions)
+        self.assertIn("function=public.consume_calendar_oauth_state(text) unsafe_search_path", mismatches)
+        self.assertIn("role=public function=public.consume_calendar_oauth_state(text) unexpected=EXECUTE expected=none", mismatches)
+
     def test_calendar_tables_are_service_role_only_and_oauth_rpc_is_protected(self):
         calendar_tables = {
             "calendars", "calendar_memberships", "calendar_events",

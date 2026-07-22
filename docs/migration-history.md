@@ -7,8 +7,8 @@ Madar keeps matching logical migrations in two trees:
 
 ## Verified production identities
 
-The production `supabase_migrations.schema_migrations` ledger was verified on
-July 17, 2026:
+The production `supabase_migrations.schema_migrations` ledger was most recently
+verified on July 22, 2026:
 
 - `047_create_notification_outbox.sql` is applied as version `047`, name
   `create_notification_outbox`.
@@ -29,8 +29,18 @@ July 17, 2026:
   operator-verified in the current production database. SQL Editor execution
   may not appear in the Supabase CLI migration ledger; every new environment
   must still apply and verify these migrations independently.
-- `058` through `065` exist in the repository. There is no operator evidence in
-  this task that they are applied in production.
+- `058` through `064` are ledger-recorded and schema-verified in production.
+- `065_secure_calendar_oauth_state.sql` and
+  `066_normalize_sensitive_object_privileges.sql` were applied from the exact
+  repository files and schema-verified on July 22, 2026. Direct `psql`
+  application did not write the Supabase ledger, which therefore still ends at
+  `064`; no manual ledger row or repair was performed.
+- Ledger versions `043` and `044` both record the name
+  `create_builder_reservations` and the same statement hash. The production
+  schema nevertheless contains the account-lifecycle contract expected by
+  repository migration 043 as well as the reservation contract. Preserve this
+  historical discrepancy until an explicitly authorized ledger-reconciliation
+  procedure is approved.
 
 The role migration was originally introduced with the conflicting
 prefix `047`. Because notification outbox owns the verified production identity
