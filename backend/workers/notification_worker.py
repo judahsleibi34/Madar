@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from services.notification_delivery_service import DeliveryError, deliver_notification
 from services.notification_outbox_service import claim_notifications, get_queue_metrics, mark_notification_result
+from services.calendar_reminder_service import enqueue_due_calendar_reminders, mark_calendar_reminder_delivery
 from services.observability_service import configure_structured_logging
 
 logger = logging.getLogger(__name__)
@@ -48,17 +49,20 @@ def process_batch(
         except DeliveryError as error:
             code = error.code if error.retryable else f"permanent.{error.code}"
             finish(outbox_id, succeeded=False, failure_code=code, retry_after_seconds=retry_delay(row))
+            mark_calendar_reminder_delivery(row, succeeded=False, failure_code=code)
             STATE["failed"] += 1
             if int(row.get("attempts") or 0) >= int(row.get("max_attempts") or 5):
                 STATE["dead"] += 1
             logger.warning("notification_worker.delivery_failed", extra={"outbox_id": outbox_id, "channel": row.get("channel"), "error_code": code})
         except Exception as error:
             finish(outbox_id, succeeded=False, failure_code="delivery_unexpected", retry_after_seconds=retry_delay(row))
+            mark_calendar_reminder_delivery(row, succeeded=False, failure_code="delivery_unexpected")
             STATE["failed"] += 1
             logger.error("notification_worker.delivery_failed", extra={"outbox_id": outbox_id, "channel": row.get("channel"), "error_code": "delivery_unexpected", "error_type": type(error).__name__})
         else:
             if finish(outbox_id, succeeded=True):
                 STATE["sent"] += 1
+                mark_calendar_reminder_delivery(row, succeeded=True)
         STATE["processed"] += 1
     with ThreadPoolExecutor(max_workers=max(1, min(int(concurrency), 16))) as executor:
         list(executor.map(process, rows))
@@ -110,6 +114,10 @@ def main() -> int:
     poll_seconds = max(0.25, min(float(os.getenv("NOTIFICATION_WORKER_POLL_SECONDS", "5")), 60.0))
     try:
         while not STOP_EVENT.is_set():
+            try:
+                enqueue_due_calendar_reminders(limit=batch_size)
+            except Exception as error:
+                logger.error("calendar_reminders.enqueue_failed", extra={"error_type": type(error).__name__})
             processed = process_batch(limit=batch_size, concurrency=concurrency)
             try:
                 STATE.update(get_queue_metrics())

@@ -93,6 +93,7 @@ export function useBuilderResponsesData({
 
     let cancelled = false;
     const cached = readResponsesCache(selectedCacheKey);
+    const forceRefresh = refreshKey > 0;
 
     queueMicrotask(() => {
       if (cancelled) return;
@@ -108,9 +109,17 @@ export function useBuilderResponsesData({
         }));
       }
 
-      setResponsesLoading(!cached);
+      setResponsesLoading(forceRefresh || !cached);
       setResponsesError("");
     });
+
+    // A fresh cached page is enough for normal navigation. The Refresh button
+    // deliberately bypasses this return and replaces the cached page.
+    if (cached && !forceRefresh) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
     getOrCreateResponsesRequest(selectedCacheKey, () =>
       fetchBuilderFormSubmissionsPage(builderProjectId, {
@@ -144,7 +153,10 @@ export function useBuilderResponsesData({
         }
       })
       .finally(() => {
-        if (!cancelled) setResponsesLoading(false);
+        if (!cancelled) {
+          setResponsesLoading(false);
+          if (forceRefresh) setRefreshKey(0);
+        }
       });
 
     return () => {

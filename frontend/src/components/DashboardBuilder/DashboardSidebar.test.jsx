@@ -170,8 +170,11 @@ describe("DashboardSidebar navigation hierarchy", () => {
     fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Settings" })[0]);
+    const settings = screen.getAllByRole("button", { name: "Settings" })[0];
+    fireEvent.click(settings);
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(false);
+    expect(settings.getAttribute("aria-expanded")).toBe("true");
+    expect(document.getElementById("dashboard-sidebar-settings")).toBeTruthy();
   });
 
   it("collapses the expanded workspace sidebar when clicking outside it", () => {

@@ -96,16 +96,19 @@ def _smtp_settings() -> tuple[str, int, str, str, str, bool]:
 
 def _deliver_email(row: dict[str, Any]) -> None:
     reference = str(row.get("recipient_reference") or "")
-    if not reference.startswith("reservation:"):
+    if reference.startswith("reservation:"):
+        reservation_id = reference.removeprefix("reservation:")
+        query = service_supabase.table("builder_reservations").select("*").eq("id", reservation_id)
+        if row.get("tenant_id") is not None:
+            query = query.eq("tenant_id", int(row["tenant_id"]))
+        reservations = _rows(query.limit(1).execute())
+        recipient = str(reservations[0].get("customer_email") if reservations else "").strip()
+    elif reference.startswith("user:"):
+        user_id = reference.removeprefix("user:")
+        users = _rows(service_supabase.table("users").select("email").eq("id", user_id).limit(1).execute())
+        recipient = str(users[0].get("email") if users else "").strip()
+    else:
         raise DeliveryError("email_recipient_reference_unsupported", retryable=False)
-    reservation_id = reference.removeprefix("reservation:")
-    query = service_supabase.table("builder_reservations").select("*").eq("id", reservation_id)
-    if row.get("tenant_id") is not None:
-        query = query.eq("tenant_id", int(row["tenant_id"]))
-    reservations = _rows(query.limit(1).execute())
-    if not reservations:
-        raise DeliveryError("email_recipient_not_found", retryable=False)
-    recipient = str(reservations[0].get("customer_email") or "").strip()
     if not recipient:
         raise DeliveryError("email_recipient_not_found", retryable=False)
     host, port, username, password, sender, use_tls = _smtp_settings()
@@ -117,6 +120,9 @@ def _deliver_email(row: dict[str, Any]) -> None:
     elif template == "reservation_status_changed":
         subject = "Madar reservation update"
         body = f"Your reservation status is now: {str(payload.get('status') or 'updated')[:80]}."
+    elif template == "calendar_reminder":
+        subject = str(payload.get("title") or "Madar calendar reminder")[:200]
+        body = str(payload.get("body") or "An event is starting soon.")[:2000]
     else:
         raise DeliveryError("email_template_unsupported", retryable=False)
     message = EmailMessage()

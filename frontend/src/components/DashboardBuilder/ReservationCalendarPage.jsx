@@ -1,34 +1,57 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BellRing,
+  AlertTriangle,
   CalendarDays,
-  Check,
+  CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Mail,
-  MapPin,
-  Search,
-  User,
+  Download,
+  History,
+  Link2,
+  ListTodo,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
   X,
 } from "lucide-react";
 
-import { listBuilderReservations } from "../PageBuilder/services/PageBuilder.api";
+import {
+  createCalendarConnection,
+  authorizeCalendarConnection,
+  createCalendarEvent,
+  createCalendarTask,
+  deleteCalendarEvent,
+  fetchCalendarEventHistory,
+  fetchCalendarWorkspace,
+  getCalendarExportUrl,
+  importCalendarIcs,
+  resolveCalendarInvitation,
+  syncCalendarConnection,
+  updateCalendarEvent,
+  updateCalendarTask,
+} from "../PageBuilder/services/PageBuilder.api";
+import {
+  clearCalendarWorkspaceCache,
+  createCalendarWorkspaceCacheKey,
+  getOrCreateCalendarWorkspaceRequest,
+  readCalendarWorkspaceCache,
+  writeCalendarWorkspaceCache,
+} from "./utils/calendarWorkspaceCache";
 
-const HOURS = Array.from({ length: 14 }, (_, index) => index + 7);
-const STATUS_OPTIONS = [
-  { id: "new", label: "New", color: "var(--theme-primary)" },
-  { id: "confirmed", label: "Confirmed", color: "var(--theme-success)" },
-  { id: "completed", label: "Completed", color: "var(--theme-info)" },
-  { id: "cancelled", label: "Cancelled", color: "var(--theme-text-muted)" },
-  { id: "rejected", label: "Rejected", color: "var(--theme-danger)" },
-];
+const HOURS = Array.from({ length: 24 }, (_, index) => index);
+const VIEWS = ["day", "week", "month", "agenda"];
+const pad = (value) => String(value).padStart(2, "0");
 
-function startOfWeek(date) {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  result.setDate(result.getDate() - result.getDay());
-  return result;
+function SidebarSectionHeading({ section, icon, title, subtitle, count, expanded, onToggle }) {
+  return (
+    <button type="button" className="calendar-sidebar-group-heading" aria-expanded={expanded} aria-controls={`calendar-sidebar-${section}`} onClick={() => onToggle(section)}>
+      <span className="calendar-sidebar-heading-main"><span className="calendar-sidebar-icon">{icon}</span><span><strong>{title}</strong><small>{subtitle}</small></span></span>
+      <span className="calendar-sidebar-heading-actions"><span className="calendar-count-badge">{count}</span><ChevronDown className="calendar-sidebar-chevron" size={15} /></span>
+    </button>
+  );
 }
 
 function addDays(date, amount) {
@@ -37,532 +60,596 @@ function addDays(date, amount) {
   return result;
 }
 
+function startOfDay(date) {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function startOfWeek(date) {
+  const result = startOfDay(date);
+  result.setDate(result.getDate() - result.getDay());
+  return result;
+}
+
+function rangeForView(focusDate, view) {
+  if (view === "day") return [startOfDay(focusDate), addDays(startOfDay(focusDate), 1)];
+  if (view === "week") {
+    const start = startOfWeek(focusDate);
+    return [start, addDays(start, 7)];
+  }
+  if (view === "agenda") return [startOfDay(focusDate), addDays(startOfDay(focusDate), 31)];
+  const first = new Date(focusDate.getFullYear(), focusDate.getMonth(), 1);
+  const start = startOfWeek(first);
+  return [start, addDays(start, 42)];
+}
+
+function dateKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function sameDay(first, second) {
-  return (
-    first.getFullYear() === second.getFullYear() &&
-    first.getMonth() === second.getMonth() &&
-    first.getDate() === second.getDate()
-  );
+  return dateKey(first) === dateKey(second);
 }
 
-function dateKey(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
+function localInputValue(value) {
+  const date = value ? new Date(value) : new Date();
+  return `${dateKey(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function getEventDate(reservation) {
-  const value = reservation?.starts_at || reservation?.payload?.starts_at;
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+function formatTime(value) {
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-function eventTitle(reservation) {
-  return (
-    reservation?.reservation_title ||
-    reservation?.payload?.service ||
-    reservation?.customer_name ||
-    "Reservation"
-  );
+function formatRange(start, end) {
+  const options = { month: "short", day: "numeric", year: "numeric" };
+  return `${new Intl.DateTimeFormat(undefined, options).format(start)} – ${new Intl.DateTimeFormat(undefined, options).format(addDays(end, -1))}`;
 }
 
-function formatTime(date) {
-  if (!date) return "Time not set";
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
+function blankEditor(calendarId, focusDate, timezone) {
+  const start = new Date(focusDate);
+  start.setHours(Math.max(9, new Date().getHours() + 1), 0, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return {
+    id: "",
+    calendar_id: calendarId,
+    title: "",
+    description: "",
+    location: "",
+    starts_at: localInputValue(start),
+    ends_at: localInputValue(end),
+    timezone: timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    visibility: "calendar_default",
+    transparency: "busy",
+    recurrence: "none",
+    reminder: "15",
+    expected_version: null,
+    allow_conflicts: false,
+  };
 }
 
-function formatHour(hour) {
-  const date = new Date(2026, 0, 1, hour);
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric" }).format(date);
+function eventEditorValue(event) {
+  return {
+    ...blankEditor(event.calendar_id, new Date(event.starts_at), event.timezone),
+    ...event,
+    starts_at: localInputValue(event.starts_at),
+    ends_at: localInputValue(event.ends_at),
+    recurrence: event.recurrence_rule?.includes("FREQ=DAILY")
+      ? "daily"
+      : event.recurrence_rule?.includes("FREQ=WEEKLY")
+        ? "weekly"
+        : event.recurrence_rule?.includes("FREQ=MONTHLY")
+          ? "monthly"
+          : "none",
+    expected_version: event.version,
+    recurrence_scope: event.occurrence_start ? "occurrence" : "series",
+  };
 }
 
-function formatWeekLabel(start) {
-  const end = addDays(start, 6);
-  const sameMonth =
-    start.getMonth() === end.getMonth() &&
-    start.getFullYear() === end.getFullYear();
-  if (sameMonth) {
-    return (
-      new Intl.DateTimeFormat(undefined, { month: "long" }).format(start) +
-      " " +
-      start.getDate() +
-      "–" +
-      end.getDate() +
-      ", " +
-      end.getFullYear()
-    );
+function taskEditorValue(task) {
+  return {
+    ...task,
+    description: task.description || "",
+    status: task.status || "todo",
+    priority: task.priority || "normal",
+    estimate_minutes: task.estimate_minutes || "",
+    reminder_minutes_before: task.reminder_minutes_before ?? 10,
+    repeat: task.recurrence_rule?.includes("FREQ=DAILY")
+      ? "daily"
+      : task.recurrence_rule?.includes("FREQ=WEEKLY")
+        ? "weekly"
+        : task.recurrence_rule?.includes("FREQ=MONTHLY")
+          ? "monthly"
+          : "none",
+    due_at: task.due_at ? localInputValue(task.due_at) : "",
+    scheduled_start: task.scheduled_start ? localInputValue(task.scheduled_start) : "",
+    scheduled_end: task.scheduled_end ? localInputValue(task.scheduled_end) : "",
+  };
+}
+
+function recurrenceRule(value) {
+  if (value === "daily") return "FREQ=DAILY";
+  if (value === "weekly") return "FREQ=WEEKLY";
+  if (value === "monthly") return "FREQ=MONTHLY";
+  return null;
+}
+
+function advanceTaskOccurrence(date, rule, anchorDay) {
+  const next = new Date(date);
+  if (rule === "FREQ=DAILY") next.setDate(next.getDate() + 1);
+  else if (rule === "FREQ=WEEKLY") next.setDate(next.getDate() + 7);
+  else if (rule === "FREQ=MONTHLY") {
+    next.setDate(1);
+    next.setMonth(next.getMonth() + 1);
+    const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+    next.setDate(Math.min(anchorDay, lastDay));
   }
+  return next;
+}
+
+function expandTaskOccurrences(tasks, rangeStart, rangeEnd) {
+  const occurrences = [];
+  tasks.forEach((task) => {
+    if (!task.scheduled_start) return;
+    const baseStart = new Date(task.scheduled_start);
+    const duration = task.scheduled_end
+      ? Math.max(0, new Date(task.scheduled_end) - baseStart)
+      : Number(task.estimate_minutes || 60) * 60000;
+    if (!task.recurrence_rule) {
+      if (baseStart >= rangeStart && baseStart < rangeEnd) {
+        occurrences.push({ ...task, agenda_start: baseStart.toISOString(), agenda_end: new Date(baseStart.getTime() + duration).toISOString() });
+      }
+      return;
+    }
+    let occurrence = new Date(baseStart);
+    const anchorDay = baseStart.getDate();
+    let guard = 0;
+    while (occurrence < rangeStart && guard < 1000) {
+      occurrence = advanceTaskOccurrence(occurrence, task.recurrence_rule, anchorDay);
+      guard += 1;
+    }
+    while (occurrence < rangeEnd && guard < 1000) {
+      occurrences.push({ ...task, agenda_start: occurrence.toISOString(), agenda_end: new Date(occurrence.getTime() + duration).toISOString() });
+      occurrence = advanceTaskOccurrence(occurrence, task.recurrence_rule, anchorDay);
+      guard += 1;
+    }
+  });
+  return occurrences;
+}
+
+function EventEditor({ value, calendars, saving, conflict, onChange, onClose, onSave, onDelete }) {
   return (
-    new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(start) +
-    " – " +
-    new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(end)
-  );
-}
-
-function buildMonthDays(date) {
-  const first = new Date(date.getFullYear(), date.getMonth(), 1);
-  const gridStart = startOfWeek(first);
-  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
-}
-
-async function loadAllReservations() {
-  const items = [];
-  let offset = 0;
-
-  for (let page = 0; page < 10; page += 1) {
-    const result = await listBuilderReservations({ limit: 100, offset });
-    items.push(...result.reservations);
-    if (!result.pagination.has_more || result.reservations.length === 0) break;
-    offset += result.reservations.length;
-  }
-
-  return items;
-}
-
-function MiniCalendar({ focusDate, onSelect }) {
-  const days = useMemo(() => buildMonthDays(focusDate), [focusDate]);
-  const today = new Date();
-
-  return (
-    <section className="reservation-calendar-mini" aria-label="Mini calendar">
-      <strong>
-        {new Intl.DateTimeFormat(undefined, {
-          month: "long",
-          year: "numeric",
-        }).format(focusDate)}
-      </strong>
-      <div className="reservation-calendar-mini-weekdays" aria-hidden="true">
-        {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-          <span key={day + index}>{day}</span>
-        ))}
-      </div>
-      <div className="reservation-calendar-mini-days">
-        {days.map((day) => (
-          <button
-            type="button"
-            key={dateKey(day)}
-            className={[
-              day.getMonth() !== focusDate.getMonth() ? "is-outside" : "",
-              sameDay(day, focusDate) ? "is-selected" : "",
-              sameDay(day, today) ? "is-today" : "",
-            ].filter(Boolean).join(" ")}
-            onClick={() => onSelect(day)}
-            aria-label={day.toLocaleDateString()}
-          >
-            {day.getDate()}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ReservationDetail({ reservation, onClose }) {
-  if (!reservation) return null;
-  const start = getEventDate(reservation);
-  const endValue = reservation?.ends_at ? new Date(reservation.ends_at) : null;
-  const end = endValue && !Number.isNaN(endValue.getTime()) ? endValue : null;
-  const status = String(reservation?.status || "new").toLowerCase();
-
-  return (
-    <aside className="reservation-calendar-detail" aria-label="Reservation details">
-      <button
-        type="button"
-        className="reservation-calendar-detail-close"
-        onClick={onClose}
-        aria-label="Close reservation details"
-      >
-        <X size={18} />
-      </button>
-      <span className={"reservation-calendar-status reservation-calendar-status--" + status}>
-        {status}
-      </span>
-      <h2>{eventTitle(reservation)}</h2>
-      <div className="reservation-calendar-detail-list">
-        <p>
-          <CalendarDays size={17} />
-          <span>
-            {start
-              ? new Intl.DateTimeFormat(undefined, {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                }).format(start)
-              : "Date not set"}
-          </span>
-        </p>
-        <p>
-          <Clock3 size={17} />
-          <span>
-            {formatTime(start)}
-            {end ? " – " + formatTime(end) : ""}
-          </span>
-        </p>
-        <p>
-          <User size={17} />
-          <span>{reservation?.customer_name || "Guest name not provided"}</span>
-        </p>
-        {reservation?.customer_email && (
-          <p>
-            <Mail size={17} />
-            <a href={"mailto:" + reservation.customer_email}>
-              {reservation.customer_email}
-            </a>
-          </p>
+    <div className="calendar-modal-backdrop" role="presentation">
+      <form className="calendar-modal" onSubmit={onSave}>
+        <header>
+          <div>
+            <span>{value.id ? "Edit event" : "New event"}</span>
+            <h2>{value.id ? value.title || "Untitled event" : "Add to calendar"}</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close"><X size={19} /></button>
+        </header>
+        {conflict && (
+          <div className="calendar-conflict-warning">
+            <AlertTriangle size={18} />
+            <div><strong>Time conflict</strong><span>{conflict}</span></div>
+          </div>
         )}
-        {reservation?.site_subdomain && (
-          <p>
-            <MapPin size={17} />
-            <span>{reservation.site_subdomain}</span>
-          </p>
+        <label>Title<input autoFocus required value={value.title} onChange={(event) => onChange("title", event.target.value)} /></label>
+        <div className="calendar-form-grid">
+          <label>Starts<input required type="datetime-local" value={value.starts_at} onChange={(event) => onChange("starts_at", event.target.value)} /></label>
+          <label>Ends<input required type="datetime-local" value={value.ends_at} onChange={(event) => onChange("ends_at", event.target.value)} /></label>
+          <label>Calendar<select value={value.calendar_id} onChange={(event) => onChange("calendar_id", event.target.value)}>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.name}</option>)}</select></label>
+          <label>Timezone<input value={value.timezone} onChange={(event) => onChange("timezone", event.target.value)} /></label>
+          <label>Repeat<select value={value.recurrence} onChange={(event) => onChange("recurrence", event.target.value)}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+          <label>Reminder<select value={value.reminder} onChange={(event) => onChange("reminder", event.target.value)}><option value="0">At start</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
+          <label>Privacy<select value={value.visibility} onChange={(event) => onChange("visibility", event.target.value)}><option value="calendar_default">Calendar default</option><option value="private">Private</option><option value="team">Team</option><option value="organization">Organization</option><option value="public">Public</option></select></label>
+          <label>Availability<select value={value.transparency} onChange={(event) => onChange("transparency", event.target.value)}><option value="busy">Busy</option><option value="free">Free</option></select></label>
+        </div>
+        <label>Location<input value={value.location} onChange={(event) => onChange("location", event.target.value)} /></label>
+        <label>Notes<textarea rows="3" value={value.description} onChange={(event) => onChange("description", event.target.value)} /></label>
+        <label className="calendar-checkbox"><input type="checkbox" checked={value.allow_conflicts} onChange={(event) => onChange("allow_conflicts", event.target.checked)} /><span>Save even if this overlaps another busy event</span></label>
+        {value.id && value.recurrence !== "none" && (
+          <div className="calendar-recurrence-scope">
+            <strong>Apply this change to</strong>
+            <div>
+              <label><input type="radio" name="recurrence-scope" checked={value.recurrence_scope === "occurrence"} onChange={() => onChange("recurrence_scope", "occurrence")} />This occurrence</label>
+              <label><input type="radio" name="recurrence-scope" checked={value.recurrence_scope === "future"} onChange={() => onChange("recurrence_scope", "future")} />This and future</label>
+              <label><input type="radio" name="recurrence-scope" checked={value.recurrence_scope === "series"} onChange={() => onChange("recurrence_scope", "series")} />Entire series</label>
+            </div>
+            <small>{value.recurrence_scope === "occurrence" ? "Only the selected date changes; the series remains intact." : value.recurrence_scope === "future" ? "The current series ends before this date and a new series begins here." : "Every occurrence in the series will use these changes."}</small>
+          </div>
         )}
-      </div>
-    </aside>
+        <div className="calendar-modal-actions">
+          {value.id && <button type="button" className="is-danger" onClick={onDelete}><Trash2 size={16} /> Delete</button>}
+          <span />
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="submit" className="is-primary" disabled={saving}>{saving ? "Saving…" : "Save event"}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
-export default function ReservationCalendarPage() {
+function TaskEditor({ value, saving, error, onChange, onClose, onSave }) {
+  return (
+    <div className="calendar-modal-backdrop" role="presentation">
+      <form className="calendar-modal calendar-task-editor" onSubmit={onSave}>
+        <header>
+          <div><span>Edit task</span><h2>{value.title || "Untitled task"}</h2></div>
+          <button type="button" onClick={onClose} aria-label="Close"><X size={19} /></button>
+        </header>
+        {error && <div className="calendar-conflict-warning"><AlertTriangle size={18} /><div><strong>Task could not be saved</strong><span>{error}</span></div></div>}
+        <label>Title<input autoFocus required value={value.title} onChange={(event) => onChange("title", event.target.value)} /></label>
+        <div className="calendar-form-grid">
+          <label>Status<select value={value.status} onChange={(event) => onChange("status", event.target.value)}><option value="todo">Todo</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></label>
+          <label>Priority<select value={value.priority} onChange={(event) => onChange("priority", event.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label>
+          <label>Scheduled start<input type="datetime-local" value={value.scheduled_start} onChange={(event) => onChange("scheduled_start", event.target.value)} /></label>
+          <label>Scheduled end<input type="datetime-local" value={value.scheduled_end} onChange={(event) => onChange("scheduled_end", event.target.value)} /></label>
+          <label>Due date<input type="datetime-local" value={value.due_at} onChange={(event) => onChange("due_at", event.target.value)} /></label>
+          <label>Estimate (minutes)<input type="number" min="1" max="525600" value={value.estimate_minutes} onChange={(event) => onChange("estimate_minutes", event.target.value)} /></label>
+          <label>Remind me before<select value={value.reminder_minutes_before} onChange={(event) => onChange("reminder_minutes_before", event.target.value)}><option value="">No reminder</option><option value="0">At start time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
+          <label>Repeat<select value={value.repeat} onChange={(event) => onChange("repeat", event.target.value)}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+        </div>
+        <label>Notes<textarea rows="3" value={value.description} onChange={(event) => onChange("description", event.target.value)} /></label>
+        <div className="calendar-modal-actions">
+          <button type="button" onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); }}>Clear schedule</button>
+          <span />
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="submit" className="is-primary" disabled={saving}>{saving ? "Saving…" : "Save task"}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export default function ReservationCalendarPage({ user = null }) {
   const [focusDate, setFocusDate] = useState(() => new Date());
   const [view, setView] = useState("week");
-  const [reservations, setReservations] = useState([]);
-  const [selectedStatuses, setSelectedStatuses] = useState(
-    () => new Set(STATUS_OPTIONS.map((status) => status.id))
-  );
-  const [selectedReservation, setSelectedReservation] = useState(null);
-  const [query, setQuery] = useState("");
+  const [workspace, setWorkspace] = useState({ calendars: [], events: [], tasks: [], connections: [] });
+  const [enabledCalendars, setEnabledCalendars] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [editor, setEditor] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [conflict, setConflict] = useState("");
+  const [history, setHistory] = useState([]);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskEditor, setTaskEditor] = useState(null);
+  const [taskEditorError, setTaskEditorError] = useState("");
+  const [syncingProvider, setSyncingProvider] = useState("");
+  const [connectionDirection, setConnectionDirection] = useState("read");
+  const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
+  const [rangeStart, rangeEnd] = useMemo(() => rangeForView(focusDate, view), [focusDate, view]);
+  const lastHandledRefreshRef = useRef(0);
+  const userScope = user?.id || user?.auth_id || user?.authId || user?.email || "authenticated";
+  const calendarFeaturesAvailable = workspace.calendar_features_available !== false;
+  const toggleSidebarSection = (section) => setExpandedSidebarSections((current) => {
+    const next = new Set(current);
+    if (next.has(section)) next.delete(section);
+    else next.add(section);
+    return next;
+  });
 
   useEffect(() => {
     let active = true;
-    loadAllReservations()
-      .then((items) => {
-        if (!active) return;
-        setReservations(items);
-        setLoadError("");
-      })
-      .catch(() => {
-        if (!active) return;
-        setLoadError("Reservations could not be loaded.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    const start = rangeStart.toISOString();
+    const end = rangeEnd.toISOString();
+    const cacheKey = createCalendarWorkspaceCacheKey({ userScope, start, end });
+    const forceRefresh = refreshKey !== lastHandledRefreshRef.current;
+    if (forceRefresh) {
+      lastHandledRefreshRef.current = refreshKey;
+      clearCalendarWorkspaceCache(userScope);
+    }
+    const cached = forceRefresh ? null : readCalendarWorkspaceCache(cacheKey);
 
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const visibleReservations = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return reservations.filter((reservation) => {
-      const status = String(reservation?.status || "new").toLowerCase();
-      if (!selectedStatuses.has(status)) return false;
-      if (!normalizedQuery) return true;
-      return [
-        eventTitle(reservation),
-        reservation?.customer_name,
-        reservation?.customer_email,
-        reservation?.site_subdomain,
-      ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+    queueMicrotask(() => {
+      if (!active) return;
+      if (cached) {
+        setWorkspace(cached);
+        setEnabledCalendars((current) => current.size ? current : new Set([...(cached.calendars || []).map((item) => item.id), "reservations"]));
+        setError(cached.warning || "");
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
     });
-  }, [query, reservations, selectedStatuses]);
 
-  const weekStart = useMemo(() => startOfWeek(focusDate), [focusDate]);
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
-    [weekStart]
+    if (cached) return () => { active = false; };
+
+    getOrCreateCalendarWorkspaceRequest(cacheKey, () => fetchCalendarWorkspace({ start, end }))
+      .then((data) => {
+        writeCalendarWorkspaceCache(cacheKey, data);
+        if (!active) return;
+        setWorkspace(data);
+        setEnabledCalendars((current) => current.size ? current : new Set([...(data.calendars || []).map((item) => item.id), "reservations"]));
+        setError(data.warning || "");
+      })
+      .catch((loadError) => active && setError(loadError?.message || "Calendar could not be loaded."))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [rangeEnd, rangeStart, refreshKey, userScope]);
+
+  const calendarById = useMemo(() => new Map((workspace.calendars || []).map((item) => [item.id, item])), [workspace.calendars]);
+  const visibleEvents = useMemo(
+    () => (workspace.events || []).filter((event) => enabledCalendars.has(event.calendar_id)),
+    [enabledCalendars, workspace.events]
   );
-  const monthDays = useMemo(() => buildMonthDays(focusDate), [focusDate]);
-  const today = new Date();
-  const unscheduledCount = reservations.filter(
-    (reservation) => !getEventDate(reservation)
-  ).length;
+  const agendaTasks = useMemo(
+    () => (workspace.tasks || []).filter((task) => !["done", "cancelled"].includes(task.status)),
+    [workspace.tasks]
+  );
+  const unscheduledAgendaTasks = useMemo(
+    () => agendaTasks.filter((task) => !task.scheduled_start),
+    [agendaTasks]
+  );
+  const scheduledAgendaTasks = useMemo(
+    () => expandTaskOccurrences(agendaTasks, rangeStart, rangeEnd),
+    [agendaTasks, rangeEnd, rangeStart]
+  );
+  const agendaItems = useMemo(
+    () => [
+      ...visibleEvents.map((item) => ({ kind: "event", item, startsAt: item.starts_at })),
+      ...scheduledAgendaTasks.map((item) => ({ kind: "task", item, startsAt: item.agenda_start })),
+    ].sort((first, second) => new Date(first.startsAt) - new Date(second.startsAt)),
+    [scheduledAgendaTasks, visibleEvents]
+  );
+  const days = view === "day" ? [startOfDay(focusDate)] : Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(focusDate), index));
 
-  const reservationsByDay = useMemo(() => {
-    const map = new Map();
-    visibleReservations.forEach((reservation) => {
-      const date = getEventDate(reservation);
-      if (!date) return;
-      const key = dateKey(date);
-      const values = map.get(key) || [];
-      values.push(reservation);
-      map.set(key, values);
-    });
-    map.forEach((values) => {
-      values.sort((first, second) => getEventDate(first) - getEventDate(second));
-    });
-    return map;
-  }, [visibleReservations]);
+  const openNewEvent = () => {
+    const defaultCalendar = workspace.calendars?.find((item) => item.is_default) || workspace.calendars?.[0];
+    if (!defaultCalendar) return;
+    setHistory([]);
+    setConflict("");
+    setEditor(blankEditor(defaultCalendar.id, focusDate, workspace.viewer_timezone));
+  };
 
-  const movePeriod = (amount) => {
+  const openEvent = async (event) => {
+    if (event.read_only) return;
+    const baseId = event.series_id || event.id;
+    setEditor(eventEditorValue({ ...event, id: baseId }));
+    setConflict("");
+    fetchCalendarEventHistory(baseId).then(setHistory).catch(() => setHistory([]));
+  };
+
+  const saveEvent = async (submitEvent) => {
+    submitEvent.preventDefault();
+    setSaving(true);
+    setConflict("");
+    const payload = {
+      calendar_id: editor.calendar_id, title: editor.title, description: editor.description,
+      location: editor.location, starts_at: new Date(editor.starts_at).toISOString(), ends_at: new Date(editor.ends_at).toISOString(),
+      timezone: editor.timezone, visibility: editor.visibility, transparency: editor.transparency,
+      status: editor.status || "confirmed", all_day: false, recurrence_rule: recurrenceRule(editor.recurrence),
+      attendees: [], reminders: [{ channel: "in_app", minutes_before: Number(editor.reminder) }],
+      expected_version: editor.expected_version, allow_conflicts: editor.allow_conflicts,
+    };
+    try {
+      if (editor.id) await updateCalendarEvent(editor.id, payload, editor.recurrence === "none" ? "event" : editor.recurrence_scope, editor.occurrence_start);
+      else await createCalendarEvent(payload);
+      setEditor(null);
+      setRefreshKey((value) => value + 1);
+    } catch (saveError) {
+      const detail = saveError?.data?.detail || saveError?.detail;
+      setConflict(detail?.message || saveError?.message || "The event could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeEvent = async () => {
+    if (!editor?.id || !window.confirm("Delete this event? This action is recorded in event history.")) return;
+    setSaving(true);
+    try {
+      await deleteCalendarEvent(editor.id, editor.expected_version, editor.recurrence === "none" ? "event" : editor.recurrence_scope, editor.occurrence_start);
+      setEditor(null);
+      setRefreshKey((value) => value + 1);
+    } catch (removeError) {
+      setConflict(removeError?.message || "The event could not be deleted.");
+    } finally { setSaving(false); }
+  };
+
+  const addTask = async (event) => {
+    event.preventDefault();
+    if (!taskTitle.trim()) return;
+    try {
+      await createCalendarTask({ title: taskTitle.trim(), description: "", status: "todo", priority: "normal", reminder_minutes_before: 10, recurrence_rule: null, milestone: false });
+      setTaskTitle("");
+      setRefreshKey((value) => value + 1);
+    } catch (taskError) { setError(taskError?.message || "Task could not be created."); }
+  };
+
+  const openTask = (task) => {
+    setTaskEditorError("");
+    setTaskEditor(taskEditorValue(task));
+  };
+
+  const saveTask = async (submitEvent) => {
+    submitEvent.preventDefault();
+    if (!taskEditor?.id) return;
+    setSaving(true);
+    setTaskEditorError("");
+    try {
+      let scheduledStart = taskEditor.scheduled_start ? new Date(taskEditor.scheduled_start) : null;
+      let scheduledEnd = taskEditor.scheduled_end ? new Date(taskEditor.scheduled_end) : null;
+      if (!scheduledStart && scheduledEnd) throw new Error("Choose a scheduled start time first.");
+      if (taskEditor.repeat !== "none" && !scheduledStart) throw new Error("Choose a scheduled start time for a repeating task.");
+      if (scheduledStart && !scheduledEnd) scheduledEnd = new Date(scheduledStart.getTime() + Number(taskEditor.estimate_minutes || 60) * 60000);
+      if (scheduledStart && scheduledEnd <= scheduledStart) throw new Error("Scheduled end must be after the start.");
+      await updateCalendarTask(taskEditor.id, {
+        title: taskEditor.title.trim(),
+        description: taskEditor.description || "",
+        calendar_id: taskEditor.calendar_id || null,
+        project_id: taskEditor.project_id || null,
+        owner_user_id: taskEditor.owner_user_id || null,
+        status: taskEditor.status,
+        priority: taskEditor.priority,
+        estimate_minutes: taskEditor.estimate_minutes ? Number(taskEditor.estimate_minutes) : null,
+        reminder_minutes_before: taskEditor.reminder_minutes_before === "" ? null : Number(taskEditor.reminder_minutes_before),
+        due_at: taskEditor.due_at ? new Date(taskEditor.due_at).toISOString() : null,
+        scheduled_start: scheduledStart?.toISOString() || null,
+        scheduled_end: scheduledEnd?.toISOString() || null,
+        recurrence_rule: recurrenceRule(taskEditor.repeat),
+        milestone: Boolean(taskEditor.milestone),
+      }, taskEditor.version);
+      setTaskEditor(null);
+      setRefreshKey((value) => value + 1);
+    } catch (taskError) {
+      setTaskEditorError(taskError?.message || "The task could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const connectProvider = async (provider) => {
+    setSyncingProvider(provider);
+    try {
+      const result = await createCalendarConnection({ provider, account_label: provider === "microsoft" ? "Outlook" : provider === "google" ? "Google Calendar" : "Calendar feed", direction: provider === "ics" ? "read" : connectionDirection });
+      if (result.requires_oauth && result.connection?.id) {
+        const url = await authorizeCalendarConnection(result.connection.id);
+        if (url) window.location.assign(url);
+      } else {
+        setRefreshKey((value) => value + 1);
+      }
+    } catch (connectionError) { setError(connectionError?.message || "Connection could not be created."); }
+    finally { setSyncingProvider(""); }
+  };
+
+  const syncProvider = async (connection) => {
+    setSyncingProvider(connection.id);
+    try {
+      if (connection.status === "setup_required") {
+        const url = await authorizeCalendarConnection(connection.id);
+        if (url) window.location.assign(url);
+        return;
+      }
+      await syncCalendarConnection(connection.id);
+      setRefreshKey((value) => value + 1);
+    } catch (syncError) {
+      setError(syncError?.message || "Calendar sync failed. Open Sync health for details.");
+    } finally {
+      setSyncingProvider("");
+    }
+  };
+
+  const movePeriod = (direction) => {
     const next = new Date(focusDate);
-    if (view === "month") next.setMonth(next.getMonth() + amount);
-    else next.setDate(next.getDate() + amount * 7);
+    if (view === "month") next.setMonth(next.getMonth() + direction);
+    else next.setDate(next.getDate() + direction * (view === "day" ? 1 : view === "agenda" ? 31 : 7));
     setFocusDate(next);
   };
 
-  const toggleStatus = (status) => {
-    setSelectedStatuses((current) => {
-      const next = new Set(current);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
+  const importIcs = async (changeEvent) => {
+    const file = changeEvent.target.files?.[0];
+    changeEvent.target.value = "";
+    if (!file) return;
+    const calendar = workspace.calendars?.find((item) => item.is_default) || workspace.calendars?.[0];
+    if (!calendar) return;
+    try {
+      const result = await importCalendarIcs({ calendarId: calendar.id, content: await file.text() });
+      setError(`ICS import complete: ${result.imported} new, ${result.updated} updated, ${result.skipped} skipped.`);
+      setRefreshKey((value) => value + 1);
+    } catch (importError) {
+      setError(importError?.message || "ICS file could not be imported.");
+    }
   };
 
+  const resolveInvitation = async (reviewId, disposition) => {
+    try {
+      await resolveCalendarInvitation(reviewId, disposition);
+      setRefreshKey((value) => value + 1);
+    } catch (reviewError) {
+      setError(reviewError?.message || "Invitation review could not be updated.");
+    }
+  };
+
+  const toggleCalendar = (id) => setEnabledCalendars((current) => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
   return (
-    <div className="reservation-calendar-page">
+    <div className="reservation-calendar-page calendar-workspace-page">
       <header className="reservation-calendar-toolbar">
-        <div>
-          <span className="reservation-calendar-eyebrow">Workspace</span>
-          <h1>Reservation calendar</h1>
-          <p>See every booking and request in one schedule.</p>
-        </div>
+        <div className="calendar-toolbar-copy"><span className="reservation-calendar-eyebrow">Workspace</span><h1>Calendar</h1><p>Bookings, events, tasks, reminders, and sync health in one place.</p></div>
         <div className="reservation-calendar-toolbar-actions">
-          <button type="button" className="reservation-calendar-today" onClick={() => setFocusDate(new Date())}>
-            Today
-          </button>
-          <div className="reservation-calendar-period-controls">
-            <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous period">
-              <ChevronLeft size={19} />
-            </button>
-            <button type="button" onClick={() => movePeriod(1)} aria-label="Next period">
-              <ChevronRight size={19} />
-            </button>
-          </div>
-          <strong className="reservation-calendar-period-label">
-            {view === "week"
-              ? formatWeekLabel(weekStart)
-              : new Intl.DateTimeFormat(undefined, {
-                  month: "long",
-                  year: "numeric",
-                }).format(focusDate)}
-          </strong>
-          <div className="reservation-calendar-view-switch" aria-label="Calendar view">
-            <button
-              type="button"
-              className={view === "week" ? "is-active" : ""}
-              onClick={() => setView("week")}
-            >
-              Week
-            </button>
-            <button
-              type="button"
-              className={view === "month" ? "is-active" : ""}
-              onClick={() => setView("month")}
-            >
-              Month
-            </button>
-          </div>
+          <button type="button" className="calendar-toolbar-action is-icon-only" onClick={() => setRefreshKey((value) => value + 1)} aria-label="Refresh calendar" title="Refresh calendar"><RefreshCw size={17} /></button>
+          <label className={`calendar-toolbar-action calendar-import${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable}><Plus size={16} /><span>Import</span><input type="file" accept=".ics,text/calendar" onChange={importIcs} disabled={!calendarFeaturesAvailable} /></label>
+          <a className={`calendar-toolbar-action${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable} onClick={(event) => { if (!calendarFeaturesAvailable) event.preventDefault(); }} href={getCalendarExportUrl({ start: rangeStart.toISOString(), end: rangeEnd.toISOString() })}><Download size={16} /><span>Export</span></a>
+          <button type="button" className="calendar-toolbar-action is-primary" onClick={openNewEvent} disabled={!calendarFeaturesAvailable}><Plus size={17} /><span>New event</span></button>
         </div>
       </header>
 
+      <section className="calendar-summary-grid" aria-label="Calendar summary">
+        <article><span>Calendars</span><strong>{(workspace.calendars?.length || 0) + 1}</strong></article>
+        <article><span>Events in view</span><strong>{workspace.events?.length || 0}</strong></article>
+        <article><span>Open tasks</span><strong>{workspace.tasks?.filter((task) => task.status !== "done" && task.status !== "cancelled").length || 0}</strong></article>
+        <article><span>Connections</span><strong>{workspace.connections?.length || 0}</strong></article>
+      </section>
+
+      <div className="calendar-control-bar">
+        <button type="button" onClick={() => setFocusDate(new Date())}>Today</button>
+        <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous"><ChevronLeft size={18} /></button>
+        <button type="button" onClick={() => movePeriod(1)} aria-label="Next"><ChevronRight size={18} /></button>
+        <strong>{formatRange(rangeStart, rangeEnd)}</strong>
+        <span className="calendar-control-spacer" />
+        <div className="reservation-calendar-view-switch">{VIEWS.map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => setView(item)}>{item}</button>)}</div>
+      </div>
+
+      {error && <div className="calendar-workspace-notice"><AlertTriangle size={17} />{error}<button type="button" onClick={() => setError("")}><X size={15} /></button></div>}
+
       <div className="reservation-calendar-layout">
-        <aside className="reservation-calendar-sidebar">
-          <label className="reservation-calendar-search">
-            <Search size={17} aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search reservations"
-            />
-          </label>
-
-          <MiniCalendar focusDate={focusDate} onSelect={setFocusDate} />
-
-          <section className="reservation-calendar-filters">
-            <div className="reservation-calendar-section-title">
-              <strong>Reservation status</strong>
-              <span>{visibleReservations.length}</span>
-            </div>
-            {STATUS_OPTIONS.map((status) => {
-              const enabled = selectedStatuses.has(status.id);
-              return (
-                <label key={status.id}>
-                  <button
-                    type="button"
-                    className={enabled ? "is-enabled" : ""}
-                    style={{ "--calendar-status-color": status.color }}
-                    onClick={() => toggleStatus(status.id)}
-                    aria-pressed={enabled}
-                  >
-                    {enabled && <Check size={13} />}
-                  </button>
-                  <span>{status.label}</span>
-                  <small>
-                    {
-                      reservations.filter(
-                        (reservation) =>
-                          String(reservation?.status || "new").toLowerCase() === status.id
-                      ).length
-                    }
-                  </small>
-                </label>
-              );
-            })}
+        <aside className="reservation-calendar-sidebar calendar-workspace-sidebar">
+          <div className="calendar-sidebar-category"><span>My calendars</span></div>
+          <section className="calendar-sidebar-group calendar-calendars-panel">
+            <SidebarSectionHeading section="calendars" icon={<CalendarDays size={16} />} title="Calendars" subtitle="Choose what appears" count={(workspace.calendars?.length || 0) + 1} expanded={expandedSidebarSections.has("calendars")} onToggle={toggleSidebarSection} />
+            {expandedSidebarSections.has("calendars") && <div id="calendar-sidebar-calendars" className="calendar-sidebar-card calendar-source-list">{[...(workspace.calendars || []), { id: "reservations", name: "Reservations", color: "#f26b4a" }].map((calendar) => <label className="calendar-source-toggle" key={calendar.id}><input type="checkbox" checked={enabledCalendars.has(calendar.id)} onChange={() => toggleCalendar(calendar.id)} /><i style={{ background: calendar.color }} /><span>{calendar.name}</span>{calendar.is_default && <small>Default</small>}</label>)}</div>}
           </section>
 
-          {unscheduledCount > 0 && (
-            <div className="reservation-calendar-unscheduled">
-              <BellRing size={18} />
-              <div>
-                <strong>{unscheduledCount} unscheduled</strong>
-                <span>Requests without a selected time</span>
-              </div>
-            </div>
-          )}
+          <div className="calendar-sidebar-category"><span>Planning</span></div>
+          <section className="calendar-sidebar-group calendar-task-panel">
+            <SidebarSectionHeading section="tasks" icon={<ListTodo size={16} />} title="Tasks" subtitle="Unscheduled work" count={workspace.tasks?.filter((task) => task.status !== "done").length || 0} expanded={expandedSidebarSections.has("tasks")} onToggle={toggleSidebarSection} />
+            {expandedSidebarSections.has("tasks") && <div id="calendar-sidebar-tasks" className="calendar-sidebar-section-content"><form onSubmit={addTask}><input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Add a task" aria-label="Task title" disabled={!calendarFeaturesAvailable} /><button type="submit" aria-label="Add task" disabled={!calendarFeaturesAvailable}><Plus size={16} /></button></form>{(workspace.tasks || []).slice(0, 6).map((task) => <div className="calendar-task" key={task.id}><i className={`priority-${task.priority}`} /><span>{task.title}</span><small>{task.estimate_minutes ? `${task.estimate_minutes}m` : task.status.replace("_", " ")}</small></div>)}</div>}
+          </section>
+          <section className="calendar-sidebar-group calendar-workload-panel">
+            <SidebarSectionHeading section="workload" icon={<Clock3 size={16} />} title="Workload" subtitle="Team capacity" count={workspace.workload?.length || 0} expanded={expandedSidebarSections.has("workload")} onToggle={toggleSidebarSection} />
+            {expandedSidebarSections.has("workload") && <div id="calendar-sidebar-workload" className="calendar-sidebar-section-content">{(workspace.workload || []).map((item) => <div className="calendar-workload-row" key={item.user_id || "unassigned"}><span>{item.user_id ? `Member ${item.user_id}` : "Unassigned"}</span><strong>{Math.round(item.estimate_minutes / 60 * 10) / 10}h</strong><div><i style={{ width: `${Math.min(100, item.estimate_minutes / 24)}%` }} /></div><small>{item.open_tasks} open tasks</small></div>)}</div>}
+          </section>
+          {(workspace.invitation_reviews || []).length > 0 && <section className="calendar-invitation-panel"><div className="calendar-section-title"><strong><ShieldCheck size={16} /> Invitation safety</strong><span>{workspace.invitation_reviews.length}</span></div>{workspace.invitation_reviews.slice(0, 4).map((review) => <div className="calendar-invitation-review" key={review.id}><strong>{review.sender_email}</strong><span>{(review.reasons || []).join(" · ").replaceAll("_", " ")}</span><div><button type="button" onClick={() => resolveInvitation(review.id, "allowed")}>Allow</button><button type="button" onClick={() => resolveInvitation(review.id, "blocked")}>Block</button><button type="button" onClick={() => resolveInvitation(review.id, "reported")}>Report</button></div></div>)}</section>}
+          <div className="calendar-sidebar-category"><span>Connections</span></div>
+          <section className="calendar-sidebar-group calendar-sync-panel">
+            <SidebarSectionHeading section="sync" icon={<Link2 size={16} />} title="Sync health" subtitle="Connected accounts" count={workspace.connections?.length || 0} expanded={expandedSidebarSections.has("sync")} onToggle={toggleSidebarSection} />
+            {expandedSidebarSections.has("sync") && <div id="calendar-sidebar-sync" className="calendar-connected-list">
+              {(workspace.connections || []).length === 0 && <p className="calendar-no-connections">No calendars connected yet.</p>}
+              {(workspace.connections || []).map((connection) => <button type="button" className={`calendar-sync-row is-${connection.status}`} key={connection.id} onClick={() => syncProvider(connection)} disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)}><span className="calendar-sync-provider-icon">{connection.status === "connected" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}</span><span className="calendar-sync-account"><strong>{connection.account_label || connection.provider}</strong><small>{connection.provider === "microsoft" ? "Outlook" : connection.provider}</small></span><span className="calendar-sync-status">{syncingProvider === connection.id ? "Syncing…" : connection.last_success_at ? `Synced ${new Date(connection.last_success_at).toLocaleDateString()}` : connection.status.replace("_", " ")}</span></button>)}
+            </div>}
+            <div className="calendar-new-connection"><button type="button" className="calendar-new-connection-toggle" aria-expanded={expandedSidebarSections.has("connect")} aria-controls="calendar-sidebar-connect" onClick={() => toggleSidebarSection("connect")}><span className="calendar-new-connection-heading"><strong>Add an account</strong><small>Connect securely with OAuth 2.0</small></span><ChevronDown className="calendar-sidebar-chevron" size={15} /></button>{expandedSidebarSections.has("connect") && <div id="calendar-sidebar-connect" className="calendar-sidebar-section-content"><label className="calendar-sync-direction"><span>Access</span><select value={connectionDirection} onChange={(event) => setConnectionDirection(event.target.value)} disabled={!calendarFeaturesAvailable}><option value="read">Read only</option><option value="two_way">Two-way sync</option></select></label><div className="calendar-connect-actions"><button type="button" disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)} onClick={() => connectProvider("google")}>Google</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)} onClick={() => connectProvider("microsoft")}>Outlook</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)} onClick={() => connectProvider("ics")}>ICS</button></div><small className="calendar-connection-help">Google and Outlook open a secure sign-in. ICS imports a calendar feed.</small></div>}</div>
+          </section>
+          <div className="calendar-privacy-note"><ShieldCheck size={17} /><span><strong>Privacy is explicit</strong>Each event shows its calendar and visibility.</span></div>
         </aside>
 
-        <main className="reservation-calendar-surface">
-          {loadError && <div className="reservation-calendar-error">{loadError}</div>}
-          {loading && <div className="reservation-calendar-loading">Loading reservations…</div>}
-
-          {!loading && view === "week" && (
-            <div className="reservation-calendar-week">
-              <div className="reservation-calendar-week-header">
-                <div className="reservation-calendar-timezone">Local time</div>
-                {weekDays.map((day) => (
-                  <button
-                    type="button"
-                    key={dateKey(day)}
-                    className={sameDay(day, today) ? "is-today" : ""}
-                    onClick={() => setFocusDate(day)}
-                  >
-                    <span>
-                      {new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(day)}
-                    </span>
-                    <strong>{day.getDate()}</strong>
-                  </button>
-                ))}
-              </div>
-
-              <div className="reservation-calendar-week-body">
-                <div className="reservation-calendar-hours">
-                  {HOURS.map((hour) => (
-                    <span key={hour}>{formatHour(hour)}</span>
-                  ))}
-                </div>
-                {weekDays.map((day) => (
-                  <div className="reservation-calendar-day-column" key={dateKey(day)}>
-                    {HOURS.map((hour) => (
-                      <div className="reservation-calendar-hour-line" key={hour} />
-                    ))}
-                    {(reservationsByDay.get(dateKey(day)) || []).map((reservation) => {
-                      const start = getEventDate(reservation);
-                      const rawEnd = reservation?.ends_at
-                        ? new Date(reservation.ends_at)
-                        : new Date(start.getTime() + 60 * 60 * 1000);
-                      const end = Number.isNaN(rawEnd.getTime())
-                        ? new Date(start.getTime() + 60 * 60 * 1000)
-                        : rawEnd;
-                      const startOffset =
-                        (start.getHours() + start.getMinutes() / 60 - HOURS[0]) * 64;
-                      const duration = Math.max(
-                        0.55,
-                        (end.getTime() - start.getTime()) / (60 * 60 * 1000)
-                      );
-                      const top = Math.max(2, Math.min(HOURS.length * 64 - 38, startOffset));
-                      const height = Math.max(38, Math.min(duration * 64, 160));
-                      const status = String(reservation?.status || "new").toLowerCase();
-
-                      return (
-                        <button
-                          type="button"
-                          className={"reservation-calendar-event reservation-calendar-event--" + status}
-                          style={{ top: top + "px", height: height + "px" }}
-                          key={reservation.id}
-                          onClick={() => setSelectedReservation(reservation)}
-                          title={eventTitle(reservation)}
-                        >
-                          <strong>{eventTitle(reservation)}</strong>
-                          <span>{formatTime(start)}</span>
-                          {height > 58 && (
-                            <small>{reservation?.customer_name || "Guest"}</small>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!loading && view === "month" && (
-            <div className="reservation-calendar-month">
-              <div className="reservation-calendar-month-weekdays">
-                {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
-                  (day) => <span key={day}>{day}</span>
-                )}
-              </div>
-              <div className="reservation-calendar-month-grid">
-                {monthDays.map((day) => {
-                  const dayReservations = reservationsByDay.get(dateKey(day)) || [];
-                  return (
-                    <section
-                      className={[
-                        day.getMonth() !== focusDate.getMonth() ? "is-outside" : "",
-                        sameDay(day, today) ? "is-today" : "",
-                      ].filter(Boolean).join(" ")}
-                      key={dateKey(day)}
-                    >
-                      <button type="button" onClick={() => setFocusDate(day)}>
-                        {day.getDate()}
-                      </button>
-                      <div>
-                        {dayReservations.slice(0, 3).map((reservation) => (
-                          <button
-                            type="button"
-                            className={
-                              "reservation-calendar-month-event reservation-calendar-month-event--" +
-                              String(reservation?.status || "new").toLowerCase()
-                            }
-                            key={reservation.id}
-                            onClick={() => setSelectedReservation(reservation)}
-                          >
-                            <span>{formatTime(getEventDate(reservation))}</span>
-                            {eventTitle(reservation)}
-                          </button>
-                        ))}
-                        {dayReservations.length > 3 && (
-                          <small>+{dayReservations.length - 3} more</small>
-                        )}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {!loading && visibleReservations.length === 0 && (
-            <div className="reservation-calendar-empty">
-              <CalendarDays size={30} />
-              <strong>No reservations in this view</strong>
-              <span>New bookings will appear here automatically.</span>
-            </div>
-          )}
+        <main className="reservation-calendar-surface calendar-workspace-surface">
+          {loading && <div className="reservation-calendar-loading">Loading calendar…</div>}
+          {!loading && (view === "day" || view === "week") && <div className={`calendar-time-grid is-${view}`}><div className="calendar-grid-header"><span>{workspace.viewer_timezone || "Local time"}</span>{days.map((day) => <button type="button" key={dateKey(day)} className={sameDay(day, new Date()) ? "is-today" : ""} onClick={() => { setFocusDate(day); setView("day"); }}><small>{day.toLocaleDateString(undefined, { weekday: "short" })}</small><strong>{day.getDate()}</strong></button>)}</div><div className="calendar-grid-body"><div className="calendar-grid-hours">{HOURS.map((hour) => <span key={hour}>{new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" })}</span>)}</div>{days.map((day) => <div className="calendar-grid-day" key={dateKey(day)}>{HOURS.map((hour) => <i key={hour} />)}{visibleEvents.filter((item) => sameDay(item.starts_at, day)).map((item) => { const start = new Date(item.starts_at); const end = new Date(item.ends_at); const top = (start.getHours() + start.getMinutes() / 60) * 48; const height = Math.max(34, Math.min(180, (end - start) / 3600000 * 48)); const calendar = calendarById.get(item.calendar_id); return <button type="button" key={item.id} className={`calendar-grid-event is-${item.source_type || "madar"}`} style={{ top, height, "--event-color": calendar?.color || "#f26b4a" }} onClick={() => openEvent(item)}><strong>{item.title}</strong><span>{formatTime(item.starts_at)} · {calendar?.name || item.source_label}</span>{item.visibility && <small>{item.visibility.replace("calendar_default", "default privacy")}</small>}</button>; })}</div>)}</div></div>}
+          {!loading && view === "month" && <div className="calendar-month-grid">{Array.from({ length: 42 }, (_, index) => addDays(rangeStart, index)).map((day) => { const dayEvents = visibleEvents.filter((item) => sameDay(item.starts_at, day)); return <section key={dateKey(day)} className={day.getMonth() !== focusDate.getMonth() ? "is-outside" : ""}><button type="button" onClick={() => { setFocusDate(day); setView("day"); }}>{day.getDate()}</button>{dayEvents.slice(0, 4).map((item) => <button type="button" className="calendar-month-event" style={{ "--event-color": calendarById.get(item.calendar_id)?.color || "#f26b4a" }} key={item.id} onClick={() => openEvent(item)}><span>{formatTime(item.starts_at)}</span>{item.title}</button>)}{dayEvents.length > 4 && <small>+{dayEvents.length - 4} more</small>}</section>; })}</div>}
+          {!loading && view === "agenda" && <div className="calendar-agenda">
+            {unscheduledAgendaTasks.length > 0 && <><div className="calendar-agenda-section-title"><ListTodo size={15} /><strong>Unscheduled tasks</strong><span>{unscheduledAgendaTasks.length}</span></div>{unscheduledAgendaTasks.map((task) => <button type="button" className="calendar-agenda-task is-unscheduled" key={`task-${task.id}`} onClick={() => openTask(task)}><time><ListTodo size={19} /><span>Task</span></time><i /><div><strong>{task.title}</strong><span>{task.due_at ? `Due ${new Date(task.due_at).toLocaleString()}` : "Choose a time to place this task on your calendar"}</span></div><small>{task.status.replace("_", " ")}</small></button>)}</>}
+            {agendaItems.length > 0 && <div className="calendar-agenda-section-title"><CalendarDays size={15} /><strong>Schedule</strong><span>{agendaItems.length}</span></div>}
+            {agendaItems.map(({ kind, item }) => {
+              if (kind === "task") return <button type="button" className="calendar-agenda-task" key={`task-${item.id}-${item.agenda_start}`} onClick={() => openTask(item)}><time><strong>{new Date(item.agenda_start).getDate()}</strong><span>{new Date(item.agenda_start).toLocaleDateString(undefined, { month: "short", weekday: "short" })}</span></time><i /><div><strong>{item.title}</strong><span><ListTodo size={14} /> {formatTime(item.agenda_start)}–{formatTime(item.agenda_end)} · Scheduled task{item.recurrence_rule ? ` · Repeats ${item.recurrence_rule.replace("FREQ=", "").toLowerCase()}` : ""}</span></div><small>{item.status.replace("_", " ")}</small></button>;
+              const calendar = calendarById.get(item.calendar_id);
+              return <button type="button" key={`event-${item.id}`} onClick={() => openEvent(item)}><time><strong>{new Date(item.starts_at).getDate()}</strong><span>{new Date(item.starts_at).toLocaleDateString(undefined, { month: "short", weekday: "short" })}</span></time><i style={{ background: calendar?.color || "#f26b4a" }} /><div><strong>{item.title}</strong><span><Clock3 size={14} /> {formatTime(item.starts_at)}–{formatTime(item.ends_at)} · {calendar?.name || item.source_label}</span></div><small>{item.read_only ? "Synced reservation" : item.visibility?.replace("calendar_default", "Default privacy")}</small></button>;
+            })}
+            {unscheduledAgendaTasks.length === 0 && agendaItems.length === 0 && <div className="reservation-calendar-empty"><CalendarDays size={30} /><strong>No events or tasks in this range</strong></div>}
+          </div>}
         </main>
       </div>
 
-      <ReservationDetail
-        reservation={selectedReservation}
-        onClose={() => setSelectedReservation(null)}
-      />
+      {editor && <EventEditor value={editor} calendars={workspace.calendars || []} saving={saving} conflict={conflict} onChange={(field, value) => setEditor((current) => ({ ...current, [field]: value }))} onClose={() => setEditor(null)} onSave={saveEvent} onDelete={removeEvent} />}
+      {taskEditor && <TaskEditor value={taskEditor} saving={saving} error={taskEditorError} onChange={(field, value) => setTaskEditor((current) => ({ ...current, [field]: value }))} onClose={() => setTaskEditor(null)} onSave={saveTask} />}
+      {editor?.id && history.length > 0 && <aside className="calendar-history-drawer"><header><History size={17} /><strong>Change history</strong></header>{history.slice(0, 8).map((item) => <div key={item.id}><strong>{item.action}</strong><span>{new Date(item.created_at).toLocaleString()} · {item.scope}</span></div>)}</aside>}
     </div>
   );
 }
