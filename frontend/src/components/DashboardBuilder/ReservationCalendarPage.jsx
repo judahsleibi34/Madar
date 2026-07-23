@@ -23,6 +23,7 @@ import {
   authorizeCalendarConnection,
   createCalendarEvent,
   createCalendarTask,
+  deleteCalendarTask,
   deleteCalendarEvent,
   disconnectCalendarConnection,
   fetchCalendarEventHistory,
@@ -31,7 +32,10 @@ import {
   importCalendarIcs,
   resolveCalendarInvitation,
   removeCalendarConnection,
+  syncCalendarTask,
   syncCalendarConnection,
+  unlinkCalendarTaskSync,
+  upgradeCalendarConnection,
   updateCalendarEvent,
   updateCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
@@ -44,7 +48,9 @@ import {
 } from "./utils/calendarWorkspaceCache";
 import {
   confirmConnectedAccountDisconnect,
+  confirmGoogleWriteUpgrade,
   confirmIncompleteConnectionRemoval,
+  chooseTaskDeletionMode,
 } from "./utils/calendarConnectionPrompts";
 import {
   expandTaskOccurrences,
@@ -65,12 +71,13 @@ function SidebarSectionHeading({ section, icon, title, subtitle, count, expanded
   );
 }
 
-export function CalendarConnectionCard({ connection, operation = "", onAuthorize, onSync, onRemove, onDisconnect }) {
+export function CalendarConnectionCard({ connection, operation = "", onAuthorize, onSync, onUpgrade, onRemove, onDisconnect }) {
   const connected = connection.status === "connected" || connection.status === "degraded";
   const pending = connection.status === "setup_required";
   const busy = Boolean(operation);
   const progressLabels = {
     authorize: "Authorizing…",
+    upgrade: "Opening consent…",
     disconnect: "Disconnecting…",
     remove: "Removing…",
     sync: "Syncing…",
@@ -91,6 +98,7 @@ export function CalendarConnectionCard({ connection, operation = "", onAuthorize
       <span className="calendar-sync-actions">
         {pending && <button type="button" disabled={busy} onClick={() => onAuthorize(connection)}>Authorize</button>}
         {connected && <button type="button" disabled={busy} onClick={() => onSync(connection)}>Sync</button>}
+        {connected && connection.provider === "google" && connection.direction === "read" && <button type="button" disabled={busy} onClick={() => onUpgrade(connection)}>Enable write access</button>}
         {!connected && <button type="button" className="is-danger" disabled={busy} onClick={() => onRemove(connection)}>Remove</button>}
         {connected && <button type="button" className="is-danger" disabled={busy} onClick={() => onDisconnect(connection)}>Disconnect</button>}
       </span>
@@ -209,6 +217,7 @@ function taskEditorValue(task) {
     due_at: task.due_at ? localInputValue(task.due_at) : "",
     scheduled_start: task.scheduled_start ? localInputValue(task.scheduled_start) : "",
     scheduled_end: task.scheduled_end ? localInputValue(task.scheduled_end) : "",
+    sync_connection_id: task.sync_connection_id || "",
   };
 }
 
@@ -272,7 +281,19 @@ function EventEditor({ value, calendars, saving, conflict, onChange, onClose, on
   );
 }
 
-function TaskEditor({ value, saving, error, onChange, onClose, onSave }) {
+function TaskEditor({ value, connections, saving, error, onChange, onClose, onSave, onDelete }) {
+  const writableGoogleConnections = connections.filter(
+    (connection) =>
+      connection.provider === "google"
+      && connection.direction === "two_way"
+      && ["connected", "degraded"].includes(connection.status)
+  );
+  const hasReadOnlyGoogle = connections.some(
+    (connection) =>
+      connection.provider === "google"
+      && connection.direction === "read"
+      && ["connected", "degraded"].includes(connection.status)
+  );
   return (
     <div className="calendar-modal-backdrop" role="presentation">
       <form className="calendar-modal calendar-task-editor" onSubmit={onSave}>
@@ -291,11 +312,15 @@ function TaskEditor({ value, saving, error, onChange, onClose, onSave }) {
           <label>Estimate (minutes)<input type="number" min="1" max="525600" value={value.estimate_minutes} onChange={(event) => onChange("estimate_minutes", event.target.value)} /></label>
           <label>Remind me before<select value={value.reminder_minutes_before} onChange={(event) => onChange("reminder_minutes_before", event.target.value)}><option value="">No reminder</option><option value="0">At start time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
           <label>Repeat<select value={value.repeat} onChange={(event) => onChange("repeat", event.target.value)}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+          <label>Calendar sync<select value={value.sync_connection_id} onChange={(event) => onChange("sync_connection_id", event.target.value)}><option value="">Madar only</option>{writableGoogleConnections.map((connection) => <option key={connection.id} value={connection.id}>Sync to {connection.account_label || "Google Calendar"}</option>)}</select></label>
         </div>
+        {hasReadOnlyGoogle && writableGoogleConnections.length === 0 && <p className="calendar-task-sync-help">Your Google connection is read only. Enable write access from Sync health to send scheduled tasks to Google Calendar.</p>}
+        {value.sync_status && value.sync_status !== "not_synced" && <p className={`calendar-task-sync-status is-${value.sync_status}`}>Google sync: {value.sync_status.replaceAll("_", " ")}</p>}
         <label>Notes<textarea rows="3" value={value.description} onChange={(event) => onChange("description", event.target.value)} /></label>
         <div className="calendar-modal-actions">
-          <button type="button" onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); }}>Clear schedule</button>
+          <button type="button" className="is-danger" disabled={saving} onClick={onDelete}><Trash2 size={16} /> Delete</button>
           <span />
+          <button type="button" onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); }}>Clear schedule</button>
           <button type="button" onClick={onClose}>Cancel</button>
           <button type="submit" className="is-primary" disabled={saving}>{saving ? "Saving…" : "Save task"}</button>
         </div>
@@ -543,10 +568,32 @@ export default function ReservationCalendarPage({ user = null }) {
         recurrence_rule: recurrenceRule(taskEditor.repeat),
         milestone: Boolean(taskEditor.milestone),
       }, taskEditor.version);
+      if (taskEditor.sync_connection_id && !taskEditor.is_synchronized) {
+        await syncCalendarTask(taskEditor.id, taskEditor.sync_connection_id);
+      } else if (!taskEditor.sync_connection_id && taskEditor.is_synchronized) {
+        await unlinkCalendarTaskSync(taskEditor.id);
+      }
       setTaskEditor(null);
       setRefreshKey((value) => value + 1);
     } catch (taskError) {
       setTaskEditorError(taskError?.message || "The task could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeTask = async () => {
+    if (!taskEditor?.id) return;
+    const mode = chooseTaskDeletionMode(Boolean(taskEditor.is_synchronized));
+    if (!mode) return;
+    setSaving(true);
+    setTaskEditorError("");
+    try {
+      await deleteCalendarTask(taskEditor.id, mode);
+      setTaskEditor(null);
+      setRefreshKey((value) => value + 1);
+    } catch (taskError) {
+      setTaskEditorError(taskError?.message || "The task could not be deleted.");
     } finally {
       setSaving(false);
     }
@@ -578,6 +625,19 @@ export default function ReservationCalendarPage({ user = null }) {
       setRefreshKey((value) => value + 1);
     } catch (syncError) {
       setError(syncError?.message || "Calendar sync failed. Open Sync health for details.");
+    } finally {
+      setConnectionOperation({ id: "", action: "" });
+    }
+  };
+
+  const upgradeProvider = async (connection) => {
+    if (!confirmGoogleWriteUpgrade()) return;
+    setConnectionOperation({ id: connection.id, action: "upgrade" });
+    try {
+      const url = await upgradeCalendarConnection(connection.id);
+      if (url) window.location.assign(url);
+    } catch (upgradeError) {
+      setError(upgradeError?.message || "Google write access could not be requested.");
     } finally {
       setConnectionOperation({ id: "", action: "" });
     }
@@ -699,7 +759,7 @@ export default function ReservationCalendarPage({ user = null }) {
             <SidebarSectionHeading section="sync" icon={<Link2 size={16} />} title="Sync health" subtitle="Connected accounts" count={workspace.connections?.length || 0} expanded={expandedSidebarSections.has("sync")} onToggle={toggleSidebarSection} />
             {expandedSidebarSections.has("sync") && <div id="calendar-sidebar-sync" className="calendar-connected-list">
               {(workspace.connections || []).length === 0 && <p className="calendar-no-connections">No calendars connected yet.</p>}
-              {(workspace.connections || []).map((connection) => <CalendarConnectionCard key={connection.id} connection={connection} operation={connectionOperation.id === connection.id ? connectionOperation.action : ""} onAuthorize={syncProvider} onSync={syncProvider} onRemove={removeConnection} onDisconnect={disconnectProvider} />)}
+              {(workspace.connections || []).map((connection) => <CalendarConnectionCard key={connection.id} connection={connection} operation={connectionOperation.id === connection.id ? connectionOperation.action : ""} onAuthorize={syncProvider} onSync={syncProvider} onUpgrade={upgradeProvider} onRemove={removeConnection} onDisconnect={disconnectProvider} />)}
             </div>}
             <div className="calendar-new-connection"><button type="button" className="calendar-new-connection-toggle" aria-expanded={expandedSidebarSections.has("connect")} aria-controls="calendar-sidebar-connect" onClick={() => toggleSidebarSection("connect")}><span className="calendar-new-connection-heading"><strong>Add an account</strong><small>Connect securely with OAuth 2.0</small></span><ChevronDown className="calendar-sidebar-chevron" size={15} /></button>{expandedSidebarSections.has("connect") && <div id="calendar-sidebar-connect" className="calendar-sidebar-section-content"><label className="calendar-sync-direction"><span>Access</span><select value={connectionDirection} onChange={(event) => setConnectionDirection(event.target.value)} disabled={!calendarFeaturesAvailable}><option value="read">Read only</option><option value="two_way">Two-way sync</option></select></label><div className="calendar-connect-actions"><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("google")}>Google</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("microsoft")}>Outlook</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("ics")}>ICS</button></div><small className="calendar-connection-help">Google and Outlook open a secure sign-in. ICS imports a calendar feed.</small></div>}</div>
           </section>
@@ -724,7 +784,7 @@ export default function ReservationCalendarPage({ user = null }) {
       </div>
 
       {editor && <EventEditor value={editor} calendars={workspace.calendars || []} saving={saving} conflict={conflict} onChange={(field, value) => setEditor((current) => ({ ...current, [field]: value }))} onClose={() => setEditor(null)} onSave={saveEvent} onDelete={removeEvent} />}
-      {taskEditor && <TaskEditor value={taskEditor} saving={saving} error={taskEditorError} onChange={(field, value) => setTaskEditor((current) => ({ ...current, [field]: value }))} onClose={() => setTaskEditor(null)} onSave={saveTask} />}
+      {taskEditor && <TaskEditor value={taskEditor} connections={workspace.connections || []} saving={saving} error={taskEditorError} onChange={(field, value) => setTaskEditor((current) => ({ ...current, [field]: value }))} onClose={() => setTaskEditor(null)} onSave={saveTask} onDelete={removeTask} />}
       {editor?.id && history.length > 0 && <aside className="calendar-history-drawer"><header><History size={17} /><strong>Change history</strong></header>{history.slice(0, 8).map((item) => <div key={item.id}><strong>{item.action}</strong><span>{new Date(item.created_at).toLocaleString()} · {item.scope}</span></div>)}</aside>}
     </div>
   );

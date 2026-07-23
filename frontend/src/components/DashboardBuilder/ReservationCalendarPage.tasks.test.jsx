@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReservationCalendarPage from "./ReservationCalendarPage";
 import {
   createCalendarTask,
+  deleteCalendarTask,
   fetchCalendarWorkspace,
+  syncCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
 
 vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
@@ -12,6 +14,7 @@ vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
   createCalendarConnection: vi.fn(),
   createCalendarEvent: vi.fn(),
   createCalendarTask: vi.fn(),
+  deleteCalendarTask: vi.fn(),
   deleteCalendarEvent: vi.fn(),
   disconnectCalendarConnection: vi.fn(),
   fetchCalendarEventHistory: vi.fn().mockResolvedValue([]),
@@ -21,8 +24,11 @@ vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
   removeCalendarConnection: vi.fn(),
   resolveCalendarInvitation: vi.fn(),
   syncCalendarConnection: vi.fn(),
+  syncCalendarTask: vi.fn(),
+  unlinkCalendarTaskSync: vi.fn(),
   updateCalendarEvent: vi.fn(),
   updateCalendarTask: vi.fn(),
+  upgradeCalendarConnection: vi.fn(),
 }));
 
 vi.mock("./utils/calendarWorkspaceCache", () => ({
@@ -93,6 +99,8 @@ afterEach(() => {
 beforeEach(() => {
   fetchCalendarWorkspace.mockResolvedValue(workspace);
   createCalendarTask.mockResolvedValue({});
+  deleteCalendarTask.mockResolvedValue({});
+  syncCalendarTask.mockResolvedValue({});
 });
 
 describe("calendar task UI", () => {
@@ -149,5 +157,44 @@ describe("calendar task UI", () => {
       scheduled_end: null,
       reminder_minutes_before: null,
     });
+  });
+
+  it("offers explicit Google sync and confirmed task deletion without exposing identifiers", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fetchCalendarWorkspace.mockResolvedValue({
+      ...workspace,
+      connections: [{
+        id: "private-connection-id",
+        provider: "google",
+        account_label: "Operator Google Calendar",
+        direction: "two_way",
+        status: "connected",
+      }],
+    });
+    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Scheduled fixture task/ }));
+    expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Calendar sync"), {
+      target: { value: "private-connection-id" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save task" }));
+    await waitFor(() =>
+      expect(syncCalendarTask).toHaveBeenCalledWith(
+        "scheduled-task",
+        "private-connection-id"
+      )
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /TasksScheduled and unscheduled work/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Unscheduled fixture task/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(deleteCalendarTask).toHaveBeenCalledWith(
+        "unscheduled-task",
+        "local_only"
+      )
+    );
+    expect(screen.queryByText("private-connection-id")).toBeNull();
   });
 });

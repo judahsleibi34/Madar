@@ -54,7 +54,7 @@ CALENDAR_SCHEMA_SELECTS = {
     "calendar_event_attendees": "id,event_id,tenant_id",
     "calendar_event_reminders": "id,event_id,tenant_id,delivery_status",
     "calendar_event_changes": "id,event_id,tenant_id,changed_by",
-    "calendar_tasks": "id,tenant_id,calendar_id,project_id,owner_user_id,recurrence_rule",
+    "calendar_tasks": "id,tenant_id,calendar_id,project_id,owner_user_id,recurrence_rule,sync_connection_id,sync_event_id,sync_status",
     "calendar_task_dependencies": "task_id,depends_on_task_id,tenant_id",
     "calendar_task_reminders": "id,task_id,tenant_id,delivery_status",
     "calendar_sync_connections": "id,tenant_id,user_id,local_calendar_id,provider,status",

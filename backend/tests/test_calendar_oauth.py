@@ -102,6 +102,27 @@ class CalendarOAuthTests(unittest.TestCase):
                 self.assertNotIn("User.Read", scope)
                 self.assertNotIn("contacts", scope.lower())
 
+    def test_explicit_google_upgrade_requests_write_scope_without_mutating_connection(self):
+        client = Client()
+        with patch.dict(os.environ, BASE_ENV, clear=False):
+            url = calendar_sync_service.authorization_url(
+                self.connection(direction="read"),
+                client=client,
+                now=1_800_000_000,
+                direction_override="two_way",
+            )
+            query = parse_qs(urlparse(url).query)
+            with patch.object(
+                calendar_sync_service.time, "time", return_value=1_800_000_001
+            ):
+                state = calendar_sync_service.decode_oauth_state(query["state"][0])
+        self.assertEqual(
+            query["scope"],
+            ["https://www.googleapis.com/auth/calendar.events"],
+        )
+        self.assertEqual(state["direction"], "two_way")
+        self.assertEqual(client.updated, [])
+
     def test_production_redirects_require_exact_https_origins(self):
         for value in ("", "http://localhost:8000", "https://api.example.test/path", "https://api.example.test?x=1"):
             env = {**BASE_ENV, "APP_ENV": "production", "PUBLIC_API_URL": value}
@@ -147,6 +168,68 @@ class CalendarOAuthTests(unittest.TestCase):
         consume.assert_called_once_with(state)
         self.assertNotIn("private-code", str(response.headers))
         self.assertNotIn("private-state", str(response.headers))
+
+    def test_failed_write_upgrade_preserves_connected_read_only_credentials(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, membership_status="active", role="member"
+        )
+        connection = {
+            **self.connection(direction="read"),
+            "status": "connected",
+            "encrypted_credentials": "existing-encrypted",
+        }
+        state = {
+            "connection_id": connection["id"],
+            "calendar_id": connection["local_calendar_id"],
+            "tenant_id": 7,
+            "user_id": 12,
+            "provider": "google",
+            "direction": "two_way",
+            "nonce": "nonce",
+        }
+        client = Client()
+        with patch.dict(os.environ, BASE_ENV, clear=False), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "decode_oauth_state", return_value=state
+        ), patch.object(
+            calendar_routes, "tenant_connection", return_value=connection
+        ), patch.object(
+            calendar_routes, "require_calendar_access"
+        ), patch.object(
+            calendar_routes, "consume_oauth_state"
+        ), patch.object(
+            calendar_routes,
+            "decrypt_credentials",
+            return_value={
+                "access_token": "existing",
+                "refresh_token": "existing-refresh",
+                "scope": "https://www.googleapis.com/auth/calendar.readonly",
+            },
+        ), patch.object(
+            calendar_routes,
+            "exchange_authorization_code",
+            return_value={
+                "access_token": "private",
+                "scope": "https://www.googleapis.com/auth/calendar.readonly",
+            },
+        ), patch.object(
+            calendar_routes, "service_supabase", client
+        ), patch.object(
+            calendar_routes.logger, "warning"
+        ):
+            response = calendar_routes.calendar_oauth_callback(
+                "google",
+                object(),
+                object(),
+                code="private-code",
+                state="private-state",
+            )
+        self.assertEqual(
+            response.headers["location"],
+            "http://127.0.0.1:5173/calendar?sync=error",
+        )
+        self.assertEqual(client.updated, [])
 
     def test_callback_rejects_cross_tenant_state_without_exchange_or_sensitive_logging(self):
         context = SimpleNamespace(tenant_id=7, user_id=12, membership_status="active", role="member")
@@ -224,6 +307,117 @@ class CalendarOAuthTests(unittest.TestCase):
         self.assertFalse(revoked)
         self.assertIsNone(client.updated[0]["encrypted_credentials"])
         self.assertEqual(client.updated[0]["status"], "disconnected")
+
+    def test_provider_event_delete_is_bound_and_treats_missing_as_success(self):
+        client = Client()
+        provider = SimpleNamespace(
+            delete=lambda *_args, **_kwargs: SimpleNamespace(status_code=404)
+        )
+        connection = {
+            **self.connection(direction="two_way"),
+            "encrypted_credentials": "encrypted",
+        }
+        event = {
+            "source_type": "google",
+            "source_id": f"{connection['id']}:remote-event",
+        }
+        with patch.object(
+            calendar_sync_service,
+            "decrypt_credentials",
+            return_value={"access_token": "private-access"},
+        ), patch.object(
+            calendar_sync_service,
+            "_refresh",
+            return_value={"access_token": "private-access"},
+        ), patch.object(
+            calendar_sync_service,
+            "encrypt_credentials",
+            return_value="encrypted-refreshed",
+        ):
+            calendar_sync_service.delete_provider_event(
+                connection, event, http_client=provider, client=client
+            )
+        self.assertEqual(client.updated[0]["encrypted_credentials"], "encrypted-refreshed")
+        self.assertNotIn("private-access", str(client.updated))
+
+    def test_local_event_retry_updates_one_google_event_instead_of_duplicating(self):
+        connection = {
+            **self.connection(direction="two_way"),
+            "encrypted_credentials": "encrypted",
+        }
+        event = {
+            "id": "local-event",
+            "tenant_id": 7,
+            "calendar_id": connection["local_calendar_id"],
+            "title": "Synthetic task",
+            "description": "",
+            "location": "",
+            "starts_at": "2026-07-23T09:00:00+00:00",
+            "ends_at": "2026-07-23T10:00:00+00:00",
+            "timezone": "UTC",
+            "visibility": "private",
+            "transparency": "busy",
+            "source_type": "madar",
+            "source_id": None,
+            "deleted_at": None,
+            "updated_at": "2026-07-23T08:00:00+00:00",
+        }
+
+        class EventQuery:
+            def __init__(self, database):
+                self.database = database
+                self.operation = "select"
+                self.values = None
+            def select(self, *_args): return self
+            def update(self, values):
+                self.operation = "update"
+                self.values = values
+                return self
+            def eq(self, *_args): return self
+            def order(self, *_args, **_kwargs): return self
+            def gt(self, *_args): return self
+            def limit(self, *_args): return self
+            def execute(self):
+                if self.operation == "update":
+                    self.database.event.update(self.values)
+                return SimpleNamespace(data=[dict(self.database.event)])
+
+        database = SimpleNamespace(event=event)
+        database.table = lambda _name: EventQuery(database)
+
+        class Provider:
+            def __init__(self):
+                self.posts = 0
+                self.patches = 0
+            def post(self, *_args, **_kwargs):
+                self.posts += 1
+                return SimpleNamespace(
+                    status_code=200,
+                    json=lambda: {"id": "remote-event", "etag": "one"},
+                )
+            def patch(self, *_args, **_kwargs):
+                self.patches += 1
+                return SimpleNamespace(
+                    status_code=200,
+                    json=lambda: {"id": "remote-event", "etag": "two"},
+                )
+
+        provider = Provider()
+        with patch.object(calendar_sync_service, "service_supabase", database):
+            first = calendar_sync_service._push_local_changes(
+                connection, {"access_token": "private"}, "google", provider
+            )
+            second = calendar_sync_service._push_local_changes(
+                connection, {"access_token": "private"}, "google", provider
+            )
+        self.assertEqual(first["pushed"], 1)
+        self.assertEqual(second["pushed"], 1)
+        self.assertEqual(provider.posts, 1)
+        self.assertEqual(provider.patches, 1)
+        self.assertEqual(
+            database.event["source_id"],
+            f"{connection['id']}:remote-event",
+        )
 
     def test_connected_connection_is_not_damaged_by_failed_attempt_cleanup(self):
         client = Client()

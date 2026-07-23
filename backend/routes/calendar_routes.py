@@ -27,7 +27,10 @@ from services.calendar_sync_service import (
     CalendarSyncError,
     authorization_url,
     consume_oauth_state,
+    credentials_allow_direction,
     decode_oauth_state,
+    delete_provider_event,
+    decrypt_credentials,
     disconnect_connection,
     encrypt_credentials,
     exchange_authorization_code,
@@ -330,6 +333,13 @@ def workspace_task_rows(context, detail_ids: list[str]) -> list[dict[str, Any]]:
     }.values())
 
 
+def safe_task_payload(task: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(task)
+    payload["is_synchronized"] = bool(payload.pop("sync_event_id", None))
+    payload.pop("sync_error_code", None)
+    return payload
+
+
 def sync_task_reminder(
     task: dict[str, Any], minutes_before: int | None, *, schedule_changed: bool = False
 ) -> None:
@@ -590,6 +600,10 @@ class TaskDependencyWrite(BaseModel):
     depends_on_task_id: UUID
 
 
+class TaskSyncWrite(BaseModel):
+    connection_id: UUID
+
+
 class ConnectionWrite(BaseModel):
     provider: Literal["google", "microsoft", "ics"]
     account_label: str = Field(default="", max_length=160)
@@ -775,6 +789,169 @@ def sync_http_error(error: CalendarSyncError) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": error.code, "message": str(error)})
 
 
+def task_sync_connection(context, task: dict[str, Any], connection_id: str) -> dict[str, Any]:
+    existing_connection_id = task.get("sync_connection_id")
+    if existing_connection_id and str(existing_connection_id) != str(connection_id):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "task_sync_connection_change_requires_unlink",
+                "message": "Keep the current Google link or switch this task to Madar only first.",
+            },
+        )
+    connection = tenant_connection(connection_id, context.tenant_id)
+    require_calendar_access(
+        context, str(connection.get("local_calendar_id")), "trigger_sync"
+    )
+    if str(connection.get("provider") or "") != "google":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "task_provider_unsupported",
+                "message": "Task synchronization currently supports Google Calendar.",
+            },
+        )
+    if str(connection.get("status") or "") not in {"connected", "degraded"}:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_connection_not_connected",
+                "message": "Connect this calendar account before synchronizing tasks.",
+            },
+        )
+    if connection.get("direction") != "two_way":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_write_access_required",
+                "message": "Enable Google write access before synchronizing tasks.",
+            },
+        )
+    if not task.get("scheduled_start") and not task.get("due_at"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "task_schedule_required",
+                "message": "Schedule this task before synchronizing it.",
+            },
+        )
+    return connection
+
+
+def sync_task_to_provider(
+    context, task: dict[str, Any], connection: dict[str, Any]
+) -> dict[str, Any]:
+    start_value = task.get("scheduled_start") or task.get("due_at")
+    start_at = datetime.fromisoformat(str(start_value).replace("Z", "+00:00"))
+    end_value = task.get("scheduled_end")
+    end_at = (
+        datetime.fromisoformat(str(end_value).replace("Z", "+00:00"))
+        if end_value
+        else start_at + timedelta(minutes=int(task.get("estimate_minutes") or 60))
+    )
+    event_values = {
+        "tenant_id": context.tenant_id,
+        "calendar_id": connection["local_calendar_id"],
+        "created_by": context.user_id,
+        "title": task.get("title") or "Task",
+        "description": task.get("description") or "",
+        "location": "",
+        "starts_at": iso(start_at),
+        "ends_at": iso(end_at),
+        "timezone": str(context.user.get("timezone") or "UTC"),
+        "all_day": False,
+        "status": "confirmed",
+        "visibility": "private",
+        "transparency": "busy",
+        "recurrence_rule": task.get("recurrence_rule"),
+        "project_id": task.get("project_id"),
+    }
+    linked_event = None
+    if task.get("sync_event_id"):
+        rows = getattr(
+            service_supabase.table("calendar_events")
+            .select("*")
+            .eq("id", task["sync_event_id"])
+            .eq("tenant_id", context.tenant_id)
+            .eq("calendar_id", connection["local_calendar_id"])
+            .is_("deleted_at", "null")
+            .limit(1)
+            .execute(),
+            "data",
+            None,
+        ) or []
+        linked_event = rows[0] if rows else None
+    if linked_event:
+        event_values["version"] = int(linked_event.get("version") or 1) + 1
+        event_rows = getattr(
+            service_supabase.table("calendar_events")
+            .update(event_values)
+            .eq("id", linked_event["id"])
+            .eq("tenant_id", context.tenant_id)
+            .execute(),
+            "data",
+            None,
+        ) or []
+    else:
+        event_values.update({"source_type": "madar", "version": 1})
+        event_rows = getattr(
+            service_supabase.table("calendar_events").insert(event_values).execute(),
+            "data",
+            None,
+        ) or []
+    if not event_rows:
+        raise HTTPException(status_code=500, detail="Task synchronization could not be prepared")
+    event = event_rows[0]
+    service_supabase.table("calendar_tasks").update({
+        "sync_connection_id": connection["id"],
+        "sync_event_id": event["id"],
+        "sync_status": "pending",
+        "sync_error_code": None,
+    }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute()
+    try:
+        sync_connection(connection)
+    except CalendarSyncError as error:
+        service_supabase.table("calendar_tasks").update({
+            "sync_status": "failed",
+            "sync_error_code": error.code,
+        }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute()
+        raise
+    synced_rows = getattr(
+        service_supabase.table("calendar_events")
+        .select("id,source_type,source_id,last_synced_at")
+        .eq("id", event["id"])
+        .eq("tenant_id", context.tenant_id)
+        .limit(1)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    synced = synced_rows[0] if synced_rows else {}
+    expected_prefix = f"{connection['id']}:"
+    if (
+        synced.get("source_type") != connection.get("provider")
+        or not str(synced.get("source_id") or "").startswith(expected_prefix)
+        or not synced.get("last_synced_at")
+    ):
+        service_supabase.table("calendar_tasks").update({
+            "sync_status": "failed",
+            "sync_error_code": "provider_event_not_confirmed",
+        }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute()
+        raise CalendarSyncError(
+            "provider_event_not_confirmed",
+            "Google Calendar did not confirm the synchronized task event.",
+        )
+    updated = getattr(
+        service_supabase.table("calendar_tasks").update({
+            "sync_status": "synced",
+            "sync_error_code": None,
+        }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute(),
+        "data",
+        None,
+    ) or []
+    return updated[0] if updated else {**task, "sync_status": "synced"}
+
+
 def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
     ensure_default_calendar(context)
     accesses = list_accessible_calendars(context)
@@ -832,6 +1009,19 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
         events.extend(reservation_payload(row) for row in reservations if row.get("starts_at"))
 
     tasks = workspace_task_rows(context, detail_ids)
+    linked_task_event_ids = {
+        str(task.get("sync_event_id"))
+        for task in tasks
+        if task.get("sync_event_id")
+    }
+    if linked_task_event_ids:
+        events = [
+            event
+            for event in events
+            if str(event.get("id") or "").split("::", 1)[0]
+            not in linked_task_event_ids
+            and str(event.get("series_id") or "") not in linked_task_event_ids
+        ]
     task_ids = [str(row.get("id")) for row in tasks if row.get("id")]
     task_reminder_rows = []
     if task_ids:
@@ -845,6 +1035,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
     for task in tasks:
         reminder = task_reminders.get(str(task.get("id")))
         task["reminder_minutes_before"] = reminder.get("minutes_before") if reminder else 10
+    safe_tasks = [safe_task_payload(task) for task in tasks]
 
     connections = []
     if sync_state_ids:
@@ -886,7 +1077,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
         "success": True,
         "calendars": [public_calendar_metadata(access) for access in accesses],
         "events": sorted(events, key=lambda item: item.get("starts_at") or ""),
-        "tasks": tasks,
+        "tasks": safe_tasks,
         "workload": list(workload_by_user.values()),
         "connections": connections,
         "invitation_reviews": invitation_reviews,
@@ -1136,7 +1327,10 @@ def create_task(payload: TaskWrite, request: Request, response: Response):
         sync_task_reminder(created[0], payload.reminder_minutes_before, schedule_changed=True)
         created[0]["reminder_minutes_before"] = payload.reminder_minutes_before
         record_calendar_audit(context, request, "calendar.task_created", "calendar_task", created[0]["id"], {"calendar_id": row.get("calendar_id")})
-    return {"success": True, "task": created[0] if created else None}
+    return {
+        "success": True,
+        "task": safe_task_payload(created[0]) if created else None,
+    }
 
 
 @router.put("/tasks/{task_id}")
@@ -1153,6 +1347,13 @@ def update_task(task_id: str, payload: TaskWrite, request: Request, response: Re
     row["owner_user_id"] = validate_active_task_owner(context, payload.owner_user_id)
     row["project_id"] = validate_project_reference(context, payload.project_id)
     row["version"] = expected_version + 1
+    linked_connection = None
+    if before.get("sync_connection_id"):
+        linked_connection = task_sync_connection(
+            context,
+            {**before, **row},
+            str(before["sync_connection_id"]),
+        )
     updated = getattr(service_supabase.table("calendar_tasks").update(row).eq("id", task_id).eq("tenant_id", context.tenant_id).eq("version", expected_version).execute(), "data", None) or []
     if not updated:
         raise HTTPException(status_code=409, detail="Task changed or was removed")
@@ -1168,7 +1369,128 @@ def update_task(task_id: str, payload: TaskWrite, request: Request, response: Re
         context, request, "calendar.task_updated", "calendar_task", task_id,
         {"owner_changed": before.get("owner_user_id") != updated[0].get("owner_user_id")},
     )
-    return {"success": True, "task": updated[0]}
+    if linked_connection:
+        try:
+            updated[0] = sync_task_to_provider(
+                context, updated[0], linked_connection
+            )
+        except CalendarSyncError as error:
+            raise sync_http_error(error) from error
+    return {"success": True, "task": safe_task_payload(updated[0])}
+
+
+@router.post("/tasks/{task_id}/sync")
+def sync_task(
+    task_id: str, payload: TaskSyncWrite, request: Request, response: Response
+):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    task = tenant_task(task_id, context.tenant_id)
+    require_task_access(context, task)
+    connection = task_sync_connection(context, task, str(payload.connection_id))
+    try:
+        updated = sync_task_to_provider(context, task, connection)
+    except CalendarSyncError as error:
+        raise sync_http_error(error) from error
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.task_synchronized",
+        "calendar_task",
+        task_id,
+        {"provider": connection.get("provider")},
+    )
+    return {"success": True, "task": safe_task_payload(updated)}
+
+
+@router.delete("/tasks/{task_id}/sync")
+def unlink_task_sync(task_id: str, request: Request, response: Response):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    task = tenant_task(task_id, context.tenant_id)
+    require_task_access(context, task)
+    updated = getattr(
+        service_supabase.table("calendar_tasks").update({
+            "sync_connection_id": None,
+            "sync_event_id": None,
+            "sync_status": "not_synced",
+            "sync_error_code": None,
+        }).eq("id", task_id).eq("tenant_id", context.tenant_id).execute(),
+        "data",
+        None,
+    ) or []
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.task_sync_unlinked",
+        "calendar_task",
+        task_id,
+        {"provider_event_preserved": bool(task.get("sync_event_id"))},
+    )
+    return {
+        "success": True,
+        "task": safe_task_payload(updated[0]) if updated else None,
+    }
+
+
+@router.delete("/tasks/{task_id}")
+def delete_task(
+    task_id: str,
+    request: Request,
+    response: Response,
+    mode: Literal["local_only", "local_and_provider"] = "local_only",
+):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    task = tenant_task(task_id, context.tenant_id)
+    require_task_access(context, task)
+    provider_deleted = False
+    if mode == "local_and_provider":
+        if not task.get("sync_connection_id") or not task.get("sync_event_id"):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "task_not_synchronized",
+                    "message": "This task is not linked to a provider event.",
+                },
+            )
+        connection = task_sync_connection(
+            context, task, str(task["sync_connection_id"])
+        )
+        event = tenant_event(str(task["sync_event_id"]), context.tenant_id)
+        try:
+            delete_provider_event(connection, event)
+        except CalendarSyncError as error:
+            raise sync_http_error(error) from error
+        provider_deleted = True
+        service_supabase.table("calendar_events").update({
+            "deleted_at": iso(utc_now()),
+            "version": int(event.get("version") or 1) + 1,
+        }).eq("id", event["id"]).eq("tenant_id", context.tenant_id).execute()
+    deleted = getattr(
+        service_supabase.table("calendar_tasks")
+        .delete()
+        .eq("id", task_id)
+        .eq("tenant_id", context.tenant_id)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    if not deleted:
+        raise HTTPException(status_code=409, detail="Task changed or was removed")
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.task_deleted",
+        "calendar_task",
+        task_id,
+        {
+            "mode": mode,
+            "was_synchronized": bool(task.get("sync_event_id")),
+            "provider_event_deleted": provider_deleted,
+        },
+    )
+    return {"success": True, "provider_event_deleted": provider_deleted}
 
 
 def dependency_would_cycle(tenant_id: int, task_id: str, dependency_id: str) -> bool:
@@ -1320,6 +1642,42 @@ def authorize_sync_connection(connection_id: str, request: Request, response: Re
     return {"success": True, "authorization_url": url}
 
 
+@router.post("/connections/{connection_id}/upgrade")
+def upgrade_sync_connection(connection_id: str, request: Request, response: Response):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    connection = tenant_connection(connection_id, context.tenant_id, context.user_id)
+    require_calendar_access(
+        context, str(connection.get("local_calendar_id")), "manage_oauth_connection"
+    )
+    if (
+        connection.get("provider") != "google"
+        or connection.get("direction") != "read"
+        or str(connection.get("status") or "") not in {"connected", "degraded"}
+        or not connection.get("encrypted_credentials")
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_upgrade_unavailable",
+                "message": "This calendar connection cannot be upgraded.",
+            },
+        )
+    try:
+        url = authorization_url(connection, direction_override="two_way")
+    except CalendarSyncError as error:
+        raise sync_http_error(error) from error
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.oauth_upgrade_requested",
+        "calendar_sync_connection",
+        connection_id,
+        {"provider": "google"},
+    )
+    return {"success": True, "authorization_url": url}
+
+
 @router.get("/oauth/{provider}/callback")
 def calendar_oauth_callback(
     provider: Literal["google", "microsoft"],
@@ -1345,12 +1703,41 @@ def calendar_oauth_callback(
             raise CalendarSyncError("oauth_access_denied", "Calendar authorization was not completed.")
         if not code:
             raise CalendarSyncError("oauth_code_missing", "Calendar authorization did not return a code.")
-        credentials = exchange_authorization_code(provider, code)
+        previous_credentials = (
+            decrypt_credentials(connection["encrypted_credentials"])
+            if connection.get("encrypted_credentials")
+            else None
+        )
+        credentials = exchange_authorization_code(
+            provider, code, previous_credentials=previous_credentials
+        )
+        intended_direction = str(state_data.get("direction") or "read")
+        if intended_direction not in {"read", "two_way"}:
+            raise CalendarSyncError("oauth_direction_invalid", "Calendar access mode is invalid.")
+        if not credentials_allow_direction(provider, credentials, intended_direction):
+            raise CalendarSyncError(
+                "oauth_scope_insufficient",
+                "The calendar provider did not grant the requested access.",
+            )
+        previous_direction = str(connection.get("direction") or "read")
         service_supabase.table("calendar_sync_connections").update({
             "encrypted_credentials": encrypt_credentials(credentials), "status": "connected",
-            "last_error_code": None, "last_attempt_at": iso(utc_now()),
+            "direction": intended_direction, "last_error_code": None,
+            "last_attempt_at": iso(utc_now()),
         }).eq("id", connection["id"]).eq("tenant_id", context.tenant_id).execute()
-        record_calendar_audit(context, request, "calendar.oauth_connected", "calendar_sync_connection", connection["id"], {"provider": provider})
+        action = (
+            "calendar.oauth_upgraded"
+            if previous_direction != intended_direction
+            else "calendar.oauth_connected"
+        )
+        record_calendar_audit(
+            context,
+            request,
+            action,
+            "calendar_sync_connection",
+            connection["id"],
+            {"provider": provider, "direction": intended_direction},
+        )
     except CalendarSyncError as error:
         if connection is not None:
             mark_pending_connection_failed(connection, error.code)

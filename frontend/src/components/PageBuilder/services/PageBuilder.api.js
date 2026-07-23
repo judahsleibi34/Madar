@@ -268,6 +268,35 @@ export const updateCalendarTask = async (taskId, task, expectedVersion) => {
   return (await parseJsonResponse(response))?.task;
 };
 
+export const syncCalendarTask = async (taskId, connectionId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/tasks/${encodeURIComponent(taskId)}/sync`),
+    {
+      method: "POST",
+      headers: builderWriteHeaders(),
+      body: JSON.stringify({ connection_id: connectionId }),
+    }
+  );
+  return (await parseJsonResponse(response))?.task;
+};
+
+export const unlinkCalendarTaskSync = async (taskId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/tasks/${encodeURIComponent(taskId)}/sync`),
+    { method: "DELETE", headers: builderWriteHeaders() }
+  );
+  return (await parseJsonResponse(response))?.task;
+};
+
+export const deleteCalendarTask = async (taskId, mode = "local_only") => {
+  const query = new URLSearchParams({ mode });
+  const response = await apiFetch(
+    getApiUrl(`/calendar/tasks/${encodeURIComponent(taskId)}?${query}`),
+    { method: "DELETE", headers: builderWriteHeaders() }
+  );
+  return parseJsonResponse(response);
+};
+
 export const createCalendarConnection = async (connection) => {
   const response = await apiFetch(getApiUrl("/calendar/connections"), {
     method: "POST",
@@ -280,6 +309,14 @@ export const createCalendarConnection = async (connection) => {
 export const authorizeCalendarConnection = async (connectionId) => {
   const response = await apiFetch(
     getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}/authorize`),
+    { method: "POST", headers: builderWriteHeaders() }
+  );
+  return (await parseJsonResponse(response))?.authorization_url || "";
+};
+
+export const upgradeCalendarConnection = async (connectionId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}/upgrade`),
     { method: "POST", headers: builderWriteHeaders() }
   );
   return (await parseJsonResponse(response))?.authorization_url || "";

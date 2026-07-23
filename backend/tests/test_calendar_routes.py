@@ -526,6 +526,123 @@ class CalendarRouteTests(unittest.TestCase):
             self.assertTrue(calendar_routes.remove_empty_connection_calendar(connection))
         self.assertEqual(client.deleted, [("calendars", "calendar-pending")])
 
+    def test_read_only_connection_rejects_task_provider_sync(self):
+        context = SimpleNamespace(tenant_id=7, user_id=12)
+        task = {
+            "id": "task",
+            "tenant_id": 7,
+            "scheduled_start": "2026-07-23T09:00:00+00:00",
+        }
+        connection = {
+            "id": "connection",
+            "tenant_id": 7,
+            "local_calendar_id": "calendar",
+            "provider": "google",
+            "direction": "read",
+            "status": "connected",
+            "encrypted_credentials": "encrypted",
+        }
+        with patch.object(
+            calendar_routes, "tenant_connection", return_value=connection
+        ), patch.object(calendar_routes, "require_calendar_access"):
+            with self.assertRaises(HTTPException) as raised:
+                calendar_routes.task_sync_connection(
+                    context, task, connection["id"]
+                )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(
+            raised.exception.detail["code"], "calendar_write_access_required"
+        )
+
+    def test_unsynchronized_task_deletion_is_authorized_audited_and_controlled(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="member", membership_status="active"
+        )
+        task = {
+            "id": "task",
+            "tenant_id": 7,
+            "calendar_id": "calendar",
+            "owner_user_id": 12,
+            "sync_connection_id": None,
+            "sync_event_id": None,
+        }
+
+        class DeleteQuery:
+            def delete(self): return self
+            def eq(self, *_args): return self
+            def execute(self): return SimpleNamespace(data=[{"id": "task"}])
+
+        client = SimpleNamespace(table=lambda _name: DeleteQuery())
+        with patch.dict(
+            os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False
+        ), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "tenant_task", return_value=task
+        ), patch.object(
+            calendar_routes, "require_task_access"
+        ) as require_access, patch.object(
+            calendar_routes, "service_supabase", client
+        ), patch.object(
+            calendar_routes, "record_calendar_audit"
+        ) as audit:
+            result = calendar_routes.delete_task(
+                task["id"], object(), object(), mode="local_only"
+            )
+        self.assertTrue(result["success"])
+        self.assertFalse(result["provider_event_deleted"])
+        require_access.assert_called_once_with(context, task)
+        audit.assert_called_once()
+
+    def test_synchronized_task_requires_explicit_remote_delete_mode(self):
+        context = SimpleNamespace(tenant_id=7, user_id=12, role="owner")
+        task = {
+            "id": "task",
+            "tenant_id": 7,
+            "calendar_id": "calendar",
+            "sync_connection_id": "connection",
+            "sync_event_id": "event",
+        }
+
+        class DeleteQuery:
+            def delete(self): return self
+            def eq(self, *_args): return self
+            def execute(self): return SimpleNamespace(data=[{"id": "task"}])
+
+        with patch.dict(
+            os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False
+        ), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "tenant_task", return_value=task
+        ), patch.object(
+            calendar_routes, "require_task_access"
+        ), patch.object(
+            calendar_routes, "service_supabase",
+            SimpleNamespace(table=lambda _name: DeleteQuery()),
+        ), patch.object(
+            calendar_routes, "delete_provider_event"
+        ) as provider_delete, patch.object(
+            calendar_routes, "record_calendar_audit"
+        ):
+            result = calendar_routes.delete_task(
+                task["id"], object(), object(), mode="local_only"
+            )
+        self.assertTrue(result["success"])
+        provider_delete.assert_not_called()
+
+    def test_task_payload_hides_internal_event_link(self):
+        payload = calendar_routes.safe_task_payload({
+            "id": "task",
+            "sync_connection_id": "connection",
+            "sync_event_id": "internal-event",
+            "sync_status": "synced",
+            "sync_error_code": "private-provider-detail",
+        })
+        self.assertTrue(payload["is_synchronized"])
+        self.assertNotIn("sync_event_id", payload)
+        self.assertNotIn("sync_error_code", payload)
+
 
 if __name__ == "__main__":
     unittest.main()

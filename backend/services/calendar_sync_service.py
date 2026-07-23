@@ -9,7 +9,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from urllib.parse import urlencode, urlparse
+from urllib.parse import quote, urlencode, urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
@@ -119,19 +119,29 @@ def _provider_settings(provider: str) -> tuple[str, str]:
     return client_id, client_secret
 
 
-def authorization_url(connection: dict[str, Any], *, client=None, now: int | None = None) -> str:
+def authorization_url(
+    connection: dict[str, Any],
+    *,
+    client=None,
+    now: int | None = None,
+    direction_override: str | None = None,
+) -> str:
     provider = str(connection.get("provider") or "")
     if provider not in {"google", "microsoft"}:
         raise CalendarSyncError("provider_oauth_unsupported", "This provider does not use OAuth authorization.")
     client_id, _ = _provider_settings(provider)
     issued_at = int(now if now is not None else time.time())
     nonce = secrets.token_urlsafe(32)
+    direction = str(direction_override or connection.get("direction") or "read")
+    if direction not in {"read", "two_way"}:
+        raise CalendarSyncError("oauth_direction_invalid", "Calendar access mode is invalid.")
     state_payload = {
         "connection_id": connection["id"],
         "calendar_id": connection["local_calendar_id"],
         "tenant_id": connection["tenant_id"],
         "user_id": connection["user_id"],
         "provider": provider,
+        "direction": direction,
         "destination": "calendar",
         "nonce": nonce,
         "iat": issued_at,
@@ -149,13 +159,13 @@ def authorization_url(connection: dict[str, Any], *, client=None, now: int | Non
     }).execute()
     state = _encode_state(state_payload)
     if provider == "google":
-        scope = "https://www.googleapis.com/auth/calendar.readonly" if connection.get("direction") == "read" else "https://www.googleapis.com/auth/calendar.events"
+        scope = "https://www.googleapis.com/auth/calendar.readonly" if direction == "read" else "https://www.googleapis.com/auth/calendar.events"
         return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
             "client_id": client_id, "redirect_uri": _redirect_uri(provider), "response_type": "code",
             "scope": scope, "access_type": "offline", "include_granted_scopes": "true",
             "prompt": "consent", "state": state,
         })
-    scope = "Calendars.Read" if connection.get("direction") == "read" else "Calendars.ReadWrite"
+    scope = "Calendars.Read" if direction == "read" else "Calendars.ReadWrite"
     return "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?" + urlencode({
         "client_id": client_id, "redirect_uri": _redirect_uri(provider), "response_type": "code",
         "response_mode": "query", "scope": f"offline_access {scope}", "state": state,
@@ -194,7 +204,29 @@ def _safe_credentials(credentials: dict[str, Any], previous: dict[str, Any] | No
     }
 
 
-def exchange_authorization_code(provider: str, code: str, *, http_client=None) -> dict[str, Any]:
+def credentials_allow_direction(
+    provider: str, credentials: dict[str, Any], direction: str
+) -> bool:
+    if direction == "read":
+        return True
+    scopes = {scope.lower() for scope in str(credentials.get("scope") or "").split()}
+    if provider == "google":
+        return bool(scopes & {
+            "https://www.googleapis.com/auth/calendar",
+            "https://www.googleapis.com/auth/calendar.events",
+        })
+    if provider == "microsoft":
+        return "calendars.readwrite" in scopes
+    return False
+
+
+def exchange_authorization_code(
+    provider: str,
+    code: str,
+    *,
+    http_client=None,
+    previous_credentials: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     client_id, client_secret = _provider_settings(provider)
     endpoint = "https://oauth2.googleapis.com/token" if provider == "google" else "https://login.microsoftonline.com/common/oauth2/v2.0/token"
     data = {
@@ -209,7 +241,7 @@ def exchange_authorization_code(provider: str, code: str, *, http_client=None) -
         credentials = response.json()
     except (ValueError, TypeError) as error:
         raise CalendarSyncError("oauth_token_invalid", "The provider returned an invalid token response.") from error
-    return _safe_credentials(credentials)
+    return _safe_credentials(credentials, previous_credentials)
 
 
 def _refresh(provider: str, credentials: dict[str, Any], client) -> dict[str, Any]:
@@ -254,6 +286,62 @@ def disconnect_connection(connection: dict[str, Any], *, http_client=None, clien
         "last_error_code": None,
     }).eq("id", connection["id"]).eq("tenant_id", connection["tenant_id"]).execute()
     return revoked
+
+
+def delete_provider_event(
+    connection: dict[str, Any],
+    event: dict[str, Any],
+    *,
+    http_client=None,
+    client=None,
+) -> None:
+    provider = str(connection.get("provider") or "")
+    if provider not in {"google", "microsoft"}:
+        raise CalendarSyncError(
+            "provider_sync_unsupported", "This provider does not support remote event deletion."
+        )
+    if connection.get("direction") != "two_way":
+        raise CalendarSyncError(
+            "calendar_write_access_required",
+            "Reconnect this calendar with read/write access before deleting its provider event.",
+        )
+    if not connection.get("encrypted_credentials"):
+        raise CalendarSyncError(
+            "connection_setup_incomplete", "Finish provider authorization before syncing."
+        )
+    source_id = str(event.get("source_id") or "")
+    prefix = f"{connection['id']}:"
+    if str(event.get("source_type") or "") != provider or not source_id.startswith(prefix):
+        raise CalendarSyncError(
+            "provider_event_binding_invalid", "The synchronized provider event link is invalid."
+        )
+    remote_id = source_id[len(prefix):]
+    if not remote_id:
+        raise CalendarSyncError(
+            "provider_event_binding_invalid", "The synchronized provider event link is invalid."
+        )
+    provider_client = http_client or httpx.Client(timeout=20)
+    credentials = _refresh(
+        provider, decrypt_credentials(connection["encrypted_credentials"]), provider_client
+    )
+    headers = {"Authorization": f"Bearer {credentials['access_token']}"}
+    if provider == "google":
+        url = (
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/"
+            f"{quote(remote_id, safe='')}"
+        )
+    else:
+        url = f"https://graph.microsoft.com/v1.0/me/events/{quote(remote_id, safe='')}"
+    result = provider_client.delete(url, headers=headers)
+    if result.status_code not in {204, 404, 410}:
+        raise CalendarSyncError(
+            "provider_event_delete_failed", "The provider event could not be deleted."
+        )
+    database_client = client or service_supabase
+    database_client.table("calendar_sync_connections").update({
+        "encrypted_credentials": encrypt_credentials(credentials),
+        "last_error_code": None,
+    }).eq("id", connection["id"]).eq("tenant_id", connection["tenant_id"]).execute()
 
 
 def _parse_provider_time(value: Any, timezone_name: str | None = None) -> datetime:
@@ -395,13 +483,16 @@ def _microsoft_sync(connection: dict[str, Any], credentials: dict[str, Any], cli
 
 def _outbound_payload(event: dict[str, Any], provider: str) -> dict[str, Any]:
     if provider == "google":
-        return {
+        payload = {
             "summary": event.get("title"), "description": event.get("description"), "location": event.get("location"),
             "start": {"dateTime": event.get("starts_at"), "timeZone": event.get("timezone") or "UTC"},
             "end": {"dateTime": event.get("ends_at"), "timeZone": event.get("timezone") or "UTC"},
             "visibility": "private" if event.get("visibility") == "private" else "default",
             "transparency": "transparent" if event.get("transparency") == "free" else "opaque",
         }
+        if event.get("recurrence_rule"):
+            payload["recurrence"] = [f"RRULE:{event['recurrence_rule']}"]
+        return payload
     return {
         "subject": event.get("title"),
         "body": {"contentType": "text", "content": event.get("description") or ""},
@@ -497,6 +588,13 @@ def sync_connection(connection: dict[str, Any], *, http_client=None) -> dict[str
         raise CalendarSyncError("connection_binding_invalid", "Calendar connection ownership is no longer valid.")
     client = http_client or httpx.Client(timeout=30)
     credentials = _refresh(provider, decrypt_credentials(connection["encrypted_credentials"]), client)
+    if not credentials_allow_direction(
+        provider, credentials, str(connection.get("direction") or "read")
+    ):
+        raise CalendarSyncError(
+            "calendar_write_access_required",
+            "Reconnect this calendar with the requested access before synchronizing.",
+        )
     started_at = datetime.now(timezone.utc).isoformat()
     try:
         push_counts = _push_local_changes(connection, credentials, provider, client)

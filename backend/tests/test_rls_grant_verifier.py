@@ -188,6 +188,39 @@ class RlsGrantVerifierTests(unittest.TestCase):
         self.assertIn("on conflict (task_id, channel) do nothing", texts[names[2]])
         self.assertIn("calendar_tasks_recurrence_rule_check", texts[names[3]])
 
+    def test_calendar_task_provider_sync_migration_matches_and_preserves_acl(self):
+        root = next(
+            parent
+            for parent in Path(__file__).resolve().parents
+            if (parent / "database/migrations").is_dir()
+        )
+        name = "067_add_calendar_task_provider_sync.sql"
+        database_sql = (root / "database/migrations" / name).read_text(
+            encoding="utf-8"
+        )
+        supabase_sql = (root / "supabase/migrations" / name).read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(database_sql, supabase_sql)
+        normalized = " ".join(database_sql.lower().split())
+        for column in (
+            "sync_connection_id",
+            "sync_event_id",
+            "sync_status",
+            "sync_error_code",
+        ):
+            self.assertIn(column, normalized)
+        self.assertIn("begin;", normalized)
+        self.assertIn("commit;", normalized)
+        self.assertIn(
+            "revoke all on table public.calendar_tasks from anon, authenticated",
+            normalized,
+        )
+        self.assertIn(
+            "grant select, insert, update, delete on table public.calendar_tasks to service_role",
+            normalized,
+        )
+
     def test_privileged_write_migration_revokes_browser_dml_in_both_trees(self):
         test_path = Path(__file__).resolve()
         root = next(

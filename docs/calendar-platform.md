@@ -10,6 +10,13 @@ state records and an atomic service-role-only consume function. None of
 migrations 058–065 should be described as production-applied without separate
 operator verification.
 
+Migration `067_add_calendar_task_provider_sync.sql` adds protected task-to-event
+linkage and bounded sync status. Tasks remain Madar planning records by default.
+A scheduled task is sent to Google only after the user explicitly selects a
+connected read/write account. The linked provider event uses the task title,
+notes, schedule, timezone, and supported recurrence rule. Retrying updates the
+same provider event instead of creating another one.
+
 ## Authorization model
 
 - Tenant owner/admin: explicit override for all calendars in the tenant.
@@ -38,6 +45,13 @@ Google read connections request `calendar.readonly`; two-way connections request
 connections request `Calendars.ReadWrite`. Both request offline access so the
 polling worker can reconcile changes when the user is away.
 
+A connected read-only Google account is never silently upgraded. The user must
+choose **Enable write access**, review the consent explanation, and complete a
+new OAuth grant. Until the callback succeeds, the existing read-only credential
+and import behavior remain intact. Interactive task synchronization runs
+immediately through the existing sync service; the background worker is an
+optional retry/reconciliation path and must be enabled separately.
+
 Provider credentials and refresh tokens are encrypted before storage using
 `CALENDAR_CREDENTIALS_SECRET`. Rotating this secret requires reconnecting
 existing provider accounts.
@@ -59,6 +73,14 @@ local edits. Concurrent local/remote changes create explicit conflict records.
 Disconnect removes stored credentials; Google revocation is attempted where
 supported, while local credential removal remains fail-closed if provider
 revocation cannot be confirmed.
+
+Deleting a Madar-only task removes only that task (task reminders and
+dependencies cascade through existing foreign keys). A synchronized task
+requires an explicit choice: delete locally while preserving the Google event,
+or delete both. Remote deletion requires an authorized read/write connection;
+provider failure leaves the local task intact so the outcome is never
+ambiguous. Completing or cancelling a task does not silently delete its Google
+event.
 
 ## Recurring-event safety
 

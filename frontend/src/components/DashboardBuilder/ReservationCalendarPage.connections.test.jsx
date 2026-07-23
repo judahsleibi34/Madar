@@ -6,6 +6,7 @@ import {
 } from "./ReservationCalendarPage";
 import {
   confirmConnectedAccountDisconnect,
+  confirmGoogleWriteUpgrade,
   confirmIncompleteConnectionRemoval,
 } from "./utils/calendarConnectionPrompts";
 
@@ -38,6 +39,7 @@ describe("calendar connection management", () => {
         connection={pending}
         onAuthorize={onAuthorize}
         onSync={vi.fn()}
+        onUpgrade={vi.fn()}
         onRemove={onRemove}
         onDisconnect={vi.fn()}
       />
@@ -58,6 +60,7 @@ describe("calendar connection management", () => {
         connection={connected}
         onAuthorize={vi.fn()}
         onSync={vi.fn()}
+        onUpgrade={vi.fn()}
         onRemove={vi.fn()}
         onDisconnect={onDisconnect}
       />
@@ -79,6 +82,7 @@ describe("calendar connection management", () => {
         operation="remove"
         onAuthorize={vi.fn()}
         onSync={vi.fn()}
+        onUpgrade={vi.fn()}
         onRemove={vi.fn()}
         onDisconnect={vi.fn()}
       />
@@ -86,6 +90,27 @@ describe("calendar connection management", () => {
     expect(screen.getByText("Removing…")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Authorize" }).disabled).toBe(true);
     expect(screen.getByRole("button", { name: "Remove" }).disabled).toBe(true);
+  });
+
+  it("offers an explicit consented upgrade only for connected read-only Google", () => {
+    const onUpgrade = vi.fn();
+    const readOnly = { ...connected, direction: "read" };
+    render(
+      <CalendarConnectionCard
+        connection={readOnly}
+        onAuthorize={vi.fn()}
+        onSync={vi.fn()}
+        onUpgrade={onUpgrade}
+        onRemove={vi.fn()}
+        onDisconnect={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Enable write access" }));
+    expect(onUpgrade).toHaveBeenCalledWith(readOnly);
+
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    expect(confirmGoogleWriteUpgrade()).toBe(true);
+    expect(confirm.mock.calls[0][0]).toContain("Existing events will not be deleted");
   });
 
   it("requires explicit confirmation for removal and disconnect", () => {
