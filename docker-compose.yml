@@ -95,6 +95,8 @@ services:
       XDG_CACHE_HOME: /tmp/.cache
       CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-false}
       CALENDAR_SYNC_REQUIRED: ${CALENDAR_SYNC_REQUIRED:-false}
+      CALENDAR_SYNC_WORKER_ENABLED: ${CALENDAR_SYNC_WORKER_ENABLED:-true}
+      CALENDAR_SYNC_WORKER_HEALTH_URL: ${CALENDAR_SYNC_WORKER_HEALTH_URL:-http://calendar-sync-worker:8091/health}
       CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
       GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
       GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
@@ -187,7 +189,6 @@ services:
     security_opt: ["no-new-privileges:true"]
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=128m
-    profiles: ["workers"]
     env_file:
       - .env
     environment:
@@ -195,10 +196,11 @@ services:
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
-      CALENDAR_SYNC_WORKER_ENABLED: ${CALENDAR_SYNC_WORKER_ENABLED:-false}
+      CALENDAR_SYNC_WORKER_ENABLED: ${CALENDAR_SYNC_WORKER_ENABLED:-true}
       CALENDAR_SYNC_BATCH_SIZE: ${CALENDAR_SYNC_BATCH_SIZE:-10}
-      CALENDAR_SYNC_CONCURRENCY: ${CALENDAR_SYNC_CONCURRENCY:-2}
-      CALENDAR_SYNC_INTERVAL_SECONDS: ${CALENDAR_SYNC_INTERVAL_SECONDS:-300}
+      CALENDAR_SYNC_POLL_SECONDS: ${CALENDAR_SYNC_POLL_SECONDS:-5}
+      CALENDAR_SYNC_WORKER_HEALTH_HOST: 0.0.0.0
+      CALENDAR_SYNC_WORKER_HEALTH_PORT: 8091
       GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
       GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
       MICROSOFT_CALENDAR_CLIENT_ID: ${MICROSOFT_CALENDAR_CLIENT_ID:-}
@@ -210,6 +212,12 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     cpus: 1.00
     mem_limit: 512m
     logging:

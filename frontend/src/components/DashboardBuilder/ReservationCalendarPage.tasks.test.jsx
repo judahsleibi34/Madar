@@ -197,4 +197,28 @@ describe("calendar task UI", () => {
     );
     expect(screen.queryByText("private-connection-id")).toBeNull();
   });
+
+  it("reports provider enqueue failure separately from a successful local save", async () => {
+    fetchCalendarWorkspace.mockResolvedValue({
+      ...workspace,
+      connections: [{
+        id: "private-connection-id",
+        provider: "google",
+        account_label: "Operator Google Calendar",
+        direction: "two_way",
+        status: "connected",
+      }],
+    });
+    syncCalendarTask.mockRejectedValueOnce(new Error("Queue unavailable."));
+    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Scheduled fixture task/ }));
+    fireEvent.change(screen.getByLabelText("Calendar sync"), {
+      target: { value: "private-connection-id" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save task" }));
+
+    expect(await screen.findByText(/Task saved, but Google synchronization could not be queued/)).toBeTruthy();
+    expect(screen.getByText("Saved locally.")).toBeTruthy();
+  });
 });

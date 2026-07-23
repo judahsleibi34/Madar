@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import logging
 import os
+import time
 from typing import Annotated, Any, Literal, Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -29,7 +30,6 @@ from services.calendar_sync_service import (
     consume_oauth_state,
     credentials_allow_direction,
     decode_oauth_state,
-    delete_provider_event,
     decrypt_credentials,
     disconnect_connection,
     encrypt_credentials,
@@ -37,6 +37,7 @@ from services.calendar_sync_service import (
     frontend_calendar_url,
     sync_connection,
 )
+from services.calendar_task_sync_queue_service import enqueue_task_sync
 
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
@@ -838,7 +839,7 @@ def task_sync_connection(context, task: dict[str, Any], connection_id: str) -> d
     return connection
 
 
-def sync_task_to_provider(
+def queue_task_to_provider(
     context, task: dict[str, Any], connection: dict[str, Any]
 ) -> dict[str, Any]:
     start_value = task.get("scheduled_start") or task.get("due_at")
@@ -902,54 +903,31 @@ def sync_task_to_provider(
     if not event_rows:
         raise HTTPException(status_code=500, detail="Task synchronization could not be prepared")
     event = event_rows[0]
-    service_supabase.table("calendar_tasks").update({
+    updated = getattr(service_supabase.table("calendar_tasks").update({
         "sync_connection_id": connection["id"],
         "sync_event_id": event["id"],
         "sync_status": "pending",
         "sync_error_code": None,
-    }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute()
-    try:
-        sync_connection(connection)
-    except CalendarSyncError as error:
-        service_supabase.table("calendar_tasks").update({
-            "sync_status": "failed",
-            "sync_error_code": error.code,
-        }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute()
-        raise
-    synced_rows = getattr(
-        service_supabase.table("calendar_events")
-        .select("id,source_type,source_id,last_synced_at")
-        .eq("id", event["id"])
-        .eq("tenant_id", context.tenant_id)
-        .limit(1)
-        .execute(),
+    }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute(),
         "data",
         None,
     ) or []
-    synced = synced_rows[0] if synced_rows else {}
-    expected_prefix = f"{connection['id']}:"
-    if (
-        synced.get("source_type") != connection.get("provider")
-        or not str(synced.get("source_id") or "").startswith(expected_prefix)
-        or not synced.get("last_synced_at")
-    ):
-        service_supabase.table("calendar_tasks").update({
-            "sync_status": "failed",
-            "sync_error_code": "provider_event_not_confirmed",
-        }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute()
-        raise CalendarSyncError(
-            "provider_event_not_confirmed",
-            "Google Calendar did not confirm the synchronized task event.",
-        )
-    updated = getattr(
-        service_supabase.table("calendar_tasks").update({
-            "sync_status": "synced",
-            "sync_error_code": None,
-        }).eq("id", task["id"]).eq("tenant_id", context.tenant_id).execute(),
-        "data",
-        None,
-    ) or []
-    return updated[0] if updated else {**task, "sync_status": "synced"}
+    queued_task = updated[0] if updated else {
+        **task,
+        "sync_connection_id": connection["id"],
+        "sync_event_id": event["id"],
+        "sync_status": "pending",
+        "sync_error_code": None,
+    }
+    operation = "update" if linked_event else "create"
+    enqueue_task_sync(
+        tenant_id=context.tenant_id,
+        task_id=str(task["id"]),
+        connection_id=str(connection["id"]),
+        operation=operation,
+        task_version=int(queued_task.get("version") or task.get("version") or 1),
+    )
+    return queued_task
 
 
 def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
@@ -1371,7 +1349,7 @@ def update_task(task_id: str, payload: TaskWrite, request: Request, response: Re
     )
     if linked_connection:
         try:
-            updated[0] = sync_task_to_provider(
+            updated[0] = queue_task_to_provider(
                 context, updated[0], linked_connection
             )
         except CalendarSyncError as error:
@@ -1379,28 +1357,41 @@ def update_task(task_id: str, payload: TaskWrite, request: Request, response: Re
     return {"success": True, "task": safe_task_payload(updated[0])}
 
 
-@router.post("/tasks/{task_id}/sync")
+@router.post("/tasks/{task_id}/sync", status_code=202)
 def sync_task(
     task_id: str, payload: TaskSyncWrite, request: Request, response: Response
 ):
+    started_at = time.monotonic()
     require_calendar_feature()
     context = require_active_tenant_member(request, response)
     task = tenant_task(task_id, context.tenant_id)
     require_task_access(context, task)
     connection = task_sync_connection(context, task, str(payload.connection_id))
     try:
-        updated = sync_task_to_provider(context, task, connection)
+        updated = queue_task_to_provider(context, task, connection)
     except CalendarSyncError as error:
         raise sync_http_error(error) from error
     record_calendar_audit(
         context,
         request,
-        "calendar.task_synchronized",
+        "calendar.task_sync_queued",
         "calendar_task",
         task_id,
         {"provider": connection.get("provider")},
     )
-    return {"success": True, "task": safe_task_payload(updated)}
+    logger.info(
+        "calendar.task_sync_queued",
+        extra={
+            "provider": connection.get("provider"),
+            "duration_ms": round((time.monotonic() - started_at) * 1000),
+        },
+    )
+    return {
+        "success": True,
+        "status": "queued",
+        "sync_status": "pending",
+        "task": safe_task_payload(updated),
+    }
 
 
 @router.delete("/tasks/{task_id}/sync")
@@ -1445,6 +1436,7 @@ def delete_task(
     task = tenant_task(task_id, context.tenant_id)
     require_task_access(context, task)
     provider_deleted = False
+    provider_delete_queued = False
     if mode == "local_and_provider":
         if not task.get("sync_connection_id") or not task.get("sync_event_id"):
             raise HTTPException(
@@ -1457,16 +1449,34 @@ def delete_task(
         connection = task_sync_connection(
             context, task, str(task["sync_connection_id"])
         )
-        event = tenant_event(str(task["sync_event_id"]), context.tenant_id)
-        try:
-            delete_provider_event(connection, event)
-        except CalendarSyncError as error:
-            raise sync_http_error(error) from error
-        provider_deleted = True
-        service_supabase.table("calendar_events").update({
-            "deleted_at": iso(utc_now()),
-            "version": int(event.get("version") or 1) + 1,
-        }).eq("id", event["id"]).eq("tenant_id", context.tenant_id).execute()
+        tenant_event(str(task["sync_event_id"]), context.tenant_id)
+        service_supabase.table("calendar_tasks").update({
+            "sync_status": "pending",
+            "sync_error_code": None,
+        }).eq("id", task_id).eq("tenant_id", context.tenant_id).execute()
+        enqueue_task_sync(
+            tenant_id=context.tenant_id,
+            task_id=task_id,
+            connection_id=str(connection["id"]),
+            operation="delete",
+            task_version=int(task.get("version") or 1),
+        )
+        provider_delete_queued = True
+        record_calendar_audit(
+            context,
+            request,
+            "calendar.task_provider_delete_queued",
+            "calendar_task",
+            task_id,
+            {"mode": mode},
+        )
+        response.status_code = 202
+        return {
+            "success": True,
+            "status": "queued",
+            "sync_status": "pending",
+            "provider_event_deleted": False,
+        }
     deleted = getattr(
         service_supabase.table("calendar_tasks")
         .delete()
@@ -1490,7 +1500,11 @@ def delete_task(
             "provider_event_deleted": provider_deleted,
         },
     )
-    return {"success": True, "provider_event_deleted": provider_deleted}
+    return {
+        "success": True,
+        "provider_event_deleted": provider_deleted,
+        "provider_delete_queued": provider_delete_queued,
+    }
 
 
 def dependency_would_cycle(tenant_id: int, task_id: str, dependency_id: str) -> bool:

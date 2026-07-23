@@ -79,6 +79,7 @@ SENSITIVE_TABLES = (
     "calendar_sync_conflicts",
     "calendar_invitation_reviews",
     "calendar_oauth_states",
+    "calendar_task_sync_jobs",
 )
 
 SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
@@ -99,6 +100,10 @@ SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
     "finish_storage_reservation",
     "release_storage_object",
     "consume_calendar_oauth_state",
+    "enqueue_calendar_task_sync_job",
+    "claim_calendar_task_sync_jobs",
+    "finish_calendar_task_sync_job",
+    "complete_calendar_task_sync_delete",
 )
 
 PROTECTED_FUNCTIONS = (
@@ -127,6 +132,10 @@ PROTECTED_FUNCTIONS = (
     "release_storage_object",
     "assign_tenant_site_project_role",
     "consume_calendar_oauth_state",
+    "enqueue_calendar_task_sync_job",
+    "claim_calendar_task_sync_jobs",
+    "finish_calendar_task_sync_job",
+    "complete_calendar_task_sync_delete",
 )
 
 TABLE_CRUD_GRANTS = {"SELECT", "INSERT", "UPDATE", "DELETE"}
@@ -186,6 +195,7 @@ ALLOWED_DIRECT_GRANTS = {
     "calendar_sync_conflicts": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "calendar_invitation_reviews": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "calendar_oauth_states": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
+    "calendar_task_sync_jobs": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
 }
 
 # Every table not given a narrower browser-read exception is backend-only.

@@ -554,6 +554,63 @@ class CalendarRouteTests(unittest.TestCase):
             raised.exception.detail["code"], "calendar_write_access_required"
         )
 
+    def test_task_sync_prepares_local_event_and_enqueues_without_provider_call(self):
+        context = SimpleNamespace(
+            tenant_id=7,
+            user_id=12,
+            user={"timezone": "UTC"},
+        )
+        task = {
+            "id": "task",
+            "tenant_id": 7,
+            "calendar_id": "calendar",
+            "title": "Synthetic",
+            "description": "",
+            "scheduled_start": "2026-07-23T09:00:00+00:00",
+            "scheduled_end": "2026-07-23T10:00:00+00:00",
+            "version": 3,
+            "sync_event_id": None,
+        }
+        connection = {
+            "id": "connection",
+            "tenant_id": 7,
+            "local_calendar_id": "calendar",
+            "provider": "google",
+        }
+
+        class Query:
+            def __init__(self, table):
+                self.table = table
+                self.action = "select"
+                self.payload = None
+            def select(self, *_args): self.action = "select"; return self
+            def eq(self, *_args): return self
+            def is_(self, *_args): return self
+            def limit(self, *_args): return self
+            def insert(self, payload): self.action = "insert"; self.payload = payload; return self
+            def update(self, payload): self.action = "update"; self.payload = payload; return self
+            def execute(self):
+                if self.table == "calendar_events" and self.action == "insert":
+                    return SimpleNamespace(data=[{"id": "event", **self.payload}])
+                if self.table == "calendar_tasks" and self.action == "update":
+                    return SimpleNamespace(data=[{**task, **self.payload}])
+                return SimpleNamespace(data=[])
+
+        client = SimpleNamespace(table=lambda table: Query(table))
+        with patch.object(
+            calendar_routes, "service_supabase", client
+        ), patch.object(
+            calendar_routes, "enqueue_task_sync", return_value={"id": "job"}
+        ) as enqueue, patch.object(
+            calendar_routes, "sync_connection"
+        ) as provider_sync:
+            result = calendar_routes.queue_task_to_provider(
+                context, task, connection
+            )
+        self.assertEqual(result["sync_status"], "pending")
+        enqueue.assert_called_once()
+        provider_sync.assert_not_called()
+
     def test_unsynchronized_task_deletion_is_authorized_audited_and_controlled(self):
         context = SimpleNamespace(
             tenant_id=7, user_id=12, role="member", membership_status="active"
@@ -621,15 +678,15 @@ class CalendarRouteTests(unittest.TestCase):
             calendar_routes, "service_supabase",
             SimpleNamespace(table=lambda _name: DeleteQuery()),
         ), patch.object(
-            calendar_routes, "delete_provider_event"
-        ) as provider_delete, patch.object(
+            calendar_routes, "enqueue_task_sync"
+        ) as enqueue, patch.object(
             calendar_routes, "record_calendar_audit"
         ):
             result = calendar_routes.delete_task(
                 task["id"], object(), object(), mode="local_only"
             )
         self.assertTrue(result["success"])
-        provider_delete.assert_not_called()
+        enqueue.assert_not_called()
 
     def test_task_payload_hides_internal_event_link(self):
         payload = calendar_routes.safe_task_payload({

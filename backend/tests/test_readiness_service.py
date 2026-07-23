@@ -69,7 +69,9 @@ class ReadinessServiceTests(unittest.TestCase):
     def test_calendar_schema_checks_tables_and_single_use_state_function(self):
         def response_for(url, **_kwargs):
             if url.endswith("/rest/v1/"):
-                return SimpleNamespace(status_code=200, json=lambda: {"paths": {"/rpc/consume_calendar_oauth_state": {}}})
+                return SimpleNamespace(status_code=200, json=lambda: {"paths": {
+                    f"/rpc/{name}": {} for name in readiness_service.CALENDAR_SCHEMA_FUNCTIONS
+                }})
             return SimpleNamespace(status_code=200)
 
         with patch.dict(os.environ, {
@@ -109,6 +111,31 @@ class ReadinessServiceTests(unittest.TestCase):
             "GOOGLE_CALENDAR_CLIENT_SECRET": "test-secret",
         }, clear=False):
             self.assertEqual(readiness_service.check_calendar_configuration(), "ok")
+
+    def test_calendar_task_sync_worker_and_queue_fail_closed(self):
+        with patch.dict(os.environ, {
+            "CALENDAR_FEATURE_ENABLED": "true",
+            "CALENDAR_SYNC_REQUIRED": "true",
+            "CALENDAR_SYNC_WORKER_HEALTH_URL": "",
+        }, clear=False):
+            self.assertEqual(
+                readiness_service.check_calendar_sync_worker(), "misconfigured"
+            )
+        with patch.dict(os.environ, {
+            "CALENDAR_FEATURE_ENABLED": "true",
+            "CALENDAR_SYNC_REQUIRED": "true",
+        }, clear=False), patch.object(
+            readiness_service,
+            "get_task_sync_queue_metrics",
+            return_value={
+                "queue_depth": 1,
+                "failed": 0,
+                "reconciliation_required": 1,
+            },
+        ):
+            self.assertEqual(
+                readiness_service.check_calendar_sync_queue(), "backlogged"
+            )
 
     def test_all_required_components_ready(self):
         with patch.object(readiness_service, "check_database", return_value="ok"), patch.object(

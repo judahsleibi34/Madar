@@ -281,7 +281,7 @@ function EventEditor({ value, calendars, saving, conflict, onChange, onClose, on
   );
 }
 
-function TaskEditor({ value, connections, saving, error, onChange, onClose, onSave, onDelete }) {
+function TaskEditor({ value, connections, saving, error, notice, onChange, onClose, onSave, onDelete }) {
   const writableGoogleConnections = connections.filter(
     (connection) =>
       connection.provider === "google"
@@ -301,7 +301,8 @@ function TaskEditor({ value, connections, saving, error, onChange, onClose, onSa
           <div><span>Edit task</span><h2>{value.title || "Untitled task"}</h2></div>
           <button type="button" onClick={onClose} aria-label="Close"><X size={19} /></button>
         </header>
-        {error && <div className="calendar-conflict-warning"><AlertTriangle size={18} /><div><strong>Task could not be saved</strong><span>{error}</span></div></div>}
+        {error && <div className="calendar-conflict-warning"><AlertTriangle size={18} /><div><strong>{error.startsWith("Task saved,") ? "Google sync was not queued" : "Task could not be saved"}</strong><span>{error}</span></div></div>}
+        {notice && <div className="calendar-task-save-notice" role="status">{notice}</div>}
         <label>Title<input autoFocus required value={value.title} onChange={(event) => onChange("title", event.target.value)} /></label>
         <div className="calendar-form-grid">
           <label>Status<select value={value.status} onChange={(event) => onChange("status", event.target.value)}><option value="todo">Todo</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></label>
@@ -345,6 +346,7 @@ export default function ReservationCalendarPage({ user = null }) {
   const [taskSchedule, setTaskSchedule] = useState("");
   const [taskEditor, setTaskEditor] = useState(null);
   const [taskEditorError, setTaskEditorError] = useState("");
+  const [taskEditorNotice, setTaskEditorNotice] = useState("");
   const [connectionOperation, setConnectionOperation] = useState({ id: "", action: "" });
   const [connectionDirection, setConnectionDirection] = useState("read");
   const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
@@ -397,6 +399,18 @@ export default function ReservationCalendarPage({ user = null }) {
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [rangeEnd, rangeStart, refreshKey, userScope]);
+
+  useEffect(() => {
+    const syncPending = (workspace.tasks || []).some(
+      (task) => task.sync_status === "pending"
+    );
+    if (!syncPending) return undefined;
+    const timer = window.setTimeout(
+      () => setRefreshKey((value) => value + 1),
+      5000
+    );
+    return () => window.clearTimeout(timer);
+  }, [workspace.tasks]);
 
   const calendarById = useMemo(() => new Map((workspace.calendars || []).map((item) => [item.id, item])), [workspace.calendars]);
   const visibleEvents = useMemo(
@@ -537,6 +551,7 @@ export default function ReservationCalendarPage({ user = null }) {
 
   const openTask = (task) => {
     setTaskEditorError("");
+    setTaskEditorNotice("");
     setTaskEditor(taskEditorValue(task));
   };
 
@@ -545,6 +560,7 @@ export default function ReservationCalendarPage({ user = null }) {
     if (!taskEditor?.id) return;
     setSaving(true);
     setTaskEditorError("");
+    setTaskEditorNotice("");
     try {
       let scheduledStart = taskEditor.scheduled_start ? new Date(taskEditor.scheduled_start) : null;
       let scheduledEnd = taskEditor.scheduled_end ? new Date(taskEditor.scheduled_end) : null;
@@ -552,7 +568,7 @@ export default function ReservationCalendarPage({ user = null }) {
       if (taskEditor.repeat !== "none" && !scheduledStart) throw new Error("Choose a scheduled start time for a repeating task.");
       if (scheduledStart && !scheduledEnd) scheduledEnd = new Date(scheduledStart.getTime() + Number(taskEditor.estimate_minutes || 60) * 60000);
       if (scheduledStart && scheduledEnd <= scheduledStart) throw new Error("Scheduled end must be after the start.");
-      await updateCalendarTask(taskEditor.id, {
+      const savedTask = await updateCalendarTask(taskEditor.id, {
         title: taskEditor.title.trim(),
         description: taskEditor.description || "",
         calendar_id: taskEditor.calendar_id || null,
@@ -568,15 +584,29 @@ export default function ReservationCalendarPage({ user = null }) {
         recurrence_rule: recurrenceRule(taskEditor.repeat),
         milestone: Boolean(taskEditor.milestone),
       }, taskEditor.version);
+      setTaskEditor((current) => ({
+        ...current,
+        ...taskEditorValue(savedTask || current),
+      }));
+      setTaskEditorNotice("Saved locally.");
       if (taskEditor.sync_connection_id && !taskEditor.is_synchronized) {
-        await syncCalendarTask(taskEditor.id, taskEditor.sync_connection_id);
+        try {
+          await syncCalendarTask(taskEditor.id, taskEditor.sync_connection_id);
+          setTaskEditorNotice("Saved locally. Google sync queued.");
+        } catch (syncError) {
+          setTaskEditorError(
+            `Task saved, but Google synchronization could not be queued.${syncError?.message ? ` ${syncError.message}` : ""}`
+          );
+          setRefreshKey((value) => value + 1);
+          return;
+        }
       } else if (!taskEditor.sync_connection_id && taskEditor.is_synchronized) {
         await unlinkCalendarTaskSync(taskEditor.id);
       }
       setTaskEditor(null);
       setRefreshKey((value) => value + 1);
     } catch (taskError) {
-      setTaskEditorError(taskError?.message || "The task could not be saved.");
+      setTaskEditorError(taskError?.message || "The task could not be saved locally.");
     } finally {
       setSaving(false);
     }
@@ -784,7 +814,7 @@ export default function ReservationCalendarPage({ user = null }) {
       </div>
 
       {editor && <EventEditor value={editor} calendars={workspace.calendars || []} saving={saving} conflict={conflict} onChange={(field, value) => setEditor((current) => ({ ...current, [field]: value }))} onClose={() => setEditor(null)} onSave={saveEvent} onDelete={removeEvent} />}
-      {taskEditor && <TaskEditor value={taskEditor} connections={workspace.connections || []} saving={saving} error={taskEditorError} onChange={(field, value) => setTaskEditor((current) => ({ ...current, [field]: value }))} onClose={() => setTaskEditor(null)} onSave={saveTask} onDelete={removeTask} />}
+      {taskEditor && <TaskEditor value={taskEditor} connections={workspace.connections || []} saving={saving} error={taskEditorError} notice={taskEditorNotice} onChange={(field, value) => setTaskEditor((current) => ({ ...current, [field]: value }))} onClose={() => setTaskEditor(null)} onSave={saveTask} onDelete={removeTask} />}
       {editor?.id && history.length > 0 && <aside className="calendar-history-drawer"><header><History size={17} /><strong>Change history</strong></header>{history.slice(0, 8).map((item) => <div key={item.id}><strong>{item.action}</strong><span>{new Date(item.created_at).toLocaleString()} · {item.scope}</span></div>)}</aside>}
     </div>
   );

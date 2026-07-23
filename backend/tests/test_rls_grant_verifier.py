@@ -221,6 +221,36 @@ class RlsGrantVerifierTests(unittest.TestCase):
             normalized,
         )
 
+    def test_calendar_task_sync_queue_migration_is_durable_and_protected(self):
+        root = next(
+            parent
+            for parent in Path(__file__).resolve().parents
+            if (parent / "database/migrations").is_dir()
+        )
+        name = "068_queue_calendar_task_sync.sql"
+        database_sql = (root / "database/migrations" / name).read_text(encoding="utf-8")
+        supabase_sql = (root / "supabase/migrations" / name).read_text(encoding="utf-8")
+        self.assertEqual(database_sql, supabase_sql)
+        normalized = " ".join(database_sql.lower().split())
+        self.assertIn("calendar_task_sync_jobs_active_unique_idx", normalized)
+        self.assertIn("for update skip locked", normalized)
+        self.assertIn("security definer set search_path = public", normalized)
+        self.assertIn(
+            "revoke all on table public.calendar_task_sync_jobs from public, anon, authenticated",
+            normalized,
+        )
+        for function in (
+            "enqueue_calendar_task_sync_job",
+            "claim_calendar_task_sync_jobs",
+            "finish_calendar_task_sync_job",
+            "complete_calendar_task_sync_delete",
+        ):
+            self.assertIn(function, normalized)
+            self.assertIn(
+                function,
+                verify_rls_grants.SENSITIVE_SECURITY_DEFINER_FUNCTIONS,
+            )
+
     def test_privileged_write_migration_revokes_browser_dml_in_both_trees(self):
         test_path = Path(__file__).resolve()
         root = next(

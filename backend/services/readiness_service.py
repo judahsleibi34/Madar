@@ -18,6 +18,7 @@ from services.upload_config import (
 )
 from services.storage_quota_service import DEFAULT_DISK_FREE_FLOOR_BYTES
 from services.notification_outbox_service import get_queue_metrics
+from services.calendar_task_sync_queue_service import get_task_sync_queue_metrics
 
 try:
     import redis
@@ -61,8 +62,15 @@ CALENDAR_SCHEMA_SELECTS = {
     "calendar_sync_conflicts": "id,tenant_id,connection_id,event_id,status",
     "calendar_invitation_reviews": "id,tenant_id,event_id,disposition",
     "calendar_oauth_states": "nonce_hash,connection_id,tenant_id,user_id,calendar_id,consumed_at",
+    "calendar_task_sync_jobs": "id,tenant_id,task_id,connection_id,operation,status,attempts,next_attempt_at,leased_at",
 }
-CALENDAR_SCHEMA_FUNCTIONS = ("consume_calendar_oauth_state",)
+CALENDAR_SCHEMA_FUNCTIONS = (
+    "consume_calendar_oauth_state",
+    "enqueue_calendar_task_sync_job",
+    "claim_calendar_task_sync_jobs",
+    "finish_calendar_task_sync_job",
+    "complete_calendar_task_sync_delete",
+)
 
 _cache_lock = Lock()
 _cached_at = 0.0
@@ -330,6 +338,41 @@ def check_calendar_configuration() -> str:
     return "ok"
 
 
+def check_calendar_sync_worker() -> str:
+    if not _env_bool("CALENDAR_FEATURE_ENABLED", False):
+        return "disabled"
+    if not _env_bool("CALENDAR_SYNC_REQUIRED", False):
+        return "disabled"
+    url = os.getenv("CALENDAR_SYNC_WORKER_HEALTH_URL", "").strip()
+    if not url:
+        return "misconfigured"
+    try:
+        response = requests.get(
+            url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False
+        )
+        return "ok" if response.status_code == 200 else "unavailable"
+    except requests.RequestException:
+        return "unavailable"
+
+
+def check_calendar_sync_queue() -> str:
+    if not _env_bool("CALENDAR_FEATURE_ENABLED", False):
+        return "disabled"
+    if not _env_bool("CALENDAR_SYNC_REQUIRED", False):
+        return "disabled"
+    try:
+        metrics = get_task_sync_queue_metrics()
+        if (
+            metrics.get("queue_depth", 0) > 1000
+            or metrics.get("failed", 0) > 100
+            or metrics.get("reconciliation_required", 0) > 0
+        ):
+            return "backlogged"
+        return "ok"
+    except Exception:
+        return "unavailable"
+
+
 def check_parser_isolation() -> str:
     return "in_process" if _app_env() in {"prod", "production"} else "development"
 
@@ -339,7 +382,7 @@ def _is_required_state_ready(component: str, state: str) -> bool:
         return True
     if component == "admin_mfa_policy" and state == "not_required":
         return True
-    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "backup_freshness", "calendar_configuration"} and state == "disabled":
+    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "backup_freshness", "calendar_configuration", "calendar_sync_worker", "calendar_sync_queue"} and state == "disabled":
         return True
     if component == "parser_isolation" and state == "development":
         return True
@@ -358,6 +401,8 @@ def compute_readiness() -> dict:
         "ai_execution_guard": check_ai_execution_guard,
         "remote_ingestion_guard": check_remote_ingestion_guard,
         "calendar_configuration": check_calendar_configuration,
+        "calendar_sync_worker": check_calendar_sync_worker,
+        "calendar_sync_queue": check_calendar_sync_queue,
         "parser_isolation": check_parser_isolation,
         "notification_worker": check_notification_worker,
         "notification_queue": check_notification_queue,
