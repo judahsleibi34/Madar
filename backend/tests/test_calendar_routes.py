@@ -208,6 +208,216 @@ class CalendarRouteTests(unittest.TestCase):
                 with self.subTest(project_id=project_id), self.assertRaises(HTTPException):
                     calendar_routes.validate_project_reference(context, project_id)
 
+    def test_repeated_oauth_connection_creation_reuses_pending_record(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="member", membership_status="active",
+            user={"timezone": "UTC"},
+        )
+        existing = {
+            "id": "connection-pending",
+            "local_calendar_id": "calendar-pending",
+            "tenant_id": 7,
+            "user_id": 12,
+            "provider": "google",
+            "account_label": "Google Calendar",
+            "direction": "read",
+            "status": "setup_required",
+            "created_at": "2026-07-23T10:00:00+00:00",
+        }
+        with patch.dict(os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(calendar_routes, "require_calendar_creator"), patch.object(
+            calendar_routes, "reusable_pending_connection", return_value=existing
+        ), patch.object(calendar_routes, "record_calendar_audit") as audit:
+            result = calendar_routes.create_sync_connection(
+                calendar_routes.ConnectionWrite(provider="google"),
+                object(),
+                object(),
+            )
+        self.assertTrue(result["reused"])
+        self.assertEqual(result["connection"]["id"], existing["id"])
+        audit.assert_called_once()
+
+    def test_pending_reuse_removes_only_bounded_stale_credential_free_rows(self):
+        rows = [
+            {
+                "id": "fresh",
+                "tenant_id": 7,
+                "user_id": 12,
+                "provider": "google",
+                "direction": "read",
+                "status": "setup_required",
+                "encrypted_credentials": None,
+                "created_at": "2026-07-23T11:55:00+00:00",
+            },
+            {
+                "id": "stale",
+                "tenant_id": 7,
+                "user_id": 12,
+                "provider": "google",
+                "direction": "read",
+                "status": "setup_required",
+                "encrypted_credentials": None,
+                "created_at": "2026-07-23T10:00:00+00:00",
+            },
+        ]
+
+        class PendingQuery:
+            def __init__(self, client):
+                self.client = client
+                self.operation = "select"
+                self.selected = list(client.rows)
+                self.filters = {}
+            def select(self, *_args): return self
+            def delete(self): self.operation = "delete"; return self
+            def eq(self, field, value):
+                self.filters[field] = value
+                self.selected = [row for row in self.selected if row.get(field) == value]
+                return self
+            def is_(self, field, value):
+                if value == "null":
+                    self.selected = [row for row in self.selected if row.get(field) is None]
+                return self
+            def lt(self, field, value):
+                self.selected = [
+                    row for row in self.selected
+                    if str(row.get(field) or "") < str(value)
+                ]
+                return self
+            def order(self, *_args, **_kwargs): return self
+            def limit(self, count): self.selected = self.selected[:count]; return self
+            def execute(self):
+                if self.operation == "delete":
+                    deleted = list(self.selected)
+                    self.client.deleted.extend(row["id"] for row in deleted)
+                    return SimpleNamespace(data=deleted)
+                return SimpleNamespace(data=list(self.selected))
+
+        client = SimpleNamespace(rows=rows, deleted=[])
+        client.table = lambda _name: PendingQuery(client)
+        context = SimpleNamespace(tenant_id=7, user_id=12)
+        with patch.object(calendar_routes, "service_supabase", client), patch.object(
+            calendar_routes,
+            "utc_now",
+            return_value=datetime(2026, 7, 23, 12, tzinfo=timezone.utc),
+        ), patch.object(
+            calendar_routes, "remove_empty_connection_calendar", return_value=True
+        ), patch.object(calendar_routes, "record_calendar_audit") as audit:
+            reusable = calendar_routes.reusable_pending_connection(
+                context,
+                calendar_routes.ConnectionWrite(provider="google", direction="read"),
+                object(),
+            )
+        self.assertEqual(reusable["id"], "fresh")
+        self.assertEqual(client.deleted, ["stale"])
+        audit.assert_called_once()
+
+    def test_incomplete_connection_removal_is_separate_from_disconnect(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="owner", membership_status="active",
+        )
+        incomplete = {
+            "id": "connection-pending",
+            "tenant_id": 7,
+            "local_calendar_id": "calendar-pending",
+            "provider": "google",
+            "status": "setup_required",
+            "encrypted_credentials": None,
+        }
+
+        class DeleteQuery:
+            def delete(self): return self
+            def eq(self, *_args): return self
+            def in_(self, *_args): return self
+            def is_(self, *_args): return self
+            def execute(self): return SimpleNamespace(data=[{"id": "connection-pending"}])
+
+        client = SimpleNamespace(table=lambda _name: DeleteQuery())
+        with patch.dict(os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(calendar_routes, "tenant_connection", return_value=incomplete), patch.object(
+            calendar_routes, "require_calendar_access"
+        ), patch.object(calendar_routes, "service_supabase", client), patch.object(
+            calendar_routes, "remove_empty_connection_calendar", return_value=True
+        ), patch.object(
+            calendar_routes, "record_calendar_audit"
+        ) as audit:
+            result = calendar_routes.remove_incomplete_sync_connection(
+                incomplete["id"], object(), object()
+            )
+        self.assertEqual(result, {"success": True, "removed": True})
+        audit.assert_called_once()
+
+    def test_connected_connection_cannot_use_incomplete_removal(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="owner", membership_status="active",
+        )
+        connected = {
+            "id": "connection-connected",
+            "tenant_id": 7,
+            "local_calendar_id": "calendar-connected",
+            "provider": "google",
+            "status": "connected",
+            "encrypted_credentials": "encrypted",
+        }
+        with patch.dict(os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(calendar_routes, "tenant_connection", return_value=connected), patch.object(
+            calendar_routes, "require_calendar_access"
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                calendar_routes.remove_incomplete_sync_connection(
+                    connected["id"], object(), object()
+                )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(
+            raised.exception.detail["code"], "calendar_connection_requires_disconnect"
+        )
+
+    def test_empty_connection_calendar_cleanup_preserves_any_calendar_with_content(self):
+        connection = {
+            "tenant_id": 7,
+            "user_id": 12,
+            "local_calendar_id": "calendar-pending",
+        }
+
+        class TableQuery:
+            def __init__(self, client, table_name):
+                self.client = client
+                self.table_name = table_name
+                self.rows = list(client.rows.get(table_name, []))
+                self.operation = "select"
+            def select(self, *_args): return self
+            def delete(self): self.operation = "delete"; return self
+            def eq(self, field, value):
+                self.rows = [row for row in self.rows if row.get(field) == value]
+                return self
+            def limit(self, count): self.rows = self.rows[:count]; return self
+            def execute(self):
+                if self.operation == "delete":
+                    self.client.deleted.extend((self.table_name, row["id"]) for row in self.rows)
+                return SimpleNamespace(data=list(self.rows))
+
+        rows = {
+            "calendars": [{
+                "id": "calendar-pending", "tenant_id": 7,
+                "owner_user_id": 12, "is_default": False,
+            }],
+            "calendar_events": [{"id": "event", "tenant_id": 7, "calendar_id": "calendar-pending"}],
+            "calendar_tasks": [],
+            "calendar_sync_connections": [],
+        }
+        client = SimpleNamespace(rows=rows, deleted=[])
+        client.table = lambda name: TableQuery(client, name)
+        with patch.object(calendar_routes, "service_supabase", client):
+            self.assertFalse(calendar_routes.remove_empty_connection_calendar(connection))
+        self.assertEqual(client.deleted, [])
+
+        client.rows["calendar_events"] = []
+        with patch.object(calendar_routes, "service_supabase", client):
+            self.assertTrue(calendar_routes.remove_empty_connection_calendar(connection))
+        self.assertEqual(client.deleted, [("calendars", "calendar-pending")])
+
 
 if __name__ == "__main__":
     unittest.main()

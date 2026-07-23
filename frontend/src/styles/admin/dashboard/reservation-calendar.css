@@ -843,11 +843,15 @@
 .calendar-task span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .calendar-task small { color: var(--theme-text-muted); text-transform: capitalize; }
 
-.calendar-sync-row { width: 100%; display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 3px 0; border: 0; color: var(--theme-text); background: transparent; font-size: 0.78rem; text-align: start; cursor: pointer; }
+.calendar-sync-row { width: 100%; display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 3px 0; border: 0; color: var(--theme-text); background: transparent; font-size: 0.78rem; text-align: start; }
 .calendar-sync-row svg { color: var(--theme-warning, #e6a23c); }
 .calendar-sync-row.is-connected svg { color: var(--theme-success); }
 .calendar-sync-row span { font-weight: 750; }
 .calendar-sync-row small { color: var(--theme-text-muted); text-transform: capitalize; }
+.calendar-sync-actions { grid-column: 2 / -1; display: flex; justify-content: flex-end; gap: 5px; }
+.calendar-sync-actions button { padding: 4px 7px; border: 1px solid var(--theme-border); border-radius: 6px; color: var(--theme-text); background: var(--theme-surface); font-size: 0.65rem; font-weight: 750; cursor: pointer; }
+.calendar-sync-actions button.is-danger { color: var(--theme-danger); }
+.calendar-sync-actions button:disabled { cursor: wait; opacity: 0.6; }
 .calendar-connect-actions { display: flex; gap: 5px; flex-wrap: wrap; }
 .calendar-connect-actions button { padding: 5px 8px; border: 1px solid var(--theme-border); border-radius: 7px; color: var(--theme-text); background: transparent; font-size: 0.7rem; font-weight: 750; cursor: pointer; }
 .calendar-sync-direction { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--theme-text-muted); font-size: 0.68rem; }

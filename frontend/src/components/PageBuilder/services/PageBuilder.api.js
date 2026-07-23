@@ -293,6 +293,22 @@ export const syncCalendarConnection = async (connectionId) => {
   return parseJsonResponse(response);
 };
 
+export const removeCalendarConnection = async (connectionId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}`),
+    { method: "DELETE", headers: builderWriteHeaders() }
+  );
+  return parseJsonResponse(response);
+};
+
+export const disconnectCalendarConnection = async (connectionId) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}/disconnect`),
+    { method: "POST", headers: builderWriteHeaders() }
+  );
+  return parseJsonResponse(response);
+};
+
 export const getCalendarExportUrl = ({ start, end, calendarId = "" }) => {
   const query = new URLSearchParams({ start, end });
   if (calendarId) query.set("calendar_id", calendarId);

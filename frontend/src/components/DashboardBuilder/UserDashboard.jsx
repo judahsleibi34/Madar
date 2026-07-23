@@ -168,7 +168,7 @@ export default function UserDashboard({ user }) {
     let cancelled = false;
 
     const loadMetrics = async () => {
-      let records = [];
+      let records;
       try {
         const result = await listBuilderProjects({ limit: 100 });
         records = result.projects;

@@ -24,11 +24,13 @@ import {
   createCalendarEvent,
   createCalendarTask,
   deleteCalendarEvent,
+  disconnectCalendarConnection,
   fetchCalendarEventHistory,
   fetchCalendarWorkspace,
   getCalendarExportUrl,
   importCalendarIcs,
   resolveCalendarInvitation,
+  removeCalendarConnection,
   syncCalendarConnection,
   updateCalendarEvent,
   updateCalendarTask,
@@ -40,6 +42,10 @@ import {
   readCalendarWorkspaceCache,
   writeCalendarWorkspaceCache,
 } from "./utils/calendarWorkspaceCache";
+import {
+  confirmConnectedAccountDisconnect,
+  confirmIncompleteConnectionRemoval,
+} from "./utils/calendarConnectionPrompts";
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
 const VIEWS = ["day", "week", "month", "agenda"];
@@ -51,6 +57,39 @@ function SidebarSectionHeading({ section, icon, title, subtitle, count, expanded
       <span className="calendar-sidebar-heading-main"><span className="calendar-sidebar-icon">{icon}</span><span><strong>{title}</strong><small>{subtitle}</small></span></span>
       <span className="calendar-sidebar-heading-actions"><span className="calendar-count-badge">{count}</span><ChevronDown className="calendar-sidebar-chevron" size={15} /></span>
     </button>
+  );
+}
+
+export function CalendarConnectionCard({ connection, operation = "", onAuthorize, onSync, onRemove, onDisconnect }) {
+  const connected = connection.status === "connected" || connection.status === "degraded";
+  const pending = connection.status === "setup_required";
+  const busy = Boolean(operation);
+  const progressLabels = {
+    authorize: "Authorizing…",
+    disconnect: "Disconnecting…",
+    remove: "Removing…",
+    sync: "Syncing…",
+  };
+  const status = busy
+    ? (progressLabels[operation] || "Working…")
+    : connection.last_success_at
+      ? `Synced ${new Date(connection.last_success_at).toLocaleDateString()}`
+      : connection.status.replaceAll("_", " ");
+  return (
+    <div className={`calendar-sync-row is-${connection.status}`}>
+      <span className="calendar-sync-provider-icon">{connected ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}</span>
+      <span className="calendar-sync-account">
+        <strong>{connection.account_label || connection.provider}</strong>
+        <small>{connection.provider === "microsoft" ? "Outlook" : connection.provider} · {connection.direction === "two_way" ? "Two-way" : "Read only"}</small>
+      </span>
+      <span className="calendar-sync-status">{status}</span>
+      <span className="calendar-sync-actions">
+        {pending && <button type="button" disabled={busy} onClick={() => onAuthorize(connection)}>Authorize</button>}
+        {connected && <button type="button" disabled={busy} onClick={() => onSync(connection)}>Sync</button>}
+        {!connected && <button type="button" className="is-danger" disabled={busy} onClick={() => onRemove(connection)}>Remove</button>}
+        {connected && <button type="button" className="is-danger" disabled={busy} onClick={() => onDisconnect(connection)}>Disconnect</button>}
+      </span>
+    </div>
   );
 }
 
@@ -318,7 +357,7 @@ export default function ReservationCalendarPage({ user = null }) {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskEditor, setTaskEditor] = useState(null);
   const [taskEditorError, setTaskEditorError] = useState("");
-  const [syncingProvider, setSyncingProvider] = useState("");
+  const [connectionOperation, setConnectionOperation] = useState({ id: "", action: "" });
   const [connectionDirection, setConnectionDirection] = useState("read");
   const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
   const [rangeStart, rangeEnd] = useMemo(() => rangeForView(focusDate, view), [focusDate, view]);
@@ -503,7 +542,7 @@ export default function ReservationCalendarPage({ user = null }) {
   };
 
   const connectProvider = async (provider) => {
-    setSyncingProvider(provider);
+    setConnectionOperation({ id: provider, action: "create" });
     try {
       const result = await createCalendarConnection({ provider, account_label: provider === "microsoft" ? "Outlook" : provider === "google" ? "Google Calendar" : "Calendar feed", direction: provider === "ics" ? "read" : connectionDirection });
       if (result.requires_oauth && result.connection?.id) {
@@ -513,11 +552,11 @@ export default function ReservationCalendarPage({ user = null }) {
         setRefreshKey((value) => value + 1);
       }
     } catch (connectionError) { setError(connectionError?.message || "Connection could not be created."); }
-    finally { setSyncingProvider(""); }
+    finally { setConnectionOperation({ id: "", action: "" }); }
   };
 
   const syncProvider = async (connection) => {
-    setSyncingProvider(connection.id);
+    setConnectionOperation({ id: connection.id, action: connection.status === "setup_required" ? "authorize" : "sync" });
     try {
       if (connection.status === "setup_required") {
         const url = await authorizeCalendarConnection(connection.id);
@@ -529,7 +568,33 @@ export default function ReservationCalendarPage({ user = null }) {
     } catch (syncError) {
       setError(syncError?.message || "Calendar sync failed. Open Sync health for details.");
     } finally {
-      setSyncingProvider("");
+      setConnectionOperation({ id: "", action: "" });
+    }
+  };
+
+  const removeConnection = async (connection) => {
+    if (!confirmIncompleteConnectionRemoval()) return;
+    setConnectionOperation({ id: connection.id, action: "remove" });
+    try {
+      await removeCalendarConnection(connection.id);
+      setRefreshKey((value) => value + 1);
+    } catch (removeError) {
+      setError(removeError?.message || "Calendar connection could not be removed.");
+    } finally {
+      setConnectionOperation({ id: "", action: "" });
+    }
+  };
+
+  const disconnectProvider = async (connection) => {
+    if (!confirmConnectedAccountDisconnect()) return;
+    setConnectionOperation({ id: connection.id, action: "disconnect" });
+    try {
+      await disconnectCalendarConnection(connection.id);
+      setRefreshKey((value) => value + 1);
+    } catch (disconnectError) {
+      setError(disconnectError?.message || "Calendar account could not be disconnected.");
+    } finally {
+      setConnectionOperation({ id: "", action: "" });
     }
   };
 
@@ -623,9 +688,9 @@ export default function ReservationCalendarPage({ user = null }) {
             <SidebarSectionHeading section="sync" icon={<Link2 size={16} />} title="Sync health" subtitle="Connected accounts" count={workspace.connections?.length || 0} expanded={expandedSidebarSections.has("sync")} onToggle={toggleSidebarSection} />
             {expandedSidebarSections.has("sync") && <div id="calendar-sidebar-sync" className="calendar-connected-list">
               {(workspace.connections || []).length === 0 && <p className="calendar-no-connections">No calendars connected yet.</p>}
-              {(workspace.connections || []).map((connection) => <button type="button" className={`calendar-sync-row is-${connection.status}`} key={connection.id} onClick={() => syncProvider(connection)} disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)}><span className="calendar-sync-provider-icon">{connection.status === "connected" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}</span><span className="calendar-sync-account"><strong>{connection.account_label || connection.provider}</strong><small>{connection.provider === "microsoft" ? "Outlook" : connection.provider}</small></span><span className="calendar-sync-status">{syncingProvider === connection.id ? "Syncing…" : connection.last_success_at ? `Synced ${new Date(connection.last_success_at).toLocaleDateString()}` : connection.status.replace("_", " ")}</span></button>)}
+              {(workspace.connections || []).map((connection) => <CalendarConnectionCard key={connection.id} connection={connection} operation={connectionOperation.id === connection.id ? connectionOperation.action : ""} onAuthorize={syncProvider} onSync={syncProvider} onRemove={removeConnection} onDisconnect={disconnectProvider} />)}
             </div>}
-            <div className="calendar-new-connection"><button type="button" className="calendar-new-connection-toggle" aria-expanded={expandedSidebarSections.has("connect")} aria-controls="calendar-sidebar-connect" onClick={() => toggleSidebarSection("connect")}><span className="calendar-new-connection-heading"><strong>Add an account</strong><small>Connect securely with OAuth 2.0</small></span><ChevronDown className="calendar-sidebar-chevron" size={15} /></button>{expandedSidebarSections.has("connect") && <div id="calendar-sidebar-connect" className="calendar-sidebar-section-content"><label className="calendar-sync-direction"><span>Access</span><select value={connectionDirection} onChange={(event) => setConnectionDirection(event.target.value)} disabled={!calendarFeaturesAvailable}><option value="read">Read only</option><option value="two_way">Two-way sync</option></select></label><div className="calendar-connect-actions"><button type="button" disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)} onClick={() => connectProvider("google")}>Google</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)} onClick={() => connectProvider("microsoft")}>Outlook</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(syncingProvider)} onClick={() => connectProvider("ics")}>ICS</button></div><small className="calendar-connection-help">Google and Outlook open a secure sign-in. ICS imports a calendar feed.</small></div>}</div>
+            <div className="calendar-new-connection"><button type="button" className="calendar-new-connection-toggle" aria-expanded={expandedSidebarSections.has("connect")} aria-controls="calendar-sidebar-connect" onClick={() => toggleSidebarSection("connect")}><span className="calendar-new-connection-heading"><strong>Add an account</strong><small>Connect securely with OAuth 2.0</small></span><ChevronDown className="calendar-sidebar-chevron" size={15} /></button>{expandedSidebarSections.has("connect") && <div id="calendar-sidebar-connect" className="calendar-sidebar-section-content"><label className="calendar-sync-direction"><span>Access</span><select value={connectionDirection} onChange={(event) => setConnectionDirection(event.target.value)} disabled={!calendarFeaturesAvailable}><option value="read">Read only</option><option value="two_way">Two-way sync</option></select></label><div className="calendar-connect-actions"><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("google")}>Google</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("microsoft")}>Outlook</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("ics")}>ICS</button></div><small className="calendar-connection-help">Google and Outlook open a secure sign-in. ICS imports a calendar feed.</small></div>}</div>
           </section>
           <div className="calendar-privacy-note"><ShieldCheck size={17} /><span><strong>Privacy is explicit</strong>Each event shows its calendar and visibility.</span></div>
         </aside>

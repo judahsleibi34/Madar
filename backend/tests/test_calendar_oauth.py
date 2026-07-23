@@ -13,7 +13,10 @@ class Query:
     def __init__(self, client): self.client = client
     def insert(self, value): self.client.inserted.append(value); return self
     def update(self, value): self.client.updated.append(value); return self
+    def delete(self): self.client.deleted += 1; return self
     def eq(self, *_args): return self
+    def in_(self, *_args): return self
+    def is_(self, *_args): return self
     def execute(self): return SimpleNamespace(data=[{"id": "ok"}])
 
 
@@ -21,6 +24,7 @@ class Client:
     def __init__(self, rpc_result=True):
         self.inserted = []
         self.updated = []
+        self.deleted = 0
         self.rpc_result = rpc_result
         self.rpc_args = None
     def table(self, _name): return Query(self)
@@ -162,6 +166,34 @@ class CalendarOAuthTests(unittest.TestCase):
         self.assertNotIn("private-code", str(warning.call_args))
         self.assertNotIn("private-state", str(warning.call_args))
 
+    def test_provider_denial_consumes_state_and_marks_only_pending_connection_failed(self):
+        context = SimpleNamespace(tenant_id=7, user_id=12, membership_status="active", role="member")
+        connection = {**self.connection(), "status": "setup_required", "encrypted_credentials": None}
+        state = {
+            "connection_id": connection["id"], "calendar_id": connection["local_calendar_id"],
+            "tenant_id": 7, "user_id": 12, "provider": "google", "nonce": "nonce",
+        }
+        with patch.dict(os.environ, BASE_ENV, clear=False), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(calendar_routes, "decode_oauth_state", return_value=state), patch.object(
+            calendar_routes, "tenant_connection", return_value=connection
+        ), patch.object(calendar_routes, "require_calendar_access"), patch.object(
+            calendar_routes, "consume_oauth_state"
+        ) as consume, patch.object(
+            calendar_routes, "exchange_authorization_code"
+        ) as exchange, patch.object(
+            calendar_routes, "mark_pending_connection_failed"
+        ) as mark_failed, patch.object(calendar_routes.logger, "warning") as warning:
+            response = calendar_routes.calendar_oauth_callback(
+                "google", object(), object(), state="private-state",
+                code=None, error="access_denied",
+            )
+        self.assertEqual(response.status_code, 303)
+        consume.assert_called_once_with(state)
+        exchange.assert_not_called()
+        mark_failed.assert_called_once_with(connection, "oauth_access_denied")
+        self.assertNotIn("private-state", str(warning.call_args))
+
     def test_disconnect_removes_credentials_and_attempts_google_revocation(self):
         client = Client()
         provider = SimpleNamespace(post=lambda *_args, **_kwargs: SimpleNamespace(status_code=200))
@@ -177,6 +209,29 @@ class CalendarOAuthTests(unittest.TestCase):
         self.assertIsNone(client.updated[0]["encrypted_credentials"])
         self.assertEqual(client.updated[0]["status"], "disconnected")
         self.assertNotIn("private-refresh", str(client.updated))
+
+    def test_revocation_failure_still_removes_local_credentials(self):
+        client = Client()
+        provider = SimpleNamespace(post=lambda *_args, **_kwargs: SimpleNamespace(status_code=503))
+        connection = {**self.connection(), "encrypted_credentials": "encrypted"}
+        with patch.object(
+            calendar_sync_service, "decrypt_credentials",
+            return_value={"refresh_token": "private-refresh"},
+        ):
+            revoked = calendar_sync_service.disconnect_connection(
+                connection, http_client=provider, client=client
+            )
+        self.assertFalse(revoked)
+        self.assertIsNone(client.updated[0]["encrypted_credentials"])
+        self.assertEqual(client.updated[0]["status"], "disconnected")
+
+    def test_connected_connection_is_not_damaged_by_failed_attempt_cleanup(self):
+        client = Client()
+        calendar_routes.mark_pending_connection_failed(
+            {**self.connection(), "status": "connected", "encrypted_credentials": "encrypted"},
+            "oauth_exchange_failed",
+        )
+        self.assertEqual(client.updated, [])
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import logging
 import os
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 MAX_RANGE_DAYS = 370
 MAX_EXPANDED_OCCURRENCES = 2000
 MAX_DEPENDENCY_EDGES = 5000
+PENDING_CONNECTION_TTL = timedelta(minutes=15)
+MAX_PENDING_CONNECTION_CLEANUP = 10
 CALENDAR_SCHEMA_TABLES = (
     "calendars",
     "calendar_memberships",
@@ -563,6 +565,166 @@ def tenant_connection(connection_id: str, tenant_id: int, user_id: int | None = 
     return rows[0]
 
 
+def safe_connection_payload(connection: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: connection.get(key)
+        for key in (
+            "id",
+            "local_calendar_id",
+            "provider",
+            "account_label",
+            "direction",
+            "status",
+            "last_success_at",
+            "last_attempt_at",
+            "last_error_code",
+            "pending_changes",
+            "failed_changes",
+            "created_at",
+        )
+    }
+
+
+def _connection_created_at(connection: dict[str, Any]) -> datetime | None:
+    try:
+        value = datetime.fromisoformat(str(connection.get("created_at") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if value.tzinfo is None:
+        return None
+    return value.astimezone(timezone.utc)
+
+
+def reusable_pending_connection(context, payload: ConnectionWrite, request: Request) -> dict[str, Any] | None:
+    if payload.provider not in {"google", "microsoft"}:
+        return None
+    newest = getattr(
+        service_supabase.table("calendar_sync_connections")
+        .select("*")
+        .eq("tenant_id", context.tenant_id)
+        .eq("user_id", context.user_id)
+        .eq("provider", payload.provider)
+        .eq("direction", payload.direction)
+        .eq("status", "setup_required")
+        .is_("encrypted_credentials", "null")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    cutoff = utc_now() - PENDING_CONNECTION_TTL
+    created_at = _connection_created_at(newest[0]) if newest else None
+    reusable = newest[0] if created_at is not None and created_at >= cutoff else None
+    stale = getattr(
+        service_supabase.table("calendar_sync_connections")
+        .select("*")
+        .eq("tenant_id", context.tenant_id)
+        .eq("user_id", context.user_id)
+        .eq("provider", payload.provider)
+        .eq("direction", payload.direction)
+        .eq("status", "setup_required")
+        .is_("encrypted_credentials", "null")
+        .lt("created_at", iso(cutoff))
+        .order("created_at")
+        .limit(MAX_PENDING_CONNECTION_CLEANUP)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    for connection in stale:
+        deleted = getattr(
+            service_supabase.table("calendar_sync_connections")
+            .delete()
+            .eq("id", connection.get("id"))
+            .eq("tenant_id", context.tenant_id)
+            .eq("user_id", context.user_id)
+            .eq("status", "setup_required")
+            .is_("encrypted_credentials", "null")
+            .execute(),
+            "data",
+            None,
+        ) or []
+        if deleted:
+            calendar_removed = remove_empty_connection_calendar(connection)
+            record_calendar_audit(
+                context,
+                request,
+                "calendar.connection_expired",
+                "calendar_sync_connection",
+                connection.get("id"),
+                {
+                    "provider": payload.provider,
+                    "empty_calendar_removed": calendar_removed,
+                },
+            )
+    return reusable
+
+
+def mark_pending_connection_failed(connection: dict[str, Any], error_code: str) -> None:
+    if (
+        str(connection.get("status") or "") != "setup_required"
+        or connection.get("encrypted_credentials")
+    ):
+        return
+    service_supabase.table("calendar_sync_connections").update({
+        "status": "disconnected",
+        "last_attempt_at": iso(utc_now()),
+        "last_error_code": str(error_code or "oauth_failed")[:80],
+    }).eq("id", connection.get("id")).eq("tenant_id", connection.get("tenant_id")).eq(
+        "status", "setup_required"
+    ).is_("encrypted_credentials", "null").execute()
+
+
+def remove_empty_connection_calendar(connection: dict[str, Any]) -> bool:
+    calendar_id = connection.get("local_calendar_id")
+    if not calendar_id:
+        return False
+    calendars = getattr(
+        service_supabase.table("calendars")
+        .select("id")
+        .eq("id", calendar_id)
+        .eq("tenant_id", connection.get("tenant_id"))
+        .eq("owner_user_id", connection.get("user_id"))
+        .eq("is_default", False)
+        .limit(1)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    if not calendars:
+        return False
+    for table_name, field_name in (
+        ("calendar_events", "calendar_id"),
+        ("calendar_tasks", "calendar_id"),
+        ("calendar_sync_connections", "local_calendar_id"),
+    ):
+        rows = getattr(
+            service_supabase.table(table_name)
+            .select("id")
+            .eq("tenant_id", connection.get("tenant_id"))
+            .eq(field_name, calendar_id)
+            .limit(1)
+            .execute(),
+            "data",
+            None,
+        ) or []
+        if rows:
+            return False
+    deleted = getattr(
+        service_supabase.table("calendars")
+        .delete()
+        .eq("id", calendar_id)
+        .eq("tenant_id", connection.get("tenant_id"))
+        .eq("owner_user_id", connection.get("user_id"))
+        .eq("is_default", False)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    return bool(deleted)
+
+
 def sync_http_error(error: CalendarSyncError) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": error.code, "message": str(error)})
 
@@ -649,7 +811,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
     if sync_state_ids:
         connections = getattr(
             service_supabase.table("calendar_sync_connections")
-            .select("id,local_calendar_id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes")
+            .select("id,local_calendar_id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes,created_at")
             .eq("tenant_id", context.tenant_id)
             .in_("local_calendar_id", sync_state_ids).limit(100).execute(), "data", None,
         ) or []
@@ -1073,6 +1235,22 @@ def create_sync_connection(payload: ConnectionWrite, request: Request, response:
     require_calendar_feature()
     context = require_active_tenant_member(request, response)
     require_calendar_creator(context)
+    existing = reusable_pending_connection(context, payload, request)
+    if existing:
+        record_calendar_audit(
+            context,
+            request,
+            "calendar.connection_reused",
+            "calendar_sync_connection",
+            existing["id"],
+            {"provider": payload.provider},
+        )
+        return {
+            "success": True,
+            "connection": safe_connection_payload(existing),
+            "requires_oauth": True,
+            "reused": True,
+        }
     calendar = getattr(service_supabase.table("calendars").insert({
         "tenant_id": context.tenant_id, "owner_user_id": context.user_id,
         "name": payload.account_label or f"{payload.provider.title()} Calendar",
@@ -1085,8 +1263,8 @@ def create_sync_connection(payload: ConnectionWrite, request: Request, response:
     created = getattr(service_supabase.table("calendar_sync_connections").insert({"tenant_id": context.tenant_id, "user_id": context.user_id, "local_calendar_id": calendar[0]["id"], **payload.model_dump(), "status": "connected" if payload.provider == "ics" else "setup_required"}).execute(), "data", None) or []
     if created:
         record_calendar_audit(context, request, "calendar.connection_created", "calendar_sync_connection", created[0]["id"], {"provider": payload.provider})
-    safe_connection = {key: created[0].get(key) for key in ("id", "local_calendar_id", "provider", "account_label", "direction", "status") } if created else None
-    return {"success": True, "connection": safe_connection, "requires_oauth": payload.provider in {"google", "microsoft"}}
+    safe_connection = safe_connection_payload(created[0]) if created else None
+    return {"success": True, "connection": safe_connection, "requires_oauth": payload.provider in {"google", "microsoft"}, "reused": False}
 
 
 @router.post("/connections/{connection_id}/authorize")
@@ -1107,11 +1285,13 @@ def calendar_oauth_callback(
     provider: Literal["google", "microsoft"],
     request: Request,
     response: Response,
-    code: str = Query(min_length=1, max_length=4096),
     state: str = Query(min_length=1, max_length=8192),
+    code: Annotated[str | None, Query(min_length=1, max_length=4096)] = None,
+    error: Annotated[str | None, Query(min_length=1, max_length=160)] = None,
 ):
     require_calendar_feature()
     context = require_active_tenant_member(request, response)
+    connection = None
     try:
         state_data = decode_oauth_state(state)
         if state_data.get("provider") != provider or int(state_data.get("tenant_id")) != context.tenant_id or int(state_data.get("user_id")) != context.user_id:
@@ -1121,6 +1301,10 @@ def calendar_oauth_callback(
             raise CalendarSyncError("oauth_state_mismatch", "Calendar authorization does not match this calendar.")
         require_calendar_access(context, str(connection.get("local_calendar_id")), "manage_oauth_connection")
         consume_oauth_state(state_data)
+        if error:
+            raise CalendarSyncError("oauth_access_denied", "Calendar authorization was not completed.")
+        if not code:
+            raise CalendarSyncError("oauth_code_missing", "Calendar authorization did not return a code.")
         credentials = exchange_authorization_code(provider, code)
         service_supabase.table("calendar_sync_connections").update({
             "encrypted_credentials": encrypt_credentials(credentials), "status": "connected",
@@ -1128,17 +1312,75 @@ def calendar_oauth_callback(
         }).eq("id", connection["id"]).eq("tenant_id", context.tenant_id).execute()
         record_calendar_audit(context, request, "calendar.oauth_connected", "calendar_sync_connection", connection["id"], {"provider": provider})
     except CalendarSyncError as error:
+        if connection is not None:
+            mark_pending_connection_failed(connection, error.code)
         logger.warning("calendar.oauth_failed", extra={"error_code": error.code})
         return RedirectResponse(frontend_calendar_url(status="error"), status_code=303)
     return RedirectResponse(frontend_calendar_url(status="connected"), status_code=303)
 
 
 @router.delete("/connections/{connection_id}")
+def remove_incomplete_sync_connection(connection_id: str, request: Request, response: Response):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    connection = tenant_connection(connection_id, context.tenant_id)
+    require_calendar_access(context, str(connection.get("local_calendar_id")), "manage_oauth_connection")
+    if (
+        str(connection.get("status") or "") not in {"setup_required", "disconnected"}
+        or connection.get("encrypted_credentials")
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_connection_requires_disconnect",
+                "message": "Connected calendar accounts must be disconnected.",
+            },
+        )
+    deleted = getattr(
+        service_supabase.table("calendar_sync_connections")
+        .delete()
+        .eq("id", connection_id)
+        .eq("tenant_id", context.tenant_id)
+        .in_("status", ["setup_required", "disconnected"])
+        .is_("encrypted_credentials", "null")
+        .execute(),
+        "data",
+        None,
+    ) or []
+    if not deleted:
+        raise HTTPException(status_code=409, detail="Calendar connection changed")
+    calendar_removed = remove_empty_connection_calendar(connection)
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.connection_removed",
+        "calendar_sync_connection",
+        connection_id,
+        {
+            "provider": connection.get("provider"),
+            "empty_calendar_removed": calendar_removed,
+        },
+    )
+    return {"success": True, "removed": True}
+
+
+@router.post("/connections/{connection_id}/disconnect")
 def disconnect_sync_connection(connection_id: str, request: Request, response: Response):
     require_calendar_feature()
     context = require_active_tenant_member(request, response)
     connection = tenant_connection(connection_id, context.tenant_id)
     require_calendar_access(context, str(connection.get("local_calendar_id")), "manage_oauth_connection")
+    if (
+        str(connection.get("status") or "") not in {"connected", "degraded"}
+        and not connection.get("encrypted_credentials")
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_connection_not_connected",
+                "message": "This calendar account is not connected.",
+            },
+        )
     revoked = disconnect_connection(connection)
     record_calendar_audit(context, request, "calendar.oauth_disconnected", "calendar_sync_connection", connection_id, {"provider": connection.get("provider"), "provider_revocation_confirmed": revoked})
     return {"success": True, "provider_revocation_confirmed": revoked}
