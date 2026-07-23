@@ -32,6 +32,7 @@ import {
   importCalendarIcs,
   resolveCalendarInvitation,
   removeCalendarConnection,
+  setCalendarInboundSync,
   syncCalendarTask,
   syncCalendarConnection,
   unlinkCalendarTaskSync,
@@ -71,7 +72,7 @@ function SidebarSectionHeading({ section, icon, title, subtitle, count, expanded
   );
 }
 
-export function CalendarConnectionCard({ connection, operation = "", onAuthorize, onSync, onUpgrade, onRemove, onDisconnect }) {
+export function CalendarConnectionCard({ connection, operation = "", onAuthorize, onSync, onInboundToggle, onUpgrade, onRemove, onDisconnect }) {
   const connected = connection.status === "connected" || connection.status === "degraded";
   const pending = connection.status === "setup_required";
   const busy = Boolean(operation);
@@ -81,23 +82,34 @@ export function CalendarConnectionCard({ connection, operation = "", onAuthorize
     disconnect: "Disconnecting…",
     remove: "Removing…",
     sync: "Syncing…",
+    inbound: "Updating…",
   };
+  const inboundActive = connection.inbound_sync_enabled !== false;
+  const inboundBusy = ["pending", "syncing"].includes(connection.inbound_sync_status);
   const status = busy
     ? (progressLabels[operation] || "Working…")
-    : connection.last_success_at
-      ? `Synced ${new Date(connection.last_success_at).toLocaleDateString()}`
-      : connection.status.replaceAll("_", " ");
+    : !inboundActive
+      ? "Inbound paused"
+      : connection.inbound_sync_status === "failed"
+        ? "Inbound sync failed"
+        : inboundBusy
+          ? connection.inbound_sync_status === "pending" ? "Inbound queued" : "Inbound syncing"
+          : connection.last_inbound_success_at
+            ? `Inbound synced ${new Date(connection.last_inbound_success_at).toLocaleString()}`
+            : connection.status.replaceAll("_", " ");
   return (
     <div className={`calendar-sync-row is-${connection.status}`}>
       <span className="calendar-sync-provider-icon">{connected ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}</span>
       <span className="calendar-sync-account">
         <strong>{connection.account_label || connection.provider}</strong>
         <small>{connection.provider === "microsoft" ? "Outlook" : connection.provider} · {connection.direction === "two_way" ? "Two-way" : "Read only"}</small>
+        {connected && <small>Importing: {connection.provider_calendar_label || "Primary provider calendar"}</small>}
       </span>
       <span className="calendar-sync-status">{status}</span>
       <span className="calendar-sync-actions">
         {pending && <button type="button" disabled={busy} onClick={() => onAuthorize(connection)}>Authorize</button>}
-        {connected && <button type="button" disabled={busy} onClick={() => onSync(connection)}>Sync</button>}
+        {connected && inboundActive && <button type="button" disabled={busy || inboundBusy} onClick={() => onSync(connection)}>Sync</button>}
+        {connected && <button type="button" disabled={busy || inboundBusy} onClick={() => onInboundToggle(connection, !inboundActive)}>{inboundActive ? "Pause import" : "Enable import"}</button>}
         {connected && connection.provider === "google" && connection.direction === "read" && <button type="button" disabled={busy} onClick={() => onUpgrade(connection)}>Enable write access</button>}
         {!connected && <button type="button" className="is-danger" disabled={busy} onClick={() => onRemove(connection)}>Remove</button>}
         {connected && <button type="button" className="is-danger" disabled={busy} onClick={() => onDisconnect(connection)}>Disconnect</button>}
@@ -401,16 +413,19 @@ export default function ReservationCalendarPage({ user = null }) {
   }, [rangeEnd, rangeStart, refreshKey, userScope]);
 
   useEffect(() => {
-    const syncPending = (workspace.tasks || []).some(
+    const taskSyncPending = (workspace.tasks || []).some(
       (task) => task.sync_status === "pending"
     );
-    if (!syncPending) return undefined;
+    const inboundSyncPending = (workspace.connections || []).some(
+      (connection) => ["pending", "syncing"].includes(connection.inbound_sync_status)
+    );
+    if (!taskSyncPending && !inboundSyncPending) return undefined;
     const timer = window.setTimeout(
       () => setRefreshKey((value) => value + 1),
       5000
     );
     return () => window.clearTimeout(timer);
-  }, [workspace.tasks]);
+  }, [workspace.connections, workspace.tasks]);
 
   const calendarById = useMemo(() => new Map((workspace.calendars || []).map((item) => [item.id, item])), [workspace.calendars]);
   const visibleEvents = useMemo(
@@ -660,6 +675,18 @@ export default function ReservationCalendarPage({ user = null }) {
     }
   };
 
+  const toggleInboundProvider = async (connection, enabled) => {
+    setConnectionOperation({ id: connection.id, action: "inbound" });
+    try {
+      await setCalendarInboundSync(connection.id, enabled);
+      setRefreshKey((value) => value + 1);
+    } catch (syncError) {
+      setError(syncError?.message || "Inbound calendar synchronization could not be updated.");
+    } finally {
+      setConnectionOperation({ id: "", action: "" });
+    }
+  };
+
   const upgradeProvider = async (connection) => {
     if (!confirmGoogleWriteUpgrade()) return;
     setConnectionOperation({ id: connection.id, action: "upgrade" });
@@ -789,7 +816,7 @@ export default function ReservationCalendarPage({ user = null }) {
             <SidebarSectionHeading section="sync" icon={<Link2 size={16} />} title="Sync health" subtitle="Connected accounts" count={workspace.connections?.length || 0} expanded={expandedSidebarSections.has("sync")} onToggle={toggleSidebarSection} />
             {expandedSidebarSections.has("sync") && <div id="calendar-sidebar-sync" className="calendar-connected-list">
               {(workspace.connections || []).length === 0 && <p className="calendar-no-connections">No calendars connected yet.</p>}
-              {(workspace.connections || []).map((connection) => <CalendarConnectionCard key={connection.id} connection={connection} operation={connectionOperation.id === connection.id ? connectionOperation.action : ""} onAuthorize={syncProvider} onSync={syncProvider} onUpgrade={upgradeProvider} onRemove={removeConnection} onDisconnect={disconnectProvider} />)}
+              {(workspace.connections || []).map((connection) => <CalendarConnectionCard key={connection.id} connection={connection} operation={connectionOperation.id === connection.id ? connectionOperation.action : ""} onAuthorize={syncProvider} onSync={syncProvider} onInboundToggle={toggleInboundProvider} onUpgrade={upgradeProvider} onRemove={removeConnection} onDisconnect={disconnectProvider} />)}
             </div>}
             <div className="calendar-new-connection"><button type="button" className="calendar-new-connection-toggle" aria-expanded={expandedSidebarSections.has("connect")} aria-controls="calendar-sidebar-connect" onClick={() => toggleSidebarSection("connect")}><span className="calendar-new-connection-heading"><strong>Add an account</strong><small>Connect securely with OAuth 2.0</small></span><ChevronDown className="calendar-sidebar-chevron" size={15} /></button>{expandedSidebarSections.has("connect") && <div id="calendar-sidebar-connect" className="calendar-sidebar-section-content"><label className="calendar-sync-direction"><span>Access</span><select value={connectionDirection} onChange={(event) => setConnectionDirection(event.target.value)} disabled={!calendarFeaturesAvailable}><option value="read">Read only</option><option value="two_way">Two-way sync</option></select></label><div className="calendar-connect-actions"><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("google")}>Google</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("microsoft")}>Outlook</button><button type="button" disabled={!calendarFeaturesAvailable || Boolean(connectionOperation.id)} onClick={() => connectProvider("ics")}>ICS</button></div><small className="calendar-connection-help">Google and Outlook open a secure sign-in. ICS imports a calendar feed.</small></div>}</div>
           </section>

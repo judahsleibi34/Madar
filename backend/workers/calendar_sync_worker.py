@@ -7,7 +7,7 @@ import signal
 import socket
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -23,6 +23,16 @@ from services.calendar_task_sync_queue_service import (
     process_task_sync_job,
     retry_delay,
 )
+from services.calendar_connection_sync_queue_service import (
+    TRANSIENT_CONNECTION_CODES,
+    claim_connection_sync_jobs,
+    eligible_inbound_connections,
+    enqueue_connection_sync,
+    finish_connection_sync_job,
+    get_connection_sync_queue_metrics,
+    mark_connection_sync_failed,
+    process_connection_sync_job,
+)
 from services.observability_service import configure_structured_logging
 
 
@@ -36,6 +46,10 @@ STATE: dict[str, Any] = {
     "failed": 0,
     "reconciliation_required": 0,
     "queue_depth": 0,
+    "inbound_processed": 0,
+    "inbound_succeeded": 0,
+    "inbound_failed": 0,
+    "inbound_queue_depth": 0,
 }
 
 
@@ -175,6 +189,90 @@ def process_sync_batch(*, limit: int = 10, worker_id: str | None = None) -> int:
     return len(jobs)
 
 
+def process_connection_job(job: dict[str, Any]) -> str:
+    try:
+        counts = process_connection_sync_job(job)
+        finish_connection_sync_job(
+            str(job["id"]), succeeded=True, result_counts=counts
+        )
+        return "succeeded"
+    except CalendarSyncError as error:
+        attempts = int(job.get("attempts") or 1)
+        max_attempts = int(job.get("max_attempts") or 6)
+        retryable = error.code in TRANSIENT_CONNECTION_CODES
+        terminal = not retryable or attempts >= max_attempts
+        mark_connection_sync_failed(job, error.code, terminal=terminal)
+        finish_connection_sync_job(
+            str(job["id"]),
+            succeeded=False,
+            error_code=error.code,
+            retry_after_seconds=retry_delay(attempts)
+            if not terminal
+            else None,
+        )
+        if terminal:
+            logger.warning(
+                "calendar_inbound_sync.failed",
+                extra={"error_code": error.code, "attempts": attempts},
+            )
+            return "failed"
+        return "retry"
+    except Exception as error:
+        attempts = int(job.get("attempts") or 1)
+        max_attempts = int(job.get("max_attempts") or 6)
+        terminal = attempts >= max_attempts
+        mark_connection_sync_failed(
+            job, "worker_unexpected", terminal=terminal
+        )
+        finish_connection_sync_job(
+            str(job["id"]),
+            succeeded=False,
+            error_code="worker_unexpected",
+            retry_after_seconds=retry_delay(attempts)
+            if not terminal
+            else None,
+        )
+        logger.error(
+            "calendar_inbound_sync.unexpected",
+            extra={"error_type": type(error).__name__, "attempts": attempts},
+        )
+        return "failed" if terminal else "retry"
+
+
+def process_connection_batch(
+    *, limit: int = 2, worker_id: str | None = None
+) -> int:
+    selected_worker = worker_id or f"{socket.gethostname()}:{uuid.uuid4().hex[:12]}"
+    jobs = claim_connection_sync_jobs(
+        worker_id=selected_worker, limit=limit
+    )
+    for job in jobs:
+        result = process_connection_job(job)
+        STATE["inbound_processed"] += 1
+        if result == "succeeded":
+            STATE["inbound_succeeded"] += 1
+        elif result == "failed":
+            STATE["inbound_failed"] += 1
+    metrics = get_connection_sync_queue_metrics()
+    STATE["inbound_queue_depth"] = metrics["queue_depth"]
+    return len(jobs)
+
+
+def schedule_periodic_inbound(
+    *, interval_seconds: int, limit: int = 20
+) -> int:
+    connections = eligible_inbound_connections(
+        interval_seconds=interval_seconds, limit=limit
+    )
+    for connection in connections:
+        enqueue_connection_sync(
+            tenant_id=int(connection["tenant_id"]),
+            connection_id=str(connection["id"]),
+            operation="incremental",
+        )
+    return len(connections)
+
+
 def main() -> int:
     configure_structured_logging()
     if os.getenv("CALENDAR_SYNC_WORKER_ENABLED", "false").strip().lower() not in {
@@ -194,14 +292,37 @@ def main() -> int:
     poll_seconds = max(
         1, min(int(os.getenv("CALENDAR_SYNC_POLL_SECONDS", "5")), 60)
     )
+    inbound_interval = max(
+        60,
+        min(
+            int(os.getenv("CALENDAR_INBOUND_SYNC_INTERVAL_SECONDS", "300")),
+            86400,
+        ),
+    )
+    inbound_batch_size = max(
+        1, min(int(os.getenv("CALENDAR_INBOUND_SYNC_BATCH_SIZE", "2")), 10)
+    )
     worker_id = f"{socket.gethostname()}:{uuid.uuid4().hex[:12]}"
+    next_schedule_at = datetime.now(timezone.utc)
     try:
         STATE["healthy"] = True
         while not STOP_EVENT.is_set():
             try:
-                processed = process_sync_batch(
+                now = datetime.now(timezone.utc)
+                if now >= next_schedule_at:
+                    schedule_periodic_inbound(
+                        interval_seconds=inbound_interval
+                    )
+                    next_schedule_at = now + timedelta(
+                        seconds=min(inbound_interval, 60)
+                    )
+                task_processed = process_sync_batch(
                     limit=batch_size, worker_id=worker_id
                 )
+                inbound_processed = process_connection_batch(
+                    limit=inbound_batch_size, worker_id=worker_id
+                )
+                processed = task_processed + inbound_processed
             except Exception as error:
                 STATE["healthy"] = False
                 logger.error(

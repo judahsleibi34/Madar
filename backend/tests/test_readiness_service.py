@@ -132,6 +132,10 @@ class ReadinessServiceTests(unittest.TestCase):
                 "failed": 0,
                 "reconciliation_required": 1,
             },
+        ), patch.object(
+            readiness_service,
+            "get_connection_sync_queue_metrics",
+            return_value={"queue_depth": 0, "failed": 0},
         ):
             self.assertEqual(
                 readiness_service.check_calendar_sync_queue(), "backlogged"

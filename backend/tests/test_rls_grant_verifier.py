@@ -143,6 +143,7 @@ class RlsGrantVerifierTests(unittest.TestCase):
             "calendar_event_changes", "calendar_tasks", "calendar_task_dependencies",
             "calendar_task_reminders", "calendar_sync_connections",
             "calendar_sync_conflicts", "calendar_invitation_reviews", "calendar_oauth_states",
+            "calendar_task_sync_jobs", "calendar_connection_sync_jobs",
         }
         self.assertTrue(calendar_tables.issubset(set(verify_rls_grants.SENSITIVE_TABLES)))
         for table in calendar_tables:
@@ -151,6 +152,25 @@ class RlsGrantVerifierTests(unittest.TestCase):
                 self.assertEqual(verify_rls_grants.ALLOWED_DIRECT_GRANTS[table]["authenticated"], set())
                 self.assertEqual(verify_rls_grants.ALLOWED_DIRECT_GRANTS[table]["service_role"], verify_rls_grants.TABLE_CRUD_GRANTS)
         self.assertIn("consume_calendar_oauth_state", verify_rls_grants.SENSITIVE_SECURITY_DEFINER_FUNCTIONS)
+
+    def test_calendar_inbound_sync_queue_migration_is_durable_and_protected(self):
+        root = next(parent for parent in Path(__file__).resolve().parents if (parent / "database/migrations").is_dir())
+        name = "069_queue_calendar_inbound_sync.sql"
+        database_sql = (root / "database/migrations" / name).read_text(encoding="utf-8")
+        supabase_sql = (root / "supabase/migrations" / name).read_text(encoding="utf-8")
+        self.assertEqual(database_sql, supabase_sql)
+        normalized = " ".join(database_sql.lower().split())
+        self.assertIn("calendar_connection_sync_jobs", normalized)
+        self.assertIn("foreign key (tenant_id, connection_id)", normalized)
+        self.assertIn("enable row level security", normalized)
+        self.assertIn("from public, anon, authenticated", normalized)
+        self.assertIn("to service_role", normalized)
+        for function in (
+            "enqueue_calendar_connection_sync_job",
+            "claim_calendar_connection_sync_jobs",
+            "finish_calendar_connection_sync_job",
+        ):
+            self.assertIn(function, verify_rls_grants.SENSITIVE_SECURITY_DEFINER_FUNCTIONS)
 
     def test_calendar_oauth_migration_matches_and_has_fixed_search_path(self):
         root = next(parent for parent in Path(__file__).resolve().parents if (parent / "database/migrations").is_dir())

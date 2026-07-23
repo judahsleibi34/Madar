@@ -28,6 +28,10 @@ const connected = {
   status: "connected",
   direction: "two_way",
   last_success_at: "2026-07-23T10:00:00+00:00",
+  inbound_sync_enabled: true,
+  inbound_sync_status: "synced",
+  last_inbound_success_at: "2026-07-23T10:00:00+00:00",
+  provider_calendar_label: "Primary Google calendar",
 };
 
 describe("calendar connection management", () => {
@@ -39,6 +43,7 @@ describe("calendar connection management", () => {
         connection={pending}
         onAuthorize={onAuthorize}
         onSync={vi.fn()}
+        onInboundToggle={vi.fn()}
         onUpgrade={vi.fn()}
         onRemove={onRemove}
         onDisconnect={vi.fn()}
@@ -60,6 +65,7 @@ describe("calendar connection management", () => {
         connection={connected}
         onAuthorize={vi.fn()}
         onSync={vi.fn()}
+        onInboundToggle={vi.fn()}
         onUpgrade={vi.fn()}
         onRemove={vi.fn()}
         onDisconnect={onDisconnect}
@@ -69,6 +75,8 @@ describe("calendar connection management", () => {
     expect(screen.getByText("Google Calendar")).toBeTruthy();
     expect(screen.getByText("google · Two-way")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sync" })).toBeTruthy();
+    expect(screen.getByText("Importing: Primary Google calendar")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Pause import" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
@@ -82,6 +90,7 @@ describe("calendar connection management", () => {
         operation="remove"
         onAuthorize={vi.fn()}
         onSync={vi.fn()}
+        onInboundToggle={vi.fn()}
         onUpgrade={vi.fn()}
         onRemove={vi.fn()}
         onDisconnect={vi.fn()}
@@ -100,6 +109,7 @@ describe("calendar connection management", () => {
         connection={readOnly}
         onAuthorize={vi.fn()}
         onSync={vi.fn()}
+        onInboundToggle={vi.fn()}
         onUpgrade={onUpgrade}
         onRemove={vi.fn()}
         onDisconnect={vi.fn()}
@@ -111,6 +121,40 @@ describe("calendar connection management", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     expect(confirmGoogleWriteUpgrade()).toBe(true);
     expect(confirm.mock.calls[0][0]).toContain("Existing events will not be deleted");
+  });
+
+  it("shows inbound progress, prevents repeat sync, and allows an explicit import toggle", () => {
+    const onInboundToggle = vi.fn();
+    const syncing = { ...connected, inbound_sync_status: "syncing" };
+    const { rerender } = render(
+      <CalendarConnectionCard
+        connection={syncing}
+        onAuthorize={vi.fn()}
+        onSync={vi.fn()}
+        onInboundToggle={onInboundToggle}
+        onUpgrade={vi.fn()}
+        onRemove={vi.fn()}
+        onDisconnect={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Inbound syncing")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sync" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Pause import" }).disabled).toBe(true);
+
+    rerender(
+      <CalendarConnectionCard
+        connection={{ ...connected, inbound_sync_enabled: false, inbound_sync_status: "idle" }}
+        onAuthorize={vi.fn()}
+        onSync={vi.fn()}
+        onInboundToggle={onInboundToggle}
+        onUpgrade={vi.fn()}
+        onRemove={vi.fn()}
+        onDisconnect={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Inbound paused")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Enable import" }));
+    expect(onInboundToggle).toHaveBeenCalledWith(expect.objectContaining({ provider: "google" }), true);
   });
 
   it("requires explicit confirmation for removal and disconnect", () => {

@@ -25,6 +25,8 @@ class CalendarSyncError(RuntimeError):
 
 
 MAX_SYNC_PAGES = 20
+MAX_SYNC_EVENTS = 5000
+SYNC_OPERATION_BUDGET_SECONDS = 90
 
 
 def _secret() -> bytes:
@@ -326,8 +328,12 @@ def delete_provider_event(
     )
     headers = {"Authorization": f"Bearer {credentials['access_token']}"}
     if provider == "google":
+        provider_calendar_id = quote(
+            str(connection.get("provider_calendar_id") or "primary"), safe=""
+        )
         url = (
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/"
+            "https://www.googleapis.com/calendar/v3/calendars/"
+            f"{provider_calendar_id}/events/"
             f"{quote(remote_id, safe='')}"
         )
     else:
@@ -361,6 +367,8 @@ def _parse_provider_time(value: Any, timezone_name: str | None = None) -> dateti
 
 
 def _upsert_external_event(connection: dict[str, Any], remote: dict[str, Any], provider: str, client) -> str:
+    if not isinstance(remote, dict):
+        return "ignored"
     remote_id = str(remote.get("id") or "")
     if not remote_id:
         return "ignored"
@@ -379,14 +387,23 @@ def _upsert_external_event(connection: dict[str, Any], remote: dict[str, Any], p
         return "ignored"
     start_value = remote.get("start")
     end_value = remote.get("end")
-    start = _parse_provider_time(start_value, (start_value or {}).get("timeZone") if isinstance(start_value, dict) else None)
-    end = _parse_provider_time(end_value, (end_value or {}).get("timeZone") if isinstance(end_value, dict) else None)
+    try:
+        start = _parse_provider_time(start_value, (start_value or {}).get("timeZone") if isinstance(start_value, dict) else None)
+        end = _parse_provider_time(end_value, (end_value or {}).get("timeZone") if isinstance(end_value, dict) else None)
+    except (TypeError, ValueError, OverflowError):
+        return "ignored"
     if end <= start:
         return "ignored"
     etag = str(remote.get("etag") or remote.get("@odata.etag") or remote.get("changeKey") or "")
     last_synced = datetime.fromisoformat(str(existing.get("last_synced_at")).replace("Z", "+00:00")) if existing and existing.get("last_synced_at") else None
     updated_at = datetime.fromisoformat(str(existing.get("updated_at")).replace("Z", "+00:00")) if existing and existing.get("updated_at") else None
-    if existing and existing.get("external_etag") != etag and last_synced and updated_at and updated_at > last_synced:
+    if (
+        existing
+        and existing.get("external_etag") != etag
+        and last_synced
+        and updated_at
+        and updated_at > last_synced + timedelta(seconds=1)
+    ):
         service_supabase.table("calendar_sync_conflicts").insert({
             "tenant_id": connection["tenant_id"], "connection_id": connection["id"], "event_id": existing["id"],
             "external_event_id": remote_id,
@@ -407,37 +424,115 @@ def _upsert_external_event(connection: dict[str, Any], remote: dict[str, Any], p
         }).execute()
         return "conflict"
     timezone_name = ((start_value or {}).get("timeZone") if isinstance(start_value, dict) else None) or "UTC"
+    recurrence = remote.get("recurrence") or []
+    recurrence_rule = next(
+        (
+            str(value)[6:]
+            for value in recurrence
+            if str(value).startswith("RRULE:")
+        ),
+        None,
+    )
+    all_day = bool(
+        remote.get("allDay")
+        or remote.get("isAllDay")
+        or (
+            isinstance(start_value, dict)
+            and bool(start_value.get("date"))
+            and not start_value.get("dateTime")
+        )
+    )
     values = {
         "tenant_id": connection["tenant_id"], "calendar_id": connection["local_calendar_id"], "created_by": connection["user_id"],
         "title": str(remote.get("summary") or remote.get("subject") or "Untitled event")[:240],
         "description": str(remote.get("description") or ((remote.get("body") or {}).get("content") if isinstance(remote.get("body"), dict) else ""))[:20000],
         "location": str(((remote.get("location") or {}).get("displayName") if isinstance(remote.get("location"), dict) else remote.get("location")) or "")[:500],
         "starts_at": start.isoformat(), "ends_at": end.isoformat(), "timezone": timezone_name,
-        "all_day": bool(remote.get("allDay") or remote.get("isAllDay")), "status": "confirmed",
+        "all_day": all_day, "status": "confirmed",
         "visibility": "private" if remote.get("visibility") == "private" or remote.get("sensitivity") == "private" else "calendar_default",
         "transparency": "free" if remote.get("transparency") == "transparent" or remote.get("showAs") == "free" else "busy",
         "source_type": provider, "source_id": source_key, "external_etag": etag,
         "last_synced_at": datetime.now(timezone.utc).isoformat(), "deleted_at": None,
+        "recurrence_rule": recurrence_rule,
     }
     if existing:
         values["version"] = int(existing.get("version") or 1) + 1
         service_supabase.table("calendar_events").update(values).eq("id", existing["id"]).execute()
+        _sync_google_attendees(connection, existing["id"], remote)
         return "updated"
-    service_supabase.table("calendar_events").insert(values).execute()
+    created = getattr(
+        service_supabase.table("calendar_events").insert(values).execute(),
+        "data",
+        None,
+    ) or []
+    if created:
+        _sync_google_attendees(connection, created[0]["id"], remote)
     return "created"
+
+
+def _sync_google_attendees(
+    connection: dict[str, Any], event_id: str, remote: dict[str, Any]
+) -> None:
+    attendees = remote.get("attendees")
+    if not isinstance(attendees, list):
+        return
+    service_supabase.table("calendar_event_attendees").delete().eq(
+        "event_id", event_id
+    ).eq("tenant_id", connection["tenant_id"]).execute()
+    rows = []
+    allowed_statuses = {
+        "needsAction": "needs_action",
+        "accepted": "accepted",
+        "declined": "declined",
+        "tentative": "tentative",
+    }
+    for attendee in attendees[:500]:
+        if not isinstance(attendee, dict):
+            continue
+        email = str(attendee.get("email") or "").strip().lower()
+        if not email or len(email) > 320:
+            continue
+        rows.append(
+            {
+                "event_id": event_id,
+                "tenant_id": connection["tenant_id"],
+                "email": email,
+                "display_name": str(attendee.get("displayName") or "")[:240],
+                "response_status": allowed_statuses.get(
+                    str(attendee.get("responseStatus") or ""), "needs_action"
+                ),
+                "is_organizer": bool(attendee.get("organizer")),
+                "is_external": True,
+            }
+        )
+    if rows:
+        service_supabase.table("calendar_event_attendees").insert(rows).execute()
 
 
 def _google_sync(connection: dict[str, Any], credentials: dict[str, Any], client) -> tuple[dict[str, int], dict[str, Any]]:
     cursor = dict(connection.get("cursor_data") or {})
-    params: dict[str, Any] = {"maxResults": 2500, "singleEvents": "true", "showDeleted": "true"}
+    params: dict[str, Any] = {"maxResults": 250, "singleEvents": "true", "showDeleted": "true"}
     if cursor.get("sync_token"):
         params["syncToken"] = cursor["sync_token"]
     else:
         params["timeMin"] = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
-    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    provider_calendar_id = quote(
+        str(connection.get("provider_calendar_id") or "primary"), safe=""
+    )
+    url = (
+        "https://www.googleapis.com/calendar/v3/calendars/"
+        f"{provider_calendar_id}/events"
+    )
     counts = {"created": 0, "updated": 0, "deleted": 0, "conflict": 0, "ignored": 0}
     pages = 0
+    total_events = 0
+    started = time.monotonic()
     while url:
+        if time.monotonic() - started > SYNC_OPERATION_BUDGET_SECONDS:
+            raise CalendarSyncError(
+                "sync_time_budget_exceeded",
+                "Calendar synchronization exceeded its time budget.",
+            )
         pages += 1
         if pages > MAX_SYNC_PAGES:
             raise CalendarSyncError("sync_page_limit", "Calendar synchronization exceeded its page limit.")
@@ -445,10 +540,30 @@ def _google_sync(connection: dict[str, Any], credentials: dict[str, Any], client
         if response.status_code == 410 and cursor.get("sync_token"):
             cursor.pop("sync_token", None)
             return _google_sync({**connection, "cursor_data": cursor}, credentials, client)
+        if response.status_code == 429:
+            raise CalendarSyncError(
+                "provider_rate_limited", "Calendar provider is busy."
+            )
+        if response.status_code in {500, 502, 503, 504}:
+            raise CalendarSyncError(
+                "provider_unavailable", "Calendar provider is unavailable."
+            )
+        if response.status_code in {401, 403}:
+            raise CalendarSyncError(
+                "provider_authorization_failed",
+                "Reconnect the calendar account before synchronizing.",
+            )
         if response.status_code >= 400:
             raise CalendarSyncError("google_sync_failed", "Google Calendar synchronization failed.")
         data = response.json()
-        for remote in data.get("items") or []:
+        items = data.get("items") or []
+        total_events += len(items)
+        if total_events > MAX_SYNC_EVENTS:
+            raise CalendarSyncError(
+                "sync_event_limit",
+                "Calendar synchronization exceeded its event limit.",
+            )
+        for remote in items:
             counts[_upsert_external_event(connection, remote, "google", client)] += 1
         page_token = data.get("nextPageToken")
         if page_token:
@@ -522,7 +637,14 @@ def _push_local_changes(connection: dict[str, Any], credentials: dict[str, Any],
             continue
         remote_id = source_id.split(":", 1)[1] if source_type == provider and ":" in source_id else ""
         if provider == "google":
-            collection_url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+            provider_calendar_id = quote(
+                str(connection.get("provider_calendar_id") or "primary"),
+                safe="",
+            )
+            collection_url = (
+                "https://www.googleapis.com/calendar/v3/calendars/"
+                f"{provider_calendar_id}/events"
+            )
             item_url = f"{collection_url}/{remote_id}" if remote_id else collection_url
         else:
             collection_url = "https://graph.microsoft.com/v1.0/me/events"
@@ -551,7 +673,9 @@ def _push_local_changes(connection: dict[str, Any], credentials: dict[str, Any],
     return counts
 
 
-def sync_connection(connection: dict[str, Any], *, http_client=None) -> dict[str, Any]:
+def _sync_connection_with_client(
+    connection: dict[str, Any], client
+) -> dict[str, Any]:
     provider = str(connection.get("provider") or "")
     if provider not in {"google", "microsoft"}:
         raise CalendarSyncError("provider_sync_unsupported", "Use ICS export or subscription for this provider.")
@@ -586,7 +710,6 @@ def sync_connection(connection: dict[str, Any], *, http_client=None) -> dict[str
     )
     if not calendar_owner_valid or not memberships:
         raise CalendarSyncError("connection_binding_invalid", "Calendar connection ownership is no longer valid.")
-    client = http_client or httpx.Client(timeout=30)
     credentials = _refresh(provider, decrypt_credentials(connection["encrypted_credentials"]), client)
     if not credentials_allow_direction(
         provider, credentials, str(connection.get("direction") or "read")
@@ -609,3 +732,11 @@ def sync_connection(connection: dict[str, Any], *, http_client=None) -> dict[str
         "pending_changes": counts["push_failed"], "failed_changes": counts["conflict"] + counts["push_failed"],
     }).eq("id", connection["id"]).execute()
     return counts
+
+
+def sync_connection(connection: dict[str, Any], *, http_client=None) -> dict[str, Any]:
+    if http_client is not None:
+        return _sync_connection_with_client(connection, http_client)
+    timeout = httpx.Timeout(connect=5.0, read=20.0, write=10.0, pool=5.0)
+    with httpx.Client(timeout=timeout) as client:
+        return _sync_connection_with_client(connection, client)

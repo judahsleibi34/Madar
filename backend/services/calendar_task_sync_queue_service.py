@@ -232,12 +232,15 @@ def _credentials(connection: dict[str, Any], client: httpx.Client) -> dict[str, 
 
 
 def _lookup_marker(
-    client: httpx.Client, headers: dict[str, str], marker: str
+    client: httpx.Client,
+    headers: dict[str, str],
+    marker: str,
+    collection_url: str,
 ) -> list[dict[str, Any]]:
     response = _request(
         client,
         "GET",
-        "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        collection_url,
         headers=headers,
         params={
             "privateExtendedProperty": f"madarTaskSync={marker}",
@@ -274,7 +277,13 @@ def process_task_sync_job(
         and source_id.startswith(source_prefix)
         else ""
     )
-    collection = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    provider_calendar_id = quote(
+        str(connection.get("provider_calendar_id") or "primary"), safe=""
+    )
+    collection = (
+        "https://www.googleapis.com/calendar/v3/calendars/"
+        f"{provider_calendar_id}/events"
+    )
 
     if job.get("operation") == "delete":
         if remote_id:
@@ -294,7 +303,11 @@ def process_task_sync_job(
         ).eq("id", event["id"]).eq("tenant_id", connection["tenant_id"]).execute()
         return "provider_deleted"
 
-    matches = [] if remote_id else _lookup_marker(client, headers, marker)
+    matches = (
+        []
+        if remote_id
+        else _lookup_marker(client, headers, marker, collection)
+    )
     if len(matches) > 1:
         service_supabase.table("calendar_tasks").update(
             {

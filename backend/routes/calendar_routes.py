@@ -38,6 +38,7 @@ from services.calendar_sync_service import (
     sync_connection,
 )
 from services.calendar_task_sync_queue_service import enqueue_task_sync
+from services.calendar_connection_sync_queue_service import enqueue_connection_sync
 
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
@@ -392,6 +393,8 @@ def sync_task_reminder(
 
 def event_payload(row: dict[str, Any], *, occurrence_start: datetime | None = None) -> dict[str, Any]:
     payload = dict(row)
+    payload.pop("source_id", None)
+    payload.pop("external_etag", None)
     payload["read_only"] = False
     source_type = str(row.get("source_type") or "madar")
     payload["source_label"] = "Madar" if source_type == "madar" else source_type.title()
@@ -641,7 +644,17 @@ def safe_connection_payload(connection: dict[str, Any]) -> dict[str, Any]:
             "last_error_code",
             "pending_changes",
             "failed_changes",
+            "inbound_sync_enabled",
+            "inbound_sync_status",
+            "last_inbound_success_at",
+            "inbound_sync_error_code",
             "created_at",
+        )
+    } | {
+        "provider_calendar_label": (
+            "Primary Google calendar"
+            if connection.get("provider") == "google"
+            else "Primary provider calendar"
         )
     }
 
@@ -1019,7 +1032,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
     if sync_state_ids:
         connections = getattr(
             service_supabase.table("calendar_sync_connections")
-            .select("id,local_calendar_id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes,created_at")
+            .select("id,local_calendar_id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes,inbound_sync_enabled,inbound_sync_status,last_inbound_success_at,inbound_sync_error_code,created_at")
             .eq("tenant_id", context.tenant_id)
             .in_("local_calendar_id", sync_state_ids).limit(100).execute(), "data", None,
         ) or []
@@ -1827,18 +1840,131 @@ def disconnect_sync_connection(connection_id: str, request: Request, response: R
     return {"success": True, "provider_revocation_confirmed": revoked}
 
 
-@router.post("/connections/{connection_id}/sync")
+@router.post("/connections/{connection_id}/sync", status_code=202)
 def run_connection_sync(connection_id: str, request: Request, response: Response):
     require_calendar_feature()
     context = require_active_tenant_member(request, response)
     connection = tenant_connection(connection_id, context.tenant_id)
     require_calendar_access(context, str(connection.get("local_calendar_id")), "trigger_sync")
+    if (
+        connection.get("status") not in {"connected", "degraded"}
+        or connection.get("provider") not in {"google", "microsoft"}
+        or not connection.get("encrypted_credentials")
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_connection_not_ready",
+                "message": "Finish connecting this calendar before synchronizing.",
+            },
+        )
+    if not connection.get("inbound_sync_enabled", True):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_inbound_sync_disabled",
+                "message": "Inbound synchronization is disabled for this calendar.",
+            },
+        )
     try:
-        counts = sync_connection(connection)
+        enqueue_connection_sync(
+            tenant_id=context.tenant_id,
+            connection_id=connection_id,
+            operation="incremental",
+        )
     except CalendarSyncError as error:
         raise sync_http_error(error) from error
-    record_calendar_audit(context, request, "calendar.sync_triggered", "calendar_sync_connection", connection_id)
-    return {"success": True, "counts": counts}
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.sync_queued",
+        "calendar_sync_connection",
+        connection_id,
+    )
+    return {
+        "success": True,
+        "status": "queued",
+        "sync_status": "pending",
+    }
+
+
+class InboundSyncWrite(BaseModel):
+    enabled: bool
+
+
+@router.patch("/connections/{connection_id}/inbound")
+def set_connection_inbound_sync(
+    connection_id: str,
+    payload: InboundSyncWrite,
+    request: Request,
+    response: Response,
+):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    connection = tenant_connection(connection_id, context.tenant_id)
+    require_calendar_access(
+        context,
+        str(connection.get("local_calendar_id")),
+        "manage_oauth_connection",
+    )
+    if connection.get("status") not in {"connected", "degraded"}:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "calendar_connection_not_ready",
+                "message": "Finish connecting this calendar before changing synchronization.",
+            },
+        )
+    values = {
+        "inbound_sync_enabled": payload.enabled,
+        "inbound_sync_status": "idle" if not payload.enabled else "pending",
+        "inbound_sync_error_code": None,
+    }
+    rows = getattr(
+        service_supabase.table("calendar_sync_connections")
+        .update(values)
+        .eq("id", connection_id)
+        .eq("tenant_id", context.tenant_id)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    if payload.enabled:
+        try:
+            enqueue_connection_sync(
+                tenant_id=context.tenant_id,
+                connection_id=connection_id,
+                operation="incremental",
+            )
+        except CalendarSyncError as error:
+            service_supabase.table("calendar_sync_connections").update(
+                {
+                    "inbound_sync_enabled": bool(
+                        connection.get("inbound_sync_enabled", True)
+                    ),
+                    "inbound_sync_status": connection.get(
+                        "inbound_sync_status", "idle"
+                    ),
+                }
+            ).eq("id", connection_id).eq(
+                "tenant_id", context.tenant_id
+            ).execute()
+            raise sync_http_error(error) from error
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.inbound_sync_changed",
+        "calendar_sync_connection",
+        connection_id,
+        {"enabled": payload.enabled},
+    )
+    return {
+        "success": True,
+        "connection": safe_connection_payload(rows[0] if rows else {
+            **connection,
+            **values,
+        }),
+    }
 
 
 @router.get("/sync-conflicts")

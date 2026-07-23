@@ -19,6 +19,9 @@ from services.upload_config import (
 from services.storage_quota_service import DEFAULT_DISK_FREE_FLOOR_BYTES
 from services.notification_outbox_service import get_queue_metrics
 from services.calendar_task_sync_queue_service import get_task_sync_queue_metrics
+from services.calendar_connection_sync_queue_service import (
+    get_connection_sync_queue_metrics,
+)
 
 try:
     import redis
@@ -58,11 +61,12 @@ CALENDAR_SCHEMA_SELECTS = {
     "calendar_tasks": "id,tenant_id,calendar_id,project_id,owner_user_id,recurrence_rule,sync_connection_id,sync_event_id,sync_status",
     "calendar_task_dependencies": "task_id,depends_on_task_id,tenant_id",
     "calendar_task_reminders": "id,task_id,tenant_id,delivery_status",
-    "calendar_sync_connections": "id,tenant_id,user_id,local_calendar_id,provider,status",
+    "calendar_sync_connections": "id,tenant_id,user_id,local_calendar_id,provider,status,provider_calendar_id,inbound_sync_enabled,inbound_sync_status,last_inbound_success_at",
     "calendar_sync_conflicts": "id,tenant_id,connection_id,event_id,status",
     "calendar_invitation_reviews": "id,tenant_id,event_id,disposition",
     "calendar_oauth_states": "nonce_hash,connection_id,tenant_id,user_id,calendar_id,consumed_at",
     "calendar_task_sync_jobs": "id,tenant_id,task_id,connection_id,operation,status,attempts,next_attempt_at,leased_at",
+    "calendar_connection_sync_jobs": "id,tenant_id,connection_id,operation,status,attempts,next_attempt_at,leased_at",
 }
 CALENDAR_SCHEMA_FUNCTIONS = (
     "consume_calendar_oauth_state",
@@ -70,6 +74,9 @@ CALENDAR_SCHEMA_FUNCTIONS = (
     "claim_calendar_task_sync_jobs",
     "finish_calendar_task_sync_job",
     "complete_calendar_task_sync_delete",
+    "enqueue_calendar_connection_sync_job",
+    "claim_calendar_connection_sync_jobs",
+    "finish_calendar_connection_sync_job",
 )
 
 _cache_lock = Lock()
@@ -362,10 +369,13 @@ def check_calendar_sync_queue() -> str:
         return "disabled"
     try:
         metrics = get_task_sync_queue_metrics()
+        inbound_metrics = get_connection_sync_queue_metrics()
         if (
             metrics.get("queue_depth", 0) > 1000
             or metrics.get("failed", 0) > 100
             or metrics.get("reconciliation_required", 0) > 0
+            or inbound_metrics.get("queue_depth", 0) > 100
+            or inbound_metrics.get("failed", 0) > 20
         ):
             return "backlogged"
         return "ok"

@@ -330,6 +330,18 @@ export const syncCalendarConnection = async (connectionId) => {
   return parseJsonResponse(response);
 };
 
+export const setCalendarInboundSync = async (connectionId, enabled) => {
+  const response = await apiFetch(
+    getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}/inbound`),
+    {
+      method: "PATCH",
+      headers: builderWriteHeaders(),
+      body: JSON.stringify({ enabled: Boolean(enabled) }),
+    }
+  );
+  return parseJsonResponse(response);
+};
+
 export const removeCalendarConnection = async (connectionId) => {
   const response = await apiFetch(
     getApiUrl(`/calendar/connections/${encodeURIComponent(connectionId)}`),
