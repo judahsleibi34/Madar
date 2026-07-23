@@ -5,10 +5,11 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
@@ -23,12 +24,13 @@ class CalendarSyncError(RuntimeError):
         self.code = code
 
 
+MAX_SYNC_PAGES = 20
+
+
 def _secret() -> bytes:
-    value = (
-        os.getenv("CALENDAR_CREDENTIALS_SECRET", "").strip()
-        or os.getenv("SECRET_KEY", "").strip()
-        or os.getenv("SUPABASE_SERVICE_KEY", "").strip()
-    )
+    value = os.getenv("CALENDAR_CREDENTIALS_SECRET", "").strip()
+    if _environment_name() not in {"prod", "production"}:
+        value = value or os.getenv("SECRET_KEY", "").strip() or os.getenv("SUPABASE_SERVICE_KEY", "").strip()
     if len(value) < 24:
         raise CalendarSyncError("calendar_secret_missing", "Calendar credential encryption is not configured.")
     return value.encode()
@@ -60,21 +62,52 @@ def _encode_state(payload: dict[str, Any]) -> str:
 
 def decode_oauth_state(value: str) -> dict[str, Any]:
     try:
+        if not value or len(value) > 8192:
+            raise ValueError("length")
         body, supplied = value.split(".", 1)
         expected = base64.urlsafe_b64encode(hmac.new(_secret(), body.encode(), hashlib.sha256).digest()).decode().rstrip("=")
         if not hmac.compare_digest(supplied, expected):
             raise ValueError("signature")
         payload = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
-        if int(payload.get("exp") or 0) < int(time.time()):
+        now = int(time.time())
+        if int(payload.get("exp") or 0) < now:
             raise ValueError("expired")
+        if int(payload.get("iat") or 0) > now + 60:
+            raise ValueError("issued_in_future")
+        required = {"connection_id", "calendar_id", "tenant_id", "user_id", "provider", "destination", "nonce", "iat", "exp"}
+        if not required.issubset(payload):
+            raise ValueError("incomplete")
+        if payload.get("destination") != "calendar":
+            raise ValueError("destination")
         return payload
     except (ValueError, TypeError, json.JSONDecodeError) as error:
         raise CalendarSyncError("oauth_state_invalid", "Calendar connection state is invalid or expired.") from error
 
 
+def _environment_name() -> str:
+    return (os.getenv("APP_ENV") or "development").strip().lower()
+
+
+def _configured_base_url(name: str, development_default: str) -> str:
+    value = os.getenv(name, "").strip() or development_default
+    parsed = urlparse(value)
+    production = _environment_name() in {"prod", "production"}
+    if not parsed.scheme or not parsed.netloc or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise CalendarSyncError("oauth_url_invalid", f"{name} must be an exact origin.")
+    if production and (parsed.scheme != "https" or parsed.hostname in {"localhost", "127.0.0.1", "::1"}):
+        raise CalendarSyncError("oauth_url_invalid", f"{name} must be an HTTPS production origin.")
+    return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+
+
 def _redirect_uri(provider: str) -> str:
-    public_api = os.getenv("PUBLIC_API_URL", "http://localhost:8000").rstrip("/")
+    public_api = _configured_base_url("PUBLIC_API_URL", "http://localhost:8000")
     return f"{public_api}/calendar/oauth/{provider}/callback"
+
+
+def frontend_calendar_url(*, status: str) -> str:
+    frontend = _configured_base_url("FRONTEND_PRIMARY_URL", "http://localhost:5173")
+    safe_status = status if status in {"connected", "error", "disconnected"} else "error"
+    return f"{frontend}/calendar?sync={safe_status}"
 
 
 def _provider_settings(provider: str) -> tuple[str, str]:
@@ -86,18 +119,35 @@ def _provider_settings(provider: str) -> tuple[str, str]:
     return client_id, client_secret
 
 
-def authorization_url(connection: dict[str, Any]) -> str:
+def authorization_url(connection: dict[str, Any], *, client=None, now: int | None = None) -> str:
     provider = str(connection.get("provider") or "")
     if provider not in {"google", "microsoft"}:
         raise CalendarSyncError("provider_oauth_unsupported", "This provider does not use OAuth authorization.")
     client_id, _ = _provider_settings(provider)
-    state = _encode_state({
+    issued_at = int(now if now is not None else time.time())
+    nonce = secrets.token_urlsafe(32)
+    state_payload = {
         "connection_id": connection["id"],
+        "calendar_id": connection["local_calendar_id"],
         "tenant_id": connection["tenant_id"],
         "user_id": connection["user_id"],
         "provider": provider,
-        "exp": int(time.time()) + 600,
-    })
+        "destination": "calendar",
+        "nonce": nonce,
+        "iat": issued_at,
+        "exp": issued_at + 600,
+    }
+    database_client = client or service_supabase
+    database_client.table("calendar_oauth_states").insert({
+        "nonce_hash": hashlib.sha256(nonce.encode()).hexdigest(),
+        "connection_id": connection["id"],
+        "tenant_id": connection["tenant_id"],
+        "user_id": connection["user_id"],
+        "calendar_id": connection["local_calendar_id"],
+        "provider": provider,
+        "expires_at": datetime.fromtimestamp(state_payload["exp"], tz=timezone.utc).isoformat(),
+    }).execute()
+    state = _encode_state(state_payload)
     if provider == "google":
         scope = "https://www.googleapis.com/auth/calendar.readonly" if connection.get("direction") == "read" else "https://www.googleapis.com/auth/calendar.events"
         return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
@@ -108,8 +158,40 @@ def authorization_url(connection: dict[str, Any]) -> str:
     scope = "Calendars.Read" if connection.get("direction") == "read" else "Calendars.ReadWrite"
     return "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?" + urlencode({
         "client_id": client_id, "redirect_uri": _redirect_uri(provider), "response_type": "code",
-        "response_mode": "query", "scope": f"offline_access User.Read {scope}", "state": state,
+        "response_mode": "query", "scope": f"offline_access {scope}", "state": state,
     })
+
+
+def consume_oauth_state(payload: dict[str, Any], *, client=None) -> None:
+    database_client = client or service_supabase
+    response = database_client.rpc("consume_calendar_oauth_state", {
+        "target_nonce_hash": hashlib.sha256(str(payload["nonce"]).encode()).hexdigest(),
+        "target_connection_id": payload["connection_id"],
+        "target_tenant_id": int(payload["tenant_id"]),
+        "target_user_id": int(payload["user_id"]),
+        "target_calendar_id": payload["calendar_id"],
+        "target_provider": payload["provider"],
+    }).execute()
+    if getattr(response, "data", None) is not True:
+        raise CalendarSyncError("oauth_state_replayed", "Calendar connection state is invalid or already used.")
+
+
+def _safe_credentials(credentials: dict[str, Any], previous: dict[str, Any] | None = None) -> dict[str, Any]:
+    previous = previous or {}
+    access_token = str(credentials.get("access_token") or "")
+    if not access_token:
+        raise CalendarSyncError("oauth_token_invalid", "The provider returned an invalid token response.")
+    try:
+        expires_in = max(60, min(int(credentials.get("expires_in") or 3600), 31_536_000))
+    except (TypeError, ValueError) as error:
+        raise CalendarSyncError("oauth_token_invalid", "The provider returned an invalid token response.") from error
+    return {
+        "access_token": access_token,
+        "refresh_token": str(credentials.get("refresh_token") or previous.get("refresh_token") or ""),
+        "token_type": str(credentials.get("token_type") or "Bearer")[:40],
+        "scope": str(credentials.get("scope") or previous.get("scope") or "")[:2000],
+        "expires_at": int(time.time()) + expires_in,
+    }
 
 
 def exchange_authorization_code(provider: str, code: str, *, http_client=None) -> dict[str, Any]:
@@ -123,9 +205,11 @@ def exchange_authorization_code(provider: str, code: str, *, http_client=None) -
     response = client.post(endpoint, data=data)
     if response.status_code >= 400:
         raise CalendarSyncError("oauth_exchange_failed", "The provider did not accept the authorization code.")
-    credentials = response.json()
-    credentials["expires_at"] = int(time.time()) + int(credentials.get("expires_in") or 3600)
-    return credentials
+    try:
+        credentials = response.json()
+    except (ValueError, TypeError) as error:
+        raise CalendarSyncError("oauth_token_invalid", "The provider returned an invalid token response.") from error
+    return _safe_credentials(credentials)
 
 
 def _refresh(provider: str, credentials: dict[str, Any], client) -> dict[str, Any]:
@@ -139,10 +223,37 @@ def _refresh(provider: str, credentials: dict[str, Any], client) -> dict[str, An
     response = client.post(endpoint, data={"client_id": client_id, "client_secret": client_secret, "refresh_token": refresh_token, "grant_type": "refresh_token"})
     if response.status_code >= 400:
         raise CalendarSyncError("token_refresh_failed", "The provider access token could not be refreshed.")
-    refreshed = response.json()
-    refreshed["refresh_token"] = refreshed.get("refresh_token") or refresh_token
-    refreshed["expires_at"] = int(time.time()) + int(refreshed.get("expires_in") or 3600)
-    return refreshed
+    try:
+        refreshed = response.json()
+    except (ValueError, TypeError) as error:
+        raise CalendarSyncError("oauth_token_invalid", "The provider returned an invalid token response.") from error
+    return _safe_credentials(refreshed, credentials)
+
+
+def disconnect_connection(connection: dict[str, Any], *, http_client=None, client=None) -> bool:
+    database_client = client or service_supabase
+    provider = str(connection.get("provider") or "")
+    revoked = False
+    if provider == "google" and connection.get("encrypted_credentials"):
+        try:
+            credentials = decrypt_credentials(connection["encrypted_credentials"])
+            token = credentials.get("refresh_token") or credentials.get("access_token")
+            if token:
+                provider_client = http_client or httpx.Client(timeout=10)
+                response = provider_client.post(
+                    "https://oauth2.googleapis.com/revoke",
+                    data={"token": token},
+                )
+                revoked = response.status_code in {200, 204, 400}
+        except (CalendarSyncError, httpx.HTTPError):
+            revoked = False
+    database_client.table("calendar_sync_connections").update({
+        "status": "disconnected",
+        "encrypted_credentials": None,
+        "cursor_data": {},
+        "last_error_code": None,
+    }).eq("id", connection["id"]).eq("tenant_id", connection["tenant_id"]).execute()
+    return revoked
 
 
 def _parse_provider_time(value: Any, timezone_name: str | None = None) -> datetime:
@@ -190,7 +301,21 @@ def _upsert_external_event(connection: dict[str, Any], remote: dict[str, Any], p
     if existing and existing.get("external_etag") != etag and last_synced and updated_at and updated_at > last_synced:
         service_supabase.table("calendar_sync_conflicts").insert({
             "tenant_id": connection["tenant_id"], "connection_id": connection["id"], "event_id": existing["id"],
-            "external_event_id": remote_id, "local_data": existing, "remote_data": remote, "status": "unresolved",
+            "external_event_id": remote_id,
+            "local_data": {
+                key: existing.get(key) for key in
+                ("id", "calendar_id", "title", "description", "location", "starts_at", "ends_at", "timezone", "version")
+            },
+            "remote_data": {
+                "id": remote_id,
+                "summary": remote.get("summary"),
+                "subject": remote.get("subject"),
+                "description": str(remote.get("description") or "")[:20000],
+                "start": remote.get("start"),
+                "end": remote.get("end"),
+                "location": remote.get("location"),
+            },
+            "status": "unresolved",
         }).execute()
         return "conflict"
     timezone_name = ((start_value or {}).get("timeZone") if isinstance(start_value, dict) else None) or "UTC"
@@ -223,7 +348,11 @@ def _google_sync(connection: dict[str, Any], credentials: dict[str, Any], client
         params["timeMin"] = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
     url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
     counts = {"created": 0, "updated": 0, "deleted": 0, "conflict": 0, "ignored": 0}
+    pages = 0
     while url:
+        pages += 1
+        if pages > MAX_SYNC_PAGES:
+            raise CalendarSyncError("sync_page_limit", "Calendar synchronization exceeded its page limit.")
         response = client.get(url, params=params, headers={"Authorization": f"Bearer {credentials['access_token']}"})
         if response.status_code == 410 and cursor.get("sync_token"):
             cursor.pop("sync_token", None)
@@ -247,7 +376,11 @@ def _microsoft_sync(connection: dict[str, Any], credentials: dict[str, Any], cli
     now = datetime.now(timezone.utc)
     url = cursor.get("delta_link") or ("https://graph.microsoft.com/v1.0/me/calendarView/delta?" + urlencode({"startDateTime": (now - timedelta(days=365)).isoformat(), "endDateTime": (now + timedelta(days=730)).isoformat()}))
     counts = {"created": 0, "updated": 0, "deleted": 0, "conflict": 0, "ignored": 0}
+    pages = 0
     while url:
+        pages += 1
+        if pages > MAX_SYNC_PAGES:
+            raise CalendarSyncError("sync_page_limit", "Calendar synchronization exceeded its page limit.")
         response = client.get(url, headers={"Authorization": f"Bearer {credentials['access_token']}", "Prefer": "odata.maxpagesize=500"})
         if response.status_code >= 400:
             raise CalendarSyncError("microsoft_sync_failed", "Outlook calendar synchronization failed.")
@@ -333,6 +466,35 @@ def sync_connection(connection: dict[str, Any], *, http_client=None) -> dict[str
         raise CalendarSyncError("provider_sync_unsupported", "Use ICS export or subscription for this provider.")
     if not connection.get("encrypted_credentials") or not connection.get("local_calendar_id"):
         raise CalendarSyncError("connection_setup_incomplete", "Finish provider authorization before syncing.")
+    calendars = getattr(
+        service_supabase.table("calendars").select("id,owner_user_id")
+        .eq("id", connection["local_calendar_id"])
+        .eq("tenant_id", connection["tenant_id"]).limit(1).execute(),
+        "data", None,
+    ) or []
+    memberships = getattr(
+        service_supabase.table("tenant_memberships").select("user_id")
+        .eq("tenant_id", connection["tenant_id"])
+        .eq("user_id", connection["user_id"])
+        .eq("status", "active").limit(1).execute(),
+        "data", None,
+    ) or []
+    calendar_memberships = []
+    if calendars and int(calendars[0].get("owner_user_id") or -1) != int(connection["user_id"]):
+        calendar_memberships = getattr(
+            service_supabase.table("calendar_memberships").select("role")
+            .eq("calendar_id", connection["local_calendar_id"])
+            .eq("tenant_id", connection["tenant_id"])
+            .eq("user_id", connection["user_id"])
+            .eq("role", "owner").limit(1).execute(),
+            "data", None,
+        ) or []
+    calendar_owner_valid = bool(calendars) and (
+        int(calendars[0].get("owner_user_id") or -1) == int(connection["user_id"])
+        or bool(calendar_memberships)
+    )
+    if not calendar_owner_valid or not memberships:
+        raise CalendarSyncError("connection_binding_invalid", "Calendar connection ownership is no longer valid.")
     client = http_client or httpx.Client(timeout=30)
     credentials = _refresh(provider, decrypt_credentials(connection["encrypted_credentials"]), client)
     started_at = datetime.now(timezone.utc).isoformat()

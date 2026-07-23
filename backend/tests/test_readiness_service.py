@@ -61,6 +61,55 @@ class ReadinessServiceTests(unittest.TestCase):
         with patch.dict("os.environ", {"APP_ENV": "production"}, clear=False):
             self.assertEqual(readiness_service.check_parser_isolation(), "in_process")
 
+    def test_environment_name_must_be_explicit_and_known(self):
+        for value, expected in (("production", "ok"), ("development", "ok"), ("test", "ok"), ("unknown", "misconfigured"), ("", "misconfigured")):
+            with self.subTest(value=value), patch.dict(os.environ, {"APP_ENV": value}, clear=False):
+                self.assertEqual(readiness_service.check_environment(), expected)
+
+    def test_calendar_schema_checks_tables_and_single_use_state_function(self):
+        def response_for(url, **_kwargs):
+            if url.endswith("/rest/v1/"):
+                return SimpleNamespace(status_code=200, json=lambda: {"paths": {"/rpc/consume_calendar_oauth_state": {}}})
+            return SimpleNamespace(status_code=200)
+
+        with patch.dict(os.environ, {
+            "CALENDAR_FEATURE_ENABLED": "true",
+            "SUPABASE_URL": "https://supabase.example",
+            "SUPABASE_SERVICE_KEY": "test-service-key",
+        }, clear=False), patch.object(readiness_service.requests, "get", side_effect=response_for):
+            self.assertEqual(readiness_service.check_schema(), "ok")
+
+        def missing_function(url, **_kwargs):
+            if url.endswith("/rest/v1/"):
+                return SimpleNamespace(status_code=200, json=lambda: {"paths": {}})
+            return SimpleNamespace(status_code=200)
+
+        with patch.dict(os.environ, {
+            "CALENDAR_FEATURE_ENABLED": "true",
+            "SUPABASE_URL": "https://supabase.example",
+            "SUPABASE_SERVICE_KEY": "test-service-key",
+        }, clear=False), patch.object(readiness_service.requests, "get", side_effect=missing_function):
+            self.assertEqual(readiness_service.check_schema(), "missing")
+
+    def test_calendar_sync_configuration_fails_closed_when_required(self):
+        with patch.dict(os.environ, {"CALENDAR_FEATURE_ENABLED": "false"}, clear=False):
+            self.assertEqual(readiness_service.check_calendar_configuration(), "disabled")
+        with patch.dict(os.environ, {
+            "CALENDAR_FEATURE_ENABLED": "true", "CALENDAR_SYNC_REQUIRED": "true",
+            "CALENDAR_SYNC_WORKER_ENABLED": "false",
+        }, clear=False):
+            self.assertEqual(readiness_service.check_calendar_configuration(), "misconfigured")
+        with patch.dict(os.environ, {
+            "CALENDAR_FEATURE_ENABLED": "true", "CALENDAR_SYNC_REQUIRED": "true",
+            "CALENDAR_SYNC_WORKER_ENABLED": "true",
+            "CALENDAR_CREDENTIALS_SECRET": "long-calendar-secret-for-tests",
+            "PUBLIC_API_URL": "https://api.example.test",
+            "FRONTEND_PRIMARY_URL": "https://app.example.test",
+            "GOOGLE_CALENDAR_CLIENT_ID": "test-client",
+            "GOOGLE_CALENDAR_CLIENT_SECRET": "test-secret",
+        }, clear=False):
+            self.assertEqual(readiness_service.check_calendar_configuration(), "ok")
+
     def test_all_required_components_ready(self):
         with patch.object(readiness_service, "check_database", return_value="ok"), patch.object(
             readiness_service, "check_redis", return_value="ok"

@@ -10,13 +10,30 @@ import sys
 from pathlib import Path
 from types import MappingProxyType
 
+THREAD_LIMIT_ENV = {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+    "BLIS_NUM_THREADS": "1",
+}
+os.environ.update(THREAD_LIMIT_ENV)
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
-
-from data_analysis.ai.code_validator import validate_generated_code
-from data_analysis.ai.result_validator import validate_analysis_result
+STARTUP_ERROR: str | None = None
+try:
+    import numpy as np
+    import pandas as pd
+    from data_analysis.ai.code_validator import validate_generated_code
+    from data_analysis.ai.result_validator import validate_analysis_result
+except BaseException as error:  # The parent requires a structured startup result.
+    STARTUP_ERROR = type(error).__name__
+    np = None
+    pd = None
+    validate_generated_code = None
+    validate_analysis_result = None
 
 
 def _network_denied(*_args, **_kwargs):
@@ -25,8 +42,11 @@ def _network_denied(*_args, **_kwargs):
 
 def main() -> int:
     os.environ.clear()
+    os.environ.update(THREAD_LIMIT_ENV)
     socket.socket = _network_denied
     try:
+        if STARTUP_ERROR:
+            raise RuntimeError(f"worker_startup_{STARTUP_ERROR}")
         payload = json.loads(sys.stdin.buffer.read(5 * 1024 * 1024).decode("utf-8"))
         code = str(payload["code"])
         approved = {str(item) for item in payload["approved_columns"]}
@@ -47,7 +67,8 @@ def main() -> int:
         sys.stdout.write(json.dumps({"success": True, "result": result}, separators=(",", ":")))
         return 0
     except BaseException as error:
-        sys.stdout.write(json.dumps({"success": False, "code": type(error).__name__}, separators=(",", ":")))
+        code = str(error) if str(error).startswith("worker_startup_") else type(error).__name__
+        sys.stdout.write(json.dumps({"success": False, "code": code[:120]}, separators=(",", ":")))
         return 1
 
 

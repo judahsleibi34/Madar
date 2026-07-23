@@ -39,6 +39,40 @@ class ObservabilityServiceTests(unittest.TestCase):
         self.assertNotIn("recipient", payload)
         self.assertNotIn("private@example.com", str(payload))
 
+    def test_http_client_info_logging_is_suppressed(self):
+        observability_service.configure_structured_logging()
+        self.assertEqual(logging.getLogger("httpx").level, logging.WARNING)
+        self.assertEqual(logging.getLogger("httpcore").level, logging.WARNING)
+        self.assertFalse(logging.getLogger("httpx").isEnabledFor(logging.INFO))
+        self.assertTrue(logging.getLogger("httpx").isEnabledFor(logging.WARNING))
+
+    def test_access_filter_removes_queries_and_successful_liveness_noise(self):
+        access_filter = observability_service.SafeAccessLogFilter()
+        successful_health = logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 1,
+            '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1", "GET", "/health/live?code=secret", "1.1", 200), None,
+        )
+        self.assertFalse(access_filter.filter(successful_health))
+        self.assertEqual(successful_health.args[2], "/health/live")
+
+        failed_health = logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 1,
+            '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1", "GET", "/health/live?state=secret", "1.1", 500), None,
+        )
+        self.assertTrue(access_filter.filter(failed_health))
+        self.assertEqual(failed_health.args[2], "/health/live")
+
+        callback = logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 1,
+            '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1", "GET", "/calendar/oauth/google/callback?code=private&state=private", "1.1", 303), None,
+        )
+        self.assertTrue(access_filter.filter(callback))
+        self.assertEqual(callback.args[2], "/calendar/oauth/google/callback")
+        self.assertNotIn("private", callback.getMessage())
+
     def test_operational_snapshot_includes_cleanup_and_reservations(self):
         class Query:
             def __init__(self, rows): self.rows = rows

@@ -12,7 +12,7 @@ import database as _database_config  # noqa: F401
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from data_analysis.routes.analysis_routes import router as analysis_router
 from data_analysis.routes.cleaning_routes import router as cleaning_router
@@ -165,7 +165,20 @@ async def observability_middleware(request: Request, call_next):
             "http.request_unhandled",
             extra={"method": request.method, "route": route, "status_code": 500, "error_type": type(error).__name__},
         )
-        raise
+        error_response = JSONResponse(
+            status_code=500,
+            content={
+                "error": "internal_server_error",
+                "message": "An unexpected server error occurred.",
+                "request_id": request_id,
+            },
+            headers={"X-Request-ID": request_id},
+        )
+        return add_cors_headers_for_allowed_origin(
+            error_response,
+            request,
+            ALLOWED_CSRF_ORIGINS,
+        )
     finally:
         CORRELATION_ID.reset(context_token)
 

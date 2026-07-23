@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import hashlib
 import logging
@@ -16,13 +15,23 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, field_validator
 
 from database import service_supabase
-from services.tenant_service import require_active_tenant_member, require_builder_write_access
+from services.tenant_service import require_active_tenant_member
+from services.audit_service import record_audit_event
+from services.calendar_authorization_service import (
+    availability_event,
+    list_accessible_calendars,
+    public_calendar_metadata,
+    require_calendar_access,
+)
 from services.calendar_sync_service import (
     CalendarSyncError,
     authorization_url,
+    consume_oauth_state,
     decode_oauth_state,
+    disconnect_connection,
     encrypt_credentials,
     exchange_authorization_code,
+    frontend_calendar_url,
     sync_connection,
 )
 
@@ -31,6 +40,7 @@ router = APIRouter(prefix="/calendar", tags=["Calendar"])
 logger = logging.getLogger(__name__)
 MAX_RANGE_DAYS = 370
 MAX_EXPANDED_OCCURRENCES = 2000
+MAX_DEPENDENCY_EDGES = 5000
 CALENDAR_SCHEMA_TABLES = (
     "calendars",
     "calendar_memberships",
@@ -79,6 +89,18 @@ def is_calendar_schema_missing_error(error: Exception) -> bool:
         or "schema cache" in raw
     )
     return missing_schema and any(table_name in raw for table_name in CALENDAR_SCHEMA_TABLES)
+
+
+def calendar_feature_enabled() -> bool:
+    return os.getenv("CALENDAR_FEATURE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def require_calendar_feature() -> None:
+    if not calendar_feature_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "calendar_feature_disabled", "message": "Calendar features are disabled."},
+        )
 
 
 def ensure_default_calendar(context) -> dict[str, Any]:
@@ -164,6 +186,119 @@ def tenant_task(task_id: str, tenant_id: int) -> dict[str, Any]:
     if not rows:
         raise HTTPException(status_code=404, detail="Task not found")
     return rows[0]
+
+
+def require_calendar_creator(context) -> None:
+    if str(context.role or "").lower() not in {"owner", "admin", "member"}:
+        raise HTTPException(status_code=403, detail="Calendar creation access required")
+
+
+def validate_active_task_owner(context, owner_user_id: int | None) -> int:
+    selected = int(owner_user_id if owner_user_id is not None else context.user_id)
+    memberships = getattr(
+        service_supabase.table("tenant_memberships")
+        .select("user_id")
+        .eq("tenant_id", context.tenant_id)
+        .eq("user_id", selected)
+        .eq("status", "active")
+        .limit(1)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    users = getattr(
+        service_supabase.table("users")
+        .select("id,account_status")
+        .eq("id", selected)
+        .eq("account_status", "active")
+        .limit(1)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    if not memberships or not users:
+        raise HTTPException(status_code=400, detail="Task owner must be an active organization member")
+    return selected
+
+
+def validate_project_reference(context, project_id: UUID | str | None) -> str | None:
+    if project_id is None:
+        return None
+    project_value = str(project_id)
+    rows = getattr(
+        service_supabase.table("builder_projects")
+        .select("id,status")
+        .eq("id", project_value)
+        .eq("tenant_id", context.tenant_id)
+        .neq("status", "archived")
+        .limit(1)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project_value
+
+
+def require_task_access(context, task: dict[str, Any], capability: str = "manage_tasks") -> None:
+    calendar_id = task.get("calendar_id")
+    if calendar_id:
+        require_calendar_access(context, str(calendar_id), capability)
+        return
+    if str(context.role or "").lower() in {"owner", "admin"}:
+        return
+    if int(task.get("owner_user_id") or -1) != int(context.user_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+
+
+def record_calendar_audit(context, request: Request, action: str, target_type: str, target_id: Any, metadata: dict | None = None) -> None:
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        metadata=metadata,
+    )
+
+
+def sanitized_conflict(row: dict[str, Any]) -> dict[str, Any]:
+    local = row.get("local_data") if isinstance(row.get("local_data"), dict) else {}
+    remote = row.get("remote_data") if isinstance(row.get("remote_data"), dict) else {}
+    return {
+        "id": row.get("id"),
+        "connection_id": row.get("connection_id"),
+        "event_id": row.get("event_id"),
+        "status": row.get("status"),
+        "created_at": row.get("created_at"),
+        "local": {
+            "title": local.get("title"),
+            "starts_at": local.get("starts_at"),
+            "ends_at": local.get("ends_at"),
+            "location": local.get("location"),
+            "version": local.get("version"),
+        },
+        "remote": {
+            "title": remote.get("summary") or remote.get("subject"),
+            "starts_at": remote.get("start"),
+            "ends_at": remote.get("end"),
+            "location": remote.get("location"),
+        },
+    }
+
+
+def sanitized_invitation(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": row.get("id"),
+        "event_id": row.get("event_id"),
+        "sender_email": row.get("sender_email"),
+        "trust_level": row.get("trust_level"),
+        "reasons": list(row.get("reasons") or [])[:20],
+        "disposition": row.get("disposition"),
+        "created_at": row.get("created_at"),
+    }
 
 
 def sync_task_reminder(
@@ -408,7 +543,7 @@ class TaskDependencyWrite(BaseModel):
 
 
 class ConnectionWrite(BaseModel):
-    provider: Literal["google", "microsoft", "caldav", "ics"]
+    provider: Literal["google", "microsoft", "ics"]
     account_label: str = Field(default="", max_length=160)
     direction: Literal["read", "two_way"] = "read"
 
@@ -434,37 +569,105 @@ def sync_http_error(error: CalendarSyncError) -> HTTPException:
 
 def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
     ensure_default_calendar(context)
-    loaders = {
-        "calendars": lambda: service_supabase.table("calendars").select("*").eq("tenant_id", context.tenant_id).order("created_at").execute(),
-        "normal_events": lambda: service_supabase.table("calendar_events").select("*").eq("tenant_id", context.tenant_id).is_("deleted_at", "null").lt("starts_at", iso(end)).gt("ends_at", iso(start)).order("starts_at").limit(2000).execute(),
-        "recurring_events": lambda: service_supabase.table("calendar_events").select("*").eq("tenant_id", context.tenant_id).is_("deleted_at", "null").not_.is_("recurrence_rule", "null").lt("starts_at", iso(end)).order("starts_at", desc=True).limit(500).execute(),
-        "reservations": lambda: service_supabase.table("builder_reservations").select("*").eq("tenant_id", context.tenant_id).lt("starts_at", iso(end)).gt("ends_at", iso(start)).limit(1000).execute(),
-        "tasks": lambda: service_supabase.table("calendar_tasks").select("*").eq("tenant_id", context.tenant_id).neq("status", "cancelled").order("due_at").limit(1000).execute(),
-        "task_reminders": lambda: service_supabase.table("calendar_task_reminders").select("task_id,minutes_before,delivery_status,scheduled_for").eq("tenant_id", context.tenant_id).eq("channel", "in_app").execute(),
-        "connections": lambda: service_supabase.table("calendar_sync_connections").select("id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes").eq("tenant_id", context.tenant_id).eq("user_id", context.user_id).execute(),
-        "invitation_reviews": lambda: service_supabase.table("calendar_invitation_reviews").select("*").eq("tenant_id", context.tenant_id).eq("disposition", "quarantined").order("created_at", desc=True).limit(50).execute(),
-    }
-    with ThreadPoolExecutor(max_workers=len(loaders), thread_name_prefix="calendar-bootstrap") as executor:
-        futures = {name: executor.submit(loader) for name, loader in loaders.items()}
-        loaded = {
-            name: getattr(future.result(), "data", None) or []
-            for name, future in futures.items()
-        }
+    accesses = list_accessible_calendars(context)
+    access_by_id = {str(access.calendar.get("id")): access for access in accesses}
+    full_detail_ids = [calendar_id for calendar_id, access in access_by_id.items() if access.role in {"editor", "owner"}]
+    viewer_ids = [calendar_id for calendar_id, access in access_by_id.items() if access.role == "viewer"]
+    detail_ids = [*full_detail_ids, *viewer_ids]
+    availability_ids = [calendar_id for calendar_id, access in access_by_id.items() if access.role == "availability"]
+    review_ids = {calendar_id for calendar_id, access in access_by_id.items() if access.allows("review_invitations")}
+    sync_state_ids = [calendar_id for calendar_id, access in access_by_id.items() if access.allows("view_sync_state")]
 
-    calendars = loaded["calendars"]
-    normal_rows = loaded["normal_events"]
-    recurring_rows = loaded["recurring_events"]
-    event_rows = list({str(row.get("id")): row for row in [*normal_rows, *recurring_rows]}.values())
-    events = expand_events(event_rows, start, end)
-    reservations = loaded["reservations"]
-    events.extend(reservation_payload(row) for row in reservations if row.get("starts_at"))
-    tasks = loaded["tasks"]
-    task_reminders = {str(row.get("task_id")): row for row in loaded["task_reminders"]}
+    def event_rows(calendar_ids: list[str], fields: str, visibility_mode: str = "all") -> list[dict[str, Any]]:
+        if not calendar_ids:
+            return []
+        normal_query = service_supabase.table("calendar_events").select(fields).eq("tenant_id", context.tenant_id).in_("calendar_id", calendar_ids).is_("deleted_at", "null")
+        recurring_query = service_supabase.table("calendar_events").select(fields).eq("tenant_id", context.tenant_id).in_("calendar_id", calendar_ids).is_("deleted_at", "null")
+        if visibility_mode == "exclude_private":
+            normal_query = normal_query.neq("visibility", "private")
+            recurring_query = recurring_query.neq("visibility", "private")
+        elif visibility_mode == "private_only":
+            normal_query = normal_query.eq("visibility", "private")
+            recurring_query = recurring_query.eq("visibility", "private")
+        normal = getattr(
+            normal_query.lt("starts_at", iso(end)).gt("ends_at", iso(start)).order("starts_at").limit(2000).execute(),
+            "data", None,
+        ) or []
+        recurring = getattr(
+            recurring_query.not_.is_("recurrence_rule", "null").lt("starts_at", iso(end)).order("starts_at", desc=True).limit(500).execute(),
+            "data", None,
+        ) or []
+        return list({str(row.get("id")): row for row in [*normal, *recurring]}.values())
+
+    detail_event_rows = [
+        *event_rows(full_detail_ids, "*"),
+        *event_rows(viewer_ids, "*", "exclude_private"),
+    ]
+    availability_rows = event_rows(
+        availability_ids,
+        "id,calendar_id,starts_at,ends_at,transparency,recurrence_rule,recurrence_exclusions",
+    )
+    availability_rows.extend(event_rows(
+        viewer_ids,
+        "id,calendar_id,starts_at,ends_at,transparency,recurrence_rule,recurrence_exclusions",
+        "private_only",
+    ))
+    events = expand_events(detail_event_rows, start, end)
+    events.extend(availability_event(row) for row in expand_events(availability_rows, start, end))
+
+    if str(context.role or "").lower() in {"owner", "admin", "member"}:
+        reservations = getattr(
+            service_supabase.table("builder_reservations").select("*")
+            .eq("tenant_id", context.tenant_id).lt("starts_at", iso(end))
+            .gt("ends_at", iso(start)).limit(1000).execute(), "data", None,
+        ) or []
+        events.extend(reservation_payload(row) for row in reservations if row.get("starts_at"))
+
+    tasks = []
+    if detail_ids:
+        tasks = getattr(
+            service_supabase.table("calendar_tasks").select("*")
+            .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
+            .neq("status", "cancelled").order("due_at").limit(1000).execute(),
+            "data", None,
+        ) or []
+    task_ids = [str(row.get("id")) for row in tasks if row.get("id")]
+    task_reminder_rows = []
+    if task_ids:
+        task_reminder_rows = getattr(
+            service_supabase.table("calendar_task_reminders")
+            .select("task_id,minutes_before,delivery_status,scheduled_for")
+            .eq("tenant_id", context.tenant_id).in_("task_id", task_ids)
+            .eq("channel", "in_app").limit(1000).execute(), "data", None,
+        ) or []
+    task_reminders = {str(row.get("task_id")): row for row in task_reminder_rows}
     for task in tasks:
         reminder = task_reminders.get(str(task.get("id")))
         task["reminder_minutes_before"] = reminder.get("minutes_before") if reminder else 10
-    connections = loaded["connections"]
-    invitation_reviews = loaded["invitation_reviews"]
+
+    connections = []
+    if sync_state_ids:
+        connections = getattr(
+            service_supabase.table("calendar_sync_connections")
+            .select("id,local_calendar_id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes")
+            .eq("tenant_id", context.tenant_id)
+            .in_("local_calendar_id", sync_state_ids).limit(100).execute(), "data", None,
+        ) or []
+
+    review_event_ids = {
+        str(row.get("id")) for row in detail_event_rows
+        if str(row.get("calendar_id")) in review_ids and row.get("id")
+    }
+    invitation_reviews = []
+    if review_event_ids:
+        review_rows = getattr(
+            service_supabase.table("calendar_invitation_reviews")
+            .select("id,event_id,sender_email,trust_level,reasons,disposition,created_at")
+            .eq("tenant_id", context.tenant_id).in_("event_id", sorted(review_event_ids))
+            .eq("disposition", "quarantined").order("created_at", desc=True).limit(50).execute(),
+            "data", None,
+        ) or []
+        invitation_reviews = [sanitized_invitation(row) for row in review_rows]
     quarantined_event_ids = {str(review.get("event_id")) for review in invitation_reviews if review.get("event_id")}
     events = [event for event in events if str(event.get("id") or "").split("::", 1)[0] not in quarantined_event_ids and str(event.get("series_id") or "") not in quarantined_event_ids]
     workload_by_user: dict[str, dict[str, Any]] = {}
@@ -478,13 +681,24 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
                 scheduled_start = datetime.fromisoformat(str(task["scheduled_start"]).replace("Z", "+00:00"))
                 scheduled_end = datetime.fromisoformat(str(task["scheduled_end"]).replace("Z", "+00:00"))
                 item["scheduled_minutes"] += max(0, int((scheduled_end - scheduled_start).total_seconds() / 60))
-    return {"success": True, "calendars": calendars, "events": sorted(events, key=lambda item: item.get("starts_at") or ""), "tasks": tasks, "workload": list(workload_by_user.values()), "connections": connections, "invitation_reviews": invitation_reviews, "viewer_timezone": str(context.user.get("timezone") or "UTC")}
+    return {
+        "success": True,
+        "calendars": [public_calendar_metadata(access) for access in accesses],
+        "events": sorted(events, key=lambda item: item.get("starts_at") or ""),
+        "tasks": tasks,
+        "workload": list(workload_by_user.values()),
+        "connections": connections,
+        "invitation_reviews": invitation_reviews,
+        "viewer_timezone": str(context.user.get("timezone") or "UTC"),
+    }
 
 
 @router.get("/bootstrap")
 def calendar_bootstrap(request: Request, response: Response, start: datetime, end: datetime):
     context = require_active_tenant_member(request, response)
     start, end = parse_range(start, end)
+    if not calendar_feature_enabled():
+        return _calendar_disabled_payload(context, start, end)
     try:
         payload = _calendar_workspace_payload(context, start, end)
         payload["calendar_features_available"] = True
@@ -500,35 +714,37 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
                 "error_type": type(error).__name__,
             },
         )
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "calendar_schema_unavailable", "message": "Calendar storage is not ready."},
+        ) from error
+
+
+def _calendar_disabled_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
+    reservations = []
+    if str(context.role or "").lower() in {"owner", "admin", "member"}:
         reservations = getattr(
             service_supabase.table("builder_reservations")
-            .select("*")
-            .eq("tenant_id", context.tenant_id)
-            .lt("starts_at", iso(end))
-            .gt("ends_at", iso(start))
-            .limit(1000)
-            .execute(),
-            "data",
-            None,
+            .select("*").eq("tenant_id", context.tenant_id)
+            .lt("starts_at", iso(end)).gt("ends_at", iso(start)).limit(1000).execute(),
+            "data", None,
         ) or []
-        events = [reservation_payload(row) for row in reservations if row.get("starts_at")]
-        return {
-            "success": True,
-            "calendar_features_available": False,
-            "warning": "Calendar storage is not configured yet. Reservations remain available.",
-            "calendars": [],
-            "events": sorted(events, key=lambda item: item.get("starts_at") or ""),
-            "tasks": [],
-            "workload": [],
-            "connections": [],
-            "invitation_reviews": [],
-            "viewer_timezone": str(context.user.get("timezone") or "UTC"),
-        }
+    events = [reservation_payload(row) for row in reservations if row.get("starts_at")]
+    return {
+        "success": True,
+        "calendar_features_available": False,
+        "warning": "Calendar features are disabled. Reservations remain available.",
+        "calendars": [], "events": sorted(events, key=lambda item: item.get("starts_at") or ""),
+        "tasks": [], "workload": [], "connections": [], "invitation_reviews": [],
+        "viewer_timezone": str(context.user.get("timezone") or "UTC"),
+    }
 
 
 @router.post("/calendars", status_code=201)
 def create_calendar(payload: CalendarCreate, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    require_calendar_creator(context)
     if payload.is_default:
         service_supabase.table("calendars").update({"is_default": False}).eq("tenant_id", context.tenant_id).eq("owner_user_id", context.user_id).execute()
     row = {**payload.model_dump(), "tenant_id": context.tenant_id, "owner_user_id": context.user_id}
@@ -536,35 +752,36 @@ def create_calendar(payload: CalendarCreate, request: Request, response: Respons
     if not created:
         raise HTTPException(status_code=500, detail="Calendar could not be created")
     service_supabase.table("calendar_memberships").insert({"calendar_id": created[0]["id"], "tenant_id": context.tenant_id, "user_id": context.user_id, "role": "owner"}).execute()
+    record_calendar_audit(context, request, "calendar.created", "calendar", created[0]["id"])
     return {"success": True, "calendar": created[0]}
 
 
 def require_calendar_manager(context, calendar_id: str) -> dict[str, Any]:
-    calendar = tenant_calendar(calendar_id, context.tenant_id)
-    if context.role in {"owner", "admin"} or int(calendar.get("owner_user_id") or 0) == context.user_id:
-        return calendar
-    membership = getattr(service_supabase.table("calendar_memberships").select("role").eq("calendar_id", calendar_id).eq("tenant_id", context.tenant_id).eq("user_id", context.user_id).limit(1).execute(), "data", None) or []
-    if membership and membership[0].get("role") == "owner":
-        return calendar
-    raise HTTPException(status_code=403, detail="Calendar owner access required")
+    return require_calendar_access(context, calendar_id, "manage_members").calendar
 
 
 @router.get("/calendars/{calendar_id}/members")
 def list_calendar_members(calendar_id: str, request: Request, response: Response):
+    require_calendar_feature()
     context = require_active_tenant_member(request, response)
-    tenant_calendar(calendar_id, context.tenant_id)
-    rows = getattr(service_supabase.table("calendar_memberships").select("*").eq("calendar_id", calendar_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
+    require_calendar_access(context, calendar_id, "manage_members")
+    rows = getattr(service_supabase.table("calendar_memberships").select("calendar_id,user_id,role,created_at").eq("calendar_id", calendar_id).eq("tenant_id", context.tenant_id).limit(500).execute(), "data", None) or []
     return {"success": True, "members": rows}
 
 
 @router.put("/calendars/{calendar_id}/members")
 def share_calendar(calendar_id: str, payload: CalendarMemberWrite, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     require_calendar_manager(context, calendar_id)
     tenant_members = getattr(service_supabase.table("tenant_memberships").select("user_id").eq("tenant_id", context.tenant_id).eq("user_id", payload.user_id).eq("status", "active").limit(1).execute(), "data", None) or []
     if not tenant_members:
         raise HTTPException(status_code=400, detail="User is not an active member of this organization")
     rows = getattr(service_supabase.table("calendar_memberships").upsert({"calendar_id": calendar_id, "tenant_id": context.tenant_id, **payload.model_dump()}, on_conflict="calendar_id,user_id").execute(), "data", None) or []
+    record_calendar_audit(
+        context, request, "calendar.member_assigned", "calendar_membership",
+        f"{calendar_id}:{payload.user_id}", {"role": payload.role},
+    )
     return {"success": True, "membership": rows[0] if rows else None, "visibility_preview": {"availability": "Busy/free only", "viewer": "View event details", "editor": "Create and edit events", "owner": "Manage events and sharing"}[payload.role]}
 
 
@@ -582,20 +799,21 @@ def replace_event_children(context, event: dict[str, Any], payload: EventWrite) 
 def normalized_event_row(context, payload: EventWrite) -> dict[str, Any]:
     if payload.starts_at.tzinfo is None or payload.ends_at.tzinfo is None or payload.ends_at <= payload.starts_at:
         raise HTTPException(status_code=400, detail="Event end must be after start and include a timezone")
-    tenant_calendar(str(payload.calendar_id), context.tenant_id)
+    require_calendar_access(context, str(payload.calendar_id), "create_event")
     return {
         "tenant_id": context.tenant_id, "calendar_id": str(payload.calendar_id), "created_by": context.user_id,
         "title": payload.title.strip(), "description": payload.description, "location": payload.location,
         "starts_at": iso(payload.starts_at), "ends_at": iso(payload.ends_at), "timezone": payload.timezone,
         "all_day": payload.all_day, "status": payload.status, "visibility": payload.visibility,
         "transparency": payload.transparency, "recurrence_rule": payload.recurrence_rule or None,
-        "project_id": str(payload.project_id) if payload.project_id else None,
+        "project_id": validate_project_reference(context, payload.project_id),
     }
 
 
 @router.post("/events", status_code=201)
 def create_event(payload: EventWrite, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     row = normalized_event_row(context, payload)
     conflicts = event_conflicts(context.tenant_id, row["calendar_id"], payload.starts_at, payload.ends_at)
     if conflicts and not payload.allow_conflicts:
@@ -605,16 +823,20 @@ def create_event(payload: EventWrite, request: Request, response: Response):
         raise HTTPException(status_code=500, detail="Event could not be created")
     replace_event_children(context, created[0], payload)
     write_change(context, created[0]["id"], "created", "event", None, created[0])
+    record_calendar_audit(context, request, "calendar.event_created", "calendar_event", created[0]["id"], {"calendar_id": row["calendar_id"]})
     return {"success": True, "event": created[0], "conflicts": conflicts}
 
 
 @router.put("/events/{event_id}")
 def update_event(event_id: str, payload: EventWrite, request: Request, response: Response, scope: Literal["event", "occurrence", "future", "series"] = "event", occurrence_start: Optional[datetime] = None):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     before = tenant_event(event_id, context.tenant_id)
+    require_calendar_access(context, str(before.get("calendar_id")), "update_event")
     if payload.expected_version is not None and int(before.get("version") or 1) != payload.expected_version:
         raise HTTPException(status_code=409, detail={"code": "calendar_version_conflict", "message": "This event changed in another session.", "current": before})
     row = normalized_event_row(context, payload)
+    require_calendar_access(context, row["calendar_id"], "update_event")
     conflicts = event_conflicts(context.tenant_id, row["calendar_id"], payload.starts_at, payload.ends_at, event_id)
     if conflicts and not payload.allow_conflicts:
         raise HTTPException(status_code=409, detail={"code": "calendar_event_conflict", "message": "This time overlaps another busy event.", "conflicts": conflicts})
@@ -631,6 +853,7 @@ def update_event(event_id: str, payload: EventWrite, request: Request, response:
             replace_event_children(context, created[0], payload)
             write_change(context, created[0]["id"], "created", "occurrence", None, created[0])
             write_change(context, event_id, "updated", "occurrence", before, parent)
+            record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
             return {"success": True, "event": created[0], "series": parent, "conflicts": conflicts}
         parent_rule = truncated_recurrence_rule(before["recurrence_rule"], occurrence_start - timedelta(seconds=1))
         parent_rows = getattr(service_supabase.table("calendar_events").update({"recurrence_rule": parent_rule, "version": int(before.get("version") or 1) + 1}).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
@@ -641,6 +864,7 @@ def update_event(event_id: str, payload: EventWrite, request: Request, response:
         replace_event_children(context, created[0], payload)
         write_change(context, event_id, "updated", "future", before, parent_rows[0] if parent_rows else before)
         write_change(context, created[0]["id"], "created", "future", None, created[0])
+        record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
         return {"success": True, "event": created[0], "series": parent_rows[0] if parent_rows else before, "conflicts": conflicts}
     row["version"] = int(before.get("version") or 1) + 1
     updated = getattr(service_supabase.table("calendar_events").update(row).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
@@ -648,13 +872,16 @@ def update_event(event_id: str, payload: EventWrite, request: Request, response:
         raise HTTPException(status_code=404, detail="Event not found")
     replace_event_children(context, updated[0], payload)
     write_change(context, event_id, "updated", scope, before, updated[0])
+    record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
     return {"success": True, "event": updated[0], "conflicts": conflicts}
 
 
 @router.delete("/events/{event_id}")
 def delete_event(event_id: str, request: Request, response: Response, expected_version: int = Query(ge=1), scope: Literal["event", "occurrence", "future", "series"] = "event", occurrence_start: Optional[datetime] = None):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     before = tenant_event(event_id, context.tenant_id)
+    require_calendar_access(context, str(before.get("calendar_id")), "delete_event")
     if int(before.get("version") or 1) != expected_version:
         raise HTTPException(status_code=409, detail={"code": "calendar_version_conflict", "current": before})
     if scope in {"occurrence", "future"}:
@@ -669,38 +896,60 @@ def delete_event(event_id: str, request: Request, response: Response, expected_v
             }).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
             updated = updated_rows[0] if updated_rows else before
         write_change(context, event_id, "cancelled", scope, before, updated)
+        record_calendar_audit(context, request, "calendar.event_deleted", "calendar_event", event_id, {"scope": scope})
         return {"success": True, "event": updated}
     deleted_at = iso(utc_now())
     updated = getattr(service_supabase.table("calendar_events").update({"deleted_at": deleted_at, "version": expected_version + 1}).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
     write_change(context, event_id, "deleted", scope, before, updated[0] if updated else None)
+    record_calendar_audit(context, request, "calendar.event_deleted", "calendar_event", event_id, {"scope": scope})
     return {"success": True}
 
 
 @router.get("/events/{event_id}/history")
 def event_history(event_id: str, request: Request, response: Response):
+    require_calendar_feature()
     context = require_active_tenant_member(request, response)
-    tenant_event(event_id, context.tenant_id)
+    event = tenant_event(event_id, context.tenant_id)
+    require_calendar_access(context, str(event.get("calendar_id")), "view_history")
     rows = getattr(service_supabase.table("calendar_event_changes").select("*").eq("tenant_id", context.tenant_id).eq("event_id", event_id).order("created_at", desc=True).limit(100).execute(), "data", None) or []
     return {"success": True, "history": rows}
 
 
 @router.post("/tasks", status_code=201)
 def create_task(payload: TaskWrite, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    if payload.calendar_id:
+        require_calendar_access(context, str(payload.calendar_id), "manage_tasks")
+    else:
+        require_calendar_creator(context)
     row = payload.model_dump(mode="json", exclude={"reminder_minutes_before"})
-    row.update({"tenant_id": context.tenant_id, "owner_user_id": payload.owner_user_id or context.user_id})
+    row.update({
+        "tenant_id": context.tenant_id,
+        "owner_user_id": validate_active_task_owner(context, payload.owner_user_id),
+        "project_id": validate_project_reference(context, payload.project_id),
+    })
     created = getattr(service_supabase.table("calendar_tasks").insert(row).execute(), "data", None) or []
     if created:
         sync_task_reminder(created[0], payload.reminder_minutes_before, schedule_changed=True)
         created[0]["reminder_minutes_before"] = payload.reminder_minutes_before
+        record_calendar_audit(context, request, "calendar.task_created", "calendar_task", created[0]["id"], {"calendar_id": row.get("calendar_id")})
     return {"success": True, "task": created[0] if created else None}
 
 
 @router.put("/tasks/{task_id}")
 def update_task(task_id: str, payload: TaskWrite, request: Request, response: Response, expected_version: int = Query(ge=1)):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     before = tenant_task(task_id, context.tenant_id)
+    require_task_access(context, before)
+    if payload.calendar_id:
+        require_calendar_access(context, str(payload.calendar_id), "manage_tasks")
+    else:
+        require_task_access(context, {**before, "calendar_id": None})
     row = payload.model_dump(mode="json", exclude={"reminder_minutes_before"})
+    row["owner_user_id"] = validate_active_task_owner(context, payload.owner_user_id)
+    row["project_id"] = validate_project_reference(context, payload.project_id)
     row["version"] = expected_version + 1
     updated = getattr(service_supabase.table("calendar_tasks").update(row).eq("id", task_id).eq("tenant_id", context.tenant_id).eq("version", expected_version).execute(), "data", None) or []
     if not updated:
@@ -713,46 +962,117 @@ def update_task(task_id: str, payload: TaskWrite, request: Request, response: Re
         updated[0], payload.reminder_minutes_before, schedule_changed=schedule_changed
     )
     updated[0]["reminder_minutes_before"] = payload.reminder_minutes_before
+    record_calendar_audit(
+        context, request, "calendar.task_updated", "calendar_task", task_id,
+        {"owner_changed": before.get("owner_user_id") != updated[0].get("owner_user_id")},
+    )
     return {"success": True, "task": updated[0]}
+
+
+def dependency_would_cycle(tenant_id: int, task_id: str, dependency_id: str) -> bool:
+    rows = getattr(
+        service_supabase.table("calendar_task_dependencies")
+        .select("task_id,depends_on_task_id")
+        .eq("tenant_id", tenant_id)
+        .limit(MAX_DEPENDENCY_EDGES + 1)
+        .execute(),
+        "data",
+        None,
+    ) or []
+    if len(rows) > MAX_DEPENDENCY_EDGES:
+        raise HTTPException(status_code=409, detail="Task dependency graph is too large to validate safely")
+    graph: dict[str, set[str]] = {}
+    for row in rows:
+        graph.setdefault(str(row.get("task_id")), set()).add(str(row.get("depends_on_task_id")))
+    graph.setdefault(task_id, set()).add(dependency_id)
+    pending = [dependency_id]
+    visited: set[str] = set()
+    while pending:
+        current = pending.pop()
+        if current == task_id:
+            return True
+        if current in visited:
+            continue
+        visited.add(current)
+        if len(visited) > MAX_DEPENDENCY_EDGES:
+            raise HTTPException(status_code=409, detail="Task dependency graph is too large to validate safely")
+        pending.extend(graph.get(current, ()))
+    return False
 
 
 @router.post("/tasks/{task_id}/dependencies", status_code=201)
 def add_task_dependency(task_id: str, payload: TaskDependencyWrite, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     dependency_id = str(payload.depends_on_task_id)
     if dependency_id == task_id:
         raise HTTPException(status_code=400, detail="A task cannot depend on itself")
-    rows = getattr(service_supabase.table("calendar_tasks").select("id").eq("tenant_id", context.tenant_id).in_("id", [task_id, dependency_id]).execute(), "data", None) or []
+    rows = getattr(service_supabase.table("calendar_tasks").select("id,calendar_id,owner_user_id,status").eq("tenant_id", context.tenant_id).in_("id", [task_id, dependency_id]).execute(), "data", None) or []
     if len({str(row.get("id")) for row in rows}) != 2:
         raise HTTPException(status_code=404, detail="Task dependency was not found")
-    reverse = getattr(service_supabase.table("calendar_task_dependencies").select("task_id").eq("tenant_id", context.tenant_id).eq("task_id", dependency_id).eq("depends_on_task_id", task_id).limit(1).execute(), "data", None) or []
-    if reverse:
+    tasks_by_id = {str(row.get("id")): row for row in rows}
+    require_task_access(context, tasks_by_id[task_id])
+    require_task_access(context, tasks_by_id[dependency_id])
+    if tasks_by_id[dependency_id].get("status") == "cancelled":
+        raise HTTPException(status_code=404, detail="Task dependency was not found")
+    if dependency_would_cycle(context.tenant_id, task_id, dependency_id):
         raise HTTPException(status_code=409, detail="This dependency would create a cycle")
     service_supabase.table("calendar_task_dependencies").upsert({"tenant_id": context.tenant_id, "task_id": task_id, "depends_on_task_id": dependency_id}, on_conflict="task_id,depends_on_task_id").execute()
+    record_calendar_audit(context, request, "calendar.task_dependency_added", "calendar_task", task_id, {"depends_on_task_id": dependency_id})
     return {"success": True}
 
 
 @router.get("/invitation-reviews")
 def list_invitation_reviews(request: Request, response: Response):
+    require_calendar_feature()
     context = require_active_tenant_member(request, response)
-    rows = getattr(service_supabase.table("calendar_invitation_reviews").select("*").eq("tenant_id", context.tenant_id).eq("disposition", "quarantined").order("created_at", desc=True).limit(200).execute(), "data", None) or []
-    return {"success": True, "reviews": rows}
+    calendar_ids = [
+        str(access.calendar.get("id")) for access in list_accessible_calendars(context)
+        if access.allows("review_invitations")
+    ]
+    if not calendar_ids:
+        return {"success": True, "reviews": []}
+    event_rows = getattr(
+        service_supabase.table("calendar_events").select("id")
+        .eq("tenant_id", context.tenant_id).in_("calendar_id", calendar_ids)
+        .limit(5000).execute(), "data", None,
+    ) or []
+    event_ids = [str(row.get("id")) for row in event_rows if row.get("id")]
+    if not event_ids:
+        return {"success": True, "reviews": []}
+    rows = getattr(
+        service_supabase.table("calendar_invitation_reviews")
+        .select("id,event_id,sender_email,trust_level,reasons,disposition,created_at")
+        .eq("tenant_id", context.tenant_id).in_("event_id", event_ids)
+        .eq("disposition", "quarantined").order("created_at", desc=True).limit(200).execute(),
+        "data", None,
+    ) or []
+    return {"success": True, "reviews": [sanitized_invitation(row) for row in rows]}
 
 
 @router.post("/invitation-reviews/{review_id}")
 def resolve_invitation_review(review_id: str, disposition: Literal["allowed", "blocked", "reported"], request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    existing = getattr(service_supabase.table("calendar_invitation_reviews").select("id,event_id").eq("id", review_id).eq("tenant_id", context.tenant_id).eq("disposition", "quarantined").limit(1).execute(), "data", None) or []
+    if not existing:
+        raise HTTPException(status_code=404, detail="Invitation review not found")
+    event = tenant_event(str(existing[0].get("event_id")), context.tenant_id)
+    require_calendar_access(context, str(event.get("calendar_id")), "review_invitations")
     rows = getattr(service_supabase.table("calendar_invitation_reviews").update({"disposition": disposition}).eq("id", review_id).eq("tenant_id", context.tenant_id).eq("disposition", "quarantined").execute(), "data", None) or []
     if not rows:
-        raise HTTPException(status_code=404, detail="Invitation review not found")
+        raise HTTPException(status_code=409, detail="Invitation review changed")
     if disposition in {"blocked", "reported"} and rows[0].get("event_id"):
         service_supabase.table("calendar_events").update({"status": "cancelled", "deleted_at": iso(utc_now())}).eq("id", rows[0]["event_id"]).eq("tenant_id", context.tenant_id).execute()
-    return {"success": True, "review": rows[0]}
+    record_calendar_audit(context, request, "calendar.invitation_reviewed", "calendar_invitation_review", review_id, {"disposition": disposition})
+    return {"success": True, "review": sanitized_invitation(rows[0])}
 
 
 @router.post("/connections", status_code=201)
 def create_sync_connection(payload: ConnectionWrite, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    require_calendar_creator(context)
     calendar = getattr(service_supabase.table("calendars").insert({
         "tenant_id": context.tenant_id, "owner_user_id": context.user_id,
         "name": payload.account_label or f"{payload.provider.title()} Calendar",
@@ -763,13 +1083,18 @@ def create_sync_connection(payload: ConnectionWrite, request: Request, response:
         raise HTTPException(status_code=500, detail="Connection calendar could not be created")
     service_supabase.table("calendar_memberships").insert({"calendar_id": calendar[0]["id"], "tenant_id": context.tenant_id, "user_id": context.user_id, "role": "owner"}).execute()
     created = getattr(service_supabase.table("calendar_sync_connections").insert({"tenant_id": context.tenant_id, "user_id": context.user_id, "local_calendar_id": calendar[0]["id"], **payload.model_dump(), "status": "connected" if payload.provider == "ics" else "setup_required"}).execute(), "data", None) or []
-    return {"success": True, "connection": created[0] if created else None, "requires_oauth": payload.provider in {"google", "microsoft", "caldav"}}
+    if created:
+        record_calendar_audit(context, request, "calendar.connection_created", "calendar_sync_connection", created[0]["id"], {"provider": payload.provider})
+    safe_connection = {key: created[0].get(key) for key in ("id", "local_calendar_id", "provider", "account_label", "direction", "status") } if created else None
+    return {"success": True, "connection": safe_connection, "requires_oauth": payload.provider in {"google", "microsoft"}}
 
 
 @router.post("/connections/{connection_id}/authorize")
 def authorize_sync_connection(connection_id: str, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     connection = tenant_connection(connection_id, context.tenant_id, context.user_id)
+    require_calendar_access(context, str(connection.get("local_calendar_id")), "manage_oauth_connection")
     try:
         url = authorization_url(connection)
     except CalendarSyncError as error:
@@ -778,49 +1103,86 @@ def authorize_sync_connection(connection_id: str, request: Request, response: Re
 
 
 @router.get("/oauth/{provider}/callback")
-def calendar_oauth_callback(provider: Literal["google", "microsoft"], code: str, state: str, request: Request, response: Response):
+def calendar_oauth_callback(
+    provider: Literal["google", "microsoft"],
+    request: Request,
+    response: Response,
+    code: str = Query(min_length=1, max_length=4096),
+    state: str = Query(min_length=1, max_length=8192),
+):
+    require_calendar_feature()
     context = require_active_tenant_member(request, response)
     try:
         state_data = decode_oauth_state(state)
         if state_data.get("provider") != provider or int(state_data.get("tenant_id")) != context.tenant_id or int(state_data.get("user_id")) != context.user_id:
             raise CalendarSyncError("oauth_state_mismatch", "Calendar authorization does not match this account.")
         connection = tenant_connection(str(state_data.get("connection_id")), context.tenant_id, context.user_id)
+        if str(connection.get("local_calendar_id")) != str(state_data.get("calendar_id")):
+            raise CalendarSyncError("oauth_state_mismatch", "Calendar authorization does not match this calendar.")
+        require_calendar_access(context, str(connection.get("local_calendar_id")), "manage_oauth_connection")
+        consume_oauth_state(state_data)
         credentials = exchange_authorization_code(provider, code)
         service_supabase.table("calendar_sync_connections").update({
             "encrypted_credentials": encrypt_credentials(credentials), "status": "connected",
             "last_error_code": None, "last_attempt_at": iso(utc_now()),
         }).eq("id", connection["id"]).eq("tenant_id", context.tenant_id).execute()
+        record_calendar_audit(context, request, "calendar.oauth_connected", "calendar_sync_connection", connection["id"], {"provider": provider})
     except CalendarSyncError as error:
-        raise sync_http_error(error) from error
-    frontend = os.getenv("FRONTEND_PRIMARY_URL", "http://localhost:5173").rstrip("/")
-    return RedirectResponse(f"{frontend}/calendar?sync=connected")
+        logger.warning("calendar.oauth_failed", extra={"error_code": error.code})
+        return RedirectResponse(frontend_calendar_url(status="error"), status_code=303)
+    return RedirectResponse(frontend_calendar_url(status="connected"), status_code=303)
+
+
+@router.delete("/connections/{connection_id}")
+def disconnect_sync_connection(connection_id: str, request: Request, response: Response):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    connection = tenant_connection(connection_id, context.tenant_id)
+    require_calendar_access(context, str(connection.get("local_calendar_id")), "manage_oauth_connection")
+    revoked = disconnect_connection(connection)
+    record_calendar_audit(context, request, "calendar.oauth_disconnected", "calendar_sync_connection", connection_id, {"provider": connection.get("provider"), "provider_revocation_confirmed": revoked})
+    return {"success": True, "provider_revocation_confirmed": revoked}
 
 
 @router.post("/connections/{connection_id}/sync")
 def run_connection_sync(connection_id: str, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
-    connection = tenant_connection(connection_id, context.tenant_id, context.user_id)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    connection = tenant_connection(connection_id, context.tenant_id)
+    require_calendar_access(context, str(connection.get("local_calendar_id")), "trigger_sync")
     try:
         counts = sync_connection(connection)
     except CalendarSyncError as error:
         raise sync_http_error(error) from error
+    record_calendar_audit(context, request, "calendar.sync_triggered", "calendar_sync_connection", connection_id)
     return {"success": True, "counts": counts}
 
 
 @router.get("/sync-conflicts")
 def list_sync_conflicts(request: Request, response: Response):
+    require_calendar_feature()
     context = require_active_tenant_member(request, response)
-    rows = getattr(service_supabase.table("calendar_sync_conflicts").select("*").eq("tenant_id", context.tenant_id).eq("status", "unresolved").order("created_at", desc=True).limit(200).execute(), "data", None) or []
-    return {"success": True, "conflicts": rows}
+    calendar_ids = [str(access.calendar.get("id")) for access in list_accessible_calendars(context) if access.allows("view_conflicts")]
+    if not calendar_ids:
+        return {"success": True, "conflicts": []}
+    connections = getattr(service_supabase.table("calendar_sync_connections").select("id").eq("tenant_id", context.tenant_id).in_("local_calendar_id", calendar_ids).limit(500).execute(), "data", None) or []
+    connection_ids = [str(row.get("id")) for row in connections if row.get("id")]
+    if not connection_ids:
+        return {"success": True, "conflicts": []}
+    rows = getattr(service_supabase.table("calendar_sync_conflicts").select("id,connection_id,event_id,local_data,remote_data,status,created_at").eq("tenant_id", context.tenant_id).in_("connection_id", connection_ids).eq("status", "unresolved").order("created_at", desc=True).limit(200).execute(), "data", None) or []
+    return {"success": True, "conflicts": [sanitized_conflict(row) for row in rows]}
 
 
 @router.post("/sync-conflicts/{conflict_id}/resolve")
 def resolve_sync_conflict(conflict_id: str, resolution: Literal["keep_local", "use_remote", "ignore"], request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     rows = getattr(service_supabase.table("calendar_sync_conflicts").select("*").eq("id", conflict_id).eq("tenant_id", context.tenant_id).eq("status", "unresolved").limit(1).execute(), "data", None) or []
     if not rows:
         raise HTTPException(status_code=404, detail="Sync conflict not found")
     conflict = rows[0]
+    connection = tenant_connection(str(conflict.get("connection_id")), context.tenant_id)
+    require_calendar_access(context, str(connection.get("local_calendar_id")), "view_conflicts")
     if resolution == "use_remote" and conflict.get("event_id"):
         remote = conflict.get("remote_data") or {}
         start = remote.get("start") or {}
@@ -834,6 +1196,7 @@ def resolve_sync_conflict(conflict_id: str, resolution: Literal["keep_local", "u
             "last_synced_at": iso(utc_now()),
         }).eq("id", conflict["event_id"]).eq("tenant_id", context.tenant_id).execute()
     service_supabase.table("calendar_sync_conflicts").update({"status": "ignored" if resolution == "ignore" else "resolved", "resolution": resolution, "resolved_at": iso(utc_now())}).eq("id", conflict_id).eq("tenant_id", context.tenant_id).execute()
+    record_calendar_audit(context, request, "calendar.sync_conflict_resolved", "calendar_sync_conflict", conflict_id, {"resolution": resolution})
     return {"success": True}
 
 
@@ -905,9 +1268,11 @@ def invitation_risk_reasons(sender_email: str, title: str, description: str) -> 
 
 @router.post("/import.ics")
 def import_calendar_ics(payload: IcsImportWrite, request: Request, response: Response):
-    context = require_builder_write_access(request, response)
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
     calendar_id = str(payload.calendar_id)
-    tenant_calendar(calendar_id, context.tenant_id)
+    require_calendar_access(context, calendar_id, "import_export")
+    require_calendar_access(context, calendar_id, "create_event")
     imported = updated = skipped = 0
     for item in parse_ics_events(payload.content)[:5000]:
         try:
@@ -950,17 +1315,27 @@ def import_calendar_ics(payload: IcsImportWrite, request: Request, response: Res
                 "tenant_id": context.tenant_id, "event_id": saved_event["id"], "sender_email": organizer,
                 "trust_level": "suspicious", "reasons": reasons, "disposition": "quarantined",
             }, on_conflict="tenant_id,event_id,sender_email").execute()
+    record_calendar_audit(context, request, "calendar.ics_imported", "calendar", calendar_id, {"imported": imported, "updated": updated, "skipped": skipped})
     return {"success": True, "imported": imported, "updated": updated, "skipped": skipped}
 
 
 @router.get("/export.ics", response_class=PlainTextResponse)
 def export_calendar(request: Request, response: Response, start: datetime, end: datetime, calendar_id: Optional[str] = None):
+    require_calendar_feature()
     context = require_active_tenant_member(request, response)
     start, end = parse_range(start, end)
     query = service_supabase.table("calendar_events").select("*").eq("tenant_id", context.tenant_id).is_("deleted_at", "null").lt("starts_at", iso(end)).gt("ends_at", iso(start))
     if calendar_id:
-        tenant_calendar(calendar_id, context.tenant_id)
+        require_calendar_access(context, calendar_id, "import_export")
         query = query.eq("calendar_id", calendar_id)
+    else:
+        calendar_ids = [
+            str(access.calendar.get("id")) for access in list_accessible_calendars(context)
+            if access.allows("import_export") and access.allows("view_details")
+        ]
+        if not calendar_ids:
+            raise HTTPException(status_code=403, detail="Calendar export access required")
+        query = query.in_("calendar_id", calendar_ids)
     rows = getattr(query.order("starts_at").limit(5000).execute(), "data", None) or []
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Madar//Calendar//EN", "CALSCALE:GREGORIAN"]
     for row in rows:
