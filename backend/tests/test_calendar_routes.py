@@ -38,6 +38,13 @@ class Query:
     def neq(self, field, value):
         self.rows = [row for row in self.rows if row.get(field) != value]
         return self
+    def is_(self, field, value):
+        expected = None if value == "null" else value
+        self.rows = [row for row in self.rows if row.get(field) is expected]
+        return self
+    def order(self, field, desc=False):
+        self.rows.sort(key=lambda row: (row.get(field) is None, row.get(field)), reverse=desc)
+        return self
     def lt(self, *_args): return self
     def gt(self, *_args): return self
     def limit(self, count):
@@ -159,6 +166,107 @@ class CalendarRouteTests(unittest.TestCase):
     def test_task_recurrence_rejects_unsupported_rules(self):
         with self.assertRaises(ValueError):
             TaskWrite(title="Review", recurrence_rule="FREQ=YEARLY")
+
+    def test_task_schedule_requires_timezone_and_ordered_values(self):
+        scheduled_start = datetime(2026, 7, 23, 9, tzinfo=timezone.utc)
+        scheduled_end = datetime(2026, 7, 23, 10, tzinfo=timezone.utc)
+        task = TaskWrite(
+            title="Review",
+            due_at=scheduled_end,
+            scheduled_start=scheduled_start,
+            scheduled_end=scheduled_end,
+        )
+        self.assertEqual(task.scheduled_start, scheduled_start)
+        for values in (
+            {"scheduled_start": datetime(2026, 7, 23, 9)},
+            {"scheduled_end": scheduled_end},
+            {"scheduled_start": scheduled_end, "scheduled_end": scheduled_start},
+        ):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                TaskWrite(title="Review", **values)
+
+    def test_task_create_uses_default_calendar_and_preserves_schedule(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="member", membership_status="active"
+        )
+        inserted = []
+
+        class InsertQuery:
+            def insert(self, row):
+                inserted.append(dict(row))
+                return self
+            def execute(self):
+                return SimpleNamespace(data=[{"id": "task-created", **inserted[-1]}])
+
+        payload = TaskWrite(
+            title="Review",
+            scheduled_start=datetime(2026, 7, 23, 9, tzinfo=timezone.utc),
+            scheduled_end=datetime(2026, 7, 23, 10, tzinfo=timezone.utc),
+        )
+        client = SimpleNamespace(table=lambda _name: InsertQuery())
+        with patch.object(calendar_routes, "service_supabase", client), patch.object(
+            calendar_routes, "require_calendar_feature"
+        ), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "ensure_default_calendar",
+            return_value={"id": "calendar-default"},
+        ), patch.object(
+            calendar_routes, "require_calendar_access"
+        ) as require_access, patch.object(
+            calendar_routes, "validate_active_task_owner", return_value=12
+        ), patch.object(
+            calendar_routes, "validate_project_reference", return_value=None
+        ), patch.object(
+            calendar_routes, "sync_task_reminder"
+        ), patch.object(
+            calendar_routes, "record_calendar_audit"
+        ):
+            result = calendar_routes.create_task(payload, object(), object())
+
+        self.assertTrue(result["success"])
+        self.assertEqual(inserted[0]["calendar_id"], "calendar-default")
+        self.assertEqual(inserted[0]["scheduled_start"], "2026-07-23T09:00:00Z")
+        require_access.assert_called_once_with(context, "calendar-default", "manage_tasks")
+
+    def test_workspace_tasks_include_only_authorized_unassigned_work(self):
+        rows = [
+            {
+                "id": "calendar-task", "tenant_id": 7, "calendar_id": "calendar-1",
+                "owner_user_id": 20, "status": "todo", "due_at": None,
+            },
+            {
+                "id": "own-unassigned", "tenant_id": 7, "calendar_id": None,
+                "owner_user_id": 12, "status": "todo", "due_at": None,
+            },
+            {
+                "id": "other-unassigned", "tenant_id": 7, "calendar_id": None,
+                "owner_user_id": 20, "status": "todo", "due_at": None,
+            },
+            {
+                "id": "cross-tenant", "tenant_id": 8, "calendar_id": None,
+                "owner_user_id": 12, "status": "todo", "due_at": None,
+            },
+            {
+                "id": "cancelled", "tenant_id": 7, "calendar_id": None,
+                "owner_user_id": 12, "status": "cancelled", "due_at": None,
+            },
+        ]
+        client = SimpleNamespace(table=lambda _name: Query(rows))
+        member = SimpleNamespace(tenant_id=7, user_id=12, role="member")
+        admin = SimpleNamespace(tenant_id=7, user_id=99, role="admin")
+        with patch.object(calendar_routes, "service_supabase", client):
+            member_rows = calendar_routes.workspace_task_rows(member, ["calendar-1"])
+            admin_rows = calendar_routes.workspace_task_rows(admin, ["calendar-1"])
+
+        self.assertEqual(
+            {row["id"] for row in member_rows},
+            {"calendar-task", "own-unassigned"},
+        )
+        self.assertEqual(
+            {row["id"] for row in admin_rows},
+            {"calendar-task", "own-unassigned", "other-unassigned"},
+        )
 
     def test_recurring_task_reminder_rolls_forward_after_delivery(self):
         next_time = next_task_reminder_time({

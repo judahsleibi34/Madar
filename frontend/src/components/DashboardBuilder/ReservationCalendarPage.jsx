@@ -46,6 +46,11 @@ import {
   confirmConnectedAccountDisconnect,
   confirmIncompleteConnectionRemoval,
 } from "./utils/calendarConnectionPrompts";
+import {
+  expandTaskOccurrences,
+  taskIsOpen,
+  taskPlacementStart,
+} from "./utils/calendarTaskSchedule";
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
 const VIEWS = ["day", "week", "month", "agenda"];
@@ -214,49 +219,6 @@ function recurrenceRule(value) {
   return null;
 }
 
-function advanceTaskOccurrence(date, rule, anchorDay) {
-  const next = new Date(date);
-  if (rule === "FREQ=DAILY") next.setDate(next.getDate() + 1);
-  else if (rule === "FREQ=WEEKLY") next.setDate(next.getDate() + 7);
-  else if (rule === "FREQ=MONTHLY") {
-    next.setDate(1);
-    next.setMonth(next.getMonth() + 1);
-    const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
-    next.setDate(Math.min(anchorDay, lastDay));
-  }
-  return next;
-}
-
-function expandTaskOccurrences(tasks, rangeStart, rangeEnd) {
-  const occurrences = [];
-  tasks.forEach((task) => {
-    if (!task.scheduled_start) return;
-    const baseStart = new Date(task.scheduled_start);
-    const duration = task.scheduled_end
-      ? Math.max(0, new Date(task.scheduled_end) - baseStart)
-      : Number(task.estimate_minutes || 60) * 60000;
-    if (!task.recurrence_rule) {
-      if (baseStart >= rangeStart && baseStart < rangeEnd) {
-        occurrences.push({ ...task, agenda_start: baseStart.toISOString(), agenda_end: new Date(baseStart.getTime() + duration).toISOString() });
-      }
-      return;
-    }
-    let occurrence = new Date(baseStart);
-    const anchorDay = baseStart.getDate();
-    let guard = 0;
-    while (occurrence < rangeStart && guard < 1000) {
-      occurrence = advanceTaskOccurrence(occurrence, task.recurrence_rule, anchorDay);
-      guard += 1;
-    }
-    while (occurrence < rangeEnd && guard < 1000) {
-      occurrences.push({ ...task, agenda_start: occurrence.toISOString(), agenda_end: new Date(occurrence.getTime() + duration).toISOString() });
-      occurrence = advanceTaskOccurrence(occurrence, task.recurrence_rule, anchorDay);
-      guard += 1;
-    }
-  });
-  return occurrences;
-}
-
 function EventEditor({ value, calendars, saving, conflict, onChange, onClose, onSave, onDelete }) {
   return (
     <div className="calendar-modal-backdrop" role="presentation">
@@ -355,6 +317,7 @@ export default function ReservationCalendarPage({ user = null }) {
   const [conflict, setConflict] = useState("");
   const [history, setHistory] = useState([]);
   const [taskTitle, setTaskTitle] = useState("");
+  const [taskSchedule, setTaskSchedule] = useState("");
   const [taskEditor, setTaskEditor] = useState(null);
   const [taskEditorError, setTaskEditorError] = useState("");
   const [connectionOperation, setConnectionOperation] = useState({ id: "", action: "" });
@@ -415,12 +378,16 @@ export default function ReservationCalendarPage({ user = null }) {
     () => (workspace.events || []).filter((event) => enabledCalendars.has(event.calendar_id)),
     [enabledCalendars, workspace.events]
   );
-  const agendaTasks = useMemo(
-    () => (workspace.tasks || []).filter((task) => !["done", "cancelled"].includes(task.status)),
+  const openTasks = useMemo(
+    () => (workspace.tasks || []).filter(taskIsOpen),
     [workspace.tasks]
   );
+  const agendaTasks = useMemo(
+    () => openTasks.filter((task) => !task.calendar_id || enabledCalendars.has(task.calendar_id)),
+    [enabledCalendars, openTasks]
+  );
   const unscheduledAgendaTasks = useMemo(
-    () => agendaTasks.filter((task) => !task.scheduled_start),
+    () => agendaTasks.filter((task) => !taskPlacementStart(task)),
     [agendaTasks]
   );
   const scheduledAgendaTasks = useMemo(
@@ -432,6 +399,25 @@ export default function ReservationCalendarPage({ user = null }) {
       ...visibleEvents.map((item) => ({ kind: "event", item, startsAt: item.starts_at })),
       ...scheduledAgendaTasks.map((item) => ({ kind: "task", item, startsAt: item.agenda_start })),
     ].sort((first, second) => new Date(first.startsAt) - new Date(second.startsAt)),
+    [scheduledAgendaTasks, visibleEvents]
+  );
+  const visibleCalendarItems = useMemo(
+    () => [
+      ...visibleEvents.map((item) => ({
+        kind: "event",
+        item,
+        key: `event-${item.id}`,
+        startsAt: item.starts_at,
+        endsAt: item.ends_at,
+      })),
+      ...scheduledAgendaTasks.map((item) => ({
+        kind: "task",
+        item,
+        key: `task-${item.id}-${item.agenda_start}`,
+        startsAt: item.agenda_start,
+        endsAt: item.agenda_end,
+      })),
+    ],
     [scheduledAgendaTasks, visibleEvents]
   );
   const days = view === "day" ? [startOfDay(focusDate)] : Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(focusDate), index));
@@ -492,9 +478,34 @@ export default function ReservationCalendarPage({ user = null }) {
   const addTask = async (event) => {
     event.preventDefault();
     if (!taskTitle.trim()) return;
+    const defaultCalendar = workspace.calendars?.find((item) => item.is_default) || workspace.calendars?.[0];
+    if (!defaultCalendar) {
+      setError("Choose or create a calendar before adding a task.");
+      return;
+    }
     try {
-      await createCalendarTask({ title: taskTitle.trim(), description: "", status: "todo", priority: "normal", reminder_minutes_before: 10, recurrence_rule: null, milestone: false });
+      const scheduledStart = taskSchedule ? new Date(taskSchedule) : null;
+      if (scheduledStart && Number.isNaN(scheduledStart.getTime())) {
+        throw new Error("Choose a valid task date and time.");
+      }
+      const scheduledEnd = scheduledStart
+        ? new Date(scheduledStart.getTime() + 60 * 60 * 1000)
+        : null;
+      await createCalendarTask({
+        calendar_id: defaultCalendar.id,
+        title: taskTitle.trim(),
+        description: "",
+        status: "todo",
+        priority: "normal",
+        due_at: null,
+        scheduled_start: scheduledStart?.toISOString() || null,
+        scheduled_end: scheduledEnd?.toISOString() || null,
+        reminder_minutes_before: scheduledStart ? 10 : null,
+        recurrence_rule: null,
+        milestone: false,
+      });
       setTaskTitle("");
+      setTaskSchedule("");
       setRefreshKey((value) => value + 1);
     } catch (taskError) { setError(taskError?.message || "Task could not be created."); }
   };
@@ -650,7 +661,7 @@ export default function ReservationCalendarPage({ user = null }) {
       <section className="calendar-summary-grid" aria-label="Calendar summary">
         <article><span>Calendars</span><strong>{(workspace.calendars?.length || 0) + 1}</strong></article>
         <article><span>Events in view</span><strong>{workspace.events?.length || 0}</strong></article>
-        <article><span>Open tasks</span><strong>{workspace.tasks?.filter((task) => task.status !== "done" && task.status !== "cancelled").length || 0}</strong></article>
+        <article><span>Open tasks</span><strong>{openTasks.length}</strong></article>
         <article><span>Connections</span><strong>{workspace.connections?.length || 0}</strong></article>
       </section>
 
@@ -675,8 +686,8 @@ export default function ReservationCalendarPage({ user = null }) {
 
           <div className="calendar-sidebar-category"><span>Planning</span></div>
           <section className="calendar-sidebar-group calendar-task-panel">
-            <SidebarSectionHeading section="tasks" icon={<ListTodo size={16} />} title="Tasks" subtitle="Unscheduled work" count={workspace.tasks?.filter((task) => task.status !== "done").length || 0} expanded={expandedSidebarSections.has("tasks")} onToggle={toggleSidebarSection} />
-            {expandedSidebarSections.has("tasks") && <div id="calendar-sidebar-tasks" className="calendar-sidebar-section-content"><form onSubmit={addTask}><input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Add a task" aria-label="Task title" disabled={!calendarFeaturesAvailable} /><button type="submit" aria-label="Add task" disabled={!calendarFeaturesAvailable}><Plus size={16} /></button></form>{(workspace.tasks || []).slice(0, 6).map((task) => <div className="calendar-task" key={task.id}><i className={`priority-${task.priority}`} /><span>{task.title}</span><small>{task.estimate_minutes ? `${task.estimate_minutes}m` : task.status.replace("_", " ")}</small></div>)}</div>}
+            <SidebarSectionHeading section="tasks" icon={<ListTodo size={16} />} title="Tasks" subtitle="Scheduled and unscheduled work" count={openTasks.length} expanded={expandedSidebarSections.has("tasks")} onToggle={toggleSidebarSection} />
+            {expandedSidebarSections.has("tasks") && <div id="calendar-sidebar-tasks" className="calendar-sidebar-section-content"><form onSubmit={addTask}><div className="calendar-task-quick-fields"><input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Add a task" aria-label="Task title" disabled={!calendarFeaturesAvailable} /><label><span>Schedule (optional)</span><input type="datetime-local" value={taskSchedule} onChange={(event) => setTaskSchedule(event.target.value)} aria-label="Task schedule" disabled={!calendarFeaturesAvailable} /></label></div><button type="submit" aria-label="Add task" disabled={!calendarFeaturesAvailable}><Plus size={16} /></button></form>{openTasks.slice(0, 6).map((task) => <button type="button" className="calendar-task" key={task.id} onClick={() => openTask(task)}><i className={`priority-${task.priority}`} /><span>{task.title}</span><small>{taskPlacementStart(task) ? new Date(taskPlacementStart(task)).toLocaleDateString() : "Unscheduled"}</small></button>)}</div>}
           </section>
           <section className="calendar-sidebar-group calendar-workload-panel">
             <SidebarSectionHeading section="workload" icon={<Clock3 size={16} />} title="Workload" subtitle="Team capacity" count={workspace.workload?.length || 0} expanded={expandedSidebarSections.has("workload")} onToggle={toggleSidebarSection} />
@@ -697,8 +708,8 @@ export default function ReservationCalendarPage({ user = null }) {
 
         <main className="reservation-calendar-surface calendar-workspace-surface">
           {loading && <div className="reservation-calendar-loading">Loading calendar…</div>}
-          {!loading && (view === "day" || view === "week") && <div className={`calendar-time-grid is-${view}`}><div className="calendar-grid-header"><span>{workspace.viewer_timezone || "Local time"}</span>{days.map((day) => <button type="button" key={dateKey(day)} className={sameDay(day, new Date()) ? "is-today" : ""} onClick={() => { setFocusDate(day); setView("day"); }}><small>{day.toLocaleDateString(undefined, { weekday: "short" })}</small><strong>{day.getDate()}</strong></button>)}</div><div className="calendar-grid-body"><div className="calendar-grid-hours">{HOURS.map((hour) => <span key={hour}>{new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" })}</span>)}</div>{days.map((day) => <div className="calendar-grid-day" key={dateKey(day)}>{HOURS.map((hour) => <i key={hour} />)}{visibleEvents.filter((item) => sameDay(item.starts_at, day)).map((item) => { const start = new Date(item.starts_at); const end = new Date(item.ends_at); const top = (start.getHours() + start.getMinutes() / 60) * 48; const height = Math.max(34, Math.min(180, (end - start) / 3600000 * 48)); const calendar = calendarById.get(item.calendar_id); return <button type="button" key={item.id} className={`calendar-grid-event is-${item.source_type || "madar"}`} style={{ top, height, "--event-color": calendar?.color || "#f26b4a" }} onClick={() => openEvent(item)}><strong>{item.title}</strong><span>{formatTime(item.starts_at)} · {calendar?.name || item.source_label}</span>{item.visibility && <small>{item.visibility.replace("calendar_default", "default privacy")}</small>}</button>; })}</div>)}</div></div>}
-          {!loading && view === "month" && <div className="calendar-month-grid">{Array.from({ length: 42 }, (_, index) => addDays(rangeStart, index)).map((day) => { const dayEvents = visibleEvents.filter((item) => sameDay(item.starts_at, day)); return <section key={dateKey(day)} className={day.getMonth() !== focusDate.getMonth() ? "is-outside" : ""}><button type="button" onClick={() => { setFocusDate(day); setView("day"); }}>{day.getDate()}</button>{dayEvents.slice(0, 4).map((item) => <button type="button" className="calendar-month-event" style={{ "--event-color": calendarById.get(item.calendar_id)?.color || "#f26b4a" }} key={item.id} onClick={() => openEvent(item)}><span>{formatTime(item.starts_at)}</span>{item.title}</button>)}{dayEvents.length > 4 && <small>+{dayEvents.length - 4} more</small>}</section>; })}</div>}
+          {!loading && (view === "day" || view === "week") && <div className={`calendar-time-grid is-${view}`}><div className="calendar-grid-header"><span>{workspace.viewer_timezone || "Local time"}</span>{days.map((day) => <button type="button" key={dateKey(day)} className={sameDay(day, new Date()) ? "is-today" : ""} onClick={() => { setFocusDate(day); setView("day"); }}><small>{day.toLocaleDateString(undefined, { weekday: "short" })}</small><strong>{day.getDate()}</strong></button>)}</div><div className="calendar-grid-body"><div className="calendar-grid-hours">{HOURS.map((hour) => <span key={hour}>{new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" })}</span>)}</div>{days.map((day) => <div className="calendar-grid-day" key={dateKey(day)}>{HOURS.map((hour) => <i key={hour} />)}{visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)).map((entry) => { const { item } = entry; const start = new Date(entry.startsAt); const end = new Date(entry.endsAt); const top = (start.getHours() + start.getMinutes() / 60) * 48; const height = Math.max(34, Math.min(180, (end - start) / 3600000 * 48)); const calendar = calendarById.get(item.calendar_id); return <button type="button" key={entry.key} className={`calendar-grid-event is-${entry.kind === "task" ? "task" : item.source_type || "madar"}`} style={{ top, height, "--event-color": calendar?.color || "#f26b4a" }} onClick={() => entry.kind === "task" ? openTask(item) : openEvent(item)}><strong>{item.title}</strong><span>{formatTime(entry.startsAt)} · {entry.kind === "task" ? "Task" : calendar?.name || item.source_label}</span>{entry.kind === "task" ? <small>{item.status.replace("_", " ")}</small> : item.visibility && <small>{item.visibility.replace("calendar_default", "default privacy")}</small>}</button>; })}</div>)}</div></div>}
+          {!loading && view === "month" && <div className="calendar-month-grid">{Array.from({ length: 42 }, (_, index) => addDays(rangeStart, index)).map((day) => { const dayItems = visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)); return <section key={dateKey(day)} className={day.getMonth() !== focusDate.getMonth() ? "is-outside" : ""}><button type="button" onClick={() => { setFocusDate(day); setView("day"); }}>{day.getDate()}</button>{dayItems.slice(0, 4).map((entry) => <button type="button" className={`calendar-month-event${entry.kind === "task" ? " is-task" : ""}`} style={{ "--event-color": calendarById.get(entry.item.calendar_id)?.color || "#f26b4a" }} key={entry.key} onClick={() => entry.kind === "task" ? openTask(entry.item) : openEvent(entry.item)}><span>{formatTime(entry.startsAt)}</span>{entry.kind === "task" && <ListTodo size={12} aria-hidden="true" />}{entry.item.title}</button>)}{dayItems.length > 4 && <small>+{dayItems.length - 4} more</small>}</section>; })}</div>}
           {!loading && view === "agenda" && <div className="calendar-agenda">
             {unscheduledAgendaTasks.length > 0 && <><div className="calendar-agenda-section-title"><ListTodo size={15} /><strong>Unscheduled tasks</strong><span>{unscheduledAgendaTasks.length}</span></div>{unscheduledAgendaTasks.map((task) => <button type="button" className="calendar-agenda-task is-unscheduled" key={`task-${task.id}`} onClick={() => openTask(task)}><time><ListTodo size={19} /><span>Task</span></time><i /><div><strong>{task.title}</strong><span>{task.due_at ? `Due ${new Date(task.due_at).toLocaleString()}` : "Choose a time to place this task on your calendar"}</span></div><small>{task.status.replace("_", " ")}</small></button>)}</>}
             {agendaItems.length > 0 && <div className="calendar-agenda-section-title"><CalendarDays size={15} /><strong>Schedule</strong><span>{agendaItems.length}</span></div>}

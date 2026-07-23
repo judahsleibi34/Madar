@@ -12,7 +12,7 @@ from dateutil.rrule import rrulestr
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import PlainTextResponse
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from database import service_supabase
 from services.tenant_service import require_active_tenant_member
@@ -303,6 +303,33 @@ def sanitized_invitation(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def workspace_task_rows(context, detail_ids: list[str]) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    if detail_ids:
+        tasks = getattr(
+            service_supabase.table("calendar_tasks").select("*")
+            .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
+            .neq("status", "cancelled").order("due_at").limit(1000).execute(),
+            "data", None,
+        ) or []
+    unassigned_query = (
+        service_supabase.table("calendar_tasks").select("*")
+        .eq("tenant_id", context.tenant_id)
+        .is_("calendar_id", "null")
+        .neq("status", "cancelled")
+    )
+    if str(context.role or "").lower() not in {"owner", "admin"}:
+        unassigned_query = unassigned_query.eq("owner_user_id", context.user_id)
+    unassigned_tasks = getattr(
+        unassigned_query.order("due_at").limit(1000).execute(), "data", None
+    ) or []
+    return list({
+        str(task.get("id")): task
+        for task in [*tasks, *unassigned_tasks]
+        if task.get("id")
+    }.values())
+
+
 def sync_task_reminder(
     task: dict[str, Any], minutes_before: int | None, *, schedule_changed: bool = False
 ) -> None:
@@ -533,6 +560,25 @@ class TaskWrite(BaseModel):
         if normalized not in {"FREQ=DAILY", "FREQ=WEEKLY", "FREQ=MONTHLY"}:
             raise ValueError("Unsupported task recurrence")
         return normalized
+
+    @field_validator("due_at", "scheduled_start", "scheduled_end")
+    @classmethod
+    def task_datetime_is_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("Task date and time values must include a timezone")
+        return value
+
+    @model_validator(mode="after")
+    def task_schedule_is_ordered(self) -> "TaskWrite":
+        if self.scheduled_end is not None and self.scheduled_start is None:
+            raise ValueError("Scheduled end requires a scheduled start")
+        if (
+            self.scheduled_start is not None
+            and self.scheduled_end is not None
+            and self.scheduled_end <= self.scheduled_start
+        ):
+            raise ValueError("Scheduled end must be after scheduled start")
+        return self
 
 
 class CalendarMemberWrite(BaseModel):
@@ -785,14 +831,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
         ) or []
         events.extend(reservation_payload(row) for row in reservations if row.get("starts_at"))
 
-    tasks = []
-    if detail_ids:
-        tasks = getattr(
-            service_supabase.table("calendar_tasks").select("*")
-            .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
-            .neq("status", "cancelled").order("due_at").limit(1000).execute(),
-            "data", None,
-        ) or []
+    tasks = workspace_task_rows(context, detail_ids)
     task_ids = [str(row.get("id")) for row in tasks if row.get("id")]
     task_reminder_rows = []
     if task_ids:
@@ -1081,13 +1120,14 @@ def event_history(event_id: str, request: Request, response: Response):
 def create_task(payload: TaskWrite, request: Request, response: Response):
     require_calendar_feature()
     context = require_active_tenant_member(request, response)
-    if payload.calendar_id:
-        require_calendar_access(context, str(payload.calendar_id), "manage_tasks")
-    else:
-        require_calendar_creator(context)
+    calendar_id = str(payload.calendar_id) if payload.calendar_id else str(
+        ensure_default_calendar(context)["id"]
+    )
+    require_calendar_access(context, calendar_id, "manage_tasks")
     row = payload.model_dump(mode="json", exclude={"reminder_minutes_before"})
     row.update({
         "tenant_id": context.tenant_id,
+        "calendar_id": calendar_id,
         "owner_user_id": validate_active_task_owner(context, payload.owner_user_id),
         "project_id": validate_project_reference(context, payload.project_id),
     })
