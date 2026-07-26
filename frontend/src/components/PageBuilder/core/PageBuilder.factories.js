@@ -153,6 +153,7 @@ export const createElement = (type = "text", overrides = {}) => {
     heading: {
       name: factoryCopy.elements.heading.name,
       content: factoryCopy.elements.heading.content,
+      directWidthMode: "auto",
       styles: {
         ...base.styles,
         fontSize: "46px",
@@ -382,6 +383,7 @@ export const createElement = (type = "text", overrides = {}) => {
       name: factoryCopy.elements.reservationBlock.name,
       content: factoryCopy.elements.reservationBlock.content,
       reservation: factoryCopy.elements.reservationBlock.reservation,
+      directSizeMode: "auto",
       styles: {
         ...base.styles,
         backgroundColor: "var(--theme-surface)",

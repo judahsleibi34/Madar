@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   compactDirectSectionAfterElementRemoval,
   constrainResizeToSiblingElements,
+  getDirectElementMinimumSize,
   getSectionCanvasHeight,
   getMovedElementPosition,
   moveElementBehindText,
@@ -156,6 +157,13 @@ describe("page builder element layers", () => {
 });
 
 describe("page builder scaled canvas coordinates", () => {
+  it("allows reservation components to resize on both axes", () => {
+    expect(getDirectElementMinimumSize({ type: "reservationBlock" })).toEqual({
+      width: 320,
+      height: 320,
+    });
+  });
+
   it("preserves a resized form width while expanding it to fit its content", () => {
     const result = reconcileMeasuredFormBlockPosition({
       current: { x: 72, y: 40, width: 420, height: 300 },

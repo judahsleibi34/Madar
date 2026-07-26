@@ -11,7 +11,11 @@ export default function PageBuilderPageInspector({
       <h3>Page Settings</h3>
       <label>
         Page name
-        <input value={page.name || ""} onChange={(event) => onUpdate({ name: event.target.value })} />
+        <input
+          value={page.name || ""}
+          onChange={(event) => onUpdate({ name: event.target.value })}
+          onBlur={(event) => onUpdate({ name: event.target.value.trim() || "Untitled page" })}
+        />
       </label>
       <label>
         Navigation label

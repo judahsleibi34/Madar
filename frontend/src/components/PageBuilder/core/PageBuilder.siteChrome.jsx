@@ -34,6 +34,7 @@ export const createSiteChromeRenderers = ({
   activePage,
   selected,
   preview,
+  publicRuntime = false,
   selectPage,
   setSelected,
 }) => {
@@ -42,6 +43,20 @@ export const createSiteChromeRenderers = ({
     if (!site.showHeader) return null;
 
     const logoSrc = resolveMediaUrl(site.logoUrl);
+    const brandLabel = String(site.brand ?? "").trim();
+    const headerButtonLabel = String(site.headerButtonLabel ?? "").trim();
+    const headerActionPage = headerButtonLabel
+      ? findPageByNavigationReference(
+          project.pages,
+          site.headerButtonPageId || site.headerButtonHref || headerButtonLabel
+        )
+      : null;
+    const navigablePages = getNavigablePages(project.pages, {
+      excludePageIds: [headerActionPage?.id],
+    });
+    const closeMobileMenu = (event) => {
+      event.currentTarget.closest("details")?.removeAttribute("open");
+    };
     const navigateHeaderButton = (event) => {
       event.stopPropagation();
 
@@ -69,19 +84,12 @@ export const createSiteChromeRenderers = ({
               if (homePage) selectPage(homePage.id);
             }}
           >
-            {logoSrc ? <img src={logoSrc} alt={`${site.brand || "Website"} logo`} /> : <span className="logo-fallback">M</span>}
-            <span>{site.brand || "Website"}</span>
+            {logoSrc ? <img src={logoSrc} alt={`${brandLabel || "Website"} logo`} /> : brandLabel ? <span className="logo-fallback">{brandLabel.slice(0, 1).toUpperCase()}</span> : null}
+            {brandLabel && <span>{brandLabel}</span>}
           </button>
 
           <nav className="built-site-nav">
-            {getNavigablePages(project.pages, {
-              excludePageIds: [
-                findPageByNavigationReference(
-                  project.pages,
-                  site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel
-                )?.id,
-              ],
-            }).map((page) => (
+            {navigablePages.map((page) => (
               <button
                 type="button"
                 key={page.id}
@@ -96,9 +104,49 @@ export const createSiteChromeRenderers = ({
             ))}
           </nav>
 
-          <button type="button" className="built-site-cta" onClick={navigateHeaderButton}>
-            {site.headerButtonLabel || "Contact"}
-          </button>
+          {headerButtonLabel && (
+            <button type="button" className="built-site-cta" onClick={navigateHeaderButton}>
+              {headerButtonLabel}
+            </button>
+          )}
+
+          {publicRuntime && (
+            <details className="built-site-mobile-menu">
+              <summary aria-label="Open navigation menu">
+                <span aria-hidden="true" />
+                <span aria-hidden="true" />
+                <span aria-hidden="true" />
+              </summary>
+              <div className="built-site-mobile-menu-panel">
+                {navigablePages.map((page) => (
+                  <button
+                    type="button"
+                    key={page.id}
+                    className={activePage?.id === page.id ? "active" : ""}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closeMobileMenu(event);
+                      selectPage(page.id);
+                    }}
+                  >
+                    {getPageNavigationLabel(page)}
+                  </button>
+                ))}
+                {headerButtonLabel && (
+                  <button
+                    type="button"
+                    className="built-site-mobile-menu-cta"
+                    onClick={(event) => {
+                      closeMobileMenu(event);
+                      navigateHeaderButton(event);
+                    }}
+                  >
+                    {headerButtonLabel}
+                  </button>
+                )}
+              </div>
+            </details>
+          )}
         </div>
       </header>
     );
@@ -109,16 +157,19 @@ export const createSiteChromeRenderers = ({
     if (!site.showFooter) return null;
 
     const pageLinks = splitLines(site.footerShopLinks || "");
-    const helpLinks = splitLines(site.footerHelpLinks || "About Us\nPolicies\nContact");
+    const helpLinks = splitLines(site.footerHelpLinks || "");
     const socialLinks = getFooterLinkItems(
       site.footerSocialItems,
-      site.footerSocialLinks || "Facebook\nLinkedIn\nX\nInstagram"
+      site.footerSocialLinks || ""
     );
     const paymentMethods = getFooterLinkItems(
       site.footerPaymentItems,
       site.footerPaymentMethods || ""
     );
-    const footerBrand = site.footerStoreName || site.brand || "Your Brand";
+    const footerBrand = String(site.footerStoreName ?? "").trim();
+    const contactEmail = String(site.contactEmail ?? "").trim();
+    const contactPhone = String(site.phone ?? "").trim();
+    const footerRights = String(site.rights ?? "").trim();
     const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || "B";
     const resolveFooterPageLink = (value) => {
       const normalizedValue = String(value || "").toLowerCase().replace(/^\//, "").trim();
@@ -163,10 +214,10 @@ export const createSiteChromeRenderers = ({
             <div className="ecommerce-footer-logo-row">
               {resolveMediaUrl(site.logoUrl) ? (
                 <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={`${footerBrand} logo`} />
-              ) : (
+              ) : footerBrand ? (
                 <div className="ecommerce-footer-logo footer-logo-fallback">{footerInitial}</div>
-              )}
-              <h3>{footerBrand}</h3>
+              ) : null}
+              {footerBrand && <h3>{footerBrand}</h3>}
             </div>
 
             <p>{site.description}</p>
@@ -206,14 +257,18 @@ export const createSiteChromeRenderers = ({
 
           <div className="ecommerce-footer-contact">
             <h4>Contact Info</h4>
-            <a className="ecommerce-contact-row" href={`mailto:${site.contactEmail || "info@madar.com"}`} onClick={(event) => event.stopPropagation()}>
-              <Mail size={19} aria-hidden="true" />
-              <span>{site.contactEmail || "info@madar.com"}</span>
-            </a>
-            <a className="ecommerce-contact-row" href={`tel:${String(site.phone || "+972599203857").replace(/\s+/g, "")}`} dir="ltr" onClick={(event) => event.stopPropagation()}>
-              <Phone size={19} aria-hidden="true" />
-              <span>{site.phone || "+972599203857"}</span>
-            </a>
+            {contactEmail && (
+              <a className="ecommerce-contact-row" href={`mailto:${contactEmail}`} onClick={(event) => event.stopPropagation()}>
+                <Mail size={19} aria-hidden="true" />
+                <span>{contactEmail}</span>
+              </a>
+            )}
+            {contactPhone && (
+              <a className="ecommerce-contact-row" href={`tel:${contactPhone.replace(/\s+/g, "")}`} dir="ltr" onClick={(event) => event.stopPropagation()}>
+                <Phone size={19} aria-hidden="true" />
+                <span>{contactPhone}</span>
+              </a>
+            )}
             {paymentMethods.length > 0 && (
               <div className="ecommerce-payment-row">
                 {paymentMethods.map((item) => {
@@ -239,7 +294,7 @@ export const createSiteChromeRenderers = ({
         </div>
 
         <div className="ecommerce-footer-bottom">
-          <p>© 2026 {site.footerStoreName || site.brand || "Your Website"}. {site.rights || "All rights reserved."}</p>
+          <p>© 2026{footerBrand ? ` ${footerBrand}.` : ""}{footerRights ? ` ${footerRights}` : ""}</p>
           <button type="button" className="powered-by-madar">Powered by Madar</button>
         </div>
       </footer>

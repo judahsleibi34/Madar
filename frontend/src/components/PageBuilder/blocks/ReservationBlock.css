@@ -653,3 +653,160 @@
     font-size: 11px;
   }
 }
+
+/* Compact fixed-slot booking card. Dates and times come from the connected
+   reservation definition configured in the Reservations workspace. */
+.reservation-block.is-fixed-slots {
+  min-height: 0;
+  padding: clamp(22px, 4cqw, 34px);
+  gap: clamp(18px, 3cqw, 26px);
+  border: 1px solid var(--form-theme-border, var(--theme-border));
+  border-radius: var(--form-theme-radius, 18px);
+  background: var(--form-theme-surface, var(--theme-surface));
+  box-shadow: 0 18px 48px rgba(var(--theme-shadow-rgb), 0.08);
+}
+
+.reservation-block.is-fixed-slots .reservation-block-header > div:first-child {
+  gap: 9px;
+}
+
+.reservation-block.is-fixed-slots .reservation-block-header span {
+  padding: 0;
+  background: transparent;
+  color: var(--form-theme-accent, var(--theme-primary));
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+}
+
+.reservation-block.is-fixed-slots .reservation-block-header h3 {
+  max-width: 22ch;
+  font-size: clamp(26px, 5cqw, 36px);
+  line-height: 1.04;
+}
+
+.reservation-block.is-fixed-slots .reservation-block-header p {
+  max-width: 58ch;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-picker {
+  gap: 0;
+}
+
+.fixed-slot-booking-controls {
+  display: grid;
+  gap: 20px;
+}
+
+.fixed-slot-date-control {
+  display: grid;
+  gap: 7px;
+}
+
+.fixed-slot-date-control > span,
+.reservation-block.is-fixed-slots .fixed-slot-times > span {
+  color: var(--form-theme-text, var(--theme-text));
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fixed-slot-date-control > div {
+  position: relative;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-date-control select {
+  min-height: 42px;
+  padding-inline-end: 42px;
+  appearance: none;
+}
+
+.fixed-slot-date-control svg {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--form-theme-muted, var(--theme-text-soft));
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-times {
+  padding: 0;
+  gap: 8px;
+  background: transparent;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-times > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-times button {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: var(--form-theme-input, var(--theme-surface));
+  font-size: 12px;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-contact-grid {
+  gap: 12px;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-contact-grid .reservation-field-name {
+  grid-column: 1 / -1;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-contact-grid :is(
+  .reservation-field-email,
+  .reservation-field-phone
+) {
+  grid-column: span 6;
+}
+
+.reservation-block.is-fixed-slots .fixed-slot-contact-grid .reservation-field-notes {
+  grid-column: 1 / -1;
+}
+
+.reservation-block.is-fixed-slots :is(input, select) {
+  min-height: 40px;
+}
+
+.reservation-block.is-fixed-slots .reservation-footer {
+  display: grid;
+  gap: 9px;
+}
+
+.reservation-block.is-fixed-slots .reservation-submit {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+}
+
+.reservation-block.is-fixed-slots .reservation-helper {
+  max-width: none;
+  text-align: center;
+}
+
+@container (max-width: 460px) {
+  .reservation-block.is-fixed-slots {
+    padding: 20px;
+  }
+
+  .reservation-block.is-fixed-slots .fixed-slot-times > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reservation-block.is-fixed-slots .fixed-slot-contact-grid :is(
+    .reservation-field-email,
+    .reservation-field-phone
+  ) {
+    grid-column: 1 / -1;
+  }
+}

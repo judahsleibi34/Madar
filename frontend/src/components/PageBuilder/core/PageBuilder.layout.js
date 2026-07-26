@@ -60,7 +60,7 @@ export const getMetricMinimumHeight = () => 170;
 
 export const getDirectElementMinimumSize = (element) => {
   if (element?.type === "reservationBlock") {
-    return { width: 360, height: 770 };
+    return { width: 320, height: 320 };
   }
 
   if (element?.type === "button") {
@@ -268,6 +268,7 @@ export const commitDirectElementInteraction = (sections, {
   sourceSectionId,
   targetSectionId = "",
   viewportName = "desktop",
+  elementUpdates = null,
 } = {}) => {
   const isCrossSectionMove = Boolean(
     movedElement && targetSectionId && sourceSectionId !== targetSectionId
@@ -319,6 +320,7 @@ export const commitDirectElementInteraction = (sections, {
         element.id === elementId
           ? {
               ...element,
+              ...(elementUpdates || {}),
               position: {
                 ...(element.position || {}),
                 [viewportName]: previewPosition,

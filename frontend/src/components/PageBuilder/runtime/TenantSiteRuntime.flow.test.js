@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getRuntimeAuthFlow,
   getRuntimeCanvasScale,
+  getRuntimeViewportForWidth,
   getRuntimeNavigationPages,
   getRuntimePageSections,
   getSafeProtectedReturnPath,
@@ -35,6 +36,17 @@ describe("tenant runtime page flow", () => {
     expect(getRuntimeCanvasScale(1000, 1200)).toBeCloseTo(5 / 6);
     expect(getRuntimeCanvasScale(390, 390)).toBe(1);
     expect(getRuntimeCanvasScale(1600, 1200)).toBe(1);
+  });
+
+  it("uses mobile geometry for common modern phone widths", () => {
+    expect(getRuntimeViewportForWidth(320)).toBe("mobile");
+    expect(getRuntimeViewportForWidth(390)).toBe("mobile");
+    expect(getRuntimeViewportForWidth(412)).toBe("mobile");
+    expect(getRuntimeViewportForWidth(430)).toBe("mobile");
+    expect(getRuntimeViewportForWidth(480)).toBe("mobile");
+    expect(getRuntimeViewportForWidth(600)).toBe("tablet");
+    expect(getRuntimeViewportForWidth(768)).toBe("tablet");
+    expect(getRuntimeViewportForWidth(769)).toBe("desktop");
   });
 
   it("accepts only internal protected-page return paths", () => {

@@ -12,6 +12,8 @@ const requiredFields = reservationDefaults.requiredFields;
 const initialValues = (service) => ({
   name: "",
   contact: "",
+  email: "",
+  phone: "",
   service,
   date: "",
   time: "",
@@ -89,8 +91,9 @@ export default function ReservationBlock({
     event.preventDefault();
 
     const nextErrors = {};
-    requiredFields
-      .filter((key) => enabledFields.includes(key))
+    (isFixedSlots
+      ? ["name", "email", "phone", "date", "time"]
+      : requiredFields.filter((key) => enabledFields.includes(key)))
       .filter((key) => key !== "service" || serviceOptions.length > 0)
       .forEach((key) => {
         if (!String(values[key] || "").trim()) {
@@ -106,6 +109,7 @@ export default function ReservationBlock({
     try {
       const submitted = await onSubmit?.({
         ...values,
+        ...(isFixedSlots ? { contact: values.phone } : {}),
         guests: Number(values.guests) || 1,
       }, idempotencyKey, honeypot, Math.min(
         86_400_000,
@@ -206,6 +210,7 @@ export default function ReservationBlock({
       </label>
       <div className="reservation-block-header">
         <div>
+          {isFixedSlots && <span>Book an appointment</span>}
           <h3>{title}</h3>
           <p>{description}</p>
         </div>
@@ -226,8 +231,40 @@ export default function ReservationBlock({
       )}
 
       {isFixedSlots ? (
-        <div className="reservation-grid">
-          {defaultFields.map((key) => renderField(key))}
+        <div className="reservation-grid fixed-slot-contact-grid">
+          <label className={`reservation-field reservation-field-name ${errors.name ? "has-error" : ""}`}>
+            Full name *
+            <input
+              value={values.name}
+              disabled={submissionDisabled}
+              placeholder="Enter your full name"
+              onChange={(event) => updateValue("name", event.target.value)}
+            />
+            {errors.name && <strong>{errors.name}</strong>}
+          </label>
+          <label className={`reservation-field reservation-field-email ${errors.email ? "has-error" : ""}`}>
+            Email address *
+            <input
+              type="email"
+              value={values.email}
+              disabled={submissionDisabled}
+              placeholder="you@example.com"
+              onChange={(event) => updateValue("email", event.target.value)}
+            />
+            {errors.email && <strong>{errors.email}</strong>}
+          </label>
+          <label className={`reservation-field reservation-field-phone ${errors.phone ? "has-error" : ""}`}>
+            Phone number *
+            <input
+              type="tel"
+              value={values.phone}
+              disabled={submissionDisabled}
+              placeholder="+1 555 123 4567"
+              onChange={(event) => updateValue("phone", event.target.value)}
+            />
+            {errors.phone && <strong>{errors.phone}</strong>}
+          </label>
+          {renderField("notes")}
         </div>
       ) : (
         <div className="reservation-request-form">

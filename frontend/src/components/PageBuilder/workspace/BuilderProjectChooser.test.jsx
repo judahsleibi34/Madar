@@ -30,6 +30,20 @@ describe("BuilderProjectChooser", () => {
     expect(container.querySelectorAll(".builder-project-loading-row")).toHaveLength(3);
   });
 
+  it("shows a responsive Builder workspace preview while automatically entering a project", () => {
+    listBuilderProjects.mockReturnValue(new Promise(() => {}));
+    const { container } = render(
+      <MemoryRouter><BuilderProjectChooser autoEnterProject /></MemoryRouter>
+    );
+
+    expect(screen.getByRole("status").textContent).toContain("Opening the Page Builder");
+    expect(container.querySelector(".builder-project-loading-screen").getAttribute("aria-busy"))
+      .toBe("true");
+    expect(container.querySelector(".builder-project-opening-preview")).toBeTruthy();
+    expect(container.querySelector(".builder-project-opening-canvas")).toBeTruthy();
+    expect(container.querySelector(".builder-project-opening-inspector")).toBeTruthy();
+  });
+
   it("keeps two backend projects explicit and opens the selected one", async () => {
     listBuilderProjects.mockResolvedValue({
       projects: [

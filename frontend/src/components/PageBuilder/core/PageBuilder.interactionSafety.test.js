@@ -49,4 +49,18 @@ describe("direct interaction commit safety", () => {
     expect(committed[0].layout.minHeight).toBe(600);
     expect(committed[0].layout.minHeightByViewport.desktop).toBe(600);
   });
+
+  it("stores interaction metadata with the resized element", () => {
+    const committed = commitDirectElementInteraction(sections, {
+      elementId: "element-a",
+      previewPosition: { ...originalFrame, width: 500 },
+      previewSectionHeight: 720,
+      sourceSectionId: "section-a",
+      viewportName: "desktop",
+      elementUpdates: { directWidthMode: "fixed" },
+    });
+
+    expect(committed[0].freeElements[0].directWidthMode).toBe("fixed");
+    expect(committed[0].freeElements[0].position.desktop.width).toBe(500);
+  });
 });
