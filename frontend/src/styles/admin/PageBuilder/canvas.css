@@ -1301,11 +1301,11 @@
   pointer-events: auto;
 }
 
-.direct-element-frame:hover {
+.page-builder:not(.preview-mode) .direct-element-frame:hover {
   border-color: rgba(var(--theme-primary-rgb), 0.3);
 }
 
-.direct-element-frame.is-selected {
+.page-builder:not(.preview-mode) .direct-element-frame.is-selected {
   z-index: 4;
   border-color: var(--madar-red);
   box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.12);
