@@ -270,7 +270,7 @@
 
 @container site-footer (max-width: 520px) {
   .ecommerce-style-footer {
-    padding-inline: 22px;
+    padding: 32px 24px 24px;
   }
 
   .ecommerce-style-footer .ecommerce-footer-grid,
@@ -278,11 +278,50 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .ecommerce-style-footer .ecommerce-footer-grid {
+    gap: 36px;
+  }
+
   .ecommerce-style-footer .ecommerce-footer-brand {
     grid-column: auto;
   }
 
+  .ecommerce-style-footer :is(
+    .ecommerce-footer-brand,
+    .ecommerce-footer-column,
+    .ecommerce-footer-contact
+  ) {
+    width: 100%;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-logo-row {
+    justify-content: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-social-row,
+  .ecommerce-style-footer .ecommerce-payment-row {
+    justify-content: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-links-grid {
+    width: min(100%, 290px);
+    gap: 14px 24px;
+  }
+
+  .ecommerce-style-footer .ecommerce-contact-row {
+    width: min(100%, 220px);
+    grid-template-columns: 22px minmax(0, 1fr);
+    justify-self: center;
+    text-align: start;
+  }
+
   .ecommerce-style-footer .ecommerce-footer-bottom {
+    width: 100%;
+    margin-top: 32px;
+    padding-top: 22px;
+    gap: 16px;
     justify-items: center;
     text-align: center;
   }

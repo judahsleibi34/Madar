@@ -81,7 +81,7 @@ export const getDirectElementFrameStyle = ({
   canvasScale = 1,
 }) => {
   const minimumSize = getDirectElementMinimumSize(element);
-  const clamped = clampElementToBounds(
+  let clamped = clampElementToBounds(
     {
       ...(position || {}),
       width: Number(position?.width) || 240,
@@ -94,6 +94,24 @@ export const getDirectElementFrameStyle = ({
       allowBottomOverflow: true,
     }
   );
+  // Headings should use the space that is actually available in their row.
+  // Older saved headings do not have directWidthMode, so they inherit the
+  // improved auto-width behavior too. A resize interaction marks the heading
+  // as fixed and preserves the width chosen by the user.
+  if (element.type === "heading" && element.directWidthMode !== "fixed") {
+    clamped = clampElementToBounds(
+      {
+        ...clamped,
+        width: Math.max(minimumSize.width, viewportWidth - clamped.x),
+      },
+      { x: 0, y: 0, width: viewportWidth, height: sectionHeight },
+      {
+        minWidth: minimumSize.width,
+        minHeight: minimumSize.height,
+        allowBottomOverflow: true,
+      }
+    );
+  }
   const { x, y, width, height } = clamped;
 
   return {

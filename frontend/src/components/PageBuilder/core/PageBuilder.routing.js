@@ -86,15 +86,23 @@ export const createNextGeneratedPageName = (pages = []) => {
   return `Page ${nextNumber}`;
 };
 
-export const createUniqueBuilderPageName = ({ name, pages = [], currentPageId = "" } = {}) => {
-  const baseName = String(name || "Untitled page").trim() || "Untitled page";
+export const createUniqueBuilderPageName = ({
+  name,
+  pages = [],
+  currentPageId = "",
+  preserveOuterWhitespace = false,
+} = {}) => {
+  const rawName = String(name ?? "");
+  const baseName = rawName.trim() || "Untitled page";
   const otherPages = (Array.isArray(pages) ? pages : []).filter(
     (page) => String(page?.id || "") !== String(currentPageId || "")
   );
   const usedNames = new Set(
     otherPages.map((page) => String(page?.name || page?.title || "").trim().toLowerCase())
   );
-  if (!usedNames.has(baseName.toLowerCase())) return baseName;
+  if (!usedNames.has(baseName.toLowerCase())) {
+    return preserveOuterWhitespace ? rawName : baseName;
+  }
   if (/^page\s+\d+$/i.test(baseName)) return createNextGeneratedPageName(otherPages);
 
   let suffix = 2;

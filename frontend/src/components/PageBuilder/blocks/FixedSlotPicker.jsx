@@ -37,53 +37,63 @@ export default function FixedSlotPicker({
     month: "long",
     year: "numeric",
   });
-  const weekdayFormatter = new Intl.DateTimeFormat(lang, { weekday: "short" });
-  const monthFormatter = new Intl.DateTimeFormat(lang, { month: "short" });
+
+  useEffect(() => {
+    if (selectedDate || fixedDates.length === 0) return;
+    onSelect?.(fixedDates[0], "");
+  }, [fixedDates, onSelect, selectedDate]);
+
+  const activeDate = fixedDates.includes(selectedDate) ? selectedDate : fixedDates[0] || "";
+  const activeDateValue = parseLocalDate(activeDate);
 
   return (
     <fieldset className={`fixed-slot-picker ${error ? "has-error" : ""}`}>
-      <legend>Choose a date and time</legend>
-      <p>Select one of the available appointment times.</p>
+      <legend className="sr-only">Choose an appointment date and time</legend>
 
       {fixedDates.length > 0 && fixedTimes.length > 0 ? (
-        <div className="fixed-slot-agenda">
-          {fixedDates.map((dateValue) => {
-            const date = parseLocalDate(dateValue);
-            if (!date) return null;
+        <div className="fixed-slot-booking-controls">
+          <label className="fixed-slot-date-control">
+            <span>Appointment date</span>
+            <div>
+              <select
+                aria-label="Appointment date"
+                value={activeDate}
+                disabled={disabled}
+                onChange={(event) => onSelect?.(event.target.value, "")}
+              >
+                {fixedDates.map((dateValue) => {
+                  const date = parseLocalDate(dateValue);
+                  return date ? (
+                    <option value={dateValue} key={dateValue}>{fullDateFormatter.format(date)}</option>
+                  ) : null;
+                })}
+              </select>
+              <CalendarDays size={17} aria-hidden="true" />
+            </div>
+          </label>
 
-            return (
-              <div className="fixed-slot-row" key={dateValue}>
-                <div className="fixed-slot-date">
-                  <span>{weekdayFormatter.format(date)}</span>
-                  <strong>{date.getDate()}</strong>
-                  <small>{monthFormatter.format(date)}</small>
-                </div>
-                <div className="fixed-slot-times">
-                  <span>Available times</span>
-                  <div>
-                    {fixedTimes.map((timeValue) => {
-                      const selected = selectedDate === dateValue && selectedTime === timeValue;
-                      const timeLabel = formatSlotTime(timeValue, lang);
-
-                      return (
-                        <button
-                          type="button"
-                          key={`${dateValue}_${timeValue}`}
-                          className={selected ? "is-selected" : ""}
-                          aria-pressed={selected}
-                          aria-label={`${fullDateFormatter.format(date)} at ${timeLabel}`}
-                          disabled={disabled}
-                          onClick={() => onSelect?.(dateValue, timeValue)}
-                        >
-                          {timeLabel}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <div className="fixed-slot-times">
+            <span>Available time slots</span>
+            <div>
+              {fixedTimes.map((timeValue) => {
+                const selected = activeDate === selectedDate && selectedTime === timeValue;
+                const timeLabel = formatSlotTime(timeValue, lang);
+                return (
+                  <button
+                    type="button"
+                    key={`${activeDate}_${timeValue}`}
+                    className={selected ? "is-selected" : ""}
+                    aria-pressed={selected}
+                    aria-label={`${activeDateValue ? fullDateFormatter.format(activeDateValue) : activeDate} at ${timeLabel}`}
+                    disabled={disabled || !activeDate}
+                    onClick={() => onSelect?.(activeDate, timeValue)}
+                  >
+                    {timeLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="fixed-slot-empty">No appointment slots are available yet.</div>
@@ -93,3 +103,5 @@ export default function FixedSlotPicker({
     </fieldset>
   );
 }
+import { useEffect } from "react";
+import { CalendarDays } from "lucide-react";

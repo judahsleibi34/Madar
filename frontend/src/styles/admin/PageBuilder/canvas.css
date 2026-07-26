@@ -168,9 +168,9 @@
 
 .built-site-nav button.active,
 .built-site-nav button:hover {
-  background: var(--madar-red);
-  color: var(--theme-text-inverse);
-  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.16);
+  background: transparent;
+  color: var(--madar-red);
+  box-shadow: none;
 }
 
 .built-site-cta {
@@ -178,10 +178,16 @@
   border-radius: 999px;
   padding: 11px 16px;
   cursor: pointer;
-  color: var(--theme-text-inverse);
-  background: var(--madar-red);
-  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18);
+  color: var(--madar-red);
+  background: transparent;
+  box-shadow: none;
   font-weight: 950;
+}
+
+.built-site-cta:hover {
+  color: var(--theme-primary-hover);
+  background: transparent;
+  box-shadow: none;
 }
 
 .site-section {
@@ -1423,6 +1429,18 @@
 
 .direct-element-frame-reservationBlock .builder-element-reservationBlock {
   width: 100%;
+  overflow: visible;
+}
+
+.direct-element-frame-reservationBlock.is-fixed-size .direct-element-content {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.direct-element-frame-reservationBlock.is-fixed-size .direct-element-content > .builder-element-reservationBlock {
+  height: auto;
+  min-height: 100%;
   overflow: visible;
 }
 

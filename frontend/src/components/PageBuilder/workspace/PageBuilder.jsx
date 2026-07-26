@@ -4156,6 +4156,7 @@ export default function PageBuilder({
           let geometryChanged = false;
           const freeElements = (section.freeElements || []).map((item) => {
             if (item.id !== elementId || !["formBlock", "reservationBlock"].includes(item.type)) return item;
+            if (item.type === "reservationBlock" && item.directSizeMode === "fixed") return item;
 
             const current = item.position?.[viewport] || createPosition()[viewport];
             const bounds = liveBounds || {
@@ -4308,7 +4309,7 @@ export default function PageBuilder({
     if (!immediateParent || !pointer) return;
 
     const minimumSize = getDirectElementMinimumSize(element);
-    const current = clampElementToBounds(
+    let current = clampElementToBounds(
       element.position?.[viewport] || createPosition()[viewport],
       pointer.bounds,
       {
@@ -4317,6 +4318,16 @@ export default function PageBuilder({
         allowBottomOverflow: true,
       }
     );
+    if (
+      interaction === "resize" &&
+      element.type === "heading" &&
+      element.directWidthMode !== "fixed"
+    ) {
+      current = {
+        ...current,
+        width: Math.max(minimumSize.width, pointer.bounds.width - current.x),
+      };
+    }
 
     setSelected({ type: "element", id: element.id });
     setDragState({
@@ -5221,6 +5232,14 @@ export default function PageBuilder({
         previewSectionHeight: finalPreview.previewSectionHeight,
         sourceSectionId: sourceLocation.sectionId,
         viewportName: viewport,
+        elementUpdates:
+          dragState.interaction === "resize"
+            ? selectedElement.type === "heading"
+              ? { directWidthMode: "fixed" }
+              : selectedElement.type === "reservationBlock"
+                ? { directSizeMode: "fixed" }
+                : null
+            : null,
       }));
     }
 
@@ -5901,7 +5920,11 @@ export default function PageBuilder({
                     {(section.freeElements || []).map((element) => {
                       const elementSelected = selected.type === "element" && selected.id === element.id;
                       const usesDetachedEditBoundary = elementSelected && element.layer === "behindText" && !preview;
-                      const hasResponsiveContentHeight = ["formBlock", "reservationBlock"].includes(element.type);
+                      const hasFixedReservationSize =
+                        element.type === "reservationBlock" && element.directSizeMode === "fixed";
+                      const hasResponsiveContentHeight =
+                        element.type === "formBlock" ||
+                        (element.type === "reservationBlock" && !hasFixedReservationSize);
                       const DirectFrame = hasResponsiveContentHeight ? PageBuilderMeasuredFrame : "div";
 
                       return (
@@ -5915,7 +5938,7 @@ export default function PageBuilder({
                                     reconcileDirectContentBlockSize(section.id, element.id, height / canvasScale),
                                 }
                               : {})}
-                            className={`direct-element-frame direct-element-frame-${element.type} ${elementSelected && !usesDetachedEditBoundary ? "is-selected" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""}`}
+                            className={`direct-element-frame direct-element-frame-${element.type} ${hasFixedReservationSize ? "is-fixed-size" : ""} ${elementSelected && !usesDetachedEditBoundary ? "is-selected" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""}`}
                             data-builder-element-id={element.id}
                             style={getDirectElementFrameStyle(element)}
                             tabIndex={-1}
@@ -6131,6 +6154,7 @@ export default function PageBuilder({
                 name: changes.name,
                 pages: prev.pages,
                 currentPageId: activePage.id,
+                preserveOuterWhitespace: true,
               });
               nextChanges.slug = createUniquePublicPageSlug({
                 name: nextChanges.name,

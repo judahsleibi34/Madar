@@ -43,4 +43,20 @@ describe("PageBuilderPageInspector", () => {
     fireEvent.change(screen.getByLabelText("Navigation label"), { target: { value: "Start" } });
     expect(onUpdate).toHaveBeenCalledWith({ navigationLabel: "Start" });
   });
+
+  it("preserves a typed space so multi-word page names can be entered", () => {
+    const onUpdate = vi.fn();
+    render(
+      <PageBuilderPageInspector
+        page={{ id: "home", name: "Home", slug: "/", isDefault: true }}
+        hasRoutingIssue={false}
+        onSetDefault={vi.fn()}
+        onUpdate={onUpdate}
+      />
+    );
+
+    const input = screen.getByLabelText("Page name");
+    fireEvent.change(input, { target: { value: "Home " } });
+    expect(onUpdate).toHaveBeenCalledWith({ name: "Home " });
+  });
 });

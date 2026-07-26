@@ -63,6 +63,9 @@ const renderPublic = ({
   showFooter = true,
   footerShopLinks = "",
   footerHelpLinks = "",
+  headerButtonLabel = "",
+  contactEmail = "",
+  phone = "",
 } = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSite.mockResolvedValue({
@@ -70,7 +73,16 @@ const renderPublic = ({
     project: {
       published_schema: {
         defaultPageId: "home",
-        siteChrome: { showHeader, showFooter, brand: "Route Test", footerShopLinks, footerHelpLinks },
+        siteChrome: {
+          showHeader,
+          showFooter,
+          brand: "Route Test",
+          footerShopLinks,
+          footerHelpLinks,
+          headerButtonLabel,
+          contactEmail,
+          phone,
+        },
         theme: {},
         forms: [],
         pages: [
@@ -156,6 +168,20 @@ describe("TenantSiteRuntime explicit project preview", () => {
 
     expect(screen.queryByText("page_restricted-12345678")).toBeNull();
     expect(screen.getByText("About Us")).toBeTruthy();
+  });
+
+  it("keeps intentionally blank header and contact settings blank", async () => {
+    renderPublic();
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
+    });
+
+    expect(document.querySelector(".built-site-cta")).toBeNull();
+    expect(document.querySelector(".built-site-mobile-menu-cta")).toBeNull();
+    expect(document.querySelectorAll(".ecommerce-contact-row")).toHaveLength(0);
+    expect(screen.queryByText("info@madar.com")).toBeNull();
+    expect(screen.queryByText("+972599203857")).toBeNull();
   });
 });
 

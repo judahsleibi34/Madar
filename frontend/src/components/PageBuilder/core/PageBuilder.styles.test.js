@@ -5,6 +5,13 @@ import {
   getBuilderFreeElementStyle,
   getDirectElementFrameStyle,
 } from "./PageBuilder.styles";
+import { viewports } from "./PageBuilder.constants";
+import { createElement, createPosition } from "./PageBuilder.factories";
+import {
+  directElementHeight,
+  getDirectElementMinimumSize,
+  getMetricMinimumHeight,
+} from "./PageBuilder.layout";
 
 describe("getBuilderElementStyle", () => {
   it("preserves independent image scale variables", () => {
@@ -26,6 +33,51 @@ describe("getBuilderElementStyle", () => {
 });
 
 describe("getBuilderFreeElementStyle", () => {
+  it("keeps every direct component inside desktop, tablet, and mobile canvases", () => {
+    const componentTypes = [
+      "heading",
+      "text",
+      "button",
+      "image",
+      "card",
+      "carousel",
+      "list",
+      "divider",
+      "thinDivider",
+      "embed",
+      "metric",
+      "loginBlock",
+      "registrationBlock",
+      "formBlock",
+      "reservationBlock",
+    ];
+
+    componentTypes.forEach((type) => {
+      const element = createElement(type);
+      Object.entries(viewports).forEach(([viewportName, viewportWidth]) => {
+        const base = createPosition()[viewportName];
+        const minimum = getDirectElementMinimumSize(element);
+        const position = {
+          ...base,
+          width: Math.max(base.width, minimum.width),
+          height: Math.max(directElementHeight(element), minimum.height),
+        };
+        const style = getDirectElementFrameStyle({
+          element,
+          position,
+          viewportWidth,
+          sectionHeight: 1000,
+          getMetricMinimumHeight,
+          getDirectElementMinimumSize,
+        });
+
+        expect(Number.parseFloat(style.width), `${type} width at ${viewportName}`).toBeLessThanOrEqual(viewportWidth);
+        expect(Number.parseFloat(style.maxWidth), `${type} max-width at ${viewportName}`).toBeLessThanOrEqual(viewportWidth);
+        expect(minimum.width, `${type} minimum width at ${viewportName}`).toBeLessThanOrEqual(viewportWidth);
+      });
+    });
+  });
+
   it("uses the same unscaled geometry contract consumed by Go Live", () => {
     const element = {
       id: "heading-1",
@@ -56,6 +108,26 @@ describe("getBuilderFreeElementStyle", () => {
     });
 
     expect(liveStyle).toEqual(builderStyle);
+    expect(builderStyle.width).toBe("1120px");
+    expect(builderStyle.maxWidth).toBe("1120px");
+  });
+
+  it("preserves a heading width after the user explicitly resizes it", () => {
+    const style = getDirectElementFrameStyle({
+      element: {
+        id: "heading-fixed",
+        type: "heading",
+        directWidthMode: "fixed",
+      },
+      position: { x: 80, y: 120, width: 560, height: 96 },
+      viewportWidth: 1200,
+      sectionHeight: 720,
+      getMetricMinimumHeight: () => 80,
+      getDirectElementMinimumSize: () => ({ width: 120, height: 48 }),
+    });
+
+    expect(style.width).toBe("560px");
+    expect(style.maxWidth).toBe("1120px");
   });
 
   it("moves a recovered element inside the canvas without collapsing its width", () => {

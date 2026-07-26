@@ -32,16 +32,45 @@ describe("ReservationBlock fixed slots", () => {
     fireEvent.click(slot);
     expect(slot.getAttribute("aria-pressed")).toBe("true");
 
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Madar User" } });
-    fireEvent.change(screen.getByLabelText("Contact"), { target: { value: "user@example.com" } });
+    expect(screen.getByLabelText("Appointment date").value).toBe("2026-07-14");
+    fireEvent.change(screen.getByLabelText("Full name *"), { target: { value: "Madar User" } });
+    fireEvent.change(screen.getByLabelText("Email address *"), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText("Phone number *"), { target: { value: "+972599000000" } });
     fireEvent.click(screen.getByRole("button", { name: "Book slot" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).toEqual(expect.objectContaining({
       date: "2026-07-14",
       time: "12:00",
+      email: "user@example.com",
+      phone: "+972599000000",
+      contact: "+972599000000",
       service: "Consultation",
     }));
+  });
+
+  it("updates the public choices when Reservations-page slots change", async () => {
+    const { rerender } = render(
+      <ReservationBlock
+        bookingMode="restricted"
+        availableDates={["2026-07-14"]}
+        timeSlots={["09:00"]}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: /July 14, 2026 at 9:00 AM/i })).toBeTruthy();
+
+    rerender(
+      <ReservationBlock
+        bookingMode="restricted"
+        availableDates={["2026-07-20"]}
+        timeSlots={["14:30"]}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Appointment date").value).toBe("2026-07-20"));
+    expect(screen.getByRole("button", { name: /July 20, 2026 at 2:30 PM/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /July 14, 2026 at 9:00 AM/i })).toBeNull();
   });
 
   it("keeps free date and time inputs for visitor date requests", () => {

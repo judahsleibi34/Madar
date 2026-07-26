@@ -309,12 +309,21 @@ const getCleanSubdomain = (value = "") =>
     .replace(/-{2,}/g, "-")
     .replace(/^-+|-+$/g, "") || runtimeFallbackCopy.runtime.subdomain;
 
-const getScreenViewport = () => {
-  if (typeof window === "undefined") return "desktop";
-  if (window.innerWidth <= viewports.mobile) return "mobile";
-  if (window.innerWidth <= viewports.tablet) return "tablet";
+// Runtime breakpoints describe device classes, while `viewports` describes
+// the logical builder canvases. Keeping those concepts separate prevents
+// 412px and 430px phones from being rendered as a scaled-down tablet canvas.
+// eslint-disable-next-line react-refresh/only-export-components
+export const getRuntimeViewportForWidth = (width) => {
+  const availableWidth = Math.max(1, Number(width) || viewports.desktop);
+  if (availableWidth <= 480) return "mobile";
+  if (availableWidth <= viewports.tablet) return "tablet";
   return "desktop";
 };
+
+const getScreenViewport = () =>
+  typeof window === "undefined"
+    ? "desktop"
+    : getRuntimeViewportForWidth(window.innerWidth);
 
 const getRuntimeAvailableWidth = () => {
   if (typeof window === "undefined") return viewports.desktop;
@@ -1793,6 +1802,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     activePage,
     selected: { type: "", id: "" },
     preview: true,
+    publicRuntime: true,
     selectPage: selectCanvasPage,
     setSelected: () => {},
   });
@@ -1913,7 +1923,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                         .map((element) => (
                         <div
                           key={element.id}
-                          className={`direct-element-frame direct-element-frame-${element.type}`}
+                          className={`direct-element-frame direct-element-frame-${element.type} ${element.type === "reservationBlock" && element.directSizeMode === "fixed" ? "is-fixed-size" : ""}`}
                           style={getDirectElementFrameStyle(element, section)}
                         >
                           <div className="direct-element-content">

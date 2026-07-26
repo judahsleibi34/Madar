@@ -66,6 +66,15 @@ describe("public page routing contract", () => {
     expect(normalized.pages.map((page) => page.slug)).toEqual(["/", "/page-3", "/page-3-2"]);
   });
 
+  it("preserves trailing whitespace while a page name is being typed", () => {
+    expect(createUniqueBuilderPageName({
+      name: "Home ",
+      pages: [{ id: "home", name: "Home" }],
+      currentPageId: "home",
+      preserveOuterWhitespace: true,
+    })).toBe("Home ");
+  });
+
   it("keeps Home as root regardless of the editor-selected page", () => {
     const project = normalizeProjectPageRouting(multiPageProject);
 
