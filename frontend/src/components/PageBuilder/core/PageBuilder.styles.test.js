@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getBuilderElementStyle, getBuilderFreeElementStyle } from "./PageBuilder.styles";
+import {
+  getBuilderElementStyle,
+  getBuilderFreeElementStyle,
+  getDirectElementFrameStyle,
+} from "./PageBuilder.styles";
 
 describe("getBuilderElementStyle", () => {
   it("preserves independent image scale variables", () => {
@@ -22,6 +26,38 @@ describe("getBuilderElementStyle", () => {
 });
 
 describe("getBuilderFreeElementStyle", () => {
+  it("uses the same unscaled geometry contract consumed by Go Live", () => {
+    const element = {
+      id: "heading-1",
+      type: "heading",
+      position: { desktop: { x: 80, y: 120, width: 560, height: 96 } },
+    };
+    const sharedOptions = {
+      element,
+      getMetricMinimumHeight: () => 80,
+      getDirectElementMinimumSize: () => ({ width: 120, height: 48 }),
+    };
+    const builderStyle = getBuilderFreeElementStyle({
+      ...sharedOptions,
+      viewport: "desktop",
+      activePage: { sections: [{ id: "section-1" }] },
+      viewports: { desktop: 1200 },
+      createPosition: () => element.position,
+      findElementLocation: () => ({ sectionId: "section-1" }),
+      getSectionCanvasHeight: () => 720,
+      canvasScale: 1,
+    });
+    const liveStyle = getDirectElementFrameStyle({
+      ...sharedOptions,
+      position: element.position.desktop,
+      viewportWidth: 1200,
+      sectionHeight: 720,
+      canvasScale: 1,
+    });
+
+    expect(liveStyle).toEqual(builderStyle);
+  });
+
   it("moves a recovered element inside the canvas without collapsing its width", () => {
     const element = {
       id: "text-1",
