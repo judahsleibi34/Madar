@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getRuntimeAuthFlow,
+  getRuntimeCanvasScale,
   getRuntimeNavigationPages,
   getRuntimePageSections,
   getSafeProtectedReturnPath,
@@ -30,6 +31,12 @@ const formPage = {
 };
 
 describe("tenant runtime page flow", () => {
+  it("scales a logical canvas down to the available browser width", () => {
+    expect(getRuntimeCanvasScale(1000, 1200)).toBeCloseTo(5 / 6);
+    expect(getRuntimeCanvasScale(390, 390)).toBe(1);
+    expect(getRuntimeCanvasScale(1600, 1200)).toBe(1);
+  });
+
   it("accepts only internal protected-page return paths", () => {
     expect(getSafeProtectedReturnPath("?returnTo=%2Fmembers%2F")).toBe("/members");
     expect(getSafeProtectedReturnPath("?returnTo=%2F%2Fevil.example")).toBe("");

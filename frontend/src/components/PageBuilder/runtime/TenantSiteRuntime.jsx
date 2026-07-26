@@ -316,6 +316,21 @@ const getScreenViewport = () => {
   return "desktop";
 };
 
+const getRuntimeAvailableWidth = () => {
+  if (typeof window === "undefined") return viewports.desktop;
+  return Math.max(
+    1,
+    Number(document.documentElement?.clientWidth) || Number(window.innerWidth) || viewports.desktop
+  );
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getRuntimeCanvasScale = (availableWidth, logicalWidth) => {
+  const available = Math.max(1, Number(availableWidth) || 1);
+  const logical = Math.max(1, Number(logicalWidth) || 1);
+  return Math.min(1, available / logical);
+};
+
 const decodePathSegment = (value) => {
   try {
     return decodeURIComponent(value);
@@ -337,6 +352,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const cleanSubdomain = getCleanSubdomain(subdomain);
   const isPublicRuntime = !draftPreview;
   const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
+  const [runtimeAvailableWidth, setRuntimeAvailableWidth] = useState(getRuntimeAvailableWidth);
   const activePath = location.pathname;
   const previewBasePath = getBuilderPreviewBasePath(projectId);
   const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
@@ -925,7 +941,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   }, [activePage, location.search, navigate, pages, runtimeBasePath, tenantAuth.user]);
 
   useEffect(() => {
-    const syncViewport = () => setRuntimeViewport(getScreenViewport());
+    const syncViewport = () => {
+      setRuntimeViewport(getScreenViewport());
+      setRuntimeAvailableWidth(getRuntimeAvailableWidth());
+    };
     syncViewport();
     window.addEventListener("resize", syncViewport);
     return () => window.removeEventListener("resize", syncViewport);
@@ -1857,36 +1876,52 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           {renderCanvasHeader()}
           {activePageSections.map((section) => {
             if (section.mode === "free" || section.mode === "direct") {
+              const logicalWidth = viewports[runtimeViewport] || viewports.desktop;
+              const logicalHeight = getSectionCanvasHeight(section, runtimeViewport);
+              const canvasScale = getRuntimeCanvasScale(runtimeAvailableWidth, logicalWidth);
               return (
                 <section
                   key={section.id}
                   className={`site-section direct-layout-section width-${section.layout.width}`}
-                  style={{ backgroundColor: section.layout.background, minHeight: getSectionCanvasHeight(section, runtimeViewport) }}
+                  style={{
+                    backgroundColor: section.layout.background,
+                    minHeight: `${logicalHeight * canvasScale}px`,
+                  }}
                 >
                   <div
-                    className="direct-layout-frame"
+                    className="runtime-direct-layout-scale-shell"
                     style={{
-                      width: `min(100%, ${viewports[runtimeViewport] || viewports.desktop}px)`,
-                      minHeight: `${getSectionCanvasHeight(section, runtimeViewport)}px`,
+                      width: `${logicalWidth * canvasScale}px`,
+                      height: `${logicalHeight * canvasScale}px`,
                     }}
                   >
-                    {(section.freeElements || [])
-                      .filter((element) =>
-                        tenantAuth.user ||
-                        activePage?.id !== authEntryPage?.id ||
-                        authElementTypes.has(element.type)
-                      )
-                      .map((element) => (
-                      <div
-                        key={element.id}
-                        className={`direct-element-frame direct-element-frame-${element.type}`}
-                        style={getDirectElementFrameStyle(element, section)}
-                      >
-                        <div className="direct-element-content">
-                          {renderElement(element, false)}
+                    <div
+                      className="direct-layout-frame"
+                      style={{
+                        width: `${logicalWidth}px`,
+                        minHeight: `${logicalHeight}px`,
+                        transform: `scale(${canvasScale})`,
+                        transformOrigin: "top left",
+                      }}
+                    >
+                      {(section.freeElements || [])
+                        .filter((element) =>
+                          tenantAuth.user ||
+                          activePage?.id !== authEntryPage?.id ||
+                          authElementTypes.has(element.type)
+                        )
+                        .map((element) => (
+                        <div
+                          key={element.id}
+                          className={`direct-element-frame direct-element-frame-${element.type}`}
+                          style={getDirectElementFrameStyle(element, section)}
+                        >
+                          <div className="direct-element-content">
+                            {renderElement(element, false)}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </section>
               );

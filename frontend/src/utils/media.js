@@ -5,6 +5,7 @@ const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
 const RELATIVE_MEDIA_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i;
+const MANAGED_ASSET_CACHE_VERSION = "2";
 
 const isSvgPath = (value) => {
   const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();
@@ -46,5 +47,11 @@ export const resolveMediaUrl = (value) => {
     return "";
   }
 
-  return `${API_BASE_URL}${relativeSource}`;
+  const resolvedUrl = `${API_BASE_URL}${relativeSource}`;
+
+  if (MANAGED_UPLOAD_ASSET_PATTERN.test(relativeSource)) {
+    return `${resolvedUrl}?v=${MANAGED_ASSET_CACHE_VERSION}`;
+  }
+
+  return resolvedUrl;
 };

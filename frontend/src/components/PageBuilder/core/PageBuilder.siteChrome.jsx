@@ -1,3 +1,7 @@
+import {
+  Mail,
+  Phone,
+} from "lucide-react";
 import { resolveMediaUrl } from "../../../utils/media";
 import { defaultSiteChrome } from "./PageBuilder.constants";
 import { splitLines } from "./PageBuilder.text";
@@ -12,7 +16,18 @@ import {
   getPageNavigationLabel,
 } from "./PageBuilder.navigation";
 
-const MADAR_ATTRIBUTION_URL = "https://madar.app/";
+const MADAR_ATTRIBUTION_URL = "https://madarportal.com/";
+
+const getFooterSocialMark = (label = "") => {
+  const value = String(label).toLowerCase();
+  if (value.includes("instagram")) return "IG";
+  if (value.includes("linkedin")) return "in";
+  if (value.includes("youtube")) return "▶";
+  if (value.includes("facebook")) return "f";
+  if (value.includes("tiktok")) return "TT";
+  if (value === "x" || value.includes("twitter")) return "X";
+  return "@";
+};
 
 export const createSiteChromeRenderers = ({
   project,
@@ -125,6 +140,7 @@ export const createSiteChromeRenderers = ({
     };
     const visiblePageLinks = pageLinks.filter(isVisibleFooterItem);
     const visibleHelpLinks = helpLinks.filter(isVisibleFooterItem);
+    const visibleQuickLinks = Array.from(new Set([...visiblePageLinks, ...visibleHelpLinks]));
     const navigateFooterLink = (label) => {
       const target = resolveFooterPageLink(label);
 
@@ -158,6 +174,7 @@ export const createSiteChromeRenderers = ({
             <div className="ecommerce-social-row">
               {socialLinks.map((item) => {
                 const href = getSafeFooterLinkUrl(item.url, item.label);
+                const socialMark = getFooterSocialMark(item.label);
                 return href ? (
                   <a
                     href={href}
@@ -170,38 +187,33 @@ export const createSiteChromeRenderers = ({
                       if (!preview) event.preventDefault();
                     }}
                   >
-                    {item.label.slice(0, 2).toUpperCase()}
+                    <span className="ecommerce-social-mark" aria-hidden="true">{socialMark}</span>
                   </a>
                 ) : (
-                  <span key={item.label} aria-label={item.label}>{item.label.slice(0, 2).toUpperCase()}</span>
+                  <span key={item.label} aria-label={item.label}><span className="ecommerce-social-mark" aria-hidden="true">{socialMark}</span></span>
                 );
               })}
             </div>
 
           </div>
 
-          <div className="ecommerce-footer-column ecommerce-footer-pages-column">
-            <h4>{site.footerShopTitle || "Pages"}</h4>
+          <div className="ecommerce-footer-column ecommerce-footer-quick-links">
+            <h4>Quick Links</h4>
             <div className="ecommerce-footer-links-grid">
-              {visiblePageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
-            </div>
-          </div>
-
-          <div className="ecommerce-footer-column ecommerce-footer-help-column">
-            <h4>{site.footerHelpTitle || "Help"}</h4>
-            <div className="ecommerce-footer-links-grid">
-              {visibleHelpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}
+              {visibleQuickLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
             </div>
           </div>
 
           <div className="ecommerce-footer-contact">
-            <h4>Contact</h4>
-            <div className="footer-language-pill">
-              <span>|</span>
-              <strong>{site.footerLanguageLabel || "AR"}</strong>
-            </div>
-            <p>{site.contactEmail || "info@madar.com"}</p>
-            <p dir="ltr">{site.phone || "+972599203857"}</p>
+            <h4>Contact Info</h4>
+            <a className="ecommerce-contact-row" href={`mailto:${site.contactEmail || "info@madar.com"}`} onClick={(event) => event.stopPropagation()}>
+              <Mail size={19} aria-hidden="true" />
+              <span>{site.contactEmail || "info@madar.com"}</span>
+            </a>
+            <a className="ecommerce-contact-row" href={`tel:${String(site.phone || "+972599203857").replace(/\s+/g, "")}`} dir="ltr" onClick={(event) => event.stopPropagation()}>
+              <Phone size={19} aria-hidden="true" />
+              <span>{site.phone || "+972599203857"}</span>
+            </a>
             {paymentMethods.length > 0 && (
               <div className="ecommerce-payment-row">
                 {paymentMethods.map((item) => {
@@ -227,7 +239,7 @@ export const createSiteChromeRenderers = ({
         </div>
 
         <div className="ecommerce-footer-bottom">
-          <p>(c) 2026 {site.footerStoreName || site.brand || "Your Website"}. {site.rights || "All rights reserved."}</p>
+          <p>© 2026 {site.footerStoreName || site.brand || "Your Website"}. {site.rights || "All rights reserved."}</p>
           <button type="button" className="powered-by-madar">Powered by Madar</button>
         </div>
       </footer>

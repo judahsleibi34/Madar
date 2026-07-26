@@ -119,6 +119,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  border: 0;
   background: transparent;
   color: var(--theme-text);
   cursor: pointer;
@@ -156,6 +157,7 @@
 }
 
 .built-site-nav button {
+  border: 0;
   border-radius: 999px;
   padding: 9px 12px;
   background: transparent;
@@ -172,6 +174,7 @@
 }
 
 .built-site-cta {
+  border: 0;
   border-radius: 999px;
   padding: 11px 16px;
   cursor: pointer;
@@ -1024,18 +1027,17 @@
 
 .builder-element-thinDivider {
   width: 100%;
-  height: 0;
-  min-height: 0;
+  height: var(--divider-thickness, 1px);
+  min-height: var(--divider-thickness, 1px);
   border: 0;
-  border-top: var(--divider-thickness, 1px) solid currentColor;
   border-radius: 0;
   margin: 16px 0;
-  background: transparent !important;
+  background: currentColor !important;
   align-self: center;
 }
 
 .builder-element.builder-element-thinDivider {
-  border-top-color: currentColor !important;
+  background-color: currentColor !important;
 }
 
 .builder-element-embed {
@@ -1330,8 +1332,10 @@
 }
 
 .direct-element-content > .builder-element-thinDivider {
-  height: 0 !important;
-  min-height: 0 !important;
+  height: var(--divider-thickness, 1px) !important;
+  min-height: var(--divider-thickness, 1px) !important;
+  border: 0 !important;
+  background: currentColor !important;
   margin: auto 0 !important;
 }
 
