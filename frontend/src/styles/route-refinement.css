@@ -1589,8 +1589,10 @@ body.theme-dark .tenant-runtime-card {
 .tenant-runtime-page .direct-layout-section,
 .tenant-runtime-page .site-column,
 .tenant-runtime-page .direct-element-frame {
-  border-color: transparent;
+  border: 0 !important;
+  box-shadow: none !important;
   color: var(--theme-text) !important;
+  outline: 0 !important;
 }
 
 .tenant-runtime-page .built-site-header,

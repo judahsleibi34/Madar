@@ -92,6 +92,8 @@ class BuilderAssetUploadTests(unittest.TestCase):
             ),
             patch.object(builder_routes, "reserve_storage", return_value="reservation-1"),
             patch.object(builder_routes, "finish_storage", return_value="object-1"),
+            patch.object(builder_routes, "store_builder_asset", return_value=None),
+            patch.object(builder_routes, "delete_builder_asset", return_value=None),
         ]
 
         for item in self.patches:
@@ -192,6 +194,30 @@ class BuilderAssetUploadTests(unittest.TestCase):
         self.assertTrue(tenant_asset_dir.is_dir())
         asset_url = response.json()["asset_url"]
         self.assertTrue((self.upload_dir / asset_url.removeprefix("/uploads/")).is_file())
+
+    def test_upload_is_copied_to_durable_storage(self):
+        with patch.object(builder_routes, "store_builder_asset") as durable_store:
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 200)
+        storage_key = response.json()["asset_url"].removeprefix("/uploads/")
+        durable_store.assert_called_once_with(
+            storage_key=storage_key,
+            content=PNG_BYTES,
+            content_type="image/png",
+        )
+
+    def test_durable_storage_failure_does_not_publish_a_broken_url(self):
+        with patch.object(
+            builder_routes,
+            "store_builder_asset",
+            side_effect=builder_routes.BuilderAssetStorageError("unavailable"),
+        ):
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "asset_storage_unavailable")
+        self.assertEqual(list(self.upload_dir.rglob("*.png")), [])
 
     def test_unwritable_storage_returns_controlled_cors_error(self):
         with patch.object(Path, "write_bytes", side_effect=PermissionError("denied")):

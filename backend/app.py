@@ -38,6 +38,7 @@ from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
 
 from services.auth_service import get_authenticated_user_row, require_regular_user
+from services.builder_asset_storage import load_builder_asset
 from services.request_body_limits import RequestBodyLimitMiddleware
 from services.observability_service import (
     CORRELATION_ID,
@@ -213,16 +214,29 @@ def get_public_builder_asset(tenant_id: int, filename: str):
         error=HTTPException(status_code=404, detail="Asset was not found."),
     )
 
-    if not asset_path.is_file():
-        raise HTTPException(status_code=404, detail="Asset was not found.")
+    response_headers = {
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Disposition": "inline",
+    }
+    media_type = PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()]
 
-    return FileResponse(
-        path=str(asset_path),
-        media_type=PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()],
-        headers={
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "Content-Disposition": "inline",
-        },
+    if asset_path.is_file():
+        return FileResponse(
+            path=str(asset_path),
+            media_type=media_type,
+            headers=response_headers,
+        )
+
+    storage_key = f"tenant_{tenant_id}/builder_assets/{safe_filename}"
+    try:
+        content = load_builder_asset(storage_key=storage_key)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Asset was not found.") from error
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers=response_headers,
     )
 
 

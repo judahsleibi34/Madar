@@ -17,6 +17,11 @@ from services.asset_registry_service import (
     reconcile_project_asset_references,
     register_builder_asset,
 )
+from services.builder_asset_storage import (
+    BuilderAssetStorageError,
+    delete_builder_asset,
+    store_builder_asset,
+)
 from services.audit_service import hash_audit_identifier, record_audit_event
 from services.api_errors import error_detail
 from services.billing_service import require_publish_entitlement
@@ -1223,12 +1228,30 @@ async def upload_builder_asset(
             ),
         ) from error
 
-    asset_url = f"/uploads/{tenant_dir}/builder_assets/{filename}"
+    storage_key = f"{tenant_dir}/builder_assets/{filename}"
+    asset_url = f"/uploads/{storage_key}"
+    try:
+        store_builder_asset(
+            storage_key=storage_key,
+            content=content,
+            content_type=detected_content_type,
+        )
+    except BuilderAssetStorageError as error:
+        target_path.unlink(missing_ok=True)
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail(
+                "asset_storage_unavailable",
+                "Image storage is temporarily unavailable.",
+            ),
+        ) from error
+
     try:
         registered_asset = register_builder_asset(
             tenant_id=context.tenant_id,
             uploader_user_id=context.user_id,
-            storage_key=f"{tenant_dir}/builder_assets/{filename}",
+            storage_key=storage_key,
             original_filename=file.filename or "asset",
             managed_filename=filename,
             mime_type=detected_content_type,
@@ -1236,6 +1259,10 @@ async def upload_builder_asset(
         )
     except Exception as error:
         target_path.unlink(missing_ok=True)
+        try:
+            delete_builder_asset(storage_key=storage_key)
+        except Exception:
+            logger.warning("builder.asset_durable_rollback_failed", extra={"storage_key": storage_key})
         finish_storage(reservation_id=storage_reservation_id, succeeded=False)
         logger.error(
             "builder.asset_registry_failed",
@@ -1252,11 +1279,15 @@ async def upload_builder_asset(
         finish_storage(
             reservation_id=storage_reservation_id,
             succeeded=True,
-            storage_key=f"{tenant_dir}/builder_assets/{filename}",
+            storage_key=storage_key,
             content=content,
         )
     except Exception as error:
         target_path.unlink(missing_ok=True)
+        try:
+            delete_builder_asset(storage_key=storage_key)
+        except Exception:
+            logger.warning("builder.asset_durable_rollback_failed", extra={"storage_key": storage_key})
         logger.error(
             "builder.asset_accounting_failed",
             extra={"tenant_id": context.tenant_id, "error_type": type(error).__name__},

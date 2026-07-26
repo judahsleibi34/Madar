@@ -36,6 +36,20 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "image/png")
         self.assertEqual(response.content, PNG_BYTES)
 
+    def test_managed_builder_asset_falls_back_to_durable_storage(self):
+        self.asset_path.unlink()
+        with patch.object(app_module, "load_builder_asset", return_value=PNG_BYTES) as load_asset:
+            response = self.client.get(
+                "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "image/png")
+        self.assertEqual(response.content, PNG_BYTES)
+        load_asset.assert_called_once_with(
+            storage_key="tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
+        )
+
     def test_unmanaged_upload_path_is_not_publicly_served(self):
         private_like_dir = self.public_dir / "tenant_1" / "user_1"
         private_like_dir.mkdir(parents=True)
