@@ -95,26 +95,21 @@ export const alignmentOptions = [
 ];
 
 export const elementTypes = [
+  { id: "reservationRequest", label: "Date request", group: "Bookings" },
+  { id: "reservationFixedSlots", label: "Fixed slots", group: "Bookings" },
   { id: "heading", label: "Heading", group: "Content" },
   { id: "text", label: "Text", group: "Content" },
   { id: "button", label: "Button", group: "Content" },
   { id: "image", label: "Image", group: "Content" },
   { id: "card", label: "Card", group: "Content" },
-  { id: "carousel", label: "Glow Carousel", group: "Content" },
-  { id: "carouselCards", label: "Card Carousel", group: "Content" },
-  { id: "carouselSplit", label: "Split Story Carousel", group: "Content" },
-  { id: "carouselSpotlight", label: "Spotlight Carousel", group: "Content" },
-  { id: "carouselStack", label: "Stacked Cards Carousel", group: "Content" },
-  { id: "carouselEditorial", label: "Editorial Carousel", group: "Content" },
-  { id: "circularGallery", label: "Circular Gallery", group: "Content" },
+  { id: "carousel", label: "Card Carousel", group: "Content" },
   { id: "list", label: "List", group: "Content" },
   { id: "divider", label: "Divider", group: "Content" },
+  { id: "thinDivider", label: "Horizontal Line", group: "Content" },
   { id: "embed", label: "Embed", group: "Content" },
   { id: "metric", label: "Metric", group: "Dashboard" },
   { id: "loginBlock", label: "Login Form", group: "Auth" },
   { id: "registrationBlock", label: "Registration Form", group: "Auth" },
-  { id: "reservationRequest", label: "Date request", group: "Bookings" },
-  { id: "reservationFixedSlots", label: "Fixed slots", group: "Bookings" },
   { id: "formBlock", label: "Form Block", group: "Connected" },
 ];
 
@@ -229,7 +224,9 @@ export const defaultSiteChrome = {
   footerHelpTitle: "Help",
   footerHelpLinks: "About Us\nPolicies\nContact",
   footerSocialLinks: "Facebook\nLinkedIn\nX\nInstagram",
+  footerSocialItems: [],
   footerPaymentMethods: "Visa\nMastercard\nApple Pay\nGoogle Pay",
+  footerPaymentItems: [],
   footerLanguageLabel: "AR",
 };
 

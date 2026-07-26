@@ -134,6 +134,17 @@ export const repairDuplicateProjectIds = (project, { idFactory = null } = {}) =>
 const deterministicRoutineId = (prefix, path) =>
   `${prefix}_${String(path || "item").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase()}`;
 
+const compactRichTextRanges = (ranges) => {
+  if (!Array.isArray(ranges)) return [];
+  const latestByTarget = new Map();
+  ranges.forEach((range) => {
+    if (!range || typeof range !== "object") return;
+    const key = [range.field || "content", range.itemIndex ?? "", range.start ?? 0, range.end ?? 0].join(":");
+    latestByTarget.set(key, range);
+  });
+  return [...latestByTarget.values()];
+};
+
 const normalizeBuilderElementShape = (element, path = "element") => {
   if (!element || typeof element !== "object" || Array.isArray(element)) {
     return createElement("text", { id: deterministicRoutineId("element", path) });
@@ -168,6 +179,28 @@ const normalizeBuilderElementShape = (element, path = "element") => {
   });
   normalized.id = String(normalized.id || "");
   normalized.action = normalizeElementAction(element.action);
+  normalized.richTextColors = compactRichTextRanges(element.richTextColors);
+  normalized.richTextSizes = compactRichTextRanges(element.richTextSizes);
+  normalized.richTextStyles = compactRichTextRanges(element.richTextStyles);
+  if (Array.isArray(normalized.textBlockFormats) && normalized.textBlockFormats.length) {
+    let repairedContent = String(normalized.content || "");
+    while (
+      repairedContent.split("\n").length > normalized.textBlockFormats.length &&
+      repairedContent.includes("\n\n\n")
+    ) {
+      repairedContent = repairedContent.replace("\n\n\n", "\n\n");
+    }
+    normalized.content = repairedContent;
+  }
+  if (
+    normalized.type === "text" &&
+    normalized.headingLevel &&
+    Array.isArray(normalized.textBlockFormats) &&
+    normalized.textBlockFormats.length > 1 &&
+    normalized.textBlockFormats.every((format) => /^h[1-3]$/i.test(String(format)))
+  ) {
+    normalized.textBlockFormats = [normalized.textBlockFormats[0], ...normalized.textBlockFormats.slice(1).map(() => "text")];
+  }
   if (normalized.type === "formBlock") {
     const reference = Object.hasOwn(element, "connectedFormId")
       ? element.connectedFormId

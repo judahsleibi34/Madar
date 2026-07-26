@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlignCenter,
@@ -7,7 +7,9 @@ import {
   AlignRight,
   Baseline,
   Bold,
+  ClipboardPaste,
   Copy,
+  CopyPlus,
   FilePlus2,
   Globe2,
   Highlighter,
@@ -100,6 +102,7 @@ import {
   updateBuilderSiteBinding,
   updateBuilderProject,
   updateBuilderSiteMember,
+  updateWebsiteSettings,
   uploadBuilderAsset,
 } from "../services/PageBuilder.api";
 import {
@@ -130,6 +133,10 @@ import {
   collectBuilderUrlErrorsFromUtils,
 } from "../core/PageBuilder.url";
 import {
+  getFooterLinkItems,
+  getFooterLinkUrlError,
+} from "../core/PageBuilder.footerLinks";
+import {
   splitLines,
   splitEditableLines,
   getListItems,
@@ -137,6 +144,8 @@ import {
   createDomTextRange,
   getFloatingToolbarPlacement,
   createInputTextSelection,
+  getTextBlockFormats,
+  getTextBlockIndexesForRange,
 } from "../core/PageBuilder.text";
 import {
   singleAnswerQuizTypes,
@@ -165,14 +174,18 @@ import {
   getDirectElementMinimumSize,
   reconcileMeasuredFormBlockPosition,
   getSectionCanvasHeight,
+  compactDirectSectionAfterElementRemoval,
   convertSectionToDirectLayout,
   positionsOverlap,
   getProjectOverlapWarnings as getProjectOverlapWarningsFromLayout,
   snapToGrid,
   getDragCandidatePosition,
+  constrainResizeToSiblingElements,
   getMovedElementPosition,
   createMovedFreeElement,
   commitDirectElementInteraction,
+  moveElementBehindText,
+  moveElementToFront,
 } from "../core/PageBuilder.layout";
 import {
   clampElementToBounds,
@@ -302,6 +315,7 @@ import {
 import {
   createElementRenderer,
 } from "../core/PageBuilder.elementRenderer";
+import { getElementHeadingTag, getHeadingLevelFromFormat } from "../core/PageBuilder.heading";
 import {
   resolveReservationBlockValue,
 } from "../core/PageBuilder.reservations";
@@ -355,6 +369,13 @@ const BUILDER_CLOUD_SYNC_CHANNEL = "madar-builder-cloud-sync";
 
 const inlineTextElementTypes = new Set(["heading", "text", "button", "list"]);
 
+const findBuilderDataElement = (root, attribute, value) => {
+  if (!root || value === null || value === undefined) return null;
+  const expectedValue = String(value);
+  return Array.from(root.querySelectorAll(`[${attribute}]`))
+    .find((candidate) => candidate.getAttribute(attribute) === expectedValue) || null;
+};
+
 const inlineTextToolbarButtons = [
   { id: "undo", icon: Undo2, label: "Undo" },
   { id: "redo", icon: Redo2, label: "Redo" },
@@ -398,6 +419,23 @@ const isDefaultShowcaseProject = (project = {}) => {
 };
 
 const createCleanBlankProject = () => cleanBuilderProject(createBlankWorkspaceProject());
+
+const getWebsiteSettingsPayload = (project = {}) => {
+  const siteChrome = { ...defaultSiteChrome, ...(project.siteChrome || {}) };
+  return {
+    subdomain: sanitizeSubdomain(project.publish?.subdomain || ""),
+    brand: String(siteChrome.brand || "").trim(),
+    footer_store_name: String(siteChrome.footerStoreName || "").trim(),
+    logo_url: String(siteChrome.logoUrl || "").trim(),
+    contact_email: String(siteChrome.contactEmail || "").trim(),
+    phone: String(siteChrome.phone || "").trim(),
+    description: String(siteChrome.description || "").trim(),
+  };
+};
+
+const websiteSettingsPayloadChanged = (previousProject, nextProject) =>
+  JSON.stringify(getWebsiteSettingsPayload(previousProject)) !==
+  JSON.stringify(getWebsiteSettingsPayload(nextProject));
 
 // Non-content placeholder used only while an existing routed project is being
 // fetched. It is never rendered, persisted, recovered, or published.
@@ -717,16 +755,20 @@ export default function PageBuilder({
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
   const [logoUrlDraftEdited, setLogoUrlDraftEdited] = useState(false);
   const projectRef = useRef(project);
+  const appliedWebsiteSettingsSignatureRef = useRef("");
   const canvasShellRef = useRef(null);
   const dragPreviewFrameRef = useRef(null);
   const pendingDragPreviewRef = useRef(null);
   const recentMetricAddRef = useRef(null);
   const userId = user?.id;
   const [textSelection, setTextSelection] = useState(null);
+  const textSelectionRef = useRef(null);
   const [inlineFontSizeDraft, setInlineFontSizeDraft] = useState(null);
+  const [hasCopiedElement, setHasCopiedElement] = useState(false);
   const [inlineToolbarPosition, setInlineToolbarPosition] = useState(null);
   const inlineToolbarRef = useRef(null);
   const inlineToolbarInteractionRef = useRef(false);
+  const elementClipboardRef = useRef(null);
   const backendAutosaveTimerRef = useRef(null);
   const backendProjectSnapshotRef = useRef("");
   const baseSchemaRef = useRef(getPersistableProject(project));
@@ -957,10 +999,11 @@ export default function PageBuilder({
     if (selected.type !== "element" || !selected.id) return undefined;
 
     const frame = window.requestAnimationFrame(() => {
-      const elementFrame = canvasShellRef.current?.querySelector(
-        `[data-builder-element-id="${CSS.escape(String(selected.id))}"]`
-      );
-      elementFrame?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      const selectedId = String(selected.id);
+      const elementFrame = Array.from(
+        canvasShellRef.current?.querySelectorAll("[data-builder-element-id]") || []
+      ).find((candidate) => candidate.dataset.builderElementId === selectedId);
+      elementFrame?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
     });
 
     return () => window.cancelAnimationFrame(frame);
@@ -1484,6 +1527,14 @@ export default function PageBuilder({
     return null;
   }, [activePage, selected]);
 
+  const activePageLayers = useMemo(() =>
+    (activePage?.sections || []).flatMap((section) =>
+      [...(section.freeElements || [])].reverse().map((element) => ({
+        element,
+        sectionName: section.name || "Section",
+      }))
+    ), [activePage]);
+
   const inspectorMode = resolveInspectorMode({
     selected,
     selectedElement,
@@ -1559,6 +1610,57 @@ export default function PageBuilder({
     setProject((prev) => updater(prev));
   }, []);
 
+  useEffect(() => {
+    if (demoMode || builderProjectLoading || !websiteSettings) return;
+
+    const syncedValues = {
+      subdomain: sanitizeSubdomain(websiteSettings.subdomain || ""),
+      brand: String(websiteSettings.brand || ""),
+      footerStoreName: String(websiteSettings.footer_store_name || ""),
+      logoUrl: String(websiteSettings.logo_url || ""),
+      contactEmail: String(websiteSettings.contact_email || ""),
+      phone: String(websiteSettings.phone || ""),
+      description: String(websiteSettings.description || ""),
+    };
+    if (!syncedValues.subdomain || !syncedValues.brand) return;
+
+    const signature = JSON.stringify(syncedValues);
+    if (appliedWebsiteSettingsSignatureRef.current === signature) return;
+    appliedWebsiteSettingsSignatureRef.current = signature;
+
+    updateProject((current) => {
+      const currentPayload = getWebsiteSettingsPayload(current);
+      const nextPayload = {
+        subdomain: syncedValues.subdomain,
+        brand: syncedValues.brand.trim(),
+        footer_store_name: syncedValues.footerStoreName.trim(),
+        logo_url: syncedValues.logoUrl.trim(),
+        contact_email: syncedValues.contactEmail.trim(),
+        phone: syncedValues.phone.trim(),
+        description: syncedValues.description.trim(),
+      };
+      if (JSON.stringify(currentPayload) === JSON.stringify(nextPayload)) return current;
+
+      return {
+        ...current,
+        publish: {
+          ...(current.publish || {}),
+          subdomain: syncedValues.subdomain,
+        },
+        siteChrome: {
+          ...defaultSiteChrome,
+          ...(current.siteChrome || {}),
+          brand: syncedValues.brand,
+          footerStoreName: syncedValues.footerStoreName,
+          logoUrl: syncedValues.logoUrl,
+          contactEmail: syncedValues.contactEmail,
+          phone: syncedValues.phone,
+          description: syncedValues.description,
+        },
+      };
+    });
+  }, [builderProjectLoading, demoMode, updateProject, websiteSettings]);
+
   const setThemeMode = (mode) => {
     updateProject((prev) => applyThemeModeToProject(prev, mode));
   };
@@ -1582,8 +1684,10 @@ export default function PageBuilder({
   );
 
   const getElementParentGeometry = useCallback((elementId) => {
-    const elementFrame = canvasShellRef.current?.querySelector(
-      `[data-builder-element-id="${CSS.escape(String(elementId))}"]`
+    const elementFrame = findBuilderDataElement(
+      canvasShellRef.current,
+      "data-builder-element-id",
+      elementId
     );
     return getImmediateParentCanvasGeometry(elementFrame, {
       coordinateScale: canvasScale,
@@ -2077,6 +2181,7 @@ export default function PageBuilder({
     setSelected({ type: "element", id: nextElement.id });
     setPaletteDropSectionId("");
     showToast(`${nextElement.name || "Component"} added to ${targetSection.name || "section"}.`);
+    return nextElement;
   };
 
   const handlePaletteDragStart = (event, type) => {
@@ -2089,10 +2194,9 @@ export default function PageBuilder({
     const shell = canvasShellRef.current;
     if (!shell) return null;
 
-    const selector = sectionId
-      ? `.direct-layout-frame[data-section-id="${CSS.escape(String(sectionId))}"]`
-      : ".direct-layout-frame";
-    const frame = shell.querySelector(selector);
+    const frame = sectionId
+      ? findBuilderDataElement(shell, "data-section-id", sectionId)
+      : shell.querySelector(".direct-layout-frame");
     if (!frame) return null;
 
     const shellRect = shell.getBoundingClientRect();
@@ -2165,6 +2269,42 @@ export default function PageBuilder({
       })
     );
   }, [selectedElement, updateSections]);
+
+  const setSelectedImageBehindText = useCallback((behindText) => {
+    if (!selectedElement || selectedElement.type !== "image") return;
+
+    const targetSection = activePage?.sections.find((section) =>
+      section.mode === "direct" &&
+      (section.freeElements || []).some((element) => element.id === selectedElement.id)
+    );
+    if (!targetSection) {
+      showToast("Place the image on the free canvas to layer it behind text.");
+      return;
+    }
+    if (behindText && !(targetSection.freeElements || []).some((element) =>
+      ["heading", "text", "list"].includes(element.type)
+    )) {
+      showToast("Add a text, heading, or list element to this section first.");
+      return;
+    }
+
+    const reorderedElements = behindText
+      ? moveElementBehindText(targetSection.freeElements, selectedElement.id)
+      : moveElementToFront(targetSection.freeElements, selectedElement.id);
+    if (reorderedElements === targetSection.freeElements) {
+      showToast(behindText ? "Image is already behind the text." : "Image is already in front.");
+      return;
+    }
+
+    updateSections((sections) =>
+      sections.map((section) => {
+        if (section.id !== targetSection.id) return section;
+        return { ...section, freeElements: reorderedElements };
+      })
+    );
+
+    showToast(behindText ? "Image placed behind the text." : "Image moved in front of the text.");
+  }, [activePage, selectedElement, updateSections]);
 
   const updateElementInlineText = useCallback((elementId, updates) => {
     if (!elementId) return;
@@ -2341,6 +2481,114 @@ export default function PageBuilder({
     });
   };
 
+  const copySelectedElement = ({ announce = true } = {}) => {
+    if (!selectedElement) return false;
+    elementClipboardRef.current = {
+      element: selectedElement,
+      pageId: activePage?.id || "",
+      location: findElementLocation(selectedElement.id),
+    };
+    setHasCopiedElement(true);
+    if (announce) showToast("Element copied. Press Ctrl+V or Cmd+V to paste.");
+    return true;
+  };
+
+  const pasteCopiedElement = ({ announce = true } = {}) => {
+    const clipboard = elementClipboardRef.current;
+    if (!clipboard?.element || !activePage) return false;
+
+    const selectedLocation = selectedElement ? findElementLocation(selectedElement.id) : null;
+    const targetLocation = selectedLocation ||
+      (clipboard.pageId === activePage.id ? clipboard.location : null);
+    if (!targetLocation?.sectionId) {
+      if (announce) showToast("Select an element where you want to paste the copy.");
+      return false;
+    }
+
+    const copy = cloneWithNewIds(clipboard.element);
+    copy.name = `${clipboard.element.name || "Element"} Copy`;
+
+    if (targetLocation.isFree) {
+      copy.mode = "direct";
+      const anchor = selectedElement?.position || clipboard.element.position || createPosition();
+      copy.position = Object.fromEntries(
+        ["desktop", "tablet", "mobile"].map((viewportName) => {
+          const sourcePosition = copy.position?.[viewportName] || createPosition()[viewportName];
+          const anchorPosition = anchor?.[viewportName] || sourcePosition;
+          return [viewportName, {
+            ...sourcePosition,
+            x: Math.max(0, (Number(anchorPosition.x) || 0) + 24),
+            y: Math.max(0, (Number(anchorPosition.y) || 0) + 24),
+          }];
+        })
+      );
+    } else {
+      copy.mode = "auto";
+    }
+
+    updateSections((sections) => sections.map((section) => {
+      if (section.id !== targetLocation.sectionId) return section;
+
+      if (targetLocation.isFree) {
+        const elements = [...(section.freeElements || [])];
+        elements.splice(Math.max(0, targetLocation.elementIndex + 1), 0, copy);
+        return { ...section, freeElements: elements };
+      }
+
+      return {
+        ...section,
+        rows: (section.rows || []).map((row) => ({
+          ...row,
+          columns: (row.columns || []).map((column) => {
+            if (column.id !== targetLocation.columnId) return column;
+            const elements = [...(column.elements || [])];
+            elements.splice(Math.max(0, targetLocation.elementIndex + 1), 0, copy);
+            return { ...column, elements };
+          }),
+        })),
+      };
+    }));
+
+    setSelected({ type: "element", id: copy.id });
+    if (announce) showToast("Element pasted.");
+    return true;
+  };
+
+  const duplicateSelectedElement = () => {
+    if (!copySelectedElement({ announce: false })) return;
+    if (pasteCopiedElement({ announce: false })) showToast("Element duplicated.");
+  };
+
+  useEffect(() => {
+    if (activeTab !== "design" || preview || modal || elementPendingDelete) return undefined;
+
+    const handleElementClipboardShortcut = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = String(event.key || "").toLowerCase();
+      if (key !== "c" && key !== "v") return;
+
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")
+      ) return;
+
+      if (key === "c") {
+        if (!selectedElement) return;
+        event.preventDefault();
+        copySelectedElement();
+        return;
+      }
+
+      if (!elementClipboardRef.current) return;
+      event.preventDefault();
+      pasteCopiedElement();
+    };
+
+    document.addEventListener("keydown", handleElementClipboardShortcut, true);
+    return () => document.removeEventListener("keydown", handleElementClipboardShortcut, true);
+  }, [activePage, activeTab, elementPendingDelete, modal, preview, selectedElement]);
+
   useEffect(() => {
     if (
       activeTab !== "design" ||
@@ -2397,21 +2645,30 @@ export default function PageBuilder({
     updateSections((sections) =>
       sections.map((section) => {
         if (section.mode === "direct") {
-          return {
-            ...section,
-            freeElements: section.freeElements.filter((element) => element.id !== elementId),
-          };
+          return compactDirectSectionAfterElementRemoval(section, elementId);
         }
 
-        return {
-          ...section,
-          rows: section.rows.map((row) => ({
+        const containsElement = section.rows.some((row) =>
+          row.columns.some((column) => column.elements.some((element) => element.id === elementId))
+        );
+        if (!containsElement) return section;
+
+        const rows = section.rows.map((row) => ({
             ...row,
             columns: row.columns.map((column) => ({
               ...column,
               elements: column.elements.filter((element) => element.id !== elementId),
             })),
-          })),
+          })).filter((row) => row.columns.some((column) => column.elements.length > 0));
+
+        return {
+          ...section,
+          layout: {
+            ...(section.layout || {}),
+            minHeight: 120,
+            minHeightByViewport: { desktop: 120, tablet: 120, mobile: 120 },
+          },
+          rows,
         };
       })
     );
@@ -2958,6 +3215,21 @@ export default function PageBuilder({
         submittedProject: nextProject,
       });
 
+      let websiteSettingsSyncFailed = false;
+      if (websiteSettingsPayloadChanged(submittedBaseSchema, nextProject)) {
+        const websitePayload = getWebsiteSettingsPayload(nextProject);
+        if (websitePayload.subdomain && websitePayload.brand) {
+          try {
+            const savedWebsite = await updateWebsiteSettings(websitePayload);
+            if (savedWebsite) {
+              setWebsiteSettings((current) => ({ ...(current || {}), ...savedWebsite }));
+            }
+          } catch {
+            websiteSettingsSyncFailed = true;
+          }
+        }
+      }
+
       builderProjectRecordRef.current = savedRecord;
       currentDraftRevisionRef.current = savedRevision;
       latestAcknowledgedSaveOperationRef.current = operationId;
@@ -2976,9 +3248,13 @@ export default function PageBuilder({
       if (!latestIsDirty) setLastCloudSavedAt(new Date());
       broadcastCloudSave(savedRecord);
       if (!silent) {
-        showToast(repairs.length > 0
-          ? "Duplicate internal IDs were repaired and your changes are saved."
-          : successMessage || "Your changes are saved.");
+        showToast(
+          websiteSettingsSyncFailed
+            ? "Your builder changes are saved, but Website Settings could not be synchronized."
+            : repairs.length > 0
+              ? "Duplicate internal IDs were repaired and your changes are saved."
+              : successMessage || "Your changes are saved."
+        );
       }
       return true;
     } catch (error) {
@@ -3861,8 +4137,10 @@ export default function PageBuilder({
   const reconcileDirectContentBlockSize = useCallback((sectionId, elementId, measuredHeight) => {
     if (!measuredHeight || dragState?.elementId === elementId) return;
 
-    const frame = canvasShellRef.current?.querySelector(
-      `.direct-layout-frame[data-section-id="${CSS.escape(String(sectionId))}"]`
+    const frame = findBuilderDataElement(
+      canvasShellRef.current,
+      "data-section-id",
+      sectionId
     );
     const liveBounds = frame ? getFrameGeometry(frame)?.bounds : null;
     const canvasWidth = liveBounds?.width || viewports[viewport] || viewports.desktop;
@@ -4161,12 +4439,43 @@ export default function PageBuilder({
     inlineToolbarPosition?.horizontalBounds,
     inlineToolbarPosition?.maxWidth,
   ]);
-  const captureCanvasTextSelection = useCallback((event, field, itemIndex = null, elementId = selectedElement?.id) => {
+  const captureCanvasTextSelection = useCallback((event, field, itemIndex = null, elementId = selectedElement?.id, options = {}) => {
     const range = getCanvasTextSelectionRange(event);
 
     if (!range) return;
 
     const browserSelection = window.getSelection();
+    const browserRangeForBlocks = browserSelection?.rangeCount
+      ? browserSelection.getRangeAt(0)
+      : null;
+    const textBlocks = [...event.currentTarget.children].filter((node) =>
+      node.hasAttribute("data-builder-text-block")
+    );
+    const getBlockIndex = (node) => {
+      const elementNode = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      const block = elementNode?.closest?.("[data-builder-text-block]");
+      return block ? textBlocks.indexOf(block) : -1;
+    };
+    const startBlockIndex = getBlockIndex(browserRangeForBlocks?.startContainer);
+    const endBlockIndex = getBlockIndex(browserRangeForBlocks?.endContainer);
+    const firstBlockIndex = startBlockIndex >= 0 ? startBlockIndex : 0;
+    const lastBlockIndex = endBlockIndex >= firstBlockIndex ? endBlockIndex : firstBlockIndex;
+    const blockIndexes = textBlocks.length
+      ? Array.from({ length: lastBlockIndex - firstBlockIndex + 1 }, (_, index) => firstBlockIndex + index)
+      : [];
+    const blockFormat = textBlocks[firstBlockIndex]?.dataset.builderTextBlock || null;
+    const nextTextSelection = {
+      elementId,
+      field,
+      itemIndex,
+      start: range.start,
+      end: range.end,
+      blockIndexes,
+      blockFormat,
+    };
+    textSelectionRef.current = nextTextSelection;
+    if (options.silent) return;
+
     const browserRange = !range.collapsed && browserSelection?.rangeCount
       ? browserSelection.getRangeAt(0)
       : null;
@@ -4178,25 +4487,13 @@ export default function PageBuilder({
 
     if (range.collapsed) {
       clearCanvasTextSelectionHighlight();
-      setTextSelection({
-        elementId,
-        field,
-        itemIndex,
-        start: 0,
-        end: 0,
-      });
+      setTextSelection(nextTextSelection);
       return;
     }
 
     preserveCanvasTextSelectionHighlight(browserRange);
 
-    setTextSelection({
-      elementId,
-      field,
-      itemIndex,
-      start: range.start,
-      end: range.end,
-    });
+    setTextSelection(nextTextSelection);
   }, [
     clearCanvasTextSelectionHighlight,
     positionInlineToolbarNear,
@@ -4208,6 +4505,10 @@ export default function PageBuilder({
     [clearCanvasTextSelectionHighlight, selectedElement?.id]
   );
 
+  useEffect(() => {
+    textSelectionRef.current = textSelection;
+  }, [textSelection]);
+
   useLayoutEffect(() => {
     if (
       !selectedElement?.id ||
@@ -4215,8 +4516,11 @@ export default function PageBuilder({
       Number(textSelection.start) === Number(textSelection.end)
     ) return;
 
-    const selector = '[data-builder-element-id="' + CSS.escape(String(selectedElement.id)) + '"]';
-    const frame = canvasShellRef.current?.querySelector(selector);
+    const frame = findBuilderDataElement(
+      canvasShellRef.current,
+      "data-builder-element-id",
+      selectedElement.id
+    );
     const editable = frame?.querySelector('[contenteditable="true"]');
     const range = createDomTextRange(editable, textSelection.start, textSelection.end);
     preserveCanvasTextSelectionHighlight(range);
@@ -4245,6 +4549,18 @@ export default function PageBuilder({
 
     const start = Number(textSelection.start) || 0;
     const end = Number(textSelection.end) || 0;
+
+    if (start === end && textSelection.blockIndexes?.length && textSelection.field === "content") {
+      const activeLineIndex = textSelection.blockIndexes[0];
+      const lines = String(targetText).split("\n");
+      const lineStart = lines.slice(0, activeLineIndex).reduce((total, line) => total + line.length + 1, 0);
+      return {
+        field: "content",
+        itemIndex: null,
+        start: lineStart,
+        end: lineStart + (lines[activeLineIndex]?.length || 0),
+      };
+    }
 
     return {
       field: textSelection.field || "content",
@@ -4340,7 +4656,12 @@ export default function PageBuilder({
 
     updateSelectedElement({
       richTextSizes: [
-        ...(selectedElement.richTextSizes || []),
+        ...(selectedElement.richTextSizes || []).filter((range) =>
+          range.field !== selectedRange.field ||
+          (range.itemIndex ?? null) !== selectedRange.itemIndex ||
+          range.end <= selectedRange.start ||
+          range.start >= selectedRange.end
+        ),
         { ...selectedRange, fontSize },
       ],
       styles: { selectedTextFontSize: fontSize },
@@ -4356,7 +4677,15 @@ export default function PageBuilder({
 
   const getInlineTextFormatValue = () => {
     if (!selectedElement) return "text";
-    if (selectedElement.type === "heading") return "heading";
+    if (["heading", "text"].includes(selectedElement.type)) {
+      if (textSelection?.elementId === selectedElement.id && textSelection.blockFormat) {
+        return textSelection.blockFormat;
+      }
+      const formats = getTextBlockFormats(selectedElement);
+      const offset = textSelection?.elementId === selectedElement.id ? Number(textSelection.start) || 0 : 0;
+      const [lineIndex] = getTextBlockIndexesForRange(selectedElement.content, offset, offset);
+      return formats[lineIndex] || (selectedElement.type === "heading" ? getElementHeadingTag(selectedElement) : "text");
+    }
     if (selectedElement.type === "button") return "button";
     if (selectedElement.type === "list") {
       if (textSelection?.elementId === selectedElement.id && textSelection.field === "listTitle") {
@@ -4376,6 +4705,32 @@ export default function PageBuilder({
     if (format === "listTitle" || format === "listItem") return;
 
     if (format === "bullets" || format === "numbers") {
+      if (["heading", "text"].includes(selectedElement.type)) {
+        const formats = getTextBlockFormats(selectedElement);
+        const activeSelection = textSelectionRef.current?.elementId === selectedElement.id
+          ? textSelectionRef.current
+          : textSelection;
+        const hasSelectionTarget = activeSelection?.elementId === selectedElement.id;
+        const start = hasSelectionTarget ? Number(activeSelection.start) || 0 : 0;
+        const end = hasSelectionTarget ? Number(activeSelection.end) || start : selectedElement.content.length;
+        const targetLineIndexes = hasSelectionTarget && activeSelection.blockIndexes?.length
+          ? activeSelection.blockIndexes
+          : getTextBlockIndexesForRange(selectedElement.content, start, end);
+        const shouldRemoveList = targetLineIndexes.every((lineIndex) => formats[lineIndex] === format);
+        targetLineIndexes.forEach((lineIndex) => {
+          formats[lineIndex] = shouldRemoveList ? "text" : format;
+        });
+        updateSelectedElement({ textBlockFormats: formats });
+        textSelectionRef.current = textSelectionRef.current?.elementId === selectedElement.id
+          ? { ...textSelectionRef.current, blockFormat: shouldRemoveList ? "text" : format }
+          : textSelectionRef.current;
+        setTextSelection((current) => current?.elementId === selectedElement.id
+          ? { ...current, blockFormat: shouldRemoveList ? "text" : format }
+          : current
+        );
+        return;
+      }
+
       const listItems =
         selectedElement.type === "list"
           ? getListItems(selectedElement)
@@ -4385,6 +4740,56 @@ export default function PageBuilder({
         listStyle: format === "numbers" ? "decimal" : "disc",
         listItems,
         content: listItems.join("\n"),
+      });
+      return;
+    }
+
+    const headingLevel = getHeadingLevelFromFormat(format);
+    if ((headingLevel || format === "text") && ["heading", "text"].includes(selectedElement.type)) {
+      const nextFormat = headingLevel ? `h${headingLevel}` : "text";
+      const formats = getTextBlockFormats(selectedElement);
+      const activeSelection = textSelectionRef.current?.elementId === selectedElement.id
+        ? textSelectionRef.current
+        : textSelection;
+      const hasSelectionTarget = activeSelection?.elementId === selectedElement.id;
+      const start = hasSelectionTarget ? Number(activeSelection.start) || 0 : 0;
+      const end = hasSelectionTarget ? Number(activeSelection.end) || start : selectedElement.content.length;
+      const targetLineIndexes = hasSelectionTarget && activeSelection.blockIndexes?.length
+        ? activeSelection.blockIndexes
+        : getTextBlockIndexesForRange(selectedElement.content, start, end);
+      targetLineIndexes.forEach((lineIndex) => {
+        formats[lineIndex] = nextFormat;
+      });
+      const targetLines = new Set(targetLineIndexes);
+      const lineBounds = String(selectedElement.content || "").split("\n").map((line, index, lines) => {
+        const startOffset = lines.slice(0, index).reduce((total, item) => total + item.length + 1, 0);
+        return { start: startOffset, end: startOffset + line.length };
+      });
+      const richTextSizes = (selectedElement.richTextSizes || []).filter((range) =>
+        !lineBounds.some((bounds, lineIndex) =>
+          targetLines.has(lineIndex) && range.field === "content" && range.end > bounds.start && range.start < bounds.end
+        )
+      );
+      updateSelectedElement({ textBlockFormats: formats, richTextSizes });
+      textSelectionRef.current = textSelectionRef.current?.elementId === selectedElement.id
+        ? { ...textSelectionRef.current, blockFormat: nextFormat }
+        : textSelectionRef.current;
+      setTextSelection((current) => current?.elementId === selectedElement.id
+        ? { ...current, blockFormat: nextFormat }
+        : current
+      );
+      return;
+    }
+
+    if (headingLevel) {
+      const content =
+        selectedElement.type === "list"
+          ? getListItems(selectedElement).join("\n")
+          : selectedElement.content;
+      updateSelectedElement({
+        type: "heading",
+        headingLevel,
+        content,
       });
       return;
     }
@@ -4502,11 +4907,15 @@ export default function PageBuilder({
 
     const selectedRangeFontSize = getSelectedTextRangeStyle("fontSize");
     const selectedRangeBackgroundColor = getSelectedTextRangeStyle("backgroundColor");
+    const activeTextFormat = getInlineTextFormatValue();
+    const blockDefaultFontSize = ({ h1: 46, h2: 36, h3: 28, text: 17, bullets: 17, numbers: 17 })[activeTextFormat];
     const toolbarFontSize = Number.parseInt(
       selectedRangeFontSize ||
-        selectedElement.styles?.selectedTextFontSize ||
-        selectedElement.styles?.fontSize ||
-        getSelectedElementFontSizeNumber(),
+        (blockDefaultFontSize && textSelection?.elementId === selectedElement.id
+          ? blockDefaultFontSize
+          : selectedElement.styles?.selectedTextFontSize ||
+            selectedElement.styles?.fontSize ||
+            getSelectedElementFontSizeNumber()),
       10
     );
 
@@ -4548,7 +4957,9 @@ export default function PageBuilder({
             </>
           )}
           <option value="text">Text</option>
-          <option value="heading">Heading</option>
+          <option value="h1">H1</option>
+          <option value="h2">H2</option>
+          <option value="h3">H3</option>
           <option value="button">Button</option>
           <option value="bullets">Bullets</option>
           <option value="numbers">Numbers</option>
@@ -4592,11 +5003,11 @@ export default function PageBuilder({
             (item.id === "underline" &&
               (selectedRangeTextDecoration === "underline" || selectedElement.styles?.textDecoration === "underline")) ||
             (item.id === "bullets" &&
-              selectedElement.type === "list" &&
-              selectedElement.listStyle !== "decimal") ||
+              (activeTextFormat === "bullets" ||
+                (selectedElement.type === "list" && selectedElement.listStyle !== "decimal"))) ||
             (item.id === "numbers" &&
-              selectedElement.type === "list" &&
-              selectedElement.listStyle === "decimal") ||
+              (activeTextFormat === "numbers" ||
+                (selectedElement.type === "list" && selectedElement.listStyle === "decimal"))) ||
             (item.id.startsWith("align-") &&
               (selectedElement.styles?.textAlign || "left") === item.id.replace("align-", ""));
 
@@ -4704,28 +5115,17 @@ export default function PageBuilder({
       snapToGrid,
     });
     const constrainedCandidate = dragState.interaction === "resize"
-      ? (section.freeElements || [])
-          .filter((element) => element.id !== selectedElement.id)
-          .reduce((nextCandidate, element) => {
-            const spacing = 12;
-            const other = element.position?.[viewport] || createPosition()[viewport];
-            if (!positionsOverlap(nextCandidate, other, spacing)) return nextCandidate;
-
-            const minimumSize = getDirectElementMinimumSize(selectedElement);
-            const clamped = { ...nextCandidate };
-            const verticalRangesMeet = nextCandidate.y < other.y + other.height + spacing && nextCandidate.y + nextCandidate.height + spacing > other.y;
-            const horizontalRangesMeet = nextCandidate.x < other.x + other.width + spacing && nextCandidate.x + nextCandidate.width + spacing > other.x;
-            if (other.x >= dragState.startX + dragState.startWidth + spacing && verticalRangesMeet) {
-              clamped.width = Math.max(
-                Math.min(minimumSize.width, canvasWidth - nextCandidate.x),
-                Math.round(other.x - nextCandidate.x - spacing)
-              );
-            }
-            if (other.y >= nextCandidate.y && horizontalRangesMeet) {
-              clamped.height = Math.max(minimumSize.height, Math.round(other.y - nextCandidate.y - spacing));
-            }
-            return clamped;
-          }, candidate)
+      ? constrainResizeToSiblingElements({
+          candidate,
+          siblings: (section.freeElements || []).filter(
+            (element) => element.id !== selectedElement.id
+          ),
+          selectedElement,
+          viewport,
+          createPosition,
+          dragState,
+          canvasWidth,
+        })
       : candidate;
     const minimumSize = getDirectElementMinimumSize(selectedElement);
     const previewPosition = clampElementToBounds(
@@ -4780,7 +5180,7 @@ export default function PageBuilder({
     pendingDragPreviewRef.current = null;
     const sourceLocation = findElementLocation(selectedElement.id);
     const targetFrame = finalPreview.dropSectionId
-      ? document.querySelector(`.direct-layout-frame[data-section-id="${CSS.escape(finalPreview.dropSectionId)}"]`)
+      ? findBuilderDataElement(document, "data-section-id", finalPreview.dropSectionId)
       : null;
     const targetSection = activePage?.sections.find((section) => section.id === finalPreview.dropSectionId);
 
@@ -5205,6 +5605,70 @@ export default function PageBuilder({
     );
   };
 
+  const renderFooterDestinationEditor = ({ itemsKey, legacyKey, label, itemPlaceholder }) => {
+    const items = getFooterLinkItems(siteChrome[itemsKey], siteChrome[legacyKey], { preserveEmpty: true });
+    const saveItems = (nextItems) => updateSiteChrome({
+      [itemsKey]: nextItems,
+      [legacyKey]: nextItems.map((item) => item.label || "").join("\n"),
+    });
+
+    return (
+      <div className="site-chrome-list-editor site-chrome-destination-editor">
+        <div className="site-chrome-list-editor-header">
+          <span>{label}</span>
+          <button
+            type="button"
+            onClick={() => saveItems([...items, { label: "", url: "" }])}
+          >
+            + Add
+          </button>
+        </div>
+        <div className="site-chrome-list-rows">
+          {items.map((item, index) => {
+            const urlError = getFooterLinkUrlError(item.url, item.label || itemPlaceholder);
+            return (
+              <div className="site-chrome-list-row site-chrome-destination-row" key={`${itemsKey}-${index}`}>
+                <span className="site-chrome-list-bullet" aria-hidden="true" />
+                <div className="site-chrome-destination-fields">
+                  <input
+                    aria-label={`${label} label ${index + 1}`}
+                    value={item.label}
+                    placeholder={itemPlaceholder}
+                    onChange={(event) => saveItems(items.map((entry, itemIndex) => (
+                      itemIndex === index ? { ...entry, label: event.target.value } : entry
+                    )))}
+                  />
+                  <input
+                    aria-label={`${label} destination ${index + 1}`}
+                    value={item.url}
+                    placeholder="https://example.com or /endpoint"
+                    aria-invalid={Boolean(urlError)}
+                    onChange={(event) => saveItems(items.map((entry, itemIndex) => (
+                      itemIndex === index ? { ...entry, url: event.target.value } : entry
+                    )))}
+                  />
+                  {urlError ? <small className="site-chrome-url-error">{urlError}</small> : null}
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Remove ${label} item ${index + 1}`}
+                  title="Remove item"
+                  onClick={() => {
+                    const nextItems = items.filter((_, itemIndex) => itemIndex !== index);
+                    saveItems(nextItems.length ? nextItems : [{ label: "", url: "" }]);
+                  }}
+                >
+                  x
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <span className="site-chrome-field-help">Add an HTTPS link or an internal endpoint beginning with /.</span>
+      </div>
+    );
+  };
+
   const renderDesignTab = () => (
     <div className="builder-layout">
       {!preview && (
@@ -5388,6 +5852,8 @@ export default function PageBuilder({
 
           {activePage?.sections.map((section) => {
             const isSelected = selected.type === "section" && selected.id === section.id;
+            const isEditingBehindText = selectedElement?.layer === "behindText" &&
+              (section.freeElements || []).some((element) => element.id === selectedElement.id);
             const renderedSectionHeight = dragState?.elementId && getElementSection(dragState.elementId)?.id === section.id
               ? Math.max(getSectionCanvasHeight(section, viewport), Number(dragState.previewSectionHeight) || 0)
               : getSectionCanvasHeight(section, viewport);
@@ -5417,7 +5883,7 @@ export default function PageBuilder({
                   }}
                 >
                   <div
-                    className="direct-layout-frame"
+                    className={`direct-layout-frame ${isEditingBehindText ? "is-editing-behind-text" : ""}`}
                     data-section-id={section.id}
                     style={{ width: "100%", minHeight: `${renderedSectionHeight * canvasScale}px` }}
                     onDragOver={(event) => {
@@ -5434,46 +5900,75 @@ export default function PageBuilder({
                   >
                     {(section.freeElements || []).map((element) => {
                       const elementSelected = selected.type === "element" && selected.id === element.id;
+                      const usesDetachedEditBoundary = elementSelected && element.layer === "behindText" && !preview;
                       const hasResponsiveContentHeight = ["formBlock", "reservationBlock"].includes(element.type);
                       const DirectFrame = hasResponsiveContentHeight ? PageBuilderMeasuredFrame : "div";
 
                       return (
-                        <DirectFrame
-                          key={element.id}
-                          {...(hasResponsiveContentHeight
-                            ? {
-                                measureEnabled: !preview && dragState?.elementId !== element.id,
-                                measurementKey: `${element.id}:${viewport}`,
-                                onMeasuredHeight: (height) =>
-                                  reconcileDirectContentBlockSize(section.id, element.id, height / canvasScale),
-                              }
-                            : {})}
-                          className={`direct-element-frame direct-element-frame-${element.type} ${elementSelected ? "is-selected" : ""}`}
-                          data-builder-element-id={element.id}
-                          style={getDirectElementFrameStyle(element)}
-                          tabIndex={-1}
-                          onPointerDownCapture={(event) => {
-                            if (preview) return;
-                            event.currentTarget.focus({ preventScroll: true });
-                            setSelected({ type: "element", id: element.id });
-                          }}
-                          onPointerDown={
-                            preview
-                              ? undefined
-                              : (event) =>
-                                  startDrag(event, element, "move", element.type === "button")
-                          }
-                          onClick={(event) => {
-                            if (preview) return;
-                            event.stopPropagation();
-                            setSelected({ type: "element", id: element.id });
-                          }}
-                        >
-                          <div className="direct-element-content">
-                            {renderElement(element, false)}
-                          </div>
-                          {elementSelected && !preview && (
-                            <>
+                        <Fragment key={element.id}>
+                          <DirectFrame
+                            {...(hasResponsiveContentHeight
+                              ? {
+                                  measureEnabled: !preview && dragState?.elementId !== element.id,
+                                  measurementKey: `${element.id}:${viewport}`,
+                                  onMeasuredHeight: (height) =>
+                                    reconcileDirectContentBlockSize(section.id, element.id, height / canvasScale),
+                                }
+                              : {})}
+                            className={`direct-element-frame direct-element-frame-${element.type} ${elementSelected && !usesDetachedEditBoundary ? "is-selected" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""}`}
+                            data-builder-element-id={element.id}
+                            style={getDirectElementFrameStyle(element)}
+                            tabIndex={-1}
+                            onPointerDownCapture={(event) => {
+                              if (preview) return;
+                              event.currentTarget.focus({ preventScroll: true });
+                              setSelected({ type: "element", id: element.id });
+                            }}
+                            onPointerDown={
+                              preview
+                                ? undefined
+                                : (event) =>
+                                    startDrag(event, element, "move", element.type === "button")
+                            }
+                            onClick={(event) => {
+                              if (preview) return;
+                              event.stopPropagation();
+                              setSelected({ type: "element", id: element.id });
+                            }}
+                          >
+                            <div className="direct-element-content">
+                              {renderElement(element, false)}
+                            </div>
+                            {elementSelected && !preview && !usesDetachedEditBoundary && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="direct-move-handle"
+                                  aria-label={`Move ${element.name || "component"}`}
+                                  title="Drag to move in any direction"
+                                  onPointerDown={(event) => startDrag(event, element, "move", true)}
+                                >
+                                  <Move size={13} aria-hidden="true" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="direct-resize-handle"
+                                  aria-label={`Resize ${element.name || "component"}`}
+                                  title="Drag to resize"
+                                  onPointerDown={(event) => startDrag(event, element, "resize", true)}
+                                />
+                              </>
+                            )}
+                          </DirectFrame>
+                          {usesDetachedEditBoundary && (
+                            <div
+                              className="direct-element-frame direct-element-edit-boundary is-selected"
+                              style={{ ...getDirectElementFrameStyle(element), zIndex: 6 }}
+                              tabIndex={-1}
+                              onPointerDownCapture={(event) => event.currentTarget.focus({ preventScroll: true })}
+                              onPointerDown={(event) => startDrag(event, element, "move")}
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <button
                                 type="button"
                                 className="direct-move-handle"
@@ -5490,9 +5985,9 @@ export default function PageBuilder({
                                 title="Drag to resize"
                                 onPointerDown={(event) => startDrag(event, element, "resize", true)}
                               />
-                            </>
+                            </div>
                           )}
-                        </DirectFrame>
+                        </Fragment>
                       );
                     })}
                   </div>
@@ -5576,6 +6071,31 @@ export default function PageBuilder({
           <h2>Inspector</h2>
           <span>{inspectorMode}</span>
         </div>
+
+      {activePageLayers.length > 0 && (
+        <div className="inspector-group element-layer-picker">
+          <h3>Layers</h3>
+          <label>
+            Select an element
+            <select
+              value={selectedElement?.id || ""}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                setInlineToolbarPosition(null);
+                setSelected({ type: "element", id: event.target.value });
+              }}
+            >
+              <option value="">Choose a layer</option>
+              {activePageLayers.map(({ element, sectionName }) => (
+                <option value={element.id} key={element.id}>
+                  {element.name || element.type} · {sectionName}{element.layer === "behindText" ? " · Behind text" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="builder-note">Top layers are listed first. Use this to select elements hidden behind others.</p>
+        </div>
+      )}
 
       {inspectorMode === "page" && activePage && (
         <PageBuilderPageInspector
@@ -5723,13 +6243,13 @@ export default function PageBuilder({
           )}
           {carouselElementTypes.has(selectedElement.type) && (
             <details open className="carousel-slide-editor">
-              <summary>Carousel slides</summary>
-              <p className="builder-note">Edit every slide and choose or replace its image.</p>
+              <summary>Carousel cards</summary>
+              <p className="builder-note">Edit each card and choose or replace its image.</p>
               <div className="carousel-slide-list">
                 {parseCarouselSlides(selectedElement.content).map((slide, index) => (
                   <details className="carousel-slide-card" defaultOpen={index === 0} key={`${selectedElement.id}_slide_${index}`}>
                     <summary>
-                      <span>Slide {index + 1}</span>
+                      <span>Card {index + 1}</span>
                       <span className="carousel-slide-edit-hint primary-action">
                         {resolveMediaUrl(slide.image) ? "Edit image" : "Add image"}
                       </span>
@@ -5740,7 +6260,7 @@ export default function PageBuilder({
                       const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item);
                       updateSelectedElement({ content: serializeCarouselSlides(slides) });
                     }} /></label>
-                    <label>Description<textarea value={slide.description} onChange={(event) => {
+                    <label>Description<textarea value={slide.description || ""} onChange={(event) => {
                       const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item);
                       updateSelectedElement({ content: serializeCarouselSlides(slides) });
                     }} /></label>
@@ -5802,12 +6322,12 @@ export default function PageBuilder({
                       <small>Only public HTTPS image URLs are accepted. Uploaded file paths stay hidden.</small>
                     </label>
                   </details>
-                  <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>Remove slide</button>
+                  <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>Remove card</button>
                     </div>
                   </details>
                 ))}
               </div>
-              <button type="button" className="primary-action" onClick={() => updateSelectedElement({ content: serializeCarouselSlides([...parseCarouselSlides(selectedElement.content), { title: "New story", description: "Add your story here.", image: "" }]) })}>+ Add slide</button>
+              <button type="button" className="primary-action" onClick={() => updateSelectedElement({ content: serializeCarouselSlides([...parseCarouselSlides(selectedElement.content), { title: "New card", description: "Add supporting text here.", image: "" }]) })}>+ Add card</button>
             </details>
           )}
           {selectedElement.type === "list" && (
@@ -5842,13 +6362,42 @@ export default function PageBuilder({
               }}>+ Add item</button>
             </details>
           )}
+          {selectedElement.type === "thinDivider" && (
+            <details open className="horizontal-line-editor">
+              <summary>Horizontal line</summary>
+              <label>
+                Thickness
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  value={Math.max(1, Math.min(20, Number.parseInt(selectedElement.styles?.["--divider-thickness"], 10) || 1))}
+                  onChange={(event) => {
+                    const thickness = Math.max(1, Math.min(20, Number.parseInt(event.target.value, 10) || 1));
+                    updateSelectedElement({ styles: { "--divider-thickness": `${thickness}px` } });
+                  }}
+                />
+              </label>
+              <label>
+                Line color
+                <input
+                  type="color"
+                  value={getColorInputValue(selectedElement.styles?.color, "#6b7280")}
+                  onChange={(event) => updateSelectedElement({ styles: { color: event.target.value } })}
+                />
+              </label>
+            </details>
+          )}
           {!carouselElementTypes.has(selectedElement.type) &&
             selectedElement.type !== "list" &&
             selectedElement.type !== "metric" &&
             selectedElement.type !== "reservationBlock" &&
             selectedElement.type !== "loginBlock" &&
             selectedElement.type !== "registrationBlock" &&
-            selectedElement.type !== "image" && (
+            selectedElement.type !== "image" &&
+            selectedElement.type !== "divider" &&
+            selectedElement.type !== "thinDivider" && (
             <label>Content<textarea value={selectedElement.content} onSelect={(event) => captureTextSelection(event, "content")} onChange={(event) => updateSelectedElement({ content: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "content") })} /></label>
           )}
           {selectedElement.type === "metric" && (
@@ -6043,6 +6592,66 @@ export default function PageBuilder({
                 {assetUploadBusy ? "Uploading..." : "Upload image"}
                 <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSelectedElementImageUpload} />
               </label>
+              <label className="image-opacity-control">
+                <span>
+                  <span>Opacity</span>
+                  <output>{Math.round(Math.max(0, Math.min(1, Number(selectedElement.styles?.opacity ?? 1))) * 100)}%</output>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  aria-label="Image opacity"
+                  value={Math.round(Math.max(0, Math.min(1, Number(selectedElement.styles?.opacity ?? 1))) * 100)}
+                  onChange={(event) =>
+                    updateSelectedElement({ styles: { opacity: Number(event.target.value) / 100 } })
+                  }
+                />
+              </label>
+              <label className="image-opacity-control">
+                <span>
+                  <span>Image size inside boundary</span>
+                  <output>{Math.round(Math.max(0.25, Math.min(3, Number.parseFloat(selectedElement.styles?.["--image-scale"]) || 1)) * 100)}%</output>
+                </span>
+                <input
+                  type="range"
+                  min="25"
+                  max="300"
+                  step="1"
+                  aria-label="Image size inside boundary"
+                  value={Math.round(Math.max(0.25, Math.min(3, Number.parseFloat(selectedElement.styles?.["--image-scale"]) || 1)) * 100)}
+                  onChange={(event) =>
+                    updateSelectedElement({
+                      styles: { "--image-scale": String(Number(event.target.value) / 100) },
+                    })
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="full-width-action"
+                onClick={() => updateSelectedElement({
+                  styles: { "--image-scale": "1" },
+                })}
+              >
+                Reset image scale
+              </button>
+              {selectedElement.mode === "direct" ? (
+                <label className="inspector-toggle-row image-layer-toggle">
+                  <input
+                    type="checkbox"
+                    checked={selectedElement.layer === "behindText"}
+                    onChange={(event) => setSelectedImageBehindText(event.target.checked)}
+                  />
+                  <span>Place image behind text</span>
+                </label>
+              ) : (
+                <p className="builder-note">Place the image on the free canvas to layer it behind text.</p>
+              )}
+              {selectedElement.layer === "behindText" && (
+                <p className="builder-note">Image editing mode is active. Elements above it are click-through so you can move or resize this image.</p>
+              )}
             </>
           )}
 
@@ -6067,8 +6676,13 @@ export default function PageBuilder({
             </details>
           )}
 
+          <div className="element-clipboard-actions">
+            <button type="button" onClick={() => copySelectedElement()}><Copy size={15} aria-hidden="true" /><span>Copy</span></button>
+            <button type="button" disabled={!hasCopiedElement} onClick={() => pasteCopiedElement()}><ClipboardPaste size={15} aria-hidden="true" /><span>Paste</span></button>
+            <button type="button" onClick={duplicateSelectedElement}><CopyPlus size={15} aria-hidden="true" /><span>Duplicate</span></button>
+          </div>
           <button type="button" className="danger-button" onClick={deleteSelectedElement}>Delete Element</button>
-          <p className="builder-note">You can also select an element on the canvas and press Delete or Backspace.</p>
+          <p className="builder-note">Shortcuts: Ctrl/Cmd+C to copy, Ctrl/Cmd+V to paste, and Delete or Backspace to remove.</p>
         </div>
       )}
       {inspectorMode === "empty" && (
@@ -6229,8 +6843,18 @@ export default function PageBuilder({
                 {renderFooterListEditor("footerHelpLinks", "Help links", "Help item")}
               </div>
               <div className="site-chrome-footer-panel-row">
-                {renderFooterListEditor("footerSocialLinks", "Social links", "Social channel")}
-                {renderFooterListEditor("footerPaymentMethods", "Payment labels", "Payment label")}
+                {renderFooterDestinationEditor({
+                  itemsKey: "footerSocialItems",
+                  legacyKey: "footerSocialLinks",
+                  label: "Social links",
+                  itemPlaceholder: "Social channel",
+                })}
+                {renderFooterDestinationEditor({
+                  itemsKey: "footerPaymentItems",
+                  legacyKey: "footerPaymentMethods",
+                  label: "Payment labels",
+                  itemPlaceholder: "Payment label",
+                })}
               </div>
             </div>
           </article>

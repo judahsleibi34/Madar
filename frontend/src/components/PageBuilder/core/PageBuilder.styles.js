@@ -90,6 +90,7 @@ export const getBuilderFreeElementStyle = ({
         : undefined,
     maxWidth: `${Math.max(1, viewportWidth - x) * canvasScale}px`,
     transform: `translate3d(${x * canvasScale}px, ${y * canvasScale}px, 0)`,
+    zIndex: element.layer === "behindText" ? 0 : 1,
   };
 };
 

@@ -5,13 +5,94 @@ import {
   collapseAccidentalTextDuplication,
   createDomTextRange,
   getFloatingToolbarPlacement,
+  getEditableTextWithLineBreaks,
+  getTextBlockFormats,
+  getTextBlockIndexesForRange,
   renderRichText,
+  renderRichTextBlocks,
   splitEditableLines,
 } from "./PageBuilder.text";
 
 afterEach(cleanup);
 
 describe("renderRichText", () => {
+  it("counts an empty paragraph placeholder as one blank row", () => {
+    const { container } = render(
+      <div>
+        <h2 data-builder-text-block="h2">Title</h2>
+        <p data-builder-text-block="text"><br /></p>
+        <p data-builder-text-block="text">Body</p>
+      </div>
+    );
+
+    expect(getEditableTextWithLineBreaks(container.firstChild)).toBe("Title\n\nBody");
+  });
+
+  it("preserves Chrome-style pasted block boundaries without internal markers", () => {
+    const { container } = render(
+      <div contentEditable suppressContentEditableWarning>
+        <div>First pasted line</div>
+        <div>Second <span>pasted</span> line</div>
+        <p>Third pasted line</p>
+      </div>
+    );
+
+    expect(getEditableTextWithLineBreaks(container.firstChild))
+      .toBe("First pasted line\nSecond pasted line\nThird pasted line");
+  });
+
+  it("keeps heading and paragraph formats per line", () => {
+    const element = {
+      type: "heading",
+      headingLevel: 1,
+      content: "Main title\nSupporting copy",
+      textBlockFormats: ["h1", "text"],
+    };
+    const { container } = render(<div>{renderRichTextBlocks(element)}</div>);
+
+    expect(getTextBlockFormats(element)).toEqual(["h1", "text"]);
+    expect(container.querySelector("h1")?.textContent).toBe("Main title");
+    expect(container.querySelector("p")?.textContent).toBe("Supporting copy");
+  });
+
+  it("keeps bullets and numbers scoped to their selected lines", () => {
+    const element = {
+      type: "text",
+      content: "Plain introduction\nSelected bullet\nPlain ending\nSelected number",
+      textBlockFormats: ["text", "bullets", "text", "numbers"],
+    };
+    const { container } = render(<div>{renderRichTextBlocks(element)}</div>);
+    const blocks = container.querySelectorAll("[data-builder-text-block]");
+
+    expect(getTextBlockFormats(element)).toEqual(["text", "bullets", "text", "numbers"]);
+    expect([...blocks].map((block) => block.dataset.builderTextBlock))
+      .toEqual(["text", "bullets", "text", "numbers"]);
+    expect(container.querySelectorAll('[data-builder-text-block="bullets"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-builder-text-block="numbers"]')).toHaveLength(1);
+  });
+
+  it("does not let an old whole-element font size flatten mixed blocks", () => {
+    const element = {
+      type: "heading",
+      headingLevel: 1,
+      content: "Main title\nSupporting copy",
+      textBlockFormats: ["h1", "text"],
+    };
+    const { container } = render(
+      <div>{renderRichTextBlocks(element, [{ field: "content", start: 0, end: element.content.length, fontSize: "17px" }])}</div>
+    );
+
+    expect(container.querySelector("h1 span")).toBeNull();
+    expect(container.querySelector("p span")).toBeNull();
+  });
+
+  it("targets only the lines touched by the selection", () => {
+    const content = "First heading\nMiddle text\nLast text";
+
+    expect(getTextBlockIndexesForRange(content, 14, 25)).toEqual([1]);
+    expect(getTextBlockIndexesForRange(content, 6, 20)).toEqual([0, 1]);
+  });
+
   it("preserves intentionally added blank editor rows", () => {
     expect(splitEditableLines("")).toEqual([""]);
     expect(splitEditableLines("\n")).toEqual(["", ""]);
@@ -51,7 +132,7 @@ describe("renderRichText", () => {
     expect(formattedRange.style.backgroundColor).toBe("rgba(254, 220, 186, 0.5)");
     expect(container.querySelector("h1").firstChild.nodeType).toBe(Node.TEXT_NODE);
   });
-  it("places the toolbar above selected words when space is available", () => {
+  it("places the toolbar high enough to clear the element move handle", () => {
     const placement = getFloatingToolbarPlacement({
       anchorRect: { left: 350, top: 300, bottom: 320, width: 100 },
       toolbarRect: { width: 400, height: 80 },
@@ -59,7 +140,7 @@ describe("renderRichText", () => {
       viewportHeight: 600,
     });
 
-    expect(placement).toEqual({ left: 200, top: 210, placement: "above" });
+    expect(placement).toEqual({ left: 200, top: 192, placement: "above" });
   });
 
   it("moves the toolbar below and keeps it inside canvas bounds near an edge", () => {

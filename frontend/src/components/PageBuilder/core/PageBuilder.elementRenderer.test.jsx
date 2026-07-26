@@ -1,90 +1,59 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createElementRenderer } from "./PageBuilder.elementRenderer";
 
 afterEach(cleanup);
 
-const createRenderer = (updateElementInlineText = vi.fn()) => createElementRenderer({
-  carouselElementTypes: new Set(),
-  selected: { type: "element", id: "text-1" },
-  preview: false,
-  getFreeElementStyle: () => ({}),
-  getElementStyle: () => ({}),
-  startDrag: vi.fn(),
-  findElementLocation: () => ({ isFree: true, sectionId: "section-1" }),
-  setInsertTarget: vi.fn(),
-  setSelected: vi.fn(),
-  captureCanvasTextSelection: vi.fn(),
-  shouldIgnoreInlineTextBlur: () => true,
-  updateElementInlineText,
-  runElementAction: vi.fn(),
-  renderConnectedForm: vi.fn(),
-  getReservationBlockValue: vi.fn(),
-});
-
-describe("Page Builder text element rendering", () => {
-  it("applies a selected-word effect without duplicating editable text", () => {
-    const content = "Design pages, collect responses, manage roles, and prototype workflows.";
-    const renderElement = createRenderer();
-    const element = {
-      id: "text-1",
-      type: "text",
-      content,
-      styles: { fontSize: "32px" },
-      richTextStyles: [],
+describe("mixed text blocks", () => {
+  it("continues an H1 as normal text inside the same element", () => {
+    const updateElementInlineText = vi.fn();
+    const heading = {
+      id: "heading-1",
+      type: "heading",
+      headingLevel: 1,
+      content: "TitleBody",
+      styles: {},
     };
-    const view = render(renderElement(element, true));
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "element", id: heading.id },
+      preview: false,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag: vi.fn(),
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText,
+      runElementAction: vi.fn(),
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
 
-    view.rerender(renderElement({
-      ...element,
-      richTextStyles: [{
-        field: "content",
-        start: 7,
-        end: 12,
-        fontStyle: "italic",
-      }],
-    }, true));
+    render(renderElement(heading, false));
+    const editable = screen.getByRole("textbox");
+    const headingBlock = editable.querySelector("h1");
+    const range = document.createRange();
+    range.setStart(headingBlock.firstChild, 5);
+    range.collapse(true);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
 
-    expect(view.getByRole("textbox").textContent).toBe(content);
-    expect(view.container.querySelector("span").textContent).toBe("pages");
-  });
-  it("never saves formatting-only DOM mutations as text edits", () => {
-    const updateElementInlineText = vi.fn();
-    const renderElement = createRenderer(updateElementInlineText);
-    const view = render(renderElement({
-      id: "text-1",
-      type: "text",
-      content: "Original server text",
-      styles: { fontSize: "24px" },
-    }, true));
-    const textbox = view.getByRole("textbox");
+    fireEvent.keyDown(editable, { key: "Enter" });
 
-    fireEvent.focus(textbox);
-    textbox.append(" accidental render copy");
-    fireEvent.blur(textbox);
-
-    expect(updateElementInlineText).not.toHaveBeenCalled();
-  });
-
-  it("still saves genuine text input before the formatting toolbar takes focus", () => {
-    const updateElementInlineText = vi.fn();
-    const renderElement = createRenderer(updateElementInlineText);
-    const view = render(renderElement({
-      id: "text-1",
-      type: "text",
-      content: "Original text",
-      styles: { fontSize: "24px" },
-    }, true));
-    const textbox = view.getByRole("textbox");
-
-    fireEvent.focus(textbox);
-    textbox.textContent = "Edited text";
-    fireEvent.input(textbox);
-    fireEvent.blur(textbox);
-
+    expect(editable.tagName).toBe("DIV");
+    expect(editable.querySelector("h1")?.textContent).toBe("Title");
+    expect(editable.querySelector("p")?.textContent).toBe("Body");
+    fireEvent.blur(editable);
     expect(updateElementInlineText).toHaveBeenCalledWith(
-      "text-1",
-      expect.objectContaining({ content: "Edited text" })
+      heading.id,
+      expect.objectContaining({
+        content: "Title\nBody",
+        textBlockFormats: ["h1", "text"],
+      })
     );
-  });});
+  });
+});

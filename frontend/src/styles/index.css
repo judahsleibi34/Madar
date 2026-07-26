@@ -323,9 +323,13 @@
   justify-content: center;
 }
 
-.tenant-social-row button {
+.tenant-social-row button,
+.tenant-social-row a,
+.tenant-social-row > span {
   width: 36px;
   height: 36px;
+  display: grid;
+  place-items: center;
   border-radius: 999px;
   border: 1px solid var(--theme-border);
   color: var(--theme-text);
@@ -333,6 +337,26 @@
   font-size: 11px;
   font-weight: 900;
   cursor: pointer;
+  text-decoration: none;
+}
+
+.tenant-payment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tenant-payment-row a,
+.tenant-payment-row span {
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .tenant-footer-column h4,

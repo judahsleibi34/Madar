@@ -56,6 +56,49 @@ describe("cleanBuilderProject", () => {
     });
   });
 
+  it("repairs duplicate font-size history and the Enter-saved all-H1 pattern", () => {
+    const normalized = normalizeBuilderProjectShape({
+      pages: [{
+        id: "home",
+        name: "Home",
+        sections: [{ freeElements: [{
+          id: "mixed-copy",
+          type: "text",
+          headingLevel: 1,
+          content: "Build. Engage. Understand.\ndad",
+          textBlockFormats: ["h1", "h1"],
+          richTextSizes: [
+            { field: "content", itemIndex: null, start: 0, end: 30, fontSize: "17px" },
+            { field: "content", itemIndex: null, start: 0, end: 30, fontSize: "32px" },
+            { field: "content", itemIndex: null, start: 0, end: 30, fontSize: "11px" },
+          ],
+        }] }],
+      }],
+    });
+    const element = normalized.pages[0].sections[0].freeElements[0];
+
+    expect(element.textBlockFormats).toEqual(["h1", "text"]);
+    expect(element.richTextSizes).toEqual([
+      { field: "content", itemIndex: null, start: 0, end: 30, fontSize: "11px" },
+    ]);
+  });
+
+  it("repairs the doubled newline produced by an empty editable paragraph", () => {
+    const normalized = normalizeBuilderProjectShape({
+      pages: [{
+        id: "home",
+        sections: [{ freeElements: [{
+          id: "copy",
+          type: "text",
+          content: "Title\n\n\nBody",
+          textBlockFormats: ["h2", "text", "text"],
+        }] }],
+      }],
+    });
+
+    expect(normalized.pages[0].sections[0].freeElements[0].content).toBe("Title\n\nBody");
+  });
+
   it("stores one canonical string form reference from the editor selector", () => {
     expect(buildFormConnectionUpdate(42)).toEqual({ connectedFormId: "42" });
   });

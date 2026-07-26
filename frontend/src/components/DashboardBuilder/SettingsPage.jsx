@@ -12,7 +12,13 @@ import {
   getConfiguredProjectSubdomain,
   sanitizeSubdomain,
 } from "../PageBuilder/core/PageBuilder.routing";
-import { uploadBuilderAsset } from "../PageBuilder/services/PageBuilder.api";
+import {
+  fetchBuilderProject,
+  listBuilderProjects,
+  updateBuilderProject,
+  uploadBuilderAsset,
+} from "../PageBuilder/services/PageBuilder.api";
+import { getBuilderAssetFileName } from "../PageBuilder/core/PageBuilder.uploadHandlers";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
 import { getSettingsContent } from "../../content";
@@ -33,6 +39,35 @@ const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
 const accountInfoRequests = new Map();
+
+const syncWebsiteDetailsToActiveBuilderProject = async (nextProject) => {
+  const { projects } = await listBuilderProjects({ limit: 1, offset: 0 });
+  const projectId = projects[0]?.id;
+  if (!projectId) return null;
+
+  const activeRecord = await fetchBuilderProject(projectId);
+  if (!activeRecord) return null;
+
+  const draftSchema = activeRecord.draft_schema || {};
+  const expectedRevision = Number(activeRecord.draft_revision);
+  return updateBuilderProject(projectId, {
+    draft_schema: {
+      ...draftSchema,
+      publish: {
+        ...(draftSchema.publish || {}),
+        subdomain: getConfiguredProjectSubdomain(nextProject),
+      },
+      siteChrome: {
+        ...defaultSiteChrome,
+        ...(draftSchema.siteChrome || {}),
+        ...(nextProject.siteChrome || {}),
+      },
+    },
+    ...(Number.isInteger(expectedRevision) && expectedRevision >= 0
+      ? { expected_revision: expectedRevision }
+      : {}),
+  });
+};
 
 const deferEffectStateUpdate = (callback) => {
   let cancelled = false;
@@ -763,6 +798,7 @@ export default function SettingsPage({
         },
       };
 
+      await syncWebsiteDetailsToActiveBuilderProject(savedProject);
       localStorage.setItem(scopedStorageKey, JSON.stringify(savedProject));
       setProject(savedProject);
       showNotification("success", data.message || t.websiteSaved);
@@ -1022,11 +1058,9 @@ export default function SettingsPage({
               <label>
                 {t.logoUrl}
                 <input
-                  value={siteForm.logoUrl}
+                  value={getBuilderAssetFileName(siteForm.logoUrl)}
                   className={fieldErrors.logoUrl ? "field-has-error" : ""}
-                  onChange={(event) =>
-                    updateSiteField("logoUrl", event.target.value)
-                  }
+                  readOnly
                 />
                 {fieldErrors.logoUrl && (
                   <span className="settings-field-error">

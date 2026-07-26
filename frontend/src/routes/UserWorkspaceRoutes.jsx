@@ -29,7 +29,15 @@ const BuilderProjectChooser = lazy(() =>
 function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps }) {
   const location = useLocation();
   const projectId = getBuilderProjectIdFromPath(location.pathname);
-  if (!projectId) return <BuilderProjectChooser workspace={workspace} autoOpenSingleProject />;
+  if (!projectId) {
+    return (
+      <BuilderProjectChooser
+        workspace={workspace}
+        autoEnterProject={workspace === "page-builder"}
+        autoOpenSingleProject
+      />
+    );
+  }
   return <PageBuilder key={`${workspace}:${projectId}`} {...pageBuilderProps} />;
 }
 

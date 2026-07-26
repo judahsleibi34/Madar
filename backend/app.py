@@ -219,7 +219,10 @@ def get_public_builder_asset(tenant_id: int, filename: str):
     return FileResponse(
         path=str(asset_path),
         media_type=PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()],
-        filename=Path(asset_path).name,
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Disposition": "inline",
+        },
     )
 
 
