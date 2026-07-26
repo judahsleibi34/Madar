@@ -66,10 +66,15 @@ import {
   normalizeElementAlignSelf,
 } from "../core/PageBuilder.elementLayout";
 import {
+  getDirectElementMinimumSize,
+  getMetricMinimumHeight,
   getMetricItems,
   getSectionCanvasHeight,
 } from "../core/PageBuilder.layout";
-import { getBuilderElementStyle } from "../core/PageBuilder.styles";
+import {
+  getBuilderElementStyle,
+  getDirectElementFrameStyle as getCanonicalDirectElementFrameStyle,
+} from "../core/PageBuilder.styles";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
 const MADAR_ATTRIBUTION_URL = "https://madar.app/";
@@ -965,20 +970,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const position = element.position?.[runtimeViewport] || element.position?.desktop || {};
     const viewportWidth = viewports[runtimeViewport] || viewports.desktop;
     const sectionHeight = getSectionCanvasHeight(section, runtimeViewport);
-    const left = `${((Number(position.x) || 0) / viewportWidth) * 100}%`;
-    const top = `${((Number(position.y) || 0) / sectionHeight) * 100}%`;
-    const width = `${((Number(position.width) || 240) / viewportWidth) * 100}%`;
-    const height = `${((Number(position.height) || 80) / sectionHeight) * 100}%`;
 
-    return {
-      position: "absolute",
-      left,
-      top,
-      width,
-      height,
-      maxWidth: `calc(100% - ${left})`,
-      zIndex: element.layer === "behindText" ? 0 : 1,
-    };
+    return getCanonicalDirectElementFrameStyle({
+      element,
+      position,
+      viewportWidth,
+      sectionHeight,
+      getMetricMinimumHeight,
+      getDirectElementMinimumSize,
+      canvasScale: 1,
+    });
   };
 
   const setFormAnswer = (instanceKey, fieldId, value) => {

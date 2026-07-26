@@ -60,12 +60,32 @@ export const getBuilderFreeElementStyle = ({
   const section = activePage?.sections.find((item) => item.id === location?.sectionId);
   const viewportWidth = viewports[viewport] || viewports.desktop;
   const sectionHeight = getSectionCanvasHeight(section, viewport);
+  return getDirectElementFrameStyle({
+    element,
+    position: pos,
+    viewportWidth,
+    sectionHeight,
+    getMetricMinimumHeight,
+    getDirectElementMinimumSize,
+    canvasScale,
+  });
+};
+
+export const getDirectElementFrameStyle = ({
+  element,
+  position,
+  viewportWidth,
+  sectionHeight,
+  getMetricMinimumHeight,
+  getDirectElementMinimumSize,
+  canvasScale = 1,
+}) => {
   const minimumSize = getDirectElementMinimumSize(element);
   const clamped = clampElementToBounds(
     {
-      ...pos,
-      width: Number(pos.width) || 240,
-      height: Number(pos.height) || 80,
+      ...(position || {}),
+      width: Number(position?.width) || 240,
+      height: Number(position?.height) || 80,
     },
     { x: 0, y: 0, width: viewportWidth, height: sectionHeight },
     {
