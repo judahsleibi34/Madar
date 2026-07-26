@@ -1,9 +1,159 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  compactDirectSectionAfterElementRemoval,
+  constrainResizeToSiblingElements,
+  getSectionCanvasHeight,
   getMovedElementPosition,
+  moveElementBehindText,
+  moveElementToFront,
   reconcileMeasuredFormBlockPosition,
 } from "./PageBuilder.layout";
+
+describe("page builder canvas compaction", () => {
+  it("renders a direct canvas from its actual content instead of stale saved height", () => {
+    const section = {
+      mode: "direct",
+      layout: { minHeight: 900, minHeightByViewport: { desktop: 900 } },
+      freeElements: [{
+        id: "card",
+        position: { desktop: { x: 20, y: 24, width: 700, height: 300 } },
+      }],
+    };
+
+    expect(getSectionCanvasHeight(section, "desktop")).toBe(372);
+  });
+
+  it("keeps only a small drop area when a direct canvas is empty", () => {
+    expect(getSectionCanvasHeight({
+      mode: "direct",
+      layout: { minHeight: 900 },
+      freeElements: [],
+    }, "desktop")).toBe(120);
+  });
+
+  it("closes a deleted element gap and shrinks every responsive canvas", () => {
+    const makePosition = (y, height) => ({ x: 20, y, width: 600, height });
+    const section = {
+      id: "section-1",
+      mode: "direct",
+      layout: {
+        minHeight: 900,
+        minHeightByViewport: { desktop: 900, tablet: 900, mobile: 900 },
+      },
+      freeElements: [
+        {
+          id: "removed",
+          position: {
+            desktop: makePosition(120, 220),
+            tablet: makePosition(120, 220),
+            mobile: makePosition(120, 220),
+          },
+        },
+        {
+          id: "below",
+          position: {
+            desktop: makePosition(356, 100),
+            tablet: makePosition(356, 100),
+            mobile: makePosition(356, 100),
+          },
+        },
+      ],
+    };
+
+    const result = compactDirectSectionAfterElementRemoval(section, "removed");
+
+    expect(result.freeElements).toHaveLength(1);
+    expect(result.freeElements[0].position.desktop.y).toBe(120);
+    expect(result.layout.minHeightByViewport).toEqual({
+      desktop: 268,
+      tablet: 268,
+      mobile: 268,
+    });
+  });
+
+  it("does not move a side-by-side element that is outside the deleted column", () => {
+    const section = {
+      mode: "direct",
+      layout: { minHeight: 700 },
+      freeElements: [
+        { id: "removed", position: { desktop: { x: 20, y: 40, width: 220, height: 180 } } },
+        { id: "side", position: { desktop: { x: 300, y: 240, width: 220, height: 100 } } },
+      ],
+    };
+
+    const result = compactDirectSectionAfterElementRemoval(section, "removed");
+    expect(result.freeElements[0].position.desktop.y).toBe(240);
+  });
+});
+
+describe("page builder element layers", () => {
+  it("moves an image below every text element while preserving the other layer order", () => {
+    const elements = [
+      { id: "shape", type: "divider" },
+      { id: "heading", type: "heading" },
+      { id: "image", type: "image" },
+      { id: "text", type: "text" },
+    ];
+
+    expect(moveElementBehindText(elements, "image").map((element) => element.id)).toEqual([
+      "shape",
+      "image",
+      "heading",
+      "text",
+    ]);
+    expect(moveElementBehindText(elements, "image")[1]).toMatchObject({
+      id: "image",
+      layer: "behindText",
+    });
+  });
+
+  it("leaves layers unchanged when there is no text element", () => {
+    const elements = [{ id: "image", type: "image" }, { id: "button", type: "button" }];
+
+    expect(moveElementBehindText(elements, "image")).toBe(elements);
+  });
+
+  it("keeps an already layered image stable", () => {
+    const elements = [
+      { id: "image", type: "image", layer: "behindText" },
+      { id: "heading", type: "heading" },
+    ];
+
+    expect(moveElementBehindText(elements, "image")).toBe(elements);
+  });
+
+  it("moves an unchecked behind-text image to the front and clears its layer", () => {
+    const elements = [
+      { id: "image", type: "image", layer: "behindText" },
+      { id: "heading", type: "heading" },
+      { id: "text", type: "text" },
+    ];
+
+    const result = moveElementToFront(elements, "image");
+    expect(result.map((element) => element.id)).toEqual(["heading", "text", "image"]);
+    expect(result[2].layer).toBeUndefined();
+  });
+
+  it("allows an image to expand across overlapping text boundaries before layering", () => {
+    const candidate = { x: 100, y: 100, width: 700, height: 300 };
+    const result = constrainResizeToSiblingElements({
+      candidate,
+      siblings: [{
+        id: "text",
+        type: "text",
+        position: { desktop: { x: 80, y: 180, width: 760, height: 220 } },
+      }],
+      selectedElement: { id: "image", type: "image" },
+      viewport: "desktop",
+      createPosition: () => ({ desktop: { x: 0, y: 0, width: 240, height: 80 } }),
+      dragState: { startX: 100, startWidth: 400 },
+      canvasWidth: 1200,
+    });
+
+    expect(result).toBe(candidate);
+  });
+});
 
 describe("page builder scaled canvas coordinates", () => {
   it("preserves a resized form width while expanding it to fit its content", () => {

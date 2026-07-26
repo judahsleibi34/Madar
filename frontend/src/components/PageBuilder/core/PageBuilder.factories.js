@@ -208,16 +208,16 @@ export const createElement = (type = "text", overrides = {}) => {
     },
     carousel: {
       name: factoryCopy.elements.carousel.name,
-      carouselVariant: "lightswind",
+      carouselVariant: "cards",
       autoScroll: true,
       autoScrollMs: 4000,
       content: factoryCopy.elements.carousel.content,
       styles: {
         ...base.styles,
-        backgroundColor: "var(--theme-surface)",
-        borderRadius: "26px",
+        backgroundColor: "var(--theme-surface-2)",
+        borderRadius: "18px",
         alignSelf: "stretch",
-        "--carousel-height": "410px",
+        "--carousel-height": "390px",
       },
     },
     carouselCards: {
@@ -308,6 +308,18 @@ export const createElement = (type = "text", overrides = {}) => {
         ...base.styles,
         backgroundColor: "rgba(var(--theme-shadow-rgb), 0.16)",
         alignSelf: "stretch",
+      },
+    },
+    thinDivider: {
+      name: factoryCopy.elements.thinDivider.name,
+      content: "",
+      styles: {
+        ...base.styles,
+        color: "var(--theme-border-strong)",
+        backgroundColor: "transparent",
+        borderRadius: "0px",
+        alignSelf: "stretch",
+        "--divider-thickness": "1px",
       },
     },
     embed: {

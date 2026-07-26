@@ -67,6 +67,10 @@ export const getDirectElementMinimumSize = (element) => {
     return { width: 80, height: 42 };
   }
 
+  if (["divider", "thinDivider"].includes(element?.type)) {
+    return { width: 80, height: 24 };
+  }
+
   if (element?.type === "metric" || element?.type === "list") {
     return { width: 160, height: getMetricMinimumHeight(element) };
   }
@@ -111,11 +115,13 @@ export const directElementHeight = (element) => {
     image: 260,
     card: 390,
     list: 170,
+    divider: 32,
+    thinDivider: 32,
     formBlock: 460,
     reservationBlock: 770,
     loginBlock: 390,
     registrationBlock: 520,
-    carousel: 400,
+    carousel: 420,
     carouselCards: 360,
     carouselSplit: 380,
     carouselSpotlight: 420,
@@ -166,10 +172,93 @@ export const getMetricItems = (element) => {
   return items.length ? items : [{ label: "Metric", value: "0" }];
 };
 
-export const getSectionCanvasHeight = (section, viewportName) =>
-  Number(section?.layout?.minHeightByViewport?.[viewportName]) ||
-  Number(section?.layout?.minHeight) ||
-  560;
+export const getSectionCanvasHeight = (section, viewportName) => {
+  if (["direct", "free"].includes(section?.mode)) {
+    const positionedElements = (section?.freeElements || []).filter(
+      (element) => element.position?.[viewportName]
+    );
+    if ((section?.freeElements || []).length === 0) return 120;
+    if (positionedElements.length > 0) {
+      return positionedElements.reduce((requiredHeight, element) => {
+        const position = element.position[viewportName];
+        return Math.max(
+          requiredHeight,
+          (Number(position.y) || 0) + (Number(position.height) || 0) + 48
+        );
+      }, 120);
+    }
+  }
+
+  return Number(section?.layout?.minHeightByViewport?.[viewportName]) ||
+    Number(section?.layout?.minHeight) ||
+    560;
+};
+
+const horizontalRangesOverlap = (first = {}, second = {}) => {
+  const firstLeft = Number(first.x) || 0;
+  const secondLeft = Number(second.x) || 0;
+  const firstRight = firstLeft + (Number(first.width) || 0);
+  const secondRight = secondLeft + (Number(second.width) || 0);
+  return firstLeft < secondRight && firstRight > secondLeft;
+};
+
+export const compactDirectSectionAfterElementRemoval = (
+  section,
+  elementId,
+  { minimumHeight = 120, verticalGap = 16, bottomPadding = 48 } = {}
+) => {
+  const sourceElements = section?.freeElements || [];
+  const removedElement = sourceElements.find((element) => element.id === elementId);
+  if (!removedElement) return section;
+
+  const remainingElements = sourceElements.filter((element) => element.id !== elementId);
+  const minHeightByViewport = {};
+  const compactedElements = remainingElements.map((element) => ({
+    ...element,
+    position: { ...(element.position || {}) },
+  }));
+
+  ["desktop", "tablet", "mobile"].forEach((viewportName) => {
+    const removedPosition = removedElement.position?.[viewportName];
+    const removedBottom = removedPosition
+      ? (Number(removedPosition.y) || 0) + (Number(removedPosition.height) || 0)
+      : 0;
+    const reclaimedHeight = removedPosition
+      ? (Number(removedPosition.height) || 0) + verticalGap
+      : 0;
+
+    compactedElements.forEach((element) => {
+      const position = element.position?.[viewportName];
+      if (!position || !removedPosition) return;
+      const isBelowRemoved = (Number(position.y) || 0) >= removedBottom - 1;
+      if (!isBelowRemoved || !horizontalRangesOverlap(position, removedPosition)) return;
+
+      element.position[viewportName] = {
+        ...position,
+        y: Math.max(8, (Number(position.y) || 0) - reclaimedHeight),
+      };
+    });
+
+    minHeightByViewport[viewportName] = compactedElements.reduce((requiredHeight, element) => {
+      const position = element.position?.[viewportName];
+      if (!position) return requiredHeight;
+      return Math.max(
+        requiredHeight,
+        (Number(position.y) || 0) + (Number(position.height) || 0) + bottomPadding
+      );
+    }, minimumHeight);
+  });
+
+  return {
+    ...section,
+    layout: {
+      ...(section.layout || {}),
+      minHeight: minHeightByViewport.desktop,
+      minHeightByViewport,
+    },
+    freeElements: compactedElements,
+  };
+};
 
 export const commitDirectElementInteraction = (sections, {
   elementId,
@@ -453,6 +542,42 @@ export const positionsOverlap = (candidate, other, spacing = 8) =>
   candidate.y < other.y + other.height + spacing &&
   candidate.y + candidate.height + spacing > other.y;
 
+const textLayerElementTypes = new Set(["heading", "text", "list"]);
+
+export const moveElementBehindText = (elements = [], elementId = "") => {
+  const elementIndex = elements.findIndex((element) => element.id === elementId);
+  if (elementIndex < 0) return elements;
+
+  const element = elements[elementIndex];
+  const layeredElement = element.layer === "behindText"
+    ? element
+    : { ...element, layer: "behindText" };
+  const remainingElements = elements.filter((item) => item.id !== elementId);
+  const firstTextIndex = remainingElements.findIndex((item) =>
+    textLayerElementTypes.has(item.type)
+  );
+
+  if (firstTextIndex < 0) return elements;
+
+  const reorderedElements = [...remainingElements];
+  reorderedElements.splice(firstTextIndex, 0, layeredElement);
+  if (reorderedElements.every((item, index) => item === elements[index])) return elements;
+  return reorderedElements;
+};
+
+export const moveElementToFront = (elements = [], elementId = "") => {
+  const elementIndex = elements.findIndex((element) => element.id === elementId);
+  if (elementIndex < 0) return elements;
+
+  const frontElement = { ...elements[elementIndex], layer: undefined };
+  const reorderedElements = [
+    ...elements.filter((element) => element.id !== elementId),
+    frontElement,
+  ];
+  if (reorderedElements.every((element, index) => element === elements[index])) return elements;
+  return reorderedElements;
+};
+
 export const getProjectOverlapWarnings = ({
   project,
   createPosition,
@@ -529,6 +654,44 @@ export const getDragCandidatePosition = ({
     mode: resizing ? "resize" : "move",
     allowBottomOverflow,
   });
+};
+
+export const constrainResizeToSiblingElements = ({
+  candidate,
+  siblings = [],
+  selectedElement,
+  viewport,
+  createPosition,
+  dragState,
+  canvasWidth,
+  spacing = 12,
+}) => {
+  if (selectedElement?.type === "image" || selectedElement?.layer === "behindText") {
+    return candidate;
+  }
+
+  return siblings.reduce((nextCandidate, element) => {
+    const other = element.position?.[viewport] || createPosition()[viewport];
+    if (!positionsOverlap(nextCandidate, other, spacing)) return nextCandidate;
+
+    const minimumSize = getDirectElementMinimumSize(selectedElement);
+    const clamped = { ...nextCandidate };
+    const verticalRangesMeet = nextCandidate.y < other.y + other.height + spacing &&
+      nextCandidate.y + nextCandidate.height + spacing > other.y;
+    const horizontalRangesMeet = nextCandidate.x < other.x + other.width + spacing &&
+      nextCandidate.x + nextCandidate.width + spacing > other.x;
+
+    if (other.x >= dragState.startX + dragState.startWidth + spacing && verticalRangesMeet) {
+      clamped.width = Math.max(
+        Math.min(minimumSize.width, canvasWidth - nextCandidate.x),
+        Math.round(other.x - nextCandidate.x - spacing)
+      );
+    }
+    if (other.y >= nextCandidate.y && horizontalRangesMeet) {
+      clamped.height = Math.max(minimumSize.height, Math.round(other.y - nextCandidate.y - spacing));
+    }
+    return clamped;
+  }, candidate);
 };
 
 export const getMovedElementPosition = ({

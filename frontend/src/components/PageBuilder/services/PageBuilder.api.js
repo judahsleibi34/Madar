@@ -521,6 +521,17 @@ export const fetchWebsiteSettings = async () => {
   return data?.website || null;
 };
 
+export const updateWebsiteSettings = async (settings) => {
+  const response = await apiFetch(getApiUrl("/website/settings"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+
+  const data = await parseJsonResponse(response);
+  return data?.website || null;
+};
+
 export const fetchBuilderFormSubmissions = async (
   projectId,
   { form_id, limit = 100, offset = 0 } = {}

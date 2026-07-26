@@ -2,6 +2,11 @@ import { resolveMediaUrl } from "../../../utils/media";
 import { defaultSiteChrome } from "./PageBuilder.constants";
 import { splitLines } from "./PageBuilder.text";
 import {
+  getFooterLinkItems,
+  getSafeFooterLinkUrl,
+  isExternalFooterLink,
+} from "./PageBuilder.footerLinks";
+import {
   findPageByNavigationReference,
   getNavigablePages,
   getPageNavigationLabel,
@@ -90,8 +95,14 @@ export const createSiteChromeRenderers = ({
 
     const pageLinks = splitLines(site.footerShopLinks || "");
     const helpLinks = splitLines(site.footerHelpLinks || "About Us\nPolicies\nContact");
-    const socialLinks = splitLines(site.footerSocialLinks || "Facebook\nLinkedIn\nX\nInstagram");
-    const paymentMethods = splitLines(site.footerPaymentMethods || "");
+    const socialLinks = getFooterLinkItems(
+      site.footerSocialItems,
+      site.footerSocialLinks || "Facebook\nLinkedIn\nX\nInstagram"
+    );
+    const paymentMethods = getFooterLinkItems(
+      site.footerPaymentItems,
+      site.footerPaymentMethods || ""
+    );
     const footerBrand = site.footerStoreName || site.brand || "Your Brand";
     const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || "B";
     const resolveFooterPageLink = (value) => {
@@ -108,6 +119,12 @@ export const createSiteChromeRenderers = ({
         );
       });
     };
+    const isVisibleFooterItem = (value) => {
+      const normalizedValue = String(value || "").trim();
+      return !/^page_[a-z0-9-]{8,}$/i.test(normalizedValue) || Boolean(resolveFooterPageLink(normalizedValue));
+    };
+    const visiblePageLinks = pageLinks.filter(isVisibleFooterItem);
+    const visibleHelpLinks = helpLinks.filter(isVisibleFooterItem);
     const navigateFooterLink = (label) => {
       const target = resolveFooterPageLink(label);
 
@@ -139,11 +156,26 @@ export const createSiteChromeRenderers = ({
             <p>{site.description}</p>
 
             <div className="ecommerce-social-row">
-              {socialLinks.map((item) => (
-                <button type="button" key={item} aria-label={item}>
-                  {item.slice(0, 2).toUpperCase()}
-                </button>
-              ))}
+              {socialLinks.map((item) => {
+                const href = getSafeFooterLinkUrl(item.url, item.label);
+                return href ? (
+                  <a
+                    href={href}
+                    key={`${item.label}-${href}`}
+                    aria-label={item.label}
+                    target={isExternalFooterLink(href) ? "_blank" : undefined}
+                    rel={isExternalFooterLink(href) ? "noopener noreferrer" : undefined}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (!preview) event.preventDefault();
+                    }}
+                  >
+                    {item.label.slice(0, 2).toUpperCase()}
+                  </a>
+                ) : (
+                  <span key={item.label} aria-label={item.label}>{item.label.slice(0, 2).toUpperCase()}</span>
+                );
+              })}
             </div>
 
           </div>
@@ -151,14 +183,14 @@ export const createSiteChromeRenderers = ({
           <div className="ecommerce-footer-column ecommerce-footer-pages-column">
             <h4>{site.footerShopTitle || "Pages"}</h4>
             <div className="ecommerce-footer-links-grid">
-              {pageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
+              {visiblePageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
             </div>
           </div>
 
           <div className="ecommerce-footer-column ecommerce-footer-help-column">
             <h4>{site.footerHelpTitle || "Help"}</h4>
             <div className="ecommerce-footer-links-grid">
-              {helpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}
+              {visibleHelpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}
             </div>
           </div>
 
@@ -172,7 +204,23 @@ export const createSiteChromeRenderers = ({
             <p dir="ltr">{site.phone || "+972599203857"}</p>
             {paymentMethods.length > 0 && (
               <div className="ecommerce-payment-row">
-                {paymentMethods.map((item) => <span key={item}>{item}</span>)}
+                {paymentMethods.map((item) => {
+                  const href = getSafeFooterLinkUrl(item.url, item.label);
+                  return href ? (
+                    <a
+                      href={href}
+                      key={`${item.label}-${href}`}
+                      target={isExternalFooterLink(href) ? "_blank" : undefined}
+                      rel={isExternalFooterLink(href) ? "noopener noreferrer" : undefined}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!preview) event.preventDefault();
+                      }}
+                    >
+                      {item.label}
+                    </a>
+                  ) : <span key={item.label}>{item.label}</span>;
+                })}
               </div>
             )}
           </div>

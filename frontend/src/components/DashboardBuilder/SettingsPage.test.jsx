@@ -7,9 +7,19 @@ import { buildProfilePayload } from "./profilePayload";
 import SettingsPage from "./SettingsPage";
 import { apiFetch } from "../../utils/apiClient";
 import { getBuilderStorageKey } from "../PageBuilder/core/PageBuilder.constants";
+import {
+  fetchBuilderProject,
+  listBuilderProjects,
+  updateBuilderProject,
+} from "../PageBuilder/services/PageBuilder.api";
 
 vi.mock("../../utils/apiClient", () => ({ apiFetch: vi.fn() }));
-vi.mock("../PageBuilder/services/PageBuilder.api", () => ({ uploadBuilderAsset: vi.fn() }));
+vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
+  fetchBuilderProject: vi.fn(),
+  listBuilderProjects: vi.fn(),
+  updateBuilderProject: vi.fn(),
+  uploadBuilderAsset: vi.fn(),
+}));
 
 const response = (data) => ({
   ok: true,
@@ -19,6 +29,7 @@ const response = (data) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  listBuilderProjects.mockResolvedValue({ projects: [], pagination: {} });
   localStorage.clear();
 });
 
@@ -130,6 +141,67 @@ describe("SettingsPage canonical email handling", () => {
     expect(screen.getByLabelText(/contact email/i).value).toBe("");
     expect(screen.queryByDisplayValue("Other tenant brand")).toBeNull();
     expect(screen.queryByDisplayValue("other@example.com")).toBeNull();
+  });
+
+  it("shows only the logo filename while retaining the backend path", async () => {
+    const currentUser = { id: 23, tenant_id: 7, email: "owner@example.com" };
+    const logoFileName = "56fee3e0f73c4110abdf423c12345678.png";
+    const logoPath = `/uploads/tenant_7/builder_assets/${logoFileName}`;
+    listBuilderProjects.mockResolvedValue({
+      projects: [{ id: "builder-project-1" }],
+      pagination: { count: 1, has_more: false },
+    });
+    fetchBuilderProject.mockResolvedValue({
+      id: "builder-project-1",
+      draft_revision: 4,
+      draft_schema: { siteChrome: { brand: "Old brand" } },
+    });
+    updateBuilderProject.mockResolvedValue({ id: "builder-project-1", draft_revision: 5 });
+    apiFetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/website/settings") && options.method === "PUT") {
+        return Promise.resolve(response({
+          website: { subdomain: "demo", brand: "Demo", logo_url: logoPath },
+        }));
+      }
+      if (String(url).includes("/website/settings")) {
+        return Promise.resolve(response({ website: { logo_url: logoPath } }));
+      }
+      return Promise.resolve(response({ user: currentUser }));
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/settings?tab=website"]}>
+        <SettingsPage user={currentUser} onUserUpdated={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    const logoField = await screen.findByLabelText(/logo file/i);
+    expect(logoField.value).toBe(logoFileName);
+    expect(logoField.value).not.toContain("/uploads/");
+
+    fireEvent.change(screen.getByLabelText(/subdomain name/i), {
+      target: { value: "demo" },
+    });
+    fireEvent.change(screen.getByLabelText(/brand name/i), {
+      target: { value: "Demo" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save website details/i }));
+    await waitFor(() => {
+      const saveCall = apiFetch.mock.calls.find(([, options]) => options?.method === "PUT");
+      expect(JSON.parse(saveCall[1].body).logo_url).toBe(logoPath);
+    });
+    expect(updateBuilderProject).toHaveBeenCalledWith(
+      "builder-project-1",
+      expect.objectContaining({
+        expected_revision: 4,
+        draft_schema: expect.objectContaining({
+          siteChrome: expect.objectContaining({
+            brand: "Demo",
+            logoUrl: logoPath,
+          }),
+        }),
+      })
+    );
   });
 });
 

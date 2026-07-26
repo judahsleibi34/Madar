@@ -5,9 +5,12 @@ import ReservationBlock from "../blocks/ReservationBlock";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
   collapseAccidentalTextDuplication,
+  getEditableTextBlockFormats,
+  getEditableTextWithLineBreaks,
   getListItems,
   getRichTextRanges,
   renderRichText,
+  renderRichTextBlocks,
 } from "./PageBuilder.text";
 import {
   getMetricItems,
@@ -17,6 +20,7 @@ import {
   getCarouselWidthValue,
   getCarouselVariant,
 } from "./PageBuilder.elementLayout";
+import { getElementHeadingTag } from "./PageBuilder.heading";
 
 export const createElementRenderer = ({
   carouselElementTypes,
@@ -49,6 +53,47 @@ export const createElementRenderer = ({
       tabIndex: 0,
       onKeyDown: (event) => {
         event.stopPropagation();
+        if (event.key === "Enter" && field === "content" && ["heading", "text"].includes(element.type)) {
+          event.preventDefault();
+          const selection = window.getSelection();
+          if (selection?.rangeCount) {
+            const range = selection.getRangeAt(0);
+            if (event.currentTarget.contains(range.startContainer)) {
+              range.deleteContents();
+              const currentBlock = (range.startContainer.nodeType === 1
+                ? range.startContainer
+                : range.startContainer.parentElement)?.closest?.("[data-builder-text-block]");
+              if (!currentBlock || !event.currentTarget.contains(currentBlock)) return;
+
+              const trailingRange = document.createRange();
+              trailingRange.setStart(range.startContainer, range.startOffset);
+              trailingRange.setEnd(currentBlock, currentBlock.childNodes.length);
+              const trailingContent = trailingRange.extractContents();
+              const nextBlock = document.createElement("p");
+              nextBlock.dataset.builderTextBlock = "text";
+              nextBlock.append(trailingContent);
+              if (!nextBlock.textContent && !nextBlock.querySelector("br")) nextBlock.append(document.createElement("br"));
+              currentBlock.after(nextBlock);
+              if (!currentBlock.textContent && !currentBlock.querySelector("br")) currentBlock.append(document.createElement("br"));
+
+              range.selectNodeContents(nextBlock);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+              event.currentTarget.dataset.builderTextEdited = "true";
+              captureCanvasTextSelection?.(event, "content", null, element.id, { silent: true });
+              const toolbarSelect = document.querySelector(
+                '.builder-inline-text-toolbar select[aria-label="Text style"]'
+              );
+              if (toolbarSelect) toolbarSelect.value = "text";
+            }
+          }
+        }
+      },
+      onKeyUp: (event) => {
+        if (field === "content" && ["heading", "text"].includes(element.type)) {
+          captureCanvasTextSelection?.(event, field, itemIndex, element.id, { silent: true });
+        }
       },
       onFocus: (event) => {
         event.currentTarget.dataset.builderTextEdited = "false";
@@ -75,12 +120,15 @@ export const createElementRenderer = ({
         event.currentTarget.dataset.builderTextEdited = "true";
       },
       onBlur: (event) => {
+        if (field === "content" && ["heading", "text"].includes(element.type)) {
+          captureCanvasTextSelection?.(event, field, itemIndex, element.id);
+        }
         const wasEdited = event.currentTarget.dataset.builderTextEdited === "true";
         if (shouldIgnoreInlineTextBlur?.(event) && !wasEdited) return;
         if (!wasEdited) return;
         event.currentTarget.dataset.builderTextEdited = "false";
 
-        const rawText = event.currentTarget.textContent || "";
+        const rawText = getEditableTextWithLineBreaks(event.currentTarget);
         const nextText = field === "content"
           ? collapseAccidentalTextDuplication(rawText)
           : rawText;
@@ -122,6 +170,9 @@ export const createElementRenderer = ({
 
         updateElementInlineText?.(element.id, {
           content: nextText,
+          ...(["heading", "text"].includes(element.type)
+            ? { textBlockFormats: getEditableTextBlockFormats(event.currentTarget, element.type === "heading" ? getElementHeadingTag(element) : "text") }
+            : {}),
           richTextColors: (element.richTextColors || []).filter((range) => range.field !== "content"),
           richTextSizes: (element.richTextSizes || []).filter((range) => range.field !== "content"),
           richTextStyles: (element.richTextStyles || []).filter((range) => range.field !== "content"),
@@ -161,11 +212,11 @@ export const createElementRenderer = ({
     };
 
     if (element.type === "heading") {
-      return <AutoFitDirectText as="h1" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getTextRanges(element, "content"))}</AutoFitDirectText>;
+      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "text") {
-      return <AutoFitDirectText as="p" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getTextRanges(element, "content"))}</AutoFitDirectText>;
+      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "button") {
@@ -243,7 +294,7 @@ export const createElementRenderer = ({
       );
     }
 
-    if (element.type === "divider") {
+    if (element.type === "divider" || element.type === "thinDivider") {
       return <hr key={element.id} {...commonProps} />;
     }
 

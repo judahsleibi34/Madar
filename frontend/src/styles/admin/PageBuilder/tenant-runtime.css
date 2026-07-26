@@ -1,10 +1,16 @@
 .tenant-runtime-page {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 32px;
+  width: 100%;
+  min-height: 0;
+  display: block;
+  padding: 0;
   background: var(--theme-bg);
   color: var(--theme-text);
+}
+
+.tenant-runtime-page > .builder-canvas {
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .tenant-site-draft-preview .tenant-runtime-page {

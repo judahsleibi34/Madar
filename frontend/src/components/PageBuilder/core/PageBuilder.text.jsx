@@ -35,6 +35,107 @@ export const collapseAccidentalTextDuplication = (value) => {
 
   return text;
 };
+
+export const getEditableTextWithLineBreaks = (root) => {
+  if (!root) return "";
+
+  const blockNames = new Set([
+    "ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "DIV", "FIGCAPTION", "FIGURE",
+    "FOOTER", "H1", "H2", "H3", "H4", "H5", "H6", "HEADER", "LI", "MAIN",
+    "NAV", "P", "SECTION",
+  ]);
+
+  const readChildren = (nodes) => {
+    const children = [...(nodes || [])];
+    let output = "";
+
+    children.forEach((child, index) => {
+      const isBlock = child.nodeType === 1 && blockNames.has(child.nodeName);
+      if (isBlock && output && !output.endsWith("\n")) output += "\n";
+      output += readNode(child);
+      if (isBlock && index < children.length - 1 && !output.endsWith("\n")) output += "\n";
+    });
+
+    return output;
+  };
+
+  const readNode = (node) => {
+    if (node.nodeType === 3) return node.data || "";
+    if (node.nodeName === "BR") return "\n";
+    return readChildren(node.childNodes);
+  };
+
+  const blocks = [...root.children].filter((node) => node.hasAttribute("data-builder-text-block"));
+  if (blocks.length) {
+    return blocks.map((block) => {
+      const isEmptyPlaceholder =
+        block.childNodes.length === 1 && block.firstChild?.nodeName === "BR";
+      return isEmptyPlaceholder ? "" : readNode(block);
+    }).join("\n");
+  }
+
+  return readChildren(root.childNodes);
+};
+
+export const getTextBlockFormats = (element) => {
+  const lineCount = String(element?.content ?? "").split("\n").length;
+  const fallback = element?.type === "heading"
+    ? `h${Math.max(1, Math.min(3, Number(element?.headingLevel) || 1))}`
+    : "text";
+  const saved = Array.isArray(element?.textBlockFormats) ? element.textBlockFormats : [];
+
+  return Array.from({ length: lineCount }, (_, index) => {
+    const format = String(saved[index] || fallback).toLowerCase();
+    return ["h1", "h2", "h3", "text", "bullets", "numbers"].includes(format) ? format : fallback;
+  });
+};
+
+export const getEditableTextBlockFormats = (root, fallback = "text") => {
+  if (!root) return [];
+  const blocks = [...root.children].filter((node) => node.hasAttribute("data-builder-text-block"));
+  if (!blocks.length) return [fallback];
+  return blocks.map((node) => {
+    const format = String(node.dataset.builderTextBlock || node.tagName || fallback).toLowerCase();
+    return ["h1", "h2", "h3", "bullets", "numbers"].includes(format) ? format : "text";
+  });
+};
+
+export const getTextBlockIndexesForRange = (value, startOffset = 0, endOffset = startOffset) => {
+  const text = String(value ?? "");
+  const start = Math.max(0, Math.min(Number(startOffset) || 0, text.length));
+  const end = Math.max(start, Math.min(Number(endOffset) || 0, text.length));
+  const lineAt = (offset) => text.slice(0, offset).split("\n").length - 1;
+  const first = lineAt(start);
+  const last = lineAt(end > start && text[end - 1] === "\n" ? end - 1 : end);
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index);
+};
+
+export const renderRichTextBlocks = (element, ranges = []) => {
+  const lines = String(element?.content ?? "").split("\n");
+  const formats = getTextBlockFormats(element);
+  const hasMixedBlockFormats = new Set(formats).size > 1;
+  let lineStart = 0;
+
+  return lines.map((line, index) => {
+    const format = formats[index];
+    const Tag = ["h1", "h2", "h3"].includes(format) ? format : "p";
+    const lineEnd = lineStart + line.length;
+    const lineRanges = ranges
+      .filter((range) =>
+        range.end > lineStart &&
+        range.start < lineEnd &&
+        !(hasMixedBlockFormats && range.fontSize && (range.start < lineStart || range.end > lineEnd))
+      )
+      .map((range) => ({
+        ...range,
+        start: Math.max(0, range.start - lineStart),
+        end: Math.min(line.length, range.end - lineStart),
+      }));
+    const rendered = line ? renderRichText(line, lineRanges) : <br />;
+    lineStart = lineEnd + 1;
+    return <Tag data-builder-text-block={format} key={`${index}_${format}`}>{rendered}</Tag>;
+  });
+};
 export const renderRichText = (value, ranges = []) => {
   const text = String(value ?? "");
   const parts = [];
@@ -132,6 +233,7 @@ export const getFloatingToolbarPlacement = ({
   horizontalBounds,
   viewportHeight,
   gap = 10,
+  aboveGap = 28,
   margin = 12,
 }) => {
   const toolbarWidth = Math.max(0, Number(toolbarRect?.width) || 0);
@@ -152,11 +254,11 @@ export const getFloatingToolbarPlacement = ({
   const anchorBottom = Number(anchorRect?.bottom) || anchorTop;
   const spaceAbove = anchorTop - minTop;
   const spaceBelow = maxBottom - anchorBottom;
-  const placement = spaceAbove >= toolbarHeight + gap || spaceAbove >= spaceBelow
+  const placement = spaceAbove >= toolbarHeight + aboveGap || spaceAbove >= spaceBelow
     ? "above"
     : "below";
   const desiredTop = placement === "above"
-    ? anchorTop - gap - toolbarHeight
+    ? anchorTop - aboveGap - toolbarHeight
     : anchorBottom + gap;
   const top = Math.min(
     Math.max(desiredTop, minTop),
@@ -169,7 +271,6 @@ export const getCanvasTextSelectionRange = (event) => {
   const selection = window.getSelection();
 
   if (!selection || selection.rangeCount === 0) return null;
-  if (selection.isCollapsed) return { collapsed: true };
 
   const range = selection.getRangeAt(0);
   if (!event.currentTarget.contains(range.commonAncestorContainer)) return null;
@@ -183,9 +284,9 @@ export const getCanvasTextSelectionRange = (event) => {
   endRange.setEnd(range.endContainer, range.endOffset);
 
   return {
-    collapsed: false,
-    start: startRange.toString().length,
-    end: endRange.toString().length,
+    collapsed: selection.isCollapsed,
+    start: getEditableTextWithLineBreaks(startRange.cloneContents()).length,
+    end: getEditableTextWithLineBreaks(endRange.cloneContents()).length,
   };
 };
 

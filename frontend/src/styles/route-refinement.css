@@ -1407,18 +1407,23 @@ body.theme-dark .page-builder {
 
 .tenant-footer-links-grid button,
 .tenant-footer-bottom button,
-.tenant-social-row button {
+.tenant-social-row button,
+.tenant-social-row a,
+.tenant-social-row > span {
   color: var(--theme-text) !important;
 }
 
 .tenant-footer-links-grid button:hover,
 .tenant-footer-bottom button:hover,
-.tenant-social-row button:hover {
+.tenant-social-row button:hover,
+.tenant-social-row a:hover {
   color: var(--theme-primary) !important;
 }
 
 .tenant-language-pill,
-.tenant-social-row button {
+.tenant-social-row button,
+.tenant-social-row a,
+.tenant-social-row > span {
   background: var(--theme-surface-2) !important;
   border-color: var(--theme-border) !important;
 }
@@ -1586,7 +1591,6 @@ body.theme-dark .tenant-runtime-card {
 .tenant-runtime-page .direct-element-frame {
   border-color: transparent;
   color: var(--theme-text) !important;
-  box-shadow: none !important;
 }
 
 .tenant-runtime-page .built-site-header,
@@ -1599,14 +1603,14 @@ body.theme-dark .tenant-runtime-card {
 .tenant-runtime-page .builder-element-heading,
 .tenant-runtime-page .builder-element-card strong,
 .tenant-runtime-page .metric-value {
-  color: var(--theme-text) !important;
+  color: var(--builder-element-color, var(--theme-text)) !important;
 }
 
 .tenant-runtime-page .builder-element-text,
 .tenant-runtime-page .builder-element-list,
 .tenant-runtime-page .builder-element-card span,
 .tenant-runtime-page .builder-element-embed {
-  color: var(--theme-text-muted) !important;
+  color: var(--builder-element-color, var(--theme-text-muted)) !important;
 }
 
 .tenant-runtime-page .builder-element-card,
@@ -1615,18 +1619,14 @@ body.theme-dark .tenant-runtime-card {
 .tenant-runtime-page .builder-element-responsesTable,
 .tenant-runtime-page .builder-element-embed,
 .tenant-runtime-page .responses-preview {
-  background: var(--theme-surface) !important;
-  border-color: var(--theme-border) !important;
-  color: var(--theme-text) !important;
-  box-shadow: 0 18px 44px rgba(var(--theme-shadow-rgb), 0.1) !important;
+  background: var(--builder-element-bg, var(--theme-surface)) !important;
+  color: var(--builder-element-color, var(--theme-text)) !important;
 }
 
 .tenant-runtime-page .builder-element-button,
 .tenant-runtime-page .reservation-submit {
-  background: var(--theme-primary) !important;
-  border-color: var(--theme-primary) !important;
-  color: var(--theme-text-inverse) !important;
-  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18) !important;
+  background: var(--builder-element-bg, var(--theme-primary)) !important;
+  color: var(--builder-element-color, var(--theme-text-inverse)) !important;
 }
 
 .tenant-runtime-page .builder-element-formBlock {

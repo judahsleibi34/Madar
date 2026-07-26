@@ -17,6 +17,11 @@ import { createFormIdempotencyKey } from "./formSubmission";
 import { getFormSections } from "../core/PageBuilder.factories";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import {
+  getRichTextRanges,
+  renderRichText,
+  renderRichTextBlocks,
+} from "../core/PageBuilder.text";
+import {
   getContentDirection,
   getDefaultFormLanguage,
   getDirectionForLanguage,
@@ -45,6 +50,26 @@ import {
 } from "../core/PageBuilder.navigation";
 import { normalizeElementAction, runPublicElementAction } from "../core/PageBuilder.actions";
 import { getStoredUrlError } from "../core/PageBuilder.url";
+import {
+  getFooterLinkItems,
+  getSafeFooterLinkUrl,
+  isExternalFooterLink,
+} from "../core/PageBuilder.footerLinks";
+import { createSiteChromeRenderers } from "../core/PageBuilder.siteChrome";
+import {
+  getCarouselVariant,
+  getCarouselWidthValue,
+  getComponentPositionClass,
+  getElementLayoutWidth,
+  getElementPlacementMargins,
+  getRowCarouselElements,
+  normalizeElementAlignSelf,
+} from "../core/PageBuilder.elementLayout";
+import {
+  getMetricItems,
+  getSectionCanvasHeight,
+} from "../core/PageBuilder.layout";
+import { getBuilderElementStyle } from "../core/PageBuilder.styles";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
 const MADAR_ATTRIBUTION_URL = "https://madar.app/";
@@ -94,79 +119,6 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
 
     return answer === option;
   });
-
-const getRichTextRanges = (element, field, itemIndex = null) =>
-  [
-    ...(element?.richTextColors || []),
-    ...(element?.richTextSizes || []),
-    ...(element?.richTextStyles || []),
-  ].filter((range) => range.field === field && (range.itemIndex ?? null) === itemIndex);
-
-const renderRichText = (value, ranges = []) => {
-  const text = String(value ?? "");
-  const parts = [];
-  let runStart = 0;
-  let runColor = null;
-  let runFontSize = null;
-  let runFontWeight = null;
-  let runFontStyle = null;
-  let runTextDecoration = null;
-
-  for (let index = 0; index <= text.length; index += 1) {
-    const activeRanges =
-      index < text.length
-        ? [...ranges].reverse().filter((range) => index >= range.start && index < range.end)
-        : [];
-    const color = activeRanges.find((range) => range.color)?.color || null;
-    const fontSize = activeRanges.find((range) => range.fontSize)?.fontSize || null;
-    const fontWeight = activeRanges.find((range) => range.fontWeight)?.fontWeight || null;
-    const fontStyle = activeRanges.find((range) => range.fontStyle)?.fontStyle || null;
-    const textDecoration = activeRanges.find((range) => range.textDecoration)?.textDecoration || null;
-
-    if (index === 0) {
-      runColor = color;
-      runFontSize = fontSize;
-      runFontWeight = fontWeight;
-      runFontStyle = fontStyle;
-      runTextDecoration = textDecoration;
-    }
-    if (
-      color === runColor &&
-      fontSize === runFontSize &&
-      fontWeight === runFontWeight &&
-      fontStyle === runFontStyle &&
-      textDecoration === runTextDecoration &&
-      index < text.length
-    ) continue;
-
-    const content = text.slice(runStart, index);
-    if (content) {
-      const style = {
-        ...(runColor ? { color: runColor } : {}),
-        ...(runFontSize ? { fontSize: runFontSize } : {}),
-        ...(runFontWeight ? { fontWeight: runFontWeight } : {}),
-        ...(runFontStyle ? { fontStyle: runFontStyle } : {}),
-        ...(runTextDecoration ? { textDecoration: runTextDecoration } : {}),
-      };
-
-      parts.push(
-        Object.keys(style).length ? (
-          <span style={style} key={`${runStart}_${runColor || ""}_${runFontSize || ""}_${runFontWeight || ""}_${runFontStyle || ""}_${runTextDecoration || ""}`}>{content}</span>
-        ) : (
-          content
-        )
-      );
-    }
-    runStart = index;
-    runColor = color;
-    runFontSize = fontSize;
-    runFontWeight = fontWeight;
-    runFontStyle = fontStyle;
-    runTextDecoration = textDecoration;
-  }
-
-  return parts.length ? parts : text;
-};
 
 const carouselElementTypes = new Set(["card", "carousel", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
 const authElementTypes = new Set(["loginBlock", "registrationBlock"]);
@@ -332,71 +284,6 @@ const getSubmissionErrorMessage = (error, copy = runtimeFallbackCopy) => {
   return copy.errors.generic;
 };
 
-const normalizeElementAlignSelf = (value) => {
-  if (!value || value === "auto") return undefined;
-  if (value === "left") return "flex-start";
-  if (value === "right") return "flex-end";
-  return value;
-};
-
-const getElementLayoutWidth = (value, alignSelf = "auto") => {
-  const placement = normalizeElementAlignSelf(alignSelf);
-
-  if (placement === "stretch") return "100%";
-
-  if (!value || value === "auto") return undefined;
-  return value;
-};
-
-const getComponentPositionClass = (position) => {
-  const normalized = normalizeElementAlignSelf(position);
-  if (position === "Left" || normalized === "flex-start") return "justify-start";
-  if (position === "Center" || normalized === "center") return "justify-center";
-  if (position === "Right" || normalized === "flex-end") return "justify-end";
-  return "justify-center";
-};
-
-const getCarouselWidthValue = (element) => {
-  const width = element.styles?.width;
-  if (!width || width === "auto") return "100%";
-  return width;
-};
-
-const getElementPlacementMargins = (value) => {
-  const placement = normalizeElementAlignSelf(value);
-
-  if (placement === "center") {
-    return { marginLeft: "auto", marginRight: "auto" };
-  }
-
-  if (placement === "flex-end") {
-    return { marginLeft: "auto", marginRight: "0" };
-  }
-
-  if (placement === "flex-start") {
-    return { marginLeft: "0", marginRight: "auto" };
-  }
-
-  return { marginLeft: undefined, marginRight: undefined };
-};
-
-const getCarouselVariant = (element) => {
-  if (element.carouselVariant) return element.carouselVariant;
-  if (element.type === "card") return "cards";
-  if (element.type === "carouselCards") return "cards";
-  if (element.type === "carouselSplit") return "split";
-  if (element.type === "carouselSpotlight") return "spotlight";
-  if (element.type === "carouselStack") return "stack";
-  if (element.type === "carouselEditorial") return "editorial";
-  if (element.type === "circularGallery") return "circular";
-  return "lightswind";
-};
-
-const getRowCarouselElements = (row) =>
-  (row.columns || []).flatMap((column) =>
-    (column.elements || []).filter((element) => carouselElementTypes.has(element.type))
-  );
-
 const unsupportedWorkspacePaths = new Set([
   "/login",
   "/signup",
@@ -423,24 +310,6 @@ const getScreenViewport = () => {
   if (window.innerWidth <= viewports.tablet) return "tablet";
   return "desktop";
 };
-
-const getMetricItems = (element) => {
-  if (Array.isArray(element?.metrics) && element.metrics.length) return element.metrics;
-  const lines = String(element?.content || "").split("\n").map((line) => line.trim()).filter(Boolean);
-  const items = [];
-  for (let index = 0; index < lines.length; index += 2) {
-    items.push({
-      label: lines[index] || runtimeFallbackCopy.runtime.metricCountLabel.replace("{number}", items.length + 1),
-      value: lines[index + 1] || runtimeFallbackCopy.runtime.metricFallbackValue,
-    });
-  }
-  return items.length ? items : [{ label: runtimeFallbackCopy.runtime.metricLabel, value: runtimeFallbackCopy.runtime.metricFallbackValue }];
-};
-
-const getSectionCanvasHeight = (section, viewportName) =>
-  Number(section?.layout?.minHeightByViewport?.[viewportName]) ||
-  Number(section?.layout?.minHeight) ||
-  560;
 
 const decodePathSegment = (value) => {
   try {
@@ -789,7 +658,14 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   const pageLinks = splitLines(site.footerShopLinks || runtimeCopy.runtime.footerShopLinks);
   const helpLinks = splitLines(site.footerHelpLinks || runtimeCopy.runtime.footerHelpLinks);
-  const socialLinks = splitLines(site.footerSocialLinks || runtimeCopy.runtime.footerSocialLinks);
+  const socialLinks = getFooterLinkItems(
+    site.footerSocialItems,
+    site.footerSocialLinks || runtimeCopy.runtime.footerSocialLinks
+  );
+  const paymentLinks = getFooterLinkItems(
+    site.footerPaymentItems,
+    site.footerPaymentMethods || ""
+  );
   const footerLinks = [...pageLinks, ...helpLinks].filter((item) => {
     if (isInternalPageReference(item)) {
       return pages.some((page) => String(page.id || "") === String(item));
@@ -1075,28 +951,14 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         maxWidth: `calc(100% - ${left})`,
       };
     }
-    const placementMargins = getElementPlacementMargins(element.styles?.alignSelf);
-    const layoutWidth =
-      getElementLayoutWidth(element.styles?.width, element.styles?.alignSelf) ||
-      (carouselElementTypes.has(element.type) ? "100%" : undefined);
-
-    return {
-      ...element.styles,
-      "--builder-element-width": layoutWidth || "auto",
-      "--builder-element-align": normalizeElementAlignSelf(element.styles?.alignSelf) || "auto",
-      "--builder-element-color": element.styles?.color || "inherit",
-      "--builder-element-bg": element.styles?.backgroundColor || "transparent",
-      "--builder-element-radius": element.styles?.borderRadius || "0",
-      "--builder-element-font-size": element.styles?.fontSize || "inherit",
-      "--builder-element-text-align": element.styles?.textAlign || "inherit",
-      position: "relative",
-      transform: undefined,
-      width: layoutWidth,
-      minHeight: element.styles?.minHeight || undefined,
-      maxWidth: "100%",
-      alignSelf: normalizeElementAlignSelf(element.styles?.alignSelf),
-      ...placementMargins,
-    };
+    return getBuilderElementStyle({
+      element,
+      selected: { type: "", id: "" },
+      carouselElementTypes,
+      getElementPlacementMargins,
+      getElementLayoutWidth,
+      normalizeElementAlignSelf,
+    });
   };
 
   const getDirectElementFrameStyle = (element, section) => {
@@ -1115,6 +977,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       width,
       height,
       maxWidth: `calc(100% - ${left})`,
+      zIndex: element.layer === "behindText" ? 0 : 1,
     };
   };
 
@@ -1706,8 +1569,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       style: getElementStyle(element, isFree, section),
     };
 
-    if (element.type === "heading") return <AutoFitDirectText as="h1" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
-    if (element.type === "text") return <AutoFitDirectText as="p" fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</AutoFitDirectText>;
+    if (element.type === "heading" || element.type === "text") return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichTextBlocks(element)}</AutoFitDirectText>;
     if (element.type === "button") {
       const link = getPublicButtonLink(element);
       const fitKey = `${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`;
@@ -1768,7 +1630,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         </div>
       );
     }
-    if (element.type === "divider") return <hr key={element.id} {...props} />;
+    if (element.type === "divider" || element.type === "thinDivider") return <hr key={element.id} {...props} />;
     if (element.type === "embed") {
       return (
         <div key={element.id} {...props}>
@@ -1898,6 +1760,23 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     return <div key={element.id} {...props}>{element.content}</div>;
   };
 
+  const selectCanvasPage = (pageId) => {
+    const targetPage = pages.find((page) => String(page.id) === String(pageId));
+    if (targetPage) navigate(getPageDestinationPath(targetPage));
+  };
+
+  const {
+    renderSiteHeader: renderCanvasHeader,
+    renderSiteFooter: renderCanvasFooter,
+  } = createSiteChromeRenderers({
+    project: project || { pages: [], siteChrome: defaultSiteChrome },
+    activePage,
+    selected: { type: "", id: "" },
+    preview: true,
+    selectPage: selectCanvasPage,
+    setSelected: () => {},
+  });
+
   const renderUnavailableState = (title, body, state = "unavailable") => (
     <main className="tenant-runtime-main">
       <section className={`tenant-runtime-card tenant-runtime-status-${state}`}>
@@ -1967,7 +1846,14 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
     return (
       <main key={activePage.id} className="tenant-runtime-page" data-page-id={activePage.id}>
-        <div className={`builder-canvas viewport-${runtimeViewport}`}>
+        <div
+          className={`builder-canvas viewport-${runtimeViewport}`}
+          style={{
+            ...getPageBuilderThemeVars(project.theme),
+            "--builder-canvas-fit-width": "100%",
+          }}
+        >
+          {renderCanvasHeader()}
           {activePageSections.map((section) => {
             if (section.mode === "free" || section.mode === "direct") {
               return (
@@ -2031,12 +1917,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                           .map((element) => renderElement(element, false))}
                       </div>
                     ))}
-                    {getRowCarouselElements(row).map((element) => renderElement(element, false))}
+                    {getRowCarouselElements(row, carouselElementTypes).map((element) => renderElement(element, false))}
                   </div>
                 ))}
               </section>
             );
           })}
+          {renderCanvasFooter()}
         </div>
       </main>
     );
@@ -2123,11 +2010,24 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           </p>
 
           <div className="tenant-social-row">
-            {socialLinks.map((item) => (
-              <button type="button" key={item} aria-label={item}>
-                {item.slice(0, 2).toUpperCase()}
-              </button>
-            ))}
+            {socialLinks.map((item) => {
+              const href = getSafeFooterLinkUrl(item.url, item.label);
+              return href ? (
+                <a
+                  href={href}
+                  key={`${item.label}-${href}`}
+                  aria-label={item.label}
+                  target={isExternalFooterLink(href) ? "_blank" : undefined}
+                  rel={isExternalFooterLink(href) ? "noopener noreferrer" : undefined}
+                >
+                  {item.label.slice(0, 2).toUpperCase()}
+                </a>
+              ) : (
+                <span key={item.label} aria-label={item.label}>
+                  {item.label.slice(0, 2).toUpperCase()}
+                </span>
+              );
+            })}
           </div>
         </div>
 
@@ -2163,6 +2063,23 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
           <p>{site.contactEmail || runtimeCopy.runtime.email}</p>
           <p dir="ltr">{site.phone || runtimeCopy.runtime.phone}</p>
+          {paymentLinks.length > 0 && (
+            <div className="tenant-payment-row">
+              {paymentLinks.map((item) => {
+                const href = getSafeFooterLinkUrl(item.url, item.label);
+                return href ? (
+                  <a
+                    href={href}
+                    key={`${item.label}-${href}`}
+                    target={isExternalFooterLink(href) ? "_blank" : undefined}
+                    rel={isExternalFooterLink(href) ? "noopener noreferrer" : undefined}
+                  >
+                    {item.label}
+                  </a>
+                ) : <span key={item.label}>{item.label}</span>;
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2199,10 +2116,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           </Link>
         </div>
       )}
-      {!standaloneFormId &&
-        (draftPreview || isPublicRuntime) &&
-        site.showHeader !== false &&
-        renderHeader()}
       {renderMainContent()}
       {publicActionMessage && (
         <div className="tenant-runtime-action-message" role="status" aria-live="polite">
@@ -2210,10 +2123,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           <button type="button" onClick={() => setPublicActionMessage("")} aria-label="Dismiss message">×</button>
         </div>
       )}
-      {!standaloneFormId &&
-        (draftPreview || isPublicRuntime) &&
-        site.showFooter !== false &&
-        renderFooter()}
     </div>
   );
 }

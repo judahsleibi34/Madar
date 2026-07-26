@@ -12,4 +12,11 @@ describe("reservation section components", () => {
     ]);
     expect(elementTypes.some((item) => item.id === "reservationBlock")).toBe(false);
   });
+
+  it("keeps booking components at the top of the visible component palette", () => {
+    expect(elementTypes.slice(0, 2).map((item) => item.id)).toEqual([
+      "reservationRequest",
+      "reservationFixedSlots",
+    ]);
+  });
 });

@@ -121,8 +121,8 @@ describe("TenantSiteRuntime explicit project preview", () => {
         expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
       });
 
-      expect(Boolean(document.querySelector(".tenant-site-header"))).toBe(expectsHeader);
-      expect(Boolean(document.querySelector(".tenant-site-footer"))).toBe(expectsFooter);
+      expect(Boolean(document.querySelector(".built-site-header"))).toBe(expectsHeader);
+      expect(Boolean(document.querySelector(".built-site-footer"))).toBe(expectsFooter);
     }
   );
 
@@ -139,8 +139,8 @@ describe("TenantSiteRuntime explicit project preview", () => {
         expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
       });
 
-      expect(Boolean(document.querySelector(".tenant-site-header"))).toBe(expectsHeader);
-      expect(Boolean(document.querySelector(".tenant-site-footer"))).toBe(expectsFooter);
+      expect(Boolean(document.querySelector(".built-site-header"))).toBe(expectsHeader);
+      expect(Boolean(document.querySelector(".built-site-footer"))).toBe(expectsFooter);
     }
   );
 

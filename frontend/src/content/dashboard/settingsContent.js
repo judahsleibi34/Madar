@@ -28,7 +28,7 @@ export const settingsContent = {
     logoUploadUnavailable:
       "Image uploads are not available yet. Use a secure HTTPS image URL for now.",
     subdomainName: "Subdomain name",
-    logoUrl: "Logo URL",
+    logoUrl: "Logo file",
     brandName: "Brand name",
     footerName: "Footer name",
     contactEmail: "Contact email",
@@ -93,7 +93,7 @@ export const settingsContent = {
     logoUploadUnavailable:
       "رفع الصور غير متاح حالياً. استخدم رابط صورة HTTPS آمناً في الوقت الحالي.",
     subdomainName: "اسم النطاق الفرعي",
-    logoUrl: "رابط الشعار",
+    logoUrl: "ملف الشعار",
     brandName: "اسم العلامة",
     footerName: "اسم التذييل",
     contactEmail: "بريد التواصل",

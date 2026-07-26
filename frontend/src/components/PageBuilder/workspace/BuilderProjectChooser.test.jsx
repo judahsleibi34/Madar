@@ -3,7 +3,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import BuilderProjectChooser from "./BuilderProjectChooser";
-import { listBuilderProjects } from "../services/PageBuilder.api";
+import { createBuilderProject, listBuilderProjects } from "../services/PageBuilder.api";
 
 vi.mock("../services/PageBuilder.api", () => ({
   createBuilderProject: vi.fn(),
@@ -73,6 +73,45 @@ describe("BuilderProjectChooser", () => {
     expect((await screen.findByTestId("location")).textContent)
       .toBe("/page-builder/projects/only-project/pages");
     expect(screen.queryByText("Only")).toBeNull();
+  });
+
+  it("enters the most recent project without showing the chooser", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [
+        { id: "recent-project", name: "Recent", status: "draft" },
+        { id: "older-project", name: "Older", status: "draft" },
+      ],
+      pagination: { limit: 20, offset: 0, count: 2, has_more: false },
+    });
+    render(
+      <MemoryRouter initialEntries={["/page-builder"]}>
+        <BuilderProjectChooser autoEnterProject />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText("Choose a project")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("location").textContent)
+      .toBe("/page-builder/projects/recent-project/pages"));
+  });
+
+  it("creates and enters a project automatically when none exists", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [],
+      pagination: { limit: 20, offset: 0, count: 0, has_more: false },
+    });
+    createBuilderProject.mockResolvedValue({ id: "new-project" });
+    render(
+      <MemoryRouter initialEntries={["/page-builder"]}>
+        <BuilderProjectChooser autoEnterProject />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByTestId("location").textContent)
+      .toBe("/page-builder/projects/new-project/pages"));
+    expect(createBuilderProject).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Create a new project")).toBeNull();
   });
 
   it("loads projects beyond the first twenty without duplicating records", async () => {

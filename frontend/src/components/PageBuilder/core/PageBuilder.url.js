@@ -57,8 +57,8 @@ export const getStoredUrlError = (
   return "";
 };
 
-export const collectSiteChromeUrlErrors = (siteChrome = {}) =>
-  Object.entries(siteChrome).flatMap(([key, value]) => {
+export const collectSiteChromeUrlErrors = (siteChrome = {}) => {
+  const directErrors = Object.entries(siteChrome).flatMap(([key, value]) => {
     if (!urlLikeSiteChromeKeys.has(key) || typeof value !== "string") return [];
 
     const error = getStoredUrlError(value, {
@@ -68,6 +68,23 @@ export const collectSiteChromeUrlErrors = (siteChrome = {}) =>
 
     return error ? [error] : [];
   });
+
+  const footerErrors = [
+    ["footerSocialItems", "Social link"],
+    ["footerPaymentItems", "Payment link"],
+  ].flatMap(([key, label]) => {
+    if (!Array.isArray(siteChrome[key])) return [];
+    return siteChrome[key].flatMap((item, index) => {
+      const error = getStoredUrlError(item?.url, {
+        fieldName: `${label} ${index + 1} destination`,
+        allowRelative: true,
+      });
+      return error ? [error] : [];
+    });
+  });
+
+  return [...directErrors, ...footerErrors];
+};
 
 export const collectCarouselImageUrlErrors = (content, fieldName) =>
   String(content || "")

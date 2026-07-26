@@ -259,36 +259,14 @@ export const showcaseContentSection = () =>
 
 export const showcaseCarouselSection = () =>
   createSection({
-    name: "Carousel Gallery",
+    name: "Card Carousel",
     layout: {
       width: "large",
       paddingY: "large",
       background: "var(--theme-surface-2)",
-      minHeight: 980,
+      minHeight: 500,
     },
-    rows: [
-      createRow([
-        createColumn([
-          createElement("heading", {
-            content: "Carousel variants",
-            styles: { fontSize: "38px", textAlign: "center", alignSelf: "stretch" },
-          }),
-          createElement("text", {
-            content:
-              "Show offers, stories, featured services, galleries, and product collections with different carousel layouts.",
-            styles: { textAlign: "center", alignSelf: "stretch" },
-          }),
-        ]),
-      ]),
-      createRow([
-        createColumn([createElement("carousel")]),
-        createColumn([createElement("carouselCards")]),
-      ]),
-      createRow([
-        createColumn([createElement("carouselSplit")]),
-        createColumn([createElement("circularGallery")]),
-      ]),
-    ],
+    rows: [createRow([createColumn([createElement("carousel")])])],
   });
 
 export const showcaseConnectedSection = (formId = "") =>
