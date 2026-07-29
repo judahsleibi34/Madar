@@ -13,11 +13,13 @@ const userSafeAuthMessages = new Set([
   "could not verify mfa code",
   "email is already registered",
   "invalid email or password",
+  "invalid request origin",
   "invalid or expired reset link.",
   "mfa login session expired",
   "password reset link expired. request a new link.",
   "password must be at least 8 characters",
   "please verify your email before logging in.",
+  "use the login page for the website where this account was created.",
 ]);
 
 const technicalErrorPatterns = [

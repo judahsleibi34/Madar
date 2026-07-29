@@ -20,6 +20,11 @@ const labels = {
   "sidebar.home": "Home",
   "sidebar.dashboard": "Dashboard",
   "sidebar.workspace": "Workspace",
+  "sidebar.ecommerce": "Ecommerce",
+  "sidebar.tags": "Tags",
+  "sidebar.categories": "Categories",
+  "sidebar.products": "Products",
+  "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
   "sidebar.submissions": "Submissions",
   "sidebar.dataLogs": "Data Logs",
@@ -100,6 +105,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
       "Home",
       "Dashboard",
       "Workspace",
+      "Ecommerce",
       "My Plan",
     ]);
 
@@ -112,15 +118,66 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
   });
 
+  it("renders Ecommerce below Workspace as an expandable section", () => {
+    renderSidebar();
+
+    const workspace = screen.getByRole("button", { name: "Workspace" });
+    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
+
+    expect(
+      workspace.compareDocumentPosition(ecommerce) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(ecommerce);
+
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
+    expect(document.getElementById("dashboard-sidebar-ecommerce")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tags" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Categories" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Products" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "Store" })).toBeTruthy();
+  });
+
+  it("opens Ecommerce on a child route and highlights the active page", () => {
+    renderSidebar("/ecommerce/categories");
+
+    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
+    const categories = screen.getByRole("button", { name: "Categories" });
+
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
+    expect(ecommerce.classList.contains("active-parent")).toBe(true);
+    expect(categories.getAttribute("aria-current")).toBe("page");
+    expect(
+      screen.getByRole("button", { name: "Products" }).hasAttribute("aria-current"),
+    ).toBe(false);
+  });
+
+  it("opens Ecommerce and highlights Store on the live view route", () => {
+    renderSidebar("/ecommerce/store");
+    expect(screen.getByRole("button", { name: "Ecommerce" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Store" }).getAttribute("aria-current")).toBe("page");
+  });
+
   it("keeps only one expandable sidebar section open at a time", () => {
     renderSidebar();
 
     const workspace = screen.getByRole("button", { name: "Workspace" });
+    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
     const settings = screen.getByRole("button", { name: "Settings" });
 
     fireEvent.click(workspace);
     expect(workspace.getAttribute("aria-expanded")).toBe("true");
     expect(settings.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(ecommerce);
+    expect(workspace.getAttribute("aria-expanded")).toBe("false");
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(workspace);
+    expect(workspace.getAttribute("aria-expanded")).toBe("true");
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(settings);
     expect(workspace.getAttribute("aria-expanded")).toBe("false");

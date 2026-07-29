@@ -78,7 +78,9 @@ Common security and session settings:
 - `CSRF_ALLOW_MISSING_ORIGIN`
 - `CSRF_TRUSTED_ORIGINS`
 - `SESSION_ACTIVITY_SECRET`
-- `SESSION_INACTIVITY_TIMEOUT_SECONDS`
+- `SESSION_INACTIVITY_TIMEOUT_SECONDS` (optional; defaults to `0`, which keeps
+  the session active for the lifetime of the browser session; set a positive
+  number to enforce an inactivity timeout)
 - `ADMIN_MFA_LOGIN_ENFORCEMENT`
 - `TRUSTED_PROXY_IPS`
 

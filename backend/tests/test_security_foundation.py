@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes import auth_routes
-from services import rate_limit_service
+from services import auth_service, rate_limit_service
 from services.rate_limit_service import InMemoryRateLimitStore, enforce_rate_limit
 from services.auth_service import (
     SESSION_ACTIVITY_COOKIE_NAME,
@@ -398,11 +398,18 @@ class SecurityFoundationTests(unittest.TestCase):
             )
         )
 
-    def test_session_activity_is_valid_for_one_hour(self):
+    def test_session_activity_remains_valid_while_browser_session_is_open(self):
         activity = create_session_activity_value(now=1_000)
 
         self.assertTrue(is_session_activity_valid(activity, now=4_600))
-        self.assertFalse(is_session_activity_valid(activity, now=4_601))
+        self.assertTrue(is_session_activity_valid(activity, now=31_537_000))
+
+    def test_session_activity_supports_an_opt_in_inactivity_timeout(self):
+        activity = create_session_activity_value(now=1_000)
+
+        with patch.object(auth_service, "SESSION_INACTIVITY_TIMEOUT_SECONDS", 3_600):
+            self.assertTrue(is_session_activity_valid(activity, now=4_600))
+            self.assertFalse(is_session_activity_valid(activity, now=4_601))
 
     def test_session_activity_rejects_tampering(self):
         activity = create_session_activity_value(now=1_000)

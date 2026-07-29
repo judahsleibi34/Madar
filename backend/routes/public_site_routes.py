@@ -8,7 +8,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -33,6 +33,10 @@ from services.notification_service import create_builder_block_event_notificatio
 from services.notification_outbox_service import enqueue_notification
 from services.api_errors import api_error
 from services.account_lifecycle_service import synchronize_verified_account
+from services.ecommerce_cache_service import (
+    ecommerce_cache_key,
+    get_or_create_ecommerce_cache,
+)
 from services.site_permission_service import (
     assign_project_role,
     has_project_permission,
@@ -1140,6 +1144,311 @@ def resolve_tenant_id(settings: dict):
     return tenant_id
 
 
+def _localized_catalog_text(translations: Any, locale: str) -> dict[str, str]:
+    values = translations if isinstance(translations, dict) else {}
+    requested = str(locale or "en").strip()
+    candidates = (requested, requested.split("-", 1)[0], "en")
+    selected: dict[str, Any] = {}
+    for candidate in candidates:
+        value = values.get(candidate)
+        if isinstance(value, dict):
+            selected = value
+            break
+    if not selected:
+        selected = next(
+            (value for value in values.values() if isinstance(value, dict)),
+            {},
+        )
+    return {
+        "name": str(selected.get("name") or "").strip(),
+        "description": str(selected.get("description") or "").strip(),
+    }
+
+
+def _public_catalog_item(row: dict[str, Any], locale: str) -> dict[str, Any]:
+    localized = _localized_catalog_text(row.get("translations"), locale)
+    return {
+        "id": str(row.get("id") or ""),
+        "slug": str(row.get("slug") or ""),
+        "name": localized["name"],
+        "description": localized["description"],
+        "parent_id": str(row.get("parent_id") or "") or None,
+        "sort_order": int(row.get("sort_order") or 0),
+    }
+
+
+def _public_catalog_product(
+    row: dict[str, Any],
+    *,
+    locale: str,
+    tag_ids: list[str],
+) -> dict[str, Any]:
+    localized = _localized_catalog_text(row.get("translations"), locale)
+    track_inventory = bool(row.get("track_inventory"))
+    inventory_quantity = int(row.get("inventory_quantity") or 0)
+    allow_backorder = bool(row.get("allow_backorder"))
+    return {
+        "id": str(row.get("id") or ""),
+        "slug": str(row.get("slug") or ""),
+        "sku": str(row.get("sku") or ""),
+        "category_id": str(row.get("category_id") or "") or None,
+        "tag_ids": tag_ids,
+        "name": localized["name"],
+        "description": localized["description"],
+        "product_type": str(row.get("product_type") or "physical"),
+        "brand": str(row.get("brand") or ""),
+        "price": str(row.get("price") or "0"),
+        "compare_at_price": (
+            str(row.get("compare_at_price"))
+            if row.get("compare_at_price") is not None
+            else None
+        ),
+        "currency": str(row.get("currency") or "USD"),
+        "in_stock": (not track_inventory) or inventory_quantity > 0 or allow_backorder,
+        "allow_backorder": allow_backorder,
+        "images": [
+            str(value)
+            for value in (row.get("images") or [])
+            if isinstance(value, str) and value.strip()
+        ],
+        "weight": str(row.get("weight")) if row.get("weight") is not None else None,
+        "weight_unit": str(row.get("weight_unit") or "kg"),
+        "requires_shipping": bool(row.get("requires_shipping")),
+        "taxable": bool(row.get("taxable")),
+        "seo_title": str(row.get("seo_title") or localized["name"]),
+        "seo_description": str(row.get("seo_description") or localized["description"]),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def _catalog_descendant_ids(
+    categories: list[dict[str, Any]],
+    root_id: str,
+) -> set[str]:
+    descendants = {root_id}
+    changed = True
+    while changed:
+        changed = False
+        for category in categories:
+            category_id = str(category.get("id") or "")
+            parent_id = str(category.get("parent_id") or "")
+            if category_id and parent_id in descendants and category_id not in descendants:
+                descendants.add(category_id)
+                changed = True
+    return descendants
+
+
+def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    category_rows = rows(
+        service_supabase.table("ecommerce_categories")
+        .select("id,slug,parent_id,translations,sort_order,updated_at")
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+        .order("sort_order")
+        .order("created_at")
+        .execute()
+    )
+    tag_rows = rows(
+        service_supabase.table("ecommerce_tags")
+        .select("id,slug,translations,updated_at")
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+        .order("created_at", desc=True)
+        .execute()
+    )
+    product_rows = rows(
+        service_supabase.table("ecommerce_products")
+        .select(
+            "id,slug,sku,category_id,translations,product_type,brand,price,"
+            "compare_at_price,currency,track_inventory,inventory_quantity,"
+            "allow_backorder,images,weight,weight_unit,requires_shipping,"
+            "taxable,seo_title,seo_description,created_at,updated_at"
+        )
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+        .order("created_at", desc=True)
+        .execute()
+    )
+    link_rows = rows(
+        service_supabase.table("ecommerce_product_tags")
+        .select("product_id,tag_id")
+        .eq("tenant_id", tenant_id)
+        .execute()
+    )
+    return category_rows, tag_rows, product_rows, link_rows
+
+
+def _filter_catalog_taxonomy(
+    products: list[dict[str, Any]],
+    *,
+    category_rows: list[dict[str, Any]],
+    tag_rows: list[dict[str, Any]],
+    category: str,
+    tag: str,
+) -> list[dict[str, Any]]:
+    clean_category = str(category or "").strip().lower()
+    if clean_category:
+        root = next(
+            (
+                item for item in category_rows
+                if str(item.get("slug") or "").lower() == clean_category
+            ),
+            None,
+        )
+        allowed = (
+            _catalog_descendant_ids(category_rows, str(root.get("id")))
+            if root else set()
+        )
+        products = [
+            item for item in products
+            if str(item.get("category_id") or "") in allowed
+        ]
+
+    clean_tag = str(tag or "").strip().lower()
+    if clean_tag:
+        selected_tag = next(
+            (
+                item for item in tag_rows
+                if str(item.get("slug") or "").lower() == clean_tag
+            ),
+            None,
+        )
+        tag_id = str(selected_tag.get("id") or "") if selected_tag else ""
+        products = [
+            item for item in products
+            if tag_id and tag_id in item.get("tag_ids", [])
+        ]
+    return products
+
+
+def _search_catalog(products: list[dict[str, Any]], search: str) -> list[dict[str, Any]]:
+    clean_search = str(search or "").strip().casefold()
+    if not clean_search:
+        return products
+    return [
+        item for item in products
+        if clean_search in " ".join((
+            item.get("name", ""),
+            item.get("description", ""),
+            item.get("brand", ""),
+            item.get("sku", ""),
+        )).casefold()
+    ]
+
+
+def _sort_catalog(products: list[dict[str, Any]], sort: str) -> list[dict[str, Any]]:
+    if sort == "price_low":
+        products.sort(key=lambda item: float(item.get("price") or 0))
+    elif sort == "price_high":
+        products.sort(key=lambda item: float(item.get("price") or 0), reverse=True)
+    elif sort == "name":
+        products.sort(key=lambda item: str(item.get("name") or "").casefold())
+    return products
+
+
+def _catalog_payload(
+    *,
+    tenant_id: int,
+    locale: str,
+    search: str = "",
+    category: str = "",
+    tag: str = "",
+    sort: Literal["latest", "price_low", "price_high", "name"] = "latest",
+    page: int = 1,
+    limit: int = 12,
+) -> dict[str, Any]:
+    category_rows, tag_rows, product_rows, link_rows = _read_public_catalog_rows(
+        tenant_id
+    )
+    tags_by_product: dict[str, list[str]] = {}
+    for link in link_rows:
+        tags_by_product.setdefault(
+            str(link.get("product_id") or ""),
+            [],
+        ).append(str(link.get("tag_id") or ""))
+
+    categories = [_public_catalog_item(row, locale) for row in category_rows]
+    tags = [_public_catalog_item(row, locale) for row in tag_rows]
+    products = [
+        _public_catalog_product(
+            row,
+            locale=locale,
+            tag_ids=tags_by_product.get(str(row.get("id") or ""), []),
+        )
+        for row in product_rows
+    ]
+    products = _filter_catalog_taxonomy(
+        products,
+        category_rows=category_rows,
+        tag_rows=tag_rows,
+        category=category,
+        tag=tag,
+    )
+    products = _sort_catalog(_search_catalog(products, search), sort)
+
+    total = len(products)
+    safe_page = max(1, page)
+    safe_limit = max(1, min(limit, 48))
+    start = (safe_page - 1) * safe_limit
+    return {
+        "categories": categories,
+        "tags": tags,
+        "products": products[start:start + safe_limit],
+        "pagination": {
+            "page": safe_page,
+            "limit": safe_limit,
+            "total": total,
+            "pages": max(1, (total + safe_limit - 1) // safe_limit),
+        },
+    }
+
+
+def _catalog_product_payload(
+    *,
+    tenant_id: int,
+    product_slug: str,
+    locale: str,
+) -> dict[str, Any]:
+    category_rows, tag_rows, product_rows, link_rows = _read_public_catalog_rows(
+        tenant_id
+    )
+    row = next(
+        (
+            item for item in product_rows
+            if str(item.get("slug") or "").lower() == product_slug
+        ),
+        None,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Product not found")
+    product_id = str(row.get("id") or "")
+    product_tag_ids = [
+        str(link.get("tag_id") or "")
+        for link in link_rows
+        if str(link.get("product_id") or "") == product_id
+    ]
+    product = _public_catalog_product(
+        row,
+        locale=locale,
+        tag_ids=product_tag_ids,
+    )
+    category = next(
+        (
+            _public_catalog_item(item, locale)
+            for item in category_rows
+            if str(item.get("id") or "") == str(product.get("category_id") or "")
+        ),
+        None,
+    )
+    tags = [
+        _public_catalog_item(item, locale)
+        for item in tag_rows
+        if str(item.get("id") or "") in product_tag_ids
+    ]
+    return {"product": product, "category": category, "tags": tags}
+
+
 def normalize_email(value: str) -> str:
     return (value or "").strip().lower()
 
@@ -1447,6 +1756,152 @@ def logout_tenant_visitor(subdomain: str, response: Response):
     normalize_subdomain(subdomain)
     delete_auth_cookies(response)
     return {"logged_in": False, "message": "Logged out"}
+
+@router.get("/sites/{subdomain}/catalog")
+def get_public_catalog(
+    subdomain: str,
+    request: Request,
+    response: Response,
+    search: str = "",
+    category: str = "",
+    tag: str = "",
+    sort: Literal["latest", "price_low", "price_high", "name"] = "latest",
+    locale: str = "en",
+    page: int = 1,
+    limit: int = 12,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "catalog_lookup", clean_subdomain)
+    settings = resolve_website_settings(clean_subdomain)
+    get_bound_published_project(settings)
+    tenant_id = resolve_tenant_id(settings)
+    locale_value = str(locale or "en")[:16]
+    search_value = str(search or "")[:200]
+    category_value = str(category or "")[:160]
+    tag_value = str(tag or "")[:160]
+    page_value = max(1, page)
+    limit_value = max(1, min(limit, 48))
+    cache_key = ecommerce_cache_key(
+        tenant_id,
+        "catalog-v1",
+        locale=locale_value,
+        search=search_value,
+        category=category_value,
+        tag=tag_value,
+        sort=sort,
+        page=page_value,
+        limit=limit_value,
+    )
+    try:
+        payload, cache_hit = get_or_create_ecommerce_cache(
+            cache_key,
+            tenant_id,
+            lambda: _catalog_payload(
+                tenant_id=tenant_id,
+                locale=locale_value,
+                search=search_value,
+                category=category_value,
+                tag=tag_value,
+                sort=sort,
+                page=page_value,
+                limit=limit_value,
+            ),
+        )
+    except Exception as error:
+        raw = str(error).lower()
+        if "pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw:
+            raise HTTPException(
+                status_code=503,
+                detail="Ecommerce catalog is not available",
+            ) from error
+        raise
+
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    metadata = {
+        "etag": f'"catalog-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
+    }
+    apply_public_cache_headers(response, metadata)
+    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
+    if request_etag_matches(request, metadata):
+        return Response(
+            status_code=304,
+            headers={
+                "ETag": metadata["etag"],
+                "Cache-Control": "public, max-age=0, must-revalidate",
+                "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
+            },
+        )
+    return {
+        "success": True,
+        "site": build_public_site_profile(settings, clean_subdomain),
+        "catalog": payload,
+    }
+
+
+@router.get("/sites/{subdomain}/catalog/products/{product_slug}")
+def get_public_catalog_product(
+    subdomain: str,
+    product_slug: str,
+    request: Request,
+    response: Response,
+    locale: str = "en",
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_slug = str(product_slug or "").strip().lower()
+    if not clean_slug or len(clean_slug) > 160:
+        raise HTTPException(status_code=404, detail="Product not found")
+    enforce_public_rate_limit(
+        request,
+        "catalog_product_lookup",
+        f"{clean_subdomain}:{clean_slug}",
+    )
+    settings = resolve_website_settings(clean_subdomain)
+    get_bound_published_project(settings)
+    tenant_id = resolve_tenant_id(settings)
+    locale_value = str(locale or "en")[:16]
+    cache_key = ecommerce_cache_key(
+        tenant_id,
+        "product-v1",
+        locale=locale_value,
+        slug=clean_slug,
+    )
+    result, cache_hit = get_or_create_ecommerce_cache(
+        cache_key,
+        tenant_id,
+        lambda: _catalog_product_payload(
+            tenant_id=tenant_id,
+            product_slug=clean_slug,
+            locale=locale_value,
+        ),
+    )
+    canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    metadata = {
+        "etag": f'"product-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
+    }
+    apply_public_cache_headers(response, metadata)
+    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
+    if request_etag_matches(request, metadata):
+        return Response(
+            status_code=304,
+            headers={
+                "ETag": metadata["etag"],
+                "Cache-Control": "public, max-age=0, must-revalidate",
+                "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
+            },
+        )
+    return {
+        "success": True,
+        "site": build_public_site_profile(settings, clean_subdomain),
+        **result,
+    }
+
 
 @router.get("/sites/{subdomain}")
 def get_public_site(subdomain: str, request: Request, response: Response):

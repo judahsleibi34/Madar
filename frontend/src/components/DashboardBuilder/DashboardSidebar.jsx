@@ -10,6 +10,10 @@ import {
   CalendarDays,
   Database,
   CreditCard,
+  FolderTree,
+  Package,
+  ShoppingBag,
+  Tag,
   ShieldCheck,
   Settings,
   LogOut,
@@ -159,8 +163,22 @@ export default function DashboardSidebar({
   const settingsRouteActive =
     location.pathname === DASHBOARD_ROUTES.settings ||
     location.pathname.startsWith(DASHBOARD_ROUTES.settings + "/");
+  const ecommerceRouteActive = [
+    DASHBOARD_ROUTES.ecommerceTags,
+    DASHBOARD_ROUTES.ecommerceCategories,
+    DASHBOARD_ROUTES.ecommerceProducts,
+    DASHBOARD_ROUTES.ecommerceStore,
+  ].some(
+    (path) =>
+      location.pathname === path ||
+      location.pathname.startsWith(`${path}/`),
+  );
   const [workspaceExpansion, setWorkspaceExpansion] = useState({
     open: workspaceRouteActive,
+    pathname: location.pathname,
+  });
+  const [ecommerceExpansion, setEcommerceExpansion] = useState({
+    open: ecommerceRouteActive,
     pathname: location.pathname,
   });
   const [settingsExpansion, setSettingsExpansion] = useState({
@@ -244,6 +262,28 @@ export default function DashboardSidebar({
       icon: Archive,
     },
   ];
+  const ecommerceItems = [
+    {
+      label: t("sidebar.tags", { defaultValue: "Tags" }),
+      path: DASHBOARD_ROUTES.ecommerceTags,
+      icon: Tag,
+    },
+    {
+      label: t("sidebar.categories", { defaultValue: "Categories" }),
+      path: DASHBOARD_ROUTES.ecommerceCategories,
+      icon: FolderTree,
+    },
+    {
+      label: t("sidebar.products", { defaultValue: "Products" }),
+      path: DASHBOARD_ROUTES.ecommerceProducts,
+      icon: Package,
+    },
+    {
+      label: t("sidebar.store", { defaultValue: "Store" }),
+      path: DASHBOARD_ROUTES.ecommerceStore,
+      icon: ShoppingBag,
+    },
+  ];
   const workspaceLabel = t("sidebar.workspace", {
     defaultValue: "Workspace",
   });
@@ -251,6 +291,10 @@ export default function DashboardSidebar({
     workspaceExpansion.pathname === location.pathname
       ? workspaceExpansion.open
       : workspaceRouteActive;
+  const ecommerceIsExpanded =
+    ecommerceExpansion.pathname === location.pathname
+      ? ecommerceExpansion.open
+      : ecommerceRouteActive;
   const settingsIsExpanded =
     settingsExpansion.pathname === location.pathname
       ? settingsExpansion.open
@@ -332,6 +376,10 @@ export default function DashboardSidebar({
 
     if (nextOpen) {
       setWorkspaceExpansion({
+        open: false,
+        pathname: location.pathname,
+      });
+      setEcommerceExpansion({
         open: false,
         pathname: location.pathname,
       });
@@ -446,6 +494,10 @@ export default function DashboardSidebar({
                   });
 
                   if (nextOpen) {
+                    setEcommerceExpansion({
+                      open: false,
+                      pathname: location.pathname,
+                    });
                     setSettingsExpansion({
                       open: false,
                       pathname: location.pathname,
@@ -479,6 +531,79 @@ export default function DashboardSidebar({
                   })}
                 </div>
               )}
+          </div>
+
+          <div className="admin-sidebar-group">
+            <SidebarRow
+              active={ecommerceRouteActive}
+              activeClassName="active-parent"
+              controls="dashboard-sidebar-ecommerce"
+              expanded={ecommerceIsExpanded}
+              icon={ShoppingBag}
+              label={t("sidebar.ecommerce", { defaultValue: "Ecommerce" })}
+              onClick={() => {
+                if (!ecommerceRouteActive) {
+                  setEcommerceExpansion({
+                    open: true,
+                    pathname: location.pathname,
+                  });
+                  setWorkspaceExpansion({
+                    open: false,
+                    pathname: location.pathname,
+                  });
+                  setSettingsExpansion({
+                    open: false,
+                    pathname: location.pathname,
+                  });
+                  goTo(DASHBOARD_ROUTES.ecommerceProducts);
+                  return;
+                }
+
+                const nextOpen = !ecommerceIsExpanded;
+
+                setEcommerceExpansion({
+                  open: nextOpen,
+                  pathname: location.pathname,
+                });
+
+                if (nextOpen) {
+                  setWorkspaceExpansion({
+                    open: false,
+                    pathname: location.pathname,
+                  });
+                  setSettingsExpansion({
+                    open: false,
+                    pathname: location.pathname,
+                  });
+                }
+              }}
+            />
+
+            {ecommerceIsExpanded && (
+              <div
+                className="admin-sidebar-subnav"
+                id="dashboard-sidebar-ecommerce"
+              >
+                {ecommerceItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+
+                  return (
+                    <button
+                      type="button"
+                      key={item.path}
+                      className={active ? "active" : ""}
+                      onClick={() => goTo(item.path)}
+                      title={item.label}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      <Icon size={16} aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {primaryNavItems.slice(2).map((item) => {

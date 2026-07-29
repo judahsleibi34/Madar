@@ -16,6 +16,7 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith(DASHBOARD_ROUTES.builderData) ||
     pathname.startsWith(DASHBOARD_ROUTES.calendar) ||
     pathname.startsWith(DASHBOARD_ROUTES.archive) ||
+    pathname.startsWith(DASHBOARD_ROUTES.ecommerce) ||
     pathname.startsWith(DASHBOARD_ROUTES.notifications) ||
     pathname.startsWith(DASHBOARD_ROUTES.myPlan) ||
     pathname.startsWith(DASHBOARD_ROUTES.adminUsers) ||
@@ -44,6 +45,7 @@ export function getSafePostLoginPath(userInfo, returnTo) {
     DASHBOARD_ROUTES.builderData,
     DASHBOARD_ROUTES.calendar,
     DASHBOARD_ROUTES.archive,
+    DASHBOARD_ROUTES.ecommerce,
     DASHBOARD_ROUTES.myPlan,
   ];
 
