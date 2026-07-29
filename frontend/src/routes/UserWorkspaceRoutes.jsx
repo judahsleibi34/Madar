@@ -12,6 +12,8 @@ const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDash
 const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
 const NotificationsPage = lazy(() => import("../components/DashboardBuilder/NotificationsPage"));
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
+const EcommercePage = lazy(() => import("../components/DashboardBuilder/EcommercePage"));
+const EcommerceStorePage = lazy(() => import("../components/DashboardBuilder/EcommerceStorePage"));
 const ReservationCalendarPage = lazy(() =>
   import("../components/DashboardBuilder/ReservationCalendarPage")
 );
@@ -180,6 +182,23 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/archive/*"
         element={renderShell(<ArchivePage user={user} />, { compactSidebar: true })}
+      />
+
+      <Route
+        path="/ecommerce/tags/*"
+        element={renderShell(<EcommercePage key="tags" section="tags" user={user} />)}
+      />
+      <Route
+        path="/ecommerce/categories/*"
+        element={renderShell(<EcommercePage key="categories" section="categories" user={user} />)}
+      />
+      <Route
+        path="/ecommerce/products/*"
+        element={renderShell(<EcommercePage key="products" section="products" user={user} />)}
+      />
+      <Route
+        path="/ecommerce/store/*"
+        element={renderShell(<EcommerceStorePage user={user} />)}
       />
 
       <Route

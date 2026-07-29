@@ -1,6 +1,11 @@
 ﻿{
   "sidebar": {
     "workspace": "Workspace",
+    "ecommerce": "Ecommerce",
+    "tags": "Tags",
+    "categories": "Categories",
+    "products": "Products",
+    "store": "Store",
     "language": "Language",
     "brand": "Madar",
     "subtitle": "Admin Panel",
@@ -22,6 +27,40 @@
     "admin": "Admin",
     "userRole": "User",
     "security": "Security"
+  },
+  "ecommercePages": {
+    "kicker": "Ecommerce",
+    "overview": "Catalog overview",
+    "summary": {
+      "active": "Active",
+      "drafts": "Drafts"
+    },
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "updated": "Updated"
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Create reusable labels that make products easier to organize and discover.",
+      "totalLabel": "Total tags",
+      "emptyTitle": "No tags yet",
+      "emptyDescription": "Tags you create will appear here and can be assigned to products."
+    },
+    "categories": {
+      "title": "Categories",
+      "description": "Build a clear catalog structure for browsing and product organization.",
+      "totalLabel": "Total categories",
+      "emptyTitle": "No categories yet",
+      "emptyDescription": "Categories you create will appear here and organize your catalog."
+    },
+    "products": {
+      "title": "Products",
+      "description": "Manage the items, services, and offers available in your ecommerce catalog.",
+      "totalLabel": "Total products",
+      "emptyTitle": "No products yet",
+      "emptyDescription": "Products you create will appear here with their price and availability."
+    }
   },
   "loading": {
     "dashboard": "Loading dashboard",

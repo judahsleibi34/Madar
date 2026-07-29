@@ -93,7 +93,7 @@ IS_PRODUCTION = APP_ENV in {"prod", "production"}
 
 SESSION_ACTIVITY_COOKIE_NAME = "madar_session_activity"
 SESSION_INACTIVITY_TIMEOUT_SECONDS = int(
-    os.getenv("SESSION_INACTIVITY_TIMEOUT_SECONDS", "3600")
+    os.getenv("SESSION_INACTIVITY_TIMEOUT_SECONDS", "0")
 )
 
 COOKIE_SECURE = os.getenv(
@@ -167,7 +167,18 @@ def is_session_activity_valid(value: str | None, now: int | None = None) -> bool
 
     current_time = int(time.time()) if now is None else int(now)
     age = current_time - last_activity_at
-    return 0 <= age <= SESSION_INACTIVITY_TIMEOUT_SECONDS
+
+    if age < 0:
+        return False
+
+    # Authentication cookies are session cookies, so the browser owns the
+    # lifetime of the signed-in session. A zero timeout keeps the session alive
+    # while the browser is open; deployments that require an inactivity policy
+    # can still opt in with a positive timeout.
+    return (
+        SESSION_INACTIVITY_TIMEOUT_SECONDS <= 0
+        or age <= SESSION_INACTIVITY_TIMEOUT_SECONDS
+    )
 
 
 def set_session_activity_cookie(response: Response):

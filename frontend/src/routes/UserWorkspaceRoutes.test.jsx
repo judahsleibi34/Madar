@@ -18,6 +18,9 @@ vi.mock("../components/DashboardBuilder/SettingsPage", () => ({
     <div>{initialTab === "security" ? "Tabbed security settings" : "General settings page"}</div>
   ),
 }));
+vi.mock("../components/DashboardBuilder/EcommerceStorePage", () => ({
+  default: () => <h1>Live Store</h1>,
+}));
 vi.mock("../components/PageBuilder", () => ({
   default: () => <div>Explicit project editor</div>,
 }));
@@ -39,6 +42,29 @@ const routeProps = {
 };
 
 describe("workspace settings routes", () => {
+  it.each([
+    ["/ecommerce/tags", "Tags"],
+    ["/ecommerce/categories", "Categories"],
+    ["/ecommerce/products", "Products"],
+  ])("renders the Ecommerce page for %s", async (pathname, heading) => {
+    render(
+      <MemoryRouter initialEntries={[pathname]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("heading", { name: heading, level: 1 })).toBeTruthy();
+  });
+
+  it("renders the authenticated live Store page", async () => {
+    render(
+      <MemoryRouter initialEntries={["/ecommerce/store"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole("heading", { name: "Live Store", level: 1 })).toBeTruthy();
+  });
+
   it("opens the Security tab on direct navigation/refresh", async () => {
     render(
       <MemoryRouter initialEntries={["/settings/security"]}>

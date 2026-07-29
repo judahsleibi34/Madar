@@ -26,6 +26,7 @@ from routes.admin_user_routes import router as admin_user_router
 from routes.auth_routes import router as auth_router
 from routes.billing_routes import router as billing_router
 from routes.calendar_routes import router as calendar_router
+from routes.ecommerce_routes import router as ecommerce_router
 from routes.builder_routes import router as builder_router
 from routes.health_routes import router as health_router
 from routes.mfa_routes import router as mfa_router
@@ -92,7 +93,11 @@ PUBLIC_UPLOAD_MEDIA_TYPES = {
 
 FRONTEND_URLS = os.getenv(
     "FRONTEND_URLS",
-    "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173",
+    (
+        "http://localhost:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:5174,http://127.0.0.1:5174"
+    ),
 ).split(",")
 
 FRONTEND_URLS = [url.strip() for url in FRONTEND_URLS if url.strip()]
@@ -250,6 +255,7 @@ app.include_router(notification_router)
 app.include_router(server_status_router)
 app.include_router(billing_router)
 app.include_router(calendar_router)
+app.include_router(ecommerce_router)
 app.include_router(admin_account_access_router)
 app.include_router(admin_billing_router)
 app.include_router(admin_profile_router)
