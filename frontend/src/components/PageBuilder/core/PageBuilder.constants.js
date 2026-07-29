@@ -101,6 +101,7 @@ export const elementTypes = [
   { id: "text", label: "Text", group: "Content" },
   { id: "button", label: "Button", group: "Content" },
   { id: "image", label: "Image", group: "Content" },
+  { id: "photoProofing", label: "Photo Proofing", group: "Media" },
   { id: "card", label: "Card", group: "Content" },
   { id: "carousel", label: "Card Carousel", group: "Content" },
   { id: "list", label: "List", group: "Content" },

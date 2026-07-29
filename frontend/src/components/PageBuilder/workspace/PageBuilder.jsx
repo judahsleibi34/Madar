@@ -6386,6 +6386,16 @@ export default function PageBuilder({
               }}>+ Add item</button>
             </details>
           )}
+          {selectedElement.type === "photoProofing" && (
+            <details open className="photo-proofing-settings">
+              <summary>Photo selection</summary>
+              <label>Title<input value={selectedElement.proofing?.title || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), title: event.target.value } })} /></label>
+              <label>Description<textarea value={selectedElement.proofing?.description || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), description: event.target.value } })} /></label>
+              <label>Button text<input value={selectedElement.proofing?.buttonText || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), buttonText: event.target.value } })} /></label>
+              <label>Photos<textarea rows="12" value={selectedElement.content || ""} onChange={(event) => updateSelectedElement({ content: event.target.value })} /></label>
+              <p className="builder-note">Use one blank line between photos. For each photo enter its title, optional description, then an uploaded path or public HTTPS image URL.</p>
+            </details>
+          )}
           {selectedElement.type === "thinDivider" && (
             <details open className="horizontal-line-editor">
               <summary>Horizontal line</summary>
@@ -6416,6 +6426,7 @@ export default function PageBuilder({
           {!carouselElementTypes.has(selectedElement.type) &&
             selectedElement.type !== "list" &&
             selectedElement.type !== "metric" &&
+            selectedElement.type !== "photoProofing" &&
             selectedElement.type !== "reservationBlock" &&
             selectedElement.type !== "loginBlock" &&
             selectedElement.type !== "registrationBlock" &&

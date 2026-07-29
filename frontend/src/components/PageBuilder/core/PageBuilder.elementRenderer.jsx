@@ -2,6 +2,7 @@ import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import AutoFitDirectText from "./PageBuilder.autoFitText";
 import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
+import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
   collapseAccidentalTextDuplication,
@@ -244,6 +245,14 @@ export const createElementRenderer = ({
         <img key={element.id} {...commonProps} src={imageSrc} alt={element.name} />
       ) : (
         <div key={element.id} {...commonProps}>Image URL unavailable</div>
+      );
+    }
+
+    if (element.type === "photoProofing") {
+      return (
+        <div key={element.id} {...commonProps}>
+          <PhotoProofingBlock content={element.content} settings={element.proofing} disabled={!preview} />
+        </div>
       );
     }
 

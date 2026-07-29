@@ -104,6 +104,18 @@ beforeEach(() => {
 });
 
 describe("calendar task UI", () => {
+  it("opens the chooser from an empty week rectangle and keeps its exact hour", async () => {
+    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    await screen.findByText("Open tasks");
+
+    const midnightSlot = screen.getAllByRole("button", { name: /Add to .*12 AM/i })[0];
+    fireEvent.click(midnightSlot);
+    expect(screen.getByRole("dialog", { name: "What would you like to add?" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
+    expect(screen.getByLabelText("Scheduled start").value).toMatch(/T00:00$/);
+  });
+
   it("renders scheduled tasks in week, day, month, and agenda while keeping unscheduled work separate", async () => {
     render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
 
@@ -121,6 +133,36 @@ describe("calendar task UI", () => {
     expect(screen.getByRole("button", { name: /Scheduled fixture task/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Unscheduled fixture task/ })).toBeTruthy();
     expect(screen.queryByText("Completed fixture task")).toBeNull();
+  });
+
+  it("opens a date chooser and creates a task or reservation on the selected day", async () => {
+    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    await screen.findByText("Open tasks");
+
+    fireEvent.click(screen.getByRole("button", { name: "month" }));
+    const dateButton = screen.getAllByRole("button", { name: /^Add to / })[10];
+    fireEvent.click(dateButton);
+
+    expect(screen.getByRole("dialog", { name: "What would you like to add?" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Create task/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Reserve time/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Reserve time/ }));
+    expect(screen.getByRole("heading", { name: "Add to calendar" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    fireEvent.click(dateButton);
+    fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
+    expect(screen.getByRole("heading", { name: "Add a task" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Task from date" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save task" }));
+
+    await waitFor(() => expect(createCalendarTask).toHaveBeenCalledTimes(1));
+    expect(createCalendarTask.mock.calls[0][0]).toMatchObject({
+      calendar_id: "calendar-fixture",
+      title: "Task from date",
+    });
+    expect(createCalendarTask.mock.calls[0][0].scheduled_start).toBeTruthy();
   });
 
   it("sends an explicit schedule or explicit nulls from quick add and counts both as open", async () => {

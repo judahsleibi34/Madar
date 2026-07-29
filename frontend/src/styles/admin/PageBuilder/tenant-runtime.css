@@ -5,6 +5,15 @@
   padding: 0;
   background: var(--theme-bg);
   color: var(--theme-text);
+  font-family: var(--theme-font-family, Inter, Arial, sans-serif);
+}
+
+.tenant-site-runtime {
+  font-family: var(--theme-font-family, Inter, Arial, sans-serif);
+}
+
+.tenant-site-runtime :is(button, input, select, textarea) {
+  font-family: inherit;
 }
 
 .tenant-runtime-page > .builder-canvas {

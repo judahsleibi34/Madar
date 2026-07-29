@@ -171,9 +171,10 @@ function formatRange(start, end) {
   return `${new Intl.DateTimeFormat(undefined, options).format(start)} – ${new Intl.DateTimeFormat(undefined, options).format(addDays(end, -1))}`;
 }
 
-function blankEditor(calendarId, focusDate, timezone) {
+function blankEditor(calendarId, focusDate, timezone, useSelectedTime = false) {
   const start = new Date(focusDate);
-  start.setHours(Math.max(9, new Date().getHours() + 1), 0, 0, 0);
+  if (useSelectedTime) start.setMinutes(0, 0, 0);
+  else start.setHours(Math.max(9, new Date().getHours() + 1), 0, 0, 0);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
   return {
     id: "",
@@ -231,6 +232,27 @@ function taskEditorValue(task) {
     scheduled_end: task.scheduled_end ? localInputValue(task.scheduled_end) : "",
     sync_connection_id: task.sync_connection_id || "",
   };
+}
+
+function blankTaskEditor(calendarId, focusDate, useSelectedTime = false) {
+  const start = new Date(focusDate);
+  if (useSelectedTime) start.setMinutes(0, 0, 0);
+  else start.setHours(9, 0, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return taskEditorValue({
+    id: "",
+    calendar_id: calendarId,
+    title: "",
+    description: "",
+    status: "todo",
+    priority: "normal",
+    scheduled_start: start.toISOString(),
+    scheduled_end: end.toISOString(),
+    due_at: null,
+    reminder_minutes_before: 10,
+    recurrence_rule: null,
+    milestone: false,
+  });
 }
 
 function recurrenceRule(value) {
@@ -310,7 +332,7 @@ function TaskEditor({ value, connections, saving, error, notice, onChange, onClo
     <div className="calendar-modal-backdrop" role="presentation">
       <form className="calendar-modal calendar-task-editor" onSubmit={onSave}>
         <header>
-          <div><span>Edit task</span><h2>{value.title || "Untitled task"}</h2></div>
+          <div><span>{value.id ? "Edit task" : "New task"}</span><h2>{value.id ? value.title || "Untitled task" : "Add a task"}</h2></div>
           <button type="button" onClick={onClose} aria-label="Close"><X size={19} /></button>
         </header>
         {error && <div className="calendar-conflict-warning"><AlertTriangle size={18} /><div><strong>{error.startsWith("Task saved,") ? "Google sync was not queued" : "Task could not be saved"}</strong><span>{error}</span></div></div>}
@@ -331,13 +353,54 @@ function TaskEditor({ value, connections, saving, error, notice, onChange, onClo
         {value.sync_status && value.sync_status !== "not_synced" && <p className={`calendar-task-sync-status is-${value.sync_status}`}>Google sync: {value.sync_status.replaceAll("_", " ")}</p>}
         <label>Notes<textarea rows="3" value={value.description} onChange={(event) => onChange("description", event.target.value)} /></label>
         <div className="calendar-modal-actions">
-          <button type="button" className="is-danger" disabled={saving} onClick={onDelete}><Trash2 size={16} /> Delete</button>
+          {value.id && <button type="button" className="is-danger" disabled={saving} onClick={onDelete}><Trash2 size={16} /> Delete</button>}
           <span />
           <button type="button" onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); }}>Clear schedule</button>
           <button type="button" onClick={onClose}>Cancel</button>
           <button type="submit" className="is-primary" disabled={saving}>{saving ? "Saving…" : "Save task"}</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function DateActionChooser({ date, onClose, onTask, onReservation, onOpenDay }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const dateLabel = date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  return (
+    <div className="calendar-date-action-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="calendar-date-action" role="dialog" aria-modal="true" aria-labelledby="calendar-date-action-title">
+        <header>
+          <div><span>{dateLabel}</span><h2 id="calendar-date-action-title">What would you like to add?</h2></div>
+          <button type="button" onClick={onClose} aria-label="Close"><X size={18} /></button>
+        </header>
+        <div className="calendar-date-action-options">
+          <button type="button" onClick={onTask}>
+            <span className="is-task"><ListTodo size={21} /></span>
+            <strong>Create task</strong>
+            <small>Add work with a schedule, due date, and reminder.</small>
+          </button>
+          <button type="button" onClick={onReservation}>
+            <span className="is-reservation"><CalendarDays size={21} /></span>
+            <strong>Reserve time</strong>
+            <small>Block this date for an event, meeting, or reservation.</small>
+          </button>
+        </div>
+        <button type="button" className="calendar-date-open-day" onClick={onOpenDay}>Open day view</button>
+      </section>
     </div>
   );
 }
@@ -359,6 +422,7 @@ export default function ReservationCalendarPage({ user = null }) {
   const [taskEditor, setTaskEditor] = useState(null);
   const [taskEditorError, setTaskEditorError] = useState("");
   const [taskEditorNotice, setTaskEditorNotice] = useState("");
+  const [dateAction, setDateAction] = useState(null);
   const [connectionOperation, setConnectionOperation] = useState({ id: "", action: "" });
   const [connectionDirection, setConnectionDirection] = useState("read");
   const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
@@ -476,12 +540,31 @@ export default function ReservationCalendarPage({ user = null }) {
   );
   const days = view === "day" ? [startOfDay(focusDate)] : Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(focusDate), index));
 
-  const openNewEvent = () => {
+  const openNewEvent = (date = focusDate, useSelectedTime = false) => {
     const defaultCalendar = workspace.calendars?.find((item) => item.is_default) || workspace.calendars?.[0];
-    if (!defaultCalendar) return;
+    if (!defaultCalendar) {
+      setError("Choose or create a calendar before reserving time.");
+      return;
+    }
     setHistory([]);
     setConflict("");
-    setEditor(blankEditor(defaultCalendar.id, focusDate, workspace.viewer_timezone));
+    setEditor(blankEditor(defaultCalendar.id, date, workspace.viewer_timezone, useSelectedTime));
+  };
+
+  const openNewTask = (date = focusDate, useSelectedTime = false) => {
+    const defaultCalendar = workspace.calendars?.find((item) => item.is_default) || workspace.calendars?.[0];
+    if (!defaultCalendar) {
+      setError("Choose or create a calendar before adding a task.");
+      return;
+    }
+    setTaskEditorError("");
+    setTaskEditorNotice("");
+    setTaskEditor(blankTaskEditor(defaultCalendar.id, date, useSelectedTime));
+  };
+
+  const openDateActions = (date, useSelectedTime = false) => {
+    setFocusDate(date);
+    setDateAction({ date: new Date(date), useSelectedTime });
   };
 
   const openEvent = async (event) => {
@@ -572,7 +655,7 @@ export default function ReservationCalendarPage({ user = null }) {
 
   const saveTask = async (submitEvent) => {
     submitEvent.preventDefault();
-    if (!taskEditor?.id) return;
+    if (!taskEditor) return;
     setSaving(true);
     setTaskEditorError("");
     setTaskEditorNotice("");
@@ -583,7 +666,7 @@ export default function ReservationCalendarPage({ user = null }) {
       if (taskEditor.repeat !== "none" && !scheduledStart) throw new Error("Choose a scheduled start time for a repeating task.");
       if (scheduledStart && !scheduledEnd) scheduledEnd = new Date(scheduledStart.getTime() + Number(taskEditor.estimate_minutes || 60) * 60000);
       if (scheduledStart && scheduledEnd <= scheduledStart) throw new Error("Scheduled end must be after the start.");
-      const savedTask = await updateCalendarTask(taskEditor.id, {
+      const taskPayload = {
         title: taskEditor.title.trim(),
         description: taskEditor.description || "",
         calendar_id: taskEditor.calendar_id || null,
@@ -598,7 +681,11 @@ export default function ReservationCalendarPage({ user = null }) {
         scheduled_end: scheduledEnd?.toISOString() || null,
         recurrence_rule: recurrenceRule(taskEditor.repeat),
         milestone: Boolean(taskEditor.milestone),
-      }, taskEditor.version);
+      };
+      const savedTask = taskEditor.id
+        ? await updateCalendarTask(taskEditor.id, taskPayload, taskEditor.version)
+        : await createCalendarTask(taskPayload);
+      const savedTaskId = savedTask?.id || taskEditor.id;
       setTaskEditor((current) => ({
         ...current,
         ...taskEditorValue(savedTask || current),
@@ -606,7 +693,7 @@ export default function ReservationCalendarPage({ user = null }) {
       setTaskEditorNotice("Saved locally.");
       if (taskEditor.sync_connection_id && !taskEditor.is_synchronized) {
         try {
-          await syncCalendarTask(taskEditor.id, taskEditor.sync_connection_id);
+          await syncCalendarTask(savedTaskId, taskEditor.sync_connection_id);
           setTaskEditorNotice("Saved locally. Google sync queued.");
         } catch (syncError) {
           setTaskEditorError(
@@ -771,7 +858,7 @@ export default function ReservationCalendarPage({ user = null }) {
           <button type="button" className="calendar-toolbar-action is-icon-only" onClick={() => setRefreshKey((value) => value + 1)} aria-label="Refresh calendar" title="Refresh calendar"><RefreshCw size={17} /></button>
           <label className={`calendar-toolbar-action calendar-import${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable}><Plus size={16} /><span>Import</span><input type="file" accept=".ics,text/calendar" onChange={importIcs} disabled={!calendarFeaturesAvailable} /></label>
           <a className={`calendar-toolbar-action${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable} onClick={(event) => { if (!calendarFeaturesAvailable) event.preventDefault(); }} href={getCalendarExportUrl({ start: rangeStart.toISOString(), end: rangeEnd.toISOString() })}><Download size={16} /><span>Export</span></a>
-          <button type="button" className="calendar-toolbar-action is-primary" onClick={openNewEvent} disabled={!calendarFeaturesAvailable}><Plus size={17} /><span>New event</span></button>
+          <button type="button" className="calendar-toolbar-action is-primary" onClick={() => openNewEvent()} disabled={!calendarFeaturesAvailable}><Plus size={17} /><span>New event</span></button>
         </div>
       </header>
 
@@ -825,8 +912,8 @@ export default function ReservationCalendarPage({ user = null }) {
 
         <main className="reservation-calendar-surface calendar-workspace-surface">
           {loading && <div className="reservation-calendar-loading">Loading calendar…</div>}
-          {!loading && (view === "day" || view === "week") && <div className={`calendar-time-grid is-${view}`}><div className="calendar-grid-header"><span>{workspace.viewer_timezone || "Local time"}</span>{days.map((day) => <button type="button" key={dateKey(day)} className={sameDay(day, new Date()) ? "is-today" : ""} onClick={() => { setFocusDate(day); setView("day"); }}><small>{day.toLocaleDateString(undefined, { weekday: "short" })}</small><strong>{day.getDate()}</strong></button>)}</div><div className="calendar-grid-body"><div className="calendar-grid-hours">{HOURS.map((hour) => <span key={hour}>{new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" })}</span>)}</div>{days.map((day) => <div className="calendar-grid-day" key={dateKey(day)}>{HOURS.map((hour) => <i key={hour} />)}{visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)).map((entry) => { const { item } = entry; const start = new Date(entry.startsAt); const end = new Date(entry.endsAt); const top = (start.getHours() + start.getMinutes() / 60) * 48; const height = Math.max(34, Math.min(180, (end - start) / 3600000 * 48)); const calendar = calendarById.get(item.calendar_id); return <button type="button" key={entry.key} className={`calendar-grid-event is-${entry.kind === "task" ? "task" : item.source_type || "madar"}`} style={{ top, height, "--event-color": calendar?.color || "#f26b4a" }} onClick={() => entry.kind === "task" ? openTask(item) : openEvent(item)}><strong>{item.title}</strong><span>{formatTime(entry.startsAt)} · {entry.kind === "task" ? "Task" : calendar?.name || item.source_label}</span>{entry.kind === "task" ? <small>{item.status.replace("_", " ")}</small> : item.visibility && <small>{item.visibility.replace("calendar_default", "default privacy")}</small>}</button>; })}</div>)}</div></div>}
-          {!loading && view === "month" && <div className="calendar-month-grid">{Array.from({ length: 42 }, (_, index) => addDays(rangeStart, index)).map((day) => { const dayItems = visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)); return <section key={dateKey(day)} className={day.getMonth() !== focusDate.getMonth() ? "is-outside" : ""}><button type="button" onClick={() => { setFocusDate(day); setView("day"); }}>{day.getDate()}</button>{dayItems.slice(0, 4).map((entry) => <button type="button" className={`calendar-month-event${entry.kind === "task" ? " is-task" : ""}`} style={{ "--event-color": calendarById.get(entry.item.calendar_id)?.color || "#f26b4a" }} key={entry.key} onClick={() => entry.kind === "task" ? openTask(entry.item) : openEvent(entry.item)}><span>{formatTime(entry.startsAt)}</span>{entry.kind === "task" && <ListTodo size={12} aria-hidden="true" />}{entry.item.title}</button>)}{dayItems.length > 4 && <small>+{dayItems.length - 4} more</small>}</section>; })}</div>}
+          {!loading && (view === "day" || view === "week") && <div className={`calendar-time-grid is-${view}`}><div className="calendar-grid-header"><span>{workspace.viewer_timezone || "Local time"}</span>{days.map((day) => <button type="button" key={dateKey(day)} className={sameDay(day, new Date()) ? "is-today" : ""} onClick={() => { setFocusDate(day); setView("day"); }}><small>{day.toLocaleDateString(undefined, { weekday: "short" })}</small><strong>{day.getDate()}</strong></button>)}</div><div className="calendar-grid-body"><div className="calendar-grid-hours">{HOURS.map((hour) => <span key={hour}>{new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" })}</span>)}</div>{days.map((day) => <div className="calendar-grid-day" key={dateKey(day)}>{HOURS.map((hour) => { const slot = new Date(day); slot.setHours(hour, 0, 0, 0); return <button type="button" className="calendar-grid-slot" key={hour} aria-label={`Add to ${slot.toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric" })}`} onClick={() => openDateActions(slot, true)} />; })}{visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)).map((entry) => { const { item } = entry; const start = new Date(entry.startsAt); const end = new Date(entry.endsAt); const top = (start.getHours() + start.getMinutes() / 60) * 48; const height = Math.max(34, Math.min(180, (end - start) / 3600000 * 48)); const calendar = calendarById.get(item.calendar_id); return <button type="button" key={entry.key} className={`calendar-grid-event is-${entry.kind === "task" ? "task" : item.source_type || "madar"}`} style={{ top, height, "--event-color": calendar?.color || "#f26b4a" }} onClick={() => entry.kind === "task" ? openTask(item) : openEvent(item)}><strong>{item.title}</strong><span>{formatTime(entry.startsAt)} · {entry.kind === "task" ? "Task" : calendar?.name || item.source_label}</span>{entry.kind === "task" ? <small>{item.status.replace("_", " ")}</small> : item.visibility && <small>{item.visibility.replace("calendar_default", "default privacy")}</small>}</button>; })}</div>)}</div></div>}
+          {!loading && view === "month" && <div className="calendar-month-grid">{Array.from({ length: 42 }, (_, index) => addDays(rangeStart, index)).map((day) => { const dayItems = visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)); return <section key={dateKey(day)} className={day.getMonth() !== focusDate.getMonth() ? "is-outside" : ""}><button type="button" aria-label={`Add to ${day.toLocaleDateString()}`} onClick={() => openDateActions(day)}>{day.getDate()}</button>{dayItems.slice(0, 4).map((entry) => <button type="button" className={`calendar-month-event${entry.kind === "task" ? " is-task" : ""}`} style={{ "--event-color": calendarById.get(entry.item.calendar_id)?.color || "#f26b4a" }} key={entry.key} onClick={() => entry.kind === "task" ? openTask(entry.item) : openEvent(entry.item)}><span>{formatTime(entry.startsAt)}</span>{entry.kind === "task" && <ListTodo size={12} aria-hidden="true" />}{entry.item.title}</button>)}{dayItems.length > 4 && <small>+{dayItems.length - 4} more</small>}</section>; })}</div>}
           {!loading && view === "agenda" && <div className="calendar-agenda">
             {unscheduledAgendaTasks.length > 0 && <><div className="calendar-agenda-section-title"><ListTodo size={15} /><strong>Unscheduled tasks</strong><span>{unscheduledAgendaTasks.length}</span></div>{unscheduledAgendaTasks.map((task) => <button type="button" className="calendar-agenda-task is-unscheduled" key={`task-${task.id}`} onClick={() => openTask(task)}><time><ListTodo size={19} /><span>Task</span></time><i /><div><strong>{task.title}</strong><span>{task.due_at ? `Due ${new Date(task.due_at).toLocaleString()}` : "Choose a time to place this task on your calendar"}</span></div><small>{task.status.replace("_", " ")}</small></button>)}</>}
             {agendaItems.length > 0 && <div className="calendar-agenda-section-title"><CalendarDays size={15} /><strong>Schedule</strong><span>{agendaItems.length}</span></div>}
@@ -842,6 +929,7 @@ export default function ReservationCalendarPage({ user = null }) {
 
       {editor && <EventEditor value={editor} calendars={workspace.calendars || []} saving={saving} conflict={conflict} onChange={(field, value) => setEditor((current) => ({ ...current, [field]: value }))} onClose={() => setEditor(null)} onSave={saveEvent} onDelete={removeEvent} />}
       {taskEditor && <TaskEditor value={taskEditor} connections={workspace.connections || []} saving={saving} error={taskEditorError} notice={taskEditorNotice} onChange={(field, value) => setTaskEditor((current) => ({ ...current, [field]: value }))} onClose={() => setTaskEditor(null)} onSave={saveTask} onDelete={removeTask} />}
+      {dateAction && <DateActionChooser date={dateAction.date} onClose={() => setDateAction(null)} onTask={() => { const selection = dateAction; setDateAction(null); openNewTask(selection.date, selection.useSelectedTime); }} onReservation={() => { const selection = dateAction; setDateAction(null); openNewEvent(selection.date, selection.useSelectedTime); }} onOpenDay={() => { setFocusDate(dateAction.date); setView("day"); setDateAction(null); }} />}
       {editor?.id && history.length > 0 && <aside className="calendar-history-drawer"><header><History size={17} /><strong>Change history</strong></header>{history.slice(0, 8).map((item) => <div key={item.id}><strong>{item.action}</strong><span>{new Date(item.created_at).toLocaleString()} · {item.scope}</span></div>)}</aside>}
     </div>
   );

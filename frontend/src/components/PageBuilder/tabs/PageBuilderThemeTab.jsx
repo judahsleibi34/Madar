@@ -78,6 +78,7 @@ const getThemeElementStyles = (element = {}) => {
       "loginBlock",
       "registrationBlock",
       "formBlock",
+      "photoProofing",
       "reservationBlock",
       "responsesTable",
     ].includes(element.type)

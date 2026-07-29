@@ -20,6 +20,7 @@
 
 .builder-canvas {
   background: var(--theme-bg);
+  font-family: var(--theme-font-family, Inter, Arial, sans-serif);
   min-height: calc(100vh - 182px);
   border-radius: 24px;
   border: 1px solid var(--madar-border);
@@ -27,6 +28,10 @@
   overflow: hidden;
   box-shadow: var(--madar-shadow-md);
   margin: 0 auto;
+}
+
+.builder-canvas :is(button, input, select, textarea) {
+  font-family: inherit;
 }
 
 .preview-mode .builder-canvas {

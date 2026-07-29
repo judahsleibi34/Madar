@@ -34,6 +34,7 @@ import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import AutoFitDirectText from "../core/PageBuilder.autoFitText";
 import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
+import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
 import { resolveReservationBlockValue } from "../core/PageBuilder.reservations";
 import { resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
@@ -1753,6 +1754,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       );
     }
     if (element.type === "formBlock") return <div key={element.id} {...props}>{renderConnectedForm(element.connectedFormId, element.id)}</div>;
+    if (element.type === "photoProofing") return <div key={element.id} {...props}><PhotoProofingBlock content={element.content} settings={element.proofing} /></div>;
     if (element.type === "reservationBlock") {
       const reservation = resolveReservationBlockValue(element, project?.pages) || {};
       const status = reservationStatus[element.id] || {};
