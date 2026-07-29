@@ -44,6 +44,16 @@ export const factoryContent = {
       image: {
         name: "Image",
       },
+      photoProofing: {
+        name: "Photo Proofing",
+        content:
+          "Portrait by the window\nNatural light portrait\nhttps://images.unsplash.com/photo-1519741497674-611481863552?w=1400&q=88&auto=format&fit=crop\n\nGolden hour walk\nOutdoor couple session\nhttps://images.unsplash.com/photo-1606800052052-a08af7148866?w=1400&q=88&auto=format&fit=crop\n\nQuiet moment\nEditorial wedding detail\nhttps://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=1400&q=88&auto=format&fit=crop\n\nCelebration\nA candid favorite from the session\nhttps://images.unsplash.com/photo-1537633552985-df8429e8048b?w=1400&q=88&auto=format&fit=crop",
+        settings: {
+          title: "Choose your favorite photos",
+          description: "Drag right to keep a photo or left to pass. You can undo any choice.",
+          buttonText: "Start selecting",
+        },
+      },
       card: {
         name: "Card Carousel",
         content:

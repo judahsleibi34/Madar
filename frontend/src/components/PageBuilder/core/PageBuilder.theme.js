@@ -138,6 +138,7 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--madar-gradient": websiteTheme.accent,
     "--madar-gradient-hover": websiteTheme.accentDark,
     "--madar-radius": `${safeTheme.radius}px`,
+    "--theme-font-family": safeTheme.fontFamily,
     fontFamily: safeTheme.fontFamily,
   };
 };

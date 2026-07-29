@@ -221,6 +221,18 @@ export const createElement = (type = "text", overrides = {}) => {
         "--carousel-height": "390px",
       },
     },
+    photoProofing: {
+      name: factoryCopy.elements.photoProofing.name,
+      content: factoryCopy.elements.photoProofing.content,
+      proofing: { ...factoryCopy.elements.photoProofing.settings },
+      styles: {
+        ...base.styles,
+        backgroundColor: "var(--theme-surface)",
+        borderRadius: "24px",
+        alignSelf: "stretch",
+        width: "100%",
+      },
+    },
     carouselCards: {
       name: factoryCopy.elements.carouselCards.name,
       carouselVariant: "cards",
