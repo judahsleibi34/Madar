@@ -74,6 +74,7 @@ import {
 } from "../core/PageBuilder.layout";
 import {
   getBuilderElementStyle,
+  getDirectCanvasScaleStyles,
   getDirectElementFrameStyle as getCanonicalDirectElementFrameStyle,
 } from "../core/PageBuilder.styles";
 
@@ -1891,30 +1892,27 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
               const logicalWidth = viewports[runtimeViewport] || viewports.desktop;
               const logicalHeight = getSectionCanvasHeight(section, runtimeViewport);
               const canvasScale = getRuntimeCanvasScale(runtimeAvailableWidth, logicalWidth);
+              const directCanvasStyles = getDirectCanvasScaleStyles({
+                logicalWidth,
+                logicalHeight,
+                scale: canvasScale,
+              });
               return (
                 <section
                   key={section.id}
                   className={`site-section direct-layout-section width-${section.layout.width}`}
                   style={{
                     backgroundColor: section.layout.background,
-                    minHeight: `${logicalHeight * canvasScale}px`,
+                    ...directCanvasStyles.section,
                   }}
                 >
                   <div
-                    className="runtime-direct-layout-scale-shell"
-                    style={{
-                      width: `${logicalWidth * canvasScale}px`,
-                      height: `${logicalHeight * canvasScale}px`,
-                    }}
+                    className="direct-layout-scale-shell"
+                    style={directCanvasStyles.shell}
                   >
                     <div
                       className="direct-layout-frame"
-                      style={{
-                        width: `${logicalWidth}px`,
-                        minHeight: `${logicalHeight}px`,
-                        transform: `scale(${canvasScale})`,
-                        transformOrigin: "top left",
-                      }}
+                      style={directCanvasStyles.frame}
                     >
                       {(section.freeElements || [])
                         .filter((element) =>

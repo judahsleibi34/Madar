@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const compose = readFileSync(resolve(cwd(), "../docker-compose.yml"), "utf8");
 const headersTemplate = readFileSync(resolve(cwd(), "security_headers.conf.template"), "utf8");
+const baseStyles = readFileSync(resolve(cwd(), "src/styles/core/base.css"), "utf8");
 
 describe("production Content Security Policy", () => {
   it("allows only the public production API connection origin", () => {
@@ -24,5 +25,7 @@ describe("production Content Security Policy", () => {
     expect(connectSrc).toBe("'self' https://api.madarportal.com");
     expect(connectSrc).not.toMatch(/127\.0\.0\.1:800[12]|localhost|\*/);
     expect(scriptSrc).not.toContain("unsafe-eval");
+    expect(renderedHeaders.match(/style-src\s+([^;]+);/)?.[1]).toBe("'self' 'unsafe-inline'");
+    expect(baseStyles).not.toMatch(/fonts\.googleapis\.com|@import\s+url\(https?:\/\//);
   });
 });

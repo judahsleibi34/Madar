@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getBuilderElementStyle,
   getBuilderFreeElementStyle,
+  getDirectCanvasScaleStyles,
   getDirectElementFrameStyle,
 } from "./PageBuilder.styles";
 import { viewports } from "./PageBuilder.constants";
@@ -12,6 +13,36 @@ import {
   getDirectElementMinimumSize,
   getMetricMinimumHeight,
 } from "./PageBuilder.layout";
+
+describe("getDirectCanvasScaleStyles", () => {
+  it("scales the logical frame, its content, and its visible section as one unit", () => {
+    const styles = getDirectCanvasScaleStyles({
+      logicalWidth: 1200,
+      logicalHeight: 1600,
+      scale: 0.8,
+    });
+
+    expect(styles.section).toEqual({ minHeight: "1280px" });
+    expect(styles.shell).toEqual({ width: "960px", height: "1280px" });
+    expect(styles.frame).toEqual({
+      width: "1200px",
+      minHeight: "1600px",
+      transform: "scale(0.8)",
+      transformOrigin: "top left",
+    });
+  });
+
+  it("never enlarges a logical canvas above its authored size", () => {
+    const styles = getDirectCanvasScaleStyles({
+      logicalWidth: 1200,
+      logicalHeight: 600,
+      scale: 1.5,
+    });
+
+    expect(styles.shell.width).toBe("1200px");
+    expect(styles.frame.transform).toBe("scale(1)");
+  });
+});
 
 describe("getBuilderElementStyle", () => {
   it("preserves independent image scale variables", () => {

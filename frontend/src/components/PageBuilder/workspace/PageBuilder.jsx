@@ -298,6 +298,7 @@ import {
 import {
   getBuilderElementStyle,
   getBuilderFreeElementStyle,
+  getDirectCanvasScaleStyles,
 } from "../core/PageBuilder.styles";
 import {
   createFormHandlers,
@@ -1679,8 +1680,8 @@ export default function PageBuilder({
   }, [updateActivePage]);
 
   const getFrameGeometry = useCallback(
-    (frame) => getCanvasLocalGeometry(frame, { coordinateScale: canvasScale }),
-    [canvasScale]
+    (frame) => getCanvasLocalGeometry(frame, { coordinateScale: 1 }),
+    []
   );
 
   const getElementParentGeometry = useCallback((elementId) => {
@@ -1690,9 +1691,9 @@ export default function PageBuilder({
       elementId
     );
     return getImmediateParentCanvasGeometry(elementFrame, {
-      coordinateScale: canvasScale,
+      coordinateScale: 1,
     });
-  }, [canvasScale]);
+  }, []);
 
   useLayoutEffect(() => {
     if (activeTab !== "design" || !canvasShellRef.current) return undefined;
@@ -2212,7 +2213,7 @@ export default function PageBuilder({
       frame,
       (visibleLeft + visibleRight) / 2,
       (visibleTop + visibleBottom) / 2,
-      { coordinateScale: canvasScale }
+      { coordinateScale: 1 }
     );
   };
 
@@ -2228,7 +2229,7 @@ export default function PageBuilder({
       event.currentTarget,
       event.clientX,
       event.clientY,
-      { coordinateScale: canvasScale }
+      { coordinateScale: 1 }
     );
     addComponentToSection(type, section.id, localPoint);
   };
@@ -4120,8 +4121,8 @@ export default function PageBuilder({
       getSectionCanvasHeight,
       getMetricMinimumHeight,
       getDirectElementMinimumSize,
-      canvasScale,
-    }), [activePage, canvasScale, findElementLocation, viewport]);
+      canvasScale: 1,
+    }), [activePage, findElementLocation, viewport]);
 
   const getDirectElementFrameStyle = (element) => {
     const previewPosition = dragState?.elementId === element.id ? dragState.previewPosition : null;
@@ -4295,7 +4296,7 @@ export default function PageBuilder({
 
     const elementFrame = event.currentTarget.closest?.(".direct-element-frame");
     const parentGeometry = getImmediateParentCanvasGeometry(elementFrame, {
-      coordinateScale: canvasScale,
+      coordinateScale: 1,
     });
     const immediateParent = parentGeometry?.parent;
     const pointer = immediateParent
@@ -4303,7 +4304,7 @@ export default function PageBuilder({
           immediateParent,
           event.clientX,
           event.clientY,
-          { coordinateScale: canvasScale }
+          { coordinateScale: 1 }
         )
       : null;
     if (!immediateParent || !pointer) return;
@@ -4346,7 +4347,7 @@ export default function PageBuilder({
       previewSectionHeight: 0,
       interaction,
     });
-  }, [canvasScale, preview, viewport]);
+  }, [preview, viewport]);
 
   const captureTextSelection = (event, field, itemIndex = null) => {
     setTextSelection(
@@ -5108,7 +5109,7 @@ export default function PageBuilder({
           parentGeometry.parent,
           event.clientX,
           event.clientY,
-          { coordinateScale: canvasScale }
+          { coordinateScale: 1 }
         )
       : null;
     if (!parentGeometry?.geometry || !localPointer) return;
@@ -5201,7 +5202,7 @@ export default function PageBuilder({
         targetFrame,
         event.clientX,
         event.clientY,
-        { coordinateScale: canvasScale }
+        { coordinateScale: 1 }
       );
       const nextPosition = getMovedElementPosition({
         selectedElement,
@@ -5876,6 +5877,12 @@ export default function PageBuilder({
             const renderedSectionHeight = dragState?.elementId && getElementSection(dragState.elementId)?.id === section.id
               ? Math.max(getSectionCanvasHeight(section, viewport), Number(dragState.previewSectionHeight) || 0)
               : getSectionCanvasHeight(section, viewport);
+            const logicalWidth = viewports[viewport] || viewports.desktop;
+            const directCanvasStyles = getDirectCanvasScaleStyles({
+              logicalWidth,
+              logicalHeight: renderedSectionHeight,
+              scale: canvasScale,
+            });
 
             if (section.mode === "direct") {
               return (
@@ -5884,7 +5891,7 @@ export default function PageBuilder({
                   className={`site-section direct-layout-section width-${section.layout.width} ${isSelected ? "is-selected" : ""} ${dragState?.dropSectionId === section.id || paletteDropSectionId === section.id ? "is-drop-target" : ""}`}
                   style={{
                     backgroundColor: section.layout.background,
-                    minHeight: renderedSectionHeight * canvasScale,
+                    ...directCanvasStyles.section,
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -5902,9 +5909,13 @@ export default function PageBuilder({
                   }}
                 >
                   <div
-                    className={`direct-layout-frame ${isEditingBehindText ? "is-editing-behind-text" : ""}`}
-                    data-section-id={section.id}
-                    style={{ width: "100%", minHeight: `${renderedSectionHeight * canvasScale}px` }}
+                    className="direct-layout-scale-shell"
+                    style={directCanvasStyles.shell}
+                  >
+                    <div
+                      className={`direct-layout-frame ${isEditingBehindText ? "is-editing-behind-text" : ""}`}
+                      data-section-id={section.id}
+                      style={directCanvasStyles.frame}
                     onDragOver={(event) => {
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "copy";
@@ -5935,7 +5946,7 @@ export default function PageBuilder({
                                   measureEnabled: !preview && dragState?.elementId !== element.id,
                                   measurementKey: `${element.id}:${viewport}`,
                                   onMeasuredHeight: (height) =>
-                                    reconcileDirectContentBlockSize(section.id, element.id, height / canvasScale),
+                                    reconcileDirectContentBlockSize(section.id, element.id, height),
                                 }
                               : {})}
                             className={`direct-element-frame direct-element-frame-${element.type} ${hasFixedReservationSize ? "is-fixed-size" : ""} ${elementSelected && !usesDetachedEditBoundary ? "is-selected" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""}`}
@@ -6013,6 +6024,7 @@ export default function PageBuilder({
                         </Fragment>
                       );
                     })}
+                    </div>
                   </div>
                 </section>
               );

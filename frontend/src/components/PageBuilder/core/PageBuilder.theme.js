@@ -71,6 +71,11 @@ const getSafeWebsiteTheme = (theme = {}) => ({
   ...theme,
 });
 
+const getThemeFontStack = (fontFamily) => {
+  const selectedFont = String(fontFamily || "Inter").trim() || "Inter";
+  return `${JSON.stringify(selectedFont)}, "IBM Plex Sans Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+};
+
 const getSafeFormTheme = (theme = {}) => ({
   ...defaultFormTheme,
   ...((theme || {}).form || {}),
@@ -138,8 +143,8 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--madar-gradient": websiteTheme.accent,
     "--madar-gradient-hover": websiteTheme.accentDark,
     "--madar-radius": `${safeTheme.radius}px`,
-    "--theme-font-family": safeTheme.fontFamily,
-    fontFamily: safeTheme.fontFamily,
+    "--theme-font-family": getThemeFontStack(safeTheme.fontFamily),
+    fontFamily: getThemeFontStack(safeTheme.fontFamily),
   };
 };
 

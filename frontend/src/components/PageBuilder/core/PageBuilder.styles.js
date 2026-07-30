@@ -1,5 +1,25 @@
 import { clampElementToBounds } from "./PageBuilder.bounds";
 
+export const getDirectCanvasScaleStyles = ({ logicalWidth, logicalHeight, scale = 1 }) => {
+  const width = Math.max(1, Number(logicalWidth) || 1);
+  const height = Math.max(1, Number(logicalHeight) || 1);
+  const safeScale = Math.min(1, Math.max(0.0001, Number(scale) || 1));
+
+  return {
+    section: { minHeight: `${height * safeScale}px` },
+    shell: {
+      width: `${width * safeScale}px`,
+      height: `${height * safeScale}px`,
+    },
+    frame: {
+      width: `${width}px`,
+      minHeight: `${height}px`,
+      transform: `scale(${safeScale})`,
+      transformOrigin: "top left",
+    },
+  };
+};
+
 export const getBuilderElementStyle = ({
   element,
   selected,
