@@ -22,6 +22,13 @@
   margin: 0;
 }
 
+.tenant-runtime-page .direct-layout-section {
+  width: 100%;
+  max-width: none;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
 .direct-layout-scale-shell {
   position: relative;
   max-width: 100%;
@@ -32,6 +39,24 @@
 .direct-layout-scale-shell > .direct-layout-frame {
   margin: 0;
   max-width: none;
+}
+
+/* Published direct layouts use fluid frame geometry. Defensive constraints
+   keep user-authored content inside its element when copy or media is larger
+   than the box chosen in the builder. */
+.tenant-runtime-page .direct-element-frame,
+.tenant-runtime-page .direct-element-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tenant-runtime-page .direct-element-content :is(h1, h2, h3, h4, h5, h6, p, li, a, button, label) {
+  overflow-wrap: anywhere;
+}
+
+.tenant-runtime-page .direct-element-content :is(img, video, iframe, svg, input, select, textarea, button) {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .tenant-site-runtime .tenant-runtime-page :is(

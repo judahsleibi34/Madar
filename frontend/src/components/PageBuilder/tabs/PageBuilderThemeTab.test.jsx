@@ -1,0 +1,44 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import PageBuilderThemeTab from "./PageBuilderThemeTab";
+
+afterEach(cleanup);
+
+describe("PageBuilderThemeTab sidebar", () => {
+  it("presents the theme controls in semantic groups and preserves a zero radius", () => {
+    const updateProject = vi.fn();
+
+    render(
+      <PageBuilderThemeTab
+        project={{ theme: { radius: 0, fontFamily: "Inter" } }}
+        updateProject={updateProject}
+        variant="sidebar"
+      />
+    );
+
+    expect(screen.getByRole("heading", { name: "Themes" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Theme colors" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Shape & typography" })).toBeTruthy();
+    expect(screen.getByLabelText("Corner radius").value).toBe("0");
+    expect(screen.getByRole("button", { name: "Apply to pages" })).toBeTruthy();
+  });
+
+  it("keeps form styling when the website theme is reset", () => {
+    const updateProject = vi.fn();
+    render(
+      <PageBuilderThemeTab
+        project={{ theme: { radius: 4, form: { accent: "#123456" } } }}
+        updateProject={updateProject}
+        variant="sidebar"
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    const resetProject = updateProject.mock.calls[0][0];
+    const result = resetProject({ theme: { radius: 4, form: { accent: "#123456" } } });
+
+    expect(result.theme.form).toEqual({ accent: "#123456" });
+    expect(result.theme.radius).not.toBe(4);
+  });
+});
