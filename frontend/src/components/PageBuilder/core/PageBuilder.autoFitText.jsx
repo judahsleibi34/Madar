@@ -9,6 +9,7 @@ export default function AutoFitDirectText({ as: Element, fitKey, children, ...pr
     if (!element || !frame) return undefined;
 
     let animationFrame = null;
+    let disposed = false;
     const requestFrame = window.requestAnimationFrame?.bind(window)
       || ((callback) => window.setTimeout(callback, 16));
     const cancelFrame = window.cancelAnimationFrame?.bind(window)
@@ -46,7 +47,7 @@ export default function AutoFitDirectText({ as: Element, fitKey, children, ...pr
       applyScale(lowerScale);
     };
     const scheduleFit = () => {
-      if (animationFrame !== null) return;
+      if (disposed || animationFrame !== null) return;
       animationFrame = requestFrame(fitText);
     };
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -56,13 +57,17 @@ export default function AutoFitDirectText({ as: Element, fitKey, children, ...pr
     resizeObserver?.observe(frame);
     element.addEventListener("input", scheduleFit);
     window.addEventListener("resize", scheduleFit);
+    document.fonts?.addEventListener?.("loadingdone", scheduleFit);
+    document.fonts?.ready?.then(scheduleFit);
     scheduleFit();
 
     return () => {
+      disposed = true;
       if (animationFrame !== null) cancelFrame(animationFrame);
       resizeObserver?.disconnect();
       element.removeEventListener("input", scheduleFit);
       window.removeEventListener("resize", scheduleFit);
+      document.fonts?.removeEventListener?.("loadingdone", scheduleFit);
     };
   }, [fitKey]);
 

@@ -22,15 +22,16 @@
   margin: 0;
 }
 
-.tenant-runtime-page .runtime-direct-layout-scale-shell {
+.direct-layout-scale-shell {
   position: relative;
   max-width: 100%;
   margin: 0 auto;
   overflow: hidden;
 }
 
-.tenant-runtime-page .runtime-direct-layout-scale-shell > .direct-layout-frame {
+.direct-layout-scale-shell > .direct-layout-frame {
   margin: 0;
+  max-width: none;
 }
 
 .tenant-site-runtime .tenant-runtime-page :is(
