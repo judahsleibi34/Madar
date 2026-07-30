@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  cacheTenantBrand,
   getRuntimeAuthFlow,
+  getTenantBrandFallback,
   getRuntimeCanvasScale,
   getRuntimeDirectPosition,
+  readCachedTenantBrand,
   getRuntimeViewportForWidth,
   getRuntimeNavigationPages,
   getRuntimePageSections,
@@ -31,6 +34,31 @@ const formPage = {
   visibility: "public",
   sections: [],
 };
+
+describe("tenant brand loading", () => {
+  it("caches a bounded tenant identity and restores it for repeat visits", () => {
+    const values = new Map();
+    const storage = {
+      getItem: (key) => values.get(key) || null,
+      setItem: (key, value) => values.set(key, value),
+    };
+
+    cacheTenantBrand(storage, "madar-demo", {
+      brand: "Madar Demo",
+      logoUrl: "/uploads/tenant_1/builder_assets/1234567890abcdef1234567890abcdef.png",
+    });
+
+    expect(readCachedTenantBrand(storage, "madar-demo")).toEqual({
+      brand: "Madar Demo",
+      logoUrl: "/uploads/tenant_1/builder_assets/1234567890abcdef1234567890abcdef.png",
+    });
+    expect(getTenantBrandFallback("madar-demo")).toBe("Madar Demo");
+  });
+
+  it("ignores malformed cached branding", () => {
+    expect(readCachedTenantBrand({ getItem: () => "not-json" }, "broken")).toBeNull();
+  });
+});
 
 describe("tenant runtime page flow", () => {
   it("fits a logical canvas to the complete available browser width", () => {

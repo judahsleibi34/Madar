@@ -185,13 +185,10 @@ export default function PageBuilderThemeTab({
   if (isSidebar) {
     return (
       <div className="theme-sidebar-editor">
-        <header className="theme-sidebar-header">
-          <span className="workspace-kicker">Builder style</span>
-          <h2>Themes</h2>
-          <p className="panel-help">Set the shared colors, shape, and typography for your site.</p>
-        </header>
+        <h2>Themes</h2>
+        <p className="panel-help">Set the shared colors, shape, and typography for your site.</p>
 
-        <div className="theme-sidebar-actions">
+        <div className="page-utility-actions theme-sidebar-actions">
           <button type="button" className="theme-sidebar-reset" onClick={resetWebsiteTheme}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>Reset</span>
@@ -202,11 +199,11 @@ export default function PageBuilderThemeTab({
           </button>
         </div>
 
-        <div className="theme-sidebar-palette">
+        <div className="section-component-palette theme-sidebar-palette">
+          <span>Site theme</span>
           <section className="theme-sidebar-section" aria-labelledby="theme-colors-heading">
             <div className="theme-sidebar-section-heading">
               <h3 id="theme-colors-heading">Theme colors</h3>
-              <p>Used across backgrounds, content, text, and buttons.</p>
             </div>
             <div className="theme-sidebar-grid theme-sidebar-color-grid">
               {websiteColorControls.map(([key, label]) =>
@@ -224,7 +221,6 @@ export default function PageBuilderThemeTab({
           <section className="theme-sidebar-section" aria-labelledby="theme-type-heading">
             <div className="theme-sidebar-section-heading">
               <h3 id="theme-type-heading">Shape & typography</h3>
-              <p>Keep corners and type consistent throughout the site.</p>
             </div>
             <div className="theme-sidebar-grid theme-sidebar-type-grid">
               <label className="theme-number-control">
