@@ -9,7 +9,7 @@ describe("PageBuilderThemeTab sidebar", () => {
   it("presents the theme controls in semantic groups and preserves a zero radius", () => {
     const updateProject = vi.fn();
 
-    render(
+    const { container } = render(
       <PageBuilderThemeTab
         project={{ theme: { radius: 0, fontFamily: "Inter" } }}
         updateProject={updateProject}
@@ -17,6 +17,8 @@ describe("PageBuilderThemeTab sidebar", () => {
       />
     );
 
+    expect(container.querySelector(".page-utility-actions.theme-sidebar-actions")).toBeTruthy();
+    expect(container.querySelector(".section-component-palette.theme-sidebar-palette")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Themes" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Theme colors" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Shape & typography" })).toBeTruthy();

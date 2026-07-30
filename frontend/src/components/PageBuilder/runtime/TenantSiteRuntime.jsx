@@ -80,6 +80,48 @@ import {
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
 const MADAR_ATTRIBUTION_URL = "https://madar.app/";
+const TENANT_BRAND_CACHE_PREFIX = "madar:tenant-brand:";
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getTenantBrandFallback = (subdomain) =>
+  String(subdomain || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ") || "Website";
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const readCachedTenantBrand = (storage, subdomain) => {
+  try {
+    const value = JSON.parse(storage?.getItem(`${TENANT_BRAND_CACHE_PREFIX}${subdomain}`) || "null");
+    if (!value || typeof value !== "object") return null;
+    const brand = String(value.brand || "").trim().slice(0, 80);
+    const logoUrl = String(value.logoUrl || "").trim().slice(0, 2048);
+    return brand || logoUrl ? { brand, logoUrl } : null;
+  } catch {
+    return null;
+  }
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const cacheTenantBrand = (storage, subdomain, value) => {
+  const brand = String(value?.brand || "").trim().slice(0, 80);
+  const logoUrl = String(value?.logoUrl || "").trim().slice(0, 2048);
+  if (!storage || (!brand && !logoUrl)) return;
+  try {
+    storage.setItem(`${TENANT_BRAND_CACHE_PREFIX}${subdomain}`, JSON.stringify({ brand, logoUrl }));
+  } catch {
+    // Storage may be unavailable in private or restricted browsing contexts.
+  }
+};
+
+const getTenantBrandStorage = () => {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+};
 
 const splitLines = (value) =>
   String(value || "")
@@ -413,6 +455,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [project, setProject] = useState(null);
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState("loading");
+  const [cachedTenantBrand, setCachedTenantBrand] = useState(() =>
+    readCachedTenantBrand(getTenantBrandStorage(), cleanSubdomain)
+  );
   const [formAnswers, setFormAnswers] = useState({});
   const [formHoneypots, setFormHoneypots] = useState({});
   const [formStatus, setFormStatus] = useState({});
@@ -427,6 +472,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const protectedPageRequestRef = useRef("");
   const pendingProtectedPageRef = useRef("");
 
+  useEffect(() => {
+    setCachedTenantBrand(readCachedTenantBrand(getTenantBrandStorage(), cleanSubdomain));
+  }, [cleanSubdomain]);
   const loadProtectedPage = useCallback(async (pageReference) => {
     const cleanReference = String(pageReference || "").replace(/^\/+/, "");
     if (draftPreview || !cleanReference) return null;
@@ -757,6 +805,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const brandName = site.brand || runtimeCopy.runtime.brand;
   const footerBrand = site.footerStoreName || brandName;
   const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || runtimeCopy.runtime.footerInitial;
+
+  useEffect(() => {
+    if (!isPublicRuntime || publicSiteState !== "ready") return;
+    const nextBrand = { brand: brandName, logoUrl: site.logoUrl || "" };
+    setCachedTenantBrand(nextBrand);
+    cacheTenantBrand(getTenantBrandStorage(), cleanSubdomain, nextBrand);
+  }, [brandName, cleanSubdomain, isPublicRuntime, publicSiteState, site.logoUrl]);
 
   const getPageDestinationPath = useCallback((page) => {
     if (!page) {
@@ -1855,13 +1910,41 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     </main>
   );
 
+  const renderLoadingState = () => {
+    const resolvedBrand = publicSiteState === "ready"
+      ? { brand: brandName, logoUrl: site.logoUrl || "" }
+      : cachedTenantBrand;
+    const loadingBrand = resolvedBrand?.brand || getTenantBrandFallback(cleanSubdomain);
+    const loadingLogo = resolveMediaUrl(resolvedBrand?.logoUrl);
+    const loadingInitial = loadingBrand.trim().slice(0, 1).toUpperCase() || "M";
+
+    return (
+      <main className="tenant-runtime-main tenant-runtime-loading-screen" aria-busy="true">
+        <div className="tenant-brand-loader" role="status" aria-live="polite">
+          <div className="tenant-brand-loader-mark" aria-hidden="true">
+            <span>{loadingInitial}</span>
+            {loadingLogo && (
+              <img
+                src={loadingLogo}
+                alt=""
+                decoding="async"
+                fetchPriority="high"
+                loading="eager"
+                onError={(event) => { event.currentTarget.hidden = true; }}
+              />
+            )}
+          </div>
+          <p className="tenant-brand-loader-name">{loadingBrand}</p>
+          <span className="tenant-brand-loader-progress" aria-hidden="true" />
+          <span className="sr-only">{runtimeCopy.runtime.loadingTitle}</span>
+        </div>
+      </main>
+    );
+  };
+
   const renderPublishedPage = () => {
     if (isPublicRuntime && (publicSiteState === "loading" || tenantAuth.loading)) {
-      return renderUnavailableState(
-        runtimeCopy.runtime.loadingTitle,
-        runtimeCopy.runtime.loadingBody,
-        "loading"
-      );
+      return renderLoadingState();
     }
 
     if (!project) {
