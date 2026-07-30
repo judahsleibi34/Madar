@@ -210,6 +210,7 @@ export const defaultSiteChrome = {
   showFooter: true,
   brand: "Madar",
   logoUrl: "",
+  loadingImageUrl: "",
   headerAlign: "center",
   headerButtonLabel: "Contact",
   headerButtonHref: "Contact",

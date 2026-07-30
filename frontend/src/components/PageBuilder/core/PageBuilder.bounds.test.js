@@ -4,6 +4,7 @@ import {
   clampElementToBounds,
   clientPointToCanvasLocal,
   getCanvasLocalGeometry,
+  getVisibleCanvasLocalBounds,
   getImmediateParentCanvasGeometry,
 } from "./PageBuilder.bounds";
 
@@ -135,4 +136,48 @@ describe("canvas-local geometry", () => {
       getImmediateParentCanvasGeometry(nestedElement)?.geometry?.bounds
     ).toEqual({ x: 0, y: 0, width: 240, height: 160 });
   });
-});
+  it("returns only the canvas area visible inside its clipping viewport", () => {
+    const canvas = {
+      offsetWidth: 1200,
+      offsetHeight: 1000,
+      clientWidth: 1200,
+      clientHeight: 1000,
+      clientLeft: 0,
+      clientTop: 0,
+      scrollLeft: 0,
+      scrollTop: 0,
+      getBoundingClientRect: () => ({
+        left: 100,
+        top: 50,
+        right: 700,
+        bottom: 550,
+        width: 600,
+        height: 500,
+      }),
+    };
+    const viewport = {
+      offsetWidth: 400,
+      offsetHeight: 300,
+      clientWidth: 380,
+      clientHeight: 280,
+      clientLeft: 0,
+      clientTop: 0,
+      scrollLeft: 0,
+      scrollTop: 0,
+      getBoundingClientRect: () => ({
+        left: 200,
+        top: 100,
+        right: 600,
+        bottom: 400,
+        width: 400,
+        height: 300,
+      }),
+    };
+
+    expect(getVisibleCanvasLocalBounds(canvas, viewport)).toEqual({
+      x: 200,
+      y: 100,
+      width: 760,
+      height: 560,
+    });
+  });});

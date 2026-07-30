@@ -59,4 +59,30 @@ describe("PageBuilderPageInspector", () => {
     fireEvent.change(input, { target: { value: "Home " } });
     expect(onUpdate).toHaveBeenCalledWith({ name: "Home " });
   });
+  it("allows the site-wide loading image to be replaced or reset", () => {
+    const onLoadingImageUpload = vi.fn();
+    const onResetLoadingImage = vi.fn();
+    render(
+      <PageBuilderPageInspector
+        page={{ id: "home", name: "Home", slug: "/", isDefault: true }}
+        hasRoutingIssue={false}
+        loadingImagePreviewUrl="/uploads/loading.png"
+        hasCustomLoadingImage
+        assetUploadBusy={false}
+        onLoadingImageUpload={onLoadingImageUpload}
+        onResetLoadingImage={onResetLoadingImage}
+        onSetDefault={vi.fn()}
+        onUpdate={vi.fn()}
+      />
+    );
+
+    expect(screen.getByAltText("Current loading screen").getAttribute("src"))
+      .toBe("/uploads/loading.png");
+    fireEvent.change(screen.getByLabelText("Replace image"), {
+      target: { files: [{ name: "new-loading.png" }] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Use site logo" }));
+    expect(onLoadingImageUpload).toHaveBeenCalledOnce();
+    expect(onResetLoadingImage).toHaveBeenCalledOnce();
+  });
 });
