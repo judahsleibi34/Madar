@@ -5,6 +5,7 @@ import {
   getBuilderFreeElementStyle,
   getDirectCanvasScaleStyles,
   getDirectElementFrameStyle,
+  getResponsiveDirectCanvasStyles,
 } from "./PageBuilder.styles";
 import { viewports } from "./PageBuilder.constants";
 import { createElement, createPosition } from "./PageBuilder.factories";
@@ -41,6 +42,16 @@ describe("getDirectCanvasScaleStyles", () => {
 
     expect(styles.shell.width).toBe("1200px");
     expect(styles.frame.transform).toBe("scale(1)");
+  });
+});
+
+describe("getResponsiveDirectCanvasStyles", () => {
+  it("fills the runtime width without scaling the frame child content", () => {
+    const styles = getResponsiveDirectCanvasStyles({ logicalHeight: 900, scale: 1.5 });
+
+    expect(styles.section).toEqual({ minHeight: "1350px" });
+    expect(styles.shell).toEqual({ width: "100%", height: "1350px" });
+    expect(styles.frame).toEqual({ width: "100%", minHeight: "1350px" });
   });
 });
 

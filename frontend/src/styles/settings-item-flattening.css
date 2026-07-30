@@ -61,6 +61,50 @@
   row-gap: 14px;
 }
 
+/* Website theme actions use the builder's standard secondary/primary hierarchy. */
+.page-builder .theme-sidebar-actions button {
+  min-width: 0;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--app-radius-control);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.page-builder .theme-sidebar-actions .theme-sidebar-reset {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.page-builder .theme-sidebar-actions .theme-sidebar-reset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.page-builder .theme-sidebar-actions .theme-sidebar-apply {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--theme-text-inverse);
+}
+
+.page-builder .theme-sidebar-actions .theme-sidebar-apply:hover {
+  border-color: var(--theme-primary-hover);
+  background: var(--theme-primary-hover);
+}
+
+.page-builder .theme-sidebar-actions button:focus-visible,
+.page-builder .theme-sidebar-grid input:focus-visible,
+.page-builder .theme-sidebar-grid select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Form actions are a compact menu inside the sidebar panel, not a stack of
    nested cards. Semantic color and hover state communicate action type. */
 .page-builder .forms-form-actions-group .form-command-button,

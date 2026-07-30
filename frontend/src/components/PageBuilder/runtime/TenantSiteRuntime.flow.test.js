@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getRuntimeAuthFlow,
   getRuntimeCanvasScale,
+  getRuntimeDirectPosition,
   getRuntimeViewportForWidth,
   getRuntimeNavigationPages,
   getRuntimePageSections,
@@ -32,10 +33,18 @@ const formPage = {
 };
 
 describe("tenant runtime page flow", () => {
-  it("scales a logical canvas down to the available browser width", () => {
+  it("fits a logical canvas to the complete available browser width", () => {
     expect(getRuntimeCanvasScale(1000, 1200)).toBeCloseTo(5 / 6);
     expect(getRuntimeCanvasScale(390, 390)).toBe(1);
-    expect(getRuntimeCanvasScale(1600, 1200)).toBe(1);
+    expect(getRuntimeCanvasScale(1600, 1200)).toBeCloseTo(4 / 3);
+  });
+
+  it("normalizes missing breakpoint geometry from the nearest saved layout", () => {
+    const position = getRuntimeDirectPosition({
+      position: { desktop: { x: 120, y: 240, width: 600, height: 300 } },
+    }, "mobile");
+
+    expect(position).toEqual({ x: 39, y: 78, width: 195, height: 97.5 });
   });
 
   it("uses mobile geometry for common modern phone widths", () => {

@@ -74,7 +74,7 @@ import {
 } from "../core/PageBuilder.layout";
 import {
   getBuilderElementStyle,
-  getDirectCanvasScaleStyles,
+  getResponsiveDirectCanvasStyles,
   getDirectElementFrameStyle as getCanonicalDirectElementFrameStyle,
 } from "../core/PageBuilder.styles";
 
@@ -339,7 +339,36 @@ const getRuntimeAvailableWidth = () => {
 export const getRuntimeCanvasScale = (availableWidth, logicalWidth) => {
   const available = Math.max(1, Number(availableWidth) || 1);
   const logical = Math.max(1, Number(logicalWidth) || 1);
-  return Math.min(1, available / logical);
+  return available / logical;
+};
+
+// Older projects may not contain all three breakpoint positions. Normalize the
+// nearest saved layout instead of applying desktop pixels directly to a phone.
+// eslint-disable-next-line react-refresh/only-export-components
+export const getRuntimeDirectPosition = (element, viewportName) => {
+  const positions = element?.position || {};
+  if (positions[viewportName]) return positions[viewportName];
+
+  const fallbackOrder = viewportName === "mobile"
+    ? ["tablet", "desktop"]
+    : viewportName === "tablet"
+      ? ["desktop", "mobile"]
+      : ["tablet", "mobile"];
+  const sourceViewport = fallbackOrder.find((name) => positions[name]);
+  if (!sourceViewport) return {};
+
+  const source = positions[sourceViewport];
+  const sourceWidth = viewports[sourceViewport] || viewports.desktop;
+  const targetWidth = viewports[viewportName] || viewports.desktop;
+  const ratio = targetWidth / sourceWidth;
+
+  return {
+    ...source,
+    x: (Number(source.x) || 0) * ratio,
+    y: (Number(source.y) || 0) * ratio,
+    width: (Number(source.width) || 240) * ratio,
+    height: (Number(source.height) || 80) * ratio,
+  };
 };
 
 const decodePathSegment = (value) => {
@@ -963,7 +992,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   const getElementStyle = (element, isFree = false, section = null) => {
     if (isFree) {
-      const position = element.position?.[runtimeViewport] || element.position?.desktop || {};
+      const position = getRuntimeDirectPosition(element, runtimeViewport);
       const viewportWidth = viewports[runtimeViewport] || viewports.desktop;
       const sectionHeight = getSectionCanvasHeight(section, runtimeViewport);
       const left = `${((Number(position.x) || 0) / viewportWidth) * 100}%`;
@@ -996,8 +1025,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     });
   };
 
-  const getDirectElementFrameStyle = (element, section) => {
-    const position = element.position?.[runtimeViewport] || element.position?.desktop || {};
+  const getDirectElementFrameStyle = (element, section, canvasScale = 1) => {
+    const position = getRuntimeDirectPosition(element, runtimeViewport);
     const viewportWidth = viewports[runtimeViewport] || viewports.desktop;
     const sectionHeight = getSectionCanvasHeight(section, runtimeViewport);
 
@@ -1008,7 +1037,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       sectionHeight,
       getMetricMinimumHeight,
       getDirectElementMinimumSize,
-      canvasScale: 1,
+      canvasScale,
     });
   };
 
@@ -1892,8 +1921,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
               const logicalWidth = viewports[runtimeViewport] || viewports.desktop;
               const logicalHeight = getSectionCanvasHeight(section, runtimeViewport);
               const canvasScale = getRuntimeCanvasScale(runtimeAvailableWidth, logicalWidth);
-              const directCanvasStyles = getDirectCanvasScaleStyles({
-                logicalWidth,
+              const directCanvasStyles = getResponsiveDirectCanvasStyles({
                 logicalHeight,
                 scale: canvasScale,
               });
@@ -1924,7 +1952,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                         <div
                           key={element.id}
                           className={`direct-element-frame direct-element-frame-${element.type} ${element.type === "reservationBlock" && element.directSizeMode === "fixed" ? "is-fixed-size" : ""}`}
-                          style={getDirectElementFrameStyle(element, section)}
+                          style={getDirectElementFrameStyle(element, section, canvasScale)}
                         >
                           <div className="direct-element-content">
                             {renderElement(element, false)}

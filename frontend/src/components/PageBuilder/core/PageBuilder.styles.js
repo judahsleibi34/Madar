@@ -20,6 +20,24 @@ export const getDirectCanvasScaleStyles = ({ logicalWidth, logicalHeight, scale 
   };
 };
 
+export const getResponsiveDirectCanvasStyles = ({ logicalHeight, scale = 1 }) => {
+  const height = Math.max(1, Number(logicalHeight) || 1);
+  const safeScale = Math.max(0.0001, Number(scale) || 1);
+  const renderedHeight = height * safeScale;
+
+  return {
+    section: { minHeight: `${renderedHeight}px` },
+    shell: {
+      width: "100%",
+      height: `${renderedHeight}px`,
+    },
+    frame: {
+      width: "100%",
+      minHeight: `${renderedHeight}px`,
+    },
+  };
+};
+
 export const getBuilderElementStyle = ({
   element,
   selected,

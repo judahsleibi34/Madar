@@ -185,60 +185,78 @@ export default function PageBuilderThemeTab({
   if (isSidebar) {
     return (
       <div className="theme-sidebar-editor">
-        <h2>Themes</h2>
-        <p className="panel-help">Tune the builder canvas and preview changes beside this panel.</p>
+        <header className="theme-sidebar-header">
+          <span className="workspace-kicker">Builder style</span>
+          <h2>Themes</h2>
+          <p className="panel-help">Set the shared colors, shape, and typography for your site.</p>
+        </header>
 
-        <div className="page-utility-actions theme-sidebar-actions">
-          <button type="button" onClick={resetWebsiteTheme}>
+        <div className="theme-sidebar-actions">
+          <button type="button" className="theme-sidebar-reset" onClick={resetWebsiteTheme}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>Reset</span>
           </button>
-          <button type="button" onClick={applyThemeToPageBlocks}>
+          <button type="button" className="theme-sidebar-apply" onClick={applyThemeToPageBlocks}>
             <Wand2 size={16} aria-hidden="true" />
-            <span>Apply</span>
+            <span>Apply to pages</span>
           </button>
         </div>
 
-        <div className="section-component-palette theme-sidebar-palette">
-          <span>Theme colors</span>
-          <div className="theme-sidebar-grid">
-            {websiteColorControls.map(([key, label]) =>
-              renderColorControl({
-                fallback: colorFallbacks[key],
-                keyName: key,
-                label,
-                onChange: updateThemeValue,
-                value: websiteTheme[key],
-              })
-            )}
-          </div>
+        <div className="theme-sidebar-palette">
+          <section className="theme-sidebar-section" aria-labelledby="theme-colors-heading">
+            <div className="theme-sidebar-section-heading">
+              <h3 id="theme-colors-heading">Theme colors</h3>
+              <p>Used across backgrounds, content, text, and buttons.</p>
+            </div>
+            <div className="theme-sidebar-grid theme-sidebar-color-grid">
+              {websiteColorControls.map(([key, label]) =>
+                renderColorControl({
+                  fallback: colorFallbacks[key],
+                  keyName: key,
+                  label,
+                  onChange: updateThemeValue,
+                  value: websiteTheme[key],
+                })
+              )}
+            </div>
+          </section>
 
-          <span>Shape & typography</span>
-          <div className="theme-sidebar-grid">
-            <label className="theme-number-control">
-              <span className="theme-token-label">Round corners</span>
-              <input
-                type="number"
-                min="0"
-                value={websiteTheme.radius || 18}
-                onChange={(event) => updateThemeValue("radius", Number(event.target.value))}
-              />
-            </label>
+          <section className="theme-sidebar-section" aria-labelledby="theme-type-heading">
+            <div className="theme-sidebar-section-heading">
+              <h3 id="theme-type-heading">Shape & typography</h3>
+              <p>Keep corners and type consistent throughout the site.</p>
+            </div>
+            <div className="theme-sidebar-grid theme-sidebar-type-grid">
+              <label className="theme-number-control">
+                <span className="theme-token-label">Corner radius</span>
+                <span className="theme-number-input-wrap">
+                  <input
+                    aria-label="Corner radius"
+                    type="number"
+                    min="0"
+                    value={websiteTheme.radius ?? 18}
+                    onChange={(event) => updateThemeValue("radius", Number(event.target.value))}
+                  />
+                  <span aria-hidden="true">px</span>
+                </span>
+              </label>
 
-            <label className="theme-select-control">
-              <span className="theme-token-label">Font family</span>
-              <select
-                value={websiteTheme.fontFamily || "Inter"}
-                onChange={(event) => updateThemeValue("fontFamily", event.target.value)}
-              >
-                {fontFamilyOptions.map((fontFamily) => (
-                  <option key={fontFamily} value={fontFamily}>
-                    {fontFamily}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+              <label className="theme-select-control">
+                <span className="theme-token-label">Font family</span>
+                <select
+                  aria-label="Font family"
+                  value={websiteTheme.fontFamily || "Inter"}
+                  onChange={(event) => updateThemeValue("fontFamily", event.target.value)}
+                >
+                  {fontFamilyOptions.map((fontFamily) => (
+                    <option key={fontFamily} value={fontFamily}>
+                      {fontFamily}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
         </div>
       </div>
     );
