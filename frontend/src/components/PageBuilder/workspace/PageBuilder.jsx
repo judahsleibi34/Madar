@@ -769,6 +769,7 @@ export default function PageBuilder({
   const dragPreviewFrameRef = useRef(null);
   const selectionMarqueeRef = useRef(null);
   const suppressCanvasClickRef = useRef(false);
+  const preserveCanvasViewportRef = useRef(null);
   const pendingDragPreviewRef = useRef(null);
   const recentMetricAddRef = useRef(null);
   const userId = user?.id;
@@ -1006,8 +1007,19 @@ export default function PageBuilder({
     dragStateRef.current = dragState;
   }, [dragState]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (selected.type !== "element" || !selected.id) return undefined;
+
+    const preservedViewport = preserveCanvasViewportRef.current;
+    preserveCanvasViewportRef.current = null;
+    if (preservedViewport?.selectedId === String(selected.id)) {
+      const shell = canvasShellRef.current;
+      if (shell) {
+        shell.scrollLeft = preservedViewport.scrollLeft;
+        shell.scrollTop = preservedViewport.scrollTop;
+      }
+      return undefined;
+    }
 
     const frame = window.requestAnimationFrame(() => {
       const selectedId = String(selected.id);
@@ -1604,8 +1616,23 @@ export default function PageBuilder({
       .map(({ element }) => element.id);
     if (!elementIds.length) return;
 
+    const shell = canvasShellRef.current;
+    preserveCanvasViewportRef.current = {
+      selectedId: String(elementIds[0]),
+      scrollLeft: shell?.scrollLeft || 0,
+      scrollTop: shell?.scrollTop || 0,
+    };
     setSelectedElementIds(elementIds);
     setSelected({ type: "element", id: elementIds[0] });
+    window.requestAnimationFrame(() => {
+      const preservedViewport = preserveCanvasViewportRef.current;
+      if (preservedViewport?.selectedId !== String(elementIds[0])) return;
+      preserveCanvasViewportRef.current = null;
+      if (shell) {
+        shell.scrollLeft = preservedViewport.scrollLeft;
+        shell.scrollTop = preservedViewport.scrollTop;
+      }
+    });
   }, [activePageLayers, selected.id, selected.type]);
 
   const clearCanvasElementSelection = useCallback(() => {
