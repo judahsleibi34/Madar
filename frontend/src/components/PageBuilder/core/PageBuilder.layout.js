@@ -333,6 +333,268 @@ export const commitDirectElementInteraction = (sections, {
   });
 };
 
+export const getMarqueeSelectionIds = (elements = [], viewportName = "desktop", rectangle = {}) => {
+  const left = Math.min(Number(rectangle.startX) || 0, Number(rectangle.currentX) || 0);
+  const top = Math.min(Number(rectangle.startY) || 0, Number(rectangle.currentY) || 0);
+  const right = Math.max(Number(rectangle.startX) || 0, Number(rectangle.currentX) || 0);
+  const bottom = Math.max(Number(rectangle.startY) || 0, Number(rectangle.currentY) || 0);
+
+  return elements.filter((element) => {
+    const position = element.position?.[viewportName];
+    if (!position) return false;
+    const elementLeft = Number(position.x) || 0;
+    const elementTop = Number(position.y) || 0;
+    const elementRight = elementLeft + (Number(position.width) || 0);
+    const elementBottom = elementTop + (Number(position.height) || 0);
+    return elementRight >= left && elementLeft <= right && elementBottom >= top && elementTop <= bottom;
+  }).map((element) => element.id);
+};
+
+export const getSmartGuideSnap = ({
+  candidate,
+  siblings = [],
+  canvasWidth = 0,
+  canvasHeight = 0,
+  canvasBounds = null,
+  interaction = "move",
+  threshold = 6,
+  spacing = 12,
+} = {}) => {
+  if (!candidate) return { position: candidate, guides: [] };
+
+  const position = {
+    ...candidate,
+    x: Number(candidate.x) || 0,
+    y: Number(candidate.y) || 0,
+    width: Number(candidate.width) || 0,
+    height: Number(candidate.height) || 0,
+  };
+  const normalizedSiblings = siblings
+    .map((item) => item?.position || item)
+    .filter(Boolean)
+    .map((item) => ({
+      x: Number(item.x) || 0,
+      y: Number(item.y) || 0,
+      width: Number(item.width) || 0,
+      height: Number(item.height) || 0,
+    }));
+  const choose = (options) => options
+    .filter((option) => Math.abs(option.delta) <= threshold)
+    .sort((first, second) => Math.abs(first.delta) - Math.abs(second.delta) ||
+      (second.priority || 0) - (first.priority || 0))[0];
+  const xOptions = [];
+  const yOptions = [];
+  const visibleCanvas = canvasBounds || { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+  const canvasCenterX = (Number(visibleCanvas.x) || 0) + (Number(visibleCanvas.width) || 0) / 2;
+  const canvasCenterY = (Number(visibleCanvas.y) || 0) + (Number(visibleCanvas.height) || 0) / 2;
+  const candidateCenterX = position.x + position.width / 2;
+  const candidateCenterY = position.y + position.height / 2;
+  const candidateRight = position.x + position.width;
+  const candidateBottom = position.y + position.height;
+  const alignmentGuide = (axis, value, sibling, kind = "alignment") => ({
+    axis,
+    value,
+    start: axis === "vertical"
+      ? Math.min(position.y, sibling?.y ?? visibleCanvas.y)
+      : Math.min(position.x, sibling?.x ?? visibleCanvas.x),
+    end: axis === "vertical"
+      ? Math.max(position.y + position.height, sibling ? sibling.y + sibling.height : visibleCanvas.y + visibleCanvas.height)
+      : Math.max(position.x + position.width, sibling ? sibling.x + sibling.width : visibleCanvas.x + visibleCanvas.width),
+    kind,
+  });
+
+  if (interaction === "move") {
+    xOptions.push({
+      delta: canvasCenterX - candidateCenterX,
+      priority: 3,
+      guides: [alignmentGuide("vertical", canvasCenterX, null, "canvas-center")],
+    });
+    yOptions.push({
+      delta: canvasCenterY - candidateCenterY,
+      priority: 3,
+      guides: [alignmentGuide("horizontal", canvasCenterY, null, "canvas-center")],
+    });
+  } else {
+    xOptions.push({
+      delta: canvasCenterX - candidateRight,
+      priority: 3,
+      guides: [alignmentGuide("vertical", canvasCenterX, null, "canvas-center")],
+    });
+    yOptions.push({
+      delta: canvasCenterY - candidateBottom,
+      priority: 3,
+      guides: [alignmentGuide("horizontal", canvasCenterY, null, "canvas-center")],
+    });
+  }
+
+  normalizedSiblings.forEach((sibling) => {
+    const siblingRight = sibling.x + sibling.width;
+    const siblingBottom = sibling.y + sibling.height;
+    const siblingCenterX = sibling.x + sibling.width / 2;
+    const siblingCenterY = sibling.y + sibling.height / 2;
+    const xPairs = interaction === "move"
+      ? [[position.x, sibling.x], [candidateCenterX, siblingCenterX], [candidateRight, siblingRight]]
+      : [[candidateRight, sibling.x - spacing], [candidateRight, siblingCenterX], [candidateRight, siblingRight]];
+    const yPairs = interaction === "move"
+      ? [[position.y, sibling.y], [candidateCenterY, siblingCenterY], [candidateBottom, siblingBottom]]
+      : [[candidateBottom, sibling.y - spacing], [candidateBottom, siblingCenterY], [candidateBottom, siblingBottom]];
+
+    xPairs.forEach(([source, target]) => xOptions.push({
+      delta: target - source,
+      priority: 1,
+      guides: [alignmentGuide("vertical", target, sibling)],
+    }));
+    yPairs.forEach(([source, target]) => yOptions.push({
+      delta: target - source,
+      priority: 1,
+      guides: [alignmentGuide("horizontal", target, sibling)],
+    }));
+  });
+
+  if (interaction === "move") {
+    const left = normalizedSiblings
+      .filter((sibling) => sibling.x + sibling.width <= position.x)
+      .sort((first, second) => second.x + second.width - (first.x + first.width))[0];
+    const right = normalizedSiblings
+      .filter((sibling) => sibling.x >= candidateRight)
+      .sort((first, second) => first.x - second.x)[0];
+    if (left && right) {
+      const leftEdge = left.x + left.width;
+      const desiredX = (leftEdge + right.x - position.width) / 2;
+      const gap = Math.round(desiredX - leftEdge);
+      xOptions.push({
+        delta: desiredX - position.x,
+        priority: 4,
+        guides: [
+          { axis: "horizontal", value: candidateCenterY, start: leftEdge, end: desiredX, kind: "spacing", label: `${gap}px` },
+          { axis: "horizontal", value: candidateCenterY, start: desiredX + position.width, end: right.x, kind: "spacing", label: `${gap}px` },
+        ],
+      });
+    }
+
+    const above = normalizedSiblings
+      .filter((sibling) => sibling.y + sibling.height <= position.y)
+      .sort((first, second) => second.y + second.height - (first.y + first.height))[0];
+    const below = normalizedSiblings
+      .filter((sibling) => sibling.y >= candidateBottom)
+      .sort((first, second) => first.y - second.y)[0];
+    if (above && below) {
+      const aboveEdge = above.y + above.height;
+      const desiredY = (aboveEdge + below.y - position.height) / 2;
+      const gap = Math.round(desiredY - aboveEdge);
+      yOptions.push({
+        delta: desiredY - position.y,
+        priority: 4,
+        guides: [
+          { axis: "vertical", value: candidateCenterX, start: aboveEdge, end: desiredY, kind: "spacing", label: `${gap}px` },
+          { axis: "vertical", value: candidateCenterX, start: desiredY + position.height, end: below.y, kind: "spacing", label: `${gap}px` },
+        ],
+      });
+    }
+  }
+
+  const xSnap = choose(xOptions);
+  const ySnap = choose(yOptions);
+  if (interaction === "resize") {
+    if (xSnap) position.width += xSnap.delta;
+    if (ySnap) position.height += ySnap.delta;
+  } else {
+    if (xSnap) position.x += xSnap.delta;
+    if (ySnap) position.y += ySnap.delta;
+  }
+
+  return {
+    position: {
+      ...position,
+      x: Math.round(position.x),
+      y: Math.round(position.y),
+      width: Math.round(position.width),
+      height: Math.round(position.height),
+    },
+    guides: [
+      ...(xSnap?.guides || []).map((guide) => ({ ...guide, dimension: "x" })),
+      ...(ySnap?.guides || []).map((guide) => ({ ...guide, dimension: "y" })),
+    ],
+  };
+};
+export const getPositionCollectionBounds = (positions = {}) => {
+  const values = (Array.isArray(positions) ? positions : Object.values(positions))
+    .filter(Boolean);
+  if (!values.length) return null;
+  const x = Math.min(...values.map((position) => Number(position.x) || 0));
+  const y = Math.min(...values.map((position) => Number(position.y) || 0));
+  const right = Math.max(...values.map((position) =>
+    (Number(position.x) || 0) + (Number(position.width) || 0)
+  ));
+  const bottom = Math.max(...values.map((position) =>
+    (Number(position.y) || 0) + (Number(position.height) || 0)
+  ));
+  return { x, y, width: right - x, height: bottom - y };
+};
+export const getGroupDragPreviewPositions = ({
+  startPositions = {},
+  primaryElementId,
+  primaryPreview,
+  bounds = { x: 0, y: 0, width: 0, height: 0 },
+} = {}) => {
+  const entries = Object.entries(startPositions).filter(([, position]) => position);
+  const primaryStart = startPositions[primaryElementId];
+  if (!entries.length || !primaryStart || !primaryPreview) return {};
+
+  const minX = Math.min(...entries.map(([, position]) => Number(position.x) || 0));
+  const minY = Math.min(...entries.map(([, position]) => Number(position.y) || 0));
+  const maxRight = Math.max(...entries.map(([, position]) =>
+    (Number(position.x) || 0) + (Number(position.width) || 0)
+  ));
+  const desiredX = (Number(primaryPreview.x) || 0) - (Number(primaryStart.x) || 0);
+  const desiredY = (Number(primaryPreview.y) || 0) - (Number(primaryStart.y) || 0);
+  const minimumDeltaX = (Number(bounds.x) || 0) - minX;
+  const maximumDeltaX = (Number(bounds.x) || 0) + (Number(bounds.width) || 0) - maxRight;
+  const minimumDeltaY = (Number(bounds.y) || 0) - minY;
+  const deltaX = Math.min(Math.max(desiredX, minimumDeltaX), maximumDeltaX);
+  const deltaY = Math.max(desiredY, minimumDeltaY);
+
+  return Object.fromEntries(entries.map(([elementId, position]) => [elementId, {
+    ...position,
+    x: Math.round((Number(position.x) || 0) + deltaX),
+    y: Math.round((Number(position.y) || 0) + deltaY),
+  }]));
+};
+
+export const commitDirectElementGroupInteraction = (sections, {
+  sourceSectionId,
+  previewPositions = {},
+  previewSectionHeight = 0,
+  viewportName = "desktop",
+} = {}) => sections.map((section) => {
+  if (section.id !== sourceSectionId || !Object.keys(previewPositions).length) return section;
+
+  const currentHeight = getSectionCanvasHeight(section, viewportName);
+  const nextHeight = Math.max(currentHeight, Number(previewSectionHeight) || 0);
+  return {
+    ...section,
+    layout: {
+      ...(section.layout || {}),
+      minHeight: viewportName === "desktop" ? nextHeight : section.layout?.minHeight,
+      minHeightByViewport: {
+        ...(section.layout?.minHeightByViewport || {}),
+        [viewportName]: nextHeight,
+      },
+    },
+    freeElements: (section.freeElements || []).map((element) =>
+      previewPositions[element.id]
+        ? {
+            ...element,
+            position: {
+              ...(element.position || {}),
+              [viewportName]: previewPositions[element.id],
+            },
+          }
+        : element
+    ),
+  };
+});
+
 export const getMinimumBuilderSectionHeight = (viewportHeight) => {
   const availableHeight = Math.max(0, Number(viewportHeight) || (typeof window !== "undefined" ? window.innerHeight : 900));
   return Math.max(360, Math.round((availableHeight - 126) * 0.5));
@@ -636,13 +898,12 @@ export const getDragCandidatePosition = ({
   const minimumSize = getDirectElementMinimumSize(selectedElement);
   const roundPixel = (value) => Math.round(Number(value) || 0);
   const resizing = dragState.interaction === "resize";
-  const resizeSensitivity = selectedElement?.type === "heading" ? 0.45 : 1;
   const candidate = resizing
     ? {
         x: dragState.startX,
         y: dragState.startY,
-        width: roundPixel(dragState.startWidth + dragState.deltaX * resizeSensitivity),
-        height: roundPixel(dragState.startHeight + dragState.deltaY * resizeSensitivity),
+        width: roundPixel(dragState.startWidth + dragState.deltaX),
+        height: roundPixel(dragState.startHeight + dragState.deltaY),
       }
     : {
         x: snapToGrid(dragState.startX + dragState.deltaX),

@@ -169,6 +169,44 @@ export const clientPointToCanvasLocal = (
   };
 };
 
+export const getVisibleCanvasLocalBounds = (
+  canvas,
+  clippingElement,
+  options
+) => {
+  const canvasGeometry = getCanvasLocalGeometry(canvas, options);
+  const clippingGeometry = getCanvasLocalGeometry(clippingElement);
+  if (!canvasGeometry || !clippingGeometry) return null;
+
+  const visibleLeft = Math.max(
+    canvasGeometry.rect.left,
+    clippingGeometry.originClientX
+  );
+  const visibleTop = Math.max(
+    canvasGeometry.rect.top,
+    clippingGeometry.originClientY
+  );
+  const visibleRight = Math.min(
+    canvasGeometry.rect.right,
+    clippingGeometry.originClientX + clippingGeometry.bounds.width * clippingGeometry.clientScaleX
+  );
+  const visibleBottom = Math.min(
+    canvasGeometry.rect.bottom,
+    clippingGeometry.originClientY + clippingGeometry.bounds.height * clippingGeometry.clientScaleY
+  );
+  if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+
+  const topLeft = clientPointToCanvasLocal(canvas, visibleLeft, visibleTop, options);
+  const bottomRight = clientPointToCanvasLocal(canvas, visibleRight, visibleBottom, options);
+  if (!topLeft || !bottomRight) return null;
+
+  return {
+    x: stableNumber(topLeft.x),
+    y: stableNumber(topLeft.y),
+    width: stableNumber(bottomRight.x - topLeft.x),
+    height: stableNumber(bottomRight.y - topLeft.y),
+  };
+};
 export const getImmediateParentCanvasGeometry = (
   elementFrame,
   options

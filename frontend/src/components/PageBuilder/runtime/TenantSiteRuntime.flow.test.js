@@ -5,6 +5,7 @@ import {
   getTenantBrandFallback,
   getRuntimeCanvasScale,
   getRuntimeDirectPosition,
+  getRuntimeDirectElements,
   readCachedTenantBrand,
   getRuntimeViewportForWidth,
   getRuntimeNavigationPages,
@@ -46,11 +47,13 @@ describe("tenant brand loading", () => {
     cacheTenantBrand(storage, "madar-demo", {
       brand: "Madar Demo",
       logoUrl: "/uploads/tenant_1/builder_assets/1234567890abcdef1234567890abcdef.png",
+      loadingImageUrl: "/uploads/tenant_1/builder_assets/loading.png",
     });
 
     expect(readCachedTenantBrand(storage, "madar-demo")).toEqual({
       brand: "Madar Demo",
       logoUrl: "/uploads/tenant_1/builder_assets/1234567890abcdef1234567890abcdef.png",
+      loadingImageUrl: "/uploads/tenant_1/builder_assets/loading.png",
     });
     expect(getTenantBrandFallback("madar-demo")).toBe("Madar Demo");
   });
@@ -75,8 +78,20 @@ describe("tenant runtime page flow", () => {
     expect(position).toEqual({ x: 39, y: 78, width: 195, height: 97.5 });
   });
 
-  it("uses mobile geometry for common modern phone widths", () => {
-    expect(getRuntimeViewportForWidth(320)).toBe("mobile");
+  it("orders published mobile elements by visual position for collision-free flow", () => {
+    const elements = [
+      { id: "image", position: { mobile: { x: 12, y: 420 } } },
+      { id: "text", position: { mobile: { x: 12, y: 180 } } },
+      { id: "heading", position: { mobile: { x: 12, y: 24 } } },
+      { id: "button", position: { mobile: { x: 12, y: 640 } } },
+    ];
+
+    expect(getRuntimeDirectElements(elements, "mobile").map((item) => item.id))
+      .toEqual(["heading", "text", "image", "button"]);
+    expect(getRuntimeDirectElements(elements, "desktop")).toBe(elements);
+  });
+
+  it("uses mobile geometry for common modern phone widths", () => {    expect(getRuntimeViewportForWidth(320)).toBe("mobile");
     expect(getRuntimeViewportForWidth(390)).toBe("mobile");
     expect(getRuntimeViewportForWidth(412)).toBe("mobile");
     expect(getRuntimeViewportForWidth(430)).toBe("mobile");

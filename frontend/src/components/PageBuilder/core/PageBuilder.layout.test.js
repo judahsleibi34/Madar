@@ -6,11 +6,71 @@ import {
   getDirectElementMinimumSize,
   getSectionCanvasHeight,
   getMovedElementPosition,
+  getSmartGuideSnap,
   moveElementBehindText,
   moveElementToFront,
   reconcileMeasuredFormBlockPosition,
 } from "./PageBuilder.layout";
 
+describe("page builder smart guides", () => {
+  it("snaps a moving component to the horizontal canvas center", () => {
+    const result = getSmartGuideSnap({
+      candidate: { x: 296, y: 40, width: 200, height: 80 },
+      canvasWidth: 800,
+      canvasHeight: 600,
+    });
+
+    expect(result.position.x).toBe(300);
+    expect(result.guides).toContainEqual(expect.objectContaining({
+      axis: "vertical",
+      value: 400,
+      kind: "canvas-center",
+    }));
+  });
+
+  it("centers against the visible canvas intersection instead of the full logical width", () => {
+    const result = getSmartGuideSnap({
+      candidate: { x: 476, y: 40, width: 200, height: 80 },
+      canvasWidth: 1200,
+      canvasHeight: 1000,
+      canvasBounds: { x: 200, y: 100, width: 760, height: 560 },
+    });
+
+    expect(result.position.x).toBe(480);
+    expect(result.guides).toContainEqual(expect.objectContaining({
+      axis: "vertical",
+      value: 580,
+      kind: "canvas-center",
+    }));
+  });
+  it("snaps matching component edges", () => {
+    const result = getSmartGuideSnap({
+      candidate: { x: 103, y: 200, width: 180, height: 70 },
+      siblings: [{ x: 100, y: 20, width: 240, height: 80 }],
+      canvasWidth: 800,
+      canvasHeight: 600,
+    });
+
+    expect(result.position.x).toBe(100);
+    expect(result.guides.some((guide) => guide.axis === "vertical" && guide.value === 100)).toBe(true);
+  });
+
+  it("shows equal spacing when a component is centered between neighbors", () => {
+    const result = getSmartGuideSnap({
+      candidate: { x: 205, y: 30, width: 100, height: 60 },
+      siblings: [
+        { x: 0, y: 30, width: 100, height: 60 },
+        { x: 410, y: 30, width: 100, height: 60 },
+      ],
+      canvasWidth: 800,
+      canvasHeight: 600,
+    });
+
+    expect(result.position.x).toBe(205);
+    expect(result.guides.filter((guide) => guide.kind === "spacing")).toHaveLength(2);
+    expect(result.guides[0].label).toBe("105px");
+  });
+});
 describe("page builder canvas compaction", () => {
   it("renders a direct canvas from its actual content instead of stale saved height", () => {
     const section = {
@@ -247,7 +307,7 @@ describe("page builder scaled canvas coordinates", () => {
 
     expect(result).toMatchObject({ x: 220, y: 370, width: 100, height: 80 });
   });
-  it("resizes headings gradually for precise pointer control", async () => {
+  it("resizes headings at the same rate as the pointer", async () => {
     const { getDragCandidatePosition } = await import("./PageBuilder.layout");
     const result = getDragCandidatePosition({
       dragState: {
@@ -265,6 +325,6 @@ describe("page builder scaled canvas coordinates", () => {
       snapToGrid: (value) => value,
     });
 
-    expect(result).toMatchObject({ width: 345, height: 165 });
+    expect(result).toMatchObject({ width: 400, height: 220 });
   });
 });

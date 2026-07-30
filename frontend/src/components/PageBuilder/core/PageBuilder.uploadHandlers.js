@@ -111,6 +111,26 @@ export const createUploadHandlers = ({  selectedElement,
     showToast("Logo uploaded.");
   };
 
+  const handleLoadingImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const assetUrl = await uploadBuilderImageFile(file);
+    if (!assetUrl) return;
+
+    updateProject((prev) => ({
+      ...prev,
+      siteChrome: {
+        ...defaultSiteChrome,
+        ...(prev.siteChrome || {}),
+        loadingImageUrl: assetUrl,
+      },
+    }));
+
+    showToast("Loading image uploaded.");
+  };
+
   const handleCarouselSlideImageUpload = async (event, slideIndex) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -130,6 +150,7 @@ export const createUploadHandlers = ({  selectedElement,
   return {
     handleSelectedElementImageUpload,
     handleSiteLogoUpload,
+    handleLoadingImageUpload,
     handleCarouselSlideImageUpload,
   };
 };

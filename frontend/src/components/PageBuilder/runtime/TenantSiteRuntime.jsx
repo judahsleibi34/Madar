@@ -97,7 +97,8 @@ export const readCachedTenantBrand = (storage, subdomain) => {
     if (!value || typeof value !== "object") return null;
     const brand = String(value.brand || "").trim().slice(0, 80);
     const logoUrl = String(value.logoUrl || "").trim().slice(0, 2048);
-    return brand || logoUrl ? { brand, logoUrl } : null;
+    const loadingImageUrl = String(value.loadingImageUrl || "").trim().slice(0, 2048);
+    return brand || logoUrl || loadingImageUrl ? { brand, logoUrl, loadingImageUrl } : null;
   } catch {
     return null;
   }
@@ -107,9 +108,10 @@ export const readCachedTenantBrand = (storage, subdomain) => {
 export const cacheTenantBrand = (storage, subdomain, value) => {
   const brand = String(value?.brand || "").trim().slice(0, 80);
   const logoUrl = String(value?.logoUrl || "").trim().slice(0, 2048);
-  if (!storage || (!brand && !logoUrl)) return;
+  const loadingImageUrl = String(value?.loadingImageUrl || "").trim().slice(0, 2048);
+  if (!storage || (!brand && !logoUrl && !loadingImageUrl)) return;
   try {
-    storage.setItem(`${TENANT_BRAND_CACHE_PREFIX}${subdomain}`, JSON.stringify({ brand, logoUrl }));
+    storage.setItem(`${TENANT_BRAND_CACHE_PREFIX}${subdomain}`, JSON.stringify({ brand, logoUrl, loadingImageUrl }));
   } catch {
     // Storage may be unavailable in private or restricted browsing contexts.
   }
@@ -411,6 +413,27 @@ export const getRuntimeDirectPosition = (element, viewportName) => {
     width: (Number(source.width) || 240) * ratio,
     height: (Number(source.height) || 80) * ratio,
   };
+};
+
+// Published phones favor readable, collision-free content over preserving
+// accidental overlaps from the free-position authoring canvas.
+// eslint-disable-next-line react-refresh/only-export-components
+export const getRuntimeDirectElements = (elements = [], viewportName = "desktop") => {
+  const items = Array.isArray(elements) ? elements : [];
+  if (viewportName !== "mobile") return items;
+
+  return items
+    .map((element, sourceIndex) => ({
+      element,
+      sourceIndex,
+      position: getRuntimeDirectPosition(element, viewportName),
+    }))
+    .sort((left, right) =>
+      (Number(left.position.y) || 0) - (Number(right.position.y) || 0) ||
+      (Number(left.position.x) || 0) - (Number(right.position.x) || 0) ||
+      left.sourceIndex - right.sourceIndex
+    )
+    .map(({ element }) => element);
 };
 
 const decodePathSegment = (value) => {
@@ -808,10 +831,14 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   useEffect(() => {
     if (!isPublicRuntime || publicSiteState !== "ready") return;
-    const nextBrand = { brand: brandName, logoUrl: site.logoUrl || "" };
+    const nextBrand = {
+      brand: brandName,
+      logoUrl: site.logoUrl || "",
+      loadingImageUrl: site.loadingImageUrl || "",
+    };
     setCachedTenantBrand(nextBrand);
     cacheTenantBrand(getTenantBrandStorage(), cleanSubdomain, nextBrand);
-  }, [brandName, cleanSubdomain, isPublicRuntime, publicSiteState, site.logoUrl]);
+  }, [brandName, cleanSubdomain, isPublicRuntime, publicSiteState, site.loadingImageUrl, site.logoUrl]);
 
   const getPageDestinationPath = useCallback((page) => {
     if (!page) {
@@ -1912,10 +1939,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   const renderLoadingState = () => {
     const resolvedBrand = publicSiteState === "ready"
-      ? { brand: brandName, logoUrl: site.logoUrl || "" }
+      ? {
+          brand: brandName,
+          logoUrl: site.logoUrl || "",
+          loadingImageUrl: site.loadingImageUrl || "",
+        }
       : cachedTenantBrand;
     const loadingBrand = resolvedBrand?.brand || getTenantBrandFallback(cleanSubdomain);
-    const loadingLogo = resolveMediaUrl(resolvedBrand?.logoUrl);
+    const loadingLogo = resolveMediaUrl(
+      resolvedBrand?.loadingImageUrl || resolvedBrand?.logoUrl
+    );
     const loadingInitial = loadingBrand.trim().slice(0, 1).toUpperCase() || "M";
 
     return (
@@ -2025,7 +2058,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                       className="direct-layout-frame"
                       style={directCanvasStyles.frame}
                     >
-                      {(section.freeElements || [])
+                      {getRuntimeDirectElements(section.freeElements, runtimeViewport)
                         .filter((element) =>
                           tenantAuth.user ||
                           activePage?.id !== authEntryPage?.id ||

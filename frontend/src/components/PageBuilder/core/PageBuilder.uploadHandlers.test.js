@@ -35,4 +35,26 @@ describe("Page Builder image uploads", () => {
       assetFileName: "team-photo.png",
     }));
   });
+  it("stores a custom loading image in site chrome", async () => {
+    const updateProject = vi.fn();
+    const handlers = createUploadHandlers({
+      carouselElementTypes: new Set(),
+      defaultSiteChrome: { logoUrl: "", loadingImageUrl: "" },
+      builderAssetMimeTypes: new Set(["image/png"]),
+      builderAssetMaxBytes: 5_000_000,
+      uploadBuilderAsset: vi.fn().mockResolvedValue({ url: "/uploads/loading.png" }),
+      setAssetUploadBusy: vi.fn(),
+      updateProject,
+      showToast: vi.fn(),
+      user: { id: "user-1" },
+    });
+
+    await handlers.handleLoadingImageUpload({
+      target: { files: [{ name: "loading.png", type: "image/png", size: 100 }], value: "selected" },
+    });
+
+    const updater = updateProject.mock.calls[0][0];
+    expect(updater({ siteChrome: { logoUrl: "/logo.png" } }).siteChrome)
+      .toMatchObject({ logoUrl: "/logo.png", loadingImageUrl: "/uploads/loading.png" });
+  });
 });

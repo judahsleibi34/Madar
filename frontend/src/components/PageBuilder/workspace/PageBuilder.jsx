@@ -184,6 +184,11 @@ import {
   getMovedElementPosition,
   createMovedFreeElement,
   commitDirectElementInteraction,
+  commitDirectElementGroupInteraction,
+  getGroupDragPreviewPositions,
+  getMarqueeSelectionIds,
+  getSmartGuideSnap,
+  getPositionCollectionBounds,
   moveElementBehindText,
   moveElementToFront,
 } from "../core/PageBuilder.layout";
@@ -191,6 +196,7 @@ import {
   clampElementToBounds,
   clientPointToCanvasLocal,
   getCanvasLocalGeometry,
+  getVisibleCanvasLocalBounds,
   getImmediateParentCanvasGeometry,
 } from "../core/PageBuilder.bounds";
 import {
@@ -716,8 +722,10 @@ export default function PageBuilder({
     type: "page",
     id: getDefaultBuilderPageId(project) || null,
   }));
+  const [storedSelectedElementIds, setSelectedElementIds] = useState([]);
   const [modal, setModal] = useState(null);
   const [dragState, setDragState] = useState(null);
+  const [selectionMarquee, setSelectionMarquee] = useState(null);
   const [paletteDropSectionId, setPaletteDropSectionId] = useState("");
   const [elementPendingDelete, setElementPendingDelete] = useState(null);
   const [userPendingDelete, setUserPendingDelete] = useState(null);
@@ -759,6 +767,8 @@ export default function PageBuilder({
   const appliedWebsiteSettingsSignatureRef = useRef("");
   const canvasShellRef = useRef(null);
   const dragPreviewFrameRef = useRef(null);
+  const selectionMarqueeRef = useRef(null);
+  const suppressCanvasClickRef = useRef(false);
   const pendingDragPreviewRef = useRef(null);
   const recentMetricAddRef = useRef(null);
   const userId = user?.id;
@@ -1532,9 +1542,80 @@ export default function PageBuilder({
     (activePage?.sections || []).flatMap((section) =>
       [...(section.freeElements || [])].reverse().map((element) => ({
         element,
+        sectionId: section.id,
         sectionName: section.name || "Section",
       }))
     ), [activePage]);
+
+  const effectiveSelectedElementIds = useMemo(() => {
+    if (selected.type !== "element" || !selected.id) return [];
+
+    const availableElementIds = new Set(
+      activePageLayers.map(({ element }) => element.id)
+    );
+    if (!availableElementIds.has(selected.id)) return [];
+
+    const validSelection = storedSelectedElementIds.filter((elementId) =>
+      availableElementIds.has(elementId)
+    );
+    return validSelection.includes(selected.id) ? validSelection : [selected.id];
+  }, [activePageLayers, selected.id, selected.type, storedSelectedElementIds]);
+
+  const selectCanvasElement = useCallback((elementId, {
+    additive = false,
+    forceSingle = false,
+  } = {}) => {
+    const targetLayer = activePageLayers.find(({ element }) => element.id === elementId);
+    if (!targetLayer) return;
+
+    const sameSectionSelection = effectiveSelectedElementIds.filter((selectedId) =>
+      activePageLayers.some(({ element, sectionId }) =>
+        element.id === selectedId && sectionId === targetLayer.sectionId
+      )
+    );
+    let nextSelection;
+
+    if (forceSingle) {
+      nextSelection = [elementId];
+    } else if (additive) {
+      nextSelection = sameSectionSelection.includes(elementId)
+        ? sameSectionSelection.filter((selectedId) => selectedId !== elementId)
+        : [...sameSectionSelection, elementId];
+    } else if (sameSectionSelection.includes(elementId) && sameSectionSelection.length > 1) {
+      nextSelection = sameSectionSelection;
+    } else {
+      nextSelection = [elementId];
+    }
+
+    setSelectedElementIds(nextSelection);
+    setSelected(nextSelection.length
+      ? { type: "element", id: nextSelection.includes(elementId) ? elementId : nextSelection[nextSelection.length - 1] }
+      : { type: "section", id: targetLayer.sectionId }
+    );
+  }, [activePageLayers, effectiveSelectedElementIds]);
+
+  const selectAllCanvasElements = useCallback(() => {
+    const selectedLayer = activePageLayers.find(({ element }) => element.id === selected.id);
+    const sectionId = selected.type === "section"
+      ? selected.id
+      : selectedLayer?.sectionId || activePageLayers[0]?.sectionId;
+    const elementIds = activePageLayers
+      .filter((layer) => layer.sectionId === sectionId)
+      .map(({ element }) => element.id);
+    if (!elementIds.length) return;
+
+    setSelectedElementIds(elementIds);
+    setSelected({ type: "element", id: elementIds[0] });
+  }, [activePageLayers, selected.id, selected.type]);
+
+  const clearCanvasElementSelection = useCallback(() => {
+    const selectedLayer = activePageLayers.find(({ element }) => element.id === selected.id);
+    setSelectedElementIds([]);
+    setSelected({
+      type: "section",
+      id: selectedLayer?.sectionId || activePageLayers[0]?.sectionId || activePage?.sections?.[0]?.id || null,
+    });
+  }, [activePage?.sections, activePageLayers, selected.id]);
 
   const inspectorMode = resolveInspectorMode({
     selected,
@@ -4125,7 +4206,9 @@ export default function PageBuilder({
     }), [activePage, findElementLocation, viewport]);
 
   const getDirectElementFrameStyle = (element) => {
-    const previewPosition = dragState?.elementId === element.id ? dragState.previewPosition : null;
+    const previewPosition =
+      dragState?.previewPositions?.[element.id] ||
+      (dragState?.elementId === element.id ? dragState.previewPosition : null);
     const renderedElement = previewPosition
       ? {
           ...element,
@@ -4222,6 +4305,7 @@ export default function PageBuilder({
   const {
     handleSelectedElementImageUpload,
     handleSiteLogoUpload,
+    handleLoadingImageUpload,
     handleCarouselSlideImageUpload,
   } = useMemo(
     // eslint-disable-next-line react-hooks/refs
@@ -4278,6 +4362,13 @@ export default function PageBuilder({
   const startDrag = useCallback((event, element, interaction = "move", forceInteraction = false) => {
     if (preview || element.mode !== "direct") return;
 
+    const additiveSelection = event.shiftKey || event.ctrlKey || event.metaKey;
+    if (interaction === "move" && additiveSelection) {
+      event.stopPropagation();
+      event.preventDefault();
+      return;
+    }
+
     const tagName = event.target?.tagName?.toLowerCase();
     const isSelectableText = Boolean(
       event.target?.closest?.(
@@ -4309,8 +4400,34 @@ export default function PageBuilder({
       : null;
     if (!immediateParent || !pointer) return;
 
+    const sourceSectionId = immediateParent.dataset?.sectionId || "";
+    const sourceSection = activePage?.sections.find((section) => section.id === sourceSectionId);
+    const sourceElements = sourceSection?.freeElements || [];
+    const selectedIdsInSection = effectiveSelectedElementIds.filter((elementId) =>
+      sourceElements.some((candidate) => candidate.id === elementId)
+    );
+    const groupElementIds = interaction === "move" && selectedIdsInSection.includes(element.id)
+      ? selectedIdsInSection
+      : [element.id];
+    const groupElements = groupElementIds
+      .map((elementId) => sourceElements.find((candidate) => candidate.id === elementId))
+      .filter(Boolean);
+    const groupStartPositions = Object.fromEntries(groupElements.map((candidate) => {
+      const minimumSize = getDirectElementMinimumSize(candidate);
+      const position = clampElementToBounds(
+        candidate.position?.[viewport] || createPosition()[viewport],
+        pointer.bounds,
+        {
+          minWidth: minimumSize.width,
+          minHeight: minimumSize.height,
+          allowBottomOverflow: true,
+        }
+      );
+      return [candidate.id, position];
+    }));
+
     const minimumSize = getDirectElementMinimumSize(element);
-    let current = clampElementToBounds(
+    let current = groupStartPositions[element.id] || clampElementToBounds(
       element.position?.[viewport] || createPosition()[viewport],
       pointer.bounds,
       {
@@ -4330,9 +4447,14 @@ export default function PageBuilder({
       };
     }
 
+    if (!effectiveSelectedElementIds.includes(element.id)) {
+      setSelectedElementIds([element.id]);
+    }
     setSelected({ type: "element", id: element.id });
     setDragState({
       elementId: element.id,
+      groupElementIds,
+      groupStartPositions,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startX: current.x || 0,
@@ -4341,13 +4463,14 @@ export default function PageBuilder({
       startHeight: current.height || 80,
       startPointerLocalX: pointer.x,
       startPointerLocalY: pointer.y,
-      parentSectionId: immediateParent.dataset?.sectionId || "",
+      parentSectionId: sourceSectionId,
       pointerId: event.pointerId,
       previewPosition: { ...current },
+      previewPositions: groupStartPositions,
       previewSectionHeight: 0,
       interaction,
     });
-  }, [preview, viewport]);
+  }, [activePage, preview, effectiveSelectedElementIds, viewport]);
 
   const captureTextSelection = (event, field, itemIndex = null) => {
     setTextSelection(
@@ -5070,6 +5193,38 @@ export default function PageBuilder({
     );
   };
 
+  const startMarqueeSelection = useCallback((event, section) => {
+    if (
+      preview ||
+      dragState ||
+      event.button !== 0 ||
+      event.target?.closest?.(".direct-element-frame")
+    ) return;
+
+    const point = clientPointToCanvasLocal(
+      event.currentTarget,
+      event.clientX,
+      event.clientY,
+      { coordinateScale: 1 }
+    );
+    if (!point) return;
+
+    const nextMarquee = {
+      sectionId: section.id,
+      pointerId: event.pointerId,
+      startX: point.x,
+      startY: point.y,
+      currentX: point.x,
+      currentY: point.y,
+      additive: event.shiftKey || event.ctrlKey || event.metaKey,
+    };
+    selectionMarqueeRef.current = nextMarquee;
+    setSelectionMarquee(nextMarquee);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+    event.preventDefault();
+  }, [dragState, preview]);
+
   const expandActiveSectionToHeight = useCallback((sectionId, requiredHeight) => {
     const nextRequiredHeight = Math.ceil(Number(requiredHeight) || 0);
     if (!sectionId || !nextRequiredHeight) return;
@@ -5094,6 +5249,33 @@ export default function PageBuilder({
   }, [updateSections, viewport]);
 
   const handlePointerMove = (event) => {
+    const activeMarquee = selectionMarqueeRef.current;
+    if (
+      activeMarquee &&
+      (activeMarquee.pointerId === undefined || event.pointerId === activeMarquee.pointerId)
+    ) {
+      const frame = findBuilderDataElement(
+        canvasShellRef.current,
+        "data-section-id",
+        activeMarquee.sectionId
+      );
+      const point = frame
+        ? clientPointToCanvasLocal(frame, event.clientX, event.clientY, { coordinateScale: 1 })
+        : null;
+      if (point) {
+        const nextMarquee = {
+          ...activeMarquee,
+          currentX: point.x,
+          currentY: point.y,
+        };
+        selectionMarqueeRef.current = nextMarquee;
+        setSelectionMarquee(nextMarquee);
+      }
+      event.stopPropagation();
+      event.preventDefault();
+      return;
+    }
+
     if (
       !dragState ||
       !selectedElement ||
@@ -5119,6 +5301,11 @@ export default function PageBuilder({
     const deltaY = localPointer.y - dragState.startPointerLocalY;
     const canvasWidth = bounds.width;
     const canvasHeight = bounds.height;
+    const visibleCanvasBounds = getVisibleCanvasLocalBounds(
+      parentGeometry.parent,
+      canvasShellRef.current,
+      { coordinateScale: 1 }
+    ) || bounds;
     const candidate = getDragCandidatePosition({
       dragState: { ...dragState, deltaX, deltaY },
       selectedElement,
@@ -5139,8 +5326,13 @@ export default function PageBuilder({
           canvasWidth,
         })
       : candidate;
+    const groupElementIds = dragState.groupElementIds || [selectedElement.id];
+    const guideSiblings = (section.freeElements || [])
+      .filter((element) => !groupElementIds.includes(element.id))
+      .map((element) => element.position?.[viewport])
+      .filter(Boolean);
     const minimumSize = getDirectElementMinimumSize(selectedElement);
-    const previewPosition = clampElementToBounds(
+    let previewPosition = clampElementToBounds(
       {
         ...(selectedElement.position?.[viewport] || createPosition()[viewport]),
         ...constrainedCandidate,
@@ -5153,21 +5345,88 @@ export default function PageBuilder({
         allowBottomOverflow: true,
       }
     );
-    const dropFrame = dragState.interaction === "move"
+    let previewPositions = { [selectedElement.id]: previewPosition };
+    let smartGuides = [];
+
+    if (dragState.interaction === "move" && groupElementIds.length > 1) {
+      previewPositions = getGroupDragPreviewPositions({
+        startPositions: dragState.groupStartPositions,
+        primaryElementId: selectedElement.id,
+        primaryPreview: previewPosition,
+        bounds,
+      });
+      const groupBounds = getPositionCollectionBounds(previewPositions);
+      const groupGuideSnap = getSmartGuideSnap({
+        candidate: groupBounds,
+        siblings: guideSiblings,
+        canvasWidth,
+        canvasHeight,
+        canvasBounds: visibleCanvasBounds,
+        interaction: "move",
+      });
+      const groupPrimary = previewPositions[selectedElement.id];
+      if (groupBounds && groupPrimary) {
+        const requestedDeltaX = groupGuideSnap.position.x - groupBounds.x;
+        const requestedDeltaY = groupGuideSnap.position.y - groupBounds.y;
+        previewPositions = getGroupDragPreviewPositions({
+          startPositions: dragState.groupStartPositions,
+          primaryElementId: selectedElement.id,
+          primaryPreview: {
+            ...groupPrimary,
+            x: groupPrimary.x + requestedDeltaX,
+            y: groupPrimary.y + requestedDeltaY,
+          },
+          bounds,
+        });
+        const finalGroupBounds = getPositionCollectionBounds(previewPositions);
+        const appliedX = (finalGroupBounds?.x || 0) - groupBounds.x;
+        const appliedY = (finalGroupBounds?.y || 0) - groupBounds.y;
+        smartGuides = groupGuideSnap.guides.filter((guide) =>
+          guide.dimension === "x"
+            ? Math.abs(appliedX - requestedDeltaX) < 0.5
+            : Math.abs(appliedY - requestedDeltaY) < 0.5
+        );
+      }
+      previewPosition = previewPositions[selectedElement.id] || previewPosition;
+    } else {
+      const guideSnap = getSmartGuideSnap({
+        candidate: previewPosition,
+        siblings: guideSiblings,
+        canvasWidth,
+        canvasHeight,
+        canvasBounds: visibleCanvasBounds,
+        interaction: dragState.interaction,
+      });
+      previewPosition = clampElementToBounds(
+        { ...previewPosition, ...guideSnap.position },
+        bounds,
+        {
+          minWidth: minimumSize.width,
+          minHeight: minimumSize.height,
+          mode: dragState.interaction === "resize" ? "resize" : "move",
+          allowBottomOverflow: true,
+        }
+      );
+      previewPositions = { [selectedElement.id]: previewPosition };
+      smartGuides = guideSnap.guides;
+    }
+
+    const dropFrame = dragState.interaction === "move" && groupElementIds.length === 1
       ? getDirectFrameAtPoint(event.clientX, event.clientY)
       : null;
     const dropSectionId = dropFrame?.dataset?.sectionId;
+    const previewSectionHeight = Math.max(
+      canvasHeight,
+      ...Object.values(previewPositions).map((position) => Math.ceil(
+        (Number(position.y) || 0) + (Number(position.height) || 0) + 48
+      ))
+    );
 
     pendingDragPreviewRef.current = {
       previewPosition,
-      previewSectionHeight: Math.max(
-        canvasHeight,
-        Math.ceil(
-          (Number(previewPosition.y) || 0) +
-          (Number(previewPosition.height) || 0) +
-          48
-        )
-      ),
+      previewPositions,
+      previewSectionHeight,
+      smartGuides,
       dropSectionId: dropSectionId && dropSectionId !== section.id ? dropSectionId : "",
     };
 
@@ -5182,6 +5441,43 @@ export default function PageBuilder({
   };
 
   const handlePointerUp = (event) => {
+    const activeMarquee = selectionMarqueeRef.current;
+    if (
+      activeMarquee &&
+      (activeMarquee.pointerId === undefined || event.pointerId === activeMarquee.pointerId)
+    ) {
+      const width = Math.abs(activeMarquee.currentX - activeMarquee.startX);
+      const height = Math.abs(activeMarquee.currentY - activeMarquee.startY);
+      const completedSelection = width >= 4 || height >= 4;
+      const section = activePage?.sections.find((item) => item.id === activeMarquee.sectionId);
+
+      selectionMarqueeRef.current = null;
+      setSelectionMarquee(null);
+
+      if (completedSelection && section) {
+        const hitIds = getMarqueeSelectionIds(
+          section.freeElements || [],
+          viewport,
+          activeMarquee
+        );
+        const nextSelection = activeMarquee.additive
+          ? [...new Set([...effectiveSelectedElementIds, ...hitIds])]
+          : hitIds;
+        setSelectedElementIds(nextSelection);
+        setSelected(nextSelection.length
+          ? { type: "element", id: hitIds[hitIds.length - 1] || nextSelection[0] }
+          : { type: "section", id: section.id }
+        );
+        suppressCanvasClickRef.current = true;
+        window.setTimeout(() => {
+          suppressCanvasClickRef.current = false;
+        }, 0);
+        event.stopPropagation();
+        event.preventDefault();
+        return;
+      }
+    }
+
     if (!dragState || !selectedElement || selectedElement.id !== dragState.elementId) return;
 
     if (dragPreviewFrameRef.current !== null) {
@@ -5196,7 +5492,21 @@ export default function PageBuilder({
       : null;
     const targetSection = activePage?.sections.find((section) => section.id === finalPreview.dropSectionId);
 
-    if (targetFrame && targetSection && sourceLocation && sourceLocation.sectionId !== targetSection.id) {
+    const groupElementIds = dragState.groupElementIds || [selectedElement.id];
+    const committingGroup =
+      dragState.interaction === "move" &&
+      groupElementIds.length > 1 &&
+      finalPreview.previewPositions;
+
+    if (committingGroup && sourceLocation) {
+      updateSections((sections) => commitDirectElementGroupInteraction(sections, {
+        sourceSectionId: sourceLocation.sectionId,
+        previewPositions: finalPreview.previewPositions,
+        previewSectionHeight: finalPreview.previewSectionHeight,
+        viewportName: viewport,
+      }));
+      showToast(`Moved ${groupElementIds.length} components together.`);
+    } else if (targetFrame && targetSection && sourceLocation && sourceLocation.sectionId !== targetSection.id) {
       const frameRect = targetFrame.getBoundingClientRect();
       const targetPoint = clientPointToCanvasLocal(
         targetFrame,
@@ -5249,6 +5559,10 @@ export default function PageBuilder({
   };
 
   const handlePointerCancel = () => {
+    if (selectionMarqueeRef.current) {
+      selectionMarqueeRef.current = null;
+      setSelectionMarquee(null);
+    }
     if (dragPreviewFrameRef.current !== null) {
       window.cancelAnimationFrame(dragPreviewFrameRef.current);
       dragPreviewFrameRef.current = null;
@@ -5894,6 +6208,11 @@ export default function PageBuilder({
                     ...directCanvasStyles.section,
                   }}
                   onClick={(event) => {
+                    if (suppressCanvasClickRef.current) {
+                      suppressCanvasClickRef.current = false;
+                      event.stopPropagation();
+                      return;
+                    }
                     event.stopPropagation();
                     if (!preview) {
                       const frame = event.currentTarget.querySelector(".direct-layout-frame");
@@ -5916,20 +6235,22 @@ export default function PageBuilder({
                       className={`direct-layout-frame ${isEditingBehindText ? "is-editing-behind-text" : ""}`}
                       data-section-id={section.id}
                       style={directCanvasStyles.frame}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = "copy";
-                      if (paletteDropSectionId !== section.id) setPaletteDropSectionId(section.id);
-                    }}
-                    onDragLeave={(event) => {
-                      if (!event.currentTarget.contains(event.relatedTarget)) {
-                        setPaletteDropSectionId("");
-                      }
-                    }}
-                    onDrop={(event) => handlePaletteDrop(event, section)}
-                  >
+                      onPointerDown={(event) => startMarqueeSelection(event, section)}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "copy";
+                        if (paletteDropSectionId !== section.id) setPaletteDropSectionId(section.id);
+                      }}
+                      onDragLeave={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) {
+                          setPaletteDropSectionId("");
+                        }
+                      }}
+                      onDrop={(event) => handlePaletteDrop(event, section)}
+                    >
                     {(section.freeElements || []).map((element) => {
-                      const elementSelected = selected.type === "element" && selected.id === element.id;
+                      const elementSelected = effectiveSelectedElementIds.includes(element.id);
+                      const elementIsPrimary = selected.type === "element" && selected.id === element.id;
                       const usesDetachedEditBoundary = elementSelected && element.layer === "behindText" && !preview;
                       const hasFixedReservationSize =
                         element.type === "reservationBlock" && element.directSizeMode === "fixed";
@@ -5949,14 +6270,16 @@ export default function PageBuilder({
                                     reconcileDirectContentBlockSize(section.id, element.id, height),
                                 }
                               : {})}
-                            className={`direct-element-frame direct-element-frame-${element.type} ${hasFixedReservationSize ? "is-fixed-size" : ""} ${elementSelected && !usesDetachedEditBoundary ? "is-selected" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""}`}
+                            className={`direct-element-frame direct-element-frame-${element.type} ${hasFixedReservationSize ? "is-fixed-size" : ""} ${elementSelected && !usesDetachedEditBoundary ? "is-selected" : ""} ${elementSelected && !elementIsPrimary ? "is-group-selected" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""}`}
                             data-builder-element-id={element.id}
                             style={getDirectElementFrameStyle(element)}
                             tabIndex={-1}
                             onPointerDownCapture={(event) => {
                               if (preview) return;
                               event.currentTarget.focus({ preventScroll: true });
-                              setSelected({ type: "element", id: element.id });
+                              selectCanvasElement(element.id, {
+                                additive: event.shiftKey || event.ctrlKey || event.metaKey,
+                              });
                             }}
                             onPointerDown={
                               preview
@@ -5967,7 +6290,6 @@ export default function PageBuilder({
                             onClick={(event) => {
                               if (preview) return;
                               event.stopPropagation();
-                              setSelected({ type: "element", id: element.id });
                             }}
                           >
                             <div className="direct-element-content">
@@ -6024,6 +6346,35 @@ export default function PageBuilder({
                         </Fragment>
                       );
                     })}
+                    {dragState?.parentSectionId === section.id &&
+                      (dragState.smartGuides || []).map((guide, guideIndex) => {
+                        const vertical = guide.axis === "vertical";
+                        const start = Math.min(Number(guide.start) || 0, Number(guide.end) || 0);
+                        const length = Math.max(1, Math.abs((Number(guide.end) || 0) - (Number(guide.start) || 0)));
+                        return (
+                          <div
+                            key={`${guide.axis}-${guide.value}-${guideIndex}`}
+                            className={`direct-smart-guide is-${guide.axis} is-${guide.kind || "alignment"}`}
+                            aria-hidden="true"
+                            style={vertical
+                              ? { left: `${guide.value}px`, top: `${start}px`, height: `${length}px` }
+                              : { left: `${start}px`, top: `${guide.value}px`, width: `${length}px` }}
+                          >
+                            {guide.label && <span>{guide.label}</span>}
+                          </div>
+                        );
+                      })}                    {selectionMarquee?.sectionId === section.id && (
+                      <div
+                        className="direct-selection-marquee"
+                        aria-hidden="true"
+                        style={{
+                          left: `${Math.min(selectionMarquee.startX, selectionMarquee.currentX)}px`,
+                          top: `${Math.min(selectionMarquee.startY, selectionMarquee.currentY)}px`,
+                          width: `${Math.abs(selectionMarquee.currentX - selectionMarquee.startX)}px`,
+                          height: `${Math.abs(selectionMarquee.currentY - selectionMarquee.startY)}px`,
+                        }}
+                      />
+                    )}
                     </div>
                   </div>
                 </section>
@@ -6117,7 +6468,7 @@ export default function PageBuilder({
               onChange={(event) => {
                 if (!event.target.value) return;
                 setInlineToolbarPosition(null);
-                setSelected({ type: "element", id: event.target.value });
+                selectCanvasElement(event.target.value, { forceSingle: true });
               }}
             >
               <option value="">Choose a layer</option>
@@ -6128,13 +6479,35 @@ export default function PageBuilder({
               ))}
             </select>
           </label>
-          <p className="builder-note">Top layers are listed first. Use this to select elements hidden behind others.</p>
+          <div className="layer-selection-actions">
+            <button type="button" className="primary-action" onClick={selectAllCanvasElements}>
+              Select all in section
+            </button>
+            {effectiveSelectedElementIds.length > 0 && (
+              <button type="button" className="danger-lite" onClick={clearCanvasElementSelection}>
+                Clear selection
+              </button>
+            )}
+          </div>
+          <p className="builder-note" role="status">
+            {effectiveSelectedElementIds.length > 0
+              ? `${effectiveSelectedElementIds.length} component${effectiveSelectedElementIds.length === 1 ? "" : "s"} selected. Drag any selected component to move the group.`
+              : "Shift, Ctrl, or Cmd-click components to select a custom group."}
+          </p>
         </div>
       )}
 
       {inspectorMode === "page" && activePage && (
         <PageBuilderPageInspector
           page={activePage}
+          loadingImagePreviewUrl={resolveMediaUrl(siteChrome.loadingImageUrl || siteChrome.logoUrl)}
+          hasCustomLoadingImage={Boolean(siteChrome.loadingImageUrl)}
+          assetUploadBusy={assetUploadBusy}
+          onLoadingImageUpload={handleLoadingImageUpload}
+          onResetLoadingImage={() => {
+            updateSiteChrome({ loadingImageUrl: "" });
+            showToast("Loading image reset to the site logo.");
+          }}
           hasRoutingIssue={collectPublicPageRoutingIssues(project).some((issue) =>
             issue.page_id === activePage.id ||
             issue.occurrences?.some((page) => page.page_id === activePage.id)
