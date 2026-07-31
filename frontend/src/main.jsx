@@ -15,6 +15,16 @@ import { LanguageProvider } from "./i18n";
 import "./styles/index.css";
 import "./styles/admin/authenticated-reference.css";
 import App from "./App.jsx";
+import { getBrandedRuntimePath } from "./utils/hostedAddress";
+
+const brandedRuntimePath = getBrandedRuntimePath(window.location);
+if (brandedRuntimePath) {
+  window.history.replaceState(
+    null,
+    "",
+    `${brandedRuntimePath}${window.location.search}${window.location.hash}`
+  );
+}
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

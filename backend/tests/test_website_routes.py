@@ -100,6 +100,7 @@ class FakeSupabase:
                     "tenant_id": 7,
                     "user_id": 3,
                     "subdomain": "fresh-site",
+                    "standard_path_slug": "standard-site",
                     "brand": "Fresh Brand",
                     "published_project_id": "project-1",
                 }
@@ -111,7 +112,12 @@ class FakeSupabase:
                     "name": "Fresh Project",
                     "slug": "fresh-project",
                     "status": "published",
-                    "published_schema": {"pages": [], "forms": []},
+                    "published_schema": {
+                        "defaultPageId": "home",
+                        "siteChrome": {"brand": "Fresh Brand"},
+                        "pages": [{"id": "home", "name": "Home", "slug": "/", "isDefault": True}],
+                        "forms": [],
+                    },
                     "published_version": 2,
                     "last_published_at": "2026-06-12T10:00:00+00:00",
                     "updated_at": "2026-06-12T10:00:00+00:00",
@@ -124,6 +130,18 @@ class FakeSupabase:
 
 
 class WebsiteRoutesTests(unittest.TestCase):
+    def setUp(self):
+        self.entitlement_patches = [
+            patch.object(website_routes, "require_any_entitlement", return_value={}),
+            patch.object(website_routes, "require_branded_subdomain", return_value=None),
+        ]
+        for entitlement_patch in self.entitlement_patches:
+            entitlement_patch.start()
+
+    def tearDown(self):
+        for entitlement_patch in reversed(self.entitlement_patches):
+            entitlement_patch.stop()
+
     def test_canonical_get_returns_tenant_settings(self):
         client = build_website_client()
         user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
@@ -573,7 +591,45 @@ class WebsiteRoutesTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["site"]["subdomain"], "fresh-site")
         self.assertEqual(body["site"]["brand"], "Fresh Brand")
-        self.assertEqual(body["project"]["published_schema"], {"pages": [], "forms": []})
+        self.assertEqual(
+            body["project"]["published_schema"],
+            {
+                "defaultPageId": "home",
+                "siteChrome": {"brand": "Fresh Brand"},
+                "pages": [{"id": "home", "name": "Home", "slug": "/", "isDefault": True}],
+                "forms": [],
+            },
+        )
+
+    def test_standard_path_resolves_published_content_without_premium_addon(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(public_site_routes, "require_branded_subdomain") as branded_gate:
+            response = client.get("/public/sites/standard-site")
+
+        self.assertEqual(response.status_code, 200)
+        branded_gate.assert_not_called()
+        self.assertEqual(response.json()["project"]["published_schema"]["defaultPageId"], "home")
+
+    def test_branded_hostname_invokes_backend_entitlement_gate(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(public_site_routes, "require_branded_subdomain") as branded_gate:
+            response = client.get(
+                "/public/sites/fresh-site",
+                headers={"Host": "fresh-site.madarportal.com"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(branded_gate.call_count, 1)
+        for call in branded_gate.call_args_list:
+            self.assertEqual(call.args[0]["tenant_id"], 7)
 
 
 

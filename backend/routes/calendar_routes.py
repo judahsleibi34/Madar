@@ -16,7 +16,8 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from database import service_supabase
-from services.tenant_service import require_active_tenant_member
+from services.tenant_service import require_active_tenant_member as _require_active_tenant_member
+from services.entitlement_service import require_entitlement
 from services.audit_service import record_audit_event
 from services.calendar_authorization_service import (
     availability_event,
@@ -108,6 +109,16 @@ def require_calendar_feature() -> None:
             status_code=503,
             detail={"code": "calendar_feature_disabled", "message": "Calendar features are disabled."},
         )
+
+
+def require_active_tenant_member(request: Request, response: Response):
+    context = _require_active_tenant_member(request, response)
+    require_entitlement(
+        context.tenant_id,
+        "internal_calendar",
+        message="Business Plus is required to use the internal calendar.",
+    )
+    return context
 
 
 def ensure_default_calendar(context) -> dict[str, Any]:

@@ -21,6 +21,7 @@ from routes import (
     website_routes,
 )
 from services.tenant_service import TenantContext
+from tests.entitlement_test_support import EntitlementTestState
 
 
 TENANT_A_USER = {
@@ -153,7 +154,15 @@ def assert_no_private_path(test_case, response):
 
 class DataRouteAuthorizationMatrixTests(unittest.TestCase):
     def setUp(self):
+        self.entitlement_state = EntitlementTestState().activate_plan("tenant-a", "business")
+        self.entitlement_state.allow_capability("tenant-b", "data_import")
+        self.entitlement_state.allow_capability("tenant-b", "charts")
+        self.entitlement_patch = self.entitlement_state.installed()
+        self.entitlement_patch.__enter__()
         self.client = build_data_client()
+
+    def tearDown(self):
+        self.entitlement_patch.__exit__(None, None, None)
 
     def auth_patches(self, current_user):
         return (
@@ -259,7 +268,15 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
 
 class TenantScopedRouteAuthorizationMatrixTests(unittest.TestCase):
     def setUp(self):
+        self.entitlement_state = EntitlementTestState().allow_capability(
+            "tenant-b", "response_management"
+        )
+        self.entitlement_patch = self.entitlement_state.installed()
+        self.entitlement_patch.__enter__()
         self.client = build_tenant_client()
+
+    def tearDown(self):
+        self.entitlement_patch.__exit__(None, None, None)
 
     def test_website_settings_requires_active_matching_user_context(self):
         with patch.object(website_routes, "require_active_tenant_member", return_value=tenant_context()), \

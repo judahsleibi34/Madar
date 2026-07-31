@@ -132,7 +132,11 @@ class FakeSupabase:
                     "name": "Published site",
                     "slug": "published-site",
                     "status": "published",
-                    "published_schema": {"pages": [], "forms": []},
+                    "published_schema": {
+                        "defaultPageId": "home",
+                        "pages": [{"id": "home", "name": "Home", "slug": "/", "isDefault": True}],
+                        "forms": [],
+                    },
                     "published_version": 4,
                     "last_published_at": "2026-06-03T13:00:00+00:00",
                     "updated_at": "2026-06-03T13:00:00+00:00",
@@ -432,9 +436,8 @@ class ArchivedBuilderProjectTests(unittest.TestCase):
         with patch.object(public_site_routes, "service_supabase", fake_supabase),              patch.object(public_site_routes, "enforce_public_rate_limit"):
             response = client.get("/public/sites/tenant-site")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json()["project"])
-        self.assertEqual(response.json()["site"]["subdomain"], "tenant-site")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")
 
 
 if __name__ == "__main__":
@@ -480,7 +483,10 @@ class PublicSiteContractTests(unittest.TestCase):
                 "slug": "older-published-site",
                 "status": "published",
                 "draft_schema": {"pages": [{"id": "draft-old"}]},
-                "published_schema": {"pages": [{"id": "published-old"}]},
+                "published_schema": {
+                    "defaultPageId": "published-old",
+                    "pages": [{"id": "published-old", "name": "Home", "slug": "/", "isDefault": True}],
+                },
                 "published_version": 1,
                 "last_published_at": "2026-06-01T10:00:00+00:00",
                 "updated_at": "2026-06-01T10:00:00+00:00",
@@ -492,7 +498,10 @@ class PublicSiteContractTests(unittest.TestCase):
                 "slug": "newest-published-site",
                 "status": "published",
                 "draft_schema": {"pages": [{"id": "draft-new"}]},
-                "published_schema": {"pages": [{"id": "published-new"}]},
+                "published_schema": {
+                    "defaultPageId": "published-new",
+                    "pages": [{"id": "published-new", "name": "Home", "slug": "/", "isDefault": True}],
+                },
                 "published_version": 2,
                 "last_published_at": "2026-06-02T10:00:00+00:00",
                 "updated_at": "2026-06-02T10:00:00+00:00",
@@ -511,30 +520,36 @@ class PublicSiteContractTests(unittest.TestCase):
         self.assertEqual(body["project"]["published_version"], 2)
         self.assertEqual(
             body["project"]["published_schema"],
-            {"pages": [{"id": "published-new"}], "forms": []},
+            {
+                "defaultPageId": "published-new",
+                "pages": [{"id": "published-new", "name": "Home", "slug": "/", "isDefault": True}],
+                "forms": [],
+            },
         )
         self.assertNotIn("draft_schema", body["project"])
 
     def test_public_site_returns_updated_schema_after_republish(self):
         fake_supabase = FakeSupabase()
         draft_v1 = {
+            "defaultPageId": "page-1",
             "pages": [
-                {"id": "page-1"},
-                {"id": "page-2"},
-                {"id": "page-3"},
-                {"id": "page-4"},
-                {"id": "page-5", "title": "Page 5"},
+                {"id": "page-1", "name": "Home", "slug": "/", "isDefault": True},
+                {"id": "page-2", "slug": "/page-2"},
+                {"id": "page-3", "slug": "/page-3"},
+                {"id": "page-4", "slug": "/page-4"},
+                {"id": "page-5", "slug": "/page-5", "title": "Page 5"},
             ],
             "forms": [],
         }
         draft_v2 = {
+            "defaultPageId": "page-1",
             "pages": [
-                {"id": "page-1"},
-                {"id": "page-2"},
-                {"id": "page-3"},
-                {"id": "page-4"},
-                {"id": "page-5", "title": "Page 5"},
-                {"id": "page-6", "title": "Page 6", "body": "FINAL PUBLISH TEST 003"},
+                {"id": "page-1", "name": "Home", "slug": "/", "isDefault": True},
+                {"id": "page-2", "slug": "/page-2"},
+                {"id": "page-3", "slug": "/page-3"},
+                {"id": "page-4", "slug": "/page-4"},
+                {"id": "page-5", "slug": "/page-5", "title": "Page 5"},
+                {"id": "page-6", "slug": "/page-6", "title": "Page 6", "body": "FINAL PUBLISH TEST 003"},
             ],
             "forms": [],
         }
@@ -546,7 +561,15 @@ class PublicSiteContractTests(unittest.TestCase):
                 "slug": "published-site",
                 "status": "published",
                 "draft_schema": draft_v1,
-                "published_schema": {"pages": [{"id": "page-1"}, {"id": "page-2"}, {"id": "page-3"}, {"id": "page-4"}]},
+                "published_schema": {
+                    "defaultPageId": "page-1",
+                    "pages": [
+                        {"id": "page-1", "name": "Home", "slug": "/", "isDefault": True},
+                        {"id": "page-2", "slug": "/page-2"},
+                        {"id": "page-3", "slug": "/page-3"},
+                        {"id": "page-4", "slug": "/page-4"},
+                    ],
+                },
                 "published_version": 4,
                 "last_published_at": "2026-06-03T13:00:00+00:00",
                 "updated_at": "2026-06-03T13:00:00+00:00",
@@ -602,7 +625,7 @@ class PublicSiteContractTests(unittest.TestCase):
         self.assertIn("FINAL PUBLISH TEST 003", str(body["project"]["published_schema"]))
         self.assertNotIn("draft_schema", body["project"])
 
-    def test_public_site_without_published_project_returns_site_chrome(self):
+    def test_public_site_without_published_project_fails_closed(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"] = [
             {
@@ -621,6 +644,5 @@ class PublicSiteContractTests(unittest.TestCase):
              patch.object(public_site_routes, "enforce_public_rate_limit"):
             response = client.get("/public/sites/tenant-site")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json()["project"])
-        self.assertEqual(response.json()["site"]["subdomain"], "tenant-site")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")

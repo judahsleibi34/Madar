@@ -5,8 +5,9 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from data_analysis import services as data_services
-from data_analysis.routes.data_routes import get_storage_scope
+from data_analysis.routes.data_routes import get_storage_scope as _get_storage_scope
 from services.rate_limit_service import enforce_data_workspace_rate_limit
+from services.entitlement_service import require_entitlement
 
 
 router = APIRouter(
@@ -14,6 +15,12 @@ router = APIRouter(
     tags=["Cleaning"],
 )
 logger = logging.getLogger(__name__)
+
+
+def get_storage_scope(request: Request, response: Response, user_id: int):
+    tenant_id, scoped_user_id = _get_storage_scope(request, response, user_id)
+    require_entitlement(tenant_id, "data_cleaning")
+    return tenant_id, scoped_user_id
 
 
 class InputPathRequest(BaseModel):

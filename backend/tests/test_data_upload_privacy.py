@@ -69,6 +69,8 @@ class DataUploadPrivacyTests(unittest.TestCase):
             patch.object(data_services, "finish_storage", return_value="object-1"),
             patch.object(builder_routes, "BUILDER_ASSET_UPLOAD_DIR", self.public_dir),
             patch.object(builder_routes, "BUILDER_ASSET_MAX_BYTES", 5 * 1024 * 1024),
+            patch.object(builder_routes, "store_builder_asset", return_value=None),
+            patch.object(builder_routes, "delete_builder_asset", return_value=None),
             patch.object(builder_routes, "register_builder_asset", return_value={"id": "asset-1"}),
             patch.object(builder_routes, "reserve_storage", return_value="reservation-1"),
             patch.object(builder_routes, "finish_storage", return_value="object-1"),

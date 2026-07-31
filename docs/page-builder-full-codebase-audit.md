@@ -792,3 +792,21 @@ Validation results:
 - Frontend Docker build: passed; retained chunk-size warning.
 - Migrations: 48/48, 0 errors, 2 known historical duplicate warnings.
 - `git diff --check`: passed before report creation.
+
+## Post-audit button color contract (2026-07-31)
+
+The later button-color follow-up adds five optional, explicit button fields:
+`backgroundColor`, `textColor`, `hoverBackgroundColor`, `hoverTextColor`, and
+`borderColor`. Each accepts only a normalized six-digit hexadecimal value.
+Empty values are removed; shorthand, alpha, CSS variables/functions,
+declarations, HTML, and arbitrary `style`/`buttonColors` objects are rejected by
+the backend draft and publish validators. Existing `styles.color` and
+`styles.backgroundColor` theme defaults remain unchanged for old buttons.
+
+`ButtonColorControls` provides a native color picker, text entry, and clear
+action with programmatic labels and a non-blocking WCAG-style 4.5:1 contrast
+warning for normal and hover pairs. The shared presentation helper is consumed
+by both the editor renderer and `TenantSiteRuntime`, so draft preview, responsive
+preview, standard-path publication, and branded-host publication use the same
+validated fields. Hover overrides exclude disabled controls, and the existing
+`:focus-visible` outline remains authoritative.

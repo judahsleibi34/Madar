@@ -51,7 +51,7 @@ export default function SignUpPage({
 
   const previewSubdomain = normalizedSubdomain || "your-site";
   const publicUrlPreview = PUBLIC_SITE_DOMAIN
-    ? `${previewSubdomain}.${PUBLIC_SITE_DOMAIN}`
+    ? `${PUBLIC_SITE_DOMAIN}/site/${previewSubdomain}`
     : previewSubdomain;
   const publicUrlPreviewLabel = PUBLIC_SITE_DOMAIN
     ? t("signup.publicUrlAfterPublishing")

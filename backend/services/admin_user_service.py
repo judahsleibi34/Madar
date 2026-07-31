@@ -128,6 +128,7 @@ def list_users_with_features(
         })
 
         features_by_tenant: dict[str, list[dict[str, Any]]] = {}
+        subscriptions_by_tenant: dict[str, dict[str, Any]] = {}
 
         if tenant_ids:
             features_response = (
@@ -142,6 +143,32 @@ def list_users_with_features(
                 tenant_key = str(feature.get("tenant_id"))
                 features_by_tenant.setdefault(tenant_key, []).append(feature)
 
+            try:
+                subscription_response = (
+                    service_supabase
+                    .table("tenant_subscriptions")
+                    .select("id,tenant_id,plan_id,state,catalog_version,price_minor,currency,billing_interval,updated_at")
+                    .in_("tenant_id", tenant_ids)
+                    .order("updated_at", desc=True)
+                    .execute()
+                )
+                for subscription in subscription_response.data or []:
+                    tenant_key = str(subscription.get("tenant_id"))
+                    current = subscriptions_by_tenant.get(tenant_key)
+                    if current is None or (
+                        subscription.get("state") == "active"
+                        and current.get("state") != "active"
+                    ):
+                        subscriptions_by_tenant[tenant_key] = subscription
+            except Exception as error:
+                # Compatibility for the short deployment window before migration
+                # 071. Legacy feature data remains visible, but canonical writes
+                # must not be enabled until the migration is applied.
+                logger.info(
+                    "admin.users.commercial_subscriptions_unavailable",
+                    extra={"error_type": type(error).__name__},
+                )
+
     except Exception as error:
         logger.warning("admin.users.list_failed", extra={"error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not load users.")
@@ -151,6 +178,9 @@ def list_users_with_features(
             **user,
             "user_type": user.get("user_type") or "user",
             "features": features_by_tenant.get(str(user.get("tenant_id")), []),
+            "commercial_subscription": subscriptions_by_tenant.get(
+                str(user.get("tenant_id"))
+            ),
         }
         for user in users
     ]

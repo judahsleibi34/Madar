@@ -14,6 +14,7 @@ from data_analysis.ai.settings import (
     get_model_config_for_plan,
     get_provider_api_key,
 )
+from data_analysis.ai.token_metering import record_provider_usage
 
 
 class AIPlannerError(RuntimeError):
@@ -142,5 +143,39 @@ def _call_gemini_json(
 
     if not text:
         raise AIPlannerError("Gemini returned empty response")
+
+    usage = getattr(response, "usage_metadata", None)
+    if usage is not None:
+        input_tokens = int(
+            getattr(usage, "prompt_token_count", 0)
+            or getattr(usage, "input_token_count", 0)
+            or 0
+        )
+        cached_tokens = int(
+            getattr(usage, "cached_content_token_count", 0)
+            or getattr(usage, "cached_input_token_count", 0)
+            or 0
+        )
+        output_tokens = int(
+            getattr(usage, "candidates_token_count", 0)
+            or getattr(usage, "output_token_count", 0)
+            or 0
+        )
+        total_tokens = int(
+            getattr(usage, "total_token_count", 0)
+            or input_tokens + output_tokens
+        )
+        record_provider_usage(
+            {
+                "provider": "gemini",
+                "model": model,
+                "input_tokens": input_tokens,
+                "cached_input_tokens": cached_tokens,
+                "output_tokens": output_tokens,
+                "total_provider_tokens": total_tokens,
+                "usage_source": "provider",
+                "estimated": False,
+            }
+        )
 
     return parse_json_response(text)

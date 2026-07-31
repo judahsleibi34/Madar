@@ -66,11 +66,17 @@ const renderPublic = ({
   headerButtonLabel = "",
   contactEmail = "",
   phone = "",
+  teamSections = [],
 } = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSite.mockResolvedValue({
-    site: { subdomain: "tenant-site" },
+    site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
     project: {
+      site_id: "site-1",
+      site_identifier: "tenant-site",
+      project_id: "project-1",
+      published_version: 1,
+      publication_key: "site-1:tenant-site:project-1:1:hash",
       published_schema: {
         defaultPageId: "home",
         siteChrome: {
@@ -87,7 +93,7 @@ const renderPublic = ({
         forms: [],
         pages: [
           { id: "home", name: "Home", slug: "/", sections: [] },
-          { id: "team", name: "Team", slug: "/about/team", sections: [] },
+          { id: "team", name: "Team", slug: "/about/team", sections: teamSections },
         ],
       },
     },
@@ -183,6 +189,31 @@ describe("TenantSiteRuntime explicit project preview", () => {
     expect(screen.queryByText("info@madar.com")).toBeNull();
     expect(screen.queryByText("+972599203857")).toBeNull();
   });
+
+  it("renders validated button colors on the standard public path", async () => {
+    renderPublic({
+      teamSections: [{
+        id: "buttons",
+        layout: { width: "large", paddingY: "medium", background: "transparent" },
+        rows: [{ id: "row", layout: { columns: 1, align: "stretch", gap: "medium" }, columns: [{ id: "column", layout: { align: "stretch" }, elements: [{
+          id: "button-1",
+          type: "button",
+          content: "Contact us",
+          styles: {},
+          backgroundColor: "#112233",
+          textColor: "#FFFFFF",
+          hoverBackgroundColor: "#334455",
+          hoverTextColor: "#EEEEEE",
+          borderColor: "#556677",
+        }] }] }],
+        freeElements: [],
+      }],
+    });
+    const button = await screen.findByRole("button", { name: "Contact us" });
+    expect(button.className).toContain("has-button-background-color");
+    expect(button.className).toContain("has-button-hover-text-color");
+    expect(button.style.getPropertyValue("--button-border-color")).toBe("#556677");
+  });
 });
 
 const protectedLoginPage = {
@@ -228,8 +259,13 @@ const RuntimeLocation = () => {
 const renderProtectedPublic = () => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSite.mockResolvedValue({
-    site: { subdomain: "tenant-site" },
-    project: {
+      site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
+      project: {
+        site_id: "site-1",
+        site_identifier: "tenant-site",
+        project_id: "project-1",
+        published_version: 1,
+        publication_key: "site-1:tenant-site:project-1:1:hash",
       published_schema: {
         defaultPageId: "home",
         siteChrome: { brand: "Protected Route Test" },
@@ -283,8 +319,13 @@ describe("TenantSiteRuntime protected page login redirect", () => {
         Object.assign(new Error("Log in to access this resource"), { status: 401 })
       )
       .mockResolvedValueOnce({
-        site: { subdomain: "tenant-site" },
+        site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
         project: {
+          site_id: "site-1",
+          site_identifier: "tenant-site",
+          project_id: "project-1",
+          published_version: 1,
+          publication_key: "site-1:tenant-site:project-1:1:hash",
           published_schema: {
             defaultPageId: "home",
             siteChrome: { brand: "Protected Route Test" },
