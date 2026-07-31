@@ -52,6 +52,7 @@ import {
   getPageNavigationLabel,
 } from "../core/PageBuilder.navigation";
 import { normalizeElementAction, runPublicElementAction } from "../core/PageBuilder.actions";
+import { getButtonColorPresentation } from "../core/PageBuilder.buttonColors";
 import { getStoredUrlError } from "../core/PageBuilder.url";
 import {
   getFooterLinkItems,
@@ -1774,10 +1775,19 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       const link = getPublicButtonLink(element);
       const fitKey = `${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`;
       const content = renderRichText(element.content, getRichTextRanges(element, "content"));
+      const presentation = getButtonColorPresentation(element);
+      const buttonProps = {
+        ...props,
+        className: `${props.className} ${presentation.className}`.trim(),
+        style: { ...props.style, ...presentation.style },
+      };
+      const disabledLinkProps = element.disabled
+        ? { "aria-disabled": "true", tabIndex: -1, onClick: (event) => event.preventDefault() }
+        : {};
 
-      if (link?.to) return <AutoFitDirectText as={Link} fitKey={fitKey} key={element.id} {...props} to={link.to}>{content}</AutoFitDirectText>;
-      if (link?.href) return <AutoFitDirectText as="a" fitKey={fitKey} key={element.id} {...props} {...link}>{content}</AutoFitDirectText>;
-      return <AutoFitDirectText as="button" fitKey={fitKey} key={element.id} type="button" {...props} onClick={() => runPublicButtonAction(element)}>{content}</AutoFitDirectText>;
+      if (link?.to) return <AutoFitDirectText as={Link} fitKey={fitKey} key={element.id} {...buttonProps} {...disabledLinkProps} to={link.to}>{content}</AutoFitDirectText>;
+      if (link?.href) return <AutoFitDirectText as="a" fitKey={fitKey} key={element.id} {...buttonProps} {...link} {...disabledLinkProps}>{content}</AutoFitDirectText>;
+      return <AutoFitDirectText as="button" fitKey={fitKey} key={element.id} type="button" {...buttonProps} disabled={Boolean(element.disabled)} onClick={() => runPublicButtonAction(element)}>{content}</AutoFitDirectText>;
     }
     if (element.type === "image") {
       const imageSrc = resolveMediaUrl(element.content);

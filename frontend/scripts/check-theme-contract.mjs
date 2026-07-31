@@ -23,6 +23,10 @@ function inspect(path) {
   const name = relative(root, path).replaceAll("\\", "/");
   if (name === tokenFile) return;
   if (authoredThemeFiles.has(name)) return;
+  // Test fixtures intentionally exercise customer-selected literal colors;
+  // they are not shipped application styling and must not weaken the runtime
+  // theme-token audit.
+  if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(name)) return;
 
   const source = readFileSync(path, "utf8");
   const checks = extname(path) === ".css"

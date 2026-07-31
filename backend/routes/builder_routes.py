@@ -388,11 +388,80 @@ def assert_json_object(
             detail=f"{field_name} is too large",
         )
 
-    return (
+    validated = (
         validate_builder_schema_urls(value, field_name=field_name)
         if validate_urls
         else value
     )
+    validate_builder_button_colors(validated, field_name=field_name)
+    return validated
+
+
+BUTTON_COLOR_FIELDS = (
+    "backgroundColor",
+    "textColor",
+    "hoverBackgroundColor",
+    "hoverTextColor",
+    "borderColor",
+)
+BUTTON_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _iter_builder_elements(schema: dict[str, Any]):
+    for page in schema.get("pages") or []:
+        if not isinstance(page, dict):
+            continue
+        for section in page.get("sections") or []:
+            if not isinstance(section, dict):
+                continue
+            for element in section.get("elements") or []:
+                if isinstance(element, dict):
+                    yield element
+            for element in section.get("freeElements") or []:
+                if isinstance(element, dict):
+                    yield element
+            for row in section.get("rows") or []:
+                if not isinstance(row, dict):
+                    continue
+                for column in row.get("columns") or []:
+                    if not isinstance(column, dict):
+                        continue
+                    for element in column.get("elements") or []:
+                        if isinstance(element, dict):
+                            yield element
+
+
+def validate_builder_button_colors(schema: dict[str, Any], *, field_name: str) -> None:
+    for element in _iter_builder_elements(schema):
+        if str(element.get("type") or "") != "button":
+            continue
+        if "style" in element or "buttonColors" in element:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{field_name} button colors must use explicit fields",
+            )
+        styles = element.get("styles")
+        if isinstance(styles, dict) and any(
+            field in styles
+            for field in ("textColor", "hoverBackgroundColor", "hoverTextColor", "borderColor")
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{field_name} button colors must use explicit fields",
+            )
+        for color_field in BUTTON_COLOR_FIELDS:
+            if color_field not in element:
+                continue
+            raw_value = element.get(color_field)
+            if raw_value is None or (isinstance(raw_value, str) and not raw_value.strip()):
+                element.pop(color_field, None)
+                continue
+            if not isinstance(raw_value, str) or not BUTTON_COLOR_PATTERN.fullmatch(raw_value.strip()):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{field_name}.{color_field} must be a six-digit hexadecimal color",
+                )
+            element[color_field] = raw_value.strip().upper()
 
 
 def _project_revision(project: dict[str, Any]) -> int:

@@ -57,3 +57,50 @@ describe("mixed text blocks", () => {
     );
   });
 });
+
+describe("button color rendering", () => {
+  const renderer = (preview = true) => createElementRenderer({
+    carouselElementTypes: new Set(),
+    selected: { type: "", id: "" },
+    preview,
+    getFreeElementStyle: () => ({}),
+    getElementStyle: () => ({ fontSize: "14px" }),
+    startDrag: vi.fn(),
+    findElementLocation: vi.fn(),
+    setInsertTarget: vi.fn(),
+    setSelected: vi.fn(),
+    captureCanvasTextSelection: vi.fn(),
+    shouldIgnoreInlineTextBlur: () => false,
+    updateElementInlineText: vi.fn(),
+    runElementAction: vi.fn(),
+    renderConnectedForm: vi.fn(),
+    getReservationBlockValue: vi.fn(),
+  });
+
+  it("applies explicit colors in preview and preserves focus/disabled semantics", () => {
+    render(renderer(true)({
+      id: "button-1",
+      type: "button",
+      content: "Continue",
+      styles: {},
+      disabled: true,
+      backgroundColor: "#112233",
+      textColor: "#FFFFFF",
+      hoverBackgroundColor: "#334455",
+      hoverTextColor: "#EEEEEE",
+      borderColor: "#556677",
+    }));
+    const button = screen.getByRole("button", { name: "Continue" });
+    expect(button.disabled).toBe(true);
+    expect(button.className).toContain("has-button-background-color");
+    expect(button.className).toContain("has-button-hover-background-color");
+    expect(button.style.getPropertyValue("--button-border-color")).toBe("#556677");
+  });
+
+  it("leaves legacy button presentation untouched", () => {
+    render(renderer(true)({ id: "button-legacy", type: "button", content: "Legacy", styles: {} }));
+    const button = screen.getByRole("button", { name: "Legacy" });
+    expect(button.className).not.toContain("has-button-");
+    expect(button.getAttribute("style")).toContain("font-size");
+  });
+});

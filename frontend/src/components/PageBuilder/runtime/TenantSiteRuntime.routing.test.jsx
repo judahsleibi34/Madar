@@ -66,6 +66,7 @@ const renderPublic = ({
   headerButtonLabel = "",
   contactEmail = "",
   phone = "",
+  teamSections = [],
 } = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSite.mockResolvedValue({
@@ -92,7 +93,7 @@ const renderPublic = ({
         forms: [],
         pages: [
           { id: "home", name: "Home", slug: "/", sections: [] },
-          { id: "team", name: "Team", slug: "/about/team", sections: [] },
+          { id: "team", name: "Team", slug: "/about/team", sections: teamSections },
         ],
       },
     },
@@ -187,6 +188,31 @@ describe("TenantSiteRuntime explicit project preview", () => {
     expect(document.querySelectorAll(".ecommerce-contact-row")).toHaveLength(0);
     expect(screen.queryByText("info@madar.com")).toBeNull();
     expect(screen.queryByText("+972599203857")).toBeNull();
+  });
+
+  it("renders validated button colors on the standard public path", async () => {
+    renderPublic({
+      teamSections: [{
+        id: "buttons",
+        layout: { width: "large", paddingY: "medium", background: "transparent" },
+        rows: [{ id: "row", layout: { columns: 1, align: "stretch", gap: "medium" }, columns: [{ id: "column", layout: { align: "stretch" }, elements: [{
+          id: "button-1",
+          type: "button",
+          content: "Contact us",
+          styles: {},
+          backgroundColor: "#112233",
+          textColor: "#FFFFFF",
+          hoverBackgroundColor: "#334455",
+          hoverTextColor: "#EEEEEE",
+          borderColor: "#556677",
+        }] }] }],
+        freeElements: [],
+      }],
+    });
+    const button = await screen.findByRole("button", { name: "Contact us" });
+    expect(button.className).toContain("has-button-background-color");
+    expect(button.className).toContain("has-button-hover-text-color");
+    expect(button.style.getPropertyValue("--button-border-color")).toBe("#556677");
   });
 });
 

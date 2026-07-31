@@ -271,3 +271,112 @@ review, or publication history as an improvised rollback.
 The final local commit hash is reported by `git rev-parse HEAD` and the terminal
 completion report. A Git commit cannot embed its own final hash in its committed
 content because changing the content changes that hash.
+
+## Follow-up hardening and builder styling (2026-07-31)
+
+This follow-up made no database call and did not alter or reapply migrations 071
+or 072. Their committed checksums remain respectively
+`b76c139ca1bcf25e09527eee6ceb071d17c01da481e20c624c70d8fdbeff9704`
+and `54b7e653a4d8e78290a79e906e9a5599b0f6427c4f8fe7ab98f067f35e702953`.
+
+### Baseline and stale-image diagnosis
+
+The authoritative current-source baseline was 800 backend tests with 16
+failures and one error. Earlier one-off Compose commands had used an older
+`madar-dev-backend` image; rebuilding the development backend copied the current
+checkout and restored the generated-code worker and CI-environment results.
+That image drift was a test-execution error, not a database or production-image
+change.
+
+### CORS 500-response correction
+
+Starlette orders newly registered user middleware outermost. CORS had been
+registered before the function-based observability middleware, so the latter
+caught an inner exception and returned its sanitized JSON response without that
+response ever traversing CORS. The exception branch tried to compensate with a
+separate header helper, which was not the same middleware boundary and made the
+behavior dependent on a second origin set.
+
+`CORSMiddleware` is now registered after the function middleware and routers,
+making it outermost. The observability exception path only constructs the safe
+500 JSON and request ID; exact-origin reflection, credentials, and exposed
+headers come from the canonical CORS middleware. Allowed development and
+production origins, disallowed/no-origin requests, credentials, sanitization,
+request IDs, preflight, HTTP exceptions, CSRF responses, body limits, and GZip
+are covered without wildcarding or arbitrary Origin reflection.
+
+### Entitlement-aware route test isolation
+
+The authorization and rate-limit test clients predated canonical commercial
+tables. Their lightweight database doubles could not satisfy either canonical
+or legacy lookup, so correct fail-closed enforcement returned 503 before the
+authorization/rate-limit behavior under test.
+
+`EntitlementTestState` now patches only the entitlement lookup boundary. Tests
+explicitly activate `business` or grant the narrow `data_import`, `charts`, or
+`response_management` capability to named fixture tenants. The real
+`require_entitlement` route gate remains active; unconfigured tenants return
+503, configured-but-denied capabilities return 402, cross-tenant authorization
+still rejects access, and approved requests still reach rate limiting. No
+global test bypass, fail-open lookup, legacy rollout flag, or all-tenant grant
+was added.
+
+### Durable storage ownership prevention
+
+The readiness failure came from four bind-mounted host directories created or
+left root-owned while the backend image correctly runs as UID/GID 65534. The
+manual production ownership repair is operator-confirmed and readiness now
+reports `storage="ok"`.
+
+The repository now contains `scripts/prepare_production_storage.sh` and a
+systemd drop-in under `deployment/systemd/`. The fixed, argument-free root hook
+runs before the unprivileged deployment service starts Compose, creates only
+the four trusted paths with `install -d`, sets directory mode 0755, and scopes
+recursive ownership repair to UID/GID 65534 without deleting, truncating, or
+world-writable chmod. The drop-in was not installed during this task; operations
+must install it before the next production deployment because modifying the
+running production host was explicitly out of scope.
+
+### Button color model and accessibility
+
+Buttons now support optional `backgroundColor`, `textColor`,
+`hoverBackgroundColor`, `hoverTextColor`, and `borderColor` fields. Frontend
+normalization and backend draft/publish validation accept only six-digit hex and
+normalize to uppercase. Empty fields reset to existing theme/variant behavior.
+Malformed hex, declarations, semicolons, URL/expression/JavaScript/HTML content,
+CSS variables, arbitrary `style`, `buttonColors`, and nested new color fields
+inside `styles` are rejected.
+
+The inspector adds native color pickers, editable hex inputs, clear actions,
+accessible labels/error association, live canvas updates, and non-blocking
+normal/hover contrast warnings. A shared presentation helper drives editor and
+public renderers. Hover overrides never apply to disabled buttons, link-shaped
+disabled actions are noninteractive, and the existing focus-visible indicator
+is not removed. Buttons with no new fields render exactly through their prior
+theme defaults; draft save/reload and publish/republish preserve configured
+values without mass-rewriting old blocks.
+
+### Follow-up validation
+
+| Check | Result |
+|---|---|
+| Focused backend follow-up suite | 42 tests passed |
+| Ephemeral root storage-preparation exercise | Passed: four paths, 65534:65534, mode 0755, existing file retained, arbitrary argument rejected |
+| Full backend suite in rebuilt current-source image | 813 tests passed, `OK` |
+| Full frontend suite | 82 files passed; 489 passed, 1 skipped |
+| Button/runtime/persistence focused frontend suite | 6 files, 62 tests passed |
+| Frontend production build and theme audit | Passed; existing large-chunk warning retained |
+| Frontend lint | Existing baseline retained: 9 errors, 4 warnings; no new finding |
+| Production Compose validation | Passed |
+| Development overlay Compose validation | Passed |
+| Migration mirror validation | 72/72, zero errors; known 013/014 warnings retained |
+| Dependency-lock validation | Passed |
+| Python compile / `pip check` / installed constraints | Passed / no broken requirements / passed |
+| `npm audit --omit=dev` | 2 findings: `react-router` high, `react-router-dom` moderate |
+| Full `npm audit` | 6 findings: 1 low, 1 moderate, 4 high (`@babel/core`, `brace-expansion`, `postcss`, `react-router`, `react-router-dom`, `vite`) |
+| `git diff --check` | Passed before documentation update; rerun at commit gate |
+| Targeted secret/artifact scan | Passed before documentation update; rerun after staging |
+
+No forced audit fix or unrelated dependency upgrade was made. The production
+checkout, database, services, deployment installation, DNS, Cloudflare, and
+remote Git state were untouched.

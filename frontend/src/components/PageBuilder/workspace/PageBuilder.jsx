@@ -80,6 +80,7 @@ import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
 import PageBuilderStatusBar from "./PageBuilderStatusBar";
 import PageBuilderWorkspaceHeader from "./PageBuilderWorkspaceHeader";
 import PageBuilderMeasuredFrame from "./PageBuilderMeasuredFrame";
+import ButtonColorControls from "./ButtonColorControls";
 import PageBuilderPageInspector from "./PageBuilderPageInspector";
 import {
   FormsTab,
@@ -7115,8 +7116,10 @@ export default function PageBuilder({
           )}
 
           {selectedElement.type === "button" && (
-            <details>
-              <summary>Interaction</summary>
+            <>
+              <ButtonColorControls key={selectedElement.id} element={selectedElement} onChange={updateSelectedElement} />
+              <details>
+                <summary>Interaction</summary>
               <label>Action<select value={selectedElement.action?.type || "none"} onChange={(event) => updateSelectedElement({ action: { type: event.target.value, pageId: "", url: "", message: "" } })}>
                 <option value="none">None</option>
                 <option value="goToPage">Go to page</option>
@@ -7132,7 +7135,8 @@ export default function PageBuilder({
               {selectedElement.action?.type === "showMessage" && (
                 <label>Message<input value={selectedElement.action?.message || ""} onChange={(event) => updateSelectedElement({ action: { message: event.target.value } })} /></label>
               )}
-            </details>
+              </details>
+            </>
           )}
 
           <div className="element-clipboard-actions">

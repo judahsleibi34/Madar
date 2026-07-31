@@ -22,6 +22,7 @@ import {
   getCarouselVariant,
 } from "./PageBuilder.elementLayout";
 import { getElementHeadingTag } from "./PageBuilder.heading";
+import { getButtonColorPresentation } from "./PageBuilder.buttonColors";
 
 export const createElementRenderer = ({
   carouselElementTypes,
@@ -221,13 +222,20 @@ export const createElementRenderer = ({
     }
 
     if (element.type === "button") {
+      const presentation = getButtonColorPresentation(element);
+      const buttonProps = {
+        ...commonProps,
+        className: `${commonProps.className} ${presentation.className}`.trim(),
+        style: { ...commonProps.style, ...presentation.style },
+        ...(preview && element.disabled ? { disabled: true } : {}),
+      };
       return (
         <AutoFitDirectText
           as="button"
           fitKey={`${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`}
           key={element.id}
           type="button"
-          {...commonProps}
+          {...buttonProps}
           onClick={(event) => {
             commonProps.onClick(event);
             if (preview) runElementAction(element);
