@@ -66,77 +66,12 @@ def require_publish_entitlement(tenant_id: int | str) -> dict[str, Any]:
             detail=error_detail("entitlement_inactive", "A tenant is required to publish."),
         )
 
-    if not is_publish_entitlement_enforced():
-        return {"enforced": False, "source": "beta_compatibility"}
+    from services.entitlement_service import require_any_entitlement
 
-    if tenant_key in _beta_publish_tenant_ids():
-        return {"enforced": True, "active": True, "source": "beta_allowlist"}
-
-    try:
-        response = (
-            service_supabase
-            .table("features")
-            .select("id, subscription_type, plan, builder_type, payment_status")
-            .eq("tenant_id", tenant_id)
-            .limit(20)
-            .execute()
-        )
-    except Exception as error:
-        logger.warning(
-            "billing.publish_entitlement_failed",
-            extra={"tenant_id": tenant_id, "error_type": type(error).__name__},
-        )
-        raise HTTPException(
-            status_code=503,
-            detail=error_detail(
-                "dependency_unavailable",
-                "Publishing access could not be verified. Please try again.",
-            ),
-        )
-
-    features = response.data or []
-    matching_features = [
-        feature
-        for feature in features
-        if feature.get("subscription_type") == "full_platform"
-        or (
-            feature.get("subscription_type") == "individual_builder"
-            and feature.get("builder_type") in PUBLISH_ENTITLEMENT_BUILDER_TYPES
-        )
-    ]
-    active_feature = next(
-        (feature for feature in matching_features if feature.get("payment_status") == "active"),
-        None,
-    )
-
-    if active_feature:
-        return {
-            "enforced": True,
-            "active": True,
-            "source": "feature",
-            "feature_id": active_feature.get("id"),
-        }
-
-    statuses = {
-        str(feature.get("payment_status") or "").strip().lower()
-        for feature in matching_features
-    }
-    if "pending" in statuses:
-        raise HTTPException(
-            status_code=402,
-            detail=error_detail(
-                "entitlement_pending",
-                "Publishing access is pending activation.",
-            ),
-        )
-
-    raise HTTPException(
-        status_code=402,
-        detail=error_detail(
-            "entitlement_inactive",
-            "An active publishing entitlement is required.",
-            context={"billing_states": sorted(statuses) if statuses else ["missing"]},
-        ),
+    return require_any_entitlement(
+        tenant_id,
+        {"website_publish", "public_form_links"},
+        message="An active website or public-form publishing entitlement is required.",
     )
 
 

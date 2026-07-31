@@ -190,8 +190,10 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     expect(screen.getByLabelText("Footer brand name").value).toBe("Madar demo");
     expect(screen.getByLabelText("Contact email").value).toBe("demo@madar.com");
     expect(screen.getByLabelText("Phone").value).toBe("+970123456");
-    expect(screen.getByLabelText("Logo").value)
-      .toBe("56fee3e0f73c4110abdf423d501fb835.png");
+    await waitFor(() =>
+      expect(screen.getByLabelText("Logo").value)
+        .toBe("56fee3e0f73c4110abdf423d501fb835.png")
+    );
     expect(screen.getByLabelText("Footer description").value)
       .toBe("Synced website description");
   });

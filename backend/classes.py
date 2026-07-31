@@ -52,6 +52,7 @@ class EmailVerificationResendRequest(BaseModel):
 
 class WebsiteSettingsUpdate(BaseModel):
     subdomain: Optional[str] = None
+    standard_path_slug: Optional[str] = None
     brand: Optional[str] = None
     footer_store_name: Optional[str] = None
     logo_url: Optional[str] = None
@@ -88,6 +89,86 @@ class AdminBillingUpdateRequest(BillingCheckoutRequest):
 class BillingWebhookUpdateRequest(AdminBillingUpdateRequest):
     provider_event_id: str = Field(..., min_length=1, max_length=200)
     provider_occurred_at: Optional[datetime] = None
+
+
+class CommercialPlanRequest(BaseModel):
+    plan_id: Literal["forms", "website", "business", "business_plus"]
+
+
+class CommercialAddonRequest(BaseModel):
+    addon_id: Literal[
+        "branded_madar_subdomain",
+        "additional_storage_5gb",
+        "ai_analytics_starter",
+        "ai_analytics_plus",
+        "ai_token_pack_750k",
+    ]
+    quantity: int = Field(default=1, ge=1, le=100)
+    idempotency_key: str = Field(..., min_length=8, max_length=160)
+
+
+class AdminCommercialPlanUpdate(BaseModel):
+    tenant_id: int
+    plan_id: Literal["forms", "website", "business", "business_plus"]
+    state: Literal[
+        "requested",
+        "pending_review",
+        "active",
+        "scheduled_change",
+        "past_due",
+        "suspended",
+        "canceled",
+        "expired",
+        "review_required",
+    ] = "active"
+    reason: str = Field(..., min_length=3, max_length=500)
+    idempotency_key: str = Field(..., min_length=8, max_length=160)
+
+
+class AdminCommercialAddonUpdate(BaseModel):
+    tenant_id: int
+    addon_id: Literal[
+        "branded_madar_subdomain",
+        "additional_storage_5gb",
+        "additional_workspace_seat",
+        "workspace_seat_pack_5",
+        "ai_analytics_starter",
+        "ai_analytics_plus",
+        "google_drive_private",
+        "ocr",
+        "hosted_email_mailbox",
+        "custom_domain",
+    ]
+    quantity: int = Field(default=1, ge=1, le=1000)
+    state: Literal[
+        "requested",
+        "pending_review",
+        "active",
+        "scheduled_change",
+        "past_due",
+        "suspended",
+        "canceled",
+        "expired",
+    ] = "active"
+    reason: str = Field(..., min_length=3, max_length=500)
+    idempotency_key: str = Field(..., min_length=8, max_length=160)
+
+
+class AdminTokenAllocationRequest(BaseModel):
+    tenant_id: int
+    product_id: Literal["ai_token_pack_750k"]
+    quantity: int = Field(default=1, ge=1, le=1000)
+    period_key: str = Field(..., pattern=r"^[0-9]{4}-[0-9]{2}$")
+    reason: str = Field(..., min_length=3, max_length=500)
+    idempotency_key: str = Field(..., min_length=8, max_length=160)
+
+
+class AdminTokenAdjustmentRequest(BaseModel):
+    tenant_id: int
+    standard_tokens: int = Field(..., gt=0, le=10_000_000_000)
+    period_key: str = Field(..., pattern=r"^[0-9]{4}-[0-9]{2}$")
+    reason: str = Field(..., min_length=3, max_length=500)
+    idempotency_key: str = Field(..., min_length=8, max_length=160)
 
 
 class AdminUserTypeUpdateRequest(BaseModel):

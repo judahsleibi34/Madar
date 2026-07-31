@@ -94,6 +94,7 @@ class BuilderAssetUploadTests(unittest.TestCase):
             patch.object(builder_routes, "finish_storage", return_value="object-1"),
             patch.object(builder_routes, "store_builder_asset", return_value=None),
             patch.object(builder_routes, "delete_builder_asset", return_value=None),
+            patch.object(builder_routes, "require_entitlement", return_value={}),
         ]
 
         for item in self.patches:

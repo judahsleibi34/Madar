@@ -1,4 +1,3 @@
-import re
 import logging
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -8,12 +7,14 @@ from services.audit_service import record_audit_event
 from services.tenant_service import require_active_tenant_member
 from services.url_validation import validate_public_url
 from services.website_settings_service import get_settings_for_tenant, ensure_settings_for_tenant, save_settings_for_tenant
+from services.entitlement_service import (
+    require_any_entitlement,
+    require_branded_subdomain,
+)
+from services.hosted_address_service import validate_hosted_address
 
 router = APIRouter(tags=["Website"])
 logger = logging.getLogger(__name__)
-
-SUBDOMAIN_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
-
 
 def clean_string(value):
     if value is None:
@@ -23,18 +24,7 @@ def clean_string(value):
 
 
 def validate_subdomain(value: str):
-    clean_value = clean_string(value).lower()
-
-    if not clean_value:
-        raise HTTPException(status_code=400, detail="Subdomain name is required")
-
-    if not SUBDOMAIN_PATTERN.match(clean_value):
-        raise HTTPException(
-            status_code=400,
-            detail="Subdomain can only contain lowercase letters, numbers, and hyphens",
-        )
-
-    return clean_value
+    return validate_hosted_address(value, label="Subdomain name")
 
 
 def validate_brand(value: str):
@@ -140,6 +130,11 @@ def build_settings_update_payload(settings: WebsiteSettingsUpdate):
     if settings.subdomain is not None:
         update_payload["subdomain"] = validate_subdomain(settings.subdomain)
 
+    if settings.standard_path_slug is not None:
+        update_payload["standard_path_slug"] = validate_subdomain(
+            settings.standard_path_slug
+        )
+
     if settings.brand is not None:
         update_payload["brand"] = validate_brand(settings.brand)
 
@@ -187,6 +182,17 @@ def update_website_settings(
         tenant_id = context.tenant_id
         authenticated_user_id = context.user_id
         existing_website = get_settings_for_tenant(tenant_id, authenticated_user_id)
+        if "standard_path_slug" in update_payload:
+            require_any_entitlement(
+                tenant_id,
+                {"standard_hosted_address", "public_form_links"},
+                message="An active website or public-form plan is required to configure a hosted identifier.",
+            )
+        if (
+            "subdomain" in update_payload
+            and update_payload["subdomain"] != (existing_website or {}).get("subdomain")
+        ):
+            require_branded_subdomain(existing_website or {"tenant_id": tenant_id})
 
         updated_website = save_settings_for_tenant(
             tenant_id=tenant_id,

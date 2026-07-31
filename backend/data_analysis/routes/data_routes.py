@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from data_analysis import services as data_services
 from services.rate_limit_service import enforce_data_workspace_rate_limit
 from services.tenant_service import require_active_tenant_user_id
+from services.entitlement_service import require_entitlement
 
 
 router = APIRouter(
@@ -24,6 +25,11 @@ def get_storage_scope(
     user_id: int,
 ) -> tuple[str, str]:
     context = require_active_tenant_user_id(user_id, request, response)
+    require_entitlement(
+        context.tenant_id,
+        "data_import",
+        message="This plan does not include the data workspace.",
+    )
 
     return (
         data_services.safe_scope_value(context.tenant_id),
@@ -72,6 +78,7 @@ def export_data(
 ):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        require_entitlement(tenant_id, "data_exports")
         enforce_data_workspace_rate_limit(
             fastapi_request,
             scoped_user_id,

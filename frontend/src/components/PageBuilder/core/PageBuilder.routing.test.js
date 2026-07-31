@@ -6,6 +6,7 @@ import {
   createUniqueBuilderPageName,
   createUniquePublicPageSlug,
   getDefaultPublicPage,
+  getStrictPublishedHomepage,
   getProductionFormUrl,
   getProductionTenantUrl,
   getStandaloneFormPath,
@@ -13,6 +14,7 @@ import {
   normalizePublicPageSlug,
   normalizeProjectPageRouting,
   resolvePublicPageByPath,
+  resolveStrictPublishedPageByPath,
   setProjectDefaultPage,
 } from "./PageBuilder.routing";
 
@@ -92,6 +94,24 @@ describe("public page routing contract", () => {
     expect(normalizePublicPageSlug("/about/team", "Team")).toBe("/about/team");
     expect(resolvePublicPageByPath(pages, "/about/team")?.id).toBe("team");
     expect(getPublicPagePath("/site/acme", pages[0])).toBe("/site/acme/about/team");
+  });
+
+  it("fails closed when published homepage metadata is missing or conflicting", () => {
+    const validPages = [
+      { id: "home", name: "Home", slug: "/", isDefault: true },
+      { id: "level-one", name: "Level One", slug: "/level-one" },
+    ];
+    expect(getStrictPublishedHomepage(validPages, "home")?.id).toBe("home");
+    expect(resolveStrictPublishedPageByPath(validPages, "/", "home")?.id).toBe("home");
+    expect(getStrictPublishedHomepage(validPages, "missing")).toBeNull();
+    expect(getStrictPublishedHomepage([
+      ...validPages,
+      { id: "other-home", slug: "/", isDefault: true },
+    ], "home")).toBeNull();
+    expect(resolveStrictPublishedPageByPath([
+      { id: "one", slug: "/same" },
+      { id: "two", slug: "/same" },
+    ], "/same", "one")).toBeNull();
   });
 
   it("builds canonical root and direct-page URLs", () => {

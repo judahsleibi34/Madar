@@ -16,6 +16,7 @@ SUBMISSION_ID = "22222222-2222-4222-8222-222222222222"
 
 
 PUBLISHED_SCHEMA = {
+    "defaultPageId": "page_home",
     "forms": [
         {
             "id": FORM_ID,
@@ -52,6 +53,9 @@ PUBLISHED_SCHEMA = {
     "pages": [
         {
             "id": "page_home",
+            "name": "Home",
+            "slug": "/",
+            "isDefault": True,
             "sections": [
                 {
                     "id": "section_page",
@@ -207,7 +211,7 @@ class FakeSupabase:
                     "status": "published",
                     "draft_schema": copy.deepcopy(PUBLISHED_SCHEMA),
                     "draft_revision": 5,
-                    "published_schema": PUBLISHED_SCHEMA,
+                    "published_schema": copy.deepcopy(PUBLISHED_SCHEMA),
                     "published_version": 4,
                     "last_published_at": "2026-06-03T13:00:00+00:00",
                     "updated_at": "2026-06-03T13:00:00+00:00",
@@ -1192,6 +1196,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             {
                 "id": "member-page",
                 "name": "Member vault",
+                "slug": "/members",
                 "visibility": "members",
                 "sections": [{"secret": "literal-private-page-content"}],
             }
@@ -1223,6 +1228,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             {
                 "id": "member-page",
                 "name": "Member vault",
+                "slug": "/members",
                 "visibility": "public",
                 "sections": [{"content": "authorized-content"}],
             }
@@ -1253,6 +1259,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             {
                 "id": "member-page",
                 "name": "Member vault",
+                "slug": "/members",
                 "visibility": "members",
                 "sections": [{"secret": "literal-private-page-content"}],
             }
@@ -1275,7 +1282,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
     def test_site_member_without_project_permission_cannot_fetch_protected_page(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"][0]["published_schema"]["pages"].append(
-            {"id": "member-page", "visibility": "members", "sections": []}
+            {"id": "member-page", "slug": "/members", "visibility": "members", "sections": []}
         )
         client = build_public_client(fake_supabase)
 
@@ -1295,7 +1302,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         fake_supabase = FakeSupabase()
         schema = fake_supabase.tables["builder_projects"][0]["published_schema"]
         schema["pages"].append(
-            {"id": "member-page", "visibility": "members", "sections": []}
+            {"id": "member-page", "slug": "/members", "visibility": "members", "sections": []}
         )
         client = build_public_client(fake_supabase)
 
@@ -1319,6 +1326,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         schema["pages"].append(
             {
                 "id": "role-page",
+                "slug": "/role-page",
                 "visibility": "vip",
                 "sections": [{"secret": "restricted-content"}],
             }

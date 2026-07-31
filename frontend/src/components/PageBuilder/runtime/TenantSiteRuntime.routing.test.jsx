@@ -69,8 +69,13 @@ const renderPublic = ({
 } = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSite.mockResolvedValue({
-    site: { subdomain: "tenant-site" },
+    site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
     project: {
+      site_id: "site-1",
+      site_identifier: "tenant-site",
+      project_id: "project-1",
+      published_version: 1,
+      publication_key: "site-1:tenant-site:project-1:1:hash",
       published_schema: {
         defaultPageId: "home",
         siteChrome: {
@@ -228,8 +233,13 @@ const RuntimeLocation = () => {
 const renderProtectedPublic = () => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSite.mockResolvedValue({
-    site: { subdomain: "tenant-site" },
-    project: {
+      site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
+      project: {
+        site_id: "site-1",
+        site_identifier: "tenant-site",
+        project_id: "project-1",
+        published_version: 1,
+        publication_key: "site-1:tenant-site:project-1:1:hash",
       published_schema: {
         defaultPageId: "home",
         siteChrome: { brand: "Protected Route Test" },
@@ -283,8 +293,13 @@ describe("TenantSiteRuntime protected page login redirect", () => {
         Object.assign(new Error("Log in to access this resource"), { status: 401 })
       )
       .mockResolvedValueOnce({
-        site: { subdomain: "tenant-site" },
+        site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
         project: {
+          site_id: "site-1",
+          site_identifier: "tenant-site",
+          project_id: "project-1",
+          published_version: 1,
+          publication_key: "site-1:tenant-site:project-1:1:hash",
           published_schema: {
             defaultPageId: "home",
             siteChrome: { brand: "Protected Route Test" },

@@ -13,12 +13,8 @@ import {
 import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
 import { apiFetch } from "../../utils/apiClient";
 import {
-  builderPlans,
-  builderTypes,
   getUserManagementFriendlyLabels,
   getUserManagementLabels,
-  paymentStatuses,
-  platformPlans,
 } from "../../content";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
@@ -55,11 +51,22 @@ function getDisplayName(user, labels = getUserManagementLabels("en")) {
 }
 
 function getPrimaryFeature(user) {
-  return user.features?.[0] || {
-    subscription_type: user.subscription_type || "individual_builder",
-    plan: user.subscription_type === "full_platform" ? "starter" : "basic",
-    builder_type: user.subscription_type === "full_platform" ? null : "website",
-    payment_status: user.payment_status || "pending",
+  if (user.commercial_subscription) {
+    return {
+      plan_id: user.commercial_subscription.plan_id,
+      state: user.commercial_subscription.state,
+    };
+  }
+  const legacy = user.features?.[0] || {};
+  const legacyPlanMap = {
+    forms_data: "forms",
+    cms: "website",
+    cms_plus: "business",
+    complete: "business_plus",
+  };
+  return {
+    plan_id: legacyPlanMap[legacy.plan] || "forms",
+    state: legacy.payment_status === "active" ? "active" : "pending_review",
   };
 }
 
@@ -70,55 +77,36 @@ function UserRow({
   onRequestDelete,
   busyKey,
   labels,
-  lang,
+  planProducts,
 }) {
   const feature = getPrimaryFeature(user);
   const [role, setRole] = useState(user.user_type || "user");
   const [planForm, setPlanForm] = useState({
-    subscription_type: feature.subscription_type || "individual_builder",
-    plan: feature.plan || "basic",
-    builder_type: feature.builder_type || "website",
-    payment_status: feature.payment_status || "pending",
+    plan_id: feature.plan_id || "forms",
+    state: feature.state || "pending_review",
   });
 
   useEffect(() => {
     return deferEffectStateUpdate(() => {
       setRole(user.user_type || "user");
       setPlanForm({
-        subscription_type: feature.subscription_type || "individual_builder",
-        plan: feature.plan || "basic",
-        builder_type: feature.builder_type || "website",
-        payment_status: feature.payment_status || "pending",
+        plan_id: feature.plan_id || "forms",
+        state: feature.state || "pending_review",
       });
     });
   }, [
     user.id,
     user.user_type,
-    feature.subscription_type,
-    feature.plan,
-    feature.builder_type,
-    feature.payment_status,
+    feature.plan_id,
+    feature.state,
   ]);
 
-  const isPlatform = planForm.subscription_type === "full_platform";
-  const planOptions = isPlatform ? platformPlans : builderPlans;
   const roleBusy = busyKey === `role-${user.id}`;
   const planBusy = busyKey === `plan-${user.id}`;
   const deleteBusy = busyKey === `delete-${user.id}`;
 
-  const updatePlanField = (field, value) => {
-    setPlanForm((prev) => {
-      const next = { ...prev, [field]: value };
-
-      if (field === "subscription_type") {
-        const nextIsPlatform = value === "full_platform";
-        next.plan = nextIsPlatform ? "starter" : "basic";
-        next.builder_type = nextIsPlatform ? null : "website";
-      }
-
-      return next;
-    });
-  };
+  const updatePlanField = (field, value) =>
+    setPlanForm((previous) => ({ ...previous, [field]: value }));
 
   return (
     <article className="user-management-row">
@@ -162,58 +150,26 @@ function UserRow({
           <label>
             <span>{labels.plan}</span>
             <select
-              value={planForm.subscription_type}
-              onChange={(event) => updatePlanField("subscription_type", event.target.value)}
+              value={planForm.plan_id}
+              onChange={(event) => updatePlanField("plan_id", event.target.value)}
             >
-              <option value="full_platform">{labels.fullPlatform}</option>
-              <option value="individual_builder">
-                {friendlyValue("subscription_type", "individual_builder", lang)}
-              </option>
-            </select>
-          </label>
-
-          <label>
-            <span>{labels.plan}</span>
-            <select
-              value={planForm.plan}
-              onChange={(event) => updatePlanField("plan", event.target.value)}
-            >
-              {planOptions.map((plan) => (
-                <option key={plan} value={plan}>
-                  {friendlyValue("plan", plan, lang)}
+              {planProducts.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            <span>{labels.builder}</span>
-            <select
-              value={planForm.builder_type || ""}
-              onChange={(event) => updatePlanField("builder_type", event.target.value)}
-              disabled={isPlatform}
-            >
-              {isPlatform ? (
-                <option value="">{labels.none}</option>
-              ) : (
-                builderTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {friendlyValue("builder_type", type, lang)}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-
-          <label>
             <span>{labels.status}</span>
             <select
-              value={planForm.payment_status}
-              onChange={(event) => updatePlanField("payment_status", event.target.value)}
+              value={planForm.state}
+              onChange={(event) => updatePlanField("state", event.target.value)}
             >
-              {paymentStatuses.map((status) => (
+              {["pending_review", "active", "scheduled_change", "past_due", "suspended", "canceled", "expired", "review_required"].map((status) => (
                 <option key={status} value={status}>
-                  {friendlyValue("payment_status", status, lang)}
+                  {friendlyValue("payment_status", status, "en")}
                 </option>
               ))}
             </select>
@@ -225,7 +181,7 @@ function UserRow({
               type="button"
               className="user-management-primary"
               onClick={() => onPlanSave(user, planForm)}
-              disabled={planBusy || deleteBusy || !user.tenant_id}
+              disabled={planBusy || deleteBusy || !user.tenant_id || !planProducts.length}
             >
               {planBusy ? <RefreshCw size={16} /> : <CreditCard size={16} />}
               {labels.applyPlan}
@@ -315,9 +271,28 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
   const [toast, setToast] = useState(null);
   const [busyKey, setBusyKey] = useState("");
   const [deleteTargetUser, setDeleteTargetUser] = useState(null);
+  const [catalogPlans, setCatalogPlans] = useState([]);
   const userPageCacheRef = useRef(new Map());
 
   const isAdmin = currentUser?.user_type === "admin";
+
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    let cancelled = false;
+    apiFetch(`${API_URL}/billing/catalog`, { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled) {
+          setCatalogPlans(
+            (data.catalog?.products || []).filter((product) => product.type === "base_plan")
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogPlans([]);
+      });
+    return () => { cancelled = true; };
+  }, [isAdmin]);
 
   const showToast = useCallback((type, text) => {
     setToast({
@@ -471,18 +446,15 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     setBusyKey(`plan-${user.id}`);
 
     try {
-      const response = await apiFetch(`${API_URL}/admin/billing/features`, {
+      const response = await apiFetch(`${API_URL}/admin/billing/subscriptions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenant_id: user.tenant_id,
-          subscription_type: planForm.subscription_type,
-          plan: planForm.plan,
-          builder_type:
-            planForm.subscription_type === "full_platform"
-              ? null
-              : planForm.builder_type,
-          payment_status: planForm.payment_status,
+          plan_id: planForm.plan_id,
+          state: planForm.state,
+          reason: "Manual assignment from the admin user-management page",
+          idempotency_key: `admin-ui-${user.tenant_id}-${planForm.plan_id}-${planForm.state}-${crypto.randomUUID()}`,
         }),
       });
 
@@ -620,7 +592,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
               onRequestDelete={setDeleteTargetUser}
               busyKey={busyKey}
               labels={labels}
-              lang={activeLang}
+              planProducts={catalogPlans}
             />
           ))
         ) : (
@@ -674,4 +646,3 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     </section>
   );
 }
-

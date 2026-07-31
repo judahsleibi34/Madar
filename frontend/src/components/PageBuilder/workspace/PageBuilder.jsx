@@ -430,7 +430,7 @@ const createCleanBlankProject = () => cleanBuilderProject(createBlankWorkspacePr
 const getWebsiteSettingsPayload = (project = {}) => {
   const siteChrome = { ...defaultSiteChrome, ...(project.siteChrome || {}) };
   return {
-    subdomain: sanitizeSubdomain(project.publish?.subdomain || ""),
+    standard_path_slug: sanitizeSubdomain(project.publish?.subdomain || ""),
     brand: String(siteChrome.brand || "").trim(),
     footer_store_name: String(siteChrome.footerStoreName || "").trim(),
     logo_url: String(siteChrome.logoUrl || "").trim(),
@@ -1409,7 +1409,9 @@ export default function PageBuilder({
   useEffect(() => {
     if (demoMode) return;
 
-    const subdomain = sanitizeSubdomain(websiteSettings?.subdomain || "");
+    const subdomain = sanitizeSubdomain(
+      websiteSettings?.standard_path_slug || websiteSettings?.subdomain || ""
+    );
 
     if (!subdomain) return;
 
@@ -1417,7 +1419,7 @@ export default function PageBuilder({
       const nextPath = resolveLiveSitePath(subdomain);
       setLiveSitePath((current) => (current === nextPath ? current : nextPath));
     });
-  }, [demoMode, websiteSettings?.subdomain]);
+  }, [demoMode, websiteSettings?.standard_path_slug, websiteSettings?.subdomain]);
 
   const safeProjectPages = useMemo(
     () => (Array.isArray(project.pages) ? project.pages : []),
@@ -1723,7 +1725,9 @@ export default function PageBuilder({
     if (demoMode || builderProjectLoading || !websiteSettings) return;
 
     const syncedValues = {
-      subdomain: sanitizeSubdomain(websiteSettings.subdomain || ""),
+      subdomain: sanitizeSubdomain(
+        websiteSettings.standard_path_slug || websiteSettings.subdomain || ""
+      ),
       brand: String(websiteSettings.brand || ""),
       footerStoreName: String(websiteSettings.footer_store_name || ""),
       logoUrl: String(websiteSettings.logo_url || ""),
@@ -1740,7 +1744,7 @@ export default function PageBuilder({
     updateProject((current) => {
       const currentPayload = getWebsiteSettingsPayload(current);
       const nextPayload = {
-        subdomain: syncedValues.subdomain,
+        standard_path_slug: syncedValues.subdomain,
         brand: syncedValues.brand.trim(),
         footer_store_name: syncedValues.footerStoreName.trim(),
         logo_url: syncedValues.logoUrl.trim(),
@@ -3327,7 +3331,7 @@ export default function PageBuilder({
       let websiteSettingsSyncFailed = false;
       if (websiteSettingsPayloadChanged(submittedBaseSchema, nextProject)) {
         const websitePayload = getWebsiteSettingsPayload(nextProject);
-        if (websitePayload.subdomain && websitePayload.brand) {
+        if (websitePayload.standard_path_slug && websitePayload.brand) {
           try {
             const savedWebsite = await updateWebsiteSettings(websitePayload);
             if (savedWebsite) {
@@ -3839,7 +3843,10 @@ export default function PageBuilder({
   };
 
   const publicSiteSubdomain = sanitizeSubdomain(
-    websiteSettings?.subdomain || project?.publish?.subdomain || ""
+    websiteSettings?.standard_path_slug ||
+      websiteSettings?.subdomain ||
+      project?.publish?.subdomain ||
+      ""
   );
   const canonicalLiveSitePath = publicSiteSubdomain
     ? resolveLiveSitePath(publicSiteSubdomain)
@@ -4017,7 +4024,12 @@ export default function PageBuilder({
         }));
       }
       const resolvedPublicSubdomain = sanitizeSubdomain(
-        publishedSite?.subdomain || websiteSettings?.subdomain || publishCandidate?.publish?.subdomain || ""
+        publishedSite?.standard_path_slug ||
+          websiteSettings?.standard_path_slug ||
+          publishedSite?.subdomain ||
+          websiteSettings?.subdomain ||
+          publishCandidate?.publish?.subdomain ||
+          ""
       );
       const resolvedLiveSitePath = resolvedPublicSubdomain
         ? resolveLiveSitePath(resolvedPublicSubdomain)

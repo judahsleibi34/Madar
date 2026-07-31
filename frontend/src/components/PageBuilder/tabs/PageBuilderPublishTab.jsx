@@ -116,11 +116,11 @@ export default function PageBuilderPublishTab({
         <section className="publish-subdomain-warning" role="alert">
           <AlertTriangle size={22} aria-hidden="true" />
           <div>
-            <strong>Choose your website address first</strong>
-            <p>Add a subdomain before using Go Live. Your subdomain becomes the address visitors use to open your website.</p>
+            <strong>Choose your standard hosted address first</strong>
+            <p>Page-builder plans include a path such as madarportal.com/site/business-name. A branded business-name.madarportal.com address is a separate paid add-on.</p>
           </div>
           <button type="button" className="primary-action" onClick={openWebsiteSettings}>
-            Add subdomain
+            Add hosted address
           </button>
         </section>
       )}
