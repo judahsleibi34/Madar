@@ -8,7 +8,8 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../../services/notificationsApi";
-import { getDummyNotifications } from "./notificationsData";
+
+const EMPTY_NOTIFICATIONS = [];
 
 const formatNotificationTime = (value) => {
   if (!value) return "";
@@ -33,21 +34,35 @@ const normalizeNotification = (item, t) => ({
   unread: item.unread !== false,
 });
 
-export default function NotificationsPage() {
+export default function NotificationsPage({ user }) {
   const { direction, t } = useLanguage();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [pushState, setPushState] = useState("");
+  const [loadedIdentity, setLoadedIdentity] = useState("");
+  const notificationIdentity = `${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`;
+  const hasNotificationIdentity = Boolean(user?.tenant_id && (user?.id || user?.auth_id));
+  const identityMatches = loadedIdentity === notificationIdentity;
+  const visibleNotifications = identityMatches ? notifications : EMPTY_NOTIFICATIONS;
+  const visibleUnreadCount = identityMatches ? unreadCount : 0;
+  const visibleLoading = hasNotificationIdentity && (identityMatches ? loading : true);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+
+    if (!hasNotificationIdentity) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const loadNotifications = async () => {
       setLoading(true);
 
       try {
-        const data = await fetchNotifications({ limit: 50 });
+        const data = await fetchNotifications({ limit: 50, signal: controller.signal });
         const items = (data.notifications || data.items || []).map((item) =>
           normalizeNotification(item, t)
         );
@@ -56,11 +71,14 @@ export default function NotificationsPage() {
 
         setNotifications(items);
         setUnreadCount(Number(data.unread_count || 0));
-      } catch {
+        setLoadedIdentity(notificationIdentity);
+      } catch (error) {
         if (cancelled) return;
-        const fallback = getDummyNotifications(t);
-        setNotifications(fallback);
-        setUnreadCount(fallback.filter((item) => item.unread).length);
+        if (error?.name !== "AbortError") {
+          setNotifications([]);
+          setUnreadCount(0);
+          setLoadedIdentity(notificationIdentity);
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -72,16 +90,21 @@ export default function NotificationsPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [t]);
+  }, [hasNotificationIdentity, notificationIdentity, t, user?.auth_id, user?.id, user?.tenant_id]);
 
-  const groupedNotifications = useMemo(() => notifications.reduce((groups, item) => {
+  const groupedNotifications = useMemo(() => visibleNotifications.reduce((groups, item) => {
     const key = item.group || t("notifications.groups.earlier");
     return {
       ...groups,
       [key]: [...(groups[key] || []), item],
     };
-  }, {}), [notifications, t]);
+  }, {}), [visibleNotifications, t]);
+  const visibleSourceCount = useMemo(
+    () => new Set(visibleNotifications.map((item) => item.source).filter(Boolean)).size,
+    [visibleNotifications],
+  );
 
   const enablePush = async () => {
     setPushState("loading");
@@ -137,10 +160,10 @@ export default function NotificationsPage() {
 
         <div
           className="notifications-header-count"
-          aria-label={t("notifications.unreadCount", { count: unreadCount })}
+          aria-label={t("notifications.unreadCount", { count: visibleUnreadCount })}
         >
           <Bell size={18} aria-hidden="true" />
-          <strong>{unreadCount}</strong>
+          <strong>{visibleUnreadCount}</strong>
           <span>{t("notifications.unread")}</span>
         </div>
       </header>
@@ -149,7 +172,7 @@ export default function NotificationsPage() {
         <button type="button" onClick={enablePush} disabled={pushState === "loading"}>
           {t("notifications.enablePush")}
         </button>
-        <button type="button" onClick={markAllRead} disabled={unreadCount === 0}>
+        <button type="button" onClick={markAllRead} disabled={visibleUnreadCount === 0}>
           {t("notifications.markAllRead")}
         </button>
         {pushState && (
@@ -163,20 +186,20 @@ export default function NotificationsPage() {
       >
         <article>
           <span>{t("notifications.total")}</span>
-          <strong>{notifications.length}</strong>
+          <strong>{visibleNotifications.length}</strong>
         </article>
         <article>
           <span>{t("notifications.unread")}</span>
-          <strong>{unreadCount}</strong>
+          <strong>{visibleUnreadCount}</strong>
         </article>
         <article>
           <span>{t("notifications.sources")}</span>
-          <strong>5</strong>
+          <strong>{visibleSourceCount}</strong>
         </article>
       </div>
 
       <div className="notifications-board">
-        {!loading && notifications.length === 0 && (
+        {!visibleLoading && visibleNotifications.length === 0 && (
           <section className="notifications-group">
             <div className="notifications-list">
               <article>

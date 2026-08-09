@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import smtplib
 from email.message import EmailMessage
@@ -8,6 +9,14 @@ from datetime import datetime, timezone
 from typing import Any
 
 from database import service_supabase
+from services.push_subscription_security import (
+    UnsafePushEndpoint,
+    create_no_redirect_session,
+    validate_push_endpoint,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 class DeliveryError(RuntimeError):
@@ -22,6 +31,19 @@ def _rows(response) -> list[dict[str, Any]]:
     if isinstance(data, dict):
         return [data]
     return [row for row in (data or []) if isinstance(row, dict)]
+
+
+def _has_active_membership(tenant_id: int | str, user_id: int | str) -> bool:
+    rows = _rows(
+        service_supabase.table("tenant_memberships")
+        .select("user_id")
+        .eq("tenant_id", int(tenant_id))
+        .eq("user_id", int(user_id))
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
+    return bool(rows)
 
 
 def _deliver_internal(row: dict[str, Any]) -> None:
@@ -107,6 +129,14 @@ def _deliver_email(row: dict[str, Any]) -> None:
         recipient = str(reservations[0].get("customer_email") if reservations else "").strip()
     elif reference.startswith("user:"):
         user_id = reference.removeprefix("user:")
+        if row.get("tenant_id") is not None and not _has_active_membership(
+            row["tenant_id"], user_id
+        ):
+            logger.warning(
+                "notifications.delivery_skipped_inactive_member",
+                extra={"tenant_id": row.get("tenant_id"), "user_id": user_id, "channel": "email"},
+            )
+            raise DeliveryError("recipient_inactive", retryable=False)
         users = _rows(service_supabase.table("users").select("email").eq("id", user_id).limit(1).execute())
         recipient = str(users[0].get("email") if users else "").strip()
     else:
@@ -151,35 +181,84 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
         from pywebpush import WebPushException, webpush
     except ImportError as error:
         raise DeliveryError("web_push_dependency_missing") from error
-    query = service_supabase.table("web_push_subscriptions").select("id,endpoint,p256dh,auth").is_("revoked_at", "null")
-    if row.get("user_id") is not None:
-        query = query.eq("user_id", int(row["user_id"]))
-    elif row.get("tenant_id") is not None:
-        query = query.eq("tenant_id", int(row["tenant_id"]))
-    else:
+    tenant_id = row.get("tenant_id")
+    target_user_id = row.get("user_id")
+    if tenant_id is None and target_user_id is None:
         raise DeliveryError("web_push_recipient_missing", retryable=False)
+    if tenant_id is not None:
+        if target_user_id is not None:
+            recipient_ids = [int(target_user_id)] if _has_active_membership(
+                tenant_id, target_user_id
+            ) else []
+        else:
+            recipient_ids = [
+                int(member["user_id"])
+                for member in _rows(
+                    service_supabase.table("tenant_memberships")
+                    .select("user_id")
+                    .eq("tenant_id", int(tenant_id))
+                    .eq("status", "active")
+                    .execute()
+                )
+                if member.get("user_id") is not None
+            ]
+        if not recipient_ids:
+            logger.warning(
+                "notifications.delivery_skipped_inactive_member",
+                extra={"tenant_id": tenant_id, "user_id": target_user_id, "channel": "web_push"},
+            )
+            raise DeliveryError("recipient_inactive", retryable=False)
+    else:
+        recipient_ids = [int(target_user_id)]
     payload = row.get("payload") or {}
     data = json.dumps({
         "title": str(payload.get("title") or "Madar")[:200],
         "body": str(payload.get("body") or "")[:1000],
         "data": payload.get("data") if isinstance(payload.get("data"), dict) else {},
     }, separators=(",", ":"))
-    for subscription in _rows(query.execute()):
-        try:
-            webpush(
-                subscription_info={"endpoint": subscription.get("endpoint"), "keys": {"p256dh": subscription.get("p256dh"), "auth": subscription.get("auth")}},
-                data=data,
-                vapid_private_key=private_key,
-                vapid_claims={"sub": subject},
-            )
-        except WebPushException as error:
-            status = getattr(getattr(error, "response", None), "status_code", None)
-            if status in {404, 410}:
+    for recipient_id in recipient_ids:
+        query = (
+            service_supabase.table("web_push_subscriptions")
+            .select("id,endpoint,p256dh,auth")
+            .eq("user_id", recipient_id)
+            .is_("revoked_at", "null")
+        )
+        if tenant_id is not None:
+            query = query.eq("tenant_id", int(tenant_id))
+        for subscription in _rows(query.execute()):
+            try:
+                safe_endpoint = validate_push_endpoint(str(subscription.get("endpoint") or ""))
+            except UnsafePushEndpoint as error:
                 service_supabase.table("web_push_subscriptions").update(
                     {"revoked_at": datetime.now(timezone.utc).isoformat()}
                 ).eq("id", subscription.get("id")).execute()
+                logger.warning(
+                    "notifications.web_push_endpoint_rejected",
+                    extra={"subscription_id": subscription.get("id"), "error_code": str(error)},
+                )
                 continue
-            raise DeliveryError("web_push_delivery_failed") from error
+            if tenant_id is not None and not _has_active_membership(tenant_id, recipient_id):
+                logger.warning(
+                    "notifications.delivery_skipped_inactive_member",
+                    extra={"tenant_id": tenant_id, "user_id": recipient_id, "channel": "web_push"},
+                )
+                raise DeliveryError("recipient_inactive", retryable=False)
+            try:
+                webpush(
+                    subscription_info={"endpoint": safe_endpoint, "keys": {"p256dh": subscription.get("p256dh"), "auth": subscription.get("auth")}},
+                    data=data,
+                    vapid_private_key=private_key,
+                    vapid_claims={"sub": subject},
+                    requests_session=create_no_redirect_session(),
+                )
+            except WebPushException as error:
+                status = getattr(getattr(error, "response", None), "status_code", None)
+                if status in {404, 410}:
+                    service_supabase.table("web_push_subscriptions").update(
+                        {"revoked_at": datetime.now(timezone.utc).isoformat()}
+                    ).eq("id", subscription.get("id")).execute()
+                    continue
+                raise DeliveryError("web_push_delivery_failed") from error
 
 
 def deliver_notification(row: dict[str, Any]) -> None:

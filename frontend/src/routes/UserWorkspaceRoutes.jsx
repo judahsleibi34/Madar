@@ -218,7 +218,7 @@ export default function UserWorkspaceRoutes({
 
       <Route
         path="/notifications/*"
-        element={renderShell(<NotificationsPage />)}
+        element={renderShell(<NotificationsPage user={user} />)}
       />
 
       <Route

@@ -12,6 +12,11 @@ from services.notification_outbox_service import (
     enqueue_notification,
     mark_notification_result,
 )
+from services.push_subscription_security import (
+    UnsafePushEndpoint,
+    create_no_redirect_session,
+    validate_push_endpoint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +48,7 @@ def get_web_push_public_config() -> dict[str, Any]:
 
 def list_user_notifications(
     *,
+    tenant_id: int | str,
     user_id: int | str,
     limit: int = 30,
     unread_only: bool = False,
@@ -51,6 +57,7 @@ def list_user_notifications(
     query = (
         service_supabase.table("user_notifications")
         .select("*")
+        .eq("tenant_id", int(tenant_id))
         .eq("user_id", int(user_id))
         .order("created_at", desc=True)
         .limit(safe_limit)
@@ -65,6 +72,7 @@ def list_user_notifications(
     unread_response = (
         service_supabase.table("user_notifications")
         .select("id")
+        .eq("tenant_id", int(tenant_id))
         .eq("user_id", int(user_id))
         .is_("read_at", "null")
         .limit(1000)
@@ -78,11 +86,14 @@ def list_user_notifications(
     }
 
 
-def mark_notification_read(*, user_id: int | str, notification_id: str) -> dict[str, Any] | None:
+def mark_notification_read(
+    *, tenant_id: int | str, user_id: int | str, notification_id: str
+) -> dict[str, Any] | None:
     response = (
         service_supabase.table("user_notifications")
         .update({"read_at": _utc_now()})
         .eq("id", notification_id)
+        .eq("tenant_id", int(tenant_id))
         .eq("user_id", int(user_id))
         .execute()
     )
@@ -90,10 +101,11 @@ def mark_notification_read(*, user_id: int | str, notification_id: str) -> dict[
     return _format_notification(rows[0]) if rows else None
 
 
-def mark_all_notifications_read(*, user_id: int | str) -> int:
+def mark_all_notifications_read(*, tenant_id: int | str, user_id: int | str) -> int:
     response = (
         service_supabase.table("user_notifications")
         .update({"read_at": _utc_now()})
+        .eq("tenant_id", int(tenant_id))
         .eq("user_id", int(user_id))
         .is_("read_at", "null")
         .execute()
@@ -157,6 +169,17 @@ def revoke_web_push_subscription(*, user_id: int | str, endpoint: str) -> int:
         .update({"revoked_at": _utc_now()})
         .eq("user_id", int(user_id))
         .eq("endpoint", endpoint)
+        .execute()
+    )
+    return len(_rows(response))
+
+
+def revoke_all_web_push_subscriptions(*, user_id: int | str) -> int:
+    response = (
+        service_supabase.table("web_push_subscriptions")
+        .update({"revoked_at": _utc_now()})
+        .eq("user_id", int(user_id))
+        .is_("revoked_at", "null")
         .execute()
     )
     return len(_rows(response))
@@ -315,25 +338,57 @@ def _send_tenant_push_notifications(
     if not _web_push_enabled():
         return
 
-    response = (
-        service_supabase.table("web_push_subscriptions")
-        .select("id, endpoint, p256dh, auth")
-        .eq("tenant_id", int(tenant_id))
-        .is_("revoked_at", "null")
-        .execute()
-    )
-
-    for subscription in _rows(response):
-        _send_web_push(subscription=subscription, title=title, body=body, data=data)
+    for recipient in _list_active_tenant_recipients(tenant_id):
+        user_id = recipient.get("user_id")
+        if user_id is None:
+            continue
+        response = (
+            service_supabase.table("web_push_subscriptions")
+            .select("id, endpoint, p256dh, auth")
+            .eq("tenant_id", int(tenant_id))
+            .eq("user_id", int(user_id))
+            .is_("revoked_at", "null")
+            .execute()
+        )
+        for subscription in _rows(response):
+            _send_web_push(
+                subscription=subscription,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                title=title,
+                body=body,
+                data=data,
+            )
 
 
 def _send_web_push(
     *,
     subscription: dict[str, Any],
+    tenant_id: int | str,
+    user_id: int | str,
     title: str,
     body: str,
     data: dict[str, Any],
 ) -> None:
+    try:
+        safe_endpoint = validate_push_endpoint(str(subscription.get("endpoint") or ""))
+    except UnsafePushEndpoint as error:
+        service_supabase.table("web_push_subscriptions").update(
+            {"revoked_at": _utc_now()}
+        ).eq("id", subscription.get("id")).execute()
+        logger.warning(
+            "notifications.web_push_endpoint_rejected",
+            extra={"subscription_id": subscription.get("id"), "error_code": str(error)},
+        )
+        return
+
+    if not _is_active_tenant_recipient(tenant_id=tenant_id, user_id=user_id):
+        logger.warning(
+            "notifications.delivery_skipped_inactive_member",
+            extra={"tenant_id": tenant_id, "user_id": user_id, "channel": "web_push"},
+        )
+        return
+
     try:
         from pywebpush import WebPushException, webpush
     except ImportError:
@@ -349,7 +404,7 @@ def _send_web_push(
         separators=(",", ":"),
     )
     subscription_info = {
-        "endpoint": subscription.get("endpoint"),
+        "endpoint": safe_endpoint,
         "keys": {
             "p256dh": subscription.get("p256dh"),
             "auth": subscription.get("auth"),
@@ -362,6 +417,7 @@ def _send_web_push(
             data=payload,
             vapid_private_key=os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip(),
             vapid_claims={"sub": os.getenv("WEB_PUSH_VAPID_SUBJECT", "").strip()},
+            requests_session=create_no_redirect_session(),
         )
     except WebPushException as error:
         status_code = getattr(getattr(error, "response", None), "status_code", None)
@@ -396,3 +452,16 @@ def _format_notification(row: dict[str, Any]) -> dict[str, Any]:
         "created_at": row.get("created_at"),
         "unread": not bool(row.get("read_at")),
     }
+
+
+def _is_active_tenant_recipient(*, tenant_id: int | str, user_id: int | str) -> bool:
+    response = (
+        service_supabase.table("tenant_memberships")
+        .select("user_id")
+        .eq("tenant_id", int(tenant_id))
+        .eq("user_id", int(user_id))
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
+    return bool(_rows(response))

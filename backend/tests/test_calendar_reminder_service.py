@@ -46,6 +46,22 @@ class Client:
 
 
 class CalendarReminderServiceTests(unittest.TestCase):
+    def test_inactive_event_creator_is_cancelled_without_enqueue(self):
+        client = Client()
+        client.tables["calendar_task_reminders"] = []
+        client.tables["calendar_event_reminders"] = [
+            {"id": "event-reminder", "event_id": "event-1", "tenant_id": 7, "channel": "web_push", "minutes_before": 10, "scheduled_for": "2026-07-22T08:50:00+00:00", "delivery_status": "scheduled"}
+        ]
+        client.tables["calendar_events"] = [
+            {"id": "event-1", "tenant_id": 7, "created_by": 99, "status": "confirmed", "title": "Private event", "starts_at": "2026-07-22T09:00:00+00:00", "deleted_at": None}
+        ]
+        with patch.object(calendar_reminder_service, "enqueue_notification") as enqueue:
+            self.assertEqual(calendar_reminder_service.enqueue_due_calendar_reminders(client=client), 0)
+        enqueue.assert_not_called()
+        reminder = client.tables["calendar_event_reminders"][0]
+        self.assertEqual(reminder["delivery_status"], "cancelled")
+        self.assertEqual(reminder["failure_code"], "owner_inactive")
+
     def test_task_only_batch_uses_current_reminder_and_continues_after_malformed_row(self):
         client = Client()
         payloads = []

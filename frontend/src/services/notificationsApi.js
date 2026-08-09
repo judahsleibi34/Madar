@@ -7,7 +7,7 @@ import {
 
 const PUSH_SERVICE_WORKER_PATH = "/madar-push-sw.js";
 
-export const fetchNotifications = async ({ limit = 30, unreadOnly = false } = {}) => {
+export const fetchNotifications = async ({ limit = 30, unreadOnly = false, signal } = {}) => {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
 
@@ -18,6 +18,7 @@ export const fetchNotifications = async ({ limit = 30, unreadOnly = false } = {}
   const response = await apiFetch(getApiUrl(`/notifications?${params.toString()}`), {
     method: "GET",
     cache: "no-store",
+    signal,
   });
   const data = await readApiResponse(response);
 
@@ -132,4 +133,20 @@ export const enableBrowserPushNotifications = async () => {
 
   await savePushSubscription(subscription.toJSON());
   return { enabled: true };
+};
+
+export const reconcileBrowserPushSubscription = async () => {
+  if (!browserSupportsPush() || Notification.permission !== "granted") {
+    return { reconciled: false };
+  }
+
+  const registration = await navigator.serviceWorker.getRegistration(PUSH_SERVICE_WORKER_PATH);
+  const subscription = await registration?.pushManager.getSubscription();
+
+  if (!subscription) {
+    return { reconciled: false };
+  }
+
+  await savePushSubscription(subscription.toJSON());
+  return { reconciled: true };
 };

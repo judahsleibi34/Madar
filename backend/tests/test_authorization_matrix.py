@@ -418,15 +418,18 @@ class NotificationAuthorizationMatrixTests(unittest.TestCase):
 
         with patch.object(
             notification_routes,
-            "get_authenticated_user_row",
+            "get_current_tenant_context",
             side_effect=HTTPException(status_code=401, detail="Not logged in"),
         ):
             unauthenticated = client.get("/notifications")
 
         with patch.object(
             notification_routes,
-            "get_authenticated_user_row",
-            return_value=fake_auth_result(TENANT_A_USER),
+            "get_current_tenant_context",
+            return_value=SimpleNamespace(
+                tenant_id=TENANT_A_USER["tenant_id"],
+                user_id=TENANT_A_USER["id"],
+            ),
         ), patch.object(
             notification_routes,
             "list_user_notifications",
@@ -437,6 +440,7 @@ class NotificationAuthorizationMatrixTests(unittest.TestCase):
         self.assertEqual(unauthenticated.status_code, 401)
         self.assertEqual(owner.status_code, 200)
         list_notifications.assert_called_once_with(
+            tenant_id=TENANT_A_USER["tenant_id"],
             user_id=TENANT_A_USER["id"],
             limit=30,
             unread_only=False,

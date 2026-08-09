@@ -65,6 +65,26 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
         configured_channel = str(reminder.get("channel") or "in_app")
         outbox_channel = "internal" if configured_channel == "in_app" else configured_channel
         user_id = event.get("created_by")
+        active_creator = []
+        if user_id is not None:
+            active_creator = _rows(
+                database_client.table("tenant_memberships")
+                .select("user_id")
+                .eq("tenant_id", reminder.get("tenant_id"))
+                .eq("user_id", user_id)
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
+        if not active_creator:
+            database_client.table("calendar_event_reminders").update(
+                {"delivery_status": "cancelled", "failure_code": "owner_inactive"}
+            ).eq("id", reminder.get("id")).execute()
+            logger.warning(
+                "calendar_event_reminder.cancelled",
+                extra={"tenant_id": reminder.get("tenant_id"), "user_id": user_id, "error_code": "owner_inactive"},
+            )
+            continue
         occurrence_start = _datetime(reminder.get("scheduled_for")) + timedelta(
             minutes=int(reminder.get("minutes_before") or 0)
         )

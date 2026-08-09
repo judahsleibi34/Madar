@@ -48,6 +48,7 @@ from services.pending_verification_context import (
     read_pending_verification_context,
     set_pending_verification_cookie,
 )
+from services.notification_service import revoke_all_web_push_subscriptions
 from services.email_verification_service import (
     GENERIC_RESEND_MESSAGE,
     mask_email,
@@ -1211,7 +1212,24 @@ def change_password(
 
 
 @router.post("/log_out")
-def log_out(response: Response):
+def log_out(request: Request, response: Response):
+    try:
+        _, user = get_authenticated_user_row(
+            request,
+            response,
+            allow_admin_account_access=False,
+        )
+        if user.get("id") is not None:
+            revoke_all_web_push_subscriptions(user_id=user["id"])
+    except HTTPException:
+        # Logout must still clear local authentication when the session is
+        # already invalid or expired.
+        pass
+    except Exception as error:
+        logger.warning(
+            "auth.logout.push_revocation_failed",
+            extra={"error_type": type(error).__name__},
+        )
     delete_auth_cookies(response)
 
     return {
