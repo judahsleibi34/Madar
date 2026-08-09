@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from pydantic import BaseModel, Field, UUID4
 
 from database import service_supabase, supabase
 from classes import EmailVerificationResendRequest, SignUpRequest, LogIn, UpdatePassword
@@ -48,7 +49,11 @@ from services.pending_verification_context import (
     read_pending_verification_context,
     set_pending_verification_cookie,
 )
-from services.notification_service import revoke_all_web_push_subscriptions
+from services.notification_service import (
+    revoke_all_web_push_subscriptions,
+    revoke_web_push_subscription,
+)
+from services.installation_service import revoke_installation_push_bindings
 from services.email_verification_service import (
     GENERIC_RESEND_MESSAGE,
     mask_email,
@@ -62,6 +67,11 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger(__name__)
 FRONTEND_URL = resolve_frontend_url()
 CURRENT_TERMS_VERSION = "2026-07-13"
+
+
+class LogoutRequest(BaseModel):
+    installation_id: UUID4 | None = None
+    push_endpoint: str | None = Field(default=None, max_length=2000)
 
 
 def ensure_csrf_token(request: Request, response: Response) -> str:
@@ -1212,7 +1222,11 @@ def change_password(
 
 
 @router.post("/log_out")
-def log_out(request: Request, response: Response):
+def log_out(
+    request: Request,
+    response: Response,
+    logout: LogoutRequest | None = None,
+):
     try:
         _, user = get_authenticated_user_row(
             request,
@@ -1220,7 +1234,34 @@ def log_out(request: Request, response: Response):
             allow_admin_account_access=False,
         )
         if user.get("id") is not None:
-            revoke_all_web_push_subscriptions(user_id=user["id"])
+            cleanup_scoped = bool(
+                logout and (logout.installation_id or logout.push_endpoint)
+            )
+            if logout and logout.installation_id:
+                try:
+                    revoke_installation_push_bindings(
+                        user_id=user["id"],
+                        installation_id=str(logout.installation_id),
+                    )
+                except Exception as error:
+                    logger.warning(
+                        "auth.logout.push_revocation_failed",
+                        extra={"error_type": type(error).__name__, "scope": "installation"},
+                    )
+            if logout and logout.push_endpoint:
+                try:
+                    revoke_web_push_subscription(
+                        user_id=user["id"], endpoint=logout.push_endpoint
+                    )
+                except Exception as error:
+                    logger.warning(
+                        "auth.logout.push_revocation_failed",
+                        extra={"error_type": type(error).__name__, "scope": "endpoint"},
+                    )
+            if not cleanup_scoped:
+                # Compatibility for older clients which cannot identify the
+                # current browser safely: fail closed by revoking all bindings.
+                revoke_all_web_push_subscriptions(user_id=user["id"])
     except HTTPException:
         # Logout must still clear local authentication when the session is
         # already invalid or expired.

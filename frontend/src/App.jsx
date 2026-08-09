@@ -23,6 +23,8 @@ import {
 } from "./utils/apiClient";
 import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
 import { clearAllCalendarWorkspaceCaches } from "./components/DashboardBuilder/utils/calendarWorkspaceCache";
+import { getInstallationId, registerInstallation } from "./pwa/installation";
+import { getExistingMadarPushEndpoint } from "./pwa/serviceWorker";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -234,6 +236,23 @@ export default function App() {
   useEffect(() => {
     if (authChecked && !isLoggedIn) clearAllCalendarWorkspaceCaches();
   }, [authChecked, isLoggedIn]);
+
+  useEffect(() => {
+    if (!authChecked || !isLoggedIn || !user?.id || !user?.tenant_id) return undefined;
+
+    registerInstallation({ tenantId: user.tenant_id }).catch(() => {
+      // Installation identity is optional infrastructure and never blocks app boot.
+    });
+    const handleInstalled = () => {
+      registerInstallation({
+        tenantId: user.tenant_id,
+        installedConfirmed: true,
+        force: true,
+      }).catch(() => {});
+    };
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => window.removeEventListener("appinstalled", handleInstalled);
+  }, [authChecked, isLoggedIn, user?.id, user?.tenant_id]);
 
   useEffect(() => {
     const closeSidebarTimer = window.setTimeout(() => {
@@ -483,8 +502,14 @@ export default function App() {
     setDashboardSidebarOpen(false);
 
     try {
+      const pushEndpoint = await getExistingMadarPushEndpoint().catch(() => null);
       await apiFetch(`${API_URL}/auth/log_out`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          installation_id: getInstallationId(),
+          push_endpoint: pushEndpoint,
+        }),
       });
     } catch (error) {
       console.error("Logout failed:", error);

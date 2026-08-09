@@ -264,7 +264,7 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
     recipient_id = recipient_ids[0]
     query = (
         service_supabase.table("web_push_subscriptions")
-        .select("id,endpoint,p256dh,auth")
+        .select("id,endpoint,p256dh,auth,app_installation_id")
         .eq("id", str(subscription_id))
         .eq("user_id", recipient_id)
         .is_("revoked_at", "null")
@@ -277,6 +277,32 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
             "web_push_subscription_revoked", retryable=False, terminal_outcome="revoked"
         )
     subscription = subscriptions[0]
+    app_installation_id = subscription.get("app_installation_id")
+    if app_installation_id:
+        installations = _rows(
+            service_supabase.table("app_installations")
+            .select("id")
+            .eq("id", str(app_installation_id))
+            .eq("user_id", recipient_id)
+            .eq("notifications_enabled", True)
+            .is_("revoked_at", "null")
+            .limit(1)
+            .execute()
+        )
+        if not installations:
+            logger.warning(
+                "notifications.delivery_skipped_inactive_installation",
+                extra={
+                    "tenant_id": tenant_id,
+                    "user_id": recipient_id,
+                    "subscription_id": subscription.get("id"),
+                },
+            )
+            raise DeliveryError(
+                "web_push_installation_inactive",
+                retryable=False,
+                terminal_outcome="revoked",
+            )
     try:
         safe_endpoint = validate_push_endpoint(str(subscription.get("endpoint") or ""))
     except UnsafePushEndpoint as error:

@@ -29,6 +29,7 @@ from routes.calendar_routes import router as calendar_router
 from routes.ecommerce_routes import router as ecommerce_router
 from routes.builder_routes import router as builder_router
 from routes.health_routes import router as health_router
+from routes.installation_routes import router as installation_router
 from routes.mfa_routes import router as mfa_router
 from routes.notification_routes import router as notification_router
 from routes.password_routes import router as password_router
@@ -238,6 +239,7 @@ app.include_router(user_router)
 app.include_router(website_router)
 app.include_router(password_router)
 app.include_router(mfa_router)
+app.include_router(installation_router)
 app.include_router(notification_router)
 app.include_router(server_status_router)
 app.include_router(billing_router)

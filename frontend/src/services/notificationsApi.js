@@ -5,6 +5,7 @@ import {
   readApiResponse,
 } from "../utils/apiClient";
 import { getMadarServiceWorkerRegistration } from "../pwa/serviceWorker";
+import { registerInstallation } from "../pwa/installation";
 
 export const fetchNotifications = async ({ limit = 30, unreadOnly = false, signal } = {}) => {
   const params = new URLSearchParams();
@@ -72,11 +73,14 @@ export const getPushPublicKey = async () => {
   return data;
 };
 
-export const savePushSubscription = async (subscription) => {
+export const savePushSubscription = async (subscription, installationId = null) => {
+  const payload = installationId
+    ? { ...subscription, installation_id: installationId }
+    : subscription;
   const response = await apiFetch(getApiUrl("/notifications/push-subscriptions"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(subscription),
+    body: JSON.stringify(payload),
   });
   const data = await readApiResponse(response);
 
@@ -106,7 +110,7 @@ export const urlBase64ToUint8Array = (base64String) => {
   return outputArray;
 };
 
-export const enableBrowserPushNotifications = async () => {
+export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
   if (!browserSupportsPush()) {
     return { enabled: false, reason: "unsupported" };
   }
@@ -133,11 +137,15 @@ export const enableBrowserPushNotifications = async () => {
     applicationServerKey: urlBase64ToUint8Array(config.public_key),
   });
 
-  await savePushSubscription(subscription.toJSON());
+  const installation = tenantId
+    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
+    : null;
+  const installationId = installation?.installationId || null;
+  await savePushSubscription(subscription.toJSON(), installationId);
   return { enabled: true };
 };
 
-export const reconcileBrowserPushSubscription = async () => {
+export const reconcileBrowserPushSubscription = async ({ tenantId } = {}) => {
   if (!browserSupportsPush() || Notification.permission !== "granted") {
     return { reconciled: false };
   }
@@ -149,6 +157,10 @@ export const reconcileBrowserPushSubscription = async () => {
     return { reconciled: false };
   }
 
-  await savePushSubscription(subscription.toJSON());
+  const installation = tenantId
+    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
+    : null;
+  const installationId = installation?.installationId || null;
+  await savePushSubscription(subscription.toJSON(), installationId);
   return { reconciled: true };
 };

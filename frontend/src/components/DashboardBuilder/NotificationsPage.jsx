@@ -110,7 +110,7 @@ export default function NotificationsPage({ user }) {
     setPushState("loading");
 
     try {
-      const result = await enableBrowserPushNotifications();
+      const result = await enableBrowserPushNotifications({ tenantId: user?.tenant_id });
       setPushState(result.enabled ? "enabled" : result.reason || "unavailable");
     } catch {
       setPushState("failed");

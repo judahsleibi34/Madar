@@ -61,7 +61,7 @@ export default function NotificationBell({
 
   useEffect(() => {
     if (!tenantId || !userId) return;
-    reconcileBrowserPushSubscription().catch(() => {
+    reconcileBrowserPushSubscription({ tenantId }).catch(() => {
       // Inbox polling remains available when optional push reconciliation fails.
     });
   }, [notificationIdentity, tenantId, userId]);

@@ -71,4 +71,20 @@ describe("Madar service-worker registration", () => {
     await expect(getMadarServiceWorkerRegistration(navigatorLike)).resolves.toBe(registration);
     expect(navigatorLike.serviceWorker.register).toHaveBeenCalledTimes(2);
   });
+
+  it("reads an existing Push endpoint without registering or prompting", async () => {
+    const getSubscription = vi.fn().mockResolvedValue({ endpoint: "https://push.example/device" });
+    const navigatorLike = {
+      serviceWorker: {
+        getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription } }),
+        register: vi.fn(),
+      },
+    };
+    const { getExistingMadarPushEndpoint } = await loadModule();
+    await expect(getExistingMadarPushEndpoint(navigatorLike)).resolves.toBe(
+      "https://push.example/device"
+    );
+    expect(navigatorLike.serviceWorker.register).not.toHaveBeenCalled();
+    expect(getSubscription).toHaveBeenCalledTimes(1);
+  });
 });

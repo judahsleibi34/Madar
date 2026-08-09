@@ -29,3 +29,14 @@ export function getMadarServiceWorkerRegistration(
 
   return registrationPromise;
 }
+
+export async function getExistingMadarPushEndpoint(
+  navigatorLike = globalThis.navigator
+) {
+  if (!serviceWorkersSupported(navigatorLike)) return null;
+  const registration = await navigatorLike.serviceWorker.getRegistration?.(
+    MADAR_SERVICE_WORKER_SCOPE
+  );
+  const subscription = await registration?.pushManager?.getSubscription?.();
+  return subscription?.endpoint || null;
+}

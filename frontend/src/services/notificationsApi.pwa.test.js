@@ -69,4 +69,31 @@ describe("explicit browser Push enablement", () => {
     });
     expect(getMadarServiceWorkerRegistration).not.toHaveBeenCalled();
   });
+
+  it("reconciles an installation before binding Push when tenant context is available", async () => {
+    const subscription = {
+      toJSON: () => ({
+        endpoint: "https://push.example/sub",
+        keys: { p256dh: "A", auth: "B" },
+      }),
+    };
+    getMadarServiceWorkerRegistration.mockResolvedValue({
+      pushManager: {
+        getSubscription: vi.fn().mockResolvedValue(subscription),
+        subscribe: vi.fn(),
+      },
+    });
+
+    await expect(enableBrowserPushNotifications({ tenantId: 7 })).resolves.toEqual({ enabled: true });
+    const installationCall = apiFetch.mock.calls.find(([url]) => url === "/installations/register");
+    const subscriptionCall = apiFetch.mock.calls.find(([url]) => url === "/notifications/push-subscriptions");
+    expect(installationCall).toBeTruthy();
+    expect(subscriptionCall).toBeTruthy();
+    expect(JSON.parse(subscriptionCall[1].body).installation_id).toMatch(
+      /^[0-9a-f-]{36}$/i
+    );
+    expect(apiFetch.mock.calls.indexOf(installationCall)).toBeLessThan(
+      apiFetch.mock.calls.indexOf(subscriptionCall)
+    );
+  });
 });

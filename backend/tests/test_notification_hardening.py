@@ -51,6 +51,7 @@ class FakeClient:
             "tenant_memberships": [],
             "user_notifications": [],
             "web_push_subscriptions": [],
+            "app_installations": [],
             "users": [],
         }
 
@@ -148,6 +149,24 @@ class PushEndpointSecurityTests(unittest.TestCase):
         self.assertEqual(upsert.call_args.kwargs["tenant_id"], 22)
         self.assertEqual(upsert.call_args.kwargs["user_id"], 7)
 
+    def test_registration_resolves_installation_under_authoritative_identity(self):
+        app = FastAPI()
+        app.include_router(notification_routes.router)
+        client = TestClient(app)
+        context = SimpleNamespace(tenant_id=22, user_id=7)
+        payload = {
+            "endpoint": "https://push.example.test/send",
+            "keys": {"p256dh": "A" * 87, "auth": "B" * 22},
+            "installation_id": "123e4567-e89b-42d3-a456-426614174000",
+        }
+        with patch.object(notification_routes, "get_current_tenant_context", return_value=context), patch("socket.getaddrinfo", return_value=resolved("8.8.8.8")), patch.object(notification_routes, "bind_push_subscription", return_value={"id": "subscription", "endpoint": payload["endpoint"]}) as bind, patch.object(notification_routes, "upsert_web_push_subscription") as legacy:
+            accepted = client.post("/notifications/push-subscriptions", json=payload)
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(bind.call_args.kwargs["user_id"], 7)
+        self.assertEqual(bind.call_args.kwargs["tenant_id"], 22)
+        self.assertEqual(bind.call_args.kwargs["installation_id"], payload["installation_id"])
+        legacy.assert_not_called()
+
     def test_inbox_route_fails_closed_without_active_tenant_context(self):
         app = FastAPI()
         app.include_router(notification_routes.router)
@@ -230,6 +249,62 @@ class LogoutPushRevocationTests(unittest.TestCase):
         with patch.object(auth_routes, "get_authenticated_user_row", return_value=(object(), {"id": 42})), patch.object(auth_routes, "revoke_all_web_push_subscriptions", side_effect=RuntimeError("database unavailable")):
             result = auth_routes.log_out(self.request(), response)
         self.assertEqual(result["message"], "Logged out successfully")
+
+    def test_identified_logout_revokes_only_current_installation(self):
+        response = Response()
+        logout = auth_routes.LogoutRequest(
+            installation_id="123e4567-e89b-42d3-a456-426614174000"
+        )
+        with patch.object(auth_routes, "get_authenticated_user_row", return_value=(object(), {"id": 42})), patch.object(auth_routes, "revoke_installation_push_bindings", return_value=1) as scoped, patch.object(auth_routes, "revoke_all_web_push_subscriptions") as revoke_all:
+            result = auth_routes.log_out(self.request(), response, logout)
+        self.assertEqual(result["message"], "Logged out successfully")
+        scoped.assert_called_once_with(
+            user_id=42,
+            installation_id="123e4567-e89b-42d3-a456-426614174000",
+        )
+        revoke_all.assert_not_called()
+
+    def test_identified_logout_still_succeeds_when_scoped_cleanup_fails(self):
+        response = Response()
+        logout = auth_routes.LogoutRequest(
+            installation_id="123e4567-e89b-42d3-a456-426614174000"
+        )
+        with patch.object(auth_routes, "get_authenticated_user_row", return_value=(object(), {"id": 42})), patch.object(auth_routes, "revoke_installation_push_bindings", side_effect=RuntimeError("database unavailable")):
+            result = auth_routes.log_out(self.request(), response, logout)
+        self.assertEqual(result["message"], "Logged out successfully")
+
+    def test_logout_revokes_known_legacy_endpoint_without_other_devices(self):
+        response = Response()
+        logout = auth_routes.LogoutRequest(
+            installation_id="123e4567-e89b-42d3-a456-426614174000",
+            push_endpoint="https://push.test/device-a",
+        )
+        with patch.object(auth_routes, "get_authenticated_user_row", return_value=(object(), {"id": 42})), patch.object(auth_routes, "revoke_installation_push_bindings", return_value=0), patch.object(auth_routes, "revoke_web_push_subscription", return_value=1) as endpoint_revoke, patch.object(auth_routes, "revoke_all_web_push_subscriptions") as revoke_all:
+            result = auth_routes.log_out(self.request(), response, logout)
+        self.assertEqual(result["message"], "Logged out successfully")
+        endpoint_revoke.assert_called_once_with(
+            user_id=42, endpoint="https://push.test/device-a"
+        )
+        revoke_all.assert_not_called()
+
+    def test_worker_rejects_subscription_bound_to_revoked_installation(self):
+        client = FakeClient()
+        client.tables["tenant_memberships"] = [{"tenant_id": 1, "user_id": 42, "status": "active"}]
+        client.tables["web_push_subscriptions"] = [{"id": "binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "installation", "endpoint": "https://push.test/send", "p256dh": "A", "auth": "B", "revoked_at": None}]
+        client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "revoked_at": "2026-01-01"}]
+        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), self.assertRaisesRegex(notification_delivery_service.DeliveryError, "web_push_installation_inactive"):
+            notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "binding", "payload": {}})
+
+    def test_worker_sends_for_active_enabled_installation(self):
+        client = FakeClient()
+        client.tables["tenant_memberships"] = [{"tenant_id": 1, "user_id": 42, "status": "active"}]
+        client.tables["web_push_subscriptions"] = [{"id": "binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "installation", "endpoint": "https://push.test/send", "p256dh": "A", "auth": "B", "revoked_at": None}]
+        client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "revoked_at": None}]
+        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush") as send:
+            notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "binding", "payload": {}})
+        send.assert_called_once()
 
     def test_revoked_binding_is_not_selected_for_later_tenant_push(self):
         client = FakeClient()
