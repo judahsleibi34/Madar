@@ -7,19 +7,31 @@ import os
 import random
 import signal
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
 from services.notification_delivery_service import DeliveryError, deliver_notification
+from services.notification_delivery_queue_service import (
+    claim_deliveries,
+    cleanup_delivery_data,
+    finish_delivery,
+    get_delivery_metrics,
+    resolve_outbox_notification,
+)
 from services.notification_outbox_service import claim_notifications, get_queue_metrics, mark_notification_result
-from services.calendar_reminder_service import enqueue_due_calendar_reminders, mark_calendar_reminder_delivery
+from services.calendar_reminder_service import (
+    enqueue_due_calendar_reminders,
+    finalize_calendar_reminder_deliveries,
+    mark_calendar_reminder_delivery,
+)
 from services.observability_service import configure_structured_logging
 
 logger = logging.getLogger(__name__)
 STOP_EVENT = threading.Event()
-STATE: dict[str, Any] = {"healthy": False, "last_poll_at": None, "processed": 0, "sent": 0, "failed": 0, "dead": 0, "queue_depth": 0, "oldest_pending_age_seconds": 0}
+STATE: dict[str, Any] = {"healthy": False, "last_poll_at": None, "processed": 0, "resolved": 0, "sent": 0, "failed": 0, "dead": 0, "queue_depth": 0, "oldest_pending_age_seconds": 0}
 
 
 def retry_delay(row: dict[str, Any], *, base: int = 30, maximum: int = 3600) -> int:
@@ -30,11 +42,11 @@ def retry_delay(row: dict[str, Any], *, base: int = 30, maximum: int = 3600) -> 
     return max(1, min(maximum, int(exponential * jitter)))
 
 
-def process_batch(
+def process_resolution_batch(
     *,
     limit: int,
     claim: Callable[..., list[dict[str, Any]]] = claim_notifications,
-    deliver: Callable[[dict[str, Any]], None] = deliver_notification,
+    resolve: Callable[[dict[str, Any]], int] = resolve_outbox_notification,
     finish: Callable[..., bool] = mark_notification_result,
     concurrency: int = 1,
 ) -> int:
@@ -45,25 +57,132 @@ def process_batch(
             logger.error("notification_worker.row_invalid", extra={"error_code": "outbox_id_missing"})
             return
         try:
+            delivery_count = resolve(row)
+        except Exception as error:
+            try:
+                finish(outbox_id, succeeded=False, failure_code="resolution_failed", retry_after_seconds=retry_delay(row))
+            except Exception as finish_error:
+                logger.error(
+                    "notification_worker.resolution_result_persist_failed",
+                    extra={
+                        "outbox_id": outbox_id,
+                        "error_type": type(finish_error).__name__,
+                    },
+                )
+            STATE["failed"] += 1
+            logger.error("notification_worker.resolution_failed", extra={"outbox_id": outbox_id, "channel": row.get("channel"), "error_code": "resolution_failed", "error_type": type(error).__name__})
+        else:
+            STATE["resolved"] += 1
+            if delivery_count == 0 and str(row.get("template") or "") == "calendar_reminder":
+                mark_calendar_reminder_delivery(row, succeeded=False, failure_code="recipient_unavailable")
+        STATE["processed"] += 1
+    with ThreadPoolExecutor(max_workers=max(1, min(int(concurrency), 16))) as executor:
+        list(executor.map(process, rows))
+    STATE["last_poll_at"] = datetime.now(timezone.utc).isoformat()
+    STATE["healthy"] = True
+    return len(rows)
+
+
+def process_batch(
+    *,
+    limit: int,
+    claim: Callable[..., list[dict[str, Any]]] = claim_deliveries,
+    deliver: Callable[[dict[str, Any]], None] = deliver_notification,
+    finish: Callable[..., dict[str, Any] | None] = finish_delivery,
+    concurrency: int = 1,
+) -> int:
+    """Process independently retryable delivery rows, never broad outbox rows."""
+    rows = claim(limit=limit)
+
+    def process(row: dict[str, Any]) -> None:
+        delivery_id = str(row.get("id") or "")
+        if not delivery_id:
+            logger.error("notification_worker.row_invalid", extra={"error_code": "delivery_id_missing"})
+            return
+        outcome = "sent"
+        error_code = None
+        selected_retry_delay = retry_delay(row)
+        try:
             deliver(row)
         except DeliveryError as error:
-            code = error.code if error.retryable else f"permanent.{error.code}"
-            finish(outbox_id, succeeded=False, failure_code=code, retry_after_seconds=retry_delay(row))
-            mark_calendar_reminder_delivery(row, succeeded=False, failure_code=code)
-            STATE["failed"] += 1
-            if int(row.get("attempts") or 0) >= int(row.get("max_attempts") or 5):
-                STATE["dead"] += 1
-            logger.warning("notification_worker.delivery_failed", extra={"outbox_id": outbox_id, "channel": row.get("channel"), "error_code": code})
+            error_code = error.code
+            outcome = "retry" if error.retryable else error.terminal_outcome
+            if error.retry_after_seconds is not None:
+                selected_retry_delay = max(
+                    selected_retry_delay,
+                    max(1, min(int(error.retry_after_seconds), 86400)),
+                )
         except Exception as error:
-            finish(outbox_id, succeeded=False, failure_code="delivery_unexpected", retry_after_seconds=retry_delay(row))
-            mark_calendar_reminder_delivery(row, succeeded=False, failure_code="delivery_unexpected")
+            error_code = "delivery_unexpected"
+            outcome = "retry"
+            logger.error(
+                "notification_worker.delivery_failed",
+                extra={
+                    "delivery_id": delivery_id,
+                    "tenant_id": row.get("tenant_id"),
+                    "user_id": row.get("user_id"),
+                    "channel": row.get("channel"),
+                    "attempt": row.get("attempts"),
+                    "error_code": error_code,
+                    "error_type": type(error).__name__,
+                },
+            )
+        try:
+            result = finish(
+                delivery_id,
+                outcome=outcome,
+                error_code=error_code,
+                retry_after_seconds=selected_retry_delay,
+            )
+        except Exception as error:
             STATE["failed"] += 1
-            logger.error("notification_worker.delivery_failed", extra={"outbox_id": outbox_id, "channel": row.get("channel"), "error_code": "delivery_unexpected", "error_type": type(error).__name__})
-        else:
-            if finish(outbox_id, succeeded=True):
-                STATE["sent"] += 1
-                mark_calendar_reminder_delivery(row, succeeded=True)
+            STATE["processed"] += 1
+            logger.error(
+                "notification_worker.delivery_result_persist_failed",
+                extra={
+                    "delivery_id": delivery_id,
+                    "tenant_id": row.get("tenant_id"),
+                    "user_id": row.get("user_id"),
+                    "channel": row.get("channel"),
+                    "attempt": row.get("attempts"),
+                    "error_type": type(error).__name__,
+                },
+            )
+            return
+        final_status = (result or {}).get("status")
+        if final_status == "sent":
+            STATE["sent"] += 1
+        elif final_status == "dead":
+            STATE["dead"] += 1
+            STATE["failed"] += 1
+        elif outcome != "sent":
+            STATE["failed"] += 1
+        logger.info(
+            "notification_worker.delivery_result",
+            extra={
+                "delivery_id": delivery_id,
+                "tenant_id": row.get("tenant_id"),
+                "user_id": row.get("user_id"),
+                "channel": row.get("channel"),
+                "attempt": row.get("attempts"),
+                "result": final_status or outcome,
+                "error_code": error_code,
+            },
+        )
+        if row.get("outbox_id") and final_status in {"sent", "dead"}:
+            try:
+                finalize_calendar_reminder_deliveries(str(row["outbox_id"]))
+            except Exception as error:
+                logger.error(
+                    "notification_worker.reminder_finalize_failed",
+                    extra={
+                        "delivery_id": delivery_id,
+                        "outbox_id": row.get("outbox_id"),
+                        "error_type": type(error).__name__,
+                    },
+                )
         STATE["processed"] += 1
+
     with ThreadPoolExecutor(max_workers=max(1, min(int(concurrency), 16))) as executor:
         list(executor.map(process, rows))
     STATE["last_poll_at"] = datetime.now(timezone.utc).isoformat()
@@ -112,20 +231,48 @@ def main() -> int:
     batch_size = max(1, min(int(os.getenv("NOTIFICATION_WORKER_BATCH_SIZE", "25")), 100))
     concurrency = max(1, min(int(os.getenv("NOTIFICATION_WORKER_CONCURRENCY", "2")), 16))
     poll_seconds = max(0.25, min(float(os.getenv("NOTIFICATION_WORKER_POLL_SECONDS", "5")), 60.0))
+    cleanup_due_at = time.monotonic()
     try:
         while not STOP_EVENT.is_set():
             try:
                 enqueue_due_calendar_reminders(limit=batch_size)
             except Exception as error:
                 logger.error("calendar_reminders.enqueue_failed", extra={"error_type": type(error).__name__})
-            processed = process_batch(limit=batch_size, concurrency=concurrency)
+            try:
+                resolved = process_resolution_batch(limit=batch_size, concurrency=concurrency)
+            except Exception as error:
+                resolved = 0
+                STATE["healthy"] = False
+                logger.error(
+                    "notification_worker.resolution_batch_failed",
+                    extra={"error_type": type(error).__name__},
+                )
+            try:
+                processed = process_batch(limit=batch_size, concurrency=concurrency)
+            except Exception as error:
+                processed = 0
+                STATE["healthy"] = False
+                logger.error(
+                    "notification_worker.delivery_batch_failed",
+                    extra={"error_type": type(error).__name__},
+                )
             try:
                 STATE.update(get_queue_metrics())
+                STATE.update(get_delivery_metrics())
             except Exception as error:
                 STATE["healthy"] = False
                 logger.error("notification_worker.metrics_failed", extra={"error_type": type(error).__name__})
-            if not processed:
+            if not resolved and not processed:
                 STOP_EVENT.wait(poll_seconds)
+            if time.monotonic() >= cleanup_due_at:
+                try:
+                    cleanup_delivery_data(limit=1000)
+                except Exception as error:
+                    logger.warning(
+                        "notification_worker.cleanup_failed",
+                        extra={"error_type": type(error).__name__},
+                    )
+                cleanup_due_at = time.monotonic() + 3600
     finally:
         STATE["healthy"] = False
         server.shutdown()

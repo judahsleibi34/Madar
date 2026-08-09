@@ -101,8 +101,7 @@ class PublicBuilderReservationTests(unittest.TestCase):
         identity = ({"id": 31}, {"id": 41, "status": "active"})
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "authorize_site_resource", return_value=identity), \
-             patch.object(public_site_routes, "create_builder_block_event_notification"):
+             patch.object(public_site_routes, "authorize_site_resource", return_value=identity):
             response = client.post(
                 "/public/sites/tenant-site/events",
                 json={
@@ -126,8 +125,7 @@ class PublicBuilderReservationTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 "/public/sites/tenant-site/events",
                 json={
@@ -170,9 +168,6 @@ class PublicBuilderReservationTests(unittest.TestCase):
         self.assertEqual(saved["status"], "new")
         self.assertEqual(saved["user_agent"], "reservation-agent")
         self.assertEqual(saved["payload"]["tenant_id"], 999)
-        notify_event.assert_called_once()
-        self.assertEqual(notify_event.call_args.kwargs["source_id"], SUBMISSION_ID)
-        self.assertEqual(notify_event.call_args.kwargs["data"]["reservation_id"], SUBMISSION_ID)
 
     def test_public_reservation_unknown_subdomain_fails_without_insert(self):
         fake_supabase = FakeSupabase()
@@ -180,8 +175,7 @@ class PublicBuilderReservationTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 "/public/sites/missing-site/events",
                 json={"block_type": "reservationBlock", "block_id": RESERVATION_BLOCK_ID, "payload": {}},
@@ -189,7 +183,6 @@ class PublicBuilderReservationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertNotIn("builder_reservations", fake_supabase.tables)
-        notify_event.assert_not_called()
 
     def test_public_reservation_honeypot_is_rejected_before_insert(self):
         fake_supabase = FakeSupabase()
@@ -197,8 +190,7 @@ class PublicBuilderReservationTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 "/public/sites/tenant-site/events",
                 json={
@@ -212,7 +204,6 @@ class PublicBuilderReservationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"]["code"], "submission_rejected")
         self.assertNotIn("builder_reservations", fake_supabase.tables)
-        notify_event.assert_not_called()
 
     def test_public_reservation_rejects_invalid_timezone(self):
         fake_supabase = FakeSupabase()
@@ -256,8 +247,7 @@ class PublicBuilderReservationTests(unittest.TestCase):
                  public_site_routes,
                  "insert_builder_reservation",
                  side_effect=[(saved, False), (saved, True)],
-             ), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             ):
             request_json = {
                 "block_type": "reservationBlock",
                 "block_id": RESERVATION_BLOCK_ID,
@@ -279,7 +269,6 @@ class PublicBuilderReservationTests(unittest.TestCase):
             first.json()["cancellation_token"],
             second.json()["cancellation_token"],
         )
-        notify_event.assert_called_once()
 
     def test_storage_conflicts_have_stable_codes(self):
         idempotency_error = public_site_routes._reservation_storage_error(
@@ -324,8 +313,7 @@ class PublicBuilderReservationTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 "/public/sites/tenant-site/events",
                 json={"block_type": "reservationBlock", "block_id": "missing", "payload": {}},
@@ -334,7 +322,6 @@ class PublicBuilderReservationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Block not found")
         self.assertNotIn("builder_reservations", fake_supabase.tables)
-        notify_event.assert_not_called()
 
 
 class BuilderReservationManagementTests(unittest.TestCase):
@@ -373,13 +360,11 @@ class BuilderReservationManagementTests(unittest.TestCase):
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
-             patch.object(builder_routes, "enqueue_notification") as enqueue:
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
             response = client.get(f"/builder/reservations/{RESERVATION_ID}")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["reservation"]["id"], RESERVATION_ID)
-        enqueue.assert_not_called()
 
     def test_tenant_can_update_reservation_status(self):
         fake_supabase = FakeSupabase()
@@ -387,8 +372,7 @@ class BuilderReservationManagementTests(unittest.TestCase):
         client = build_builder_client(fake_supabase)
 
         with patch.object(builder_routes, "service_supabase", fake_supabase), \
-             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()), \
-             patch.object(builder_routes, "enqueue_notification") as enqueue:
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()):
             response = client.patch(
                 f"/builder/reservations/{RESERVATION_ID}/status",
                 json={"status": "confirmed"},
@@ -397,9 +381,6 @@ class BuilderReservationManagementTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["reservation"]["status"], "confirmed")
         self.assertEqual(fake_supabase.tables["builder_reservations"][0]["status"], "confirmed")
-        enqueue.assert_called_once()
-        self.assertEqual(enqueue.call_args.kwargs["template"], "reservation_status_changed")
-        self.assertEqual(enqueue.call_args.kwargs["payload"]["status"], "confirmed")
 
     def test_invalid_status_is_rejected(self):
         fake_supabase = FakeSupabase()

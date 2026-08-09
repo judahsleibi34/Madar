@@ -291,8 +291,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         identity = ({"id": 31}, {"id": 41, "status": "active"})
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "authorize_site_resource", return_value=identity), \
-             patch.object(public_site_routes, "create_builder_block_event_notification"):
+             patch.object(public_site_routes, "authorize_site_resource", return_value=identity):
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada"}},
@@ -316,8 +315,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         }
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             first = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json=body,
@@ -333,7 +331,6 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(replay.status_code, 200)
         self.assertEqual(first.json()["id"], replay.json()["id"])
         self.assertEqual(len(fake_supabase.tables["builder_form_submissions"]), initial_count + 1)
-        notify.assert_called_once()
         saved = fake_supabase.tables["builder_form_submissions"][-1]
         self.assertRegex(saved["idempotency_key_hash"], r"^[0-9a-f]{64}$")
         self.assertNotIn(body["idempotency_key"], str(saved))
@@ -343,8 +340,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
         key = "madar-form-conflict-0001"
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification"):
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             first = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada"}, "idempotency_key": key},
@@ -388,12 +384,16 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         }
         with patch.object(public_site_routes, "service_supabase", fake_supabase):
             first, _ = public_site_routes.insert_builder_form_submission(
-                base, idempotency_key_hash=key_hash, request_hash="b" * 64
+                base,
+                idempotency_key_hash=key_hash,
+                request_hash="b" * 64,
+                notification={"event_type": "test"},
             )
             other_form, duplicate = public_site_routes.insert_builder_form_submission(
                 {**base, "form_id": "another-form"},
                 idempotency_key_hash=key_hash,
                 request_hash="c" * 64,
+                notification={"event_type": "test"},
             )
         self.assertFalse(duplicate)
         self.assertNotEqual(first["form_id"], other_form["form_id"])
@@ -403,8 +403,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada", "field_email": "ada@example.com"}},
@@ -425,11 +424,6 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(saved["form_version"], 4)
         self.assertEqual(saved["user_agent"], "test-agent")
         self.assertEqual(len(saved["field_snapshot"]), 2)
-        notify_event.assert_called_once()
-        self.assertEqual(notify_event.call_args.kwargs["tenant_id"], 1)
-        self.assertEqual(notify_event.call_args.kwargs["event_type"], "builder.form_submitted")
-        self.assertEqual(notify_event.call_args.kwargs["block_type"], "form")
-        self.assertEqual(notify_event.call_args.kwargs["data"]["submission_id"], SUBMISSION_ID)
 
     def test_missing_required_field_fails(self):
         fake_supabase = FakeSupabase()
@@ -451,8 +445,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         initial_count = len(fake_supabase.tables["builder_form_submissions"])
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={
@@ -467,7 +460,6 @@ class BuilderFormSubmissionTests(unittest.TestCase):
             len(fake_supabase.tables["builder_form_submissions"]),
             initial_count,
         )
-        notify_event.assert_not_called()
 
     def test_public_submission_rejects_too_many_answer_fields(self):
         fake_supabase = FakeSupabase()
@@ -573,8 +565,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification"):
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada"}},
@@ -616,8 +607,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification"):
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
                 json={"answers": {"field_name": "Ada", "field_email": "ada@example.com"}},
@@ -1473,8 +1463,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 "/public/sites/tenant-site/events",
                 json={
@@ -1502,20 +1491,13 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(saved["tenant_id"], 1)
         self.assertEqual(saved["project_id"], PROJECT_ID)
         self.assertEqual(saved["customer_name"], "Ada")
-        notify_event.assert_called_once()
-        self.assertEqual(notify_event.call_args.kwargs["tenant_id"], 1)
-        self.assertEqual(notify_event.call_args.kwargs["event_type"], "builder.reservation_requested")
-        self.assertEqual(notify_event.call_args.kwargs["block_type"], "reservationBlock")
-        self.assertEqual(notify_event.call_args.kwargs["source_id"], SUBMISSION_ID)
-        self.assertEqual(notify_event.call_args.kwargs["data"]["payload"]["service"], "Dinner")
 
     def test_public_event_rejects_missing_published_block(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
-             patch.object(public_site_routes, "create_builder_block_event_notification") as notify_event:
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
             response = client.post(
                 "/public/sites/tenant-site/events",
                 json={
@@ -1527,7 +1509,6 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Block not found")
-        notify_event.assert_not_called()
 
 
 

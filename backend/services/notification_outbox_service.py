@@ -216,14 +216,55 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
             )
         except ValueError:
             continue
+    delivery_rows: list[dict[str, Any]] = []
+    try:
+        delivery_response = (
+            database_client.table("notification_deliveries")
+            .select("status,created_at")
+            .in_("status", ["pending", "processing", "dead", "sent"])
+            .limit(5000)
+            .execute()
+        )
+        delivery_rows = [
+            row
+            for row in (getattr(delivery_response, "data", None) or [])
+            if isinstance(row, dict)
+        ]
+    except Exception:
+        # During migration-first rolling deployment the legacy queue can still
+        # be inspected before the delivery table becomes visible to PostgREST.
+        delivery_rows = []
+
     current = now or _now()
+    for row in delivery_rows:
+        if row.get("status") not in {"pending", "processing"} or not row.get("created_at"):
+            continue
+        try:
+            pending_dates.append(
+                datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00"))
+            )
+        except ValueError:
+            continue
     oldest_age = (
         max(0, int((current - min(pending_dates)).total_seconds()))
         if pending_dates
         else 0
     )
     return {
-        "queue_depth": counts["pending"] + counts["failed"],
+        "queue_depth": counts["pending"] + counts["failed"] + sum(
+            row.get("status") in {"pending", "processing"} for row in delivery_rows
+        ),
         "oldest_pending_age_seconds": oldest_age,
-        **counts,
+        **{
+            **counts,
+            "dead": counts["dead"] + sum(
+                row.get("status") == "dead" for row in delivery_rows
+            ),
+        },
+        "delivery_pending": sum(
+            row.get("status") == "pending" for row in delivery_rows
+        ),
+        "delivery_processing": sum(
+            row.get("status") == "processing" for row in delivery_rows
+        ),
     }

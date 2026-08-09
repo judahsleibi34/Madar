@@ -77,13 +77,39 @@ class FakeSupabase:
             "notification_events": [],
             "user_notifications": [],
             "web_push_subscriptions": [],
+            "notification_outbox": [],
         }
 
     def table(self, table_name):
         return FakeQuery(self, table_name)
 
+    def rpc(self, name, payload):
+        assert name == "create_notification_event_intent"
+        event = {
+            "id": "event-1",
+            "tenant_id": payload["p_tenant_id"],
+            "event_type": payload["p_event_type"],
+            "source_type": payload["p_source_type"],
+            "source_id": payload["p_source_id"],
+            "title": payload["p_title"],
+            "body": payload["p_body"],
+            "data": payload["p_data"],
+            "deduplication_key": payload["p_deduplication_key"],
+        }
+        self.tables["notification_events"].append(event)
+        self.tables["notification_outbox"].append({"event_id": event["id"]})
+        return FakeQueryResult([event])
 
-def test_create_tenant_notification_event_fans_out_to_active_members(monkeypatch):
+
+class FakeQueryResult:
+    def __init__(self, data):
+        self.data = data
+
+    def execute(self):
+        return self
+
+
+def test_create_tenant_notification_event_creates_atomic_durable_intent(monkeypatch):
     fake_supabase = FakeSupabase()
     monkeypatch.setattr(notification_service, "service_supabase", fake_supabase)
     monkeypatch.delenv("WEB_PUSH_VAPID_PUBLIC_KEY", raising=False)
@@ -102,9 +128,9 @@ def test_create_tenant_notification_event_fans_out_to_active_members(monkeypatch
 
     assert event["event_type"] == "builder.form_submitted"
     assert len(fake_supabase.tables["notification_events"]) == 1
-    assert len(fake_supabase.tables["user_notifications"]) == 2
-    assert {row["user_id"] for row in fake_supabase.tables["user_notifications"]} == {11, 12}
-    assert fake_supabase.tables["user_notifications"][0]["data"]["block_type"] == "form"
+    assert len(fake_supabase.tables["notification_outbox"]) == 1
+    assert fake_supabase.tables["user_notifications"] == []
+    assert event["data"]["block_type"] == "form"
 
 
 def test_internal_reminder_is_delivered_only_to_its_target_user(monkeypatch):

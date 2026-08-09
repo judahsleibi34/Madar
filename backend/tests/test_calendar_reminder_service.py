@@ -41,11 +41,46 @@ class Client:
                 {"id": "task-good", "tenant_id": 7, "owner_user_id": 12, "status": "todo", "title": "Good", "scheduled_start": "2026-07-22T09:00:00+00:00"},
             ],
             "tenant_memberships": [{"tenant_id": 7, "user_id": 12, "status": "active"}],
+            "notification_deliveries": [],
+            "notification_outbox": [],
         }
     def table(self, name): return Query(self, name)
 
 
+class RpcClient:
+    def __init__(self):
+        self.calls = []
+
+    def rpc(self, name, payload):
+        self.calls.append((name, payload))
+        return SimpleNamespace(
+            execute=lambda: SimpleNamespace(data=[{"id": "outbox"}])
+        )
+
+
 class CalendarReminderServiceTests(unittest.TestCase):
+    def test_due_reminder_enqueue_uses_transactional_rpc(self):
+        client = RpcClient()
+        queued = calendar_reminder_service._enqueue_reminder_notification(
+            reminder_source="event",
+            reminder={
+                "id": "00000000-0000-0000-0000-000000000001",
+                "tenant_id": 7,
+                "scheduled_for": "2026-07-22T08:50:00+00:00",
+            },
+            channel="email",
+            user_id=12,
+            recipient_reference="user:12",
+            deduplication_key="calendar-reminder:one",
+            payload={"reminder_id": "one"},
+            client=client,
+        )
+        self.assertEqual(queued["id"], "outbox")
+        self.assertEqual(
+            client.calls[0][0], "enqueue_calendar_reminder_notification"
+        )
+        self.assertEqual(client.calls[0][1]["p_user_id"], 12)
+
     def test_inactive_event_creator_is_cancelled_without_enqueue(self):
         client = Client()
         client.tables["calendar_task_reminders"] = []
@@ -88,6 +123,46 @@ class CalendarReminderServiceTests(unittest.TestCase):
             self.assertEqual(calendar_reminder_service.enqueue_due_calendar_reminders(client=client), 0)
         enqueue.assert_not_called()
         self.assertEqual(client.tables["calendar_task_reminders"][0]["failure_code"], "owner_inactive")
+
+    def test_reminder_waits_for_all_independent_deliveries(self):
+        client = Client()
+        client.tables["calendar_task_reminders"] = []
+        client.tables["calendar_event_reminders"] = [
+            {"id": "reminder", "delivery_status": "queued"}
+        ]
+        client.tables["notification_outbox"] = [
+            {
+                "id": "outbox",
+                "template": "calendar_reminder",
+                "payload": {"reminder_id": "reminder"},
+            }
+        ]
+        client.tables["notification_deliveries"] = [
+            {"outbox_id": "outbox", "status": "sent", "last_error_code": None},
+            {"outbox_id": "outbox", "status": "pending", "last_error_code": None},
+        ]
+        self.assertFalse(
+            calendar_reminder_service.finalize_calendar_reminder_deliveries(
+                "outbox", client=client
+            )
+        )
+        self.assertEqual(
+            client.tables["calendar_event_reminders"][0]["delivery_status"],
+            "queued",
+        )
+
+        client.tables["notification_deliveries"][1].update(
+            {"status": "dead", "last_error_code": "subscription_revoked"}
+        )
+        self.assertTrue(
+            calendar_reminder_service.finalize_calendar_reminder_deliveries(
+                "outbox", client=client
+            )
+        )
+        self.assertEqual(
+            client.tables["calendar_event_reminders"][0]["delivery_status"],
+            "delivered",
+        )
 
 
 if __name__ == "__main__":

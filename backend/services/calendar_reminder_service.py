@@ -34,6 +34,60 @@ def next_task_reminder_time(payload: dict[str, Any]) -> str | None:
     return (next_occurrence - timedelta(minutes=minutes_before)).isoformat() if next_occurrence else None
 
 
+def _enqueue_reminder_notification(
+    *,
+    reminder_source: str,
+    reminder: dict[str, Any],
+    channel: str,
+    user_id: int,
+    recipient_reference: str | None,
+    deduplication_key: str,
+    payload: dict[str, Any],
+    client,
+) -> dict[str, Any] | None:
+    rpc = getattr(client, "rpc", None)
+    if callable(rpc):
+        response = rpc(
+            "enqueue_calendar_reminder_notification",
+            {
+                "p_reminder_source": reminder_source,
+                "p_reminder_id": reminder["id"],
+                "p_scheduled_for": reminder["scheduled_for"],
+                "p_tenant_id": int(reminder["tenant_id"]),
+                "p_user_id": int(user_id),
+                "p_channel": channel,
+                "p_recipient_reference": recipient_reference,
+                "p_deduplication_key": deduplication_key,
+                "p_payload": payload,
+            },
+        ).execute()
+        rows = _rows(response)
+        return rows[0] if rows else None
+
+    # Lightweight in-memory unit-test clients do not implement RPC. Production
+    # enqueue and scheduled->queued transition share the database transaction.
+    queued = enqueue_notification(
+        channel=channel,
+        template="calendar_reminder",
+        tenant_id=int(reminder["tenant_id"]),
+        user_id=int(user_id),
+        recipient_reference=recipient_reference,
+        deduplication_key=deduplication_key,
+        payload=payload,
+        client=client,
+    )
+    if queued:
+        table = (
+            "calendar_task_reminders"
+            if reminder_source == "task"
+            else "calendar_event_reminders"
+        )
+        client.table(table).update(
+            {"delivery_status": "queued", "failure_code": None}
+        ).eq("id", reminder.get("id")).eq("delivery_status", "scheduled").execute()
+    return queued
+
+
 def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
     database_client = client or service_supabase
     due = _rows(
@@ -102,20 +156,17 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
             },
             "reminder_id": reminder.get("id"),
         }
-        queued_row = enqueue_notification(
+        queued_row = _enqueue_reminder_notification(
+            reminder_source="event",
+            reminder=reminder,
             channel=outbox_channel,
-            template="calendar_reminder",
-            tenant_id=int(reminder["tenant_id"]),
-            user_id=int(user_id) if user_id is not None else None,
+            user_id=int(user_id),
             recipient_reference=f"user:{user_id}" if configured_channel == "email" and user_id else None,
             deduplication_key=f"calendar-reminder:{reminder['id']}",
             payload=payload,
             client=database_client,
         )
         if queued_row:
-            database_client.table("calendar_event_reminders").update(
-                {"delivery_status": "queued", "failure_code": None}
-            ).eq("id", reminder.get("id")).eq("delivery_status", "scheduled").execute()
             queued += 1
     task_due = _rows(
         database_client.table("calendar_task_reminders")
@@ -191,11 +242,11 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
             "task_recurrence_rule": task.get("recurrence_rule"),
             "task_recurrence_start": task.get("scheduled_start"),
         }
-        queued_row = enqueue_notification(
+        queued_row = _enqueue_reminder_notification(
+            reminder_source="task",
+            reminder=reminder,
             channel=outbox_channel,
-            template="calendar_reminder",
-            tenant_id=int(reminder["tenant_id"]),
-            user_id=int(user_id) if user_id is not None else None,
+            user_id=int(user_id),
             recipient_reference=f"user:{user_id}" if configured_channel == "email" and user_id else None,
             deduplication_key=f"calendar-task-reminder:{reminder['id']}:{reminder.get('scheduled_for')}",
             payload=payload,
@@ -238,3 +289,43 @@ def mark_calendar_reminder_delivery(
         query.execute()
         return
     database_client.table("calendar_event_reminders").update(values).eq("id", reminder_id).execute()
+
+
+def finalize_calendar_reminder_deliveries(outbox_id: str, *, client=None) -> bool:
+    """Finalize a reminder only after every independent delivery is terminal."""
+    database_client = client or service_supabase
+    deliveries = _rows(
+        database_client.table("notification_deliveries")
+        .select("status,last_error_code")
+        .eq("outbox_id", outbox_id)
+        .execute()
+    )
+    if not deliveries or any(
+        row.get("status") in {"pending", "processing"} for row in deliveries
+    ):
+        return False
+    outbox_rows = _rows(
+        database_client.table("notification_outbox")
+        .select("*")
+        .eq("id", outbox_id)
+        .limit(1)
+        .execute()
+    )
+    if not outbox_rows:
+        return False
+    succeeded = any(row.get("status") == "sent" for row in deliveries)
+    failure_code = next(
+        (
+            str(row.get("last_error_code"))
+            for row in deliveries
+            if row.get("last_error_code")
+        ),
+        "delivery_failed",
+    )
+    mark_calendar_reminder_delivery(
+        outbox_rows[0],
+        succeeded=succeeded,
+        failure_code=None if succeeded else failure_code,
+        client=database_client,
+    )
+    return True
