@@ -1,4 +1,4 @@
-﻿export const PUBLIC_ROUTES = {
+export const PUBLIC_ROUTES = {
   home: "/",
   pricing: "/pricing",
   pricingBasePlans: "/pricing/base-plans",
@@ -25,6 +25,7 @@ export const DASHBOARD_ROUTES = {
   ecommerceTags: "/ecommerce/tags",
   ecommerceCategories: "/ecommerce/categories",
   ecommerceProducts: "/ecommerce/products",
+  ecommerceCvRerank: "/ecommerce/cv-rerank",
   ecommerceStore: "/ecommerce/store",
   notifications: "/notifications",
   myPlan: "/my-plan",

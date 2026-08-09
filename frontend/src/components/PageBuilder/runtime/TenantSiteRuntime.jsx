@@ -15,12 +15,17 @@ import {
 } from "../services/PageBuilder.api";
 import { createFormIdempotencyKey } from "./formSubmission";
 import { getFormSections } from "../core/PageBuilder.factories";
+import { createElementRenderer } from "../core/PageBuilder.elementRenderer";
+import SiteRenderer from "../core/PageBuilder.siteRenderer";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import {
-  getRichTextRanges,
-  renderRichText,
-  renderRichTextBlocks,
-} from "../core/PageBuilder.text";
+  getArtboardElementPosition,
+  getLiveArtboardProfile,
+  getLiveArtboardViewportMode,
+  getLivePresentationZoom,
+} from "../core/PageBuilder.artboard";
+import { isSmartResponsiveProject } from "../core/PageBuilder.responsiveCapabilities";
+import { getSmartLayoutWidth } from "../core/PageBuilder.responsiveLayout";
 import {
   getContentDirection,
   getDefaultFormLanguage,
@@ -30,9 +35,6 @@ import {
   normalizeLanguageMode,
 } from "../core/PageBuilder.localization";
 import "../../../styles/admin/PageBuilder/index.css";
-import PageBuilderCarousel from "../ui/PageBuilderCarousel";
-import AutoFitDirectText from "../core/PageBuilder.autoFitText";
-import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
 import { resolveReservationBlockValue } from "../core/PageBuilder.reservations";
@@ -49,7 +51,7 @@ import {
   getNavigablePages,
   getPageNavigationLabel,
 } from "../core/PageBuilder.navigation";
-import { normalizeElementAction, runPublicElementAction } from "../core/PageBuilder.actions";
+import { runPublicElementAction } from "../core/PageBuilder.actions";
 import { getStoredUrlError } from "../core/PageBuilder.url";
 import {
   getFooterLinkItems,
@@ -58,24 +60,12 @@ import {
 } from "../core/PageBuilder.footerLinks";
 import { createSiteChromeRenderers } from "../core/PageBuilder.siteChrome";
 import {
-  getCarouselVariant,
-  getCarouselWidthValue,
-  getComponentPositionClass,
   getElementLayoutWidth,
   getElementPlacementMargins,
-  getRowCarouselElements,
   normalizeElementAlignSelf,
 } from "../core/PageBuilder.elementLayout";
 import {
-  getDirectElementMinimumSize,
-  getMetricMinimumHeight,
-  getMetricItems,
-  getSectionCanvasHeight,
-} from "../core/PageBuilder.layout";
-import {
   getBuilderElementStyle,
-  getResponsiveDirectCanvasStyles,
-  getDirectElementFrameStyle as getCanonicalDirectElementFrameStyle,
 } from "../core/PageBuilder.styles";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
@@ -103,6 +93,14 @@ export const readCachedTenantBrand = (storage, subdomain) => {
     return null;
   }
 };
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getTenantLoadingLogoUrl = ({
+  settingsLogoUrl = "",
+  logoUrl = "",
+  loadingImageUrl = "",
+} = {}) =>
+  String(settingsLogoUrl || logoUrl || loadingImageUrl || "").trim();
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const cacheTenantBrand = (storage, subdomain, value) => {
@@ -133,11 +131,6 @@ const splitLines = (value) =>
 
 const isInternalPageReference = (value) =>
   /^page_[a-z0-9-]{8,}$/i.test(String(value || "").trim());
-
-const getListItems = (element) =>
-  Array.isArray(element?.listItems) && element.listItems.length
-    ? element.listItems
-    : splitLines(element?.content);
 
 const getRuntimeFieldOptions = (field, lang = "en") =>
   getLocalizedOptions(field, lang).filter((option) =>
@@ -360,16 +353,8 @@ const getCleanSubdomain = (value = "") =>
 // 412px and 430px phones from being rendered as a scaled-down tablet canvas.
 // eslint-disable-next-line react-refresh/only-export-components
 export const getRuntimeViewportForWidth = (width) => {
-  const availableWidth = Math.max(1, Number(width) || viewports.desktop);
-  if (availableWidth <= 480) return "mobile";
-  if (availableWidth <= viewports.tablet) return "tablet";
-  return "desktop";
+  return getLiveArtboardViewportMode(width);
 };
-
-const getScreenViewport = () =>
-  typeof window === "undefined"
-    ? "desktop"
-    : getRuntimeViewportForWidth(window.innerWidth);
 
 const getRuntimeAvailableWidth = () => {
   if (typeof window === "undefined") return viewports.desktop;
@@ -381,60 +366,24 @@ const getRuntimeAvailableWidth = () => {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const getRuntimeCanvasScale = (availableWidth, logicalWidth) => {
-  const available = Math.max(1, Number(availableWidth) || 1);
-  const logical = Math.max(1, Number(logicalWidth) || 1);
-  return available / logical;
+  const mode = Number(logicalWidth) === viewports.mobile
+    ? "mobile"
+    : Number(logicalWidth) === viewports.tablet
+      ? "tablet"
+      : "desktop";
+  return getLivePresentationZoom(availableWidth, mode);
 };
 
 // Older projects may not contain all three breakpoint positions. Normalize the
 // nearest saved layout instead of applying desktop pixels directly to a phone.
 // eslint-disable-next-line react-refresh/only-export-components
 export const getRuntimeDirectPosition = (element, viewportName) => {
-  const positions = element?.position || {};
-  if (positions[viewportName]) return positions[viewportName];
-
-  const fallbackOrder = viewportName === "mobile"
-    ? ["tablet", "desktop"]
-    : viewportName === "tablet"
-      ? ["desktop", "mobile"]
-      : ["tablet", "mobile"];
-  const sourceViewport = fallbackOrder.find((name) => positions[name]);
-  if (!sourceViewport) return {};
-
-  const source = positions[sourceViewport];
-  const sourceWidth = viewports[sourceViewport] || viewports.desktop;
-  const targetWidth = viewports[viewportName] || viewports.desktop;
-  const ratio = targetWidth / sourceWidth;
-
-  return {
-    ...source,
-    x: (Number(source.x) || 0) * ratio,
-    y: (Number(source.y) || 0) * ratio,
-    width: (Number(source.width) || 240) * ratio,
-    height: (Number(source.height) || 80) * ratio,
-  };
+  return getArtboardElementPosition(element, viewportName);
 };
 
-// Published phones favor readable, collision-free content over preserving
-// accidental overlaps from the free-position authoring canvas.
 // eslint-disable-next-line react-refresh/only-export-components
-export const getRuntimeDirectElements = (elements = [], viewportName = "desktop") => {
-  const items = Array.isArray(elements) ? elements : [];
-  if (viewportName !== "mobile") return items;
-
-  return items
-    .map((element, sourceIndex) => ({
-      element,
-      sourceIndex,
-      position: getRuntimeDirectPosition(element, viewportName),
-    }))
-    .sort((left, right) =>
-      (Number(left.position.y) || 0) - (Number(right.position.y) || 0) ||
-      (Number(left.position.x) || 0) - (Number(right.position.x) || 0) ||
-      left.sourceIndex - right.sourceIndex
-    )
-    .map(({ element }) => element);
-};
+export const getRuntimeDirectElements = (elements = []) =>
+  Array.isArray(elements) ? elements : [];
 
 const decodePathSegment = (value) => {
   try {
@@ -456,8 +405,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   const cleanSubdomain = getCleanSubdomain(subdomain);
   const isPublicRuntime = !draftPreview;
-  const [runtimeViewport, setRuntimeViewport] = useState(getScreenViewport);
-  const [runtimeAvailableWidth, setRuntimeAvailableWidth] = useState(getRuntimeAvailableWidth);
+  const [runtimeLayout, setRuntimeLayout] = useState(() => {
+    const availableWidth = getRuntimeAvailableWidth();
+    return { availableWidth, ...getLiveArtboardProfile(availableWidth) };
+  });
+  const {
+    availableWidth: runtimeAvailableWidth,
+    viewportMode: runtimeViewport,
+    logicalWidth: runtimeLogicalWidth,
+    presentationZoom: runtimePresentationZoom,
+  } = runtimeLayout;
   const activePath = location.pathname;
   const previewBasePath = getBuilderPreviewBasePath(projectId);
   const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
@@ -476,6 +433,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     ? decodePathSegment(standaloneFormMatch[1])
     : "");
   const [project, setProject] = useState(null);
+  const smartResponsiveEnabled = isSmartResponsiveProject(project);
+  const effectiveRuntimeLogicalWidth = smartResponsiveEnabled
+    ? getSmartLayoutWidth(runtimeAvailableWidth)
+    : runtimeLogicalWidth;
+  const effectiveRuntimePresentationZoom = smartResponsiveEnabled
+    ? 1
+    : runtimePresentationZoom;
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState("loading");
   const [cachedTenantBrand, setCachedTenantBrand] = useState(() =>
@@ -681,7 +645,22 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
         if (cancelled) return;
 
-        setPublicSiteProfile(publicContent?.site || null);
+        const publicProfile = publicContent?.site || null;
+        setPublicSiteProfile(publicProfile);
+
+        const settingsLogoUrl = String(publicProfile?.logo_url || "").trim();
+        const storedBrand = readCachedTenantBrand(getTenantBrandStorage(), cleanSubdomain);
+        if (settingsLogoUrl && storedBrand?.logoUrl !== settingsLogoUrl) {
+          const nextBrand = {
+            brand: publicProfile?.brand || getTenantBrandFallback(cleanSubdomain),
+            logoUrl: settingsLogoUrl,
+            loadingImageUrl: "",
+          };
+          setCachedTenantBrand(nextBrand);
+          cacheTenantBrand(getTenantBrandStorage(), cleanSubdomain, nextBrand);
+          await new Promise((resolve) => window.setTimeout(resolve, 600));
+          if (cancelled) return;
+        }
 
         if (standaloneFormId) {
           if (publicContent?.form && typeof publicContent.form === "object") {
@@ -833,12 +812,12 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     if (!isPublicRuntime || publicSiteState !== "ready") return;
     const nextBrand = {
       brand: brandName,
-      logoUrl: site.logoUrl || "",
+      logoUrl: publicSiteProfile?.logo_url || site.logoUrl || "",
       loadingImageUrl: site.loadingImageUrl || "",
     };
     setCachedTenantBrand(nextBrand);
     cacheTenantBrand(getTenantBrandStorage(), cleanSubdomain, nextBrand);
-  }, [brandName, cleanSubdomain, isPublicRuntime, publicSiteState, site.loadingImageUrl, site.logoUrl]);
+  }, [brandName, cleanSubdomain, isPublicRuntime, publicSiteProfile?.logo_url, publicSiteState, site.loadingImageUrl, site.logoUrl]);
 
   const getPageDestinationPath = useCallback((page) => {
     if (!page) {
@@ -917,29 +896,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     showUnavailable: setPublicActionMessage,
   });
 
-  const getPublicButtonLink = (element) => {
-    const action = normalizeElementAction(element?.action);
-
-    if (action.type === "goToPage") {
-      const targetPage = pages.find((page) => String(page?.id || "") === action.pageId);
-      return targetPage ? { to: getPageDestinationPath(targetPage) } : null;
-    }
-
-    if (action.type === "openUrl" && !getStoredUrlError(action.url, {
-      fieldName: "Button action URL",
-      allowRelative: false,
-      allowEmpty: false,
-    })) {
-      return {
-        href: action.url,
-        target: action.openInNewTab === false ? undefined : "_blank",
-        rel: action.openInNewTab === false ? undefined : "noopener noreferrer",
-      };
-    }
-
-    return null;
-  };
-
   const resolveFooterPageLink = (value) => {
     const normalizedValue = String(value || "")
       .toLowerCase()
@@ -1005,7 +961,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     authLoading: tenantAuth.loading,
     user: tenantAuth.user,
   });
-  const activePageSections = getRuntimePageSections(activePage);
 
   useEffect(() => {
     setPublicActionMessage("");
@@ -1064,40 +1019,15 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   useEffect(() => {
     const syncViewport = () => {
-      setRuntimeViewport(getScreenViewport());
-      setRuntimeAvailableWidth(getRuntimeAvailableWidth());
+      const availableWidth = getRuntimeAvailableWidth();
+      setRuntimeLayout({ availableWidth, ...getLiveArtboardProfile(availableWidth) });
     };
     syncViewport();
     window.addEventListener("resize", syncViewport);
     return () => window.removeEventListener("resize", syncViewport);
   }, []);
 
-  const getElementStyle = (element, isFree = false, section = null) => {
-    if (isFree) {
-      const position = getRuntimeDirectPosition(element, runtimeViewport);
-      const viewportWidth = viewports[runtimeViewport] || viewports.desktop;
-      const sectionHeight = getSectionCanvasHeight(section, runtimeViewport);
-      const left = `${((Number(position.x) || 0) / viewportWidth) * 100}%`;
-      const top = `${((Number(position.y) || 0) / sectionHeight) * 100}%`;
-      const width = `${((Number(position.width) || 240) / viewportWidth) * 100}%`;
-      const minHeight = `${((Number(position.height) || 80) / sectionHeight) * 100}%`;
-
-      return {
-        ...element.styles,
-        "--builder-element-color": element.styles?.color || "inherit",
-        "--builder-element-bg": element.styles?.backgroundColor || "transparent",
-        "--builder-element-radius": element.styles?.borderRadius || "0",
-        "--builder-element-font-size": element.styles?.fontSize || "inherit",
-        "--builder-element-text-align": element.styles?.textAlign || "inherit",
-        position: "absolute",
-        left,
-        top,
-        width,
-        minHeight,
-        maxWidth: `calc(100% - ${left})`,
-      };
-    }
-    return getBuilderElementStyle({
+  const getElementStyle = (element) => getBuilderElementStyle({
       element,
       selected: { type: "", id: "" },
       carouselElementTypes,
@@ -1105,23 +1035,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       getElementLayoutWidth,
       normalizeElementAlignSelf,
     });
-  };
-
-  const getDirectElementFrameStyle = (element, section, canvasScale = 1) => {
-    const position = getRuntimeDirectPosition(element, runtimeViewport);
-    const viewportWidth = viewports[runtimeViewport] || viewports.desktop;
-    const sectionHeight = getSectionCanvasHeight(section, runtimeViewport);
-
-    return getCanonicalDirectElementFrameStyle({
-      element,
-      position,
-      viewportWidth,
-      sectionHeight,
-      getMetricMinimumHeight,
-      getDirectElementMinimumSize,
-      canvasScale,
-    });
-  };
 
   const setFormAnswer = (instanceKey, fieldId, value) => {
     setFormAnswers((prev) => ({
@@ -1705,97 +1618,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     );
   };
 
-  const renderElement = (element, isFree = false, section = null) => {
-    const props = {
-      className: `builder-element builder-element-${element.type}`,
-      style: getElementStyle(element, isFree, section),
-    };
-
-    if (element.type === "heading" || element.type === "text") return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={element.id} {...props}>{renderRichTextBlocks(element)}</AutoFitDirectText>;
-    if (element.type === "button") {
-      const link = getPublicButtonLink(element);
-      const fitKey = `${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`;
-      const content = renderRichText(element.content, getRichTextRanges(element, "content"));
-
-      if (link?.to) return <AutoFitDirectText as={Link} fitKey={fitKey} key={element.id} {...props} to={link.to}>{content}</AutoFitDirectText>;
-      if (link?.href) return <AutoFitDirectText as="a" fitKey={fitKey} key={element.id} {...props} {...link}>{content}</AutoFitDirectText>;
-      return <AutoFitDirectText as="button" fitKey={fitKey} key={element.id} type="button" {...props} onClick={() => runPublicButtonAction(element)}>{content}</AutoFitDirectText>;
-    }
-    if (element.type === "image") {
-      const imageSrc = resolveMediaUrl(element.content);
-      return imageSrc ? (
-        <img key={element.id} {...props} src={imageSrc} alt={element.name || ""} />
-      ) : null;
-    }
-    if (carouselElementTypes.has(element.type)) {
-      const carouselWidth = getCarouselWidthValue(element);
-      const carouselFrameStyle = {
-        ...props.style,
-        width: "100%",
-        maxWidth: "100%",
-        alignSelf: "stretch",
-        marginLeft: undefined,
-        marginRight: undefined,
-        "--builder-element-width": "100%",
-        "--builder-element-align": "stretch",
-      };
-
-      return (
-        <div
-          key={element.id}
-          {...props}
-          className={`${props.className} carousel-position-frame ${getComponentPositionClass(element.styles?.alignSelf)}`}
-          style={carouselFrameStyle}
-        >
-          <div
-            className="carousel-position-inner"
-            style={{ width: carouselWidth, maxWidth: carouselWidth }}
-          >
-            <PageBuilderCarousel
-              autoScroll={Boolean(element.autoScroll)}
-              autoScrollMs={element.autoScrollMs}
-              content={element.content}
-              name={element.name}
-              variant={getCarouselVariant(element)}
-            />
-          </div>
-        </div>
-      );
-    }
-    if (element.type === "list") {
-      return (
-        <div key={element.id} {...props} className={`${props.className} list-style-${element.listStyle || "disc"}`} style={{ ...props.style, "--list-count": Math.max(1, getListItems(element).length) }}>
-          {element.listTitle && <h3 className="builder-list-title">{renderRichText(element.listTitle, getRichTextRanges(element, "listTitle"))}</h3>}
-          <ul>
-            {getListItems(element).map((item, index) => <li key={`${item}_${index}`} style={{ "--list-index": index }}>{renderRichText(item, getRichTextRanges(element, "listItem", index))}</li>)}
-          </ul>
-        </div>
-      );
-    }
-    if (element.type === "divider" || element.type === "thinDivider") return <hr key={element.id} {...props} />;
-    if (element.type === "embed") {
-      return (
-        <div key={element.id} {...props}>
-          <strong>{runtimeCopy.runtime.embed}</strong>
-          <a href={element.content} target="_blank" rel="noreferrer">{element.content}</a>
-        </div>
-      );
-    }
-    if (element.type === "metric") {
-      const metrics = getMetricItems(element);
-      const columns = Math.max(2, Math.min(4, Number(element.metricColumns) || 2));
-      return (
-        <div key={element.id} {...props} className={`${props.className} metric-group`} style={{ ...props.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "var(--theme-text)", "--metric-symbol-color": element.styles?.metricSymbolColor || "var(--theme-warning)" }}>
-          {metrics.map((metric, index) => (
-            <div className="metric-group-item" key={`${element.id}_${index}`}>
-              <strong className="metric-value"><CountUpText value={metric.value} /></strong>
-              <span className="metric-label">{metric.label}</span>
-              {metric.description && <span className="metric-description">{metric.description}</span>}
-            </div>
-          ))}
-        </div>
-      );
-    }
+  const renderRuntimeElementOverride = (element, { commonProps: props }) => {
     if (element.type === "loginBlock" || element.type === "registrationBlock") {
       const defaultRegistrationMode = element.type === "registrationBlock";
       const isRegistration = authPanelModes[element.id] ?? defaultRegistrationMode;
@@ -1900,8 +1723,28 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     }
     if (element.type === "responsesTable") return null;
 
-    return <div key={element.id} {...props}>{element.content}</div>;
+    return undefined;
   };
+
+  const renderElement = createElementRenderer({
+    carouselElementTypes,
+    selected: { type: "", id: "" },
+    preview: true,
+    renderMode: "runtime",
+    getFreeElementStyle: getElementStyle,
+    getElementStyle,
+    startDrag: () => {},
+    findElementLocation: () => null,
+    setInsertTarget: () => {},
+    setSelected: () => {},
+    captureCanvasTextSelection: () => {},
+    shouldIgnoreInlineTextBlur: () => false,
+    updateElementInlineText: () => {},
+    runElementAction: runPublicButtonAction,
+    renderConnectedForm,
+    getReservationBlockValue: (element) => resolveReservationBlockValue(element, project?.pages),
+    renderElementOverride: renderRuntimeElementOverride,
+  });
 
   const selectCanvasPage = (pageId) => {
     const targetPage = pages.find((page) => String(page.id) === String(pageId));
@@ -1946,9 +1789,11 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         }
       : cachedTenantBrand;
     const loadingBrand = resolvedBrand?.brand || getTenantBrandFallback(cleanSubdomain);
-    const loadingLogo = resolveMediaUrl(
-      resolvedBrand?.loadingImageUrl || resolvedBrand?.logoUrl
-    );
+    const loadingLogo = resolveMediaUrl(getTenantLoadingLogoUrl({
+      settingsLogoUrl: publicSiteProfile?.logo_url,
+      logoUrl: resolvedBrand?.logoUrl,
+      loadingImageUrl: resolvedBrand?.loadingImageUrl,
+    }));
     const loadingInitial = loadingBrand.trim().slice(0, 1).toUpperCase() || "M";
 
     return (
@@ -2022,103 +1867,35 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       );
     }
 
+    const filterElement = (element) =>
+      tenantAuth.user ||
+      activePage?.id !== authEntryPage?.id ||
+      authElementTypes.has(element.type);
+
     return (
       <main key={activePage.id} className="tenant-runtime-page" data-page-id={activePage.id}>
-        <div
-          className={`builder-canvas viewport-${runtimeViewport}`}
-          style={{
-            ...getPageBuilderThemeVars(project.theme),
-            "--builder-canvas-fit-width": "100%",
-          }}
-        >
-          {renderCanvasHeader()}
-          {activePageSections.map((section) => {
-            if (section.mode === "free" || section.mode === "direct") {
-              const logicalWidth = viewports[runtimeViewport] || viewports.desktop;
-              const logicalHeight = getSectionCanvasHeight(section, runtimeViewport);
-              const canvasScale = getRuntimeCanvasScale(runtimeAvailableWidth, logicalWidth);
-              const directCanvasStyles = getResponsiveDirectCanvasStyles({
-                logicalHeight,
-                scale: canvasScale,
-              });
-              return (
-                <section
-                  key={section.id}
-                  className={`site-section direct-layout-section width-${section.layout.width}`}
-                  style={{
-                    backgroundColor: section.layout.background,
-                    ...directCanvasStyles.section,
-                  }}
-                >
-                  <div
-                    className="direct-layout-scale-shell"
-                    style={directCanvasStyles.shell}
-                  >
-                    <div
-                      className="direct-layout-frame"
-                      style={directCanvasStyles.frame}
-                    >
-                      {getRuntimeDirectElements(section.freeElements, runtimeViewport)
-                        .filter((element) =>
-                          tenantAuth.user ||
-                          activePage?.id !== authEntryPage?.id ||
-                          authElementTypes.has(element.type)
-                        )
-                        .map((element) => (
-                        <div
-                          key={element.id}
-                          className={`direct-element-frame direct-element-frame-${element.type} ${element.type === "reservationBlock" && element.directSizeMode === "fixed" ? "is-fixed-size" : ""}`}
-                          style={getDirectElementFrameStyle(element, section, canvasScale)}
-                        >
-                          <div className="direct-element-content">
-                            {renderElement(element, false)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-              );
-            }
-
-            return (
-              <section
-                key={section.id}
-                className={`site-section width-${section.layout.width} padding-${section.layout.paddingY}`}
-                style={{ backgroundColor: section.layout.background }}
-              >
-                {(section.rows || []).map((row) => (
-                  <div
-                    key={row.id}
-                    className={`site-row columns-${row.layout.columns} align-${row.layout.align} gap-${row.layout.gap}`}
-                  >
-                    {(row.columns || []).map((column) => (
-                      <div
-                        key={column.id}
-                        className={`site-column column-align-${column.layout.align}`}
-                      >
-                        {(column.elements || [])
-                          .filter((element) =>
-                            tenantAuth.user ||
-                            activePage?.id !== authEntryPage?.id ||
-                            authElementTypes.has(element.type)
-                          )
-                          .filter((element) => !carouselElementTypes.has(element.type))
-                          .map((element) => renderElement(element, false))}
-                      </div>
-                    ))}
-                    {getRowCarouselElements(row, carouselElementTypes).map((element) => renderElement(element, false))}
-                  </div>
-                ))}
-              </section>
-            );
-          })}
-          {renderCanvasFooter()}
-        </div>
+        <SiteRenderer
+          project={project}
+          activePage={activePage}
+          viewportMode={runtimeViewport}
+          presentationZoom={effectiveRuntimePresentationZoom}
+          availablePresentationWidth={runtimeAvailableWidth}
+          responsiveLayoutWidth={effectiveRuntimeLogicalWidth}
+          renderElement={renderElement}
+          renderSiteHeader={renderCanvasHeader}
+          renderSiteFooter={renderCanvasFooter}
+          carouselElementTypes={carouselElementTypes}
+          filterElement={filterElement}
+          getDirectElementPosition={smartResponsiveEnabled
+            ? undefined
+            : (element) => getRuntimeDirectPosition(element, runtimeViewport)}
+          canvasStyle={{ "--site-runtime-logical-width": `${effectiveRuntimeLogicalWidth}px` }}
+        />
       </main>
     );
   };
 
+  // eslint-disable-next-line no-unused-vars
   const renderHeader = () => (
     <header className="tenant-site-header">
       <div className="tenant-site-header-inner">
@@ -2174,6 +1951,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     </header>
   );
 
+  // eslint-disable-next-line no-unused-vars
   const renderFooter = () => (
     <footer className="tenant-site-footer">
       <div className="tenant-footer-grid">

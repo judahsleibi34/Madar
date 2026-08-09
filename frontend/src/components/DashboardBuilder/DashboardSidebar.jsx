@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,6 +11,7 @@ import {
   Database,
   CreditCard,
   FolderTree,
+  FileSearch,
   Package,
   ShoppingBag,
   Tag,
@@ -227,6 +228,11 @@ export default function DashboardSidebar({
       label: t("sidebar.dashboard"),
       path: DASHBOARD_ROUTES.dashboard,
       icon: LayoutDashboard,
+    },
+    {
+      label: t("sidebar.cvRerank", { defaultValue: "CV Rerank" }),
+      path: DASHBOARD_ROUTES.ecommerceCvRerank,
+      icon: FileSearch,
     },
     {
       label: t("sidebar.myPlan"),

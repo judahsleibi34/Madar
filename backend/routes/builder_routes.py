@@ -3,6 +3,7 @@ import json
 import os
 import re
 import logging
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -175,6 +176,17 @@ def normalize_published_page_routes(schema: dict[str, Any]) -> dict[str, Any]:
     default_page_id = str(default_page.get("id") or "")
     schema["defaultPageId"] = default_page_id
 
+    # The public root route must stay reachable without role membership.
+    for role in schema.get("roles") or []:
+        resource_access = role.get("resourceAccess") if isinstance(role, dict) else None
+        page_ids = resource_access.get("pageIds") if isinstance(resource_access, dict) else None
+        if isinstance(page_ids, list):
+            resource_access["pageIds"] = [
+                page_id
+                for page_id in page_ids
+                if str(page_id) != default_page_id
+            ]
+
     route_occurrences: dict[str, list[dict[str, Any]]] = {}
     for index, page in enumerate(pages):
         page_id = str(page.get("id") or "")
@@ -334,6 +346,108 @@ def _raise_revision_conflict(project_id: str, tenant_id: int | str) -> None:
             context=context,
         ),
     )
+
+
+def _validate_smart_responsive_geometry(schema: dict[str, Any]) -> None:
+    responsive_layout = schema.get("responsiveLayout")
+    if not isinstance(responsive_layout, dict) or responsive_layout.get("mode") != "smart":
+        return
+    try:
+        engine_version = int(responsive_layout.get("engineVersion"))
+    except (TypeError, ValueError):
+        engine_version = 0
+    if engine_version != 1:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail(
+                "publish_validation_failed",
+                "This smart responsive engine version cannot be published.",
+                context={"issue_type": "unsupported_responsive_engine", "engine_version": engine_version},
+            ),
+        )
+
+    anchor_widths = {"desktop": 1200.0, "tablet": 768.0, "mobile": 390.0}
+
+    def finite_rect(value: Any) -> dict[str, float] | None:
+        if not isinstance(value, dict):
+            return None
+        try:
+            rect = {key: float(value.get(key)) for key in ("x", "y", "width", "height")}
+        except (TypeError, ValueError):
+            return None
+        if not all(math.isfinite(item) for item in rect.values()) or rect["width"] <= 0 or rect["height"] <= 0:
+            return None
+        return rect
+
+    for page in schema.get("pages") or []:
+        if not isinstance(page, dict):
+            continue
+        for section in page.get("sections") or []:
+            if not isinstance(section, dict):
+                continue
+            elements = [element for element in section.get("freeElements") or [] if isinstance(element, dict)]
+            for viewport_mode, logical_width in anchor_widths.items():
+                manual_solids: list[dict[str, Any]] = []
+                for element in elements:
+                    capabilities = element.get("responsive", {}).get("capabilities", {})
+                    collision_policy = capabilities.get("collisionPolicy") if isinstance(capabilities, dict) else None
+                    if element.get("layer") == "behindText" or collision_policy in {"overlay", "background"}:
+                        continue
+                    overrides = element.get("responsive", {}).get("overrides", {})
+                    override = overrides.get(viewport_mode) if isinstance(overrides, dict) else None
+                    if not isinstance(override, dict) or override.get("mode") != "manual":
+                        continue
+                    rect = finite_rect(override.get("rect"))
+                    block_id = str(element.get("id") or "")
+                    if rect is None:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=error_detail(
+                                "publish_validation_failed",
+                                "A smart responsive manual override has invalid geometry.",
+                                context={"issue_type": "invalid_manual_responsive_rect", "block_id": block_id, "viewport": viewport_mode},
+                            ),
+                        )
+                    if rect["x"] < 0 or rect["x"] + rect["width"] > logical_width:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=error_detail(
+                                "publish_validation_failed",
+                                "A smart responsive manual override is outside its artboard.",
+                                context={"issue_type": "manual_responsive_out_of_bounds", "block_id": block_id, "viewport": viewport_mode},
+                            ),
+                        )
+                    manual_solids.append({"id": block_id, "rect": rect})
+
+                active: list[dict[str, Any]] = []
+                for current in sorted(manual_solids, key=lambda item: (item["rect"]["x"], item["rect"]["y"], item["id"])):
+                    current_rect = current["rect"]
+                    active = [
+                        item for item in active
+                        if item["rect"]["x"] + item["rect"]["width"] > current_rect["x"]
+                    ]
+                    for other in active:
+                        other_rect = other["rect"]
+                        vertical_overlap = (
+                            current_rect["y"] < other_rect["y"] + other_rect["height"]
+                            and current_rect["y"] + current_rect["height"] > other_rect["y"]
+                        )
+                        if vertical_overlap:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=error_detail(
+                                    "publish_validation_failed",
+                                    "Smart responsive manual components overlap.",
+                                    context={
+                                        "issue_type": "unresolved_manual_responsive_collision",
+                                        "page_id": str(page.get("id") or ""),
+                                        "section_id": str(section.get("id") or ""),
+                                        "viewport": viewport_mode,
+                                        "block_ids": sorted([other["id"], current["id"]]),
+                                    },
+                                ),
+                            )
+                    active.append(current)
 
 
 def validate_publish_schema(
@@ -649,6 +763,7 @@ def validate_publish_schema(
             for element in page_elements(page):
                 inspect_element(page, element)
 
+    _validate_smart_responsive_geometry(schema)
     validate_builder_schema_urls(schema, field_name="draft_schema")
     return schema, schema_version
 

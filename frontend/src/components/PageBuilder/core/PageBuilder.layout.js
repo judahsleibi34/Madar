@@ -1,6 +1,7 @@
 import { viewports } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
 import { clampElementToBounds } from "./PageBuilder.bounds";
+import { withManualResponsiveOverride } from "./PageBuilder.responsiveCapabilities";
 
 export const getSectionElements = (section) => {
   const autoElements = (section.rows || []).flatMap((row) =>
@@ -270,6 +271,7 @@ export const commitDirectElementInteraction = (sections, {
   targetSectionId = "",
   viewportName = "desktop",
   elementUpdates = null,
+  smartResponsive = false,
 } = {}) => {
   const isCrossSectionMove = Boolean(
     movedElement && targetSectionId && sourceSectionId !== targetSectionId
@@ -299,7 +301,16 @@ export const commitDirectElementInteraction = (sections, {
           minHeight: minHeightByViewport.desktop,
           minHeightByViewport,
         },
-        freeElements: [...(section.freeElements || []), movedElement],
+        freeElements: [
+          ...(section.freeElements || []),
+          smartResponsive
+            ? withManualResponsiveOverride(
+                movedElement,
+                viewportName,
+                movedElement.position?.[viewportName] || createPosition()[viewportName]
+              )
+            : movedElement,
+        ],
       };
     }
 
@@ -317,18 +328,20 @@ export const commitDirectElementInteraction = (sections, {
           [viewportName]: nextHeight,
         },
       },
-      freeElements: (section.freeElements || []).map((element) =>
-        element.id === elementId
-          ? {
+      freeElements: (section.freeElements || []).map((element) => {
+        if (element.id !== elementId) return element;
+        const updatedElement = {
               ...element,
               ...(elementUpdates || {}),
               position: {
                 ...(element.position || {}),
                 [viewportName]: previewPosition,
               },
-            }
-          : element
-      ),
+            };
+        return smartResponsive
+          ? withManualResponsiveOverride(updatedElement, viewportName, previewPosition)
+          : updatedElement;
+      }),
     };
   });
 };
@@ -566,6 +579,7 @@ export const commitDirectElementGroupInteraction = (sections, {
   previewPositions = {},
   previewSectionHeight = 0,
   viewportName = "desktop",
+  smartResponsive = false,
 } = {}) => sections.map((section) => {
   if (section.id !== sourceSectionId || !Object.keys(previewPositions).length) return section;
 
@@ -581,17 +595,19 @@ export const commitDirectElementGroupInteraction = (sections, {
         [viewportName]: nextHeight,
       },
     },
-    freeElements: (section.freeElements || []).map((element) =>
-      previewPositions[element.id]
-        ? {
+    freeElements: (section.freeElements || []).map((element) => {
+      if (!previewPositions[element.id]) return element;
+      const updatedElement = {
             ...element,
             position: {
               ...(element.position || {}),
               [viewportName]: previewPositions[element.id],
             },
-          }
-        : element
-    ),
+          };
+      return smartResponsive
+        ? withManualResponsiveOverride(updatedElement, viewportName, previewPositions[element.id])
+        : updatedElement;
+    }),
   };
 });
 

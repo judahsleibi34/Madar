@@ -16,10 +16,8 @@
   font-family: inherit;
 }
 
-.tenant-runtime-page > .builder-canvas {
-  width: 100%;
-  max-width: none;
-  margin: 0;
+.tenant-runtime-page > .site-renderer-camera {
+  margin: 0 auto;
 }
 
 .tenant-runtime-page .direct-layout-section {
@@ -187,75 +185,6 @@
   color: var(--theme-primary);
 }
 
-/* A phone cannot safely preserve arbitrary desktop-style absolute geometry.
-   Published mobile pages therefore use the saved visual order, natural text
-   height, and a single readable column. The authoring canvas remains exact. */
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-layout-section,
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-layout-scale-shell,
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-layout-frame {
-  width: 100% !important;
-  height: auto !important;
-  min-height: 0 !important;
-  overflow: visible;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-layout-frame {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(18px, 5vw, 28px);
-  padding: 24px 12px 32px;
-  box-sizing: border-box;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-element-frame {
-  position: relative !important;
-  container-type: inline-size;
-  inset: auto !important;
-  width: 100% !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-width: 100% !important;
-  transform: none !important;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-element-content,
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-element-content > .builder-element {
-  width: 100% !important;
-  height: auto !important;
-  min-height: 0 !important;
-  overflow: visible;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile :is(
-  .direct-element-frame-heading,
-  .direct-element-frame-text
-) :is(.builder-element-heading, .builder-element-text) {
-  overflow: visible;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-element-frame-image {
-  display: grid;
-  place-items: center;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-element-frame-image .builder-element-image {
-  width: 100% !important;
-  height: auto !important;
-  max-height: 70dvh;
-  object-fit: contain;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile :is(
-  .direct-element-frame-divider,
-  .direct-element-frame-thinDivider
-) {
-  min-height: var(--divider-thickness, 1px) !important;
-}
-
-.tenant-runtime-page .builder-canvas.viewport-mobile .direct-element-frame-button {
-  width: 100% !important;
-  max-width: 100% !important;
-}
 
 .tenant-site-draft-preview .tenant-runtime-page {
   display: block;
@@ -414,6 +343,9 @@
   height: calc(100% - 16px);
   object-fit: contain;
   background: var(--theme-bg);
+  transform-origin: center;
+  will-change: transform;
+  animation: tenant-brand-logo-spin 1.6s linear infinite;
 }
 
 .tenant-brand-loader-name {
@@ -539,42 +471,6 @@
   background: white !important;
 }
 
-/* Runtime forms are content, not fixed-size canvas artwork. Let their real
-   height participate in page layout so a long or multi-page form always
-   pushes the footer below its final field and actions. */
-.tenant-runtime-page .direct-layout-section:has(.direct-element-frame-formBlock) {
-  overflow: visible;
-}
-
-.tenant-runtime-page .direct-layout-frame:has(.direct-element-frame-formBlock) {
-  display: grid;
-  height: auto;
-  align-content: start;
-}
-
-.tenant-runtime-page .direct-element-frame-formBlock {
-  max-width: 100% !important;
-  height: auto !important;
-  min-height: 0 !important;
-  container-type: inline-size;
-}
-
-.tenant-runtime-page .direct-element-frame-formBlock .direct-element-content,
-.tenant-runtime-page .direct-element-frame-formBlock .builder-element-formBlock,
-.tenant-runtime-page .direct-element-frame-formBlock .runtime-form {
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-@media (max-width: 720px) {
-  .tenant-runtime-page .direct-element-frame-formBlock {
-    left: 12px !important;
-    width: calc(100% - 24px) !important;
-    max-width: calc(100% - 24px) !important;
-  }
-}
-
 .tenant-runtime-loader {
   width: 38px;
   height: 38px;
@@ -599,10 +495,15 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes tenant-brand-logo-spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tenant-runtime-loader,
   .tenant-brand-loader-mark,
   .tenant-brand-loader-mark::before,
+  .tenant-brand-loader-mark img,
   .tenant-brand-loader-name,
   .tenant-brand-loader-progress::after {
     animation: none;
@@ -1013,7 +914,7 @@ body.theme-dark .tenant-site-runtime .builder-element-button,
 
 .tenant-site-runtime .builder-element-button:hover {
   background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
-  color: #fff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 /* Component-level color boundary for tenant pages embedded in the dark builder shell. */
@@ -1023,6 +924,18 @@ body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element,
 .tenant-site-runtime .tenant-runtime-page .builder-element {
   border-color: transparent !important;
   color: var(--theme-text) !important;
+}
+
+.tenant-site-runtime .tenant-runtime-page .builder-element-button {
+  background: var(--action-primary, var(--theme-primary)) !important;
+  background-color: var(--action-primary, var(--theme-primary)) !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+.tenant-site-runtime .tenant-runtime-page .builder-element-button:hover {
+  background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
+  background-color: var(--action-primary-hover, var(--theme-primary-hover)) !important;
 }
 
 :root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-heading,

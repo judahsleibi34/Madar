@@ -3,6 +3,7 @@ import {
   cacheTenantBrand,
   getRuntimeAuthFlow,
   getTenantBrandFallback,
+  getTenantLoadingLogoUrl,
   getRuntimeCanvasScale,
   getRuntimeDirectPosition,
   getRuntimeDirectElements,
@@ -61,13 +62,23 @@ describe("tenant brand loading", () => {
   it("ignores malformed cached branding", () => {
     expect(readCachedTenantBrand({ getItem: () => "not-json" }, "broken")).toBeNull();
   });
+
+  it("prioritizes the Website Settings logo while loading", () => {
+    expect(getTenantLoadingLogoUrl({
+      settingsLogoUrl: "/uploads/settings-logo.png",
+      logoUrl: "/uploads/project-logo.png",
+      loadingImageUrl: "/uploads/legacy-loader.png",
+    })).toBe("/uploads/settings-logo.png");
+  });
 });
 
 describe("tenant runtime page flow", () => {
   it("fits a logical canvas to the complete available browser width", () => {
     expect(getRuntimeCanvasScale(1000, 1200)).toBeCloseTo(5 / 6);
     expect(getRuntimeCanvasScale(390, 390)).toBe(1);
-    expect(getRuntimeCanvasScale(1600, 1200)).toBeCloseTo(4 / 3);
+    expect(getRuntimeCanvasScale(600, 390)).toBe(1);
+    expect(getRuntimeCanvasScale(1024, 768)).toBe(1);
+    expect(getRuntimeCanvasScale(1600, 1200)).toBe(1);
   });
 
   it("normalizes missing breakpoint geometry from the nearest saved layout", () => {
@@ -78,7 +89,7 @@ describe("tenant runtime page flow", () => {
     expect(position).toEqual({ x: 39, y: 78, width: 195, height: 97.5 });
   });
 
-  it("orders published mobile elements by visual position for collision-free flow", () => {
+  it("preserves authored element order at every breakpoint", () => {
     const elements = [
       { id: "image", position: { mobile: { x: 12, y: 420 } } },
       { id: "text", position: { mobile: { x: 12, y: 180 } } },
@@ -86,19 +97,22 @@ describe("tenant runtime page flow", () => {
       { id: "button", position: { mobile: { x: 12, y: 640 } } },
     ];
 
-    expect(getRuntimeDirectElements(elements, "mobile").map((item) => item.id))
-      .toEqual(["heading", "text", "image", "button"]);
+    expect(getRuntimeDirectElements(elements, "mobile")).toBe(elements);
     expect(getRuntimeDirectElements(elements, "desktop")).toBe(elements);
   });
 
-  it("uses mobile geometry for common modern phone widths", () => {    expect(getRuntimeViewportForWidth(320)).toBe("mobile");
+  it("uses deliberate mobile/tablet/desktop crossover widths", () => {
+    expect(getRuntimeViewportForWidth(320)).toBe("mobile");
     expect(getRuntimeViewportForWidth(390)).toBe("mobile");
     expect(getRuntimeViewportForWidth(412)).toBe("mobile");
     expect(getRuntimeViewportForWidth(430)).toBe("mobile");
     expect(getRuntimeViewportForWidth(480)).toBe("mobile");
-    expect(getRuntimeViewportForWidth(600)).toBe("tablet");
+    expect(getRuntimeViewportForWidth(600)).toBe("mobile");
+    expect(getRuntimeViewportForWidth(601)).toBe("tablet");
     expect(getRuntimeViewportForWidth(768)).toBe("tablet");
-    expect(getRuntimeViewportForWidth(769)).toBe("desktop");
+    expect(getRuntimeViewportForWidth(769)).toBe("tablet");
+    expect(getRuntimeViewportForWidth(1024)).toBe("tablet");
+    expect(getRuntimeViewportForWidth(1025)).toBe("desktop");
   });
 
   it("accepts only internal protected-page return paths", () => {

@@ -445,6 +445,13 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
                 {"id": "about", "name": "About", "slug": "/about", "showInNavigation": False, "sections": []},
             ],
             "forms": [{"id": "form-1"}],
+            "roles": [{
+                "id": "member",
+                "resourceAccess": {
+                    "pageIds": ["home", "about"],
+                    "formIds": [],
+                },
+            }],
         }
 
         validated, _ = builder_routes.validate_publish_schema(schema)
@@ -454,6 +461,76 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
         self.assertEqual([page["slug"] for page in validated["pages"]], ["/form", "/", "/about"])
         self.assertEqual([page["isDefault"] for page in validated["pages"]], [False, True, False])
         self.assertFalse(validated["pages"][2]["showInNavigation"])
+        self.assertEqual(
+            validated["roles"][0]["resourceAccess"]["pageIds"],
+            ["about"],
+        )
+
+    def test_smart_publish_rejects_unresolved_manual_collisions(self):
+        def element(block_id, x, collision_policy="solid"):
+            return {
+                "id": block_id,
+                "type": "future-component",
+                "responsive": {
+                    "capabilities": {"collisionPolicy": collision_policy},
+                    "overrides": {
+                        "tablet": {
+                            "mode": "manual",
+                            "rect": {"x": x, "y": 40, "width": 240, "height": 100},
+                        },
+                    },
+                },
+            }
+
+        schema = {
+            "responsiveLayout": {"mode": "smart", "engineVersion": 1},
+            "pages": [{
+                "id": "home",
+                "name": "Home",
+                "slug": "/",
+                "sections": [{"id": "hero", "freeElements": [element("one", 40), element("two", 120)]}],
+            }],
+            "forms": [],
+        }
+
+        with self.assertRaises(HTTPException) as collision:
+            builder_routes.validate_publish_schema(schema)
+        self.assertEqual(
+            collision.exception.detail["context"]["issue_type"],
+            "unresolved_manual_responsive_collision",
+        )
+
+        schema["pages"][0]["sections"][0]["freeElements"][1]["responsive"]["capabilities"]["collisionPolicy"] = "overlay"
+        validated, _ = builder_routes.validate_publish_schema(schema)
+        self.assertEqual(validated["responsiveLayout"]["engineVersion"], 1)
+
+    def test_smart_publish_rejects_out_of_bounds_manual_geometry_and_unknown_engine(self):
+        schema = {
+            "responsiveLayout": {"mode": "smart", "engineVersion": 1},
+            "pages": [{
+                "id": "home",
+                "name": "Home",
+                "slug": "/",
+                "sections": [{"id": "hero", "freeElements": [{
+                    "id": "outside",
+                    "type": "future-component",
+                    "responsive": {"overrides": {"mobile": {
+                        "mode": "manual",
+                        "rect": {"x": 300, "y": 40, "width": 120, "height": 80},
+                    }}},
+                }]}],
+            }],
+            "forms": [],
+        }
+        with self.assertRaises(HTTPException) as outside:
+            builder_routes.validate_publish_schema(schema)
+        self.assertEqual(outside.exception.detail["context"]["issue_type"], "manual_responsive_out_of_bounds")
+
+        schema["pages"][0]["sections"][0]["freeElements"][0]["responsive"]["overrides"] = {}
+        schema["responsiveLayout"]["engineVersion"] = 999
+        with self.assertRaises(HTTPException) as unsupported:
+            builder_routes.validate_publish_schema(schema)
+        self.assertEqual(unsupported.exception.detail["context"]["issue_type"], "unsupported_responsive_engine")
 
     def test_publish_routing_rejects_duplicate_invalid_and_reserved_slugs(self):
         with self.assertRaises(HTTPException) as duplicate:
@@ -690,6 +767,13 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
                 }]}],
             }],
             "forms": [{"id": "form-1"}],
+            "roles": [{
+                "id": "member",
+                "resourceAccess": {
+                    "pageIds": ["home", "about"],
+                    "formIds": [],
+                },
+            }],
         }
 
         validated, _ = builder_routes.validate_publish_schema(schema)
@@ -775,6 +859,13 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
                 {"id": "buttons", "name": "Buttons", "slug": "/buttons", "sections": [{"freeElements": [{"id": "message", "type": "button", "action": {"type": "showMessage", "message": "Hello"}}]}]},
             ],
             "forms": [{"id": "form-1"}],
+            "roles": [{
+                "id": "member",
+                "resourceAccess": {
+                    "pageIds": ["home", "about"],
+                    "formIds": [],
+                },
+            }],
         }
 
         validated, _ = builder_routes.validate_publish_schema(schema)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -44,7 +44,7 @@ import {
   clearCalendarWorkspaceCache,
   createCalendarWorkspaceCacheKey,
   getOrCreateCalendarWorkspaceRequest,
-  readCalendarWorkspaceCache,
+  readCalendarWorkspaceCacheEntry,
   writeCalendarWorkspaceCache,
 } from "./utils/calendarWorkspaceCache";
 import {
@@ -436,6 +436,21 @@ export default function ReservationCalendarPage({ user = null }) {
     else next.add(section);
     return next;
   });
+  const warmAgendaCache = useCallback(() => {
+    const [agendaStart, agendaEnd] = rangeForView(focusDate, "agenda");
+    const start = agendaStart.toISOString();
+    const end = agendaEnd.toISOString();
+    const cacheKey = createCalendarWorkspaceCacheKey({ userScope, start, end });
+    if (readCalendarWorkspaceCacheEntry(cacheKey)) return;
+    getOrCreateCalendarWorkspaceRequest(
+      cacheKey,
+      () => fetchCalendarWorkspace({ start, end })
+    )
+      .then((data) => writeCalendarWorkspaceCache(cacheKey, data))
+      .catch(() => {
+        // The normal view loader reports errors if the user opens Agenda.
+      });
+  }, [focusDate, userScope]);
 
   useEffect(() => {
     let active = true;
@@ -447,7 +462,8 @@ export default function ReservationCalendarPage({ user = null }) {
       lastHandledRefreshRef.current = refreshKey;
       clearCalendarWorkspaceCache(userScope);
     }
-    const cached = forceRefresh ? null : readCalendarWorkspaceCache(cacheKey);
+    const cachedEntry = forceRefresh ? null : readCalendarWorkspaceCacheEntry(cacheKey);
+    const cached = cachedEntry?.workspace || null;
 
     queueMicrotask(() => {
       if (!active) return;
@@ -461,12 +477,15 @@ export default function ReservationCalendarPage({ user = null }) {
       }
     });
 
-    if (cached) return () => { active = false; };
+    if (cachedEntry?.freshness === "fresh") return () => { active = false; };
 
-    getOrCreateCalendarWorkspaceRequest(cacheKey, () => fetchCalendarWorkspace({ start, end }))
+    getOrCreateCalendarWorkspaceRequest(
+      cacheKey,
+      () => fetchCalendarWorkspace({ start, end, force: forceRefresh })
+    )
       .then((data) => {
-        writeCalendarWorkspaceCache(cacheKey, data);
         if (!active) return;
+        writeCalendarWorkspaceCache(cacheKey, data);
         setWorkspace(data);
         setEnabledCalendars((current) => current.size ? current : new Set([...(data.calendars || []).map((item) => item.id), "reservations"]));
         setError(data.warning || "");
@@ -875,7 +894,7 @@ export default function ReservationCalendarPage({ user = null }) {
         <button type="button" onClick={() => movePeriod(1)} aria-label="Next"><ChevronRight size={18} /></button>
         <strong>{formatRange(rangeStart, rangeEnd)}</strong>
         <span className="calendar-control-spacer" />
-        <div className="reservation-calendar-view-switch">{VIEWS.map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => setView(item)}>{item}</button>)}</div>
+        <div className="reservation-calendar-view-switch">{VIEWS.map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => setView(item)} onPointerEnter={item === "agenda" ? warmAgendaCache : undefined} onFocus={item === "agenda" ? warmAgendaCache : undefined}>{item}</button>)}</div>
       </div>
 
       {error && <div className="calendar-workspace-notice"><AlertTriangle size={17} />{error}<button type="button" onClick={() => setError("")}><X size={15} /></button></div>}

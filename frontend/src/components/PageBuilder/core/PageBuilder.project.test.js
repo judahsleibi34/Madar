@@ -56,6 +56,22 @@ describe("cleanBuilderProject", () => {
     });
   });
 
+  it("keeps the public homepage out of members-only role access", () => {
+    const normalized = normalizeBuilderProjectShape({
+      defaultPageId: "home",
+      pages: [
+        { id: "home", name: "Home", isDefault: true, sections: [] },
+        { id: "members", name: "Members", sections: [] },
+      ],
+      roles: [{
+        id: "member",
+        resourceAccess: { pageIds: ["home", "members"], formIds: [] },
+      }],
+    });
+
+    expect(normalized.roles[0].resourceAccess.pageIds).toEqual(["members"]);
+  });
+
   it("repairs duplicate font-size history and the Enter-saved all-H1 pattern", () => {
     const normalized = normalizeBuilderProjectShape({
       pages: [{
@@ -469,5 +485,14 @@ describe("cleanBuilderProject", () => {
     expect(first.pages[0].id).toBe("page_page_0");
     expect(first.pages[0].sections[0].freeElements[0].id).toContain("element_page_0_section_0_free_0");
     expect(first.forms[0].id).toBe("form_form_0");
+  });
+
+  it("does not introduce responsive metadata into an existing legacy schema", () => {
+    const project = cleanBuilderProject({
+      pages: [{ id: "home", name: "Home", slug: "/", sections: [] }],
+      forms: [],
+    });
+
+    expect(Object.hasOwn(project, "responsiveLayout")).toBe(false);
   });
 });

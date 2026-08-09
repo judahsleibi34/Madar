@@ -5,7 +5,10 @@ import {
   createCalendarWorkspaceCacheKey,
   getOrCreateCalendarWorkspaceRequest,
   readCalendarWorkspaceCache,
+  readCalendarWorkspaceCacheEntry,
   writeCalendarWorkspaceCache,
+  CALENDAR_WORKSPACE_FRESH_MS,
+  CALENDAR_WORKSPACE_STALE_MS,
 } from "./calendarWorkspaceCache";
 
 beforeEach(() => window.sessionStorage.clear());
@@ -31,5 +34,56 @@ describe("calendar workspace cache", () => {
     expect(first).toBe(second);
     await first;
     expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reuse an in-flight request after the user cache is invalidated", async () => {
+    const key = createCalendarWorkspaceCacheKey({
+      userScope: "mutation-user",
+      start: "start",
+      end: "end",
+    });
+    let resolveFirst;
+    const firstLoader = vi.fn(() => new Promise((resolve) => {
+      resolveFirst = resolve;
+    }));
+    const secondLoader = vi.fn(async () => ({ calendars: [], events: [{ id: "new" }] }));
+    const first = getOrCreateCalendarWorkspaceRequest(key, firstLoader);
+
+    clearCalendarWorkspaceCache("mutation-user");
+    const second = getOrCreateCalendarWorkspaceRequest(key, secondLoader);
+
+    expect(second).not.toBe(first);
+    await expect(second).resolves.toEqual({ calendars: [], events: [{ id: "new" }] });
+    resolveFirst({ calendars: [], events: [{ id: "old" }] });
+    await first;
+    expect(firstLoader).toHaveBeenCalledTimes(1);
+    expect(secondLoader).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves stale workspace data immediately while identifying it for revalidation", () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const key = createCalendarWorkspaceCacheKey({
+      userScope: "stale-user",
+      start: "start",
+      end: "end",
+    });
+    const workspace = { calendars: [], events: [{ id: "cached-event" }] };
+    writeCalendarWorkspaceCache(key, workspace);
+
+    expect(readCalendarWorkspaceCacheEntry(key)).toMatchObject({
+      workspace,
+      freshness: "fresh",
+    });
+
+    now.mockReturnValue(1_000_000 + CALENDAR_WORKSPACE_FRESH_MS + 1);
+    expect(readCalendarWorkspaceCacheEntry(key)).toMatchObject({
+      workspace,
+      freshness: "stale",
+    });
+    expect(readCalendarWorkspaceCache(key)).toEqual(workspace);
+
+    now.mockReturnValue(1_000_000 + CALENDAR_WORKSPACE_STALE_MS + 1);
+    expect(readCalendarWorkspaceCacheEntry(key)).toBeNull();
+    now.mockRestore();
   });
 });

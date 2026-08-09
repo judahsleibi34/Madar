@@ -1,5 +1,6 @@
 import { createId, slugify, defaultPermissions, defaultTheme, defaultSiteChrome, fieldTypes } from "./PageBuilder.constants";
 import { getFactoryContent } from "../../../content/pageBuilder";
+import { RESPONSIVE_LAYOUT_ENGINE_VERSION, RESPONSIVE_LAYOUT_MODES } from "./PageBuilder.responsiveCapabilities";
 
 const factoryCopy = getFactoryContent("en");
 const createFactoryId = (prefix, overrides = {}) =>
@@ -552,6 +553,10 @@ export const createProject = ({
   id: createId("project"),
   name,
   status: "draft",
+  responsiveLayout: {
+    mode: RESPONSIVE_LAYOUT_MODES.legacy,
+    engineVersion: RESPONSIVE_LAYOUT_ENGINE_VERSION,
+  },
   activePageId: pages[0]?.id || "",
   activeFormId: forms[0]?.id || "",
   activeCollectionId: collections[0]?.id || "",

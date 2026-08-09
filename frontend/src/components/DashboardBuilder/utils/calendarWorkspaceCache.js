@@ -1,7 +1,8 @@
 export const CALENDAR_WORKSPACE_CACHE_VERSION = 1;
 
 const STORAGE_KEY = `madar-calendar-workspace-cache-v${CALENDAR_WORKSPACE_CACHE_VERSION}`;
-const MAX_AGE_MS = 5 * 60 * 1000;
+export const CALENDAR_WORKSPACE_FRESH_MS = 5 * 60 * 1000;
+export const CALENDAR_WORKSPACE_STALE_MS = 30 * 60 * 1000;
 const MAX_ENTRIES = 24;
 const memoryCache = new Map();
 const inFlightRequests = new Map();
@@ -23,14 +24,25 @@ function writeStoredEntries(entries) {
   }
 }
 
-function isUsable(entry) {
+function isStructurallyValid(entry) {
   return Boolean(
     entry?.workspace &&
       Array.isArray(entry.workspace.calendars) &&
       Array.isArray(entry.workspace.events) &&
-      Number.isFinite(Number(entry.cachedAt)) &&
-      Date.now() - Number(entry.cachedAt) <= MAX_AGE_MS
+      Number.isFinite(Number(entry.cachedAt))
   );
+}
+
+function classifyEntry(entry) {
+  if (!isStructurallyValid(entry)) return null;
+  const ageMs = Math.max(0, Date.now() - Number(entry.cachedAt));
+  if (ageMs > CALENDAR_WORKSPACE_STALE_MS) return null;
+  return {
+    workspace: entry.workspace,
+    cachedAt: Number(entry.cachedAt),
+    ageMs,
+    freshness: ageMs <= CALENDAR_WORKSPACE_FRESH_MS ? "fresh" : "stale",
+  };
 }
 
 export function createCalendarWorkspaceCacheKey({ userScope, start, end }) {
@@ -40,14 +52,20 @@ export function createCalendarWorkspaceCacheKey({ userScope, start, end }) {
 }
 
 export function readCalendarWorkspaceCache(cacheKey) {
+  return readCalendarWorkspaceCacheEntry(cacheKey)?.workspace || null;
+}
+
+export function readCalendarWorkspaceCacheEntry(cacheKey) {
   if (!cacheKey) return null;
   const memoryEntry = memoryCache.get(cacheKey);
-  if (isUsable(memoryEntry)) return memoryEntry.workspace;
+  const memoryResult = classifyEntry(memoryEntry);
+  if (memoryResult) return memoryResult;
   if (memoryEntry) memoryCache.delete(cacheKey);
 
   const entries = readStoredEntries();
   const storedEntry = entries[cacheKey];
-  if (!isUsable(storedEntry)) {
+  const storedResult = classifyEntry(storedEntry);
+  if (!storedResult) {
     if (storedEntry) {
       delete entries[cacheKey];
       writeStoredEntries(entries);
@@ -55,7 +73,7 @@ export function readCalendarWorkspaceCache(cacheKey) {
     return null;
   }
   memoryCache.set(cacheKey, storedEntry);
-  return storedEntry.workspace;
+  return storedResult;
 }
 
 export function writeCalendarWorkspaceCache(cacheKey, workspace) {
@@ -85,6 +103,9 @@ export function clearCalendarWorkspaceCache(userScope) {
   });
   Array.from(memoryCache.keys()).forEach((key) => {
     if (key.startsWith(prefix)) memoryCache.delete(key);
+  });
+  Array.from(inFlightRequests.keys()).forEach((key) => {
+    if (key.startsWith(prefix)) inFlightRequests.delete(key);
   });
   writeStoredEntries(entries);
 }

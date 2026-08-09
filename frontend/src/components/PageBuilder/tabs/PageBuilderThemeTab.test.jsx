@@ -43,4 +43,24 @@ describe("PageBuilderThemeTab sidebar", () => {
     expect(result.theme.form).toEqual({ accent: "#123456" });
     expect(result.theme.radius).not.toBe(4);
   });
+
+  it("allows theme colors to be edited as hexadecimal values", () => {
+    const updateProject = vi.fn();
+    const initialBackground = ["#", "ABCDEF"].join("");
+    render(
+      <PageBuilderThemeTab
+        project={{ theme: { background: initialBackground } }}
+        updateProject={updateProject}
+        variant="sidebar"
+      />
+    );
+
+    const hexInput = screen.getByLabelText("Site background hex");
+    expect(hexInput.value).toBe("#ABCDEF");
+    fireEvent.change(hexInput, { target: { value: "#123456" } });
+
+    const updater = updateProject.mock.calls.at(-1)[0];
+    expect(updater({ theme: { background: initialBackground } }).theme.background).toBe("#123456");
+    expect(screen.getByLabelText("Site background color picker")).toBeTruthy();
+  });
 });

@@ -22,6 +22,7 @@ from routes.calendar_routes import (
     validate_timezone,
 )
 from services.calendar_reminder_service import next_task_reminder_time
+from services.calendar_workspace_cache_service import clear_calendar_workspace_cache
 
 
 class Query:
@@ -54,6 +55,9 @@ class Query:
 
 
 class CalendarRouteTests(unittest.TestCase):
+    def tearDown(self):
+        clear_calendar_workspace_cache()
+
     def test_calendar_schema_missing_error_is_detected_without_masking_other_failures(self):
         self.assertTrue(is_calendar_schema_missing_error(
             RuntimeError("PGRST205: Could not find the table 'public.calendars' in the schema cache")
@@ -102,6 +106,55 @@ class CalendarRouteTests(unittest.TestCase):
                 )
         self.assertEqual(raised.exception.status_code, 503)
         self.assertEqual(raised.exception.detail["code"], "calendar_schema_unavailable")
+
+    def test_enabled_calendar_bootstrap_reuses_private_user_range_cache(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="member", membership_status="active",
+            user={"timezone": "UTC"},
+        )
+        start = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 7, 8, tzinfo=timezone.utc)
+        payload = {
+            "success": True,
+            "calendars": [],
+            "events": [],
+            "tasks": [],
+            "connections": [],
+        }
+        first_response = SimpleNamespace(headers={})
+        second_response = SimpleNamespace(headers={})
+        with patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "_calendar_workspace_payload", return_value=payload
+        ) as loader, patch.dict(
+            os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False
+        ):
+            first = calendar_routes.calendar_bootstrap(object(), first_response, start, end)
+            second = calendar_routes.calendar_bootstrap(object(), second_response, start, end)
+
+        self.assertEqual(first, second)
+        self.assertEqual(loader.call_count, 1)
+        self.assertEqual(first_response.headers["X-Calendar-Cache"], "miss")
+        self.assertEqual(second_response.headers["X-Calendar-Cache"], "hit")
+        self.assertEqual(second_response.headers["Cache-Control"], "private, no-store")
+
+        bypass_response = SimpleNamespace(headers={})
+        bypass_request = SimpleNamespace(
+            headers={"X-Calendar-Cache-Bypass": "1"}
+        )
+        with patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "_calendar_workspace_payload", return_value=payload
+        ) as bypass_loader, patch.dict(
+            os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False
+        ):
+            calendar_routes.calendar_bootstrap(
+                bypass_request, bypass_response, start, end
+            )
+        self.assertEqual(bypass_loader.call_count, 1)
+        self.assertEqual(bypass_response.headers["X-Calendar-Cache"], "miss")
 
     def test_calendar_range_requires_ordered_bounded_timezone_aware_values(self):
         start = datetime(2026, 7, 1, tzinfo=timezone.utc)

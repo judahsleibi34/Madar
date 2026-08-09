@@ -5,13 +5,19 @@ export default function PageBuilderSubbar({
   viewport,
   setViewport,
   renderWorkspaceNavigator,
+  artboardCameraControls,
   copy,
   onPreviewClick,
 }) {
   if (!preview && !hideWorkspaceTabs) {
     return (
       <div className="builder-subbar">
-        {renderWorkspaceNavigator()}
+        <div className="builder-subbar-inner">
+          {renderWorkspaceNavigator()}
+          <div className="builder-subbar-actions">
+            {artboardCameraControls}
+          </div>
+        </div>
       </div>
     );
   }

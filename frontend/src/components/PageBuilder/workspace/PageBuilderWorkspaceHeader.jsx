@@ -5,6 +5,7 @@ export default function PageBuilderWorkspaceHeader({
   activeHelper,
   activeTab,
   activeTopbarAction,
+  artboardCameraControls,
   builderCopy,
   demoMode,
   displayName,
@@ -49,6 +50,7 @@ export default function PageBuilderWorkspaceHeader({
         copy={builderCopy.topbar}
         onPreviewClick={handlePreviewClick}
         renderWorkspaceNavigator={renderWorkspaceNavigator}
+        artboardCameraControls={artboardCameraControls}
       />
     </>
   );

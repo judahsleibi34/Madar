@@ -39,9 +39,9 @@ describe("BuilderProjectChooser", () => {
     expect(screen.getByRole("status").textContent).toContain("Opening the Page Builder");
     expect(container.querySelector(".builder-project-loading-screen").getAttribute("aria-busy"))
       .toBe("true");
-    expect(container.querySelector(".builder-project-opening-preview")).toBeTruthy();
-    expect(container.querySelector(".builder-project-opening-canvas")).toBeTruthy();
-    expect(container.querySelector(".builder-project-opening-inspector")).toBeTruthy();
+    expect(container.querySelector(".builder-project-loading-bar")).toBeTruthy();
+    expect(container.querySelector(".builder-project-loading-progress")).toBeTruthy();
+    expect(container.querySelector(".builder-project-opening-preview")).toBeNull();
   });
 
   it("keeps two backend projects explicit and opens the selected one", async () => {
@@ -84,8 +84,8 @@ describe("BuilderProjectChooser", () => {
         <LocationProbe />
       </MemoryRouter>
     );
-    expect((await screen.findByTestId("location")).textContent)
-      .toBe("/page-builder/projects/only-project/pages");
+    await waitFor(() => expect(screen.getByTestId("location").textContent)
+      .toBe("/page-builder/projects/only-project/pages"));
     expect(screen.queryByText("Only")).toBeNull();
   });
 

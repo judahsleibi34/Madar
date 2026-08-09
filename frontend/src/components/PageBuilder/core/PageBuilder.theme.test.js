@@ -18,4 +18,17 @@ describe("Page Builder typography theme", () => {
     expect(variables.fontFamily).toContain('"IBM Plex Sans Arabic"');
     expect(variables["--theme-font-family"]).toBe(variables.fontFamily);
   });
+
+  it("isolates site action colors from the surrounding application theme", () => {
+    const variables = getPageBuilderThemeVars({
+      accent: "#2f7a58",
+      accentDark: "#245e49",
+      buttonText: "#ffe1e1",
+    });
+
+    expect(variables["--action-primary"]).toBe("#2f7a58");
+    expect(variables["--action-primary-hover"]).toBe("#245e49");
+    expect(variables["--theme-on-primary"]).toBe("#ffe1e1");
+    expect(variables["--theme-text-inverse"]).toBe("#ffe1e1");
+  });
 });

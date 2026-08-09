@@ -1,4 +1,4 @@
-﻿import { lazy } from "react";
+import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
@@ -14,6 +14,7 @@ const NotificationsPage = lazy(() => import("../components/DashboardBuilder/Noti
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
 const EcommercePage = lazy(() => import("../components/DashboardBuilder/EcommercePage"));
 const EcommerceStorePage = lazy(() => import("../components/DashboardBuilder/EcommerceStorePage"));
+const CvRerankPage = lazy(() => import("../components/DashboardBuilder/CvRerankPage"));
 const ReservationCalendarPage = lazy(() =>
   import("../components/DashboardBuilder/ReservationCalendarPage")
 );
@@ -195,6 +196,10 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/ecommerce/products/*"
         element={renderShell(<EcommercePage key="products" section="products" user={user} />)}
+      />
+      <Route
+        path="/ecommerce/cv-rerank/*"
+        element={renderShell(<CvRerankPage user={user} />)}
       />
       <Route
         path="/ecommerce/store/*"

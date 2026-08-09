@@ -7,6 +7,8 @@ import { useLanguage } from "../../i18n";
 import { fetchNotifications } from "../../services/notificationsApi";
 import { getDummyNotifications } from "./notificationsData";
 
+const NOTIFICATION_POLL_MS = 15_000;
+
 const formatNotificationTime = (value) => {
   if (!value) return "";
 
@@ -49,8 +51,11 @@ export default function NotificationBell({
 
   useEffect(() => {
     let cancelled = false;
+    let requestInFlight = false;
 
     const loadNotifications = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
       try {
         const data = await fetchNotifications({ limit: 4 });
         const items = (data.notifications || data.items || []).map((item) =>
@@ -65,13 +70,24 @@ export default function NotificationBell({
         const fallback = getDummyNotifications(t);
         setNotifications(fallback.slice(0, 4));
         setUnreadCount(fallback.filter((item) => item.unread).length);
+      } finally {
+        requestInFlight = false;
       }
     };
 
     loadNotifications();
+    const poll = () => {
+      if (document.visibilityState !== "hidden") loadNotifications();
+    };
+    const interval = window.setInterval(poll, NOTIFICATION_POLL_MS);
+    window.addEventListener("focus", poll);
+    document.addEventListener("visibilitychange", poll);
 
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", poll);
+      document.removeEventListener("visibilitychange", poll);
     };
   }, [t]);
 
