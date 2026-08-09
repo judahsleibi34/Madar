@@ -111,15 +111,6 @@ def require_normal_user(request: Request, response: Response):
     return require_regular_user(request, response)
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=FRONTEND_URLS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=[CSRF_HEADER_NAME, "X-Request-ID"],
-)
-
 ALLOWED_CSRF_ORIGINS = get_allowed_origins(FRONTEND_URLS)
 
 
@@ -180,11 +171,7 @@ async def observability_middleware(request: Request, call_next):
             },
             headers={"X-Request-ID": request_id},
         )
-        return add_cors_headers_for_allowed_origin(
-            error_response,
-            request,
-            ALLOWED_CSRF_ORIGINS,
-        )
+        return error_response
     finally:
         CORRELATION_ID.reset(context_token)
 
@@ -270,3 +257,17 @@ app.include_router(data_router, dependencies=protected_data_dependencies)
 app.include_router(cleaning_router, dependencies=protected_data_dependencies)
 app.include_router(analysis_router, dependencies=protected_data_dependencies)
 app.include_router(visualization_router, dependencies=protected_data_dependencies)
+
+# Keep CORS outermost so every response path, including the sanitized response
+# produced by observability_middleware for an unhandled exception, is evaluated
+# by the same exact-origin policy. Starlette inserts newly added middleware at
+# the front of the user middleware stack, so this registration intentionally
+# follows the function-based middleware declarations above.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_URLS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=[CSRF_HEADER_NAME, "X-Request-ID"],
+)

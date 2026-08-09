@@ -44,6 +44,11 @@ from services.tenant_service import (
     require_builder_write_access,
 )
 from services.upload_config import get_public_uploads_dir
+from services.entitlement_service import (
+    increment_operational_usage,
+    require_any_entitlement,
+    require_entitlement,
+)
 
 router = APIRouter(tags=["Builder"])
 logger = logging.getLogger(__name__)
@@ -69,6 +74,22 @@ RESERVED_PUBLIC_PAGE_SLUGS = {
     "admin", "api", "auth", "builder", "dashboard", "forgot-password",
     "login", "reset-password", "settings", "signup", "verify-email",
 }
+
+
+def schema_contains_element_type(value: Any, element_type: str) -> bool:
+    if isinstance(value, dict):
+        if str(value.get("type") or "") == element_type:
+            return True
+        return any(
+            schema_contains_element_type(item, element_type)
+            for item in value.values()
+        )
+    if isinstance(value, list):
+        return any(
+            schema_contains_element_type(item, element_type)
+            for item in value
+        )
+    return False
 BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
 BUILDER_ASSET_UPLOAD_DIR = get_public_uploads_dir()
 BUILDER_CLIENT_CONTRACT = "cloud-draft-v1"
@@ -77,6 +98,27 @@ BUILDER_ASSET_EXTENSIONS = {
     "image/jpeg": ".jpg",
     "image/webp": ".webp",
 }
+MANAGED_TENANT_ASSET_PATTERN = re.compile(r"^/uploads/tenant_(\d+)/")
+
+
+def validate_managed_asset_ownership(value: Any, tenant_id: int) -> None:
+    if isinstance(value, dict):
+        for child in value.values():
+            validate_managed_asset_ownership(child, tenant_id)
+    elif isinstance(value, list):
+        for child in value:
+            validate_managed_asset_ownership(child, tenant_id)
+    elif isinstance(value, str):
+        match = MANAGED_TENANT_ASSET_PATTERN.match(value.strip())
+        if match and str(match.group(1)) != str(tenant_id):
+            raise HTTPException(
+                status_code=400,
+                detail=error_detail(
+                    "publish_validation_failed",
+                    "A managed asset belongs to a different workspace.",
+                    context={"issue_type": "asset_tenant_mismatch"},
+                ),
+            )
 
 
 def require_supported_builder_client(request: Request) -> str:
@@ -163,17 +205,60 @@ def normalize_published_page_routes(schema: dict[str, Any]) -> dict[str, Any]:
             ),
         )
 
-    default_page = next((page for page in pages if str(page.get("id") or "") == explicit_default_id), None)
-    default_page = default_page or (explicit_default_pages[0] if explicit_default_pages else None)
-    default_page = default_page or next(
-        (page for page in pages if str(page.get("slug", page.get("path", ""))).strip() == "/"),
+    explicit_id_matches = [
+        page for page in pages if str(page.get("id") or "") == explicit_default_id
+    ] if explicit_default_id else []
+    root_pages = [
+        page
+        for page in pages
+        if str(page.get("slug", page.get("path", page.get("route", ""))) or "").strip() == "/"
+    ]
+    named_home_pages = [
+        page
+        for page in pages
+        if str(page.get("name") or page.get("title") or "").strip().lower() == "home"
+    ]
+    legacy_unambiguous_pages = named_home_pages if len(named_home_pages) == 1 else (pages if len(pages) == 1 else [])
+    candidate_ids = {
+        str(page.get("id") or "")
+        for page in [
+            *explicit_id_matches,
+            *explicit_default_pages,
+            *root_pages,
+            *legacy_unambiguous_pages,
+        ]
+        if str(page.get("id") or "")
+    }
+    if (
+        (explicit_default_id and len(explicit_id_matches) != 1)
+        or len(root_pages) > 1
+        or len(candidate_ids) != 1
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail(
+                "publish_validation_failed",
+                "Exactly one published page must be the homepage.",
+                context={
+                    "issue_type": "ambiguous_default_page",
+                    "default_page_id": explicit_default_id,
+                },
+            ),
+        )
+    default_page_id = next(iter(candidate_ids), "")
+    default_page = next(
+        (page for page in pages if str(page.get("id") or "") == default_page_id),
         None,
     )
-    default_page = default_page or next(
-        (page for page in pages if str(page.get("name") or page.get("title") or "").strip().lower() == "home"),
-        pages[0],
-    )
-    default_page_id = str(default_page.get("id") or "")
+    if not default_page:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail(
+                "publish_validation_failed",
+                "Select a homepage before publishing.",
+                context={"issue_type": "missing_default_page"},
+            ),
+        )
     schema["defaultPageId"] = default_page_id
 
     # The public root route must stay reachable without role membership.
@@ -315,11 +400,80 @@ def assert_json_object(
             detail=f"{field_name} is too large",
         )
 
-    return (
+    validated = (
         validate_builder_schema_urls(value, field_name=field_name)
         if validate_urls
         else value
     )
+    validate_builder_button_colors(validated, field_name=field_name)
+    return validated
+
+
+BUTTON_COLOR_FIELDS = (
+    "backgroundColor",
+    "textColor",
+    "hoverBackgroundColor",
+    "hoverTextColor",
+    "borderColor",
+)
+BUTTON_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _iter_builder_elements(schema: dict[str, Any]):
+    for page in schema.get("pages") or []:
+        if not isinstance(page, dict):
+            continue
+        for section in page.get("sections") or []:
+            if not isinstance(section, dict):
+                continue
+            for element in section.get("elements") or []:
+                if isinstance(element, dict):
+                    yield element
+            for element in section.get("freeElements") or []:
+                if isinstance(element, dict):
+                    yield element
+            for row in section.get("rows") or []:
+                if not isinstance(row, dict):
+                    continue
+                for column in row.get("columns") or []:
+                    if not isinstance(column, dict):
+                        continue
+                    for element in column.get("elements") or []:
+                        if isinstance(element, dict):
+                            yield element
+
+
+def validate_builder_button_colors(schema: dict[str, Any], *, field_name: str) -> None:
+    for element in _iter_builder_elements(schema):
+        if str(element.get("type") or "") != "button":
+            continue
+        if "style" in element or "buttonColors" in element:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{field_name} button colors must use explicit fields",
+            )
+        styles = element.get("styles")
+        if isinstance(styles, dict) and any(
+            field in styles
+            for field in ("textColor", "hoverBackgroundColor", "hoverTextColor", "borderColor")
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{field_name} button colors must use explicit fields",
+            )
+        for color_field in BUTTON_COLOR_FIELDS:
+            if color_field not in element:
+                continue
+            raw_value = element.get(color_field)
+            if raw_value is None or (isinstance(raw_value, str) and not raw_value.strip()):
+                element.pop(color_field, None)
+                continue
+            if not isinstance(raw_value, str) or not BUTTON_COLOR_PATTERN.fullmatch(raw_value.strip()):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{field_name}.{color_field} must be a six-digit hexadecimal color",
+                )
+            element[color_field] = raw_value.strip().upper()
 
 
 def _project_revision(project: dict[str, Any]) -> int:
@@ -454,6 +608,7 @@ def validate_publish_schema(
     value: Any,
     *,
     project_schema_version: Any = None,
+    tenant_id: int | None = None,
 ) -> tuple[dict[str, Any], int]:
     """Revalidate persisted builder JSON and its supported schema version at publish."""
 
@@ -551,6 +706,8 @@ def validate_publish_schema(
                 )
 
     schema = normalize_published_page_routes(schema)
+    if tenant_id is not None:
+        validate_managed_asset_ownership(schema, tenant_id)
 
     form_ids = {
         str(form.get("id") or "").strip()
@@ -1273,6 +1430,7 @@ async def upload_builder_asset(
     file: UploadFile = File(...),
 ):
     context = require_builder_context(request, response, require_builder_write_access)
+    require_entitlement(context.tenant_id, "image_uploads")
     enforce_builder_asset_upload_rate_limit(request, context.user_id, context.tenant_id)
 
     declared_content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
@@ -1449,6 +1607,7 @@ def list_builder_reservations(
     offset: int = Query(default=0, ge=0),
 ):
     context = require_builder_context(request, response, require_active_tenant_member)
+    require_entitlement(context.tenant_id, "reservation_management")
     query = (
         service_supabase.table("builder_reservations")
         .select("*")
@@ -1483,6 +1642,7 @@ def list_builder_reservations(
 @router.get("/builder/reservations/{reservation_id}")
 def get_builder_reservation(reservation_id: str, request: Request, response: Response):
     context = require_builder_context(request, response, require_active_tenant_member)
+    require_entitlement(context.tenant_id, "reservation_management")
     reservation_response = (
         service_supabase.table("builder_reservations")
         .select("*")
@@ -1508,6 +1668,7 @@ def update_builder_reservation_status(
     response: Response,
 ):
     context = require_builder_context(request, response, require_builder_write_access)
+    require_entitlement(context.tenant_id, "reservation_management")
     status = normalize_reservation_status(status_update.status)
 
     update_response = (
@@ -1663,14 +1824,20 @@ def create_builder_project(
 ):
     require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_write_access)
+    require_any_entitlement(
+        context.tenant_id,
+        {"forms", "page_builder"},
+        message="An active Forms or page-builder plan is required.",
+    )
 
+    draft_schema = assert_json_object(project.draft_schema)
     payload = {
         "tenant_id": context.tenant_id,
         "owner_user_id": context.user_id,
         "name": normalize_name(project.name),
         "slug": normalize_slug(project.slug),
         "status": "draft",
-        "draft_schema": assert_json_object(project.draft_schema),
+        "draft_schema": draft_schema,
         "draft_revision": 0,
         "schema_version": 1,
     }
@@ -1684,6 +1851,9 @@ def create_builder_project(
         logger.warning("builder.project_create_failed", extra={"tenant_id": context.tenant_id, "user_id": context.user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not create builder project")
 
+    form_count = len(draft_schema.get("forms") or []) if isinstance(draft_schema.get("forms"), list) else 0
+    if form_count:
+        increment_operational_usage(context.tenant_id, "forms_created", delta=form_count)
     return {
         "success": True,
         "project": first_row(create_response),
@@ -2063,6 +2233,20 @@ def update_builder_project(
         if revision_supported:
             update_query = update_query.eq("draft_revision", expected_revision)
         update_response = update_query.execute()
+        if "draft_schema" in update_payload:
+            previous_forms = (existing_project.get("draft_schema") or {}).get("forms") or []
+            next_forms = update_payload["draft_schema"].get("forms") or []
+            added_forms = max(
+                (len(next_forms) if isinstance(next_forms, list) else 0)
+                - (len(previous_forms) if isinstance(previous_forms, list) else 0),
+                0,
+            )
+            if added_forms:
+                increment_operational_usage(
+                    context.tenant_id,
+                    "forms_created",
+                    delta=added_forms,
+                )
     except Exception as error:
         if "duplicate" in str(error).lower() or "unique" in str(error).lower():
             raise HTTPException(status_code=409, detail="Project slug already exists")
@@ -2170,6 +2354,7 @@ def list_builder_form_submissions(
     offset: int = Query(default=0, ge=0),
 ):
     context = require_builder_context(request, response, require_active_tenant_member)
+    require_entitlement(context.tenant_id, "response_management")
     get_project_for_tenant(project_id, context.tenant_id)
 
     query = (
@@ -2216,6 +2401,7 @@ def get_builder_form_submission(
     response: Response,
 ):
     context = require_builder_context(request, response, require_active_tenant_member)
+    require_entitlement(context.tenant_id, "response_management")
     get_project_for_tenant(project_id, context.tenant_id)
 
     submission_response = (
@@ -2250,6 +2436,7 @@ def update_builder_form_submission_status(
     response: Response,
 ):
     context = require_builder_context_without_admin_account_access(request, response)
+    require_entitlement(context.tenant_id, "response_management")
     get_project_for_tenant(project_id, context.tenant_id)
 
     status = normalize_submission_status(submission_update.status)
@@ -2351,7 +2538,14 @@ def publish_builder_project(
     validated_schema, schema_version = validate_publish_schema(
         project.get("draft_schema") or {},
         project_schema_version=project.get("schema_version"),
+        tenant_id=context.tenant_id,
     )
+    if schema_contains_element_type(validated_schema, "reservationBlock"):
+        require_entitlement(
+            context.tenant_id,
+            "reservations",
+            message="Business Plus is required to publish reservation blocks.",
+        )
     project_for_publish = {**project, "draft_schema": validated_schema}
     published_project = publish_project_atomically(
         project=project_for_publish,
@@ -2364,11 +2558,12 @@ def publish_builder_project(
             entitlement.get("enforced") and entitlement.get("source") == "feature"
         ),
     )
-    website_settings, binding_created = bind_first_published_project_if_unbound(
-        settings=website_settings,
-        project=published_project,
-        tenant_id=context.tenant_id,
-    )
+    # Migration 072 performs an unambiguous first publication binding inside
+    # this same RPC transaction. Never follow a successful RPC with a second
+    # activation write: that would recreate the old hybrid-publication window.
+    binding_created = not bool(website_settings.get("published_project_id"))
+    if binding_created:
+        website_settings = {**website_settings, "published_project_id": project_id}
 
     logger.info(
         "builder.project_published",
@@ -2394,6 +2589,10 @@ def publish_builder_project(
         "project": published_project,
         "site": {
             "subdomain": website_settings.get("subdomain"),
+            "standard_path_slug": (
+                website_settings.get("standard_path_slug")
+                or website_settings.get("subdomain")
+            ),
             "tenant_id": website_settings.get("tenant_id"),
             "published_project_id": website_settings.get("published_project_id"),
         },

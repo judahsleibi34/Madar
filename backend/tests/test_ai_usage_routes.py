@@ -99,28 +99,46 @@ class AIUsageRouteTests(unittest.TestCase):
         self.dataset_dir.mkdir(parents=True)
         self.dataset_path = self.dataset_dir / "scores.csv"
         self.dataset_path.write_text("department,score\nSales,10\nSupport,20\n", encoding="utf-8")
-        self.usage = FakeUsageStore()
-        FakeDate.current = date(2026, 7, 7)
+        self.reservations = []
+        self.finalizations = []
+        self.releases = []
 
         self.patches = [
             patch.dict(
                 "os.environ",
                 {
                     "DATA_UPLOAD_DIR": str(self.upload_root),
-                    "AI_FREE_DAILY_MESSAGES": "2",
-                    "AI_FREE_GLOBAL_DAILY_MESSAGES": "100",
-                    "AI_PRO_DAILY_MESSAGES": "3",
-                    "AI_PRO_GLOBAL_DAILY_MESSAGES": "",
                     "AI_MOCK_MODE": "true",
                 },
                 clear=False,
             ),
-            patch.object(analysis_routes, "date", FakeDate),
             patch.object(analysis_routes, "enforce_data_workspace_rate_limit", return_value=None),
             patch.object(analysis_routes, "require_regular_user_id", return_value=auth_user()),
-            patch.object(analysis_routes.ai_usage, "get_daily_ai_usage", side_effect=self.usage.get_daily_ai_usage),
-            patch.object(analysis_routes.ai_usage, "get_global_daily_ai_usage", side_effect=self.usage.get_global_daily_ai_usage),
-            patch.object(analysis_routes.ai_usage, "reserve_daily_ai_usage", side_effect=self.usage.reserve_daily_ai_usage),
+            patch.object(
+                analysis_routes.token_metering,
+                "get_model_multipliers",
+                return_value={
+                    "version": "test-v1",
+                    "input_multiplier_micros": 1_000_000,
+                    "cached_input_multiplier_micros": 1_000_000,
+                    "output_multiplier_micros": 2_000_000,
+                },
+            ),
+            patch.object(
+                analysis_routes.token_metering,
+                "reserve_tokens",
+                side_effect=self._reserve_tokens,
+            ),
+            patch.object(
+                analysis_routes.token_metering,
+                "finalize_tokens",
+                side_effect=self._finalize_tokens,
+            ),
+            patch.object(
+                analysis_routes.token_metering,
+                "release_tokens",
+                side_effect=self._release_tokens,
+            ),
         ]
 
         for item in self.patches:
@@ -141,29 +159,44 @@ class AIUsageRouteTests(unittest.TestCase):
             },
         )
 
-    def test_free_user_requests_through_daily_limit_are_allowed_then_blocked(self):
-        with patch.object(analysis_routes.ai_service, "ask_planner", return_value=SAFE_PLANNER_RESPONSE) as ask_planner:
-            first = self.post_ai()
-            second = self.post_ai()
-            third = self.post_ai()
+    def _reserve_tokens(self, **kwargs):
+        request_id = f"request-{len(self.reservations) + 1}"
+        self.reservations.append(kwargs)
+        return {"accepted": True, "request_id": request_id}
 
-        self.assertEqual(first.status_code, 200)
-        self.assertEqual(second.status_code, 200)
-        self.assertEqual(third.status_code, 429)
-        self.assertEqual(self.usage.get_daily_ai_usage(user_id=1, usage_date=FakeDate.today())["message_count"], 2)
-        self.assertEqual(ask_planner.call_count, 2)
+    def _finalize_tokens(self, request_id, usage, **kwargs):
+        self.finalizations.append((request_id, usage, kwargs))
+        return 123
 
-    def test_limit_resets_on_new_day(self):
-        with patch.object(analysis_routes.ai_service, "ask_planner", return_value=SAFE_PLANNER_RESPONSE):
-            self.assertEqual(self.post_ai().status_code, 200)
-            self.assertEqual(self.post_ai().status_code, 200)
-            self.assertEqual(self.post_ai().status_code, 429)
+    def _release_tokens(self, request_id):
+        self.releases.append(request_id)
 
-            FakeDate.current = date(2026, 7, 8)
-            next_day = self.post_ai()
+    def test_question_count_does_not_determine_allowance(self):
+        with patch.object(
+            analysis_routes.ai_service,
+            "run_ai_analysis_on_dataframe",
+            return_value=SAFE_PLANNER_RESPONSE,
+        ) as run_ai:
+            responses = [self.post_ai() for _ in range(4)]
 
-        self.assertEqual(next_day.status_code, 200)
-        self.assertEqual(self.usage.get_daily_ai_usage(user_id=1, usage_date=date(2026, 7, 8))["message_count"], 1)
+        self.assertEqual([response.status_code for response in responses], [200] * 4)
+        self.assertEqual(run_ai.call_count, 4)
+        self.assertEqual(len(self.reservations), 4)
+        self.assertEqual(len(self.finalizations), 4)
+
+    def test_exhausted_token_balance_hard_stops_before_provider(self):
+        with patch.object(
+            analysis_routes.token_metering,
+            "reserve_tokens",
+            side_effect=HTTPException(status_code=402, detail={"code": "ai_tokens_exhausted"}),
+        ), patch.object(
+            analysis_routes.ai_service,
+            "run_ai_analysis_on_dataframe",
+        ) as run_ai:
+            response = self.post_ai()
+
+        self.assertEqual(response.status_code, 402)
+        run_ai.assert_not_called()
 
     def test_unsafe_prompt_is_blocked_and_does_not_increment_usage(self):
         with patch.object(analysis_routes.ai_service, "ask_planner") as ask_planner:
@@ -171,7 +204,7 @@ class AIUsageRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["type"], "blocked")
-        self.assertEqual(self.usage.get_daily_ai_usage(user_id=1, usage_date=FakeDate.today())["message_count"], 0)
+        self.assertEqual(self.reservations, [])
         ask_planner.assert_not_called()
 
     def test_unauthorized_user_cannot_use_ai_route(self):
@@ -183,7 +216,7 @@ class AIUsageRouteTests(unittest.TestCase):
             response = self.post_ai()
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(self.usage.get_daily_ai_usage(user_id=1, usage_date=FakeDate.today())["message_count"], 0)
+        self.assertEqual(self.reservations, [])
         ask_planner.assert_not_called()
 
     def test_tenant_user_dataset_mismatch_is_rejected_before_usage_increment(self):
@@ -195,7 +228,7 @@ class AIUsageRouteTests(unittest.TestCase):
             response = self.post_ai()
 
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(self.usage.get_daily_ai_usage(user_id=1, usage_date=FakeDate.today())["message_count"], 0)
+        self.assertEqual(self.reservations, [])
         ask_planner.assert_not_called()
 
     def test_path_user_mismatch_is_rejected_before_usage_increment(self):
@@ -207,38 +240,63 @@ class AIUsageRouteTests(unittest.TestCase):
             response = self.post_ai(user_id=2)
 
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(self.usage.get_daily_ai_usage(user_id=1, usage_date=FakeDate.today())["message_count"], 0)
+        self.assertEqual(self.reservations, [])
         ask_planner.assert_not_called()
 
-    def test_provider_failure_is_counted_after_provider_attempt(self):
+    def test_provider_failure_without_usage_releases_reservation(self):
         with patch.object(
             analysis_routes.ai_service,
-            "ask_planner",
-            side_effect=AIPlannerError("provider unavailable"),
-        ) as ask_planner:
+            "run_ai_analysis_on_dataframe",
+            return_value={
+                "success": False,
+                "code": "ai_provider_error",
+                "message": "provider unavailable",
+            },
+        ) as run_ai:
             response = self.post_ai()
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["code"], "ai_provider_error")
-        self.assertEqual(self.usage.get_daily_ai_usage(user_id=1, usage_date=FakeDate.today())["message_count"], 1)
-        ask_planner.assert_called_once()
+        self.assertEqual(self.finalizations, [])
+        self.assertEqual(self.releases, ["request-1"])
+        run_ai.assert_called_once()
 
-    def test_paid_active_plan_uses_higher_daily_limit(self):
+    def test_provider_exception_with_reported_usage_finalizes_confirmed_tokens(self):
+        def provider_call(**_kwargs):
+            analysis_routes.token_metering.record_provider_usage(
+                {
+                    "provider": "mock",
+                    "model": "mock",
+                    "input_tokens": 10,
+                    "output_tokens": 5,
+                    "total_provider_tokens": 15,
+                }
+            )
+            raise RuntimeError("provider disconnected after reporting usage")
+
         with patch.object(
-            analysis_routes,
-            "require_regular_user_id",
-            return_value=auth_user(payment_status="active", plan="business"),
-        ), patch.object(analysis_routes.ai_service, "ask_planner", return_value=SAFE_PLANNER_RESPONSE) as ask_planner:
-            first = self.post_ai()
-            second = self.post_ai()
-            third = self.post_ai()
-            fourth = self.post_ai()
+            analysis_routes.ai_service,
+            "run_ai_analysis_on_dataframe",
+            side_effect=provider_call,
+        ):
+            response = self.post_ai()
 
-        self.assertEqual(first.status_code, 200)
-        self.assertEqual(second.status_code, 200)
-        self.assertEqual(third.status_code, 200)
-        self.assertEqual(fourth.status_code, 429)
-        self.assertEqual(ask_planner.call_count, 3)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(self.finalizations), 1)
+        self.assertEqual(self.finalizations[0][2]["request_status"], "provider_error")
+        self.assertEqual(self.releases, [])
+
+    def test_provider_exception_without_reported_usage_releases_reservation(self):
+        with patch.object(
+            analysis_routes.ai_service,
+            "run_ai_analysis_on_dataframe",
+            side_effect=RuntimeError("provider unavailable"),
+        ):
+            response = self.post_ai()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.finalizations, [])
+        self.assertEqual(self.releases, ["request-1"])
 
 
 if __name__ == "__main__":

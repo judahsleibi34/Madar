@@ -458,8 +458,9 @@ class BuilderBackendHardeningTests(unittest.TestCase):
             body["site"],
             {
                 "subdomain": "tenant-site",
+                "standard_path_slug": "tenant-site",
                 "tenant_id": 1,
-                "published_project_id": None,
+                "published_project_id": "project-1",
             },
         )
         self.assertEqual(

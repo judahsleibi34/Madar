@@ -22,8 +22,57 @@ class Client:
     def __init__(self, result=None, error=None): self.result, self.error, self.calls = result, error, []
     def rpc(self, name, params): self.calls.append((name, params)); return Rpc(self.result, self.error)
 
+class UsageQuery:
+    def __init__(self, rows): self.rows, self.filters = rows, []
+    def select(self, *_args): return self
+    def eq(self, field, value): self.filters.append(("eq", field, value)); return self
+    def is_(self, field, value): self.filters.append(("is", field, value)); return self
+    def limit(self, *_args): return self
+    def execute(self):
+        rows = list(self.rows)
+        for operation, field, value in self.filters:
+            if operation == "eq": rows = [row for row in rows if row.get(field) == value]
+            if operation == "is" and value == "null": rows = [row for row in rows if row.get(field) is None]
+        return Response(rows[:1])
+
+
+class UsageClient:
+    def __init__(self, row): self.rows = [row]
+    def table(self, _name): return UsageQuery(self.rows)
+
+
+class StorageMutationQuery(UsageQuery):
+    def __init__(self, rows):
+        super().__init__(rows)
+        self.update_payload = None
+    def update(self, payload): self.update_payload = payload; return self
+    def execute(self):
+        rows = list(self.rows)
+        for operation, field, value in self.filters:
+            if operation == "eq": rows = [row for row in rows if row.get(field) == value]
+            if operation == "is" and value == "null": rows = [row for row in rows if row.get(field) is None]
+        if self.update_payload is not None:
+            for row in rows: row.update(self.update_payload)
+        return Response(rows)
+
+
+class StorageMutationClient:
+    def __init__(self, rows): self.rows = rows
+    def table(self, _name): return StorageMutationQuery(self.rows)
+
 
 class StorageQuotaTests(unittest.TestCase):
+    def setUp(self):
+        self.quota_patch = patch.object(
+            storage_quota_service,
+            "get_storage_quota_bytes",
+            return_value=5 * 1024 * 1024 * 1024,
+        )
+        self.quota_patch.start()
+
+    def tearDown(self):
+        self.quota_patch.stop()
+
     def test_migration_uses_atomic_locked_upserts_and_nonnegative_release(self):
         candidates = (
             Path.cwd() / "database/migrations/056_add_storage_quota_accounting.sql",
@@ -53,7 +102,34 @@ class StorageQuotaTests(unittest.TestCase):
             )
         self.assertEqual(result, "reservation-1")
         self.assertEqual(client.calls[0][1]["p_tenant_id"], 7)
-        self.assertGreater(client.calls[0][1]["p_user_quota"], 0)
+        self.assertEqual(client.calls[0][1]["p_tenant_quota"], 5 * 1024 * 1024 * 1024)
+        self.assertEqual(client.calls[0][1]["p_user_quota"], 1024 * 1024 * 1024)
+
+    def test_tenant_and_user_scopes_report_once_and_quota_sync_updates_only_tenant(self):
+        gib = 1024 * 1024 * 1024
+        rows = [
+            {"tenant_id": 7, "scope_key": "tenant", "user_id": None, "used_bytes": 1234, "reserved_bytes": 0, "quota_bytes": 5 * gib},
+            {"tenant_id": 7, "scope_key": "user:9", "user_id": 9, "used_bytes": 1234, "reserved_bytes": 0, "quota_bytes": gib},
+        ]
+        client = StorageMutationClient(rows)
+
+        usage = storage_quota_service.get_tenant_storage_usage(7, client=client)
+        self.assertEqual(usage["used_bytes"], 1234)
+
+        self.quota_patch.stop()
+        self.quota_patch = patch.object(
+            storage_quota_service,
+            "get_storage_quota_bytes",
+            return_value=2 * gib,
+        )
+        self.quota_patch.start()
+        storage_quota_service.sync_tenant_storage_quota(7, client=client)
+
+        self.assertEqual(rows[0]["quota_bytes"], 2 * gib)
+        self.assertEqual(rows[0]["used_bytes"], 1234)
+        self.assertEqual(rows[0]["reserved_bytes"], 0)
+        self.assertEqual(rows[1]["quota_bytes"], gib)
+        self.assertEqual(rows[1]["used_bytes"], 1234)
 
     def test_quota_errors_have_stable_codes(self):
         with tempfile.TemporaryDirectory() as root, patch.object(storage_quota_service, "ensure_disk_capacity", return_value=10**9):
@@ -67,6 +143,30 @@ class StorageQuotaTests(unittest.TestCase):
                         storage_root=Path(root), client=Client(error=provider_error),
                     )
                 self.assertEqual(raised.exception.code, code)
+
+    def test_downgrade_below_usage_reports_over_capacity_without_deleting_objects(self):
+        gib = 1024 * 1024 * 1024
+        self.quota_patch.stop()
+        self.quota_patch = patch.object(
+            storage_quota_service,
+            "get_storage_quota_bytes",
+            return_value=1 * gib,
+        )
+        self.quota_patch.start()
+        usage = storage_quota_service.get_tenant_storage_usage(
+            7,
+            client=UsageClient({
+                "tenant_id": 7,
+                "scope_key": "tenant",
+                "user_id": None,
+                "used_bytes": 2 * gib,
+                "reserved_bytes": 0,
+                "quota_bytes": 5 * gib,
+            }),
+        )
+        self.assertEqual(usage["used_bytes"], 2 * gib)
+        self.assertEqual(usage["quota_bytes"], 1 * gib)
+        self.assertTrue(usage["over_capacity"])
 
     def test_finish_records_hash_without_raw_content(self):
         client = Client(result="object-1")

@@ -1,5 +1,4 @@
 import logging
-from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -9,9 +8,11 @@ from pydantic import BaseModel
 from data_analysis import services as data_services
 from data_analysis.ai import service as ai_service
 from data_analysis.ai import usage as ai_usage
-from data_analysis.ai.settings import get_ai_limits_for_plan, normalize_plan_name
+from data_analysis.ai.settings import get_model_config_for_plan, normalize_plan_name
+from data_analysis.ai import token_metering
 from data_analysis.routes.data_routes import get_storage_scope
 from services.auth_service import require_regular_user_id
+from services.entitlement_service import require_entitlement
 from services.rate_limit_service import enforce_data_workspace_rate_limit
 
 
@@ -117,7 +118,8 @@ def _result_status(result: dict[str, Any]) -> int:
 
 @router.get("/catalog")
 def analysis_catalog(user_id: int, fastapi_request: Request, response: Response, language: str = "en"):
-    get_storage_scope(fastapi_request, response, user_id)
+    tenant_id, _ = get_storage_scope(fastapi_request, response, user_id)
+    require_entitlement(tenant_id, "standard_data_analysis")
     return data_services.get_analysis_catalog(language)
 
 
@@ -125,6 +127,7 @@ def analysis_catalog(user_id: int, fastapi_request: Request, response: Response,
 def run_analysis(user_id: int, request: AnalysisRunRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        require_entitlement(tenant_id, "standard_data_analysis")
         enforce_data_workspace_rate_limit(
             fastapi_request,
             scoped_user_id,
@@ -153,6 +156,7 @@ def run_analysis(user_id: int, request: AnalysisRunRequest, fastapi_request: Req
 def assisted_analysis(user_id: int, request: AssistedAnalysisRequest, fastapi_request: Request, response: Response):
     try:
         tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        require_entitlement(tenant_id, "standard_data_analysis")
         enforce_data_workspace_rate_limit(
             fastapi_request,
             scoped_user_id,
@@ -180,6 +184,7 @@ def assisted_analysis(user_id: int, request: AssistedAnalysisRequest, fastapi_re
 
 @router.post("/ai")
 def ai_analysis(user_id: int, request: AIAnalysisRequest, fastapi_request: Request, response: Response):
+    token_reservation_id = ""
     try:
         tenant_id, scoped_user_id, user_data = _get_ai_context(user_id, fastapi_request, response)
         enforce_data_workspace_rate_limit(
@@ -214,79 +219,95 @@ def ai_analysis(user_id: int, request: AIAnalysisRequest, fastapi_request: Reque
         if preflight_error:
             return JSONResponse(status_code=_result_status(preflight_error), content=preflight_error)
 
-        usage_date = date.today()
-        limits = get_ai_limits_for_plan(user_plan)
-        daily_usage = ai_usage.get_daily_ai_usage(
-            user_id=scoped_user_id,
-            usage_date=usage_date,
+        model_config = get_model_config_for_plan(user_plan)
+        multipliers = token_metering.get_model_multipliers(
+            model_config.provider,
+            model_config.model,
         )
-        global_usage = ai_usage.get_global_daily_ai_usage(usage_date=usage_date)
+        # Reserve conservatively for a planner and optional code-generator call.
+        # Finalization releases the unused capacity using provider metadata.
+        maximum_standard_tokens = token_metering.normalize_standard_tokens(
+            input_tokens=40_000,
+            cached_input_tokens=0,
+            output_tokens=model_config.max_output_tokens * 2,
+            multipliers=multipliers,
+        )
+        supplied_request_id = str(
+            fastapi_request.headers.get("Idempotency-Key")
+            or fastapi_request.headers.get("X-Request-ID")
+            or ""
+        ).strip()
+        reservation = token_metering.reserve_tokens(
+            tenant_id=int(tenant_id),
+            user_id=int(scoped_user_id),
+            operation_type="analytics",
+            maximum_standard_tokens=maximum_standard_tokens,
+            request_id=supplied_request_id or None,
+        )
+        token_reservation_id = str(reservation.get("request_id") or "")
 
-        if daily_usage["message_count"] >= limits.daily_messages:
-            return _limit_response(
-                "You reached today’s AI analysis limit. Try again tomorrow or upgrade for more AI analysis."
-            )
+        captured_usage: list[dict[str, Any]] = []
+        try:
+            with token_metering.capture_provider_usage() as captured_usage:
+                result = ai_service.run_ai_analysis_on_dataframe(
+                    df=df,
+                    user_message=request.user_message,
+                    user_plan=user_plan,
+                    dataset_name=request.dataset_name or request.input_path,
+                    # Legacy question counters no longer determine commercial access.
+                    # Zeros retain non-commercial row/code safety checks in the AI service.
+                    daily_messages_used=0,
+                    daily_code_generations_used=0,
+                    global_daily_messages_used=0,
+                    global_daily_code_generations_used=0,
+                    reserve_code_generation=lambda: True,
+                )
+        except Exception:
+            # A provider exception consumes nothing when usage is unknown. If the
+            # provider already reported usage, charge only that confirmed amount.
+            if captured_usage:
+                failed_usage = token_metering.aggregate_usage(
+                    captured_usage,
+                    fallback_input={},
+                    fallback_output={},
+                    provider=model_config.provider,
+                    model=model_config.model,
+                )
+                token_metering.finalize_tokens(
+                    token_reservation_id,
+                    failed_usage,
+                    request_status="provider_error",
+                )
+                token_reservation_id = ""
+            raise
 
-        if (
-            limits.global_daily_messages is not None
-            and global_usage["message_count"] >= limits.global_daily_messages
-        ):
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "success": False,
-                    "type": "error",
-                    "code": "global_free_ai_limit_reached",
-                    "message": "The free AI analysis pool is busy today. Try again later or upgrade for more access.",
+        provider_attempt_succeeded = result.get("code") not in {
+            "ai_provider_error",
+            "code_generation_failed",
+        }
+        if captured_usage or provider_attempt_succeeded:
+            usage_record = token_metering.aggregate_usage(
+                captured_usage,
+                fallback_input={
+                    "question": request.user_message,
+                    "dataset_name": request.dataset_name or request.input_path,
                 },
+                fallback_output=result,
+                provider=model_config.provider,
+                model=model_config.model,
             )
-
-        reservation = ai_usage.reserve_daily_ai_usage(
-            user_id=scoped_user_id,
-            tenant_id=tenant_id,
-            usage_date=usage_date,
-            message_limit=limits.daily_messages,
-            code_generation_limit=limits.daily_code_generations,
-            message_delta=1,
-            code_generation_delta=0,
-        )
-
-        if not reservation.get("accepted"):
-            return _limit_response(
-                "You reached today’s AI analysis limit. Try again tomorrow or upgrade for more AI analysis."
+            consumed = token_metering.finalize_tokens(
+                token_reservation_id,
+                usage_record,
+                request_status="succeeded" if result.get("success") is not False else "failed",
             )
-
-        def reserve_code_generation() -> bool:
-            current_global_usage = ai_usage.get_global_daily_ai_usage(usage_date=usage_date)
-
-            if (
-                limits.global_daily_code_generations is not None
-                and current_global_usage["code_generation_count"] >= limits.global_daily_code_generations
-            ):
-                return False
-
-            code_reservation = ai_usage.reserve_daily_ai_usage(
-                user_id=scoped_user_id,
-                tenant_id=tenant_id,
-                usage_date=usage_date,
-                message_limit=limits.daily_messages,
-                code_generation_limit=limits.daily_code_generations,
-                message_delta=0,
-                code_generation_delta=1,
-            )
-            return bool(code_reservation.get("accepted"))
-
-        result = ai_service.run_ai_analysis_on_dataframe(
-            df=df,
-            user_message=request.user_message,
-            user_plan=user_plan,
-            dataset_name=request.dataset_name or request.input_path,
-            daily_messages_used=int(daily_usage["message_count"]),
-            daily_code_generations_used=int(daily_usage["code_generation_count"]),
-            global_daily_messages_used=int(global_usage["message_count"]),
-            global_daily_code_generations_used=int(global_usage["code_generation_count"]),
-            reserve_code_generation=reserve_code_generation,
-        )
+            result["token_usage"] = {
+                "standard_tokens": consumed,
+                "estimated": usage_record["estimated"],
+                "source": usage_record["usage_source"],
+            }
+        else:
+            token_metering.release_tokens(token_reservation_id)
 
         return JSONResponse(status_code=_result_status(result), content=result)
 
@@ -294,5 +315,13 @@ def ai_analysis(user_id: int, request: AIAnalysisRequest, fastapi_request: Reque
         raise
 
     except Exception as error:
+        if token_reservation_id:
+            try:
+                token_metering.release_tokens(token_reservation_id)
+            except Exception:
+                logger.warning(
+                    "data.analysis.ai_token_release_failed",
+                    extra={"user_id": user_id, "error_type": type(error).__name__},
+                )
         logger.warning("data.analysis.ai_failed", extra={"user_id": user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=400, detail="Could not run AI analysis.")

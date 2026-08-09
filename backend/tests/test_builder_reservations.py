@@ -338,6 +338,17 @@ class PublicBuilderReservationTests(unittest.TestCase):
 
 
 class BuilderReservationManagementTests(unittest.TestCase):
+    def setUp(self):
+        self.entitlement_patch = patch.object(
+            builder_routes,
+            "require_entitlement",
+            return_value={},
+        )
+        self.entitlement_patch.start()
+
+    def tearDown(self):
+        self.entitlement_patch.stop()
+
     def test_tenant_can_list_own_reservations_with_filters_and_pagination(self):
         fake_supabase = FakeSupabase()
         seed_reservations(fake_supabase)

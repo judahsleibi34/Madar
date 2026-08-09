@@ -72,6 +72,23 @@ describe("cleanBuilderProject", () => {
     expect(normalized.roles[0].resourceAccess.pageIds).toEqual(["members"]);
   });
 
+  it("normalizes explicit button colors on draft reload without adding defaults", () => {
+    const normalized = normalizeBuilderProjectShape({
+      pages: [{
+        id: "home",
+        sections: [{ freeElements: [
+          { id: "custom", type: "button", backgroundColor: "#aabbcc", textColor: "#ffffff" },
+          { id: "legacy", type: "button" },
+        ] }],
+      }],
+      forms: [],
+    });
+    const [custom, legacy] = normalized.pages[0].sections[0].freeElements;
+    expect(custom).toMatchObject({ backgroundColor: "#AABBCC", textColor: "#FFFFFF" });
+    expect(legacy).not.toHaveProperty("backgroundColor");
+    expect(legacy).not.toHaveProperty("textColor");
+  });
+
   it("repairs duplicate font-size history and the Enter-saved all-H1 pattern", () => {
     const normalized = normalizeBuilderProjectShape({
       pages: [{

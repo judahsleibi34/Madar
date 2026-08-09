@@ -10,6 +10,7 @@ from data_analysis import services as data_services
 from data_analysis.routes import analysis_routes, cleaning_routes, data_routes, visualization_routes
 from services import rate_limit_service
 from services.rate_limit_service import InMemoryRateLimitStore
+from tests.entitlement_test_support import EntitlementTestState
 
 
 def fake_require_active_tenant_user_id(user_id, request, response):
@@ -28,8 +29,12 @@ class DataWorkspaceRateLimitTests(unittest.TestCase):
             side_effect=fake_require_active_tenant_user_id,
         )
         self.auth_patch.start()
+        self.entitlement_state = EntitlementTestState().activate_plan("tenant-a", "business")
+        self.entitlement_patch = self.entitlement_state.installed()
+        self.entitlement_patch.__enter__()
 
     def tearDown(self):
+        self.entitlement_patch.__exit__(None, None, None)
         self.auth_patch.stop()
         self.audit_patch.stop()
         rate_limit_service._store = None

@@ -59,74 +59,31 @@ class PublishEntitlementTests(unittest.TestCase):
             )
             self.assertEqual(normalized["plan"], plan)
 
-    def test_rollout_defaults_to_beta_compatibility_without_database_lookup(self):
-        fake = _EntitlementSupabase([])
-        with patch.dict("os.environ", {}, clear=False), \
-             patch.dict("os.environ", {"ENFORCE_PUBLISH_ENTITLEMENT": "false"}), \
-             patch.object(billing_service, "service_supabase", fake):
+    def test_publish_uses_server_authoritative_entitlements(self):
+        expected = {"plan_id": "website", "capabilities": ["website_publish"]}
+        with patch(
+            "services.entitlement_service.require_any_entitlement",
+            return_value=expected,
+        ) as require:
             result = billing_service.require_publish_entitlement(7)
 
-        self.assertFalse(result["enforced"])
-        self.assertEqual(fake.table_calls, [])
+        self.assertEqual(result, expected)
+        require.assert_called_once_with(
+            7,
+            {"website_publish", "public_form_links"},
+            message="An active website or public-form publishing entitlement is required.",
+        )
 
-    def test_active_website_feature_allows_publish_when_enforced(self):
-        fake = _EntitlementSupabase([
-            {
-                "id": 12,
-                "subscription_type": "individual_builder",
-                "builder_type": "website",
-                "payment_status": "active",
-            }
-        ])
-        with patch.dict("os.environ", {"ENFORCE_PUBLISH_ENTITLEMENT": "true", "PUBLISH_BETA_TENANT_IDS": ""}), \
-             patch.object(billing_service, "service_supabase", fake):
-            result = billing_service.require_publish_entitlement(7)
-
-        self.assertTrue(result["active"])
-        self.assertEqual(result["feature_id"], 12)
-
-    def test_pending_feature_returns_stable_entitlement_code(self):
-        fake = _EntitlementSupabase([
-            {
-                "subscription_type": "full_platform",
-                "builder_type": None,
-                "payment_status": "pending",
-            }
-        ])
-        with patch.dict("os.environ", {"ENFORCE_PUBLISH_ENTITLEMENT": "true", "PUBLISH_BETA_TENANT_IDS": ""}), \
-             patch.object(billing_service, "service_supabase", fake):
+    def test_publish_denial_is_not_disabled_by_legacy_environment_flags(self):
+        denial = HTTPException(status_code=402, detail={"code": "entitlement_required"})
+        with patch.dict("os.environ", {"ENFORCE_PUBLISH_ENTITLEMENT": "false"}), patch(
+            "services.entitlement_service.require_any_entitlement",
+            side_effect=denial,
+        ):
             with self.assertRaises(HTTPException) as raised:
                 billing_service.require_publish_entitlement(7)
 
-        self.assertEqual(raised.exception.status_code, 402)
-        self.assertEqual(raised.exception.detail["code"], "entitlement_pending")
-
-    def test_past_due_canceled_expired_and_missing_features_are_inactive(self):
-        for features in (
-            [{"subscription_type": "full_platform", "payment_status": "past_due"}],
-            [{"subscription_type": "full_platform", "payment_status": "canceled"}],
-            [{"subscription_type": "full_platform", "payment_status": "expired"}],
-            [],
-        ):
-            with self.subTest(features=features), patch.dict(
-                "os.environ",
-                {"ENFORCE_PUBLISH_ENTITLEMENT": "true", "PUBLISH_BETA_TENANT_IDS": ""},
-            ), patch.object(
-                billing_service,
-                "service_supabase",
-                _EntitlementSupabase(features),
-            ):
-                with self.assertRaises(HTTPException) as raised:
-                    billing_service.require_publish_entitlement(7)
-                self.assertEqual(raised.exception.status_code, 402)
-                self.assertEqual(raised.exception.detail["code"], "entitlement_inactive")
-                expected_state = (
-                    features[0]["payment_status"] if features else "missing"
-                )
-                self.assertEqual(
-                    raised.exception.detail["context"]["billing_states"],
-                    [expected_state],
-                )
+        self.assertIs(raised.exception, denial)
 
 
 class _RpcCall:

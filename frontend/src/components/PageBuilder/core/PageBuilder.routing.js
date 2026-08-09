@@ -125,6 +125,25 @@ export const getDefaultPublicPage = (pages = [], defaultPageId = "") => {
   );
 };
 
+export const getStrictPublishedHomepage = (pages = [], defaultPageId = "") => {
+  const explicitId = String(defaultPageId || "").trim();
+  if (!explicitId || !Array.isArray(pages) || !pages.length) return null;
+  const idMatches = pages.filter((page) => String(page?.id || "") === explicitId);
+  const rootMatches = pages.filter(
+    (page) => String(page?.slug || page?.path || "").trim() === "/"
+  );
+  const flaggedMatches = pages.filter(
+    (page) => page?.isDefault === true || page?.is_default === true
+  );
+  if (idMatches.length !== 1 || rootMatches.length !== 1) return null;
+  if (String(rootMatches[0]?.id || "") !== explicitId) return null;
+  if (
+    flaggedMatches.length &&
+    (flaggedMatches.length !== 1 || String(flaggedMatches[0]?.id || "") !== explicitId)
+  ) return null;
+  return idMatches[0];
+};
+
 export const normalizeProjectPageRouting = (project = {}) => {
   const sourcePages = Array.isArray(project.pages) ? project.pages : [];
   const namedPages = [];
@@ -185,6 +204,15 @@ export const resolvePublicPageByPath = (pages, path, defaultPageId = "") => {
   return (pages || []).find(
     (page) => normalizePublicPageSlug(page?.slug, page?.name) === normalizedPath
   ) || null;
+};
+
+export const resolveStrictPublishedPageByPath = (pages, path, defaultPageId = "") => {
+  const normalizedPath = String(path || "/").replace(/\/+$/, "") || "/";
+  if (normalizedPath === "/") return getStrictPublishedHomepage(pages, defaultPageId);
+  const matches = (pages || []).filter(
+    (page) => normalizePublicPageSlug(page?.slug, page?.name) === normalizedPath
+  );
+  return matches.length === 1 ? matches[0] : null;
 };
 
 export const collectPublicPageRoutingIssues = (project = {}) => {

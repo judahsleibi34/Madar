@@ -118,9 +118,14 @@ export const userManagementFriendlyLabels = {
     },
     payment_status: {
       pending: "Pending setup",
+      pending_review: "Pending review",
       active: "Active",
+      scheduled_change: "Scheduled change",
       past_due: "Payment issue",
+      suspended: "Suspended",
       canceled: "Canceled",
+      expired: "Expired",
+      review_required: "Review required",
     },
   },
   ar: {
@@ -145,9 +150,14 @@ export const userManagementFriendlyLabels = {
     },
     payment_status: {
       pending: "بانتظار الإعداد",
+      pending_review: "بانتظار المراجعة",
       active: "نشطة",
+      scheduled_change: "تغيير مجدول",
       past_due: "مشكلة دفع",
+      suspended: "معلقة",
       canceled: "ملغاة",
+      expired: "منتهية",
+      review_required: "تتطلب مراجعة",
     },
   },
 };

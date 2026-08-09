@@ -136,7 +136,9 @@ describe("SettingsPage canonical email handling", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: /website/i }));
 
-    await waitFor(() => expect(screen.getByLabelText(/subdomain name/i).value).toBe("jus"));
+    await waitFor(() =>
+      expect(screen.getByLabelText(/standard hosted-address name/i).value).toBe("jus")
+    );
     expect(screen.getByLabelText(/brand name/i).value).toBe("");
     expect(screen.getByLabelText(/contact email/i).value).toBe("");
     expect(screen.queryByDisplayValue("Other tenant brand")).toBeNull();
@@ -179,7 +181,7 @@ describe("SettingsPage canonical email handling", () => {
     expect(logoField.value).toBe(logoFileName);
     expect(logoField.value).not.toContain("/uploads/");
 
-    fireEvent.change(screen.getByLabelText(/subdomain name/i), {
+    fireEvent.change(screen.getByLabelText(/standard hosted-address name/i), {
       target: { value: "demo" },
     });
     fireEvent.change(screen.getByLabelText(/brand name/i), {
@@ -208,4 +210,3 @@ describe("SettingsPage canonical email handling", () => {
 afterEach(() => {
   cleanup();
 });
-

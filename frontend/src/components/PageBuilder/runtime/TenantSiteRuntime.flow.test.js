@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cacheTenantBrand,
   getRuntimeAuthFlow,
+  getVerifiedPublicationBoundary,
   getTenantBrandFallback,
   getTenantLoadingLogoUrl,
   getRuntimeCanvasScale,
@@ -45,13 +46,20 @@ describe("tenant brand loading", () => {
       setItem: (key, value) => values.set(key, value),
     };
 
-    cacheTenantBrand(storage, "madar-demo", {
+    const boundary = {
+      hostname: "madarportal.com",
+      siteIdentifier: "madar-demo",
+      siteId: "site-1",
+      projectId: "project-1",
+      publishedVersion: 4,
+    };
+    cacheTenantBrand(storage, boundary, {
       brand: "Madar Demo",
       logoUrl: "/uploads/tenant_1/builder_assets/1234567890abcdef1234567890abcdef.png",
       loadingImageUrl: "/uploads/tenant_1/builder_assets/loading.png",
     });
 
-    expect(readCachedTenantBrand(storage, "madar-demo")).toEqual({
+    expect(readCachedTenantBrand(storage, boundary)).toEqual({
       brand: "Madar Demo",
       logoUrl: "/uploads/tenant_1/builder_assets/1234567890abcdef1234567890abcdef.png",
       loadingImageUrl: "/uploads/tenant_1/builder_assets/loading.png",
@@ -60,7 +68,39 @@ describe("tenant brand loading", () => {
   });
 
   it("ignores malformed cached branding", () => {
-    expect(readCachedTenantBrand({ getItem: () => "not-json" }, "broken")).toBeNull();
+    expect(readCachedTenantBrand({ getItem: () => "not-json" }, {
+      hostname: "madarportal.com",
+      siteIdentifier: "broken",
+      siteId: "site-1",
+      projectId: "project-1",
+      publishedVersion: 1,
+    })).toBeNull();
+  });
+
+  it("does not reuse branding without the complete publication boundary", () => {
+    expect(readCachedTenantBrand({ getItem: () => "{}" }, "madar-demo")).toBeNull();
+  });
+});
+
+describe("public publication boundary", () => {
+  it("accepts only matching site and project identities", () => {
+    const payload = {
+      site: { subdomain: "alpha", site_id: "site-1", project_id: "project-1" },
+      project: {
+        site_id: "site-1",
+        site_identifier: "alpha",
+        project_id: "project-1",
+        published_version: 4,
+        publication_key: "site-1:alpha:project-1:4:hash",
+      },
+    };
+    expect(getVerifiedPublicationBoundary(payload, "alpha", "madarportal.com"))
+      .toMatchObject({ siteId: "site-1", projectId: "project-1", publishedVersion: 4 });
+    expect(getVerifiedPublicationBoundary(payload, "beta", "madarportal.com")).toBeNull();
+    expect(getVerifiedPublicationBoundary({
+      ...payload,
+      project: { ...payload.project, site_id: "" },
+    }, "alpha", "madarportal.com")).toBeNull();
   });
 
   it("prioritizes the Website Settings logo while loading", () => {

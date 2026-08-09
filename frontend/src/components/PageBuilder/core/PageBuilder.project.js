@@ -1,6 +1,7 @@
 import { defaultSiteChrome, defaultTheme } from "./PageBuilder.constants";
 import { normalizeProjectPageRouting } from "./PageBuilder.routing";
 import { normalizeElementAction } from "./PageBuilder.actions";
+import { BUTTON_COLOR_FIELDS, normalizeButtonColor } from "./PageBuilder.buttonColors";
 import {
   stripEditorOnlyState,
   withLocalProjectEditorDefaults,
@@ -179,6 +180,13 @@ const normalizeBuilderElementShape = (element, path = "element") => {
     id: String(element.id || deterministicRoutineId("element", path)),
   });
   normalized.id = String(normalized.id || "");
+  if (normalized.type === "button") {
+    BUTTON_COLOR_FIELDS.forEach((field) => {
+      const value = normalizeButtonColor(element[field]);
+      if (value) normalized[field] = value;
+      else delete normalized[field];
+    });
+  }
   normalized.action = normalizeElementAction(element.action);
   normalized.richTextColors = compactRichTextRanges(element.richTextColors);
   normalized.richTextSizes = compactRichTextRanges(element.richTextSizes);

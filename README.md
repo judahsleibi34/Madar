@@ -279,9 +279,19 @@ Madar uses a layered security model:
 
 ## Billing Limitation
 
-Billing is currently limited to internal feature-state handling and pending checkout records.
+The server-authoritative commercial catalog is exposed at `GET /billing/catalog`.
+Canonical base-plan, add-on, storage, hosted-address, workspace-seat, and AI
+standard-token primitives are introduced by migration `071`. Customer plan and
+add-on requests remain pending until an AAL2-authenticated administrator reviews
+and activates them.
 
-There is no real payment provider integration yet, so this branch should be treated as billing-preparation work rather than a production payment system.
+There is no payment-provider integration, automatic renewal, card storage, or
+invoice generation. Migrations `071` and `072` were applied to the shared live
+database on 2026-07-31. Legacy billing and branded-route review records must
+still be reconciled before strict canonical entitlements are enabled in an
+application rollout. See
+`docs/madar-pricing-entitlements-implementation.md` for the compatibility and
+deployment sequence.
 
 ## Testing Commands
 

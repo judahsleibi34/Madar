@@ -43,8 +43,10 @@ import { getTenantRuntimeContent } from "../../../content/pageBuilder";
 import { getReservationErrorMessage } from "./reservationSubmission";
 import {
   getDefaultPublicPage,
+  getStrictPublishedHomepage,
   getPublicPagePath,
   resolvePublicPageByPath,
+  resolveStrictPublishedPageByPath,
 } from "../core/PageBuilder.routing";
 import {
   findPageByNavigationReference,
@@ -80,10 +82,23 @@ export const getTenantBrandFallback = (subdomain) =>
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ") || "Website";
 
+const getTenantBrandCacheKey = (boundary) => {
+  if (!boundary || typeof boundary !== "object") return "";
+  const hostname = String(boundary.hostname || "").trim().toLowerCase();
+  const siteIdentifier = String(boundary.siteIdentifier || "").trim().toLowerCase();
+  const siteId = String(boundary.siteId || "").trim();
+  const projectId = String(boundary.projectId || "").trim();
+  const publishedVersion = Number(boundary.publishedVersion);
+  if (!hostname || !siteIdentifier || !siteId || !projectId || !Number.isInteger(publishedVersion)) return "";
+  return `${TENANT_BRAND_CACHE_PREFIX}${hostname}:${siteIdentifier}:${siteId}:${projectId}:${publishedVersion}`;
+};
+
 // eslint-disable-next-line react-refresh/only-export-components
-export const readCachedTenantBrand = (storage, subdomain) => {
+export const readCachedTenantBrand = (storage, boundary) => {
   try {
-    const value = JSON.parse(storage?.getItem(`${TENANT_BRAND_CACHE_PREFIX}${subdomain}`) || "null");
+    const cacheKey = getTenantBrandCacheKey(boundary);
+    if (!cacheKey) return null;
+    const value = JSON.parse(storage?.getItem(cacheKey) || "null");
     if (!value || typeof value !== "object") return null;
     const brand = String(value.brand || "").trim().slice(0, 80);
     const logoUrl = String(value.logoUrl || "").trim().slice(0, 2048);
@@ -103,16 +118,42 @@ export const getTenantLoadingLogoUrl = ({
   String(settingsLogoUrl || logoUrl || loadingImageUrl || "").trim();
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const cacheTenantBrand = (storage, subdomain, value) => {
+export const cacheTenantBrand = (storage, boundary, value) => {
   const brand = String(value?.brand || "").trim().slice(0, 80);
   const logoUrl = String(value?.logoUrl || "").trim().slice(0, 2048);
   const loadingImageUrl = String(value?.loadingImageUrl || "").trim().slice(0, 2048);
-  if (!storage || (!brand && !logoUrl && !loadingImageUrl)) return;
+  const cacheKey = getTenantBrandCacheKey(boundary);
+  if (!storage || !cacheKey || (!brand && !logoUrl && !loadingImageUrl)) return;
   try {
-    storage.setItem(`${TENANT_BRAND_CACHE_PREFIX}${subdomain}`, JSON.stringify({ brand, logoUrl, loadingImageUrl }));
+    storage.setItem(cacheKey, JSON.stringify({ brand, logoUrl, loadingImageUrl }));
   } catch {
     // Storage may be unavailable in private or restricted browsing contexts.
   }
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getVerifiedPublicationBoundary = (payload, siteIdentifier, hostname = "") => {
+  const site = payload?.site;
+  const publication = payload?.project;
+  const cleanIdentifier = String(siteIdentifier || "").trim().toLowerCase();
+  if (!site || !publication || String(site.subdomain || "").trim().toLowerCase() !== cleanIdentifier) return null;
+  const siteId = String(publication.site_id || "").trim();
+  const publicationIdentifier = String(publication.site_identifier || "").trim().toLowerCase();
+  const projectId = String(publication.project_id || "").trim();
+  const publishedVersion = Number(publication.published_version);
+  const publicationKey = String(publication.publication_key || "").trim();
+  if (
+    !siteId || publicationIdentifier !== cleanIdentifier || !projectId ||
+    !Number.isInteger(publishedVersion) || publishedVersion < 0 || !publicationKey
+  ) return null;
+  return {
+    hostname: String(hostname || "").trim().toLowerCase(),
+    siteIdentifier: cleanIdentifier,
+    siteId,
+    projectId,
+    publishedVersion,
+    publicationKey,
+  };
 };
 
 const getTenantBrandStorage = () => {
@@ -442,9 +483,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     : runtimePresentationZoom;
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState("loading");
-  const [cachedTenantBrand, setCachedTenantBrand] = useState(() =>
-    readCachedTenantBrand(getTenantBrandStorage(), cleanSubdomain)
-  );
+  const [publicationBoundary, setPublicationBoundary] = useState(null);
   const [formAnswers, setFormAnswers] = useState({});
   const [formHoneypots, setFormHoneypots] = useState({});
   const [formStatus, setFormStatus] = useState({});
@@ -459,9 +498,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const protectedPageRequestRef = useRef("");
   const pendingProtectedPageRef = useRef("");
 
-  useEffect(() => {
-    setCachedTenantBrand(readCachedTenantBrand(getTenantBrandStorage(), cleanSubdomain));
-  }, [cleanSubdomain]);
   const loadProtectedPage = useCallback(async (pageReference) => {
     const cleanReference = String(pageReference || "").replace(/^\/+/, "");
     if (draftPreview || !cleanReference) return null;
@@ -470,6 +506,17 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     protectedPageRequestRef.current = cleanReference;
     try {
       const result = await fetchProtectedSitePage(cleanSubdomain, cleanReference);
+      const nextBoundary = getVerifiedPublicationBoundary(
+        result,
+        cleanSubdomain,
+        window.location.hostname
+      );
+      if (
+        !nextBoundary || !publicationBoundary ||
+        nextBoundary.siteId !== publicationBoundary.siteId ||
+        nextBoundary.projectId !== publicationBoundary.projectId ||
+        nextBoundary.publishedVersion !== publicationBoundary.publishedVersion
+      ) throw new Error("Published site changed while loading the page.");
       const schema = result?.project?.published_schema;
       if (!schema || typeof schema !== "object") return null;
       setProject(schema);
@@ -482,7 +529,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     } finally {
       protectedPageRequestRef.current = "";
     }
-  }, [cleanSubdomain, draftPreview]);
+  }, [cleanSubdomain, draftPreview, publicationBoundary]);
 
   useEffect(() => {
     if (draftPreview) return;
@@ -606,6 +653,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     if (draftPreview) {
       let cancelled = false;
       setProject(null);
+      setPublicationBoundary(null);
       setPublicSiteState("loading");
       if (!projectId) {
         setPublicSiteState("unavailable");
@@ -635,6 +683,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     let cancelled = false;
     setProject(null);
     setPublicSiteProfile(null);
+    setPublicationBoundary(null);
     setPublicSiteState("loading");
 
     const loadBackendPublicContent = async () => {
@@ -645,24 +694,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
         if (cancelled) return;
 
-        const publicProfile = publicContent?.site || null;
-        setPublicSiteProfile(publicProfile);
-
-        const settingsLogoUrl = String(publicProfile?.logo_url || "").trim();
-        const storedBrand = readCachedTenantBrand(getTenantBrandStorage(), cleanSubdomain);
-        if (settingsLogoUrl && storedBrand?.logoUrl !== settingsLogoUrl) {
-          const nextBrand = {
-            brand: publicProfile?.brand || getTenantBrandFallback(cleanSubdomain),
-            logoUrl: settingsLogoUrl,
-            loadingImageUrl: "",
-          };
-          setCachedTenantBrand(nextBrand);
-          cacheTenantBrand(getTenantBrandStorage(), cleanSubdomain, nextBrand);
-          await new Promise((resolve) => window.setTimeout(resolve, 600));
-          if (cancelled) return;
-        }
-
         if (standaloneFormId) {
+          setPublicSiteProfile(publicContent?.site || null);
           if (publicContent?.form && typeof publicContent.form === "object") {
             setProject({
               forms: [publicContent.form],
@@ -682,8 +715,15 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         }
 
         const publishedProject = publicContent?.project?.published_schema;
+        const verifiedBoundary = getVerifiedPublicationBoundary(
+          publicContent,
+          cleanSubdomain,
+          window.location.hostname
+        );
 
-        if (publishedProject && typeof publishedProject === "object") {
+        if (verifiedBoundary && publishedProject && typeof publishedProject === "object") {
+          setPublicationBoundary(verifiedBoundary);
+          setPublicSiteProfile(publicContent?.site || null);
           setProject(publishedProject);
           setPublicSiteState("ready");
           return;
@@ -743,12 +783,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const pagePath = routePagePath && routePagePath !== "/" ? routePagePath : "/";
   const normalizedPagePath = pagePath === "/" ? "/" : pagePath.replace(/\/+$/, "");
   const defaultPage = useMemo(
-    () => getDefaultPublicPage(pages, project?.defaultPageId),
-    [pages, project?.defaultPageId]
+    () => draftPreview
+      ? getDefaultPublicPage(pages, project?.defaultPageId)
+      : getStrictPublishedHomepage(pages, project?.defaultPageId),
+    [draftPreview, pages, project?.defaultPageId]
   );
   const requestedPage = useMemo(() => {
-    return resolvePublicPageByPath(pages, pagePath, project?.defaultPageId);
-  }, [pagePath, pages, project?.defaultPageId]);
+    return draftPreview
+      ? resolvePublicPageByPath(pages, pagePath, project?.defaultPageId)
+      : resolveStrictPublishedPageByPath(pages, pagePath, project?.defaultPageId);
+  }, [draftPreview, pagePath, pages, project?.defaultPageId]);
   const { entryPage: authEntryPage, destinationPageIds: authDestinationPageIds } = useMemo(
     () => getRuntimeAuthFlow(pages),
     [pages]
@@ -815,9 +859,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       logoUrl: publicSiteProfile?.logo_url || site.logoUrl || "",
       loadingImageUrl: site.loadingImageUrl || "",
     };
-    setCachedTenantBrand(nextBrand);
-    cacheTenantBrand(getTenantBrandStorage(), cleanSubdomain, nextBrand);
-  }, [brandName, cleanSubdomain, isPublicRuntime, publicSiteProfile?.logo_url, publicSiteState, site.loadingImageUrl, site.logoUrl]);
+    cacheTenantBrand(getTenantBrandStorage(), publicationBoundary, nextBrand);
+  }, [brandName, isPublicRuntime, publicationBoundary, publicSiteProfile?.logo_url, publicSiteState, site.loadingImageUrl, site.logoUrl]);
 
   const getPageDestinationPath = useCallback((page) => {
     if (!page) {
@@ -1755,7 +1798,14 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     renderSiteHeader: renderCanvasHeader,
     renderSiteFooter: renderCanvasFooter,
   } = createSiteChromeRenderers({
-    project: project || { pages: [], siteChrome: defaultSiteChrome },
+    project: project
+      ? {
+          ...project,
+          // A legacy snapshot without chrome must not acquire Madar's factory
+          // header/footer at public runtime. Absence is safer than a hybrid.
+          siteChrome: project.siteChrome || { showHeader: false, showFooter: false },
+        }
+      : { pages: [], siteChrome: { showHeader: false, showFooter: false } },
     activePage,
     selected: { type: "", id: "" },
     preview: true,
@@ -1787,7 +1837,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           logoUrl: site.logoUrl || "",
           loadingImageUrl: site.loadingImageUrl || "",
         }
-      : cachedTenantBrand;
+      : readCachedTenantBrand(getTenantBrandStorage(), publicationBoundary);
     const loadingBrand = resolvedBrand?.brand || getTenantBrandFallback(cleanSubdomain);
     const loadingLogo = resolveMediaUrl(getTenantLoadingLogoUrl({
       settingsLogoUrl: publicSiteProfile?.logo_url,

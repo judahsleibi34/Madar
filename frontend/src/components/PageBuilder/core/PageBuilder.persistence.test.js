@@ -71,6 +71,47 @@ describe("builder project persistence", () => {
     expect(payload.draft_schema.forms[0].sections[8].fields[0].label).toBe("Question 9");
   });
 
+  it("preserves explicit button colors in browser and backend draft payloads", () => {
+    const project = {
+      ...fullProject,
+      pages: [{
+        id: "home",
+        sections: [{ freeElements: [{
+          id: "button-1",
+          type: "button",
+          backgroundColor: "#112233",
+          textColor: "#FFFFFF",
+          hoverBackgroundColor: "#334455",
+          hoverTextColor: "#EEEEEE",
+          borderColor: "#556677",
+        }] }],
+      }],
+    };
+    persistBuilderProject({
+      nextProject: project,
+      storageKey: "button-color-draft",
+      setProject: vi.fn(),
+      showToast: vi.fn(),
+      demoMode: false,
+    });
+    const localButton = JSON.parse(localStorage.getItem("button-color-draft"))
+      .pages[0].sections[0].freeElements[0];
+    const payloadButton = createBuilderProjectPayload({
+      project,
+      builderProjectRecord: { id: "project-1", slug: "buttons" },
+      getBuilderProjectName: () => "Buttons",
+      getBuilderProjectSlug: () => "buttons",
+    }).draft_schema.pages[0].sections[0].freeElements[0];
+    expect(localButton).toMatchObject(payloadButton);
+    expect(payloadButton).toMatchObject({
+      backgroundColor: "#112233",
+      textColor: "#FFFFFF",
+      hoverBackgroundColor: "#334455",
+      hoverTextColor: "#EEEEEE",
+      borderColor: "#556677",
+    });
+  });
+
   it("sends the backend revision when updating an existing project", () => {
     const payload = createBuilderProjectPayload({
       project: fullProject,
