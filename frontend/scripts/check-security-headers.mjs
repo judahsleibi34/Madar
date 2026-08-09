@@ -42,4 +42,29 @@ if (!assetResponse.headers.get("content-security-policy")) {
   throw new Error("asset response is missing security headers");
 }
 
+const workerResponse = await fetch(`${baseUrl}/madar-push-sw.js`);
+if (!workerResponse.ok) throw new Error(`service worker returned HTTP ${workerResponse.status}`);
+if (!/javascript/.test(workerResponse.headers.get("content-type") || "")) {
+  throw new Error("service worker has an invalid JavaScript content type");
+}
+if (/immutable/.test(workerResponse.headers.get("cache-control") || "")) {
+  throw new Error("service worker must not use immutable caching");
+}
+if (!/no-cache/.test(workerResponse.headers.get("cache-control") || "")) {
+  throw new Error("service worker must be revalidated");
+}
+if (workerResponse.headers.get("service-worker-allowed") !== "/") {
+  throw new Error("service worker root scope is not explicitly allowed");
+}
+
+const manifestResponse = await fetch(`${baseUrl}/manifest.webmanifest`);
+if (!manifestResponse.ok) throw new Error(`manifest returned HTTP ${manifestResponse.status}`);
+if (!/application\/(?:manifest\+json|json)/.test(manifestResponse.headers.get("content-type") || "")) {
+  throw new Error("manifest has an invalid content type");
+}
+if (/immutable/.test(manifestResponse.headers.get("cache-control") || "")) {
+  throw new Error("manifest must not use immutable caching");
+}
+await manifestResponse.json();
+
 console.log("Frontend edge security headers passed.");

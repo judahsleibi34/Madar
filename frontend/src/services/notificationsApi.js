@@ -4,8 +4,7 @@ import {
   readApiError,
   readApiResponse,
 } from "../utils/apiClient";
-
-const PUSH_SERVICE_WORKER_PATH = "/madar-push-sw.js";
+import { getMadarServiceWorkerRegistration } from "../pwa/serviceWorker";
 
 export const fetchNotifications = async ({ limit = 30, unreadOnly = false, signal } = {}) => {
   const params = new URLSearchParams();
@@ -124,7 +123,10 @@ export const enableBrowserPushNotifications = async () => {
     return { enabled: false, reason: "permission_denied" };
   }
 
-  const registration = await navigator.serviceWorker.register(PUSH_SERVICE_WORKER_PATH);
+  const registration = await getMadarServiceWorkerRegistration();
+  if (!registration) {
+    return { enabled: false, reason: "unsupported" };
+  }
   const existingSubscription = await registration.pushManager.getSubscription();
   const subscription = existingSubscription || await registration.pushManager.subscribe({
     userVisibleOnly: true,
@@ -140,7 +142,7 @@ export const reconcileBrowserPushSubscription = async () => {
     return { reconciled: false };
   }
 
-  const registration = await navigator.serviceWorker.getRegistration(PUSH_SERVICE_WORKER_PATH);
+  const registration = await getMadarServiceWorkerRegistration();
   const subscription = await registration?.pushManager.getSubscription();
 
   if (!subscription) {

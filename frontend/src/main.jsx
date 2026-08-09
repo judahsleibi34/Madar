@@ -16,8 +16,24 @@ import "./styles/index.css";
 import "./styles/admin/authenticated-reference.css";
 import App from "./App.jsx";
 import { getBrandedRuntimePath } from "./utils/hostedAddress";
+import { installMadarPwaMetadata, isMadarPwaHost } from "./pwa/pwaContext";
+import { getMadarServiceWorkerRegistration } from "./pwa/serviceWorker";
 
 const brandedRuntimePath = getBrandedRuntimePath(window.location);
+const madarPwaHost = isMadarPwaHost(window.location);
+
+if (madarPwaHost) {
+  installMadarPwaMetadata(document);
+
+  // Avoid development workers controlling Vite's mutable module graph. The
+  // explicit Push action can still register the worker when a developer tests it.
+  if (import.meta.env.PROD) {
+    getMadarServiceWorkerRegistration().catch((error) => {
+      console.warn("Madar service worker registration failed:", error);
+    });
+  }
+}
+
 if (brandedRuntimePath) {
   window.history.replaceState(
     null,
