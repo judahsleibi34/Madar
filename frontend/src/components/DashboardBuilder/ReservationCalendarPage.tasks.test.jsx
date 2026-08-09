@@ -37,7 +37,9 @@ vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
 
 vi.mock("./utils/calendarWorkspaceCache", () => ({
   clearCalendarWorkspaceCache: vi.fn(),
-  createCalendarWorkspaceCacheKey: vi.fn(({ start, end }) => `${start}:${end}`),
+  createCalendarWorkspaceCacheKey: vi.fn(
+    ({ tenantScope, userScope, start, end }) => `${tenantScope}:${userScope}:${start}:${end}`
+  ),
   getOrCreateCalendarWorkspaceRequest: vi.fn((_key, loader) => loader()),
   readCalendarWorkspaceCacheEntry: vi.fn(() => null),
   writeCalendarWorkspaceCache: vi.fn(),
@@ -95,6 +97,8 @@ const workspace = {
   viewer_timezone: "UTC",
 };
 
+const operator = { id: "operator-fixture", tenant_id: "tenant-a" };
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -109,7 +113,7 @@ beforeEach(() => {
 
 describe("calendar task UI", () => {
   it("prewarms and stores the Agenda range before switching views", async () => {
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
     await screen.findByText("Open tasks");
     await waitFor(() => expect(writeCalendarWorkspaceCache).toHaveBeenCalledTimes(1));
 
@@ -137,7 +141,7 @@ describe("calendar task UI", () => {
     });
     fetchCalendarWorkspace.mockReturnValueOnce(network);
 
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
 
     expect(await screen.findByRole("button", { name: /Cached scheduled task/ })).toBeTruthy();
     expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(1);
@@ -149,7 +153,7 @@ describe("calendar task UI", () => {
   });
 
   it("opens the chooser from an empty week rectangle and keeps its exact hour", async () => {
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
     await screen.findByText("Open tasks");
 
     const midnightSlot = screen.getAllByRole("button", { name: /Add to .*12 AM/i })[0];
@@ -161,7 +165,7 @@ describe("calendar task UI", () => {
   });
 
   it("renders scheduled tasks in week, day, month, and agenda while keeping unscheduled work separate", async () => {
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
 
     expect(await screen.findByRole("button", { name: /Scheduled fixture task/ })).toBeTruthy();
     const openTasksSummary = screen.getByText("Open tasks").closest("article");
@@ -180,7 +184,7 @@ describe("calendar task UI", () => {
   });
 
   it("opens a date chooser and creates a task or reservation on the selected day", async () => {
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
     await screen.findByText("Open tasks");
 
     fireEvent.click(screen.getByRole("button", { name: "month" }));
@@ -210,7 +214,7 @@ describe("calendar task UI", () => {
   });
 
   it("sends an explicit schedule or explicit nulls from quick add and counts both as open", async () => {
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
     await screen.findByText("Open tasks");
 
     fireEvent.click(screen.getByRole("button", { name: /TasksScheduled and unscheduled work/ }));
@@ -257,7 +261,7 @@ describe("calendar task UI", () => {
         status: "connected",
       }],
     });
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Scheduled fixture task/ }));
     expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
@@ -296,7 +300,7 @@ describe("calendar task UI", () => {
       }],
     });
     syncCalendarTask.mockRejectedValueOnce(new Error("Queue unavailable."));
-    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    render(<ReservationCalendarPage user={operator} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Scheduled fixture task/ }));
     fireEvent.change(screen.getByLabelText("Calendar sync"), {

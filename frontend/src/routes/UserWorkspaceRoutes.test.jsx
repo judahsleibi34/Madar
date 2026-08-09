@@ -21,6 +21,16 @@ vi.mock("../components/DashboardBuilder/SettingsPage", () => ({
 vi.mock("../components/DashboardBuilder/EcommerceStorePage", () => ({
   default: () => <h1>Live Store</h1>,
 }));
+vi.mock("../components/DashboardBuilder/ReservationCalendarPage", async () => {
+  const React = await import("react");
+  function CalendarMock({ user }) {
+    const [mountedTenant] = React.useState(user?.tenant_id || "missing");
+    return <div>Calendar mounted for {mountedTenant}</div>;
+  }
+  return {
+    default: CalendarMock,
+  };
+});
 vi.mock("../components/PageBuilder", () => ({
   default: () => <div>Explicit project editor</div>,
 }));
@@ -96,5 +106,28 @@ describe("workspace settings routes", () => {
     expect(await screen.findByText("Explicit project editor")).toBeTruthy();
     expect(screen.queryByText("Project chooser")).toBeNull();
   });
-});
 
+  it("remounts the calendar before rendering after the authenticated tenant changes", async () => {
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/calendar"]}>
+        <UserWorkspaceRoutes
+          {...routeProps}
+          user={{ id: 3, tenant_id: "tenant-a" }}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Calendar mounted for tenant-a")).toBeTruthy();
+
+    rerender(
+      <MemoryRouter initialEntries={["/calendar"]}>
+        <UserWorkspaceRoutes
+          {...routeProps}
+          user={{ id: 3, tenant_id: "tenant-b" }}
+        />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Calendar mounted for tenant-b")).toBeTruthy();
+    expect(screen.queryByText("Calendar mounted for tenant-a")).toBeNull();
+  });
+});

@@ -545,8 +545,6 @@ def _validate_smart_responsive_geometry(schema: dict[str, Any]) -> None:
                 for element in elements:
                     capabilities = element.get("responsive", {}).get("capabilities", {})
                     collision_policy = capabilities.get("collisionPolicy") if isinstance(capabilities, dict) else None
-                    if element.get("layer") == "behindText" or collision_policy in {"overlay", "background"}:
-                        continue
                     overrides = element.get("responsive", {}).get("overrides", {})
                     override = overrides.get(viewport_mode) if isinstance(overrides, dict) else None
                     if not isinstance(override, dict) or override.get("mode") != "manual":
@@ -562,6 +560,17 @@ def _validate_smart_responsive_geometry(schema: dict[str, Any]) -> None:
                                 context={"issue_type": "invalid_manual_responsive_rect", "block_id": block_id, "viewport": viewport_mode},
                             ),
                         )
+                    if rect["y"] < 0:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=error_detail(
+                                "publish_validation_failed",
+                                "A smart responsive manual override is outside its artboard.",
+                                context={"issue_type": "manual_responsive_out_of_bounds", "block_id": block_id, "viewport": viewport_mode},
+                            ),
+                        )
+                    if element.get("layer") == "behindText" or collision_policy in {"overlay", "background"}:
+                        continue
                     if rect["x"] < 0 or rect["x"] + rect["width"] > logical_width:
                         raise HTTPException(
                             status_code=400,

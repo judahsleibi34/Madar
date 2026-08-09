@@ -22,6 +22,7 @@ import {
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
 import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
+import { clearAllCalendarWorkspaceCaches } from "./components/DashboardBuilder/utils/calendarWorkspaceCache";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -229,6 +230,10 @@ export default function App() {
   useEffect(() => {
     applyThemeMode(themeMode, { emit: false });
   }, [themeMode]);
+
+  useEffect(() => {
+    if (authChecked && !isLoggedIn) clearAllCalendarWorkspaceCaches();
+  }, [authChecked, isLoggedIn]);
 
   useEffect(() => {
     const closeSidebarTimer = window.setTimeout(() => {

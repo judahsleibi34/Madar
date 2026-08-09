@@ -428,7 +428,12 @@ export default function ReservationCalendarPage({ user = null }) {
   const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
   const [rangeStart, rangeEnd] = useMemo(() => rangeForView(focusDate, view), [focusDate, view]);
   const lastHandledRefreshRef = useRef(0);
-  const userScope = user?.id || user?.auth_id || user?.authId || user?.email || "authenticated";
+  const tenantScope = user?.tenant_id ?? user?.tenantId ?? "";
+  const userScope = user?.id || user?.auth_id || user?.authId || "";
+  const cacheIdentity = useMemo(
+    () => ({ tenantScope: String(tenantScope), userScope: String(userScope) }),
+    [tenantScope, userScope]
+  );
   const calendarFeaturesAvailable = workspace.calendar_features_available !== false;
   const toggleSidebarSection = (section) => setExpandedSidebarSections((current) => {
     const next = new Set(current);
@@ -440,29 +445,31 @@ export default function ReservationCalendarPage({ user = null }) {
     const [agendaStart, agendaEnd] = rangeForView(focusDate, "agenda");
     const start = agendaStart.toISOString();
     const end = agendaEnd.toISOString();
-    const cacheKey = createCalendarWorkspaceCacheKey({ userScope, start, end });
-    if (readCalendarWorkspaceCacheEntry(cacheKey)) return;
+    const cacheKey = createCalendarWorkspaceCacheKey({ ...cacheIdentity, start, end });
+    if (readCalendarWorkspaceCacheEntry(cacheKey, cacheIdentity)) return;
     getOrCreateCalendarWorkspaceRequest(
       cacheKey,
       () => fetchCalendarWorkspace({ start, end })
     )
-      .then((data) => writeCalendarWorkspaceCache(cacheKey, data))
+      .then((data) => writeCalendarWorkspaceCache(cacheKey, data, cacheIdentity))
       .catch(() => {
         // The normal view loader reports errors if the user opens Agenda.
       });
-  }, [focusDate, userScope]);
+  }, [cacheIdentity, focusDate]);
 
   useEffect(() => {
     let active = true;
     const start = rangeStart.toISOString();
     const end = rangeEnd.toISOString();
-    const cacheKey = createCalendarWorkspaceCacheKey({ userScope, start, end });
+    const cacheKey = createCalendarWorkspaceCacheKey({ ...cacheIdentity, start, end });
     const forceRefresh = refreshKey !== lastHandledRefreshRef.current;
     if (forceRefresh) {
       lastHandledRefreshRef.current = refreshKey;
-      clearCalendarWorkspaceCache(userScope);
+      clearCalendarWorkspaceCache(cacheIdentity);
     }
-    const cachedEntry = forceRefresh ? null : readCalendarWorkspaceCacheEntry(cacheKey);
+    const cachedEntry = forceRefresh
+      ? null
+      : readCalendarWorkspaceCacheEntry(cacheKey, cacheIdentity);
     const cached = cachedEntry?.workspace || null;
 
     queueMicrotask(() => {
@@ -485,7 +492,7 @@ export default function ReservationCalendarPage({ user = null }) {
     )
       .then((data) => {
         if (!active) return;
-        writeCalendarWorkspaceCache(cacheKey, data);
+        writeCalendarWorkspaceCache(cacheKey, data, cacheIdentity);
         setWorkspace(data);
         setEnabledCalendars((current) => current.size ? current : new Set([...(data.calendars || []).map((item) => item.id), "reservations"]));
         setError(data.warning || "");
@@ -493,7 +500,7 @@ export default function ReservationCalendarPage({ user = null }) {
       .catch((loadError) => active && setError(loadError?.message || "Calendar could not be loaded."))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [rangeEnd, rangeStart, refreshKey, userScope]);
+  }, [cacheIdentity, rangeEnd, rangeStart, refreshKey]);
 
   useEffect(() => {
     const taskSyncPending = (workspace.tasks || []).some(

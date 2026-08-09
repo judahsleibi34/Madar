@@ -461,30 +461,77 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
         validated, _ = builder_routes.validate_publish_schema(schema)
         self.assertEqual(validated["responsiveLayout"]["engineVersion"], 1)
 
-    def test_smart_publish_rejects_out_of_bounds_manual_geometry_and_unknown_engine(self):
+    def test_smart_publish_enforces_manual_geometry_bounds_without_capping_vertical_growth(self):
+        def schema_for(rect):
+            return {
+                "responsiveLayout": {"mode": "smart", "engineVersion": 1},
+                "pages": [{
+                    "id": "home",
+                    "name": "Home",
+                    "slug": "/",
+                    "sections": [{"id": "hero", "freeElements": [{
+                        "id": "outside",
+                        "type": "future-component",
+                        "responsive": {"overrides": {"mobile": {
+                            "mode": "manual",
+                            "rect": rect,
+                        }}},
+                    }]}],
+                }],
+                "forms": [],
+            }
+
+        invalid_rects = [
+            {"x": -1, "y": 40, "width": 120, "height": 80},
+            {"x": 300, "y": 40, "width": 120, "height": 80},
+            {"x": 20, "y": -1, "width": 120, "height": 80},
+            {"x": 20, "y": -500, "width": 120, "height": 80},
+        ]
+        for rect in invalid_rects:
+            with self.subTest(rect=rect), self.assertRaises(HTTPException) as outside:
+                builder_routes.validate_publish_schema(schema_for(rect))
+            self.assertEqual(
+                outside.exception.detail["context"]["issue_type"],
+                "manual_responsive_out_of_bounds",
+            )
+
+        for y in (0, 40, 1_000_000):
+            with self.subTest(y=y):
+                validated, _ = builder_routes.validate_publish_schema(schema_for({
+                    "x": 20,
+                    "y": y,
+                    "width": 120,
+                    "height": 80,
+                }))
+                rect = (
+                    validated["pages"][0]["sections"][0]["freeElements"][0]
+                    ["responsive"]["overrides"]["mobile"]["rect"]
+                )
+                self.assertEqual(rect["y"], y)
+
+        overlay = schema_for({"x": 20, "y": -1, "width": 120, "height": 80})
+        overlay["pages"][0]["sections"][0]["freeElements"][0]["responsive"][
+            "capabilities"
+        ] = {"collisionPolicy": "overlay"}
+        with self.assertRaises(HTTPException) as outside_overlay:
+            builder_routes.validate_publish_schema(overlay)
+        self.assertEqual(
+            outside_overlay.exception.detail["context"]["issue_type"],
+            "manual_responsive_out_of_bounds",
+        )
+
+    def test_smart_publish_rejects_unknown_engine(self):
         schema = {
-            "responsiveLayout": {"mode": "smart", "engineVersion": 1},
+            "responsiveLayout": {"mode": "smart", "engineVersion": 999},
             "pages": [{
                 "id": "home",
                 "name": "Home",
                 "slug": "/",
-                "sections": [{"id": "hero", "freeElements": [{
-                    "id": "outside",
-                    "type": "future-component",
-                    "responsive": {"overrides": {"mobile": {
-                        "mode": "manual",
-                        "rect": {"x": 300, "y": 40, "width": 120, "height": 80},
-                    }}},
-                }]}],
+                "sections": [{"id": "hero", "freeElements": []}],
             }],
             "forms": [],
         }
-        with self.assertRaises(HTTPException) as outside:
-            builder_routes.validate_publish_schema(schema)
-        self.assertEqual(outside.exception.detail["context"]["issue_type"], "manual_responsive_out_of_bounds")
 
-        schema["pages"][0]["sections"][0]["freeElements"][0]["responsive"]["overrides"] = {}
-        schema["responsiveLayout"]["engineVersion"] = 999
         with self.assertRaises(HTTPException) as unsupported:
             builder_routes.validate_publish_schema(schema)
         self.assertEqual(unsupported.exception.detail["context"]["issue_type"], "unsupported_responsive_engine")
