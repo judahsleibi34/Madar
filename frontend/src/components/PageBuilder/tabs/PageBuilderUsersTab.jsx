@@ -112,6 +112,11 @@ export default function PageBuilderUsersTab({
 
   const updateResourceAccess = (key, resourceId, checked) => {
     if (!editableRole) return;
+    if (
+      key === "pageIds" &&
+      checked &&
+      String(resourceId) === String(project.defaultPageId || "")
+    ) return;
     const current = Array.isArray(editableRole.resourceAccess?.[key])
       ? editableRole.resourceAccess[key].map(String)
       : [];
@@ -494,18 +499,28 @@ onClick={() => {
                           <span>{selectedCount}/{group.items.length}</span>
                         </div>
                         {group.items.length === 0 && <small>None created</small>}
-                        {group.items.map((item) => (
-                          <label className="checkbox-control" key={item.id}>
-                            <input
-                              type="checkbox"
-                              checked={(editableRole.resourceAccess?.[group.key] || []).map(String).includes(item.id)}
-                              onChange={(event) =>
-                                updateResourceAccess(group.key, item.id, event.target.checked)
-                              }
-                            />
-                            {item.name}
-                          </label>
-                        ))}
+                        {group.items.map((item) => {
+                          const isPublicHomepage =
+                            group.key === "pageIds" &&
+                            item.id === String(project.defaultPageId || "");
+                          return (
+                            <label
+                              className="checkbox-control"
+                              key={item.id}
+                              title={isPublicHomepage ? "The public homepage cannot be members-only." : undefined}
+                            >
+                              <input
+                                type="checkbox"
+                                disabled={isPublicHomepage}
+                                checked={(editableRole.resourceAccess?.[group.key] || []).map(String).includes(item.id)}
+                                onChange={(event) =>
+                                  updateResourceAccess(group.key, item.id, event.target.checked)
+                                }
+                              />
+                              {item.name}
+                            </label>
+                          );
+                        })}
                       </section>
                     );
                   })}

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RotateCcw, Wand2 } from "lucide-react";
 import { defaultTheme } from "../core/PageBuilder.constants";
 
@@ -41,6 +42,75 @@ const getColorValue = (value, fallback = "#000000") =>
   /^#[0-9a-f]{6}$/i.test(String(value || "")) ? value : fallback;
 
 const formatColorValue = (value) => String(value || "").toUpperCase();
+
+const normalizeHexColor = (value, { allowShort = true } = {}) => {
+  const candidate = String(value || "").trim();
+  const prefixed = candidate.startsWith("#") ? candidate : `#${candidate}`;
+  if (/^#[0-9a-f]{6}$/i.test(prefixed)) return prefixed.toUpperCase();
+  if (allowShort && /^#[0-9a-f]{3}$/i.test(prefixed)) {
+    return `#${[...prefixed.slice(1)].map((character) => character.repeat(2)).join("")}`.toUpperCase();
+  }
+  return "";
+};
+
+function ThemeColorControl({ fallback, keyName, label, onChange, value }) {
+  const currentValue = getColorValue(value, fallback);
+  const [hexDraft, setHexDraft] = useState(formatColorValue(currentValue));
+
+  const commitHex = (candidate, options) => {
+    const normalized = normalizeHexColor(candidate, options);
+    if (!normalized) return false;
+    setHexDraft(normalized);
+    onChange(keyName, normalized);
+    return true;
+  };
+
+  return (
+    <label className="theme-token-control">
+      <span className="theme-token-label">{label}</span>
+      <span className="theme-token-input">
+        <span
+          className="theme-token-swatch"
+          style={{ "--theme-token-color": currentValue }}
+        >
+          <input
+            aria-label={`${label} color picker`}
+            type="color"
+            value={currentValue}
+            onChange={(event) => {
+              const nextColor = formatColorValue(event.target.value);
+              setHexDraft(nextColor);
+              onChange(keyName, nextColor);
+            }}
+          />
+        </span>
+        <input
+          aria-label={`${label} hex`}
+          className="theme-token-hex-input"
+          type="text"
+          inputMode="text"
+          maxLength={7}
+          spellCheck="false"
+          value={hexDraft}
+          onChange={(event) => {
+            const nextDraft = event.target.value.toUpperCase();
+            setHexDraft(nextDraft);
+            commitHex(nextDraft, { allowShort: false });
+          }}
+          onBlur={() => {
+            if (!commitHex(hexDraft, { allowShort: true })) {
+              setHexDraft(formatColorValue(currentValue));
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+          placeholder="#RRGGBB"
+        />
+      </span>
+    </label>
+  );
+}
 
 const getThemeElementStyles = (element = {}) => {
   const baseStyles = { ...(element.styles || {}) };
@@ -152,36 +222,6 @@ export default function PageBuilderThemeTab({
     }));
   };
 
-  const renderColorControl = ({
-    fallback,
-    keyName,
-    label,
-    onChange,
-    value,
-  }) => {
-    const currentValue = getColorValue(value, fallback);
-
-    return (
-      <label className="theme-token-control" key={keyName}>
-        <span className="theme-token-label">{label}</span>
-        <span className="theme-token-input">
-          <span
-            className="theme-token-swatch"
-            style={{ "--theme-token-color": currentValue }}
-            aria-hidden="true"
-          />
-          <span className="theme-token-value">{formatColorValue(currentValue)}</span>
-          <input
-            aria-label={label}
-            type="color"
-            value={currentValue}
-            onChange={(event) => onChange(keyName, event.target.value)}
-          />
-        </span>
-      </label>
-    );
-  };
-
   if (isSidebar) {
     return (
       <div className="theme-sidebar-editor">
@@ -207,13 +247,14 @@ export default function PageBuilderThemeTab({
             </div>
             <div className="theme-sidebar-grid theme-sidebar-color-grid">
               {websiteColorControls.map(([key, label]) =>
-                renderColorControl({
-                  fallback: colorFallbacks[key],
-                  keyName: key,
-                  label,
-                  onChange: updateThemeValue,
-                  value: websiteTheme[key],
-                })
+                <ThemeColorControl
+                  fallback={colorFallbacks[key]}
+                  key={`${key}:${getColorValue(websiteTheme[key], colorFallbacks[key])}`}
+                  keyName={key}
+                  label={label}
+                  onChange={updateThemeValue}
+                  value={websiteTheme[key]}
+                />
               )}
             </div>
           </section>
@@ -285,13 +326,14 @@ export default function PageBuilderThemeTab({
 
         <div className="theme-grid">
           {websiteColorControls.map(([key, label]) =>
-            renderColorControl({
-              fallback: colorFallbacks[key],
-              keyName: key,
-              label,
-              onChange: updateThemeValue,
-              value: websiteTheme[key],
-            })
+            <ThemeColorControl
+              fallback={colorFallbacks[key]}
+              key={`${key}:${getColorValue(websiteTheme[key], colorFallbacks[key])}`}
+              keyName={key}
+              label={label}
+              onChange={updateThemeValue}
+              value={websiteTheme[key]}
+            />
           )}
 
           <label className="theme-number-control">

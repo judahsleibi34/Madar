@@ -6,16 +6,87 @@
   position: relative;
   min-width: 0;
   padding: 18px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: auto;
   background: transparent;
 }
 
+.site-renderer-camera {
+  position: relative;
+  flex: 0 0 auto;
+  margin: 0 auto;
+}
+
+.editor-camera-stage {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+  margin-inline: auto;
+}
+
+.editor-camera-stage > .site-renderer-camera {
+  margin-inline: 0;
+}
+
+.site-renderer-artboard {
+  position: relative;
+  max-width: none !important;
+  margin: 0;
+  will-change: transform;
+  overflow: visible !important;
+}
+
+.site-section.has-full-bleed {
+  position: relative;
+}
+
+.site-section-bleed-background {
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  z-index: 0;
+  max-width: none;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.site-section.has-full-bleed > :not(.site-section-bleed-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.artboard-camera-controls {
+  position: static;
+  width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid var(--madar-border);
+  border-radius: 10px;
+  background: var(--madar-surface);
+  box-shadow: var(--madar-shadow-sm);
+}
+
+.artboard-camera-controls button,
+.artboard-camera-controls output {
+  min-width: 34px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--madar-text);
+  font: inherit;
+  text-align: center;
+}
+
+.artboard-camera-controls button { cursor: pointer; }
+.artboard-camera-controls button:is(:hover, .is-active) { background: var(--madar-primary-soft); color: var(--madar-primary); }
+
 .preview-mode .builder-canvas-shell {
   width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  display: block;
 }
 
 .builder-canvas {
@@ -36,16 +107,6 @@
 
 .preview-mode .builder-canvas {
   min-height: calc(100vh - 134px);
-}
-
-.preview-mode .builder-canvas.viewport-desktop {
-  flex: 1 1 auto;
-  max-width: 100%;
-}
-
-.preview-mode .builder-canvas.viewport-tablet,
-.preview-mode .builder-canvas.viewport-mobile {
-  flex: 0 0 auto;
 }
 
 .builder-canvas.viewport-desktop {
@@ -151,6 +212,10 @@
   color: var(--theme-text-inverse);
   font-weight: 950;
   box-shadow: var(--madar-red-shadow);
+}
+
+.built-site-mobile-menu {
+  display: none;
 }
 
 .built-site-nav {
@@ -459,8 +524,8 @@
   background: var(--action-primary) !important;
   background-color: var(--action-primary) !important;
   background-image: none !important;
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
   opacity: 1 !important;
   box-shadow: none;
   font-weight: 850;
@@ -486,8 +551,8 @@
 .builder-element-button:focus-visible {
   outline: 0;
   box-shadow:
-    0 0 0 3px rgba(155, 47, 37, 0.28),
-    0 10px 22px rgba(155, 47, 37, 0.22);
+    0 0 0 3px rgba(var(--theme-primary-rgb), 0.28),
+    0 10px 22px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 .builder-element-image {
@@ -1250,8 +1315,24 @@
 
 .direct-layout-section {
   overflow: hidden;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+
+.direct-layout-section.has-full-bleed {
+  overflow: visible;
+}
+
+.direct-layout-section.has-full-bleed > .direct-layout-frame {
+  overflow: hidden;
+}
+
+.page-builder:not(.preview-mode) .site-renderer-artboard,
+.page-builder:not(.preview-mode) .direct-layout-section,
+.page-builder:not(.preview-mode) .direct-layout-frame {
+  overflow: visible;
 }
 
 .direct-layout-section.is-drop-target {
@@ -1283,6 +1364,29 @@
     linear-gradient(rgba(var(--theme-shadow-rgb), 0.045) 1px, transparent 1px),
     linear-gradient(90deg, rgba(var(--theme-shadow-rgb), 0.045) 1px, transparent 1px);
   background-size: 8px 8px;
+}
+
+.editor-overlay {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.editor-section-overlay,
+.editor-element-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.editor-section-overlay {
+  z-index: 18;
+}
+
+.editor-element-overlay {
+  z-index: 8;
+}
+
+.editor-element-overlay > :is(button, [role="button"]) {
+  pointer-events: auto;
 }
 
 .page-builder:not(.preview-mode) .direct-layout-frame {
@@ -1491,9 +1595,11 @@
   overflow: hidden;
 }
 
-.preview-mode .direct-element-frame-formBlock,
-.tenant-runtime-page .direct-element-frame-formBlock {
-  height: auto !important;
+.site-renderer-artboard .direct-element-frame-formBlock,
+.site-renderer-artboard .direct-element-frame-reservationBlock:not(.is-fixed-size),
+.site-renderer-artboard .direct-element-frame-loginBlock,
+.site-renderer-artboard .direct-element-frame-registrationBlock {
+  height: var(--site-element-logical-height) !important;
 }
 
 .direct-element-frame-formBlock .direct-element-content,

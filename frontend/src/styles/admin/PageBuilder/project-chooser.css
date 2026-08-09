@@ -57,6 +57,36 @@
   width: min(100%, 820px);
 }
 
+.builder-project-loading-bar {
+  width: min(100%, 520px);
+  display: grid;
+  gap: 14px;
+  margin-inline: auto;
+}
+
+.builder-project-loading-bar-copy {
+  display: grid;
+  gap: 5px;
+  text-align: center;
+}
+
+.builder-project-loading-bar-copy strong {
+  color: var(--theme-text);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.builder-project-loading-bar-copy span {
+  color: var(--theme-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.builder-project-loading-bar .builder-project-loading-progress {
+  height: 6px;
+  border-radius: 999px;
+}
+
 .builder-project-loading-heading {
   display: flex;
   align-items: center;

@@ -20,6 +20,7 @@ import {
   convertSectionToDirectLayout,
   mergeSectionsIntoPageCanvas,
 } from "./PageBuilder.layout";
+import { RESPONSIVE_LAYOUT_ENGINE_VERSION, RESPONSIVE_LAYOUT_MODES } from "./PageBuilder.responsiveCapabilities";
 
 export const normalizeFormReference = (value) => String(value ?? "").trim();
 export const buildFormConnectionUpdate = (value) => ({
@@ -367,7 +368,23 @@ export const normalizeBuilderProjectShape = (project) => {
     ? source.workflows
     : [];
 
-  const roles = Array.isArray(source.roles) ? source.roles : [];
+  const defaultPageId = String(routedProject.defaultPageId || "");
+  const roles = (Array.isArray(source.roles) ? source.roles : []).map((role) => {
+    const resourceAccess = role?.resourceAccess;
+    if (!resourceAccess || !Array.isArray(resourceAccess.pageIds) || !defaultPageId) {
+      return role;
+    }
+
+    return {
+      ...role,
+      resourceAccess: {
+        ...resourceAccess,
+        pageIds: resourceAccess.pageIds
+          .map(String)
+          .filter((pageId) => pageId !== defaultPageId),
+      },
+    };
+  });
   const users = Array.isArray(source.users) ? source.users : [];
   const collections = Array.isArray(source.collections)
     ? source.collections
@@ -407,6 +424,16 @@ export const normalizeBuilderProjectShape = (project) => {
       ...defaultTheme,
       ...(source.theme || {}),
     },
+    ...(source.responsiveLayout && typeof source.responsiveLayout === "object"
+      ? {
+          responsiveLayout: {
+            mode: source.responsiveLayout.mode === RESPONSIVE_LAYOUT_MODES.smart
+              ? RESPONSIVE_LAYOUT_MODES.smart
+              : RESPONSIVE_LAYOUT_MODES.legacy,
+            engineVersion: Number(source.responsiveLayout.engineVersion) || RESPONSIVE_LAYOUT_ENGINE_VERSION,
+          },
+        }
+      : {}),
   };
 };
 

@@ -1,4 +1,4 @@
-from services import notification_service
+from services import notification_delivery_service, notification_service
 
 
 class FakeResponse:
@@ -36,6 +36,10 @@ class FakeQuery:
 
     def update(self, payload):
         self.update_payload = payload
+        return self
+
+    def upsert(self, payload, **_kwargs):
+        self.insert_payload = payload
         return self
 
     def execute(self):
@@ -101,3 +105,27 @@ def test_create_tenant_notification_event_fans_out_to_active_members(monkeypatch
     assert len(fake_supabase.tables["user_notifications"]) == 2
     assert {row["user_id"] for row in fake_supabase.tables["user_notifications"]} == {11, 12}
     assert fake_supabase.tables["user_notifications"][0]["data"]["block_type"] == "form"
+
+
+def test_internal_reminder_is_delivered_only_to_its_target_user(monkeypatch):
+    fake_supabase = FakeSupabase()
+    monkeypatch.setattr(
+        notification_delivery_service, "service_supabase", fake_supabase
+    )
+
+    notification_delivery_service.deliver_notification({
+        "channel": "internal",
+        "tenant_id": 7,
+        "user_id": 11,
+        "payload": {
+            "event_type": "calendar_task_reminder",
+            "source_type": "calendar_task",
+            "source_id": "task-1",
+            "title": "Task starts soon",
+            "body": "Scheduled for now",
+            "data": {"task_id": "task-1"},
+        },
+    })
+
+    assert len(fake_supabase.tables["user_notifications"]) == 1
+    assert fake_supabase.tables["user_notifications"][0]["user_id"] == 11

@@ -2464,8 +2464,8 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
   background-image: none !important;
   border-color: transparent !important;
   border-radius: 8px !important;
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
   opacity: 1 !important;
   box-shadow: none !important;
 }
@@ -2474,8 +2474,8 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
 .page-builder .workspace-page .direct-element-frame-button .builder-element-button:hover {
   background: var(--action-primary-hover) !important;
   background-color: var(--action-primary-hover) !important;
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
 }
 
 /* Product carousel controls retain their storefront treatment inside the editor. */

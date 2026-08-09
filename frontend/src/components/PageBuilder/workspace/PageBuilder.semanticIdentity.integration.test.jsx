@@ -167,6 +167,25 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     );
   });
 
+  it("renders public responsive navigation inside builder Preview", async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages"]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("button", { name: /preview site/i }));
+    fireEvent.click(screen.getByRole("button", { name: "mobile" }));
+
+    expect(screen.getByLabelText("Open navigation menu")).toBeTruthy();
+    expect(container.querySelector(".builder-canvas.viewport-mobile")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /exit site preview/i }));
+
+    expect(container.querySelector(".builder-canvas.viewport-desktop")).toBeTruthy();
+    expect(container.querySelector(".builder-canvas.viewport-mobile")).toBeNull();
+  });
   it("hydrates Header & Footer controls directly from Website Settings", async () => {
     apiMocks.fetchWebsiteSettings.mockResolvedValue({
       subdomain: "madar-demo",

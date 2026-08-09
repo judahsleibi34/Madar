@@ -41,6 +41,7 @@ export const createElementRenderer = ({
   runElementAction,
   renderConnectedForm,
   getReservationBlockValue,
+  renderElementOverride,
 }) => {
   const getTextRanges = (element, field, itemIndex = null) =>
     getRichTextRanges(element, field, itemIndex);
@@ -212,6 +213,14 @@ export const createElementRenderer = ({
         }
       },
     };
+
+    const overridden = renderElementOverride?.(element, {
+      commonProps,
+      getEditableTextProps,
+      getTextRanges,
+      renderMode,
+    });
+    if (overridden !== undefined) return overridden;
 
     if (element.type === "heading") {
       return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;

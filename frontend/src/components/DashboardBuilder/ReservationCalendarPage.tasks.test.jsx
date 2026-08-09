@@ -8,6 +8,10 @@ import {
   fetchCalendarWorkspace,
   syncCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
+import {
+  readCalendarWorkspaceCacheEntry,
+  writeCalendarWorkspaceCache,
+} from "./utils/calendarWorkspaceCache";
 
 vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
   authorizeCalendarConnection: vi.fn(),
@@ -35,7 +39,7 @@ vi.mock("./utils/calendarWorkspaceCache", () => ({
   clearCalendarWorkspaceCache: vi.fn(),
   createCalendarWorkspaceCacheKey: vi.fn(({ start, end }) => `${start}:${end}`),
   getOrCreateCalendarWorkspaceRequest: vi.fn((_key, loader) => loader()),
-  readCalendarWorkspaceCache: vi.fn(() => null),
+  readCalendarWorkspaceCacheEntry: vi.fn(() => null),
   writeCalendarWorkspaceCache: vi.fn(),
 }));
 
@@ -104,6 +108,46 @@ beforeEach(() => {
 });
 
 describe("calendar task UI", () => {
+  it("prewarms and stores the Agenda range before switching views", async () => {
+    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+    await screen.findByText("Open tasks");
+    await waitFor(() => expect(writeCalendarWorkspaceCache).toHaveBeenCalledTimes(1));
+
+    fireEvent.pointerEnter(screen.getByRole("button", { name: "agenda" }));
+
+    await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(2));
+    const agendaRequest = fetchCalendarWorkspace.mock.calls[1][0];
+    expect(
+      (new Date(agendaRequest.end) - new Date(agendaRequest.start)) / 86_400_000
+    ).toBe(31);
+    await waitFor(() => expect(writeCalendarWorkspaceCache).toHaveBeenCalledTimes(2));
+  });
+
+  it("paints stale cached workspace immediately and refreshes it in the background", async () => {
+    let resolveNetwork;
+    const network = new Promise((resolve) => {
+      resolveNetwork = resolve;
+    });
+    readCalendarWorkspaceCacheEntry.mockReturnValueOnce({
+      freshness: "stale",
+      workspace: {
+        ...workspace,
+        tasks: [{ ...workspace.tasks[0], title: "Cached scheduled task" }],
+      },
+    });
+    fetchCalendarWorkspace.mockReturnValueOnce(network);
+
+    render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
+
+    expect(await screen.findByRole("button", { name: /Cached scheduled task/ })).toBeTruthy();
+    expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(1);
+    expect(writeCalendarWorkspaceCache).not.toHaveBeenCalled();
+
+    resolveNetwork(workspace);
+    expect(await screen.findByRole("button", { name: /Scheduled fixture task/ })).toBeTruthy();
+    expect(writeCalendarWorkspaceCache).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the chooser from an empty week rectangle and keeps its exact hour", async () => {
     render(<ReservationCalendarPage user={{ id: "operator-fixture" }} />);
     await screen.findByText("Open tasks");

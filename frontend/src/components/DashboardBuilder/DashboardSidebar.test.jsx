@@ -1,4 +1,4 @@
-﻿import {
+import {
   cleanup,
   fireEvent,
   render,
@@ -24,6 +24,7 @@ const labels = {
   "sidebar.tags": "Tags",
   "sidebar.categories": "Categories",
   "sidebar.products": "Products",
+  "sidebar.cvRerank": "CV Rerank",
   "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
   "sidebar.submissions": "Submissions",
@@ -106,6 +107,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
       "Dashboard",
       "Workspace",
       "Ecommerce",
+      "CV Rerank",
       "My Plan",
     ]);
 
@@ -137,6 +139,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Tags" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Categories" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Products" }).getAttribute("aria-current")).toBe("page");
+    expect(within(document.getElementById("dashboard-sidebar-ecommerce")).queryByRole("button", { name: "CV Rerank" })).toBeNull();
     expect(screen.getByRole("button", { name: "Store" })).toBeTruthy();
   });
 
@@ -152,6 +155,18 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(
       screen.getByRole("button", { name: "Products" }).hasAttribute("aria-current"),
     ).toBe(false);
+  });
+
+  it("renders CV Rerank before My Plan as a top-level active route", () => {
+    renderSidebar("/ecommerce/cv-rerank");
+    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
+    const cvRerank = screen.getByRole("button", { name: "CV Rerank" });
+    const myPlan = screen.getByRole("button", { name: "My Plan" });
+
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
+    expect(cvRerank.getAttribute("aria-current")).toBe("page");
+    expect(ecommerce.compareDocumentPosition(cvRerank) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cvRerank.compareDocumentPosition(myPlan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("opens Ecommerce and highlights Store on the live view route", () => {

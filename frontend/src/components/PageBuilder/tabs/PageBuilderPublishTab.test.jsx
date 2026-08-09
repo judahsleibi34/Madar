@@ -143,25 +143,23 @@ describe("PageBuilderPublishTab", () => {
     expect(openPublicFormPage).toHaveBeenCalledWith("form-1");
   });
 
-  it("opens the confirmed live site without writing browser recovery", () => {
-    const persistProjectNow = vi.fn();
+  it("previews the current builder draft while keeping the shared URL canonical", () => {
+    const onPreviewSite = vi.fn();
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(
       <PageBuilderPublishTab
         project={project}
         liveSitePath="/site/disco2/"
-        persistProjectNow={persistProjectNow}
+        onPreviewSite={onPreviewSite}
       />
     );
 
+    expect(screen.getByDisplayValue("https://madarportal.com/site/disco2/")).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: /preview site/i }));
 
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://madarportal.com/site/disco2/",
-      "_blank",
-      "noopener,noreferrer"
-    );
-    expect(persistProjectNow).not.toHaveBeenCalled();
+    expect(onPreviewSite).toHaveBeenCalledTimes(1);
+    expect(openSpy).not.toHaveBeenCalled();
   });
 });

@@ -43,6 +43,7 @@ export default function PageBuilderPublishTab({
   hasConfiguredSubdomain = false,
   openWebsiteSettings,
   openPublicFormPage,
+  onPreviewSite,
   onUnpublish,
   isUnpublishing = false,
   isLiveProject = false,
@@ -211,12 +212,8 @@ export default function PageBuilderPublishTab({
                 </a>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (publicLink) {
-                      window.open(publicLink, "_blank", "noopener,noreferrer");
-                    }
-                  }}
-                  disabled={!publicLink}
+                  onClick={onPreviewSite}
+                  disabled={!onPreviewSite}
                 >
                   <Eye size={15} aria-hidden="true" />
                     {content.previewSite}

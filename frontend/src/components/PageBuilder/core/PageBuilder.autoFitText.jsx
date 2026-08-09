@@ -19,6 +19,8 @@ export default function AutoFitDirectText({ as: Element, fitKey, children, ...pr
       element.style.removeProperty("--builder-fitted-font-size");
       element.style.removeProperty("--builder-text-fit-scale");
 
+      if (frame.closest("[data-responsive-layout-mode='smart']")) return;
+
       if (!element.clientWidth || !element.clientHeight) return;
 
       const maximumFontSize = Number.parseFloat(window.getComputedStyle(element).fontSize);
@@ -34,7 +36,13 @@ export default function AutoFitDirectText({ as: Element, fitKey, children, ...pr
         element.style.setProperty("--builder-fitted-font-size", `${maximumFontSize * scale}px`);
         element.style.setProperty("--builder-text-fit-scale", String(scale));
       };
-      let lowerScale = Math.min(1, 6 / maximumFontSize);
+      const declaredMinimum = Number.parseFloat(
+        window.getComputedStyle(frame).getPropertyValue("--site-minimum-font-size")
+      );
+      const minimumFontSize = Number.isFinite(declaredMinimum) && declaredMinimum > 0
+        ? declaredMinimum
+        : 12;
+      let lowerScale = Math.min(1, minimumFontSize / maximumFontSize);
       let upperScale = 1;
 
       applyScale(lowerScale);

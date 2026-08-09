@@ -40,6 +40,11 @@ from services.calendar_sync_service import (
 )
 from services.calendar_task_sync_queue_service import enqueue_task_sync
 from services.calendar_connection_sync_queue_service import enqueue_connection_sync
+from services.calendar_workspace_cache_service import (
+    calendar_workspace_cache_key,
+    get_or_create_calendar_workspace,
+    invalidate_calendar_workspace_cache,
+)
 
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
@@ -271,6 +276,7 @@ def require_task_access(context, task: dict[str, Any], capability: str = "manage
 
 
 def record_calendar_audit(context, request: Request, action: str, target_type: str, target_id: Any, metadata: dict | None = None) -> None:
+    invalidate_calendar_workspace_cache(context.tenant_id)
     record_audit_event(
         request=request,
         tenant_id=context.tenant_id,
@@ -1094,8 +1100,23 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
     if not calendar_feature_enabled():
         return _calendar_disabled_payload(context, start, end)
     try:
-        payload = _calendar_workspace_payload(context, start, end)
+        cache_key = calendar_workspace_cache_key(
+            tenant_id=context.tenant_id,
+            user_id=context.user_id,
+            role=context.role,
+            start=iso(start),
+            end=iso(end),
+        )
+        if getattr(request, "headers", {}).get("X-Calendar-Cache-Bypass") == "1":
+            invalidate_calendar_workspace_cache(context.tenant_id)
+        payload, cache_hit = get_or_create_calendar_workspace(
+            cache_key,
+            context.tenant_id,
+            lambda: _calendar_workspace_payload(context, start, end),
+        )
         payload["calendar_features_available"] = True
+        response.headers["X-Calendar-Cache"] = "hit" if cache_hit else "miss"
+        response.headers["Cache-Control"] = "private, no-store"
         return payload
     except Exception as error:
         if not is_calendar_schema_missing_error(error):

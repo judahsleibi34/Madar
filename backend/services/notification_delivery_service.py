@@ -57,13 +57,15 @@ def _deliver_internal(row: dict[str, Any]) -> None:
             raise DeliveryError("internal_event_insert_failed")
         event = rows[0]
 
-    recipients = _rows(
+    recipient_query = (
         service_supabase.table("tenant_memberships")
         .select("user_id")
         .eq("tenant_id", int(tenant_id))
         .eq("status", "active")
-        .execute()
     )
+    if row.get("user_id") is not None:
+        recipient_query = recipient_query.eq("user_id", int(row["user_id"]))
+    recipients = _rows(recipient_query.execute())
     for recipient in recipients:
         if recipient.get("user_id") is None:
             continue

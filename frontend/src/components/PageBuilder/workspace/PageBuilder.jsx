@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlignCenter,
@@ -10,6 +10,7 @@ import {
   ClipboardPaste,
   Copy,
   CopyPlus,
+  Eye,
   FilePlus2,
   Globe2,
   Highlighter,
@@ -79,7 +80,24 @@ import PageBuilderModals from "./PageBuilderModals";
 import PageDeleteConfirmModal from "../modals/PageDeleteConfirmModal";
 import PageBuilderStatusBar from "./PageBuilderStatusBar";
 import PageBuilderWorkspaceHeader from "./PageBuilderWorkspaceHeader";
-import PageBuilderMeasuredFrame from "./PageBuilderMeasuredFrame";
+import SiteRenderer from "../core/PageBuilder.siteRenderer";
+import {
+  clampEditorZoom,
+  getArtboardElementPosition,
+  getArtboardLogicalWidth,
+  getEditorCameraStageWidth,
+} from "../core/PageBuilder.artboard";
+import {
+  RESPONSIVE_LAYOUT_ENGINE_VERSION,
+  RESPONSIVE_LAYOUT_MODES,
+  isSmartResponsiveProject,
+  withAutoResponsiveOverride,
+} from "../core/PageBuilder.responsiveCapabilities";
+import {
+  compareLegacyPageWithSmartShadow,
+  getSmartProjectLayoutDiagnostics,
+  resolvePageResponsiveLayout,
+} from "../core/PageBuilder.responsiveLayout";
 import ButtonColorControls from "./ButtonColorControls";
 import PageBuilderPageInspector from "./PageBuilderPageInspector";
 import {
@@ -119,7 +137,6 @@ import {
 import {
   applyThemeModeToProject,
   getPageBuilderThemeClassName,
-  getPageBuilderThemeVars,
 } from "../core/PageBuilder.theme";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
@@ -173,7 +190,6 @@ import {
   getMetricItems,
   getMetricMinimumHeight,
   getDirectElementMinimumSize,
-  reconcileMeasuredFormBlockPosition,
   getSectionCanvasHeight,
   compactDirectSectionAfterElementRemoval,
   convertSectionToDirectLayout,
@@ -196,7 +212,6 @@ import {
 import {
   clampElementToBounds,
   clientPointToCanvasLocal,
-  getCanvasLocalGeometry,
   getVisibleCanvasLocalBounds,
   getImmediateParentCanvasGeometry,
 } from "../core/PageBuilder.bounds";
@@ -209,7 +224,6 @@ import {
   getBuilderProjectSlug,
   getDraftProjectFromRecord,
   getDraftProjectFromRecordWithRepairs,
-  getPreviewCanvasStyle,
 } from "../core/PageBuilder.project";
 import {
   normalizeElementAlignSelf,
@@ -218,7 +232,6 @@ import {
   getElementPlacementMargins,
   isDirectionalElementPlacement,
   getClosestColumnIdFromEvent,
-  getRowCarouselElements,
 } from "../core/PageBuilder.elementLayout";
 import {
   getBuilderDraftReadStatus,
@@ -305,7 +318,6 @@ import {
 import {
   getBuilderElementStyle,
   getBuilderFreeElementStyle,
-  getDirectCanvasScaleStyles,
 } from "../core/PageBuilder.styles";
 import {
   createFormHandlers,
@@ -597,6 +609,7 @@ export function BuilderSidebarActions({
   isSavingProject,
   lastCloudSavedAt,
   onSave,
+  onPreview,
   onGoLive,
   publicationState,
   saveDisabled = false,
@@ -643,6 +656,15 @@ export function BuilderSidebarActions({
           ? "Publish blocked by conflict"
           : getBuilderPublicationLabel(publicationState)}
       </p>
+      <button
+        type="button"
+        className="page-primary-action builder-sidebar-save-button"
+        disabled={!onPreview}
+        onClick={() => onPreview?.()}
+      >
+        <Eye size={17} aria-hidden="true" />
+        <span>Preview site</span>
+      </button>
       <button
         type="button"
         className="page-primary-action builder-sidebar-save-button"
@@ -718,7 +740,12 @@ export default function PageBuilder({
   const [designPanel, setDesignPanelState] = useState(routeDesignPanel || "Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
-  const [canvasScale, setCanvasScale] = useState(1);
+  const [legacyShadowEnabled, setLegacyShadowEnabled] = useState(false);
+  const [editorViewportWidth, setEditorViewportWidth] = useState(0);
+  const [manualEditorZoom, setManualEditorZoom] = useState(1);
+  const logicalArtboardWidth = getArtboardLogicalWidth(viewport);
+  const canvasScale = manualEditorZoom;
+  const cameraStageWidth = getEditorCameraStageWidth(logicalArtboardWidth, canvasScale);
   const [selected, setSelected] = useState(() => ({
     type: "page",
     id: getDefaultBuilderPageId(project) || null,
@@ -914,39 +941,27 @@ export default function PageBuilder({
     const shell = canvasShellRef.current;
     if (!shell || activeTab !== "design") return undefined;
 
-    const updateCanvasScale = () => {
-      if (preview && viewport === "desktop") {
-        setCanvasScale(1);
-        return;
-      }
-
+    const updateEditorViewport = () => {
       const computedStyle = window.getComputedStyle(shell);
       const horizontalPadding =
         (Number.parseFloat(computedStyle.paddingLeft) || 0) +
         (Number.parseFloat(computedStyle.paddingRight) || 0);
       const availableWidth = Math.max(0, shell.clientWidth - horizontalPadding);
-      const viewportWidth = Number(viewports[viewport] || viewports.desktop) || 1;
-
-      if (!availableWidth) return;
-
-      const nextScale = Math.min(1, Math.max(0.25, availableWidth / viewportWidth));
-      setCanvasScale((current) =>
-        Math.abs(current - nextScale) > 0.001 ? nextScale : current
-      );
+      setEditorViewportWidth(availableWidth);
     };
 
-    updateCanvasScale();
+    updateEditorViewport();
 
     if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", updateCanvasScale);
-      return () => window.removeEventListener("resize", updateCanvasScale);
+      window.addEventListener("resize", updateEditorViewport);
+      return () => window.removeEventListener("resize", updateEditorViewport);
     }
 
-    const observer = new ResizeObserver(updateCanvasScale);
+    const observer = new ResizeObserver(updateEditorViewport);
     observer.observe(shell);
 
     return () => observer.disconnect();
-  }, [activeTab, preview, viewport]);
+  }, [activeTab]);
 
   useEffect(() => () => {
     serverAdoptionGenerationRef.current += 1;
@@ -1443,6 +1458,43 @@ export default function PageBuilder({
     () => resolveInspectorPage(project),
     [project]
   );
+  const smartResponsiveEnabled = isSmartResponsiveProject(project);
+  const activeSmartDiagnostics = useMemo(
+    () => {
+      if (!smartResponsiveEnabled || !activePage) return [];
+      const resolved = resolvePageResponsiveLayout({
+        project,
+        page: activePage,
+        viewportMode: viewport,
+        layoutWidth: logicalArtboardWidth,
+      });
+      return (resolved?.diagnostics || []).map((diagnostic) => ({
+        ...diagnostic,
+        pageId: activePage.id,
+        layoutWidth: logicalArtboardWidth,
+        viewportMode: viewport,
+      }));
+    },
+    [activePage, logicalArtboardWidth, project, smartResponsiveEnabled, viewport]
+  );
+  const legacyShadowComparison = useMemo(
+    () => legacyShadowEnabled && !smartResponsiveEnabled
+      ? compareLegacyPageWithSmartShadow({
+          project,
+          page: activePage,
+          viewportMode: viewport,
+          layoutWidth: logicalArtboardWidth,
+        })
+      : null,
+    [
+      activePage,
+      legacyShadowEnabled,
+      logicalArtboardWidth,
+      project,
+      smartResponsiveEnabled,
+      viewport,
+    ]
+  );
 
   const activeForm = useMemo(
     () =>
@@ -1792,11 +1844,6 @@ export default function PageBuilder({
     updateActivePage((page) => ({ ...page, sections: updater(page.sections) }));
   }, [updateActivePage]);
 
-  const getFrameGeometry = useCallback(
-    (frame) => getCanvasLocalGeometry(frame, { coordinateScale: 1 }),
-    []
-  );
-
   const getElementParentGeometry = useCallback((elementId) => {
     const elementFrame = findBuilderDataElement(
       canvasShellRef.current,
@@ -1808,139 +1855,6 @@ export default function PageBuilder({
     });
   }, []);
 
-  useLayoutEffect(() => {
-    if (activeTab !== "design" || !canvasShellRef.current) return undefined;
-
-    let animationFrame = null;
-    const revalidateProjectGeometry = () => {
-      const liveBoundsBySection = new Map(
-        Array.from(
-          canvasShellRef.current?.querySelectorAll(".direct-layout-frame[data-section-id]") || []
-        ).map((frame) => [
-          frame.dataset.sectionId,
-          (() => {
-            const bounds = getFrameGeometry(frame)?.bounds;
-            return bounds?.width > 0 && bounds?.height > 0 ? bounds : null;
-          })(),
-        ])
-      );
-
-      updateProject((currentProject) => {
-        let projectChanged = false;
-        const pages = (currentProject.pages || []).map((page) => {
-          let pageChanged = false;
-          const sections = (page.sections || []).map((section) => {
-            if (section.mode !== "direct" || !(section.freeElements || []).length) return section;
-
-            let sectionChanged = false;
-            const freeElements = section.freeElements.map((element) => {
-              const minimumSize = getDirectElementMinimumSize(element);
-              let positionChanged = false;
-              const position = { ...(element.position || {}) };
-
-              ["desktop", "tablet", "mobile"].forEach((viewportName) => {
-                if (!element.position?.[viewportName]) return;
-                const current = element.position?.[viewportName] || createPosition()[viewportName];
-                const liveBounds =
-                  page.id === currentProject.activePageId && viewportName === viewport
-                    ? liveBoundsBySection.get(section.id)
-                    : null;
-                const bounds = liveBounds || {
-                  x: 0,
-                  y: 0,
-                  width: viewports[viewportName] || viewports.desktop,
-                  height: getSectionCanvasHeight(section, viewportName),
-                };
-                const clamped = clampElementToBounds(current, bounds, {
-                  minWidth: minimumSize.width,
-                  minHeight: minimumSize.height,
-                  allowBottomOverflow: true,
-                });
-                const changed = ["x", "y", "width", "height"].some(
-                  (key) => Math.abs((Number(current[key]) || 0) - clamped[key]) > 0.001
-                );
-                if (!changed) return;
-                position[viewportName] = clamped;
-                positionChanged = true;
-              });
-
-              if (!positionChanged) return element;
-              sectionChanged = true;
-              return { ...element, position };
-            });
-
-            const minHeightByViewport = { ...(section.layout?.minHeightByViewport || {}) };
-            let layoutChanged = false;
-            ["desktop", "tablet", "mobile"].forEach((viewportName) => {
-              const currentHeight = getSectionCanvasHeight(section, viewportName);
-              const requiredHeight = freeElements.reduce((maximum, element) => {
-                const position = element.position?.[viewportName];
-                if (!position) return maximum;
-                return Math.max(
-                  maximum,
-                  (Number(position.y) || 0) + (Number(position.height) || 0) + 48
-                );
-              }, currentHeight);
-              if (requiredHeight <= currentHeight) return;
-              minHeightByViewport[viewportName] = requiredHeight;
-              layoutChanged = true;
-            });
-
-            if (!sectionChanged && !layoutChanged) return section;
-            pageChanged = true;
-            return {
-              ...section,
-              ...(layoutChanged
-                ? {
-                    layout: {
-                      ...(section.layout || {}),
-                      minHeight: minHeightByViewport.desktop,
-                      minHeightByViewport,
-                    },
-                  }
-                : {}),
-              freeElements,
-            };
-          });
-
-          if (!pageChanged) return page;
-          projectChanged = true;
-          return { ...page, sections };
-        });
-
-        return projectChanged ? { ...currentProject, pages } : currentProject;
-      });
-    };
-
-    const scheduleRevalidation = () => {
-      if (animationFrame !== null) return;
-      animationFrame = window.requestAnimationFrame(() => {
-        animationFrame = null;
-        revalidateProjectGeometry();
-      });
-    };
-
-    revalidateProjectGeometry();
-    const frames = Array.from(
-      canvasShellRef.current.querySelectorAll(".direct-layout-frame[data-section-id]")
-    );
-    if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", scheduleRevalidation);
-      return () => {
-        window.removeEventListener("resize", scheduleRevalidation);
-        if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
-      };
-    }
-
-    const observer = new ResizeObserver(scheduleRevalidation);
-    frames.forEach((frame) => observer.observe(frame));
-    observer.observe(canvasShellRef.current);
-
-    return () => {
-      observer.disconnect();
-      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
-    };
-  }, [activePage, activeTab, canvasScale, getFrameGeometry, updateProject, viewport]);
 
   const updateSelectedSection = useCallback((changes) => {
     if (!selectedSection) return;
@@ -2383,6 +2297,50 @@ export default function PageBuilder({
       })
     );
   }, [selectedElement, updateSections]);
+
+  const applyResponsiveDiagnosticAction = useCallback((diagnostic, action) => {
+    const elementId = diagnostic?.elementIds?.[0];
+    if (!elementId) return;
+    if (action === "move_element") {
+      setSelected({ type: "element", id: elementId });
+      window.requestAnimationFrame(() => {
+        findBuilderDataElement(document, "data-element-id", elementId)?.scrollIntoView?.({
+          block: "center",
+          inline: "center",
+        });
+      });
+      showToast("Element selected. Drag it to resolve the collision.");
+      return;
+    }
+    updateSections((sections) => sections.map((section) => {
+      if (!["direct", "free"].includes(section.mode)) return section;
+      let changed = false;
+      const freeElements = (section.freeElements || []).map((element) => {
+        if (element.id !== elementId) return element;
+        changed = true;
+        if (action === "reset_to_auto") {
+          return withAutoResponsiveOverride(element, diagnostic.viewportMode || viewport);
+        }
+        const collisionPolicy = action === "mark_background" ? "background" : "overlay";
+        return {
+          ...element,
+          responsive: {
+            ...(element.responsive || {}),
+            capabilities: {
+              ...(element.responsive?.capabilities || {}),
+              collisionPolicy,
+            },
+          },
+        };
+      });
+      return changed ? { ...section, freeElements } : section;
+    }));
+    showToast(action === "reset_to_auto"
+      ? "Responsive geometry reset to Auto."
+      : action === "mark_background"
+        ? "Element marked as an intentional background."
+        : "Element marked as an intentional overlay.");
+  }, [showToast, updateSections, viewport]);
 
   const setSelectedImageBehindText = useCallback((behindText) => {
     if (!selectedElement || selectedElement.type !== "image") return;
@@ -3978,7 +3936,19 @@ export default function PageBuilder({
       return false;
     }
 
-    const overlapWarnings = getProjectOverlapWarnings(publishedProject);
+    const overlapWarnings = isSmartResponsiveProject(publishedProject)
+      ? []
+      : getProjectOverlapWarnings(publishedProject);
+
+    if (isSmartResponsiveProject(publishedProject)) {
+      const blockingDiagnostics = getSmartProjectLayoutDiagnostics(publishedProject).filter((diagnostic) =>
+        ["unresolved_manual_collision", "manual_out_of_bounds", "collision_iteration_limit"].includes(diagnostic.code)
+      );
+      if (blockingDiagnostics.length > 0) {
+        showToast("Smart responsive layout has unresolved manual collisions or out-of-bounds components. Reset or reposition them before publishing.");
+        return false;
+      }
+    }
 
     if (!skipOverlapCheck && overlapWarnings.length > 0) {
       setPublishOverlapWarnings(overlapWarnings);
@@ -4245,102 +4215,14 @@ export default function PageBuilder({
       canvasScale: 1,
     }), [activePage, findElementLocation, viewport]);
 
-  const getDirectElementFrameStyle = (element) => {
+  const getRenderedDirectElementPosition = (element) => {
     const previewPosition =
       dragState?.previewPositions?.[element.id] ||
       (dragState?.elementId === element.id ? dragState.previewPosition : null);
-    const renderedElement = previewPosition
-      ? {
-          ...element,
-          position: { ...(element.position || {}), [viewport]: previewPosition },
-        }
-      : element;
-    return getFreeElementStyle(renderedElement);
+    if (previewPosition) return previewPosition;
+    return smartResponsiveEnabled ? null : getArtboardElementPosition(element, viewport);
   };
 
-  const reconcileDirectContentBlockSize = useCallback((sectionId, elementId, measuredHeight) => {
-    if (!measuredHeight || dragState?.elementId === elementId) return;
-
-    const frame = findBuilderDataElement(
-      canvasShellRef.current,
-      "data-section-id",
-      sectionId
-    );
-    const liveBounds = frame ? getFrameGeometry(frame)?.bounds : null;
-    const canvasWidth = liveBounds?.width || viewports[viewport] || viewports.desktop;
-    updateProject((prev) => {
-      let projectChanged = false;
-      const pages = prev.pages.map((page) => {
-        if (page.id !== activePage?.id) return page;
-
-        let pageChanged = false;
-        const sections = page.sections.map((section) => {
-          if (section.id !== sectionId) return section;
-
-          let geometryChanged = false;
-          const freeElements = (section.freeElements || []).map((item) => {
-            if (item.id !== elementId || !["formBlock", "reservationBlock"].includes(item.type)) return item;
-            if (item.type === "reservationBlock" && item.directSizeMode === "fixed") return item;
-
-            const current = item.position?.[viewport] || createPosition()[viewport];
-            const bounds = liveBounds || {
-              x: 0,
-              y: 0,
-              width: canvasWidth,
-              height: getSectionCanvasHeight(section, viewport),
-            };
-            const minimumSize = getDirectElementMinimumSize(item);
-            const nextPosition = reconcileMeasuredFormBlockPosition({
-              current,
-              measuredHeight,
-              bounds,
-              minimumSize,
-            });
-            const changed =
-              Math.abs((Number(current.x) || 0) - nextPosition.x) > 1 ||
-              Math.abs((Number(current.width) || 0) - nextPosition.width) > 1 ||
-              Math.abs((Number(current.height) || 0) - nextPosition.height) > 1;
-            if (!changed) return item;
-
-            geometryChanged = true;
-            return {
-              ...item,
-              position: { ...(item.position || {}), [viewport]: nextPosition },
-            };
-          });
-
-          const currentSectionHeight = getSectionCanvasHeight(section, viewport);
-          const formPosition = freeElements.find((item) => item.id === elementId)
-            ?.position?.[viewport];
-          const nextSectionHeight = Math.max(
-            currentSectionHeight,
-            (Number(formPosition?.y) || 0) + (Number(formPosition?.height) || 0) + (viewport === "mobile" ? 12 : 24)
-          );
-          if (!geometryChanged && nextSectionHeight === currentSectionHeight) return section;
-
-          pageChanged = true;
-          return {
-            ...section,
-            layout: {
-              ...(section.layout || {}),
-              minHeight: viewport === "desktop" ? nextSectionHeight : section.layout?.minHeight,
-              minHeightByViewport: {
-                ...(section.layout?.minHeightByViewport || {}),
-                [viewport]: nextSectionHeight,
-              },
-            },
-            freeElements,
-          };
-        });
-
-        if (!pageChanged) return page;
-        projectChanged = true;
-        return { ...page, sections };
-      });
-
-      return projectChanged ? { ...prev, pages } : prev;
-    });
-  }, [activePage?.id, dragState?.elementId, getFrameGeometry, updateProject, viewport]);
 
   const {
     handleSelectedElementImageUpload,
@@ -4382,21 +4264,16 @@ export default function PageBuilder({
 
   const handlePreviewClick = () => {
     if (preview) {
+      setViewport("desktop");
       setPreview(false);
       showToast("Preview closed.");
       return;
     }
 
-    const overlapWarnings = getProjectOverlapWarnings(project);
-
-    if (overlapWarnings.length > 0) {
-      setPreviewOverlapWarnings(overlapWarnings);
-      showToast("Preview blocked. Fix the overlapping elements first.");
-      return;
-    }
-
+    setPreviewOverlapWarnings([]);
+    setActiveTab("design");
     setPreview(true);
-    showToast("Preview mode on.");
+    showToast("Previewing the current builder draft.");
   };
 
   const startDrag = useCallback((event, element, interaction = "move", forceInteraction = false) => {
@@ -4452,10 +4329,21 @@ export default function PageBuilder({
     const groupElements = groupElementIds
       .map((elementId) => sourceElements.find((candidate) => candidate.id === elementId))
       .filter(Boolean);
+    const getRenderedFramePosition = (candidate) => {
+      const frame = findBuilderDataElement(immediateParent, "data-builder-element-id", candidate.id);
+      if (!frame) return null;
+      const position = {
+        x: Number(frame.dataset.logicalX),
+        y: Number(frame.dataset.logicalY),
+        width: Number(frame.dataset.logicalWidth),
+        height: Number(frame.dataset.logicalHeight),
+      };
+      return Object.values(position).every(Number.isFinite) ? position : null;
+    };
     const groupStartPositions = Object.fromEntries(groupElements.map((candidate) => {
       const minimumSize = getDirectElementMinimumSize(candidate);
       const position = clampElementToBounds(
-        candidate.position?.[viewport] || createPosition()[viewport],
+        getRenderedFramePosition(candidate) || candidate.position?.[viewport] || createPosition()[viewport],
         pointer.bounds,
         {
           minWidth: minimumSize.width,
@@ -4468,7 +4356,7 @@ export default function PageBuilder({
 
     const minimumSize = getDirectElementMinimumSize(element);
     let current = groupStartPositions[element.id] || clampElementToBounds(
-      element.position?.[viewport] || createPosition()[viewport],
+      getRenderedFramePosition(element) || element.position?.[viewport] || createPosition()[viewport],
       pointer.bounds,
       {
         minWidth: minimumSize.width,
@@ -5544,6 +5432,7 @@ export default function PageBuilder({
         previewPositions: finalPreview.previewPositions,
         previewSectionHeight: finalPreview.previewSectionHeight,
         viewportName: viewport,
+        smartResponsive: smartResponsiveEnabled,
       }));
       showToast(`Moved ${groupElementIds.length} components together.`);
     } else if (targetFrame && targetSection && sourceLocation && sourceLocation.sectionId !== targetSection.id) {
@@ -5574,6 +5463,8 @@ export default function PageBuilder({
         movedElement,
         sourceSectionId: sourceLocation.sectionId,
         targetSectionId: targetSection.id,
+        viewportName: viewport,
+        smartResponsive: smartResponsiveEnabled,
       }));
       showToast(`Moved ${selectedElement.name || "component"} to ${targetSection.name || "section"}.`);
     } else if (sourceLocation && finalPreview.previewPosition) {
@@ -5583,6 +5474,7 @@ export default function PageBuilder({
         previewSectionHeight: finalPreview.previewSectionHeight,
         sourceSectionId: sourceLocation.sectionId,
         viewportName: viewport,
+        smartResponsive: smartResponsiveEnabled,
         elementUpdates:
           dragState.interaction === "resize"
             ? selectedElement.type === "heading"
@@ -5784,6 +5676,7 @@ export default function PageBuilder({
     activePage,
     selected,
     preview,
+    publicRuntime: preview,
     selectPage,
     setSelected,
   });
@@ -6081,6 +5974,7 @@ export default function PageBuilder({
                 isSavingProject={isSavingProject}
                 lastCloudSavedAt={lastCloudSavedAt}
                 onSave={() => saveProject({ successMessage: "Changes saved." })}
+                onPreview={handlePreviewClick}
                 onGoLive={publishProject}
                 publicationState={publicationState}
                 saveDisabled={
@@ -6201,7 +6095,7 @@ export default function PageBuilder({
       )}
 
       <main
-        className="builder-canvas-shell"
+        className="builder-canvas-shell editor-viewport camera-manual"
         ref={canvasShellRef}
         onClick={() => {
           if (!preview) {
@@ -6212,280 +6106,166 @@ export default function PageBuilder({
       >
         {!preview && renderInlineTextToolbar()}
         <div
-          className={`builder-canvas viewport-${viewport}`}
-          style={{
-            ...getPageBuilderThemeVars(project.theme),
-            ...getPreviewCanvasStyle(viewport, preview, viewports),
-            "--builder-canvas-fit-width": preview && viewport === "desktop"
-              ? "100%"
-              : `${(Number(viewports[viewport] || viewports.desktop) || 1) * canvasScale}px`,
-          }}
-          data-canvas-scale={canvasScale.toFixed(4)}
+          className="editor-camera-stage"
+          data-logical-width={logicalArtboardWidth}
+          data-editor-zoom={canvasScale}
+          style={{ width: cameraStageWidth + "px" }}
         >
-          {renderSiteHeader()}
-
-          {activePage?.sections.map((section) => {
-            const isSelected = selected.type === "section" && selected.id === section.id;
-            const isEditingBehindText = selectedElement?.layer === "behindText" &&
-              (section.freeElements || []).some((element) => element.id === selectedElement.id);
-            const renderedSectionHeight = dragState?.elementId && getElementSection(dragState.elementId)?.id === section.id
+        <SiteRenderer
+          project={project}
+          activePage={activePage}
+          viewportMode={viewport}
+          presentationZoom={canvasScale}
+          availablePresentationWidth={editorViewportWidth}
+          responsiveLayoutWidth={logicalArtboardWidth}
+          responsiveChangedElementIds={smartResponsiveEnabled && dragState
+            ? dragState.groupElementIds || [dragState.elementId]
+            : []}
+          responsiveTransientRectsBySection={smartResponsiveEnabled && dragState?.parentSectionId
+            ? {
+                [dragState.parentSectionId]: dragState.previewPositions || (
+                  dragState.previewPosition ? { [dragState.elementId]: dragState.previewPosition } : {}
+                ),
+              }
+            : {}}
+          renderElement={renderElement}
+          renderSiteHeader={renderSiteHeader}
+          renderSiteFooter={renderSiteFooter}
+          carouselElementTypes={carouselElementTypes}
+          getDirectElementPosition={getRenderedDirectElementPosition}
+          getSectionLogicalHeight={(section) =>
+            dragState?.elementId && getElementSection(dragState.elementId)?.id === section.id
               ? Math.max(getSectionCanvasHeight(section, viewport), Number(dragState.previewSectionHeight) || 0)
-              : getSectionCanvasHeight(section, viewport);
-            const logicalWidth = viewports[viewport] || viewports.desktop;
-            const directCanvasStyles = getDirectCanvasScaleStyles({
-              logicalWidth,
-              logicalHeight: renderedSectionHeight,
-              scale: canvasScale,
-            });
-
-            if (section.mode === "direct") {
-              return (
-                <section
-                  key={section.id}
-                  className={`site-section direct-layout-section width-${section.layout.width} ${isSelected ? "is-selected" : ""} ${dragState?.dropSectionId === section.id || paletteDropSectionId === section.id ? "is-drop-target" : ""}`}
-                  style={{
-                    backgroundColor: section.layout.background,
-                    ...directCanvasStyles.section,
-                  }}
-                  onClick={(event) => {
-                    if (suppressCanvasClickRef.current) {
-                      suppressCanvasClickRef.current = false;
-                      event.stopPropagation();
-                      return;
-                    }
-                    event.stopPropagation();
-                    if (!preview) {
-                      const frame = event.currentTarget.querySelector(".direct-layout-frame");
-                      const rect = frame?.getBoundingClientRect();
-                      setInsertTarget({
-                        sectionId: section.id,
-                        mode: "direct",
-                        x: rect ? Math.max(0, Math.round((event.clientX - rect.left) / canvasScale)) : 40,
-                        y: rect ? Math.max(0, Math.round((event.clientY - rect.top) / canvasScale)) : 40,
-                      });
-                      setSelected({ type: "section", id: section.id });
-                    }
-                  }}
-                >
-                  <div
-                    className="direct-layout-scale-shell"
-                    style={directCanvasStyles.shell}
-                  >
-                    <div
-                      className={`direct-layout-frame ${isEditingBehindText ? "is-editing-behind-text" : ""}`}
-                      data-section-id={section.id}
-                      style={directCanvasStyles.frame}
-                      onPointerDown={(event) => startMarqueeSelection(event, section)}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        event.dataTransfer.dropEffect = "copy";
-                        if (paletteDropSectionId !== section.id) setPaletteDropSectionId(section.id);
-                      }}
-                      onDragLeave={(event) => {
-                        if (!event.currentTarget.contains(event.relatedTarget)) {
-                          setPaletteDropSectionId("");
-                        }
-                      }}
-                      onDrop={(event) => handlePaletteDrop(event, section)}
-                    >
-                    {(section.freeElements || []).map((element) => {
-                      const elementSelected = effectiveSelectedElementIds.includes(element.id);
-                      const elementIsPrimary = selected.type === "element" && selected.id === element.id;
-                      const usesDetachedEditBoundary = elementSelected && element.layer === "behindText" && !preview;
-                      const hasFixedReservationSize =
-                        element.type === "reservationBlock" && element.directSizeMode === "fixed";
-                      const hasResponsiveContentHeight =
-                        element.type === "formBlock" ||
-                        (element.type === "reservationBlock" && !hasFixedReservationSize);
-                      const DirectFrame = hasResponsiveContentHeight ? PageBuilderMeasuredFrame : "div";
-
-                      return (
-                        <Fragment key={element.id}>
-                          <DirectFrame
-                            {...(hasResponsiveContentHeight
-                              ? {
-                                  measureEnabled: !preview && dragState?.elementId !== element.id,
-                                  measurementKey: `${element.id}:${viewport}`,
-                                  onMeasuredHeight: (height) =>
-                                    reconcileDirectContentBlockSize(section.id, element.id, height),
-                                }
-                              : {})}
-                            className={`direct-element-frame direct-element-frame-${element.type} ${hasFixedReservationSize ? "is-fixed-size" : ""} ${elementSelected && !usesDetachedEditBoundary ? "is-selected" : ""} ${elementSelected && !elementIsPrimary ? "is-group-selected" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""}`}
-                            data-builder-element-id={element.id}
-                            style={getDirectElementFrameStyle(element)}
-                            tabIndex={-1}
-                            onPointerDownCapture={(event) => {
-                              if (preview) return;
-                              event.currentTarget.focus({ preventScroll: true });
-                              selectCanvasElement(element.id, {
-                                additive: event.shiftKey || event.ctrlKey || event.metaKey,
-                              });
-                            }}
-                            onPointerDown={
-                              preview
-                                ? undefined
-                                : (event) =>
-                                    startDrag(event, element, "move", element.type === "button")
-                            }
-                            onClick={(event) => {
-                              if (preview) return;
-                              event.stopPropagation();
-                            }}
-                          >
-                            <div className="direct-element-content">
-                              {renderElement(element, false)}
-                            </div>
-                            {elementSelected && !preview && !usesDetachedEditBoundary && (
-                              <>
-                                <button
-                                  type="button"
-                                  className="direct-move-handle"
-                                  aria-label={`Move ${element.name || "component"}`}
-                                  title="Drag to move in any direction"
-                                  onPointerDown={(event) => startDrag(event, element, "move", true)}
-                                >
-                                  <Move size={13} aria-hidden="true" />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="direct-resize-handle"
-                                  aria-label={`Resize ${element.name || "component"}`}
-                                  title="Drag to resize"
-                                  onPointerDown={(event) => startDrag(event, element, "resize", true)}
-                                />
-                              </>
-                            )}
-                          </DirectFrame>
-                          {usesDetachedEditBoundary && (
-                            <div
-                              className="direct-element-frame direct-element-edit-boundary is-selected"
-                              style={{ ...getDirectElementFrameStyle(element), zIndex: 6 }}
-                              tabIndex={-1}
-                              onPointerDownCapture={(event) => event.currentTarget.focus({ preventScroll: true })}
-                              onPointerDown={(event) => startDrag(event, element, "move")}
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <button
-                                type="button"
-                                className="direct-move-handle"
-                                aria-label={`Move ${element.name || "component"}`}
-                                title="Drag to move in any direction"
-                                onPointerDown={(event) => startDrag(event, element, "move", true)}
-                              >
-                                <Move size={13} aria-hidden="true" />
-                              </button>
-                              <button
-                                type="button"
-                                className="direct-resize-handle"
-                                aria-label={`Resize ${element.name || "component"}`}
-                                title="Drag to resize"
-                                onPointerDown={(event) => startDrag(event, element, "resize", true)}
-                              />
-                            </div>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                    {dragState?.parentSectionId === section.id &&
-                      (dragState.smartGuides || []).map((guide, guideIndex) => {
-                        const vertical = guide.axis === "vertical";
-                        const start = Math.min(Number(guide.start) || 0, Number(guide.end) || 0);
-                        const length = Math.max(1, Math.abs((Number(guide.end) || 0) - (Number(guide.start) || 0)));
-                        return (
-                          <div
-                            key={`${guide.axis}-${guide.value}-${guideIndex}`}
-                            className={`direct-smart-guide is-${guide.axis} is-${guide.kind || "alignment"}`}
-                            aria-hidden="true"
-                            style={vertical
-                              ? { left: `${guide.value}px`, top: `${start}px`, height: `${length}px` }
-                              : { left: `${start}px`, top: `${guide.value}px`, width: `${length}px` }}
-                          >
-                            {guide.label && <span>{guide.label}</span>}
-                          </div>
-                        );
-                      })}                    {selectionMarquee?.sectionId === section.id && (
-                      <div
-                        className="direct-selection-marquee"
-                        aria-hidden="true"
-                        style={{
-                          left: `${Math.min(selectionMarquee.startX, selectionMarquee.currentX)}px`,
-                          top: `${Math.min(selectionMarquee.startY, selectionMarquee.currentY)}px`,
-                          width: `${Math.abs(selectionMarquee.currentX - selectionMarquee.startX)}px`,
-                          height: `${Math.abs(selectionMarquee.currentY - selectionMarquee.startY)}px`,
-                        }}
-                      />
-                    )}
-                    </div>
-                  </div>
-                </section>
-              );
-            }
-
-            return (
-              <section
-                key={section.id}
-                className={`site-section width-${section.layout.width} padding-${section.layout.paddingY} ${isSelected ? "is-selected" : ""}`}
-                style={{ backgroundColor: section.layout.background }}
-                onClick={(event) => {
+              : getSectionCanvasHeight(section, viewport)
+          }
+          getSectionProps={(section) => {
+            const isSelected = selected.type === "section" && selected.id === section.id;
+            const isDirect = section.mode === "direct" || section.mode === "free";
+            return {
+              className: [
+                isSelected ? "is-selected" : "",
+                isDirect && (dragState?.dropSectionId === section.id || paletteDropSectionId === section.id) ? "is-drop-target" : "",
+              ].filter(Boolean).join(" "),
+              onClick: (event) => {
+                if (suppressCanvasClickRef.current) {
+                  suppressCanvasClickRef.current = false;
                   event.stopPropagation();
-                  if (!preview) {
-                    const columnId = getClosestColumnIdFromEvent(event);
-                      setInsertTarget({
-                        sectionId: section.id,
-                        mode: "auto",
-                        columnId,
-                        afterElementId: "",
-                      });
-                    setSelected({ type: "section", id: section.id });
-                  }
-                }}
-              >
-                {section.rows.map((row) => (
-                  <div
-                    key={row.id}
-                    className={`site-row columns-${row.layout.columns} align-${row.layout.align} gap-${row.layout.gap}`}
-                  >
-                    {row.columns.map((column) => {
-                      const columnSelected = selected.type === "column" && selected.id === column.id;
-
-                      return (
-                        <div
-                          key={column.id}
-                          data-column-id={column.id}
-                          className={`site-column column-align-${column.layout.align} ${columnSelected ? "is-selected" : ""}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (!preview) {
-                              setInsertTarget({
-                                sectionId: section.id,
-                                mode: "auto",
-                                columnId: column.id,
-                                afterElementId: "",
-                              });
-                              setSelected({ type: "column", id: column.id });
-                            }
-                          }}
-                        >
-                          {column.elements
-                            .filter((element) => !carouselElementTypes.has(element.type))
-                            .map((element) => renderElement(element, false))}
-                          {!preview && column.elements.length === 0 && (
-                            <div className="empty-column">Select this column, then add an element.</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {getRowCarouselElements(row, carouselElementTypes).map((element) => renderElement(element, false))}
-                  </div>
-                ))}
-              </section>
-            );
+                  return;
+                }
+                event.stopPropagation();
+                if (preview) return;
+                if (isDirect) {
+                  const frame = event.currentTarget.querySelector(".direct-layout-frame");
+                  const point = frame ? clientPointToCanvasLocal(frame, event.clientX, event.clientY, { coordinateScale: 1 }) : { x: 40, y: 40 };
+                  setInsertTarget({ sectionId: section.id, mode: "direct", x: Math.max(0, Math.round(point.x)), y: Math.max(0, Math.round(point.y)) });
+                } else {
+                  setInsertTarget({ sectionId: section.id, mode: "auto", columnId: getClosestColumnIdFromEvent(event), afterElementId: "" });
+                }
+                setSelected({ type: "section", id: section.id });
+              },
+              renderOverlay: isDirect ? () => (
+                <div className="editor-overlay editor-section-overlay">
+                  {dragState?.parentSectionId === section.id && (dragState.smartGuides || []).map((guide, guideIndex) => {
+                    const vertical = guide.axis === "vertical";
+                    const start = Math.min(Number(guide.start) || 0, Number(guide.end) || 0);
+                    const length = Math.max(1, Math.abs((Number(guide.end) || 0) - (Number(guide.start) || 0)));
+                    return (
+                      <div
+                        key={guide.axis + "-" + guide.value + "-" + guideIndex}
+                        className={"direct-smart-guide is-" + guide.axis + " is-" + (guide.kind || "alignment")}
+                        aria-hidden="true"
+                        style={vertical ? { left: guide.value + "px", top: start + "px", height: length + "px" } : { left: start + "px", top: guide.value + "px", width: length + "px" }}
+                      >
+                        {guide.label && <span>{guide.label}</span>}
+                      </div>
+                    );
+                  })}
+                  {selectionMarquee?.sectionId === section.id && (
+                    <div
+                      className="direct-selection-marquee"
+                      aria-hidden="true"
+                      style={{
+                        left: Math.min(selectionMarquee.startX, selectionMarquee.currentX) + "px",
+                        top: Math.min(selectionMarquee.startY, selectionMarquee.currentY) + "px",
+                        width: Math.abs(selectionMarquee.currentX - selectionMarquee.startX) + "px",
+                        height: Math.abs(selectionMarquee.currentY - selectionMarquee.startY) + "px",
+                      }}
+                    />
+                  )}
+                </div>
+              ) : undefined,
+            };
+          }}
+          getDirectCanvasProps={(section) => ({
+            className: selectedElement?.layer === "behindText" && (section.freeElements || []).some((element) => element.id === selectedElement.id) ? "is-editing-behind-text" : "",
+            onPointerDown: (event) => startMarqueeSelection(event, section),
+            onDragOver: (event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+              if (paletteDropSectionId !== section.id) setPaletteDropSectionId(section.id);
+            },
+            onDragLeave: (event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setPaletteDropSectionId("");
+            },
+            onDrop: (event) => handlePaletteDrop(event, section),
           })}
-
-          {renderSiteFooter()}
+          getDirectFrameProps={(element) => {
+            const elementSelected = effectiveSelectedElementIds.includes(element.id);
+            const elementIsPrimary = selected.type === "element" && selected.id === element.id;
+            const usesDetachedEditBoundary = elementSelected && element.layer === "behindText" && !preview;
+            return {
+              className: [elementSelected && !usesDetachedEditBoundary ? "is-selected" : "", elementSelected && !elementIsPrimary ? "is-group-selected" : ""].filter(Boolean).join(" "),
+              tabIndex: -1,
+              onPointerDownCapture: (event) => {
+                if (preview) return;
+                event.currentTarget.focus({ preventScroll: true });
+                selectCanvasElement(element.id, { additive: event.shiftKey || event.ctrlKey || event.metaKey });
+              },
+              onPointerDown: preview ? undefined : (event) => startDrag(event, element, "move", element.type === "button"),
+              onClick: (event) => { if (!preview) event.stopPropagation(); },
+            };
+          }}
+          renderDirectElementOverlay={(element) => {
+            const elementSelected = effectiveSelectedElementIds.includes(element.id);
+            const usesDetachedEditBoundary = elementSelected && element.layer === "behindText" && !preview;
+            if (!elementSelected || preview || usesDetachedEditBoundary) return null;
+            return (
+              <div className="editor-overlay editor-element-overlay">
+                <button type="button" className="direct-move-handle" aria-label={"Move " + (element.name || "component")} title="Drag to move in any direction" onPointerDown={(event) => startDrag(event, element, "move", true)}>
+                  <Move size={13} aria-hidden="true" />
+                </button>
+                <button type="button" className="direct-resize-handle" aria-label={"Resize " + (element.name || "component")} title="Drag to resize" onPointerDown={(event) => startDrag(event, element, "resize", true)} />
+              </div>
+            );
+          }}
+          renderAfterDirectElement={(element, section, frameStyle) => {
+            const elementSelected = effectiveSelectedElementIds.includes(element.id);
+            if (!elementSelected || element.layer !== "behindText" || preview) return null;
+            return (
+              <div className="direct-element-frame direct-element-edit-boundary is-selected" style={{ ...frameStyle, zIndex: 6 }} tabIndex={-1} onPointerDownCapture={(event) => event.currentTarget.focus({ preventScroll: true })} onPointerDown={(event) => startDrag(event, element, "move")} onClick={(event) => event.stopPropagation()}>
+                <div className="editor-overlay editor-element-overlay">
+                <button type="button" className="direct-move-handle" aria-label={"Move " + (element.name || "component")} title="Drag to move in any direction" onPointerDown={(event) => startDrag(event, element, "move", true)}>
+                  <Move size={13} aria-hidden="true" />
+                </button>
+                <button type="button" className="direct-resize-handle" aria-label={"Resize " + (element.name || "component")} title="Drag to resize" onPointerDown={(event) => startDrag(event, element, "resize", true)} />
+                </div>
+              </div>
+            );
+          }}
+          getColumnProps={(column, section) => ({
+            className: selected.type === "column" && selected.id === column.id ? "is-selected" : "",
+            onClick: (event) => {
+              event.stopPropagation();
+              if (!preview) {
+                setInsertTarget({ sectionId: section.id, mode: "auto", columnId: column.id, afterElementId: "" });
+                setSelected({ type: "column", id: column.id });
+              }
+            },
+          })}
+          renderEmptyColumn={(column) => !preview && column.elements.length === 0 ? <div className="empty-column">Select this column, then add an element.</div> : null}
+        />
         </div>
       </main>
-
       {!preview && renderInspector()}
     </div>
   );
@@ -6536,6 +6316,81 @@ export default function PageBuilder({
           </p>
         </div>
       )}
+
+      <div className="inspector-group responsive-layout-control">
+        <h3>Responsive layout</h3>
+        <p className="builder-note">
+          {smartResponsiveEnabled
+            ? `Smart engine v${RESPONSIVE_LAYOUT_ENGINE_VERSION} is enabled. Live pages solve continuously up to 1200 CSS px.`
+            : "Legacy mode preserves the three saved artboards exactly."}
+        </p>
+        <button
+          type="button"
+          className={smartResponsiveEnabled ? "danger-lite" : "primary-action"}
+          onClick={() => updateProject((current) => ({
+            ...current,
+            responsiveLayout: {
+              mode: smartResponsiveEnabled ? RESPONSIVE_LAYOUT_MODES.legacy : RESPONSIVE_LAYOUT_MODES.smart,
+              engineVersion: RESPONSIVE_LAYOUT_ENGINE_VERSION,
+            },
+          }))}
+        >
+          {smartResponsiveEnabled ? "Use legacy responsive" : "Enable smart responsive"}
+        </button>
+        {!smartResponsiveEnabled && (
+          <>
+            <button
+              type="button"
+              className="danger-lite"
+              onClick={() => setLegacyShadowEnabled((current) => !current)}
+            >
+              {legacyShadowEnabled ? "Stop shadow comparison" : "Compare smart layout in shadow"}
+            </button>
+            {legacyShadowComparison && (
+              <div className="responsive-shadow-report" role="status">
+                <strong>Shadow comparison only</strong>
+                <p className="builder-note">
+                  Smart geometry is not displayed or saved. Compared {legacyShadowComparison.summary.comparedElementCount} elements;
+                  {" "}{legacyShadowComparison.summary.changedElementCount} differ by more than 0.5px.
+                  Maximum displacement: {legacyShadowComparison.summary.maximumDisplacement.toFixed(1)}px.
+                </p>
+                <p className="builder-note">
+                  Blocking smart diagnostics: {legacyShadowComparison.summary.blockingDiagnosticCount}.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+        {smartResponsiveEnabled && activeSmartDiagnostics
+          .filter((diagnostic) => diagnostic.code === "unresolved_manual_collision")
+          .map((diagnostic) => (
+            <div
+              className="responsive-collision-diagnostic"
+              key={`${diagnostic.sectionId}:${diagnostic.elementIds.join(":")}:${diagnostic.layoutWidth}`}
+              role="alert"
+            >
+              <strong>Manual collision</strong>
+              <p className="builder-note">
+                {diagnostic.elementIds.join(" and ")} conflict at {diagnostic.layoutWidth}px.
+                Publishing remains blocked until this is resolved.
+              </p>
+              <div className="layer-selection-actions">
+                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "move_element")}>
+                  Move element
+                </button>
+                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "reset_to_auto")}>
+                  Reset to Auto
+                </button>
+                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "mark_intentional_overlay")}>
+                  Mark overlay
+                </button>
+                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "mark_background")}>
+                  Mark background
+                </button>
+              </div>
+            </div>
+          ))}
+      </div>
 
       {inspectorMode === "page" && activePage && (
         <PageBuilderPageInspector
@@ -6639,6 +6494,26 @@ export default function PageBuilder({
       {inspectorMode === "element" && selectedElement && (
         <div className="inspector-group">
           <h3>{selectedElement.type === "reservationBlock" ? "Reservation" : "Element"}</h3>
+          {smartResponsiveEnabled && ["tablet", "mobile"].includes(viewport) && (
+            <div className="responsive-element-override">
+              <p className="builder-note">
+                {selectedElement.responsive?.overrides?.[viewport]?.mode === "manual"
+                  ? `${viewport} geometry is manually overridden.`
+                  : `${viewport} geometry is generated automatically.`}
+              </p>
+              <button
+                type="button"
+                className="danger-lite"
+                onClick={() => {
+                  const resetElement = withAutoResponsiveOverride(selectedElement, viewport);
+                  updateSelectedElement({ responsive: resetElement.responsive });
+                  showToast(`${viewport} layout reset to Auto.`);
+                }}
+              >
+                Reset {viewport} to Auto
+              </button>
+            </div>
+          )}
           {selectedElement.type !== "reservationBlock" && (
             <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
           )}
@@ -7245,7 +7120,7 @@ export default function PageBuilder({
                     <span className="site-chrome-logo-control">
                       <input
                         id="site-chrome-logo-url"
-                        value={logoUrlDraftEdited ? logoUrlDraft : getBuilderAssetFileName(logoUrlDraft)}
+                        value={logoUrlDraftEdited ? logoUrlDraft : getBuilderAssetFileName(siteChrome.logoUrl)}
                         placeholder="Image URL"
                         onChange={(event) => {
                           setLogoUrlDraftEdited(true);
@@ -7549,6 +7424,7 @@ export default function PageBuilder({
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
       openPublicFormPage={openPublicFormPage}
+      onPreviewSite={handlePreviewClick}
       onUnpublish={unpublishProject}
       isUnpublishing={isUnpublishingProject}
       isLiveProject={
@@ -7657,8 +7533,11 @@ export default function PageBuilder({
     "";
   const templateCopy = templateModalText[templateLang] || templateModalText.en;
   const projectDisplayName =
+    String(websiteSettings?.brand || "").trim() ||
+    String(project.siteChrome?.brand || project.siteChrome?.brandName || "").trim() ||
     builderCopy.projectNames[project.name] ||
-    project.name;
+    project.name ||
+    "Untitled Site";
   const mobileCopy =
     (mobileBlockerCopy[lang] || mobileBlockerCopy.en)[activeTab] ||
     (mobileBlockerCopy[lang] || mobileBlockerCopy.en).default;
@@ -7706,6 +7585,14 @@ export default function PageBuilder({
           activeHelper={activeHelper}
           activeTab={activeTab}
           activeTopbarAction={activeTopbarAction}
+          artboardCameraControls={(
+            <div className="artboard-camera-controls" role="toolbar" aria-label="Artboard zoom">
+              <button type="button" className={manualEditorZoom === 1 ? "is-active" : ""} onClick={() => setManualEditorZoom(1)}>100%</button>
+              <button type="button" aria-label="Zoom out" onClick={() => setManualEditorZoom((value) => clampEditorZoom(value - 0.1))}>-</button>
+              <output>{Math.round(canvasScale * 100)}%</output>
+              <button type="button" aria-label="Zoom in" onClick={() => setManualEditorZoom((value) => clampEditorZoom(value + 0.1))}>+</button>
+            </div>
+          )}
           builderCopy={builderCopy}
           demoMode={demoMode}
           displayName={projectDisplayName}

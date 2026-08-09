@@ -2469,6 +2469,66 @@
   gap: 10px;
 }
 
+/* Keep the expanded task panel compact inside the narrow workspace sidebar. */
+.calendar-workspace-page .calendar-task-panel .calendar-sidebar-section-content {
+  gap: 4px;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-task-panel form {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px 34px;
+  align-items: stretch;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields {
+  display: contents;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > input {
+  min-width: 0;
+  padding: 7px 9px;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > label {
+  display: contents;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > label input {
+  min-width: 0;
+  padding: 6px;
+  border-top: 0;
+  border-inline-start: 1px solid var(--theme-border);
+  font-size: 0.65rem;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-task-panel form button {
+  width: 34px;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task {
+  min-height: 24px;
+  padding: 2px 1px;
+  line-height: 1.2;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task i {
+  width: 6px;
+  height: 6px;
+}
+
 .calendar-workspace-page .calendar-new-connection-toggle {
   width: 100%;
   display: flex;

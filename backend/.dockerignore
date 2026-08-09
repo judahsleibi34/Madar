@@ -1,9 +1,14 @@
 __pycache__
 *.py[cod]
+.venv/
+venv/
+madar_back/
+cv_reranker/
 .pytest_cache
 .coverage
 avatar_uploads/*
 uploads/*
 private_uploads/*
 private_generated_charts/*
+generated_charts/*
 .env*

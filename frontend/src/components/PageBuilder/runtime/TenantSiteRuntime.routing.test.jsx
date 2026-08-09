@@ -22,7 +22,11 @@ vi.mock("../services/PageBuilder.api", async () => ({
 
 const PROJECT_ID = "3023144a-6f48-46ee-90ed-fe712f51283a";
 
-const renderPreview = ({ showHeader = true, showFooter = true } = {}) => {
+const renderPreview = ({
+  showHeader = true,
+  showFooter = true,
+  teamSections = [],
+} = {}) => {
   fetchBuilderProject.mockResolvedValue({
     id: PROJECT_ID,
     draft_schema: {
@@ -36,7 +40,7 @@ const renderPreview = ({ showHeader = true, showFooter = true } = {}) => {
           id: "team",
           name: "Team",
           slug: "/about/team",
-          sections: [],
+          sections: teamSections,
         },
       ],
     },
@@ -124,6 +128,45 @@ describe("TenantSiteRuntime explicit project preview", () => {
       `/page-builder/projects/${PROJECT_ID}/preview`
     );
     expect(screen.getByText("Draft preview")).toBeTruthy();
+  });
+
+  it("marks background artwork so responsive content sizing leaves it authored", async () => {
+    const position = {
+      desktop: { x: 24, y: 24, width: 320, height: 180 },
+      tablet: { x: 20, y: 20, width: 280, height: 160 },
+      mobile: { x: 12, y: 16, width: 260, height: 140 },
+    };
+    renderPreview({
+      teamSections: [{
+        id: "responsive-section",
+        mode: "direct",
+        layout: { minHeight: 420 },
+        freeElements: [
+          {
+            id: "background-artwork",
+            type: "image",
+            layer: "behindText",
+            content: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+            styles: {},
+            position,
+          },
+          {
+            id: "foreground-copy",
+            type: "text",
+            content: "Responsive copy",
+            styles: {},
+            position,
+          },
+        ],
+      }],
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
+    });
+
+    expect(document.querySelector(".direct-element-frame-image.is-behind-text")).toBeTruthy();
+    expect(document.querySelector(".direct-element-frame-text.is-behind-text")).toBeNull();
   });
 
   it.each([

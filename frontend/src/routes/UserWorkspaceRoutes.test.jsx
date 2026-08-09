@@ -1,4 +1,4 @@
-﻿import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -46,6 +46,7 @@ describe("workspace settings routes", () => {
     ["/ecommerce/tags", "Tags"],
     ["/ecommerce/categories", "Categories"],
     ["/ecommerce/products", "Products"],
+    ["/ecommerce/cv-rerank", "CV Rerank"],
   ])("renders the Ecommerce page for %s", async (pathname, heading) => {
     render(
       <MemoryRouter initialEntries={[pathname]}>

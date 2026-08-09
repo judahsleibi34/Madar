@@ -236,15 +236,10 @@
   }
 }
 
-/* The authoring canvas follows the center column's live width. Direct element
-   geometry is scaled by the renderer, so the editor never needs an x-axis. */
+/* EditorViewport owns visibility and scrolling. The CameraStage and artboard
+   retain their authored physical width even when the center column is narrow. */
 .page-builder .builder-canvas-shell {
-  overflow-x: hidden !important;
-}
-
-.page-builder:not(.preview-mode) .builder-canvas {
-  width: var(--builder-canvas-fit-width, 100%) !important;
-  max-width: 100% !important;
+  overflow-x: auto !important;
 }
 
 /* Free-positioned sections use the complete canvas as their coordinate plane.

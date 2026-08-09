@@ -16,6 +16,19 @@ function BuilderProjectLoadingState({
 }) {
   const openingBuilder = variant === "builder";
 
+  if (openingBuilder) {
+    return (
+      <div className="builder-project-loading-bar" role="status" aria-live="polite">
+        <div className="builder-project-loading-bar-copy">
+          <strong>{title}</strong>
+          <span>{description}</span>
+        </div>
+        <div className="builder-project-loading-progress" aria-hidden="true"><span /></div>
+        <span className="builder-project-loading-announcement">{announcement}</span>
+      </div>
+    );
+  }
+
   return (
     <div className={`builder-project-chooser-loading is-${variant}`} role="status" aria-live="polite">
       <div className="builder-project-loading-heading">
@@ -32,33 +45,15 @@ function BuilderProjectLoadingState({
 
       <div className="builder-project-loading-progress" aria-hidden="true"><span /></div>
 
-      {openingBuilder ? (
-        <div className="builder-project-opening-preview" aria-hidden="true">
-          <div className="builder-project-opening-sidebar">
-            <span className="is-brand" /><span /><span /><span /><span />
+      <div className="builder-project-loading-list" aria-hidden="true">
+        {[0, 1, 2].map((item) => (
+          <div className="builder-project-loading-row" key={item}>
+            <span className="builder-project-loading-icon" />
+            <span className="builder-project-loading-copy"><span /><span /></span>
+            <span className="builder-project-loading-status" />
           </div>
-          <div className="builder-project-opening-canvas">
-            <span className="is-title" />
-            <span className="is-copy" />
-            <span className="is-copy is-short" />
-            <div><span /><span /><span /></div>
-          </div>
-          <div className="builder-project-opening-inspector">
-            <span className="is-heading" /><span /><span />
-            <span className="is-field" /><span className="is-field" />
-          </div>
-        </div>
-      ) : (
-        <div className="builder-project-loading-list" aria-hidden="true">
-          {[0, 1, 2].map((item) => (
-            <div className="builder-project-loading-row" key={item}>
-              <span className="builder-project-loading-icon" />
-              <span className="builder-project-loading-copy"><span /><span /></span>
-              <span className="builder-project-loading-status" />
-            </div>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
 
       <p className="builder-project-loading-note"><span aria-hidden="true" />{note}</p>
       <span className="builder-project-loading-announcement">{announcement}</span>

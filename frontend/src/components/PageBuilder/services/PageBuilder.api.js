@@ -174,11 +174,15 @@ export const listBuilderReservations = async ({
   };
 };
 
-export const fetchCalendarWorkspace = async ({ start, end }) => {
+export const fetchCalendarWorkspace = async ({ start, end, force = false }) => {
   const query = new URLSearchParams({ start, end });
   const response = await apiFetch(
     getApiUrl("/calendar/bootstrap?" + query.toString()),
-    { method: "GET", cache: "no-store" }
+    {
+      method: "GET",
+      cache: "no-store",
+      headers: force ? { "X-Calendar-Cache-Bypass": "1" } : undefined,
+    }
   );
   return parseJsonResponse(response);
 };

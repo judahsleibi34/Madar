@@ -38,7 +38,7 @@ services:
       - .env
     environment:
       APP_ENV: production
-      FRONTEND_URLS: ${FRONTEND_URLS}
+      FRONTEND_URLS: ${FRONTEND_URLS:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-none}
       SUPABASE_URL: ${SUPABASE_URL}
@@ -230,7 +230,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_URL: ${VITE_API_URL:-}
     container_name: madar-frontend
     restart: unless-stopped
     init: true

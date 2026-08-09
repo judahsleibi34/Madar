@@ -1,4 +1,4 @@
-﻿{
+{
   "sidebar": {
     "workspace": "Workspace",
     "ecommerce": "Ecommerce",
@@ -6,6 +6,7 @@
     "categories": "Categories",
     "products": "Products",
     "store": "Store",
+    "cvRerank": "CV Rerank",
     "language": "Language",
     "brand": "Madar",
     "subtitle": "Admin Panel",
