@@ -52,5 +52,7 @@ def register_current_installation(
             "installation_id": str(installation.get("installation_id")),
             "display_mode": installation.get("display_mode"),
             "installed": bool(installation.get("installed_confirmed_at")),
+            "notification_permission": installation.get("notification_permission"),
+            "notifications_enabled": bool(installation.get("notifications_enabled")),
         },
     }

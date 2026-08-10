@@ -9,6 +9,9 @@ if (!/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(appUrl)) {
 
 const browser = await chromium.launch({
   headless: true,
+  ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+    ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+    : {}),
   args: ["--host-resolver-rules=MAP customer.madarportal.com 127.0.0.1"],
 });
 

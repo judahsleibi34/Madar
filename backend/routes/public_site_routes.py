@@ -50,6 +50,7 @@ from services.hosted_address_service import (
     HOSTED_ADDRESS_PATTERN,
     normalize_hosted_address,
 )
+from services.notification_action_service import build_notification_action
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -2321,6 +2322,9 @@ def submit_public_builder_form(
                 "form_id": clean_form_id,
                 "form_title": form.get("title"),
                 "subdomain": clean_subdomain,
+                "action": build_notification_action(
+                    kind="form_submission"
+                ),
             },
         },
     )
@@ -2484,6 +2488,13 @@ def submit_public_builder_block_event(
                 "block_type": block_type,
                 "subdomain": clean_subdomain,
                 "payload": cleaned_payload,
+                "action": build_notification_action(
+                    kind=(
+                        "reservation"
+                        if block_type == "reservationBlock"
+                        else "notification_center"
+                    ),
+                ),
             },
         },
     )

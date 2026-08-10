@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiFetch, getMadarServiceWorkerRegistration } = vi.hoisted(() => ({
+const { apiFetch, clearPushRotationNeeded, getExistingMadarPushEndpoint, getMadarServiceWorkerRegistration, readPushRotationNeeded } = vi.hoisted(() => ({
   apiFetch: vi.fn(),
+  clearPushRotationNeeded: vi.fn().mockResolvedValue(true),
+  getExistingMadarPushEndpoint: vi.fn().mockResolvedValue(null),
   getMadarServiceWorkerRegistration: vi.fn(),
+  readPushRotationNeeded: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("../pwa/serviceWorker", () => ({
+  getExistingMadarPushEndpoint,
   getMadarServiceWorkerRegistration,
+}));
+
+vi.mock("../pwa/pushLifecycle", () => ({
+  clearPushRotationNeeded,
+  readPushRotationNeeded,
 }));
 
 vi.mock("../utils/apiClient", () => ({
@@ -16,7 +25,10 @@ vi.mock("../utils/apiClient", () => ({
   readApiResponse: async (response) => response.data,
 }));
 
-import { enableBrowserPushNotifications } from "./notificationsApi";
+import {
+  enableBrowserPushNotifications,
+  reconcileBrowserPushLifecycle,
+} from "./notificationsApi";
 
 describe("explicit browser Push enablement", () => {
   beforeEach(() => {
@@ -31,7 +43,10 @@ describe("explicit browser Push enablement", () => {
     });
     Object.defineProperty(window, "Notification", {
       configurable: true,
-      value: { requestPermission: vi.fn().mockResolvedValue("granted") },
+      value: {
+        permission: "default",
+        requestPermission: vi.fn().mockResolvedValue("granted"),
+      },
     });
     apiFetch.mockImplementation(async (url) => ({
       ok: true,
@@ -59,6 +74,7 @@ describe("explicit browser Push enablement", () => {
       "/notifications/push-subscriptions",
       expect.objectContaining({ method: "POST" })
     );
+    expect(clearPushRotationNeeded).toHaveBeenCalled();
   });
 
   it("does not register or subscribe after permission denial", async () => {
@@ -95,5 +111,118 @@ describe("explicit browser Push enablement", () => {
     expect(apiFetch.mock.calls.indexOf(installationCall)).toBeLessThan(
       apiFetch.mock.calls.indexOf(subscriptionCall)
     );
+  });
+
+  it("reconciles an existing subscription without prompting", async () => {
+    window.Notification.permission = "granted";
+    const subscription = {
+      toJSON: () => ({
+        endpoint: "https://push.example/sub",
+        keys: { p256dh: "A", auth: "B" },
+      }),
+    };
+    const subscribe = vi.fn();
+    getMadarServiceWorkerRegistration.mockResolvedValue({
+      pushManager: {
+        getSubscription: vi.fn().mockResolvedValue(subscription),
+        subscribe,
+      },
+    });
+
+    await expect(reconcileBrowserPushLifecycle({
+      installation: {
+        installationId: "123e4567-e89b-42d3-a456-426614174000",
+        installation: { notifications_enabled: true },
+      },
+    })).resolves.toEqual({ reconciled: true, restored: true });
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/notifications/push-subscriptions",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  it("restores a missing subscription only after prior explicit opt-in", async () => {
+    window.Notification.permission = "granted";
+    const subscription = {
+      toJSON: () => ({ endpoint: "https://push.example/restored", keys: { p256dh: "A", auth: "B" } }),
+    };
+    const subscribe = vi.fn().mockResolvedValue(subscription);
+    getMadarServiceWorkerRegistration.mockResolvedValue({
+      pushManager: {
+        getSubscription: vi.fn().mockResolvedValue(null),
+        subscribe,
+      },
+    });
+
+    await expect(reconcileBrowserPushLifecycle({
+      installation: {
+        installationId: "123e4567-e89b-42d3-a456-426614174000",
+        installation: { notifications_enabled: true },
+      },
+    })).resolves.toEqual({ reconciled: true, restored: true });
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it("does not create Push from permission alone without explicit opt-in", async () => {
+    window.Notification.permission = "granted";
+    const subscribe = vi.fn();
+    getMadarServiceWorkerRegistration.mockResolvedValue({
+      pushManager: {
+        getSubscription: vi.fn().mockResolvedValue(null),
+        subscribe,
+      },
+    });
+
+    await expect(reconcileBrowserPushLifecycle({
+      installation: {
+        installationId: "123e4567-e89b-42d3-a456-426614174000",
+        installation: { notifications_enabled: false },
+      },
+    })).resolves.toEqual({ reconciled: false, reason: "subscription_missing" });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it.each(["default", "denied"])(
+    "does not bind, subscribe, or prompt when permission is %s",
+    async (permission) => {
+      window.Notification.permission = permission;
+      const subscribe = vi.fn();
+      getMadarServiceWorkerRegistration.mockResolvedValue({
+        pushManager: { getSubscription: vi.fn(), subscribe },
+      });
+
+      await expect(reconcileBrowserPushLifecycle({
+        installation: {
+          installationId: "123e4567-e89b-42d3-a456-426614174000",
+          installation: { notifications_enabled: true },
+        },
+      })).resolves.toEqual({ reconciled: false, reason: permission });
+      expect(getMadarServiceWorkerRegistration).not.toHaveBeenCalled();
+      expect(subscribe).not.toHaveBeenCalled();
+      expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    }
+  );
+
+  it("revokes the current browser endpoint after permission is denied", async () => {
+    window.Notification.permission = "denied";
+    getExistingMadarPushEndpoint.mockResolvedValue("https://push.example/current-device");
+
+    await expect(reconcileBrowserPushLifecycle()).resolves.toEqual({
+      reconciled: false,
+      reason: "denied",
+    });
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/notifications/push-subscriptions",
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ endpoint: "https://push.example/current-device" }),
+      })
+    );
+    expect(getMadarServiceWorkerRegistration).not.toHaveBeenCalled();
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
   });
 });

@@ -15,9 +15,14 @@ from services.push_subscription_security import (
     create_no_redirect_session,
     validate_push_endpoint,
 )
+from services.notification_action_service import (
+    action_kind_for_source,
+    normalize_notification_data,
+)
 
 
 logger = logging.getLogger(__name__)
+MAX_WEB_PUSH_PAYLOAD_BYTES = 3500
 
 
 class DeliveryError(RuntimeError):
@@ -56,6 +61,54 @@ def _has_active_membership(tenant_id: int | str, user_id: int | str) -> bool:
     return bool(rows)
 
 
+def build_web_push_payload(row: dict[str, Any]) -> str:
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    event_type = payload.get("event_type")
+    source_type = payload.get("source_type")
+    action_data = normalize_notification_data(
+        payload.get("data") if isinstance(payload.get("data"), dict) else {},
+        default_kind=action_kind_for_source(
+            event_type=event_type, source_type=source_type
+        ),
+        object_id=payload.get("source_id"),
+    )
+    kind = action_data["action"]["kind"]
+    if kind == "form_submission":
+        title, body = "New form submission", "A new form submission was received."
+    elif kind == "reservation":
+        title, body = "New reservation received", "A new reservation request was received."
+    elif kind in {"calendar_event", "calendar_task"}:
+        title, body = "Calendar reminder", "Open Madar to view reminder details."
+    elif action_data.get("block_type") or str(source_type or "").lower() in {
+        "reservationblock",
+        "form",
+    }:
+        title, body = "New site activity", "New activity was received from a published site."
+    else:
+        title, body = "Madar notification", "Open Madar to view details."
+
+    event_id = str(row.get("event_id") or payload.get("event_id") or "").strip()
+    document = {
+        "title": title,
+        "body": body,
+        "data": {"action": action_data["action"]},
+    }
+    if event_id and len(event_id) <= 100:
+        document["tag"] = f"madar-event:{event_id}"
+    encoded = json.dumps(document, separators=(",", ":"))
+    if len(encoded.encode("utf-8")) > MAX_WEB_PUSH_PAYLOAD_BYTES:
+        fallback = normalize_notification_data(None)
+        encoded = json.dumps(
+            {
+                "title": "Madar notification",
+                "body": "Open Madar to view details.",
+                "data": {"action": fallback["action"]},
+            },
+            separators=(",", ":"),
+        )
+    return encoded
+
+
 def _deliver_internal(row: dict[str, Any]) -> None:
     tenant_id = row.get("tenant_id")
     payload = row.get("payload") or {}
@@ -63,6 +116,14 @@ def _deliver_internal(row: dict[str, Any]) -> None:
     if not all(required):
         raise DeliveryError("internal_payload_invalid", retryable=False)
     source_id = payload.get("source_id")
+    canonical_payload_data = normalize_notification_data(
+        payload.get("data") if isinstance(payload.get("data"), dict) else {},
+        default_kind=action_kind_for_source(
+            event_type=payload.get("event_type"),
+            source_type=payload.get("source_type"),
+        ),
+        object_id=source_id,
+    )
     event_id = row.get("event_id") or payload.get("event_id")
     if event_id:
         existing = _rows(
@@ -93,7 +154,7 @@ def _deliver_internal(row: dict[str, Any]) -> None:
                     "p_source_id": str(source_id)[:200] if source_id else None,
                     "p_title": str(payload["title"])[:200],
                     "p_body": str(payload.get("body") or "")[:1000],
-                    "p_data": payload.get("data") if isinstance(payload.get("data"), dict) else {},
+                    "p_data": canonical_payload_data,
                     "p_deduplication_key": deduplication_key,
                 },
             ).execute()
@@ -111,7 +172,7 @@ def _deliver_internal(row: dict[str, Any]) -> None:
                 "source_id": str(source_id)[:200] if source_id else None,
                 "title": str(payload["title"])[:200],
                 "body": str(payload.get("body") or "")[:1000],
-                "data": payload.get("data") if isinstance(payload.get("data"), dict) else {},
+                "data": canonical_payload_data,
                 "deduplication_key": deduplication_key,
             }).execute()
             rows = _rows(inserted)
@@ -138,6 +199,14 @@ def _deliver_internal(row: dict[str, Any]) -> None:
             },
         )
         raise DeliveryError("recipient_inactive", retryable=False)
+    event_data = normalize_notification_data(
+        event.get("data") if isinstance(event.get("data"), dict) else canonical_payload_data,
+        default_kind=action_kind_for_source(
+            event_type=event.get("event_type") or payload.get("event_type"),
+            source_type=event.get("source_type") or payload.get("source_type"),
+        ),
+        object_id=event.get("source_id") or source_id,
+    )
     for recipient in recipients:
         if recipient.get("user_id") is None:
             continue
@@ -145,10 +214,10 @@ def _deliver_internal(row: dict[str, Any]) -> None:
             "event_id": event.get("id"),
             "tenant_id": int(tenant_id),
             "user_id": int(recipient["user_id"]),
-            "event_type": str(payload["event_type"])[:120],
-            "title": str(payload["title"])[:200],
-            "body": str(payload.get("body") or "")[:1000],
-            "data": payload.get("data") if isinstance(payload.get("data"), dict) else {},
+            "event_type": str(event.get("event_type") or payload["event_type"])[:120],
+            "title": str(event.get("title") or payload["title"])[:200],
+            "body": str(event.get("body") or payload.get("body") or "")[:1000],
+            "data": event_data,
         }, on_conflict="event_id,user_id").execute()
 
 
@@ -255,12 +324,7 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
             raise DeliveryError("recipient_inactive", retryable=False)
     else:
         recipient_ids = [int(target_user_id)]
-    payload = row.get("payload") or {}
-    data = json.dumps({
-        "title": str(payload.get("title") or "Madar")[:200],
-        "body": str(payload.get("body") or "")[:1000],
-        "data": payload.get("data") if isinstance(payload.get("data"), dict) else {},
-    }, separators=(",", ":"))
+    data = build_web_push_payload(row)
     recipient_id = recipient_ids[0]
     query = (
         service_supabase.table("web_push_subscriptions")
@@ -285,6 +349,7 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
             .eq("id", str(app_installation_id))
             .eq("user_id", recipient_id)
             .eq("notifications_enabled", True)
+            .eq("notification_permission", "granted")
             .is_("revoked_at", "null")
             .limit(1)
             .execute()

@@ -4,8 +4,15 @@ import {
   readApiError,
   readApiResponse,
 } from "../utils/apiClient";
-import { getMadarServiceWorkerRegistration } from "../pwa/serviceWorker";
+import {
+  getExistingMadarPushEndpoint,
+  getMadarServiceWorkerRegistration,
+} from "../pwa/serviceWorker";
 import { registerInstallation } from "../pwa/installation";
+import {
+  clearPushRotationNeeded,
+  readPushRotationNeeded,
+} from "../pwa/pushLifecycle";
 
 export const fetchNotifications = async ({ limit = 30, unreadOnly = false, signal } = {}) => {
   const params = new URLSearchParams();
@@ -91,6 +98,20 @@ export const savePushSubscription = async (subscription, installationId = null) 
   return data;
 };
 
+export const revokePushSubscription = async (endpoint) => {
+  if (!endpoint) return { success: true, revoked_count: 0 };
+  const response = await apiFetch(getApiUrl("/notifications/push-subscriptions"), {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint }),
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok) {
+    throw new Error(readApiError(data, "Could not disable push subscription."));
+  }
+  return data;
+};
+
 export const browserSupportsPush = () =>
   typeof window !== "undefined" &&
   "serviceWorker" in navigator &&
@@ -142,25 +163,55 @@ export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
     : null;
   const installationId = installation?.installationId || null;
   await savePushSubscription(subscription.toJSON(), installationId);
+  await clearPushRotationNeeded().catch(() => false);
   return { enabled: true };
 };
 
-export const reconcileBrowserPushSubscription = async ({ tenantId } = {}) => {
-  if (!browserSupportsPush() || Notification.permission !== "granted") {
-    return { reconciled: false };
+export const reconcileBrowserPushLifecycle = async ({
+  tenantId,
+  installation: suppliedInstallation = null,
+} = {}) => {
+  if (!browserSupportsPush()) {
+    return { reconciled: false, reason: "unsupported" };
+  }
+  const rotationNeeded = await readPushRotationNeeded().catch(() => false);
+  if (Notification.permission !== "granted") {
+    const existingEndpoint = await getExistingMadarPushEndpoint().catch(() => null);
+    if (existingEndpoint) {
+      await revokePushSubscription(existingEndpoint).catch(() => null);
+    }
+    await clearPushRotationNeeded().catch(() => false);
+    return { reconciled: false, reason: Notification.permission };
   }
 
   const registration = await getMadarServiceWorkerRegistration();
-  const subscription = await registration?.pushManager.getSubscription();
+  let subscription = await registration?.pushManager.getSubscription();
+  const installation = suppliedInstallation || (tenantId
+    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
+    : null);
+  const installationId = installation?.installationId || null;
+  const explicitlyEnabled = installation?.installation?.notifications_enabled === true;
 
+  if (!subscription && explicitlyEnabled) {
+    const config = await getPushPublicKey();
+    if (config.enabled && config.public_key) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.public_key),
+      });
+    }
+  }
   if (!subscription) {
-    return { reconciled: false };
+    await clearPushRotationNeeded().catch(() => false);
+    return {
+      reconciled: false,
+      reason: rotationNeeded ? "rotation_without_opt_in" : "subscription_missing",
+    };
   }
 
-  const installation = tenantId
-    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
-    : null;
-  const installationId = installation?.installationId || null;
   await savePushSubscription(subscription.toJSON(), installationId);
-  return { reconciled: true };
+  await clearPushRotationNeeded().catch(() => false);
+  return { reconciled: true, restored: explicitlyEnabled };
 };
+
+export const reconcileBrowserPushSubscription = reconcileBrowserPushLifecycle;

@@ -3,14 +3,10 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import NotificationBell from "./NotificationBell";
-import {
-  fetchNotifications,
-  reconcileBrowserPushSubscription,
-} from "../../services/notificationsApi";
+import { fetchNotifications } from "../../services/notificationsApi";
 
 vi.mock("../../services/notificationsApi", () => ({
   fetchNotifications: vi.fn(),
-  reconcileBrowserPushSubscription: vi.fn(),
 }));
 
 const translate = (key, values = {}) => {
@@ -51,8 +47,6 @@ describe("NotificationBell tenant safety", () => {
 
   beforeEach(() => {
     fetchNotifications.mockReset();
-    reconcileBrowserPushSubscription.mockReset();
-    reconcileBrowserPushSubscription.mockResolvedValue({ reconciled: false });
   });
 
   it("clears tenant state immediately and ignores a late prior-tenant response", async () => {
@@ -72,7 +66,6 @@ describe("NotificationBell tenant safety", () => {
       </MemoryRouter>,
     );
 
-    expect(reconcileBrowserPushSubscription).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("Tenant A notification")).toBeNull();
     expect(screen.queryByText("3")).toBeNull();
 

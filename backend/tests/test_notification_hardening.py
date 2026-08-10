@@ -167,6 +167,21 @@ class PushEndpointSecurityTests(unittest.TestCase):
         self.assertEqual(bind.call_args.kwargs["installation_id"], payload["installation_id"])
         legacy.assert_not_called()
 
+    def test_endpoint_revocation_is_authenticated_user_scoped(self):
+        app = FastAPI()
+        app.include_router(notification_routes.router)
+        client = TestClient(app)
+        context = SimpleNamespace(tenant_id=22, user_id=7)
+        endpoint = "https://push.example.test/current-device"
+        with patch.object(notification_routes, "get_current_tenant_context", return_value=context), patch.object(notification_routes, "revoke_web_push_subscription", return_value=1) as revoke:
+            response = client.request(
+                "DELETE",
+                "/notifications/push-subscriptions",
+                json={"endpoint": endpoint},
+            )
+        self.assertEqual(response.status_code, 200)
+        revoke.assert_called_once_with(user_id=7, endpoint=endpoint)
+
     def test_inbox_route_fails_closed_without_active_tenant_context(self):
         app = FastAPI()
         app.include_router(notification_routes.router)
@@ -291,7 +306,7 @@ class LogoutPushRevocationTests(unittest.TestCase):
         client = FakeClient()
         client.tables["tenant_memberships"] = [{"tenant_id": 1, "user_id": 42, "status": "active"}]
         client.tables["web_push_subscriptions"] = [{"id": "binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "installation", "endpoint": "https://push.test/send", "p256dh": "A", "auth": "B", "revoked_at": None}]
-        client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "revoked_at": "2026-01-01"}]
+        client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "notification_permission": "granted", "revoked_at": "2026-01-01"}]
         environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), self.assertRaisesRegex(notification_delivery_service.DeliveryError, "web_push_installation_inactive"):
             notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "binding", "payload": {}})
@@ -300,10 +315,28 @@ class LogoutPushRevocationTests(unittest.TestCase):
         client = FakeClient()
         client.tables["tenant_memberships"] = [{"tenant_id": 1, "user_id": 42, "status": "active"}]
         client.tables["web_push_subscriptions"] = [{"id": "binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "installation", "endpoint": "https://push.test/send", "p256dh": "A", "auth": "B", "revoked_at": None}]
-        client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "revoked_at": None}]
+        client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "notification_permission": "granted", "revoked_at": None}]
         environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush") as send:
             notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "binding", "payload": {}})
+        send.assert_called_once()
+
+    def test_worker_rejects_permission_denied_installation_without_affecting_sibling(self):
+        client = FakeClient()
+        client.tables["tenant_memberships"] = [{"tenant_id": 1, "user_id": 42, "status": "active"}]
+        client.tables["web_push_subscriptions"] = [
+            {"id": "denied-binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "denied-installation", "endpoint": "https://push.test/denied", "p256dh": "A", "auth": "B", "revoked_at": None},
+            {"id": "active-binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "active-installation", "endpoint": "https://push.test/active", "p256dh": "A", "auth": "B", "revoked_at": None},
+        ]
+        client.tables["app_installations"] = [
+            {"id": "denied-installation", "user_id": 42, "notifications_enabled": False, "notification_permission": "denied", "revoked_at": None},
+            {"id": "active-installation", "user_id": 42, "notifications_enabled": True, "notification_permission": "granted", "revoked_at": None},
+        ]
+        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), self.assertRaisesRegex(notification_delivery_service.DeliveryError, "web_push_installation_inactive"):
+            notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "denied-binding", "payload": {}})
+        with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush") as send:
+            notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "active-binding", "payload": {}})
         send.assert_called_once()
 
     def test_revoked_binding_is_not_selected_for_later_tenant_push(self):

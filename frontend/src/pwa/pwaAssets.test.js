@@ -39,7 +39,7 @@ describe("PWA static contract", () => {
 
   it("keeps one push/lifecycle worker without a private-data fetch cache", () => {
     const worker = fs.readFileSync(path.join(publicRoot, "madar-push-sw.js"), "utf8");
-    for (const eventName of ["install", "activate", "push", "notificationclick"]) {
+    for (const eventName of ["install", "activate", "push", "pushsubscriptionchange", "notificationclick"]) {
       expect(worker).toContain(`addEventListener("${eventName}"`);
     }
     expect(worker).not.toContain('addEventListener("fetch"');

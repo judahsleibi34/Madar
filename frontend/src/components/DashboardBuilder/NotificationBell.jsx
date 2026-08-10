@@ -6,7 +6,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useLanguage } from "../../i18n";
 import {
   fetchNotifications,
-  reconcileBrowserPushSubscription,
 } from "../../services/notificationsApi";
 
 const NOTIFICATION_POLL_MS = 15_000;
@@ -58,13 +57,6 @@ export default function NotificationBell({
   const visibleUnreadCount = identityMatches ? unreadCount : 0;
   const active = location.pathname.startsWith("/notifications");
   const resolvedLabel = label || t("notifications.title");
-
-  useEffect(() => {
-    if (!tenantId || !userId) return;
-    reconcileBrowserPushSubscription({ tenantId }).catch(() => {
-      // Inbox polling remains available when optional push reconciliation fails.
-    });
-  }, [notificationIdentity, tenantId, userId]);
 
   useEffect(() => {
     let cancelled = false;

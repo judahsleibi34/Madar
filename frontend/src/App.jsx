@@ -24,7 +24,9 @@ import {
 import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
 import { clearAllCalendarWorkspaceCaches } from "./components/DashboardBuilder/utils/calendarWorkspaceCache";
 import { getInstallationId, registerInstallation } from "./pwa/installation";
+import { isMadarPwaHost } from "./pwa/pwaContext";
 import { getExistingMadarPushEndpoint } from "./pwa/serviceWorker";
+import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -238,20 +240,61 @@ export default function App() {
   }, [authChecked, isLoggedIn]);
 
   useEffect(() => {
-    if (!authChecked || !isLoggedIn || !user?.id || !user?.tenant_id) return undefined;
+    if (
+      !authChecked
+      || !isLoggedIn
+      || !user?.id
+      || !user?.tenant_id
+      || !isMadarPwaHost(window.location)
+    ) return undefined;
 
-    registerInstallation({ tenantId: user.tenant_id }).catch(() => {
-      // Installation identity is optional infrastructure and never blocks app boot.
-    });
+    let cancelled = false;
+    let inFlight = false;
+    const reconcile = async ({ force = false, installedConfirmed = false } = {}) => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        const installation = await registerInstallation({
+          tenantId: user.tenant_id,
+          installedConfirmed,
+          force,
+        });
+        if (!cancelled) {
+          await reconcileBrowserPushLifecycle({
+            tenantId: user.tenant_id,
+            installation,
+          });
+        }
+      } catch {
+        // Installation/Push lifecycle is optional and never blocks app boot.
+      } finally {
+        inFlight = false;
+      }
+    };
+    reconcile();
     const handleInstalled = () => {
-      registerInstallation({
-        tenantId: user.tenant_id,
-        installedConfirmed: true,
-        force: true,
-      }).catch(() => {});
+      reconcile({ installedConfirmed: true, force: true });
+    };
+    const handleFocus = () => reconcile();
+    const handleVisibility = () => {
+      if (document.visibilityState !== "hidden") reconcile();
+    };
+    const handleServiceWorkerMessage = (event) => {
+      if (event.data?.type === "MADAR_PUSH_RECONCILE_REQUIRED") {
+        reconcile();
+      }
     };
     window.addEventListener("appinstalled", handleInstalled);
-    return () => window.removeEventListener("appinstalled", handleInstalled);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    navigator.serviceWorker?.addEventListener?.("message", handleServiceWorkerMessage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("appinstalled", handleInstalled);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      navigator.serviceWorker?.removeEventListener?.("message", handleServiceWorkerMessage);
+    };
   }, [authChecked, isLoggedIn, user?.id, user?.tenant_id]);
 
   useEffect(() => {

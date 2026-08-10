@@ -8,6 +8,7 @@ from dateutil.rrule import rrulestr
 
 from database import service_supabase
 from services.notification_outbox_service import enqueue_notification
+from services.notification_action_service import build_notification_action
 
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,9 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
                 "calendar_id": event.get("calendar_id"),
                 "starts_at": event.get("starts_at"),
                 "reminder_id": reminder.get("id"),
+                "action": build_notification_action(
+                    kind="calendar_event", object_id=event.get("id")
+                ),
             },
             "reminder_id": reminder.get("id"),
         }
@@ -234,6 +238,9 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
                 "task_id": task.get("id"),
                 "scheduled_start": occurrence_start.isoformat(),
                 "reminder_id": reminder.get("id"),
+                "action": build_notification_action(
+                    kind="calendar_task", object_id=task.get("id")
+                ),
             },
             "reminder_id": reminder.get("id"),
             "reminder_source": "task",

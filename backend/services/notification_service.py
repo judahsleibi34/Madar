@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from database import service_supabase
+from services.notification_action_service import (
+    action_kind_for_source,
+    normalize_notification_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +196,13 @@ def create_tenant_notification_event(
         "source_id": source_id,
         "title": title[:200],
         "body": body[:1000],
-        "data": data or {},
+        "data": normalize_notification_data(
+            data,
+            default_kind=action_kind_for_source(
+                event_type=event_type, source_type=source_type
+            ),
+            object_id=source_id,
+        ),
     }
     deduplication_material = ":".join(
         (
