@@ -86,7 +86,7 @@ export default function AdminRoutes({
 
         <Route
           path="/notifications/*"
-          element={renderShell(<NotificationsPage />)}
+          element={renderShell(<NotificationsPage user={user} />)}
         />
 
         <Route
@@ -156,4 +156,3 @@ export default function AdminRoutes({
     </RouteSuspense>
   );
 }
-

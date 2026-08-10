@@ -23,10 +23,9 @@ from services.builder_asset_storage import (
     delete_builder_asset,
     store_builder_asset,
 )
-from services.audit_service import hash_audit_identifier, record_audit_event
+from services.audit_service import record_audit_event
 from services.api_errors import error_detail
 from services.billing_service import require_publish_entitlement
-from services.notification_outbox_service import enqueue_notification
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
 from services.site_permission_service import assign_project_role, project_role_keys
 from services.storage_quota_service import (
@@ -545,8 +544,6 @@ def _validate_smart_responsive_geometry(schema: dict[str, Any]) -> None:
                 for element in elements:
                     capabilities = element.get("responsive", {}).get("capabilities", {})
                     collision_policy = capabilities.get("collisionPolicy") if isinstance(capabilities, dict) else None
-                    if element.get("layer") == "behindText" or collision_policy in {"overlay", "background"}:
-                        continue
                     overrides = element.get("responsive", {}).get("overrides", {})
                     override = overrides.get(viewport_mode) if isinstance(overrides, dict) else None
                     if not isinstance(override, dict) or override.get("mode") != "manual":
@@ -562,6 +559,17 @@ def _validate_smart_responsive_geometry(schema: dict[str, Any]) -> None:
                                 context={"issue_type": "invalid_manual_responsive_rect", "block_id": block_id, "viewport": viewport_mode},
                             ),
                         )
+                    if rect["y"] < 0:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=error_detail(
+                                "publish_validation_failed",
+                                "A smart responsive manual override is outside its artboard.",
+                                context={"issue_type": "manual_responsive_out_of_bounds", "block_id": block_id, "viewport": viewport_mode},
+                            ),
+                        )
+                    if element.get("layer") == "behindText" or collision_policy in {"overlay", "background"}:
+                        continue
                     if rect["x"] < 0 or rect["x"] + rect["width"] > logical_width:
                         raise HTTPException(
                             status_code=400,
@@ -1671,33 +1679,32 @@ def update_builder_reservation_status(
     require_entitlement(context.tenant_id, "reservation_management")
     status = normalize_reservation_status(status_update.status)
 
-    update_response = (
-        service_supabase.table("builder_reservations")
-        .update({"status": status, "updated_at": datetime.now(timezone.utc).isoformat()})
-        .eq("id", reservation_id)
-        .eq("tenant_id", context.tenant_id)
-        .execute()
-    )
-    reservation_rows = getattr(update_response, "data", None) or []
-    reservation = reservation_rows[0] if reservation_rows else None
+    rpc = getattr(service_supabase, "rpc", None)
+    if callable(rpc):
+        update_response = rpc(
+            "update_builder_reservation_status_notified_safe",
+            {
+                "p_reservation_id": reservation_id,
+                "p_tenant_id": context.tenant_id,
+                "p_status": status,
+                "p_updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        ).execute()
+    else:
+        # Lightweight in-memory unit-test clients do not implement RPC.
+        # Production status mutation and email intent share the RPC transaction.
+        update_response = (
+            service_supabase.table("builder_reservations")
+            .update({"status": status, "updated_at": datetime.now(timezone.utc).isoformat()})
+            .eq("id", reservation_id)
+            .eq("tenant_id", context.tenant_id)
+            .execute()
+        )
+    update_data = getattr(update_response, "data", None)
+    reservation = update_data[0] if isinstance(update_data, list) and update_data else update_data
 
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
-
-    customer_email = str(reservation.get("customer_email") or "").strip().lower()
-    if customer_email:
-        enqueue_notification(
-            channel="email",
-            template="reservation_status_changed",
-            tenant_id=context.tenant_id,
-            recipient_hash=hash_audit_identifier(customer_email),
-            recipient_reference=f"reservation:{reservation_id}",
-            deduplication_key=hash_audit_identifier(
-                f"reservation-status:{reservation_id}:{status}"
-            ),
-            payload={"reservation_id": reservation_id, "status": status},
-            client=service_supabase,
-        )
 
     return {"success": True, "reservation": format_reservation(reservation)}
 

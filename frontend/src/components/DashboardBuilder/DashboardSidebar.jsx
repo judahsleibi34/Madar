@@ -465,6 +465,8 @@ export default function DashboardSidebar({
             <NotificationBell
               className="admin-sidebar-notifications"
               onNavigate={onNavigate}
+              tenantId={user?.tenant_id}
+              userId={user?.id || user?.auth_id}
             />
           )}
 

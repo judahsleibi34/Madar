@@ -178,7 +178,12 @@ export default function UserWorkspaceRoutes({
 
       <Route
         path="/calendar/*"
-        element={renderShell(<ReservationCalendarPage user={user} />)}
+        element={renderShell(
+          <ReservationCalendarPage
+            key={`calendar:${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`}
+            user={user}
+          />
+        )}
       />
       <Route
         path="/archive/*"
@@ -213,7 +218,7 @@ export default function UserWorkspaceRoutes({
 
       <Route
         path="/notifications/*"
-        element={renderShell(<NotificationsPage />)}
+        element={renderShell(<NotificationsPage user={user} />)}
       />
 
       <Route

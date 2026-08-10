@@ -4,10 +4,17 @@ import {
   readApiError,
   readApiResponse,
 } from "../utils/apiClient";
+import {
+  getExistingMadarPushEndpoint,
+  getMadarServiceWorkerRegistration,
+} from "../pwa/serviceWorker";
+import { registerInstallation } from "../pwa/installation";
+import {
+  clearPushRotationNeeded,
+  readPushRotationNeeded,
+} from "../pwa/pushLifecycle";
 
-const PUSH_SERVICE_WORKER_PATH = "/madar-push-sw.js";
-
-export const fetchNotifications = async ({ limit = 30, unreadOnly = false } = {}) => {
+export const fetchNotifications = async ({ limit = 30, unreadOnly = false, signal } = {}) => {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
 
@@ -18,6 +25,7 @@ export const fetchNotifications = async ({ limit = 30, unreadOnly = false } = {}
   const response = await apiFetch(getApiUrl(`/notifications?${params.toString()}`), {
     method: "GET",
     cache: "no-store",
+    signal,
   });
   const data = await readApiResponse(response);
 
@@ -72,11 +80,14 @@ export const getPushPublicKey = async () => {
   return data;
 };
 
-export const savePushSubscription = async (subscription) => {
+export const savePushSubscription = async (subscription, installationId = null) => {
+  const payload = installationId
+    ? { ...subscription, installation_id: installationId }
+    : subscription;
   const response = await apiFetch(getApiUrl("/notifications/push-subscriptions"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(subscription),
+    body: JSON.stringify(payload),
   });
   const data = await readApiResponse(response);
 
@@ -84,6 +95,20 @@ export const savePushSubscription = async (subscription) => {
     throw new Error(readApiError(data, "Could not save push subscription."));
   }
 
+  return data;
+};
+
+export const revokePushSubscription = async (endpoint) => {
+  if (!endpoint) return { success: true, revoked_count: 0 };
+  const response = await apiFetch(getApiUrl("/notifications/push-subscriptions"), {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint }),
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok) {
+    throw new Error(readApiError(data, "Could not disable push subscription."));
+  }
   return data;
 };
 
@@ -106,7 +131,7 @@ export const urlBase64ToUint8Array = (base64String) => {
   return outputArray;
 };
 
-export const enableBrowserPushNotifications = async () => {
+export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
   if (!browserSupportsPush()) {
     return { enabled: false, reason: "unsupported" };
   }
@@ -123,13 +148,70 @@ export const enableBrowserPushNotifications = async () => {
     return { enabled: false, reason: "permission_denied" };
   }
 
-  const registration = await navigator.serviceWorker.register(PUSH_SERVICE_WORKER_PATH);
+  const registration = await getMadarServiceWorkerRegistration();
+  if (!registration) {
+    return { enabled: false, reason: "unsupported" };
+  }
   const existingSubscription = await registration.pushManager.getSubscription();
   const subscription = existingSubscription || await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(config.public_key),
   });
 
-  await savePushSubscription(subscription.toJSON());
+  const installation = tenantId
+    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
+    : null;
+  const installationId = installation?.installationId || null;
+  await savePushSubscription(subscription.toJSON(), installationId);
+  await clearPushRotationNeeded().catch(() => false);
   return { enabled: true };
 };
+
+export const reconcileBrowserPushLifecycle = async ({
+  tenantId,
+  installation: suppliedInstallation = null,
+} = {}) => {
+  if (!browserSupportsPush()) {
+    return { reconciled: false, reason: "unsupported" };
+  }
+  const rotationNeeded = await readPushRotationNeeded().catch(() => false);
+  if (Notification.permission !== "granted") {
+    const existingEndpoint = await getExistingMadarPushEndpoint().catch(() => null);
+    if (existingEndpoint) {
+      await revokePushSubscription(existingEndpoint).catch(() => null);
+    }
+    await clearPushRotationNeeded().catch(() => false);
+    return { reconciled: false, reason: Notification.permission };
+  }
+
+  const registration = await getMadarServiceWorkerRegistration();
+  let subscription = await registration?.pushManager.getSubscription();
+  const installation = suppliedInstallation || (tenantId
+    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
+    : null);
+  const installationId = installation?.installationId || null;
+  const explicitlyEnabled = installation?.installation?.notifications_enabled === true;
+
+  if (!subscription && explicitlyEnabled) {
+    const config = await getPushPublicKey();
+    if (config.enabled && config.public_key) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.public_key),
+      });
+    }
+  }
+  if (!subscription) {
+    await clearPushRotationNeeded().catch(() => false);
+    return {
+      reconciled: false,
+      reason: rotationNeeded ? "rotation_without_opt_in" : "subscription_missing",
+    };
+  }
+
+  await savePushSubscription(subscription.toJSON(), installationId);
+  await clearPushRotationNeeded().catch(() => false);
+  return { reconciled: true, restored: explicitlyEnabled };
+};
+
+export const reconcileBrowserPushSubscription = reconcileBrowserPushLifecycle;

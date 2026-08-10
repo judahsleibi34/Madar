@@ -16,6 +16,23 @@ server {
         include /etc/nginx/conf.d/includes/security_headers.conf;
     }
 
+    location = /madar-push-sw.js {
+        try_files $uri =404;
+        access_log off;
+        default_type application/javascript;
+        add_header Cache-Control "no-cache, must-revalidate" always;
+        add_header Service-Worker-Allowed "/" always;
+        include /etc/nginx/conf.d/includes/security_headers.conf;
+    }
+
+    location = /manifest.webmanifest {
+        try_files $uri =404;
+        access_log off;
+        default_type application/manifest+json;
+        add_header Cache-Control "no-cache, must-revalidate" always;
+        include /etc/nginx/conf.d/includes/security_headers.conf;
+    }
+
     location ~* \.(?:js|css|png|jpg|jpeg|gif|ico|svg|webp|woff2?|pdf)$ {
         try_files $uri =404;
         access_log off;

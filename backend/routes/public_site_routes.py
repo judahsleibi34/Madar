@@ -30,8 +30,6 @@ from services.rate_limit_service import (
     enforce_public_rate_limit,
     get_client_ip,
 )
-from services.notification_service import create_builder_block_event_notification
-from services.notification_outbox_service import enqueue_notification
 from services.api_errors import api_error
 from services.account_lifecycle_service import synchronize_verified_account
 from services.ecommerce_cache_service import (
@@ -52,6 +50,7 @@ from services.hosted_address_service import (
     HOSTED_ADDRESS_PATTERN,
     normalize_hosted_address,
 )
+from services.notification_action_service import build_notification_action
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -332,16 +331,18 @@ def insert_builder_form_submission(
     *,
     idempotency_key_hash: str | None,
     request_hash: str,
+    notification: dict[str, Any],
 ) -> tuple[dict[str, Any], bool]:
     try:
         rpc = getattr(service_supabase, "rpc", None)
         if callable(rpc):
             response = rpc(
-                "create_builder_form_submission_safe",
+                "create_builder_form_submission_notified_safe",
                 {
                     "p_submission": payload,
                     "p_idempotency_key_hash": idempotency_key_hash,
                     "p_request_hash": request_hash,
+                    "p_notification": notification,
                 },
             ).execute()
             data = getattr(response, "data", None)
@@ -1137,17 +1138,19 @@ def insert_builder_reservation(
     idempotency_key_hash: str | None,
     request_hash: str,
     exclusive_slot: bool,
+    notification: dict[str, Any],
 ) -> tuple[dict[str, Any], bool]:
     try:
         rpc = getattr(service_supabase, "rpc", None)
         if callable(rpc):
             insert_response = rpc(
-                "create_builder_reservation_safe",
+                "create_builder_reservation_notified_safe",
                 {
                     "p_reservation": payload,
                     "p_idempotency_key_hash": idempotency_key_hash,
                     "p_request_hash": request_hash,
                     "p_exclusive_slot": exclusive_slot,
+                    "p_notification": notification,
                 },
             ).execute()
             data = getattr(insert_response, "data", None)
@@ -2308,6 +2311,22 @@ def submit_public_builder_form(
         payload,
         idempotency_key_hash=idempotency_key_hash,
         request_hash=request_hash,
+        notification={
+            "event_type": "builder.form_submitted",
+            "source_type": "form",
+            "title": "New form submission",
+            "body": f"{form.get('title') or 'A published form'} received a new response.",
+            "data": {
+                "block_type": "form",
+                "project_id": project.get("id"),
+                "form_id": clean_form_id,
+                "form_title": form.get("title"),
+                "subdomain": clean_subdomain,
+                "action": build_notification_action(
+                    kind="form_submission"
+                ),
+            },
+        },
     )
     saved_submission = attach_site_record_owner(
         "builder_form_submissions", saved_submission, identity
@@ -2326,21 +2345,6 @@ def submit_public_builder_form(
 
     if not duplicate:
         increment_operational_usage(tenant_id, "form_submissions")
-        create_builder_block_event_notification(
-            tenant_id=tenant_id,
-            event_type="builder.form_submitted",
-            block_type="form",
-            source_id=str(saved_submission.get("id") or clean_form_id),
-            title="New form submission",
-            body=f"{form.get('title') or 'A published form'} received a new response.",
-            data={
-                "project_id": project.get("id"),
-                "form_id": clean_form_id,
-                "form_title": form.get("title"),
-                "submission_id": saved_submission.get("id"),
-                "subdomain": clean_subdomain,
-            },
-        )
 
     return format_submission(saved_submission)
 
@@ -2473,6 +2477,26 @@ def submit_public_builder_block_event(
         exclusive_slot=(
             block_type == "reservationBlock" and reservation_block_is_exclusive(block)
         ),
+        notification={
+            "event_type": event_type,
+            "source_type": block_type,
+            "title": title,
+            "body": body,
+            "data": {
+                "project_id": project.get("id"),
+                "block_id": block.get("id"),
+                "block_type": block_type,
+                "subdomain": clean_subdomain,
+                "payload": cleaned_payload,
+                "action": build_notification_action(
+                    kind=(
+                        "reservation"
+                        if block_type == "reservationBlock"
+                        else "notification_center"
+                    ),
+                ),
+            },
+        },
     )
     saved_reservation = attach_site_record_owner(
         "builder_reservations", saved_reservation, identity
@@ -2482,40 +2506,6 @@ def submit_public_builder_block_event(
     if not duplicate:
         if block_type == "reservationBlock":
             increment_operational_usage(tenant_id, "reservation_requests")
-        create_builder_block_event_notification(
-            tenant_id=tenant_id,
-            event_type=event_type,
-            block_type=block_type,
-            source_id=reservation_id or block_id or str(block.get("id") or block_type),
-            title=title,
-            body=body,
-            data={
-                "project_id": project.get("id"),
-                "block_id": block.get("id"),
-                "block_type": block_type,
-                "reservation_id": reservation_id,
-                "subdomain": clean_subdomain,
-                "payload": cleaned_payload,
-            },
-        )
-        customer_email = str(saved_reservation.get("customer_email") or "").strip().lower()
-        if block_type == "reservationBlock" and customer_email:
-            enqueue_notification(
-                channel="email",
-                template="reservation_confirmation",
-                tenant_id=tenant_id,
-                recipient_hash=hash_public_identifier(customer_email),
-                recipient_reference=f"reservation:{reservation_id}",
-                deduplication_key=hash_public_identifier(
-                    f"reservation-confirmation:{reservation_id}"
-                ),
-                payload={
-                    "reservation_id": reservation_id,
-                    "status": str(saved_reservation.get("status") or "new"),
-                    "site_subdomain": clean_subdomain,
-                },
-                client=service_supabase,
-            )
 
     logger.info(
         "public.builder_block_event_created",
@@ -2564,7 +2554,7 @@ def cancel_public_builder_reservation(
     )
     try:
         response = service_supabase.rpc(
-            "cancel_builder_reservation_safe",
+            "cancel_builder_reservation_notified_safe",
             {
                 "p_reservation_id": reservation_id,
                 "p_token_hash": token_hash,
@@ -2615,20 +2605,6 @@ def cancel_public_builder_reservation(
         "public.builder_reservation_cancelled",
         extra={"reservation_id": reservation_id},
     )
-    customer_email = str(reservation.get("customer_email") or "").strip().lower()
-    if customer_email:
-        enqueue_notification(
-            channel="email",
-            template="reservation_status_changed",
-            tenant_id=reservation.get("tenant_id"),
-            recipient_hash=hash_public_identifier(customer_email),
-            recipient_reference=f"reservation:{reservation_id}",
-            deduplication_key=hash_public_identifier(
-                f"reservation-cancelled:{reservation_id}"
-            ),
-            payload={"reservation_id": reservation_id, "status": "cancelled"},
-            client=service_supabase,
-        )
     return {
         "success": True,
         "reservation_id": reservation_id,

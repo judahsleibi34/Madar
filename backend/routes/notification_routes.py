@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field
+import logging
 
-from services.auth_service import get_authenticated_user_row
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field, UUID4
+
+from services.push_subscription_security import UnsafePushEndpoint, validate_push_endpoint
+from services.installation_service import bind_push_subscription
+from services.tenant_service import get_current_tenant_context
 from services.notification_service import (
     get_web_push_public_config,
     list_user_notifications,
@@ -15,29 +19,30 @@ from services.notification_service import (
 
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
+logger = logging.getLogger(__name__)
 
 
 class PushSubscriptionKeys(BaseModel):
-    p256dh: str = Field(..., min_length=1)
-    auth: str = Field(..., min_length=1)
+    p256dh: str = Field(..., min_length=80, max_length=128, pattern=r"^[A-Za-z0-9_-]+={0,2}$")
+    auth: str = Field(..., min_length=16, max_length=64, pattern=r"^[A-Za-z0-9_-]+={0,2}$")
 
 
 class PushSubscriptionRequest(BaseModel):
     endpoint: str = Field(..., min_length=1, max_length=2000)
     keys: PushSubscriptionKeys
+    installation_id: UUID4 | None = None
 
 
 class PushSubscriptionDeleteRequest(BaseModel):
     endpoint: str = Field(..., min_length=1, max_length=2000)
 
 
-def _current_user(request: Request, response: Response):
-    _, user = get_authenticated_user_row(
+def _current_context(request: Request, response: Response):
+    return get_current_tenant_context(
         request,
         response,
         allow_admin_account_access=False,
     )
-    return user
 
 
 @router.get("")
@@ -47,11 +52,12 @@ def list_notifications(
     limit: int = Query(default=30, ge=1, le=100),
     unread_only: bool = Query(default=False),
 ):
-    user = _current_user(request, response)
+    context = _current_context(request, response)
     return {
         "success": True,
         **list_user_notifications(
-            user_id=user["id"],
+            tenant_id=context.tenant_id,
+            user_id=context.user_id,
             limit=limit,
             unread_only=unread_only,
         ),
@@ -60,9 +66,10 @@ def list_notifications(
 
 @router.post("/{notification_id}/read")
 def mark_read(notification_id: str, request: Request, response: Response):
-    user = _current_user(request, response)
+    context = _current_context(request, response)
     notification = mark_notification_read(
-        user_id=user["id"],
+        tenant_id=context.tenant_id,
+        user_id=context.user_id,
         notification_id=notification_id,
     )
 
@@ -77,8 +84,11 @@ def mark_read(notification_id: str, request: Request, response: Response):
 
 @router.post("/read-all")
 def mark_all_read(request: Request, response: Response):
-    user = _current_user(request, response)
-    count = mark_all_notifications_read(user_id=user["id"])
+    context = _current_context(request, response)
+    count = mark_all_notifications_read(
+        tenant_id=context.tenant_id,
+        user_id=context.user_id,
+    )
     return {
         "success": True,
         "updated_count": count,
@@ -99,15 +109,43 @@ def save_push_subscription(
     request: Request,
     response: Response,
 ):
-    user = _current_user(request, response)
-    saved = upsert_web_push_subscription(
-        user_id=user["id"],
-        tenant_id=user.get("tenant_id"),
-        endpoint=subscription.endpoint,
-        p256dh=subscription.keys.p256dh,
-        auth=subscription.keys.auth,
-        user_agent=request.headers.get("user-agent", ""),
-    )
+    context = _current_context(request, response)
+    try:
+        endpoint = validate_push_endpoint(subscription.endpoint)
+    except UnsafePushEndpoint as error:
+        logger.warning(
+            "notifications.push_subscription_rejected",
+            extra={
+                "tenant_id": context.tenant_id,
+                "user_id": context.user_id,
+                "error_code": str(error),
+            },
+        )
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if subscription.installation_id is not None:
+        saved = bind_push_subscription(
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            installation_id=str(subscription.installation_id),
+            endpoint=endpoint,
+            p256dh=subscription.keys.p256dh,
+            auth=subscription.keys.auth,
+            user_agent=request.headers.get("user-agent", ""),
+        )
+        if not saved:
+            raise HTTPException(status_code=409, detail="Installation is not available")
+    else:
+        # Temporary rollout compatibility for clients loaded before migration
+        # 074. These rows remain subject to Phase 1 tenant/user checks and are
+        # attached when that browser next reconciles with an installation id.
+        saved = upsert_web_push_subscription(
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            endpoint=endpoint,
+            p256dh=subscription.keys.p256dh,
+            auth=subscription.keys.auth,
+            user_agent=request.headers.get("user-agent", ""),
+        )
     return {
         "success": True,
         "subscription": {
@@ -123,9 +161,9 @@ def delete_push_subscription(
     request: Request,
     response: Response,
 ):
-    user = _current_user(request, response)
+    context = _current_context(request, response)
     revoked_count = revoke_web_push_subscription(
-        user_id=user["id"],
+        user_id=context.user_id,
         endpoint=subscription.endpoint,
     )
     return {
