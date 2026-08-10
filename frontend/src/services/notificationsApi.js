@@ -164,6 +164,17 @@ export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
   const installationId = installation?.installationId || null;
   await savePushSubscription(subscription.toJSON(), installationId);
   await clearPushRotationNeeded().catch(() => false);
+  if (typeof registration.showNotification === "function") {
+    await registration.showNotification("Madar notifications enabled", {
+      body: "Calendar reminders can now appear on this device when Madar is closed.",
+      icon: "/pwa-icon-192.png",
+      badge: "/pwa-icon-192.png",
+      tag: "madar-push-enabled",
+      data: {
+        action: { kind: "notification_center", path: "/notifications" },
+      },
+    });
+  }
   return { enabled: true };
 };
 

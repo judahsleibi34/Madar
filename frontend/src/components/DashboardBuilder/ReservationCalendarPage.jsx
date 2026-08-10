@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  BellRing,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -58,10 +59,17 @@ import {
   taskIsOpen,
   taskPlacementStart,
 } from "./utils/calendarTaskSchedule";
+import { enableBrowserPushNotifications } from "../../services/notificationsApi";
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
 const VIEWS = ["day", "week", "month", "agenda"];
+const PHONE_AGENDA_QUERY = "(max-width: 680px)";
 const pad = (value) => String(value).padStart(2, "0");
+
+const phoneAgendaMatches = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia(PHONE_AGENDA_QUERY).matches;
 
 function SidebarSectionHeading({ section, icon, title, subtitle, count, expanded, onToggle }) {
   return (
@@ -407,7 +415,8 @@ function DateActionChooser({ date, onClose, onTask, onReservation, onOpenDay }) 
 
 export default function ReservationCalendarPage({ user = null }) {
   const [focusDate, setFocusDate] = useState(() => new Date());
-  const [view, setView] = useState("week");
+  const [view, setView] = useState(() => phoneAgendaMatches() ? "agenda" : "week");
+  const [isPhoneAgenda, setIsPhoneAgenda] = useState(phoneAgendaMatches);
   const [workspace, setWorkspace] = useState({ calendars: [], events: [], tasks: [], connections: [] });
   const [enabledCalendars, setEnabledCalendars] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -425,6 +434,7 @@ export default function ReservationCalendarPage({ user = null }) {
   const [dateAction, setDateAction] = useState(null);
   const [connectionOperation, setConnectionOperation] = useState({ id: "", action: "" });
   const [connectionDirection, setConnectionDirection] = useState("read");
+  const [pushState, setPushState] = useState("");
   const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
   const [rangeStart, rangeEnd] = useMemo(() => rangeForView(focusDate, view), [focusDate, view]);
   const lastHandledRefreshRef = useRef(0);
@@ -435,6 +445,40 @@ export default function ReservationCalendarPage({ user = null }) {
     [tenantScope, userScope]
   );
   const calendarFeaturesAvailable = workspace.calendar_features_available !== false;
+  const enableSystemNotifications = async () => {
+    setPushState("loading");
+    try {
+      const result = await enableBrowserPushNotifications({ tenantId: tenantScope });
+      setPushState(result.enabled ? "enabled" : result.reason || "failed");
+    } catch {
+      setPushState("failed");
+    }
+  };
+  const pushButtonLabel = {
+    loading: "Enabling alerts...",
+    enabled: "System alerts on",
+    permission_denied: "Allow alerts in Chrome",
+    server_not_configured: "Alerts unavailable",
+    unsupported: "Alerts unsupported",
+    failed: "Retry system alerts",
+  }[pushState] || "Enable system alerts";
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const mediaQuery = window.matchMedia(PHONE_AGENDA_QUERY);
+    const syncPhoneLayout = (event) => {
+      const matches = typeof event?.matches === "boolean" ? event.matches : mediaQuery.matches;
+      setIsPhoneAgenda(matches);
+      if (matches) setView("agenda");
+    };
+    syncPhoneLayout(mediaQuery);
+    mediaQuery.addEventListener?.("change", syncPhoneLayout);
+    mediaQuery.addListener?.(syncPhoneLayout);
+    return () => {
+      mediaQuery.removeEventListener?.("change", syncPhoneLayout);
+      mediaQuery.removeListener?.(syncPhoneLayout);
+    };
+  }, []);
   const toggleSidebarSection = (section) => setExpandedSidebarSections((current) => {
     const next = new Set(current);
     if (next.has(section)) next.delete(section);
@@ -881,6 +925,7 @@ export default function ReservationCalendarPage({ user = null }) {
       <header className="reservation-calendar-toolbar">
         <div className="calendar-toolbar-copy"><span className="reservation-calendar-eyebrow">Workspace</span><h1>Calendar</h1><p>Bookings, events, tasks, reminders, and sync health in one place.</p></div>
         <div className="reservation-calendar-toolbar-actions">
+          <button type="button" className="calendar-toolbar-action calendar-notification-action" onClick={enableSystemNotifications} disabled={pushState === "loading" || pushState === "enabled"} title="Allow system notifications for calendar reminders"><BellRing size={16} /><span>{pushButtonLabel}</span></button>
           <button type="button" className="calendar-toolbar-action is-icon-only" onClick={() => setRefreshKey((value) => value + 1)} aria-label="Refresh calendar" title="Refresh calendar"><RefreshCw size={17} /></button>
           <label className={`calendar-toolbar-action calendar-import${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable}><Plus size={16} /><span>Import</span><input type="file" accept=".ics,text/calendar" onChange={importIcs} disabled={!calendarFeaturesAvailable} /></label>
           <a className={`calendar-toolbar-action${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable} onClick={(event) => { if (!calendarFeaturesAvailable) event.preventDefault(); }} href={getCalendarExportUrl({ start: rangeStart.toISOString(), end: rangeEnd.toISOString() })}><Download size={16} /><span>Export</span></a>
@@ -901,7 +946,7 @@ export default function ReservationCalendarPage({ user = null }) {
         <button type="button" onClick={() => movePeriod(1)} aria-label="Next"><ChevronRight size={18} /></button>
         <strong>{formatRange(rangeStart, rangeEnd)}</strong>
         <span className="calendar-control-spacer" />
-        <div className="reservation-calendar-view-switch">{VIEWS.map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => setView(item)} onPointerEnter={item === "agenda" ? warmAgendaCache : undefined} onFocus={item === "agenda" ? warmAgendaCache : undefined}>{item}</button>)}</div>
+        <div className="reservation-calendar-view-switch">{(isPhoneAgenda ? ["agenda"] : VIEWS).map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => setView(item)} onPointerEnter={item === "agenda" ? warmAgendaCache : undefined} onFocus={item === "agenda" ? warmAgendaCache : undefined}>{item}</button>)}</div>
       </div>
 
       {error && <div className="calendar-workspace-notice"><AlertTriangle size={17} />{error}<button type="button" onClick={() => setError("")}><X size={15} /></button></div>}

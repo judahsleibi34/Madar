@@ -94,6 +94,17 @@ Calendar integrations and workers:
 - `CALENDAR_SYNC_INTERVAL_SECONDS`
 - `NOTIFICATION_WORKER_ENABLED` (also dispatches scheduled calendar reminders)
 
+Native browser/operating-system notifications:
+
+- `WEB_PUSH_VAPID_PUBLIC_KEY`
+- `WEB_PUSH_VAPID_PRIVATE_KEY`
+- `WEB_PUSH_VAPID_SUBJECT` (a contact URI such as `mailto:ops@example.com`)
+- Run the notification worker (`docker compose --profile workers up`) so queued
+  notifications and calendar reminders are delivered while the Madar page is
+  closed.
+- Each user must click **Enable system notifications** on the Notifications
+  page once per browser/device and grant the browser permission prompt.
+
 Rate limiting and request-size controls:
 
 - `REDIS_URL`

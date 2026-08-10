@@ -2288,28 +2288,36 @@
 
 @media (max-width: 680px) {
   .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
-    grid-template-columns: 44px repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action {
+  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action:not(.calendar-notification-action) {
+    display: none !important;
+  }
+
+  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.calendar-notification-action {
     width: 100%;
     padding-inline: 10px;
   }
 
-  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-primary {
-    grid-column: 1 / -1;
-    width: 100%;
+  .calendar-workspace-page .calendar-summary-grid,
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    display: none;
+  }
+
+  .calendar-workspace-page .reservation-calendar-layout {
+    display: block;
+  }
+
+  .calendar-workspace-page .calendar-workspace-surface {
+    height: auto;
+    min-height: 50dvh;
   }
 }
 
 @media (max-width: 420px) {
   .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
-  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action:nth-child(3),
-  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-primary {
-    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

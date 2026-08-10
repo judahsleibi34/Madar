@@ -140,6 +140,19 @@ describe("Madar Push service worker", () => {
     );
   });
 
+  it("opens calendar notifications directly in the mobile-safe calendar route", async () => {
+    const harness = loadWorker();
+    await dispatch(harness.listeners.notificationclick, {
+      notification: {
+        close: vi.fn(),
+        data: {
+          action: { kind: "calendar_task", object_id: "task-1", path: "/calendar" },
+        },
+      },
+    });
+    expect(harness.openWindow).toHaveBeenCalledWith("https://app.example.test/calendar");
+  });
+
   it("records rotation locally and asks only same-origin pages to reconcile", async () => {
     const sameOrigin = { url: "https://app.example.test/dashboard", postMessage: vi.fn() };
     const otherOrigin = { url: "https://customer.example.test/", postMessage: vi.fn() };

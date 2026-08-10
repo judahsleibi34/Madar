@@ -17,7 +17,10 @@ export function getMadarServiceWorkerRegistration(
     const existing = await navigatorLike.serviceWorker.getRegistration?.(
       MADAR_SERVICE_WORKER_SCOPE
     );
-    if (existing) return existing;
+    if (existing) {
+      await existing.update?.();
+      return existing;
+    }
 
     return navigatorLike.serviceWorker.register(MADAR_SERVICE_WORKER_PATH, {
       scope: MADAR_SERVICE_WORKER_SCOPE,

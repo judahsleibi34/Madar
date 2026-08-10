@@ -9,6 +9,7 @@ import {
 } from "../../services/notificationsApi";
 
 const NOTIFICATION_POLL_MS = 15_000;
+const MOBILE_SIDEBAR_QUERY = "(max-width: 900px)";
 const EMPTY_NOTIFICATIONS = [];
 
 const formatNotificationTime = (value) => {
@@ -225,6 +226,15 @@ export default function NotificationBell({
     }
   };
 
+  const handleBellClick = (event) => {
+    if (window.matchMedia?.(MOBILE_SIDEBAR_QUERY).matches) {
+      viewAllNotifications();
+      return;
+    }
+
+    togglePanel(event);
+  };
+
   return (
     <div
       className={[
@@ -241,7 +251,7 @@ export default function NotificationBell({
       <button
         type="button"
         className="notification-bell-button"
-        onClick={togglePanel}
+        onClick={handleBellClick}
         aria-label={resolvedLabel}
         aria-expanded={open}
         aria-haspopup="dialog"

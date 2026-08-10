@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import NotificationBell from "./NotificationBell";
@@ -42,8 +42,16 @@ const renderBell = (props) => render(
   </MemoryRouter>,
 );
 
+const CurrentPath = () => {
+  const location = useLocation();
+  return <output data-testid="current-path">{location.pathname}</output>;
+};
+
 describe("NotificationBell tenant safety", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   beforeEach(() => {
     fetchNotifications.mockReset();
@@ -103,6 +111,29 @@ describe("NotificationBell tenant safety", () => {
     await waitFor(() => expect(fetchNotifications).toHaveBeenCalledTimes(1));
     expect(screen.queryByText("New form submission")).toBeNull();
     expect(document.querySelector(".notification-bell-badge")).toBeNull();
+  });
+
+  it("opens the notifications page directly and closes the mobile drawer", async () => {
+    const onNavigate = vi.fn();
+    fetchNotifications.mockResolvedValueOnce(response("a", "Mobile notification"));
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+
+    render(
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <NotificationBell
+          onNavigate={onNavigate}
+          tenantId="tenant-a"
+          userId="7"
+        />
+        <CurrentPath />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+
+    expect(screen.getByTestId("current-path").textContent).toBe("/notifications");
+    expect(onNavigate).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("keeps focus polling and prevents overlapping requests", async () => {

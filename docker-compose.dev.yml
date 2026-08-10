@@ -16,10 +16,8 @@ services:
       CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-true}
       PUBLIC_API_URL: http://127.0.0.1:8002
       FRONTEND_PRIMARY_URL: http://127.0.0.1:3001
-    depends_on:
+    depends_on: !override
       redis:
-        condition: service_healthy
-      notification-worker:
         condition: service_healthy
 
   notification-worker:

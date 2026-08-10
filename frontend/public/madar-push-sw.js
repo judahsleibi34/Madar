@@ -1,4 +1,5 @@
 const MADAR_NOTIFICATION_FALLBACK_PATH = "/notifications";
+const MADAR_CALENDAR_PATH = "/calendar";
 const MADAR_ACTION_KINDS = new Set([
   "notification_center",
   "reservation",
@@ -15,6 +16,9 @@ function normalizeNotificationAction(value) {
   const kind = MADAR_ACTION_KINDS.has(candidate.kind)
     ? candidate.kind
     : "notification_center";
+  const expectedPath = kind === "calendar_event" || kind === "calendar_task"
+    ? MADAR_CALENDAR_PATH
+    : MADAR_NOTIFICATION_FALLBACK_PATH;
   const rawPath = typeof candidate.path === "string"
     ? candidate.path
     : MADAR_NOTIFICATION_FALLBACK_PATH;
@@ -32,14 +36,14 @@ function normalizeNotificationAction(value) {
     const target = new URL(rawPath, self.location.origin);
     if (
       target.origin !== self.location.origin
-      || target.pathname !== MADAR_NOTIFICATION_FALLBACK_PATH
+      || target.pathname !== expectedPath
     ) {
       return { kind: "notification_center", path: MADAR_NOTIFICATION_FALLBACK_PATH };
     }
   } catch {
     return { kind: "notification_center", path: MADAR_NOTIFICATION_FALLBACK_PATH };
   }
-  const action = { kind, path: MADAR_NOTIFICATION_FALLBACK_PATH };
+  const action = { kind, path: expectedPath };
   if (
     typeof candidate.object_id === "string"
     && /^[A-Za-z0-9_.:-]{1,200}$/.test(candidate.object_id)

@@ -18,6 +18,7 @@ class NotificationActionContractTests(unittest.TestCase):
         self.assertEqual(
             validate_notification_action_path("/notifications"), "/notifications"
         )
+        self.assertEqual(validate_notification_action_path("/calendar"), "/calendar")
         rejected = [
             "https://evil.example/notifications",
             "//evil.example/notifications",
@@ -59,6 +60,7 @@ class NotificationActionContractTests(unittest.TestCase):
     def test_object_identity_has_a_bounded_non_url_shape(self):
         valid = build_notification_action(kind="calendar_event", object_id="event:123")
         self.assertEqual(valid["object_id"], "event:123")
+        self.assertEqual(valid["path"], "/calendar")
         invalid = build_notification_action(
             kind="calendar_event", object_id="../../secret?token=1"
         )
@@ -155,6 +157,30 @@ class PushLifecycleMigrationContractTests(unittest.TestCase):
         self.assertIn("existing_subscription.auth <> p_auth", normalized)
         self.assertIn("set endpoint = concat( 'revoked:'", normalized)
         self.assertNotIn("delete from public.web_push_subscriptions", normalized)
+
+    def test_calendar_reminders_fan_out_to_active_opted_in_installations(self):
+        local = Path(__file__).resolve().parents[2]
+        root = local if (local / "database/migrations").is_dir() else Path("/workspace")
+        database_sql = (
+            root
+            / "database/migrations/076_fan_out_calendar_reminders_to_web_push.sql"
+        ).read_text()
+        supabase_sql = (
+            root
+            / "supabase/migrations/076_fan_out_calendar_reminders_to_web_push.sql"
+        ).read_text()
+        normalized = " ".join(database_sql.lower().split())
+
+        self.assertEqual(database_sql, supabase_sql)
+        self.assertIn(
+            "when (new.channel = 'internal' and new.template = 'calendar_reminder')",
+            normalized,
+        )
+        self.assertIn("subscription.revoked_at is null", normalized)
+        self.assertIn("membership.status = 'active'", normalized)
+        self.assertIn("installation.notifications_enabled = true", normalized)
+        self.assertIn("installation.notification_permission = 'granted'", normalized)
+        self.assertIn("on conflict (deduplication_key) do nothing", normalized)
 
 
 if __name__ == "__main__":

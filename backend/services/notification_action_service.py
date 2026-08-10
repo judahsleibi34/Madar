@@ -9,6 +9,7 @@ from urllib.parse import unquote, urlsplit
 logger = logging.getLogger(__name__)
 
 NOTIFICATION_CENTER_PATH = "/notifications"
+CALENDAR_PATH = "/calendar"
 ACTION_KINDS = {
     "notification_center",
     "reservation",
@@ -41,19 +42,28 @@ def validate_notification_action_path(path: Any) -> str | None:
     decoded_path = unquote(parsed.path)
     if "\\" in decoded_path or decoded_path.startswith("//"):
         return None
-    # Current object routes do not carry an authoritative tenant identity.
-    # Keep actions in the tenant-scoped inbox until that routing contract exists.
-    return NOTIFICATION_CENTER_PATH if decoded_path == NOTIFICATION_CENTER_PATH else None
+    # Both routes resolve their tenant from the authenticated session. Object
+    # identifiers remain display hints and are never trusted for authorization.
+    return decoded_path if decoded_path in {NOTIFICATION_CENTER_PATH, CALENDAR_PATH} else None
+
+
+def default_action_path(kind: str) -> str:
+    return CALENDAR_PATH if kind in {"calendar_event", "calendar_task"} else NOTIFICATION_CENTER_PATH
 
 
 def build_notification_action(
     *,
     kind: str = "notification_center",
     object_id: Any = None,
-    path: str = NOTIFICATION_CENTER_PATH,
+    path: str | None = None,
 ) -> dict[str, str]:
     safe_kind = kind if kind in ACTION_KINDS else "notification_center"
-    safe_path = validate_notification_action_path(path) or NOTIFICATION_CENTER_PATH
+    expected_path = default_action_path(safe_kind)
+    safe_path = validate_notification_action_path(path or expected_path) or expected_path
+    if safe_kind in {"calendar_event", "calendar_task"} and safe_path != CALENDAR_PATH:
+        safe_path = CALENDAR_PATH
+    elif safe_kind not in {"calendar_event", "calendar_task"} and safe_path != NOTIFICATION_CENTER_PATH:
+        safe_path = NOTIFICATION_CENTER_PATH
     action = {"kind": safe_kind, "path": safe_path}
     candidate_id = str(object_id or "").strip()
     if candidate_id and _OBJECT_ID_PATTERN.fullmatch(candidate_id):
