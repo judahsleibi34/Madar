@@ -923,6 +923,29 @@
 .calendar-agenda > button > div span { display: flex; align-items: center; gap: 5px; color: var(--theme-text-muted); font-size: 0.76rem; }
 .calendar-agenda > button > small { color: var(--theme-text-muted); text-transform: capitalize; }
 
+.calendar-agenda-task-row { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; border-bottom: 1px solid var(--theme-border); }
+.calendar-agenda-task-row > .calendar-agenda-task { min-width: 0; min-height: 74px; display: grid; grid-template-columns: 58px 5px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 16px; border: 0; color: var(--theme-text); background: transparent; text-align: start; cursor: pointer; }
+.calendar-agenda-task-row > .calendar-agenda-task:hover { background: var(--theme-surface-elevated, var(--theme-bg)); }
+.calendar-agenda-task-row > .calendar-agenda-task > i { width: 5px; height: 36px; border-radius: 8px; }
+.calendar-agenda-task-row > .calendar-agenda-task > div { min-width: 0; display: grid; gap: 4px; }
+.calendar-agenda-task-row > .calendar-agenda-task > div span { display: flex; align-items: center; gap: 5px; color: var(--theme-text-muted); font-size: 0.76rem; }
+.calendar-agenda-task-row > .calendar-agenda-task > small { color: var(--theme-text-muted); text-transform: capitalize; }
+.calendar-agenda-task-actions { align-self: center; display: flex; align-items: center; gap: 6px; margin: 8px 12px 8px 4px; }
+.calendar-agenda-task-actions > button { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--theme-border); border-radius: 8px; color: var(--theme-text-muted); background: var(--theme-surface); font: inherit; cursor: pointer; transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease; }
+.calendar-agenda-task-actions > button span { display: none; }
+.calendar-agenda-task-actions > .calendar-agenda-archive:hover,
+.calendar-agenda-task-actions > .calendar-agenda-archive:focus-visible { border-color: rgba(var(--theme-primary-rgb), 0.22); color: var(--theme-primary); background: var(--theme-primary-soft); outline: 0; }
+.calendar-agenda-task-actions > .calendar-agenda-delete:hover,
+.calendar-agenda-task-actions > .calendar-agenda-delete:focus-visible { border-color: color-mix(in srgb, var(--theme-danger) 42%, var(--theme-border)); color: var(--theme-danger); background: color-mix(in srgb, var(--theme-danger) 9%, transparent); outline: 0; }
+.calendar-agenda-task-actions > button:disabled { opacity: 0.5; cursor: wait; }
+
+@media (max-width: 680px) {
+  .calendar-agenda-task-row > .calendar-agenda-task { grid-template-columns: 46px 4px minmax(0, 1fr); gap: 9px; padding-inline: 10px; }
+  .calendar-agenda-task-row > .calendar-agenda-task > small { display: none; }
+  .calendar-agenda-task-actions { gap: 5px; margin-inline-end: 8px; }
+  .calendar-agenda-task-actions > button { width: 32px; height: 34px; }
+}
+
 .calendar-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 0.58); backdrop-filter: blur(4px); }
 .calendar-modal { width: min(680px, 100%); max-height: calc(100vh - 40px); display: grid; gap: 13px; overflow: auto; padding: 22px; border: 1px solid var(--theme-border); border-radius: 18px; color: var(--theme-text); background: var(--theme-surface); box-shadow: 0 28px 80px rgb(0 0 0 / 0.34); }
 .calendar-modal header { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -1278,6 +1301,301 @@
 @media (max-width: 680px) {
   .calendar-workspace-page .calendar-workspace-sidebar {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Task editor: keep utility actions separate from the save flow. */
+.calendar-modal.calendar-task-editor {
+  width: min(720px, 100%);
+  gap: 14px;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.calendar-task-editor > header {
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.calendar-task-editor > header h2 {
+  font-size: 1.38rem;
+  line-height: 1.15;
+  font-weight: 850;
+}
+
+.calendar-task-editor .calendar-form-grid {
+  gap: 12px;
+}
+
+.calendar-task-editor label {
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.calendar-task-editor input,
+.calendar-task-editor select,
+.calendar-task-editor textarea {
+  min-height: 38px;
+  font-size: 0.76rem;
+  font-weight: 550;
+}
+
+.calendar-task-editor select option {
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.calendar-task-editor > label:first-of-type input {
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.calendar-task-editor textarea {
+  line-height: 1.45;
+}
+
+.calendar-task-schedule-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -6px;
+}
+
+.calendar-task-schedule-tools > button {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--theme-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-task-schedule-tools > button:hover:not(:disabled),
+.calendar-task-schedule-tools > button:focus-visible {
+  color: var(--theme-primary);
+  background: var(--theme-primary-soft);
+  outline: 0;
+}
+
+.calendar-task-schedule-tools > button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.calendar-task-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--theme-border);
+}
+
+.calendar-task-record-actions,
+.calendar-task-submit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-task-editor-footer button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  color: var(--theme-text);
+  background: var(--theme-surface-elevated);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+
+.calendar-task-editor-footer button:hover:not(:disabled),
+.calendar-task-editor-footer button:focus-visible {
+  border-color: color-mix(in srgb, var(--theme-primary) 42%, var(--theme-border));
+  color: var(--theme-primary);
+  background: var(--theme-primary-soft);
+  outline: 0;
+}
+
+.calendar-task-editor-footer button.is-primary {
+  min-width: 122px;
+  border-color: var(--theme-primary);
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+}
+
+.calendar-task-editor-footer button.is-primary:hover:not(:disabled),
+.calendar-task-editor-footer button.is-primary:focus-visible {
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary-hover);
+}
+
+.calendar-task-editor-footer button.is-danger {
+  color: var(--theme-text-muted);
+  background: transparent;
+}
+
+.calendar-task-editor-footer button.is-danger:hover:not(:disabled),
+.calendar-task-editor-footer button.is-danger:focus-visible {
+  border-color: color-mix(in srgb, var(--theme-danger) 42%, var(--theme-border));
+  color: var(--theme-danger);
+  background: color-mix(in srgb, var(--theme-danger) 9%, transparent);
+}
+
+.calendar-task-editor-footer button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+@media (max-width: 620px) {
+  .calendar-modal-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .calendar-modal.calendar-task-editor {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .calendar-task-editor-footer {
+    display: grid;
+  }
+
+  .calendar-task-submit-actions {
+    order: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .calendar-task-record-actions {
+    order: 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-task-editor-footer button,
+  .calendar-task-editor-footer button.is-primary {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Shared warning block adapted to the Calendar theme. */
+.calendar-task-confirmation .page-delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--theme-black) 64%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.calendar-task-confirmation .page-delete-modal {
+  width: min(430px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 26px;
+  border: 1px solid color-mix(in srgb, var(--theme-danger) 32%, var(--theme-border));
+  border-radius: 28px;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  text-align: center;
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--theme-black) 38%, transparent);
+}
+
+.calendar-task-confirmation .page-delete-modal-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  color: var(--theme-danger);
+  background: color-mix(in srgb, var(--theme-danger) 11%, transparent);
+}
+
+.calendar-task-confirmation.is-archive .page-delete-modal-icon {
+  color: var(--theme-danger);
+  background: color-mix(in srgb, var(--theme-danger) 11%, transparent);
+}
+
+.calendar-task-confirmation .page-delete-modal-copy h2 {
+  margin: 0;
+  color: var(--theme-text);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.calendar-task-confirmation .page-delete-modal-copy p {
+  margin: 8px 0 0;
+  color: var(--theme-text-muted);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.calendar-task-confirmation .page-delete-modal-copy strong {
+  color: var(--theme-text);
+}
+
+.calendar-task-confirmation .page-delete-modal-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.calendar-task-confirmation .page-delete-modal-actions button {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.calendar-task-confirmation .page-delete-modal-secondary {
+  color: var(--theme-text);
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-task-confirmation .page-delete-modal-danger {
+  border-color: var(--theme-danger);
+  color: var(--theme-text-inverse);
+  background: var(--theme-danger);
+}
+
+.calendar-task-confirmation .page-delete-modal-actions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+@media (max-width: 520px) {
+  .calendar-task-confirmation .page-delete-modal {
+    padding: 20px;
+  }
+
+  .calendar-task-confirmation .page-delete-modal-copy h2 {
+    font-size: 1.45rem;
   }
 }
 

@@ -3,27 +3,11 @@ import { createPortal } from "react-dom";
 import { Check, Heart, Images, RotateCcw, X } from "lucide-react";
 
 import { resolveMediaUrl } from "../../../utils/media";
+import { parsePhotoProofingContent } from "../core/PageBuilder.uploadHandlers";
 import "./PhotoProofingBlock.css";
 
 const SWIPE_THRESHOLD = 90;
 const EXIT_DELAY_MS = 220;
-
-function parsePhotoProofingPhotos(content = "") {
-  return String(content)
-    .split(/\n\s*\n/)
-    .map((block, index) => {
-      const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
-      const image = lines.findLast((line) => /^(https:\/\/|\/)/i.test(line)) || "";
-      const copy = image ? lines.filter((line) => line !== image) : lines;
-      return {
-        id: `proof-${index + 1}`,
-        title: copy[0] || `Photo ${index + 1}`,
-        description: copy.slice(1).join(" "),
-        image: resolveMediaUrl(image),
-      };
-    })
-    .filter((photo) => photo.image);
-}
 
 function DecisionSummary({ decisions }) {
   const values = Object.values(decisions);
@@ -40,7 +24,15 @@ function DecisionSummary({ decisions }) {
 }
 
 export default function PhotoProofingBlock({ content, settings = {}, disabled = false }) {
-  const photos = useMemo(() => parsePhotoProofingPhotos(content), [content]);
+  const photos = useMemo(
+    () => parsePhotoProofingContent(content).map((photo, index) => ({
+      ...photo,
+      id: `proof-${index + 1}`,
+      description: index === 0 ? settings.description || photo.description : "",
+      image: resolveMediaUrl(photo.image),
+    })),
+    [content, settings.description]
+  );
   const [open, setOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [decisions, setDecisions] = useState({});

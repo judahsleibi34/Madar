@@ -8,6 +8,31 @@ export const getBuilderAssetFileName = (value) => {
   }
 };
 
+export const parsePhotoProofingContent = (content = "") =>
+  String(content)
+    .split(/\n\s*\n/)
+    .map((block, index) => {
+      const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+      const image = lines.findLast((line) => /^(https:\/\/|\/)/i.test(line)) || "";
+      const copy = image ? lines.filter((line) => line !== image) : lines;
+      return {
+        title: copy[0] || `Photo ${index + 1}`,
+        description: copy.slice(1).join(" "),
+        image,
+      };
+    })
+    .filter((photo) => photo.image);
+
+export const serializePhotoProofingContent = (photos = []) =>
+  photos
+    .filter((photo) => photo?.image)
+    .map((photo, index) => [
+      photo.title || `Photo ${index + 1}`,
+      index === 0 ? photo.description || "" : "",
+      photo.image,
+    ].filter(Boolean).join("\n"))
+    .join("\n\n");
+
 export const createUploadHandlers = ({  selectedElement,
   carouselElementTypes,
   defaultSiteChrome,
@@ -147,10 +172,46 @@ export const createUploadHandlers = ({  selectedElement,
     showToast("Carousel image uploaded.");
   };
 
+  const uploadPhotoProofingFiles = async (files, { replaceCover = false } = {}) => {
+    const selectedFiles = Array.from(files || []);
+    if (!selectedFiles.length || !selectedElement || selectedElement.type !== "photoProofing") return;
+
+    const uploadedPhotos = [];
+    for (const file of selectedFiles) {
+      const assetUrl = await uploadBuilderImageFile(file);
+      if (!assetUrl) continue;
+      const fileName = String(file.name || "").replace(/\.[^.]+$/, "").trim();
+      uploadedPhotos.push({
+        title: fileName || `Photo ${uploadedPhotos.length + 1}`,
+        description: "",
+        image: assetUrl,
+      });
+    }
+    if (!uploadedPhotos.length) return;
+
+    const currentPhotos = parsePhotoProofingContent(selectedElement.content);
+    const nextPhotos = replaceCover
+      ? [
+          { ...uploadedPhotos[0], description: selectedElement.proofing?.description || currentPhotos[0]?.description || "" },
+          ...currentPhotos.slice(1),
+        ]
+      : [...currentPhotos, ...uploadedPhotos];
+    updateSelectedElement({ content: serializePhotoProofingContent(nextPhotos) });
+    showToast(uploadedPhotos.length === 1 ? "Photo uploaded." : `${uploadedPhotos.length} photos uploaded.`);
+  };
+
+  const handlePhotoProofingImagesUpload = async (event, options) => {
+    const files = event.target.files;
+    event.target.value = "";
+    await uploadPhotoProofingFiles(files, options);
+  };
+
   return {
     handleSelectedElementImageUpload,
     handleSiteLogoUpload,
     handleLoadingImageUpload,
     handleCarouselSlideImageUpload,
+    handlePhotoProofingImagesUpload,
+    uploadPhotoProofingFiles,
   };
 };

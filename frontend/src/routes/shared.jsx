@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 
 import DashboardSidebar from "../components/DashboardBuilder/DashboardSidebar";
+import PageSkeleton from "../components/common/PageSkeleton";
 import { appShellContent } from "../content";
 
 const AUTHENTICATED_REFERENCE_WIDTH = 1440;
@@ -502,18 +503,6 @@ export function PageBuilderSkeleton({ lang, pathname = "/page-builder" }) {
 }
 
 export function DashboardLoadingElement({ pathname, labels, lang }) {
-  if (pathname.startsWith("/page-builder/form-preview")) {
-    return <FormPreviewSkeleton lang={lang} />;
-  }
-
-  if (
-    pathname.startsWith("/page-builder") ||
-    pathname.startsWith("/builder-responses") ||
-    pathname.startsWith("/builder-data")
-  ) {
-    return <PageBuilderSkeleton lang={lang} pathname={pathname} />;
-  }
-
   const safeLabels = labels || appShellContent.loading || {};
   let label = safeLabels.dashboard || "Loading dashboard";
 
@@ -526,7 +515,7 @@ export function DashboardLoadingElement({ pathname, labels, lang }) {
   if (pathname.startsWith("/settings/change-password")) label = safeLabels.passwordSettings || label;
   if (pathname.startsWith("/settings")) label = safeLabels.settings || label;
 
-  return <DashboardSkeleton label={label} lang={lang} />;
+  return <PageSkeleton label={label} lang={lang} variant="dashboard" />;
 }
 
 export function DashboardShell({

@@ -123,6 +123,31 @@ export const browserSupportsPush = () =>
   "PushManager" in window &&
   "Notification" in window;
 
+export const getBrowserPushStatus = async () => {
+  if (isIOSDevice() && !getMadarLaunchContext().isStandalone) {
+    return { enabled: false, reason: "ios_home_screen_required" };
+  }
+  if (typeof window !== "undefined" && window.isSecureContext === false) {
+    return { enabled: false, reason: "secure_context_required" };
+  }
+  if (!browserSupportsPush()) {
+    return {
+      enabled: false,
+      reason: isAndroidDevice() ? "android_browser_unsupported" : "unsupported",
+    };
+  }
+  if (Notification.permission !== "granted") {
+    return {
+      enabled: false,
+      reason: Notification.permission === "denied" ? "permission_denied" : "",
+    };
+  }
+  const endpoint = await getExistingMadarPushEndpoint();
+  return endpoint
+    ? { enabled: true }
+    : { enabled: false, reason: "subscription_missing" };
+};
+
 export const urlBase64ToUint8Array = (base64String) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
@@ -141,6 +166,10 @@ export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
     return { enabled: false, reason: "ios_home_screen_required" };
   }
 
+  if (typeof window !== "undefined" && window.isSecureContext === false) {
+    return { enabled: false, reason: "secure_context_required" };
+  }
+
   if (!browserSupportsPush()) {
     return {
       enabled: false,
@@ -148,16 +177,18 @@ export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
     };
   }
 
-  const config = await getPushPublicKey();
-
-  if (!config.enabled || !config.public_key) {
-    return { enabled: false, reason: "server_not_configured" };
-  }
-
+  // iOS requires the permission request to run directly from the user's tap.
+  // A network or service-worker await before this call consumes that gesture.
   const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
     return { enabled: false, reason: "permission_denied" };
+  }
+
+  const config = await getPushPublicKey();
+
+  if (!config.enabled || !config.public_key) {
+    return { enabled: false, reason: "server_not_configured" };
   }
 
   const registration = await getMadarServiceWorkerRegistration();

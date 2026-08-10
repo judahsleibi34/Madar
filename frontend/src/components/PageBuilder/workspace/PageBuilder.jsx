@@ -26,6 +26,7 @@ import {
   Undo2,
 } from "lucide-react";
 import "../../../styles/admin/PageBuilder/index.css";
+import LoadingBar from "../../common/LoadingBar";
 import {
   deferEffectStateUpdate,
   normalizeRuntimeAnswerValue,
@@ -88,8 +89,6 @@ import {
   getEditorCameraStageWidth,
 } from "../core/PageBuilder.artboard";
 import {
-  RESPONSIVE_LAYOUT_ENGINE_VERSION,
-  RESPONSIVE_LAYOUT_MODES,
   isSmartResponsiveProject,
   withAutoResponsiveOverride,
 } from "../core/PageBuilder.responsiveCapabilities";
@@ -328,6 +327,8 @@ import {
 import {
   createUploadHandlers,
   getBuilderAssetFileName,
+  parsePhotoProofingContent,
+  serializePhotoProofingContent,
 } from "../core/PageBuilder.uploadHandlers";
 import {
   createRuntimeFormRenderers,
@@ -4229,6 +4230,8 @@ export default function PageBuilder({
     handleSiteLogoUpload,
     handleLoadingImageUpload,
     handleCarouselSlideImageUpload,
+    handlePhotoProofingImagesUpload,
+    uploadPhotoProofingFiles,
   } = useMemo(
     // eslint-disable-next-line react-hooks/refs
     () => createUploadHandlers({
@@ -6317,51 +6320,12 @@ export default function PageBuilder({
         </div>
       )}
 
-      <div className="inspector-group responsive-layout-control">
-        <h3>Responsive layout</h3>
-        <p className="builder-note">
-          {smartResponsiveEnabled
-            ? `Smart engine v${RESPONSIVE_LAYOUT_ENGINE_VERSION} is enabled. Live pages solve continuously up to 1200 CSS px.`
-            : "Legacy mode preserves the three saved artboards exactly."}
-        </p>
-        <button
-          type="button"
-          className={smartResponsiveEnabled ? "danger-lite" : "primary-action"}
-          onClick={() => updateProject((current) => ({
-            ...current,
-            responsiveLayout: {
-              mode: smartResponsiveEnabled ? RESPONSIVE_LAYOUT_MODES.legacy : RESPONSIVE_LAYOUT_MODES.smart,
-              engineVersion: RESPONSIVE_LAYOUT_ENGINE_VERSION,
-            },
-          }))}
-        >
-          {smartResponsiveEnabled ? "Use legacy responsive" : "Enable smart responsive"}
-        </button>
-        {!smartResponsiveEnabled && (
-          <>
-            <button
-              type="button"
-              className="danger-lite"
-              onClick={() => setLegacyShadowEnabled((current) => !current)}
-            >
-              {legacyShadowEnabled ? "Stop shadow comparison" : "Compare smart layout in shadow"}
-            </button>
-            {legacyShadowComparison && (
-              <div className="responsive-shadow-report" role="status">
-                <strong>Shadow comparison only</strong>
-                <p className="builder-note">
-                  Smart geometry is not displayed or saved. Compared {legacyShadowComparison.summary.comparedElementCount} elements;
-                  {" "}{legacyShadowComparison.summary.changedElementCount} differ by more than 0.5px.
-                  Maximum displacement: {legacyShadowComparison.summary.maximumDisplacement.toFixed(1)}px.
-                </p>
-                <p className="builder-note">
-                  Blocking smart diagnostics: {legacyShadowComparison.summary.blockingDiagnosticCount}.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-        {smartResponsiveEnabled && activeSmartDiagnostics
+      {smartResponsiveEnabled && activeSmartDiagnostics.some(
+        (diagnostic) => diagnostic.code === "unresolved_manual_collision"
+      ) && (
+        <div className="inspector-group responsive-layout-control">
+          <h3>Responsive issues</h3>
+          {activeSmartDiagnostics
           .filter((diagnostic) => diagnostic.code === "unresolved_manual_collision")
           .map((diagnostic) => (
             <div
@@ -6390,7 +6354,8 @@ export default function PageBuilder({
               </div>
             </div>
           ))}
-      </div>
+        </div>
+      )}
 
       {inspectorMode === "page" && activePage && (
         <PageBuilderPageInspector
@@ -6686,16 +6651,83 @@ export default function PageBuilder({
               }}>+ Add item</button>
             </details>
           )}
-          {selectedElement.type === "photoProofing" && (
-            <details open className="photo-proofing-settings">
-              <summary>Photo selection</summary>
-              <label>Title<input value={selectedElement.proofing?.title || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), title: event.target.value } })} /></label>
-              <label>Description<textarea value={selectedElement.proofing?.description || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), description: event.target.value } })} /></label>
-              <label>Button text<input value={selectedElement.proofing?.buttonText || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), buttonText: event.target.value } })} /></label>
-              <label>Photos<textarea rows="12" value={selectedElement.content || ""} onChange={(event) => updateSelectedElement({ content: event.target.value })} /></label>
-              <p className="builder-note">Use one blank line between photos. For each photo enter its title, optional description, then an uploaded path or public HTTPS image URL.</p>
-            </details>
-          )}
+          {selectedElement.type === "photoProofing" && (() => {
+            const photos = parsePhotoProofingContent(selectedElement.content);
+            const cover = photos[0] || null;
+            return (
+              <details open className="photo-proofing-settings">
+                <summary>Photo selection</summary>
+                <label>Card title<input value={selectedElement.proofing?.title || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), title: event.target.value } })} /></label>
+                <label>Cover description<textarea value={selectedElement.proofing?.description || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), description: event.target.value } })} /></label>
+                <p className="builder-note">This description belongs only to the first image, which is the cover of the card.</p>
+                <label>Button text<input value={selectedElement.proofing?.buttonText || ""} onChange={(event) => updateSelectedElement({ proofing: { ...(selectedElement.proofing || {}), buttonText: event.target.value } })} /></label>
+
+                <div className="photo-proofing-cover-editor">
+                  <div className="photo-proofing-editor-heading"><strong>Cover image</strong><span>First image</span></div>
+                  {cover ? (
+                    <div className="photo-proofing-cover-preview">
+                      <img src={resolveMediaUrl(cover.image)} alt="" />
+                      <span>{cover.title}</span>
+                    </div>
+                  ) : (
+                    <div className="photo-proofing-cover-empty">Choose the first image for the card.</div>
+                  )}
+                  <div className="photo-proofing-cover-actions">
+                    <label className="upload-image-button">
+                      {assetUploadBusy ? "Uploading..." : cover ? "Replace cover" : "Upload cover"}
+                      <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={(event) => handlePhotoProofingImagesUpload(event, { replaceCover: true })} />
+                    </label>
+                    {cover && <button type="button" className="danger-lite" onClick={() => updateSelectedElement({ content: serializePhotoProofingContent(photos.slice(1)) })}>Remove cover</button>}
+                  </div>
+                </div>
+
+                <div
+                  className="photo-proofing-gallery-upload"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    uploadPhotoProofingFiles(event.dataTransfer.files);
+                  }}
+                >
+                  <strong>Upload gallery images</strong>
+                  <span>Drop any number of images here, or choose them together.</span>
+                  <label className="upload-image-button">
+                    {assetUploadBusy ? "Uploading..." : "Choose images"}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden disabled={assetUploadBusy} onChange={handlePhotoProofingImagesUpload} />
+                  </label>
+                </div>
+
+                <div className="photo-proofing-gallery-list">
+                  <div className="photo-proofing-editor-heading"><strong>Gallery</strong><span>{Math.max(0, photos.length - 1)} images</span></div>
+                  {photos.slice(1).map((photo, galleryIndex) => {
+                    const photoIndex = galleryIndex + 1;
+                    return (
+                      <div className="photo-proofing-gallery-item" key={`${photo.image}-${photoIndex}`}>
+                        <img src={resolveMediaUrl(photo.image)} alt="" />
+                        <input
+                          aria-label={`Photo ${photoIndex + 1} title`}
+                          value={photo.title || ""}
+                          onChange={(event) => updateSelectedElement({
+                            content: serializePhotoProofingContent(photos.map((item, index) => index === photoIndex ? { ...item, title: event.target.value } : item)),
+                          })}
+                        />
+                        <button type="button" onClick={() => updateSelectedElement({
+                          content: serializePhotoProofingContent([
+                            { ...photo, description: selectedElement.proofing?.description || "" },
+                            ...photos.filter((_, index) => index !== photoIndex),
+                          ]),
+                        })}>Make cover</button>
+                        <button type="button" className="danger-lite" aria-label={`Remove ${photo.title || `photo ${photoIndex + 1}`}`} onClick={() => updateSelectedElement({
+                          content: serializePhotoProofingContent(photos.filter((_, index) => index !== photoIndex)),
+                        })}>Remove</button>
+                      </div>
+                    );
+                  })}
+                  {photos.length <= 1 && <p className="builder-note">Gallery images will be loaded one by one after the cover.</p>}
+                </div>
+              </details>
+            );
+          })()}
           {selectedElement.type === "thinDivider" && (
             <details open className="horizontal-line-editor">
               <summary>Horizontal line</summary>
@@ -7396,6 +7428,9 @@ export default function PageBuilder({
       project={project}
       updateProject={updateProject}
       setThemeMode={setThemeMode}
+      legacyShadowEnabled={legacyShadowEnabled}
+      legacyShadowComparison={legacyShadowComparison}
+      onToggleLegacyShadow={() => setLegacyShadowEnabled((current) => !current)}
       {...themeTabProps}
     />
   );
@@ -7488,7 +7523,9 @@ export default function PageBuilder({
           className="builder-project-loading builder-project-loading-silent"
           aria-busy="true"
           aria-label="Loading project"
-        />
+        >
+          <LoadingBar label="Loading project" />
+        </main>
       </div>
     );
   }

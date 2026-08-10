@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
 import { getBuilderProjectIdFromPath } from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
@@ -31,6 +31,7 @@ const BuilderProjectChooser = lazy(() =>
 
 function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const projectId = getBuilderProjectIdFromPath(location.pathname);
   if (!projectId) {
     return (
@@ -58,6 +59,7 @@ export default function UserWorkspaceRoutes({
     location.pathname.startsWith("/builder-responses") ||
     location.pathname.startsWith("/builder-data") ||
     location.pathname.startsWith("/calendar") ||
+    location.pathname.startsWith("/agenda") ||
     location.pathname.startsWith("/archive");
 
   const renderShell = (children, options = {}) => (
@@ -182,6 +184,23 @@ export default function UserWorkspaceRoutes({
           <ReservationCalendarPage
             key={`calendar:${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`}
             user={user}
+            initialView={location.state?.calendarView || ""}
+            onViewChange={(nextView) => {
+              if (nextView === "agenda") navigate("/agenda");
+            }}
+          />
+        )}
+      />
+      <Route
+        path="/agenda/*"
+        element={renderShell(
+          <ReservationCalendarPage
+            key={`agenda:${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`}
+            user={user}
+            initialView="agenda"
+            onViewChange={(nextView) => {
+              if (nextView !== "agenda") navigate("/calendar", { state: { calendarView: nextView } });
+            }}
           />
         )}
       />

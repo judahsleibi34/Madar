@@ -2,11 +2,15 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import NotificationsPage from "./NotificationsPage";
-import { fetchNotifications } from "../../services/notificationsApi";
+import {
+  fetchNotifications,
+  getBrowserPushStatus,
+} from "../../services/notificationsApi";
 
 vi.mock("../../services/notificationsApi", () => ({
   enableBrowserPushNotifications: vi.fn(),
   fetchNotifications: vi.fn(),
+  getBrowserPushStatus: vi.fn(),
   markAllNotificationsRead: vi.fn(),
   markNotificationRead: vi.fn(),
 }));
@@ -22,6 +26,8 @@ const translate = (key, values = {}) => {
     "notifications.sources": "Sources",
     "notifications.markAllRead": "Mark all read",
     "notifications.enablePush": "Enable push",
+    "notifications.pushEnabledButton": "Push enabled",
+    "notifications.pushState.enabled": "Push is enabled",
   };
   if (key === "notifications.unreadCount") return `${values.count} unread`;
   if (key === "notifications.items") return `${values.count} items`;
@@ -46,7 +52,19 @@ const response = (id, title, unreadCount = 1) => ({
 describe("NotificationsPage tenant safety", () => {
   afterEach(() => cleanup());
 
-  beforeEach(() => fetchNotifications.mockReset());
+  beforeEach(() => {
+    fetchNotifications.mockReset();
+    getBrowserPushStatus.mockReset();
+    getBrowserPushStatus.mockResolvedValue({ enabled: false, reason: "" });
+  });
+
+  it("restores the enabled Push state after a page refresh", async () => {
+    getBrowserPushStatus.mockResolvedValue({ enabled: true });
+    fetchNotifications.mockResolvedValue(response("a", "Notification"));
+    render(<NotificationsPage user={{ id: 7, tenant_id: "tenant-a" }} />);
+    expect((await screen.findByRole("button", { name: "Push enabled" })).disabled).toBe(true);
+    expect(screen.getByText("Push is enabled")).toBeTruthy();
+  });
 
   it("clears old tenant content while loading the next tenant", async () => {
     const tenantB = deferred();

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Archive,
   BellRing,
   CalendarDays,
   CheckCircle2,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 
 import {
+  archiveCalendarTask,
   createCalendarConnection,
   authorizeCalendarConnection,
   createCalendarEvent,
@@ -42,6 +44,11 @@ import {
   updateCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
 import {
+  archiveItem,
+  deleteArchiveItem,
+} from "../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage";
+import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
+import {
   clearCalendarWorkspaceCache,
   createCalendarWorkspaceCacheKey,
   getOrCreateCalendarWorkspaceRequest,
@@ -52,14 +59,16 @@ import {
   confirmConnectedAccountDisconnect,
   confirmGoogleWriteUpgrade,
   confirmIncompleteConnectionRemoval,
-  chooseTaskDeletionMode,
 } from "./utils/calendarConnectionPrompts";
 import {
   expandTaskOccurrences,
   taskIsOpen,
   taskPlacementStart,
 } from "./utils/calendarTaskSchedule";
-import { enableBrowserPushNotifications } from "../../services/notificationsApi";
+import {
+  enableBrowserPushNotifications,
+  getBrowserPushStatus,
+} from "../../services/notificationsApi";
 import { isAndroidDevice } from "../../pwa/pwaContext";
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
@@ -324,7 +333,11 @@ function EventEditor({ value, calendars, saving, conflict, onChange, onClose, on
   );
 }
 
-function TaskEditor({ value, connections, saving, error, notice, onChange, onClose, onSave, onDelete }) {
+function TaskEditor({ value: initialValue, connections, saving, error, notice, onClose, onSave, onArchive, onDelete }) {
+  const [value, setValue] = useState(initialValue);
+  const onChange = (field, nextValue) => {
+    setValue((current) => ({ ...current, [field]: nextValue }));
+  };
   const writableGoogleConnections = connections.filter(
     (connection) =>
       connection.provider === "google"
@@ -339,7 +352,7 @@ function TaskEditor({ value, connections, saving, error, notice, onChange, onClo
   );
   return (
     <div className="calendar-modal-backdrop" role="presentation">
-      <form className="calendar-modal calendar-task-editor" onSubmit={onSave}>
+      <form className="calendar-modal calendar-task-editor" onSubmit={(event) => onSave(event, value)}>
         <header>
           <div><span>{value.id ? "Edit task" : "New task"}</span><h2>{value.id ? value.title || "Untitled task" : "Add a task"}</h2></div>
           <button type="button" onClick={onClose} aria-label="Close"><X size={19} /></button>
@@ -358,17 +371,54 @@ function TaskEditor({ value, connections, saving, error, notice, onChange, onClo
           <label>Repeat<select value={value.repeat} onChange={(event) => onChange("repeat", event.target.value)}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
           <label>Calendar sync<select value={value.sync_connection_id} onChange={(event) => onChange("sync_connection_id", event.target.value)}><option value="">Madar only</option>{writableGoogleConnections.map((connection) => <option key={connection.id} value={connection.id}>Sync to {connection.account_label || "Google Calendar"}</option>)}</select></label>
         </div>
+        {(value.scheduled_start || value.scheduled_end) && (
+          <div className="calendar-task-schedule-tools">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); }}
+            >
+              Remove date and time
+            </button>
+          </div>
+        )}
         {hasReadOnlyGoogle && writableGoogleConnections.length === 0 && <p className="calendar-task-sync-help">Your Google connection is read only. Enable write access from Sync health to send scheduled tasks to Google Calendar.</p>}
         {value.sync_status && value.sync_status !== "not_synced" && <p className={`calendar-task-sync-status is-${value.sync_status}`}>Google sync: {value.sync_status.replaceAll("_", " ")}</p>}
         <label>Notes<textarea rows="3" value={value.description} onChange={(event) => onChange("description", event.target.value)} /></label>
-        <div className="calendar-modal-actions">
-          {value.id && <button type="button" className="is-danger" disabled={saving} onClick={onDelete}><Trash2 size={16} /> Delete</button>}
-          <span />
-          <button type="button" onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); }}>Clear schedule</button>
-          <button type="button" onClick={onClose}>Cancel</button>
+        <footer className="calendar-task-editor-footer">
+          <div className="calendar-task-record-actions">
+            {value.id && <button type="button" className="is-archive" disabled={saving} onClick={onArchive}><Archive size={16} /> Archive</button>}
+            {value.id && <button type="button" className="is-danger" disabled={saving} onClick={onDelete}><Trash2 size={16} /> Delete</button>}
+          </div>
+          <div className="calendar-task-submit-actions">
+            <button type="button" disabled={saving} onClick={onClose}>Cancel</button>
           <button type="submit" className="is-primary" disabled={saving}>{saving ? "Saving…" : "Save task"}</button>
-        </div>
+          </div>
+        </footer>
       </form>
+    </div>
+  );
+}
+
+function AgendaTaskRow({ task, start, end, unscheduled = false, saving, onOpen, onArchive, onDelete }) {
+  return (
+    <div className="calendar-agenda-task-row">
+      <button type="button" className={`calendar-agenda-task${unscheduled ? " is-unscheduled" : ""}`} onClick={() => onOpen(task)}>
+        <time>{unscheduled ? <><ListTodo size={19} /><span>Task</span></> : <><strong>{new Date(start).getDate()}</strong><span>{new Date(start).toLocaleDateString(undefined, { month: "short", weekday: "short" })}</span></>}</time>
+        <i />
+        <div><strong>{task.title}</strong><span>{unscheduled ? (task.due_at ? `Due ${new Date(task.due_at).toLocaleString()}` : "Choose a time to place this task on your calendar") : <><ListTodo size={14} /> {formatTime(start)} - {formatTime(end)} - Scheduled task{task.recurrence_rule ? ` - Repeats ${task.recurrence_rule.replace("FREQ=", "").toLowerCase()}` : ""}</>}</span></div>
+        <small>{task.status.replace("_", " ")}</small>
+      </button>
+      <div className="calendar-agenda-task-actions">
+        <button type="button" className="calendar-agenda-archive" disabled={saving} onClick={() => onArchive(task)} aria-label={`Archive ${task.title}`} title="Archive task">
+          <Archive size={15} />
+          <span>Archive</span>
+        </button>
+        <button type="button" className="calendar-agenda-delete" disabled={saving} onClick={() => onDelete(task)} aria-label={`Delete ${task.title}`} title="Delete task">
+          <Trash2 size={15} />
+          <span>Delete</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -414,9 +464,9 @@ function DateActionChooser({ date, onClose, onTask, onReservation, onOpenDay }) 
   );
 }
 
-export default function ReservationCalendarPage({ user = null }) {
+export default function ReservationCalendarPage({ user = null, initialView = "", onViewChange = null }) {
   const [focusDate, setFocusDate] = useState(() => new Date());
-  const [view, setView] = useState(() => phoneAgendaMatches() ? "agenda" : "week");
+  const [view, setView] = useState(() => VIEWS.includes(initialView) ? initialView : phoneAgendaMatches() ? "agenda" : "week");
   const [isPhoneAgenda, setIsPhoneAgenda] = useState(phoneAgendaMatches);
   const [workspace, setWorkspace] = useState({ calendars: [], events: [], tasks: [], connections: [] });
   const [enabledCalendars, setEnabledCalendars] = useState(new Set());
@@ -432,13 +482,15 @@ export default function ReservationCalendarPage({ user = null }) {
   const [taskEditor, setTaskEditor] = useState(null);
   const [taskEditorError, setTaskEditorError] = useState("");
   const [taskEditorNotice, setTaskEditorNotice] = useState("");
+  const [taskConfirmation, setTaskConfirmation] = useState(null);
   const [dateAction, setDateAction] = useState(null);
   const [connectionOperation, setConnectionOperation] = useState({ id: "", action: "" });
   const [connectionDirection, setConnectionDirection] = useState("read");
-  const [pushState, setPushState] = useState("");
+  const [pushState, setPushState] = useState("checking");
   const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
   const [rangeStart, rangeEnd] = useMemo(() => rangeForView(focusDate, view), [focusDate, view]);
   const lastHandledRefreshRef = useRef(0);
+  const hasLoadedWorkspaceRef = useRef(false);
   const tenantScope = user?.tenant_id ?? user?.tenantId ?? "";
   const userScope = user?.id || user?.auth_id || user?.authId || "";
   const cacheIdentity = useMemo(
@@ -446,6 +498,25 @@ export default function ReservationCalendarPage({ user = null }) {
     [tenantScope, userScope]
   );
   const calendarFeaturesAvailable = workspace.calendar_features_available !== false;
+  useEffect(() => {
+    let cancelled = false;
+    getBrowserPushStatus()
+      .then((result) => {
+        if (cancelled) return;
+        setPushState(
+          result.enabled
+            ? isAndroidDevice() ? "android_enabled" : "enabled"
+            : result.reason === "subscription_missing" ? "" : result.reason || ""
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setPushState("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantScope]);
+
   const enableSystemNotifications = async () => {
     setPushState("loading");
     try {
@@ -460,6 +531,7 @@ export default function ReservationCalendarPage({ user = null }) {
     }
   };
   const pushButtonLabel = {
+    checking: "Checking system alerts...",
     loading: "Enabling alerts...",
     enabled: "System alerts on",
     android_enabled: "Android alerts on",
@@ -467,15 +539,16 @@ export default function ReservationCalendarPage({ user = null }) {
     server_not_configured: "Alerts unavailable",
     ios_home_screen_required: "Add Madar to Home Screen",
     android_browser_unsupported: "Open Madar in Chrome",
+    secure_context_required: "HTTPS required for alerts",
     unsupported: "Alerts unsupported",
     failed: "Retry system alerts",
   }[pushState] || "Enable system alerts";
-  const pushGuidance = pushState === "ios_home_screen_required"
-    ? "On iPhone: tap Safari's Share button, choose Add to Home Screen, open Madar from its new icon, then enable system alerts again. Requires iOS 16.4 or later."
-    : pushState === "android_enabled"
-      ? "Android alerts are enabled. For Lock Screen delivery, allow notifications for Madar or Chrome in Android Settings. You can also use Chrome's menu and choose Install app for an app-like icon and badge."
+  const pushGuidance = pushState === "android_enabled"
+    ? "Android alerts are enabled. For Lock Screen delivery, allow notifications for Madar or Chrome in Android Settings. You can also use Chrome's menu and choose Install app for an app-like icon and badge."
       : pushState === "android_browser_unsupported"
         ? "Open Madar in an up-to-date Chrome browser on Android, then enable system alerts again."
+        : pushState === "secure_context_required"
+          ? "Lock Screen notifications require the installed Madar app to use a secure HTTPS address. HTTP and local-network addresses cannot receive Web Push."
         : "";
 
   useEffect(() => {
@@ -516,6 +589,11 @@ export default function ReservationCalendarPage({ user = null }) {
       });
   }, [cacheIdentity, focusDate]);
 
+  const selectView = (nextView) => {
+    setView(nextView);
+    onViewChange?.(nextView);
+  };
+
   useEffect(() => {
     let active = true;
     const start = rangeStart.toISOString();
@@ -534,11 +612,12 @@ export default function ReservationCalendarPage({ user = null }) {
     queueMicrotask(() => {
       if (!active) return;
       if (cached) {
+        hasLoadedWorkspaceRef.current = true;
         setWorkspace(cached);
         setEnabledCalendars((current) => current.size ? current : new Set([...(cached.calendars || []).map((item) => item.id), "reservations"]));
         setError(cached.warning || "");
         setLoading(false);
-      } else {
+      } else if (!hasLoadedWorkspaceRef.current) {
         setLoading(true);
       }
     });
@@ -551,6 +630,7 @@ export default function ReservationCalendarPage({ user = null }) {
     )
       .then((data) => {
         if (!active) return;
+        hasLoadedWorkspaceRef.current = true;
         writeCalendarWorkspaceCache(cacheKey, data, cacheIdentity);
         setWorkspace(data);
         setEnabledCalendars((current) => current.size ? current : new Set([...(data.calendars || []).map((item) => item.id), "reservations"]));
@@ -738,82 +818,166 @@ export default function ReservationCalendarPage({ user = null }) {
     setTaskEditor(taskEditorValue(task));
   };
 
-  const saveTask = async (submitEvent) => {
+  const saveTask = async (submitEvent, editedTask = taskEditor) => {
     submitEvent.preventDefault();
-    if (!taskEditor) return;
+    if (!editedTask) return;
     setSaving(true);
     setTaskEditorError("");
     setTaskEditorNotice("");
+    let optimisticId = "";
+    let previousTask = null;
+    let optimisticApplied = false;
     try {
-      let scheduledStart = taskEditor.scheduled_start ? new Date(taskEditor.scheduled_start) : null;
-      let scheduledEnd = taskEditor.scheduled_end ? new Date(taskEditor.scheduled_end) : null;
+      let scheduledStart = editedTask.scheduled_start ? new Date(editedTask.scheduled_start) : null;
+      let scheduledEnd = editedTask.scheduled_end ? new Date(editedTask.scheduled_end) : null;
       if (!scheduledStart && scheduledEnd) throw new Error("Choose a scheduled start time first.");
-      if (taskEditor.repeat !== "none" && !scheduledStart) throw new Error("Choose a scheduled start time for a repeating task.");
-      if (scheduledStart && !scheduledEnd) scheduledEnd = new Date(scheduledStart.getTime() + Number(taskEditor.estimate_minutes || 60) * 60000);
+      if (editedTask.repeat !== "none" && !scheduledStart) throw new Error("Choose a scheduled start time for a repeating task.");
+      if (scheduledStart && !scheduledEnd) scheduledEnd = new Date(scheduledStart.getTime() + Number(editedTask.estimate_minutes || 60) * 60000);
       if (scheduledStart && scheduledEnd <= scheduledStart) throw new Error("Scheduled end must be after the start.");
       const taskPayload = {
-        title: taskEditor.title.trim(),
-        description: taskEditor.description || "",
-        calendar_id: taskEditor.calendar_id || null,
-        project_id: taskEditor.project_id || null,
-        owner_user_id: taskEditor.owner_user_id || null,
-        status: taskEditor.status,
-        priority: taskEditor.priority,
-        estimate_minutes: taskEditor.estimate_minutes ? Number(taskEditor.estimate_minutes) : null,
-        reminder_minutes_before: taskEditor.reminder_minutes_before === "" ? null : Number(taskEditor.reminder_minutes_before),
-        due_at: taskEditor.due_at ? new Date(taskEditor.due_at).toISOString() : null,
+        title: editedTask.title.trim(),
+        description: editedTask.description || "",
+        calendar_id: editedTask.calendar_id || null,
+        project_id: editedTask.project_id || null,
+        owner_user_id: editedTask.owner_user_id || null,
+        status: editedTask.status,
+        priority: editedTask.priority,
+        estimate_minutes: editedTask.estimate_minutes ? Number(editedTask.estimate_minutes) : null,
+        reminder_minutes_before: editedTask.reminder_minutes_before === "" ? null : Number(editedTask.reminder_minutes_before),
+        due_at: editedTask.due_at ? new Date(editedTask.due_at).toISOString() : null,
         scheduled_start: scheduledStart?.toISOString() || null,
         scheduled_end: scheduledEnd?.toISOString() || null,
-        recurrence_rule: recurrenceRule(taskEditor.repeat),
-        milestone: Boolean(taskEditor.milestone),
+        recurrence_rule: recurrenceRule(editedTask.repeat),
+        milestone: Boolean(editedTask.milestone),
       };
-      const savedTask = taskEditor.id
-        ? await updateCalendarTask(taskEditor.id, taskPayload, taskEditor.version)
-        : await createCalendarTask(taskPayload);
-      const savedTaskId = savedTask?.id || taskEditor.id;
-      setTaskEditor((current) => ({
+      optimisticId = editedTask.id || `optimistic-task-${Date.now()}`;
+      previousTask = editedTask.id
+        ? (workspace.tasks || []).find((task) => task.id === editedTask.id) || null
+        : null;
+      const optimisticTask = {
+        ...editedTask,
+        ...taskPayload,
+        id: optimisticId,
+        version: editedTask.id ? Number(editedTask.version || 0) + 1 : 1,
+      };
+      setWorkspace((current) => ({
         ...current,
-        ...taskEditorValue(savedTask || current),
+        tasks: editedTask.id
+          ? (current.tasks || []).map((task) => task.id === editedTask.id ? optimisticTask : task)
+          : [...(current.tasks || []), optimisticTask],
       }));
-      setTaskEditorNotice("Saved locally.");
-      if (taskEditor.sync_connection_id && !taskEditor.is_synchronized) {
-        try {
-          await syncCalendarTask(savedTaskId, taskEditor.sync_connection_id);
-          setTaskEditorNotice("Saved locally. Google sync queued.");
-        } catch (syncError) {
-          setTaskEditorError(
-            `Task saved, but Google synchronization could not be queued.${syncError?.message ? ` ${syncError.message}` : ""}`
-          );
-          setRefreshKey((value) => value + 1);
-          return;
-        }
-      } else if (!taskEditor.sync_connection_id && taskEditor.is_synchronized) {
-        await unlinkCalendarTaskSync(taskEditor.id);
-      }
+      optimisticApplied = true;
       setTaskEditor(null);
-      setRefreshKey((value) => value + 1);
+
+      const savedTask = editedTask.id
+        ? await updateCalendarTask(editedTask.id, taskPayload, editedTask.version)
+        : await createCalendarTask(taskPayload);
+      const savedTaskId = savedTask?.id || editedTask.id;
+      setWorkspace((current) => ({
+        ...current,
+        tasks: (current.tasks || []).map((task) =>
+          task.id === optimisticId ? { ...optimisticTask, ...(savedTask || {}), id: savedTaskId || optimisticId } : task
+        ),
+      }));
+      clearCalendarWorkspaceCache(cacheIdentity);
+
+      if (editedTask.sync_connection_id && !editedTask.is_synchronized) {
+        syncCalendarTask(savedTaskId, editedTask.sync_connection_id)
+          .then((syncedTask) => {
+            if (syncedTask) {
+              setWorkspace((current) => ({
+                ...current,
+                tasks: (current.tasks || []).map((task) => task.id === savedTaskId ? { ...task, ...syncedTask } : task),
+              }));
+            }
+            clearCalendarWorkspaceCache(cacheIdentity);
+          })
+          .catch((syncError) => {
+            setError(`Task saved, but Google synchronization could not be queued.${syncError?.message ? ` ${syncError.message}` : ""}`);
+          });
+      } else if (!editedTask.sync_connection_id && editedTask.is_synchronized) {
+        unlinkCalendarTaskSync(editedTask.id)
+          .then((unlinkedTask) => {
+            if (unlinkedTask) {
+              setWorkspace((current) => ({
+                ...current,
+                tasks: (current.tasks || []).map((task) => task.id === editedTask.id ? { ...task, ...unlinkedTask } : task),
+              }));
+            }
+            clearCalendarWorkspaceCache(cacheIdentity);
+          })
+          .catch((syncError) => setError(syncError?.message || "Task saved, but Google Calendar could not be unlinked."));
+      }
     } catch (taskError) {
+      if (optimisticApplied) {
+        setWorkspace((current) => ({
+          ...current,
+          tasks: editedTask.id
+            ? (current.tasks || []).map((task) => task.id === optimisticId ? previousTask : task).filter(Boolean)
+            : (current.tasks || []).filter((task) => task.id !== optimisticId),
+        }));
+      }
+      setTaskEditor(editedTask);
       setTaskEditorError(taskError?.message || "The task could not be saved locally.");
     } finally {
       setSaving(false);
     }
   };
 
-  const removeTask = async () => {
-    if (!taskEditor?.id) return;
-    const mode = chooseTaskDeletionMode(Boolean(taskEditor.is_synchronized));
-    if (!mode) return;
+  const removeTask = async (selectedTask, mode = "local_only") => {
+    if (!selectedTask?.id) return;
+    setTaskConfirmation(null);
     setSaving(true);
     setTaskEditorError("");
     try {
-      await deleteCalendarTask(taskEditor.id, mode);
-      setTaskEditor(null);
+      await deleteCalendarTask(selectedTask.id, mode);
+      if (taskEditor?.id === selectedTask.id) setTaskEditor(null);
       setRefreshKey((value) => value + 1);
     } catch (taskError) {
-      setTaskEditorError(taskError?.message || "The task could not be deleted.");
+      if (taskEditor?.id === selectedTask.id) setTaskEditorError(taskError?.message || "The task could not be deleted.");
+      else setError(taskError?.message || "The task could not be deleted.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const archiveTask = async (selectedTask) => {
+    if (!selectedTask?.id) return;
+    setTaskConfirmation(null);
+    setSaving(true);
+    setTaskEditorError("");
+    const archiveId = `calendar-task-${selectedTask.id}`;
+    try {
+      await archiveItem({
+        id: archiveId,
+        type: "task",
+        scope: user?.id ? `user-${user.id}` : "",
+        title: selectedTask.title || "Untitled task",
+        description: selectedTask.description || "Archived from the Calendar agenda.",
+        payload: {
+          task: {
+            ...selectedTask,
+            status_before_archive: selectedTask.status,
+          },
+        },
+      });
+      await archiveCalendarTask(selectedTask.id, selectedTask.version);
+      setTaskEditor(null);
+      setRefreshKey((value) => value + 1);
+    } catch (taskError) {
+      await deleteArchiveItem(archiveId).catch(() => {});
+      setTaskEditorError(taskError?.message || "The task could not be archived.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const requestTaskArchive = (selectedTask) => {
+    if (selectedTask?.id) setTaskConfirmation({ action: "archive", task: selectedTask });
+  };
+
+  const requestTaskDelete = (selectedTask) => {
+    if (selectedTask?.id) setTaskConfirmation({ action: "delete", task: selectedTask });
   };
 
   const connectProvider = async (provider) => {
@@ -940,7 +1104,7 @@ export default function ReservationCalendarPage({ user = null }) {
       <header className="reservation-calendar-toolbar">
         <div className="calendar-toolbar-copy"><span className="reservation-calendar-eyebrow">Workspace</span><h1>Calendar</h1><p>Bookings, events, tasks, reminders, and sync health in one place.</p></div>
         <div className="reservation-calendar-toolbar-actions">
-          <button type="button" className="calendar-toolbar-action calendar-notification-action" onClick={enableSystemNotifications} disabled={pushState === "loading" || pushState === "enabled" || pushState === "android_enabled"} title="Allow system notifications for calendar reminders"><BellRing size={16} /><span>{pushButtonLabel}</span></button>
+          <button type="button" className="calendar-toolbar-action calendar-notification-action" onClick={enableSystemNotifications} disabled={pushState === "checking" || pushState === "loading" || pushState === "enabled" || pushState === "android_enabled"} title="Allow system notifications for calendar reminders"><BellRing size={16} /><span>{pushButtonLabel}</span></button>
           <button type="button" className="calendar-toolbar-action is-icon-only" onClick={() => setRefreshKey((value) => value + 1)} aria-label="Refresh calendar" title="Refresh calendar"><RefreshCw size={17} /></button>
           <label className={`calendar-toolbar-action calendar-import${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable}><Plus size={16} /><span>Import</span><input type="file" accept=".ics,text/calendar" onChange={importIcs} disabled={!calendarFeaturesAvailable} /></label>
           <a className={`calendar-toolbar-action${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable} onClick={(event) => { if (!calendarFeaturesAvailable) event.preventDefault(); }} href={getCalendarExportUrl({ start: rangeStart.toISOString(), end: rangeEnd.toISOString() })}><Download size={16} /><span>Export</span></a>
@@ -962,7 +1126,7 @@ export default function ReservationCalendarPage({ user = null }) {
         <button type="button" onClick={() => movePeriod(1)} aria-label="Next"><ChevronRight size={18} /></button>
         <strong>{formatRange(rangeStart, rangeEnd)}</strong>
         <span className="calendar-control-spacer" />
-        <div className="reservation-calendar-view-switch">{(isPhoneAgenda ? ["agenda"] : VIEWS).map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => setView(item)} onPointerEnter={item === "agenda" ? warmAgendaCache : undefined} onFocus={item === "agenda" ? warmAgendaCache : undefined}>{item}</button>)}</div>
+        <div className="reservation-calendar-view-switch">{(isPhoneAgenda ? ["month", "agenda"] : VIEWS).map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => selectView(item)} onPointerEnter={item === "agenda" ? warmAgendaCache : undefined} onFocus={item === "agenda" ? warmAgendaCache : undefined}>{isPhoneAgenda && item === "month" ? "calendar" : item}</button>)}</div>
       </div>
 
       {error && <div className="calendar-workspace-notice"><AlertTriangle size={17} />{error}<button type="button" onClick={() => setError("")}><X size={15} /></button></div>}
@@ -1002,9 +1166,10 @@ export default function ReservationCalendarPage({ user = null }) {
           {!loading && (view === "day" || view === "week") && <div className={`calendar-time-grid is-${view}`}><div className="calendar-grid-header"><span>{workspace.viewer_timezone || "Local time"}</span>{days.map((day) => <button type="button" key={dateKey(day)} className={sameDay(day, new Date()) ? "is-today" : ""} onClick={() => { setFocusDate(day); setView("day"); }}><small>{day.toLocaleDateString(undefined, { weekday: "short" })}</small><strong>{day.getDate()}</strong></button>)}</div><div className="calendar-grid-body"><div className="calendar-grid-hours">{HOURS.map((hour) => <span key={hour}>{new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" })}</span>)}</div>{days.map((day) => <div className="calendar-grid-day" key={dateKey(day)}>{HOURS.map((hour) => { const slot = new Date(day); slot.setHours(hour, 0, 0, 0); return <button type="button" className="calendar-grid-slot" key={hour} aria-label={`Add to ${slot.toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric" })}`} onClick={() => openDateActions(slot, true)} />; })}{visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)).map((entry) => { const { item } = entry; const start = new Date(entry.startsAt); const end = new Date(entry.endsAt); const top = (start.getHours() + start.getMinutes() / 60) * 48; const height = Math.max(34, Math.min(180, (end - start) / 3600000 * 48)); const calendar = calendarById.get(item.calendar_id); return <button type="button" key={entry.key} className={`calendar-grid-event is-${entry.kind === "task" ? "task" : item.source_type || "madar"}`} style={{ top, height, "--event-color": calendar?.color || "#f26b4a" }} onClick={() => entry.kind === "task" ? openTask(item) : openEvent(item)}><strong>{item.title}</strong><span>{formatTime(entry.startsAt)} · {entry.kind === "task" ? "Task" : calendar?.name || item.source_label}</span>{entry.kind === "task" ? <small>{item.status.replace("_", " ")}</small> : item.visibility && <small>{item.visibility.replace("calendar_default", "default privacy")}</small>}</button>; })}</div>)}</div></div>}
           {!loading && view === "month" && <div className="calendar-month-grid">{Array.from({ length: 42 }, (_, index) => addDays(rangeStart, index)).map((day) => { const dayItems = visibleCalendarItems.filter((entry) => sameDay(entry.startsAt, day)); return <section key={dateKey(day)} className={day.getMonth() !== focusDate.getMonth() ? "is-outside" : ""}><button type="button" aria-label={`Add to ${day.toLocaleDateString()}`} onClick={() => openDateActions(day)}>{day.getDate()}</button>{dayItems.slice(0, 4).map((entry) => <button type="button" className={`calendar-month-event${entry.kind === "task" ? " is-task" : ""}`} style={{ "--event-color": calendarById.get(entry.item.calendar_id)?.color || "#f26b4a" }} key={entry.key} onClick={() => entry.kind === "task" ? openTask(entry.item) : openEvent(entry.item)}><span>{formatTime(entry.startsAt)}</span>{entry.kind === "task" && <ListTodo size={12} aria-hidden="true" />}{entry.item.title}</button>)}{dayItems.length > 4 && <small>+{dayItems.length - 4} more</small>}</section>; })}</div>}
           {!loading && view === "agenda" && <div className="calendar-agenda">
-            {unscheduledAgendaTasks.length > 0 && <><div className="calendar-agenda-section-title"><ListTodo size={15} /><strong>Unscheduled tasks</strong><span>{unscheduledAgendaTasks.length}</span></div>{unscheduledAgendaTasks.map((task) => <button type="button" className="calendar-agenda-task is-unscheduled" key={`task-${task.id}`} onClick={() => openTask(task)}><time><ListTodo size={19} /><span>Task</span></time><i /><div><strong>{task.title}</strong><span>{task.due_at ? `Due ${new Date(task.due_at).toLocaleString()}` : "Choose a time to place this task on your calendar"}</span></div><small>{task.status.replace("_", " ")}</small></button>)}</>}
+            {unscheduledAgendaTasks.length > 0 && <><div className="calendar-agenda-section-title"><ListTodo size={15} /><strong>Unscheduled tasks</strong><span>{unscheduledAgendaTasks.length}</span></div>{unscheduledAgendaTasks.map((task) => <AgendaTaskRow key={`task-${task.id}`} task={task} unscheduled saving={saving} onOpen={openTask} onArchive={requestTaskArchive} onDelete={requestTaskDelete} />)}</>}
             {agendaItems.length > 0 && <div className="calendar-agenda-section-title"><CalendarDays size={15} /><strong>Schedule</strong><span>{agendaItems.length}</span></div>}
             {agendaItems.map(({ kind, item }) => {
+              if (kind === "task") return <AgendaTaskRow key={`task-${item.id}-${item.agenda_start}`} task={item} start={item.agenda_start} end={item.agenda_end} saving={saving} onOpen={openTask} onArchive={requestTaskArchive} onDelete={requestTaskDelete} />;
               if (kind === "task") return <button type="button" className="calendar-agenda-task" key={`task-${item.id}-${item.agenda_start}`} onClick={() => openTask(item)}><time><strong>{new Date(item.agenda_start).getDate()}</strong><span>{new Date(item.agenda_start).toLocaleDateString(undefined, { month: "short", weekday: "short" })}</span></time><i /><div><strong>{item.title}</strong><span><ListTodo size={14} /> {formatTime(item.agenda_start)}–{formatTime(item.agenda_end)} · Scheduled task{item.recurrence_rule ? ` · Repeats ${item.recurrence_rule.replace("FREQ=", "").toLowerCase()}` : ""}</span></div><small>{item.status.replace("_", " ")}</small></button>;
               const calendar = calendarById.get(item.calendar_id);
               return <button type="button" key={`event-${item.id}`} onClick={() => openEvent(item)}><time><strong>{new Date(item.starts_at).getDate()}</strong><span>{new Date(item.starts_at).toLocaleDateString(undefined, { month: "short", weekday: "short" })}</span></time><i style={{ background: calendar?.color || "#f26b4a" }} /><div><strong>{item.title}</strong><span><Clock3 size={14} /> {formatTime(item.starts_at)}–{formatTime(item.ends_at)} · {calendar?.name || item.source_label}</span></div><small>{item.read_only ? "Synced reservation" : item.visibility?.replace("calendar_default", "Default privacy")}</small></button>;
@@ -1015,7 +1180,29 @@ export default function ReservationCalendarPage({ user = null }) {
       </div>
 
       {editor && <EventEditor value={editor} calendars={workspace.calendars || []} saving={saving} conflict={conflict} onChange={(field, value) => setEditor((current) => ({ ...current, [field]: value }))} onClose={() => setEditor(null)} onSave={saveEvent} onDelete={removeEvent} />}
-      {taskEditor && <TaskEditor value={taskEditor} connections={workspace.connections || []} saving={saving} error={taskEditorError} notice={taskEditorNotice} onChange={(field, value) => setTaskEditor((current) => ({ ...current, [field]: value }))} onClose={() => setTaskEditor(null)} onSave={saveTask} onDelete={removeTask} />}
+      {taskEditor && <TaskEditor value={taskEditor} connections={workspace.connections || []} saving={saving} error={taskEditorError} notice={taskEditorNotice} onClose={() => setTaskEditor(null)} onSave={saveTask} onArchive={() => requestTaskArchive(taskEditor)} onDelete={() => requestTaskDelete(taskEditor)} />}
+      {taskConfirmation && (
+        <div className={`calendar-task-confirmation is-${taskConfirmation.action}`}>
+          <PageDeleteConfirmModal
+            icon={taskConfirmation.action === "archive" ? <Archive size={24} /> : <AlertTriangle size={24} />}
+            title={taskConfirmation.action === "archive" ? "Archive this task?" : "Delete this task?"}
+            message={taskConfirmation.action === "archive"
+              ? <><strong>"{taskConfirmation.task.title}"</strong> will leave the active Calendar and can be viewed in Archive.</>
+              : taskConfirmation.task.is_synchronized
+                ? <><strong>"{taskConfirmation.task.title}"</strong> is synchronized with Google Calendar. Choose where it should be deleted.</>
+                : <><strong>"{taskConfirmation.task.title}"</strong> will be permanently deleted from Madar.</>}
+            cancelLabel="Cancel"
+            alternateLabel={taskConfirmation.action === "delete" && taskConfirmation.task.is_synchronized ? "Madar only" : undefined}
+            confirmLabel={taskConfirmation.action === "archive" ? "Archive task" : taskConfirmation.task.is_synchronized ? "Madar + Google" : "Delete task"}
+            confirmDisabled={saving}
+            onCancel={() => setTaskConfirmation(null)}
+            onAlternate={() => removeTask(taskConfirmation.task, "local_only")}
+            onConfirm={() => taskConfirmation.action === "archive"
+              ? archiveTask(taskConfirmation.task)
+              : removeTask(taskConfirmation.task, taskConfirmation.task.is_synchronized ? "local_and_provider" : "local_only")}
+          />
+        </div>
+      )}
       {dateAction && <DateActionChooser date={dateAction.date} onClose={() => setDateAction(null)} onTask={() => { const selection = dateAction; setDateAction(null); openNewTask(selection.date, selection.useSelectedTime); }} onReservation={() => { const selection = dateAction; setDateAction(null); openNewEvent(selection.date, selection.useSelectedTime); }} onOpenDay={() => { setFocusDate(dateAction.date); setView("day"); setDateAction(null); }} />}
       {editor?.id && history.length > 0 && <aside className="calendar-history-drawer"><header><History size={17} /><strong>Change history</strong></header>{history.slice(0, 8).map((item) => <div key={item.id}><strong>{item.action}</strong><span>{new Date(item.created_at).toLocaleString()} · {item.scope}</span></div>)}</aside>}
     </div>

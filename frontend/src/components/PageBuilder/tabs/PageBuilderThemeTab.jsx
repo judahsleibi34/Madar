@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { RotateCcw, Wand2 } from "lucide-react";
 import { defaultTheme } from "../core/PageBuilder.constants";
+import {
+  RESPONSIVE_LAYOUT_ENGINE_VERSION,
+  RESPONSIVE_LAYOUT_MODES,
+  isSmartResponsiveProject,
+} from "../core/PageBuilder.responsiveCapabilities";
 
 const websiteColorControls = [
   ["background", "Site background"],
@@ -188,9 +193,13 @@ export default function PageBuilderThemeTab({
   project,
   updateProject,
   variant = "page",
+  legacyShadowEnabled = false,
+  legacyShadowComparison = null,
+  onToggleLegacyShadow,
 }) {
   const websiteTheme = project.theme || {};
   const isSidebar = variant === "sidebar";
+  const smartResponsiveEnabled = isSmartResponsiveProject(project);
 
   const resetWebsiteTheme = () => {
     updateProject((prev) => ({
@@ -221,6 +230,54 @@ export default function PageBuilderThemeTab({
       },
     }));
   };
+
+  const toggleSmartResponsive = () => {
+    updateProject((current) => ({
+      ...current,
+      responsiveLayout: {
+        mode: smartResponsiveEnabled ? RESPONSIVE_LAYOUT_MODES.legacy : RESPONSIVE_LAYOUT_MODES.smart,
+        engineVersion: RESPONSIVE_LAYOUT_ENGINE_VERSION,
+      },
+    }));
+  };
+
+  const responsiveLayoutSection = (
+    <section className="theme-sidebar-section theme-responsive-section" aria-labelledby="theme-responsive-heading">
+      <div className="theme-sidebar-section-heading">
+        <h3 id="theme-responsive-heading">Website responsive layout</h3>
+      </div>
+      <p className="panel-help">
+        {smartResponsiveEnabled
+          ? `Smart engine v${RESPONSIVE_LAYOUT_ENGINE_VERSION} is active across every page of this website.`
+          : "Legacy mode preserves the three saved artboards across the website."}
+      </p>
+      <button
+        type="button"
+        className={smartResponsiveEnabled ? "danger-lite" : "primary-action"}
+        onClick={toggleSmartResponsive}
+      >
+        {smartResponsiveEnabled ? "Use legacy responsive" : "Enable smart responsive"}
+      </button>
+      {!smartResponsiveEnabled && typeof onToggleLegacyShadow === "function" && (
+        <button type="button" className="danger-lite" onClick={onToggleLegacyShadow}>
+          {legacyShadowEnabled ? "Stop shadow comparison" : "Compare smart layout in shadow"}
+        </button>
+      )}
+      {legacyShadowComparison && (
+        <div className="responsive-shadow-report" role="status">
+          <strong>Shadow comparison only</strong>
+          <p className="panel-help">
+            Compared {legacyShadowComparison.summary.comparedElementCount} elements;{" "}
+            {legacyShadowComparison.summary.changedElementCount} differ by more than 0.5px.
+            Maximum displacement: {legacyShadowComparison.summary.maximumDisplacement.toFixed(1)}px.
+          </p>
+          <p className="panel-help">
+            Blocking smart diagnostics: {legacyShadowComparison.summary.blockingDiagnosticCount}.
+          </p>
+        </div>
+      )}
+    </section>
+  );
 
   if (isSidebar) {
     return (
@@ -294,6 +351,7 @@ export default function PageBuilderThemeTab({
               </label>
             </div>
           </section>
+          {responsiveLayoutSection}
         </div>
       </div>
     );
@@ -360,6 +418,7 @@ export default function PageBuilderThemeTab({
             </select>
           </label>
         </div>
+        {responsiveLayoutSection}
       </section>
 
     </div>

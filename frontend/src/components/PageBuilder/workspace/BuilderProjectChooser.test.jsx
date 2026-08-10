@@ -20,14 +20,15 @@ function LocationProbe() {
 describe("BuilderProjectChooser", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("presents a structured, accessible loading state while projects are fetched", () => {
+  it("presents an accessible loading bar while projects are fetched", () => {
     listBuilderProjects.mockReturnValue(new Promise(() => {}));
     const { container } = render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
 
     expect(screen.getByRole("status").textContent).toContain("Loading your projects");
     expect(screen.getByText("Loading projects...")).toBeTruthy();
     expect(container.querySelector(".builder-project-chooser").getAttribute("aria-busy")).toBe("true");
-    expect(container.querySelectorAll(".builder-project-loading-row")).toHaveLength(3);
+    expect(container.querySelector(".app-loading-inline")).toBeTruthy();
+    expect(container.querySelectorAll(".builder-project-loading-row")).toHaveLength(0);
   });
 
   it("shows a responsive Builder workspace preview while automatically entering a project", () => {
@@ -40,7 +41,7 @@ describe("BuilderProjectChooser", () => {
     expect(container.querySelector(".builder-project-loading-screen").getAttribute("aria-busy"))
       .toBe("true");
     expect(container.querySelector(".builder-project-loading-bar")).toBeTruthy();
-    expect(container.querySelector(".builder-project-loading-progress")).toBeTruthy();
+    expect(container.querySelector(".app-loading-inline")).toBeTruthy();
     expect(container.querySelector(".builder-project-opening-preview")).toBeNull();
   });
 

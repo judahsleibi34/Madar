@@ -22,8 +22,28 @@ describe("PageBuilderThemeTab sidebar", () => {
     expect(screen.getByRole("heading", { name: "Themes" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Theme colors" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Shape & typography" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Website responsive layout" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable smart responsive" })).toBeTruthy();
     expect(screen.getByLabelText("Corner radius").value).toBe("0");
     expect(screen.getByRole("button", { name: "Apply to pages" })).toBeTruthy();
+  });
+
+  it("enables smart responsive for the complete project from Themes", () => {
+    const updateProject = vi.fn();
+    render(
+      <PageBuilderThemeTab
+        project={{ theme: {}, responsiveLayout: { mode: "legacy", engineVersion: 1 } }}
+        updateProject={updateProject}
+        variant="sidebar"
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Enable smart responsive" }));
+    const updater = updateProject.mock.calls[0][0];
+    expect(updater({ pages: [{ id: "one" }, { id: "two" }] }).responsiveLayout).toEqual({
+      mode: "smart",
+      engineVersion: 1,
+    });
   });
 
   it("keeps form styling when the website theme is reset", () => {

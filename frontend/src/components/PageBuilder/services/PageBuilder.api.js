@@ -272,6 +272,23 @@ export const updateCalendarTask = async (taskId, task, expectedVersion) => {
   return (await parseJsonResponse(response))?.task;
 };
 
+export const archiveCalendarTask = async (taskId, expectedVersion) => {
+  const query = new URLSearchParams({ expected_version: String(expectedVersion) });
+  const response = await apiFetch(
+    getApiUrl(`/calendar/tasks/${encodeURIComponent(taskId)}/archive?${query}`),
+    { method: "POST", headers: builderWriteHeaders() }
+  );
+  return (await parseJsonResponse(response))?.task;
+};
+
+export const fetchArchivedCalendarTasks = async () => {
+  const response = await apiFetch(getApiUrl("/calendar/tasks/archived"), {
+    method: "GET",
+    cache: "no-store",
+  });
+  return (await parseJsonResponse(response))?.tasks || [];
+};
+
 export const syncCalendarTask = async (taskId, connectionId) => {
   const response = await apiFetch(
     getApiUrl(`/calendar/tasks/${encodeURIComponent(taskId)}/sync`),

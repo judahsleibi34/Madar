@@ -23,9 +23,9 @@ vi.mock("../components/DashboardBuilder/EcommerceStorePage", () => ({
 }));
 vi.mock("../components/DashboardBuilder/ReservationCalendarPage", async () => {
   const React = await import("react");
-  function CalendarMock({ user }) {
+  function CalendarMock({ user, initialView }) {
     const [mountedTenant] = React.useState(user?.tenant_id || "missing");
-    return <div>Calendar mounted for {mountedTenant}</div>;
+    return <div>Calendar mounted for {mountedTenant} in {initialView || "calendar"} view</div>;
   }
   return {
     default: CalendarMock,
@@ -116,7 +116,7 @@ describe("workspace settings routes", () => {
         />
       </MemoryRouter>
     );
-    expect(await screen.findByText("Calendar mounted for tenant-a")).toBeTruthy();
+    expect(await screen.findByText("Calendar mounted for tenant-a in calendar view")).toBeTruthy();
 
     rerender(
       <MemoryRouter initialEntries={["/calendar"]}>
@@ -127,7 +127,17 @@ describe("workspace settings routes", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Calendar mounted for tenant-b")).toBeTruthy();
-    expect(screen.queryByText("Calendar mounted for tenant-a")).toBeNull();
+    expect(await screen.findByText("Calendar mounted for tenant-b in calendar view")).toBeTruthy();
+    expect(screen.queryByText("Calendar mounted for tenant-a in calendar view")).toBeNull();
+  });
+
+  it("opens Agenda directly on its own refresh-safe route", async () => {
+    render(
+      <MemoryRouter initialEntries={["/agenda"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
   });
 });

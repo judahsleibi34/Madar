@@ -6,6 +6,7 @@ import { isAndroidDevice } from "../../pwa/pwaContext";
 import {
   enableBrowserPushNotifications,
   fetchNotifications,
+  getBrowserPushStatus,
   markAllNotificationsRead,
   markNotificationRead,
 } from "../../services/notificationsApi";
@@ -40,7 +41,7 @@ export default function NotificationsPage({ user }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [pushState, setPushState] = useState("");
+  const [pushState, setPushState] = useState("checking");
   const [loadedIdentity, setLoadedIdentity] = useState("");
   const notificationIdentity = `${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`;
   const hasNotificationIdentity = Boolean(user?.tenant_id && (user?.id || user?.auth_id));
@@ -48,6 +49,25 @@ export default function NotificationsPage({ user }) {
   const visibleNotifications = identityMatches ? notifications : EMPTY_NOTIFICATIONS;
   const visibleUnreadCount = identityMatches ? unreadCount : 0;
   const visibleLoading = hasNotificationIdentity && (identityMatches ? loading : true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBrowserPushStatus()
+      .then((result) => {
+        if (cancelled) return;
+        setPushState(
+          result.enabled
+            ? isAndroidDevice() ? "android_enabled" : "enabled"
+            : result.reason === "subscription_missing" ? "" : result.reason || ""
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setPushState("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [notificationIdentity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,8 +194,14 @@ export default function NotificationsPage({ user }) {
       </header>
 
       <div className="notifications-actions">
-        <button type="button" onClick={enablePush} disabled={pushState === "loading"}>
-          {t("notifications.enablePush")}
+        <button
+          type="button"
+          onClick={enablePush}
+          disabled={["checking", "loading", "enabled", "android_enabled"].includes(pushState)}
+        >
+          {pushState === "enabled" || pushState === "android_enabled"
+            ? t("notifications.pushEnabledButton")
+            : t("notifications.enablePush")}
         </button>
         <button type="button" onClick={markAllRead} disabled={visibleUnreadCount === 0}>
           {t("notifications.markAllRead")}

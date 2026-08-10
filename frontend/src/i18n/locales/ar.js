@@ -63,9 +63,12 @@ const ar = {
     fallbackTitle: "إشعار مساحة العمل",
     emptyTitle: "لا توجد إشعارات بعد",
     emptyDetail: "ستظهر ردود النماذج وأحداث المنشئ هنا.",
+    pushEnabledButton: "System notifications on",
     pushState: {
+      checking: "Checking notification status...",
       android_enabled: "Android notifications are enabled, even when Madar is closed. Allow notifications for Madar or Chrome in Android Settings for Lock Screen delivery.",
       android_browser_unsupported: "Open Madar in an up-to-date Chrome browser on Android, then enable notifications again.",
+      secure_context_required: "Lock Screen notifications require the installed Madar app to use a secure HTTPS address. HTTP and local-network addresses are not supported.",
       ios_home_screen_required: "On iPhone: tap Share, choose Add to Home Screen, open Madar from the new Home Screen icon, then enable notifications again. Requires iOS 16.4 or later.",
       loading: "جاري طلب الإذن...",
       enabled: "تم تفعيل إشعارات المتصفح.",

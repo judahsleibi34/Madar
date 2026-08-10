@@ -304,6 +304,11 @@ class CalendarRouteTests(unittest.TestCase):
                 "id": "cancelled", "tenant_id": 7, "calendar_id": None,
                 "owner_user_id": 12, "status": "cancelled", "due_at": None,
             },
+            {
+                "id": "linked-cancelled", "tenant_id": 7, "calendar_id": "calendar-1",
+                "owner_user_id": 12, "status": "cancelled", "due_at": None,
+                "sync_event_id": "provider-event-1",
+            },
         ]
         client = SimpleNamespace(table=lambda _name: Query(rows))
         member = SimpleNamespace(tenant_id=7, user_id=12, role="member")
@@ -311,6 +316,9 @@ class CalendarRouteTests(unittest.TestCase):
         with patch.object(calendar_routes, "service_supabase", client):
             member_rows = calendar_routes.workspace_task_rows(member, ["calendar-1"])
             admin_rows = calendar_routes.workspace_task_rows(admin, ["calendar-1"])
+            linked_event_ids = calendar_routes.workspace_linked_task_event_ids(
+                member, ["calendar-1"]
+            )
 
         self.assertEqual(
             {row["id"] for row in member_rows},
@@ -320,6 +328,52 @@ class CalendarRouteTests(unittest.TestCase):
             {row["id"] for row in admin_rows},
             {"calendar-task", "own-unassigned", "other-unassigned"},
         )
+        self.assertEqual(linked_event_ids, {"provider-event-1"})
+
+    def test_archive_task_marks_it_cancelled_without_deleting_it(self):
+        context = SimpleNamespace(tenant_id=7, user_id=12, role="member")
+        existing = {
+            "id": "task-1", "tenant_id": 7, "calendar_id": "calendar-1",
+            "owner_user_id": 12, "status": "todo", "version": 3,
+        }
+
+        class UpdateQuery:
+            def __init__(self):
+                self.values = {}
+            def update(self, values):
+                self.values = dict(values)
+                return self
+            def eq(self, *_args):
+                return self
+            def execute(self):
+                return SimpleNamespace(data=[{**existing, **self.values}])
+
+        query = UpdateQuery()
+        client = SimpleNamespace(table=lambda _name: query)
+        with patch.object(calendar_routes, "service_supabase", client), patch.object(
+            calendar_routes, "require_calendar_feature"
+        ), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "tenant_task", return_value=existing
+        ), patch.object(
+            calendar_routes, "require_task_access"
+        ), patch.object(
+            calendar_routes, "sync_task_reminder"
+        ) as sync_reminder, patch.object(
+            calendar_routes, "record_calendar_audit"
+        ) as audit:
+            result = calendar_routes.archive_task(
+                "task-1", object(), object(), expected_version=3
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["task"]["status"], "cancelled")
+        self.assertEqual(result["task"]["version"], 4)
+        sync_reminder.assert_called_once()
+        self.assertEqual(sync_reminder.call_args.args[0]["status"], "cancelled")
+        self.assertIsNone(sync_reminder.call_args.args[1])
+        self.assertEqual(audit.call_args.args[2], "calendar.task_archived")
 
     def test_recurring_task_reminder_rolls_forward_after_delivery(self):
         next_time = next_task_reminder_time({

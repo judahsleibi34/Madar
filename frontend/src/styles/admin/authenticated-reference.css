@@ -58,6 +58,63 @@
   overflow: hidden;
 }
 
+/* The submissions workspace is the visual contract for every authenticated
+   page: one neutral app canvas, flat bordered surfaces, and the shared accent. */
+.admin-dashboard-layout.authenticated-shell {
+  --theme-bg-soft: var(--theme-bg);
+  --app-card-shadow: none;
+  --app-control-shadow: none;
+  background: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+.admin-dashboard-layout.authenticated-shell > :is(.admin-sidebar, .admin-dashboard-page) {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+.admin-dashboard-layout.authenticated-shell > .admin-sidebar {
+  background: var(--theme-surface);
+  border-inline-end: 1px solid var(--theme-border);
+  box-shadow: none;
+}
+
+.admin-dashboard-layout.authenticated-shell > .admin-dashboard-page {
+  background-image: none;
+}
+
+.admin-dashboard-layout.authenticated-shell :where(
+  .overview-card,
+  .dashboard-panel,
+  .admin-signal-card,
+  .user-dashboard-stat,
+  .user-dashboard-panel,
+  .user-dashboard-form-data-card,
+  .settings-card,
+  .settings-security-panel,
+  .notifications-summary-grid > article,
+  .notifications-board,
+  .my-plan-current-card,
+  .security-mfa-panel,
+  .change-password-card,
+  .user-management-row,
+  .ecommerce-summary-card,
+  .ecommerce-list-card,
+  .ecommerce-form-section,
+  .cv-rerank-card
+) {
+  border-color: var(--theme-border);
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.user-management-loading-bar {
+  display: grid;
+  min-height: 120px;
+  place-items: start center;
+  padding-block: 32px;
+}
+
 .admin-dashboard-layout,
 .admin-dashboard-layout *,
 .admin-dashboard-layout *::before,

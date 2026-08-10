@@ -27,6 +27,7 @@ from services.calendar_reminder_service import (
     finalize_calendar_reminder_deliveries,
     mark_calendar_reminder_delivery,
 )
+from services.calendar_task_archive_service import archive_ended_calendar_tasks
 from services.observability_service import configure_structured_logging
 
 logger = logging.getLogger(__name__)
@@ -234,6 +235,10 @@ def main() -> int:
     cleanup_due_at = time.monotonic()
     try:
         while not STOP_EVENT.is_set():
+            try:
+                archive_ended_calendar_tasks(limit=batch_size)
+            except Exception as error:
+                logger.error("calendar_tasks.auto_archive_failed", extra={"error_type": type(error).__name__})
             try:
                 enqueue_due_calendar_reminders(limit=batch_size)
             except Exception as error:

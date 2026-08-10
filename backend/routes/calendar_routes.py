@@ -352,6 +352,22 @@ def workspace_task_rows(context, detail_ids: list[str]) -> list[dict[str, Any]]:
     }.values())
 
 
+def workspace_linked_task_event_ids(context, detail_ids: list[str]) -> set[str]:
+    rows: list[dict[str, Any]] = []
+    if detail_ids:
+        rows = getattr(
+            service_supabase.table("calendar_tasks").select("sync_event_id")
+            .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
+            .limit(1000).execute(),
+            "data", None,
+        ) or []
+    return {
+        str(row.get("sync_event_id"))
+        for row in rows
+        if row.get("sync_event_id")
+    }
+
+
 def safe_task_payload(task: dict[str, Any]) -> dict[str, Any]:
     payload = dict(task)
     payload["is_synchronized"] = bool(payload.pop("sync_event_id", None))
@@ -1017,11 +1033,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
         events.extend(reservation_payload(row) for row in reservations if row.get("starts_at"))
 
     tasks = workspace_task_rows(context, detail_ids)
-    linked_task_event_ids = {
-        str(task.get("sync_event_id"))
-        for task in tasks
-        if task.get("sync_event_id")
-    }
+    linked_task_event_ids = workspace_linked_task_event_ids(context, detail_ids)
     if linked_task_event_ids:
         events = [
             event
@@ -1356,6 +1368,30 @@ def create_task(payload: TaskWrite, request: Request, response: Response):
     }
 
 
+@router.get("/tasks/archived")
+def list_archived_tasks(request: Request, response: Response):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    detail_ids = [
+        str(access.calendar.get("id"))
+        for access in list_accessible_calendars(context)
+        if access.role in {"viewer", "editor", "owner"}
+    ]
+    tasks: list[dict[str, Any]] = []
+    if detail_ids:
+        tasks = getattr(
+            service_supabase.table("calendar_tasks").select("*")
+            .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
+            .eq("status", "cancelled").order("updated_at", desc=True)
+            .limit(1000).execute(),
+            "data", None,
+        ) or []
+    return {
+        "success": True,
+        "tasks": [safe_task_payload(task) for task in tasks],
+    }
+
+
 @router.put("/tasks/{task_id}")
 def update_task(task_id: str, payload: TaskWrite, request: Request, response: Response, expected_version: int = Query(ge=1)):
     require_calendar_feature()
@@ -1437,6 +1473,39 @@ def sync_task(
         "sync_status": "pending",
         "task": safe_task_payload(updated),
     }
+
+
+@router.post("/tasks/{task_id}/archive")
+def archive_task(
+    task_id: str,
+    request: Request,
+    response: Response,
+    expected_version: int = Query(ge=1),
+):
+    require_calendar_feature()
+    context = require_active_tenant_member(request, response)
+    task = tenant_task(task_id, context.tenant_id)
+    require_task_access(context, task)
+    updated = getattr(
+        service_supabase.table("calendar_tasks").update({
+            "status": "cancelled",
+            "version": expected_version + 1,
+        }).eq("id", task_id).eq("tenant_id", context.tenant_id)
+        .eq("version", expected_version).execute(),
+        "data", None,
+    ) or []
+    if not updated:
+        raise HTTPException(status_code=409, detail="Task changed or was removed")
+    sync_task_reminder(updated[0], None)
+    record_calendar_audit(
+        context,
+        request,
+        "calendar.task_archived",
+        "calendar_task",
+        task_id,
+        {"previous_status": task.get("status")},
+    )
+    return {"success": True, "task": safe_task_payload(updated[0])}
 
 
 @router.delete("/tasks/{task_id}/sync")

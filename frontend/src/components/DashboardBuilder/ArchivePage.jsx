@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  ListTodo,
   RefreshCw,
   Trash2,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import {
   deleteArchiveItem,
   listArchiveItems,
 } from "../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage";
+import { fetchArchivedCalendarTasks } from "../PageBuilder/services/PageBuilder.api";
 import { downloadCsv } from "../PageBuilder/DataAnalysisWorkspace/utils/dataframeExport";
 import { getBuilderStorageKey } from "../PageBuilder/core/PageBuilder.constants";
 
@@ -22,6 +24,7 @@ const FILTERS = [
   { id: "dataset", label: "Saved data", description: "Cleaned and imported datasets", icon: Database },
   { id: "chart", label: "Plots", description: "Charts saved from analysis", icon: BarChart3 },
   { id: "report", label: "Reports", description: "Reusable report drafts", icon: FileText },
+  { id: "task", label: "Tasks", description: "Tasks removed from the Calendar agenda", icon: ListTodo },
 ];
 
 const DATASET_TYPES = new Set(["dataset", "loaded_dataset", "cleaned_dataset"]);
@@ -37,6 +40,7 @@ function getItemKindLabel(item, fallback = "Archived item") {
   if (item.type === "cleaned_dataset" || item.type === "dataset") return "Cleaned dataset";
   if (item.type === "chart") return "Plot";
   if (item.type === "report") return "Report";
+  if (item.type === "task") return "Task";
   return fallback;
 }
 
@@ -88,6 +92,15 @@ function getItemMeta(item) {
     ].filter(Boolean);
   }
 
+  if (item.type === "task") {
+    const task = item.payload?.task || {};
+    return [
+      task.status_before_archive ? `Was: ${task.status_before_archive.replaceAll("_", " ")}` : "Archived task",
+      task.scheduled_start ? `Scheduled: ${formatDate(task.scheduled_start)}` : "Unscheduled",
+      task.priority ? `Priority: ${task.priority}` : "",
+    ].filter(Boolean);
+  }
+
   return [];
 }
 
@@ -129,6 +142,17 @@ function getArchiveWorkspaceName(userId) {
   }
 }
 
+function archivedTaskItem(task) {
+  return {
+    id: `calendar-task-${task.id}`,
+    type: "task",
+    title: task.title || "Untitled task",
+    description: task.description || "Archived from the Calendar agenda.",
+    createdAt: task.updated_at || task.created_at || Date.now(),
+    payload: { task },
+  };
+}
+
 export default function ArchivePage({ user }) {
   const [items, setItems] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
@@ -142,7 +166,24 @@ export default function ArchivePage({ user }) {
       const archiveItems = await listArchiveItems({
         scope: archiveScope,
       });
-      setItems(archiveItems);
+      let archivedTasks = [];
+      try {
+        archivedTasks = await fetchArchivedCalendarTasks();
+      } catch {
+        archivedTasks = [];
+      }
+      const combined = new Map(
+        archivedTasks.map((task) => {
+          const item = archivedTaskItem(task);
+          return [item.id, item];
+        })
+      );
+      archiveItems.forEach((item) => {
+        combined.set(item.id, { ...combined.get(item.id), ...item });
+      });
+      setItems([...combined.values()].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      ));
       setStatus("ready");
     } catch {
       setStatus("error");
@@ -196,8 +237,8 @@ export default function ArchivePage({ user }) {
               <span className="archive-kicker daw-kicker">Archive</span>
               <h1 id="archive-title">Saved work history</h1>
               <p>
-                Keep old cleaned datasets, deleted charts, and report drafts so the
-                next dataset does not erase useful previous work.
+                Keep old tasks, cleaned datasets, deleted charts, and report drafts
+                so useful previous work remains available.
               </p>
             </div>
           </header>
@@ -274,7 +315,7 @@ export default function ArchivePage({ user }) {
           <div className="archive-empty-state" role="status">
             <span className="archive-empty-icon" aria-hidden="true"><RefreshCw className="is-spinning" size={24} /></span>
             <h3>Loading saved work</h3>
-            <p>Checking this browser for datasets, plots, and report drafts.</p>
+            <p>Checking this browser for tasks, datasets, plots, and report drafts.</p>
           </div>
         ) : null}
 
@@ -293,7 +334,7 @@ export default function ArchivePage({ user }) {
             <h3>{activeFilter === "all" ? "Your archive is ready" : `No ${FILTERS.find((filter) => filter.id === activeFilter)?.label.toLowerCase()} yet`}</h3>
             <p>
               {activeFilter === "all"
-                ? "Saved data, plots, and report drafts will appear here automatically as you work."
+                ? "Archived tasks, saved data, plots, and report drafts will appear here as you work."
                 : "Try another filter or save new work from the data workspace."}
             </p>
             {activeFilter !== "all" ? (
@@ -350,15 +391,17 @@ export default function ArchivePage({ user }) {
                 >
                   <Download size={16} />
                 </button>
-                <button
-                  type="button"
-                  className="archive-delete-button"
-                  onClick={() => removeItem(item.id)}
-                  title="Delete from archive"
-                  aria-label="Delete from archive"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {item.type !== "task" ? (
+                  <button
+                    type="button"
+                    className="archive-delete-button"
+                    onClick={() => removeItem(item.id)}
+                    title="Delete from archive"
+                    aria-label="Delete from archive"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                ) : null}
               </div>
             </article>
           );

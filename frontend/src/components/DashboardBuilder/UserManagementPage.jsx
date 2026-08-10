@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
+import LoadingBar from "../common/LoadingBar";
 import { apiFetch } from "../../utils/apiClient";
 import {
   getUserManagementFriendlyLabels,
@@ -204,49 +205,8 @@ function UserRow({
 
 function UserManagementSkeleton({ labels }) {
   return (
-    <div
-      className="user-management-skeleton-list"
-      aria-busy="true"
-      aria-label={labels.loading}
-    >
-      {Array.from({ length: 4 }).map((_, index) => (
-        <article className="user-management-row user-management-skeleton-row" key={index}>
-          <div className="user-management-half user-management-identity-half">
-            <div className="user-management-profile">
-              <div className="user-management-skeleton-avatar" />
-              <div className="user-management-skeleton-profile-lines">
-                <span className="user-management-skeleton-line name" />
-                <span className="user-management-skeleton-line email" />
-                <span className="user-management-skeleton-line tenant" />
-              </div>
-            </div>
-
-            <div className="user-management-controls">
-              <div className="user-management-skeleton-field">
-                <span className="user-management-skeleton-line label" />
-                <span className="user-management-skeleton-line input" />
-              </div>
-              <span className="user-management-skeleton-line button" />
-            </div>
-          </div>
-
-          <div className="user-management-half user-management-management-half">
-            <div className="user-management-plan-grid">
-              {Array.from({ length: 4 }).map((__, fieldIndex) => (
-                <div className="user-management-skeleton-field" key={fieldIndex}>
-                  <span className="user-management-skeleton-line label" />
-                  <span className="user-management-skeleton-line input" />
-                </div>
-              ))}
-            </div>
-
-            <div className="user-management-actions">
-              <span className="user-management-skeleton-line action" />
-              <span className="user-management-skeleton-line action" />
-            </div>
-          </div>
-        </article>
-      ))}
+    <div className="user-management-loading-bar">
+      <LoadingBar mode="inline" label={labels.loading} />
     </div>
   );
 }

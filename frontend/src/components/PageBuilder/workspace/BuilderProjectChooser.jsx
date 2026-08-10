@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import LoadingBar from "../../common/LoadingBar";
 import { createBuilderProject, listBuilderProjects } from "../services/PageBuilder.api";
 import { cleanBuilderProject } from "../core/PageBuilder.project";
 import { createBlankWorkspaceProject } from "../core/PageBuilder.starters";
@@ -14,49 +15,14 @@ function BuilderProjectLoadingState({
   note,
   announcement,
 }) {
-  const openingBuilder = variant === "builder";
-
-  if (openingBuilder) {
-    return (
-      <div className="builder-project-loading-bar" role="status" aria-live="polite">
-        <div className="builder-project-loading-bar-copy">
-          <strong>{title}</strong>
-          <span>{description}</span>
-        </div>
-        <div className="builder-project-loading-progress" aria-hidden="true"><span /></div>
-        <span className="builder-project-loading-announcement">{announcement}</span>
-      </div>
-    );
-  }
-
   return (
-    <div className={`builder-project-chooser-loading is-${variant}`} role="status" aria-live="polite">
-      <div className="builder-project-loading-heading">
-        <div className="builder-project-loading-mark" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div>
-          <strong>{title}</strong>
-          <span>{description}</span>
-        </div>
+    <div className={`builder-project-loading-bar is-${variant}`}>
+      <div className="builder-project-loading-bar-copy">
+        <strong>{title}</strong>
+        <span>{description}</span>
       </div>
-
-      <div className="builder-project-loading-progress" aria-hidden="true"><span /></div>
-
-      <div className="builder-project-loading-list" aria-hidden="true">
-        {[0, 1, 2].map((item) => (
-          <div className="builder-project-loading-row" key={item}>
-            <span className="builder-project-loading-icon" />
-            <span className="builder-project-loading-copy"><span /><span /></span>
-            <span className="builder-project-loading-status" />
-          </div>
-        ))}
-      </div>
-
-      <p className="builder-project-loading-note"><span aria-hidden="true" />{note}</p>
-      <span className="builder-project-loading-announcement">{announcement}</span>
+      <LoadingBar mode="inline" label={title} />
+      <span className="builder-project-loading-announcement">{announcement || note}</span>
     </div>
   );
 }

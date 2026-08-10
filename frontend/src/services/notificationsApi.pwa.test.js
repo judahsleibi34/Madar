@@ -27,6 +27,7 @@ vi.mock("../utils/apiClient", () => ({
 
 import {
   enableBrowserPushNotifications,
+  getBrowserPushStatus,
   reconcileBrowserPushLifecycle,
 } from "./notificationsApi";
 
@@ -104,6 +105,9 @@ describe("explicit browser Push enablement", () => {
 
     await expect(enableBrowserPushNotifications()).resolves.toEqual({ enabled: true });
     expect(window.Notification.requestPermission).toHaveBeenCalledTimes(1);
+    expect(window.Notification.requestPermission.mock.invocationCallOrder[0]).toBeLessThan(
+      apiFetch.mock.invocationCallOrder[0]
+    );
     expect(getMadarServiceWorkerRegistration).toHaveBeenCalledTimes(1);
     expect(subscribe).not.toHaveBeenCalled();
     expect(apiFetch).toHaveBeenCalledWith(
@@ -120,6 +124,29 @@ describe("explicit browser Push enablement", () => {
       reason: "permission_denied",
     });
     expect(getMadarServiceWorkerRegistration).not.toHaveBeenCalled();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("restores enabled state from the browser permission and saved subscription", async () => {
+    window.Notification.permission = "granted";
+    getExistingMadarPushEndpoint.mockResolvedValue("https://push.example/ios-device");
+    await expect(getBrowserPushStatus()).resolves.toEqual({ enabled: true });
+  });
+
+  it("explains that Web Push requires a secure origin", async () => {
+    Object.defineProperty(window, "isSecureContext", {
+      configurable: true,
+      value: false,
+    });
+    await expect(enableBrowserPushNotifications()).resolves.toEqual({
+      enabled: false,
+      reason: "secure_context_required",
+    });
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    Object.defineProperty(window, "isSecureContext", {
+      configurable: true,
+      value: true,
+    });
   });
 
   it("reconciles an installation before binding Push when tenant context is available", async () => {

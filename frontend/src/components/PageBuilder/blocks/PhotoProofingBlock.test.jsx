@@ -38,4 +38,20 @@ describe("PhotoProofingBlock", () => {
     expect(screen.getByAltText("Second portrait")).toBeTruthy();
     expect(container.querySelector(".photo-proofing-launcher")).toBeTruthy();
   });
+
+  it("shows the description on the cover only", () => {
+    render(<PhotoProofingBlock content={content} settings={{ description: "Cover copy" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start selecting" }));
+
+    const card = document.querySelector(".photo-proofing-card");
+    expect(card.textContent).toContain("Cover copy");
+    fireEvent.pointerDown(card, { pointerId: 1, clientX: 100 });
+    fireEvent.pointerMove(card, { pointerId: 1, clientX: 230 });
+    fireEvent.pointerUp(card, { pointerId: 1, clientX: 230 });
+    act(() => vi.advanceTimersByTime(250));
+
+    expect(screen.getByAltText("Second portrait")).toBeTruthy();
+    expect(document.querySelector(".photo-proofing-card").textContent).not.toContain("Cover copy");
+    expect(document.querySelector(".photo-proofing-card").textContent).not.toContain("Golden hour");
+  });
 });
