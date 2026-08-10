@@ -66,6 +66,9 @@ const en = {
     pushState: {
       loading: "Requesting permission...",
       enabled: "System notifications are enabled on this device, even when Madar is closed.",
+      android_enabled: "Android notifications are enabled, even when Madar is closed. If they do not appear on the Lock Screen, allow notifications for Madar or Chrome in Android Settings. Chrome's Install app option is available for an app-like icon and badge.",
+      ios_home_screen_required: "On iPhone: tap Share, choose Add to Home Screen, open Madar from the new Home Screen icon, then tap Enable system notifications again. Requires iOS 16.4 or later.",
+      android_browser_unsupported: "Open Madar in an up-to-date Chrome browser on Android, then enable system notifications again.",
       unsupported: "This browser does not support web push.",
       server_not_configured: "Web push is not configured on the server yet.",
       permission_denied: "Notification permission was not granted.",

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCircle2, Circle } from "lucide-react";
 
 import { useLanguage } from "../../i18n";
+import { isAndroidDevice } from "../../pwa/pwaContext";
 import {
   enableBrowserPushNotifications,
   fetchNotifications,
@@ -111,7 +112,11 @@ export default function NotificationsPage({ user }) {
 
     try {
       const result = await enableBrowserPushNotifications({ tenantId: user?.tenant_id });
-      setPushState(result.enabled ? "enabled" : result.reason || "unavailable");
+      setPushState(
+        result.enabled
+          ? isAndroidDevice() ? "android_enabled" : "enabled"
+          : result.reason || "unavailable"
+      );
     } catch {
       setPushState("failed");
     }
@@ -176,7 +181,7 @@ export default function NotificationsPage({ user }) {
           {t("notifications.markAllRead")}
         </button>
         {pushState && (
-          <span>{t(`notifications.pushState.${pushState}`)}</span>
+          <span role="status">{t(`notifications.pushState.${pushState}`)}</span>
         )}
       </div>
 

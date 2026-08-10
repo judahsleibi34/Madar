@@ -20,6 +20,7 @@ describe("PWA static contract", () => {
     expect(manifest).toMatchObject({
       name: "Madar",
       short_name: "Madar",
+      id: "/",
       start_url: "/dashboard",
       scope: "/",
       display: "standalone",

@@ -2315,6 +2315,18 @@
   }
 }
 
+.calendar-push-guidance {
+  margin: -10px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--theme-primary) 34%, var(--theme-border));
+  border-radius: 10px;
+  color: var(--theme-text);
+  background: var(--theme-primary-soft);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 @media (max-width: 420px) {
   .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
     grid-template-columns: minmax(0, 1fr);

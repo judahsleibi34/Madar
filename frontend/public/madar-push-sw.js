@@ -106,8 +106,8 @@ self.addEventListener("push", (event) => {
     body: typeof payload.body === "string" && payload.body
       ? payload.body.slice(0, 240)
       : "Open Madar to view details.",
-    icon: "/pwa-icon-192.png",
-    badge: "/pwa-icon-192.png",
+    icon: "/madar-app-icon-192.png",
+    badge: "/madar-app-icon-192.png",
     data: { action },
   };
   if (typeof payload.tag === "string" && /^madar-event:[A-Za-z0-9-]{1,100}$/.test(payload.tag)) {

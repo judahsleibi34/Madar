@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   getMadarLaunchContext,
   installMadarPwaMetadata,
+  isAndroidDevice,
+  isIOSDevice,
   isMadarPwaHost,
   MADAR_MANIFEST_PATH,
 } from "./pwaContext";
@@ -33,6 +35,21 @@ describe("Madar PWA launch context", () => {
     });
     expect(context.isStandalone).toBe(true);
     expect(context.isIOSStandalone).toBe(true);
+  });
+
+  it("detects modern iPhone and iPad devices", () => {
+    expect(isIOSDevice({ navigator: { userAgent: "Mozilla/5.0 (iPhone)" } })).toBe(true);
+    expect(isIOSDevice({
+      navigator: { platform: "MacIntel", maxTouchPoints: 5, userAgent: "Safari" },
+    })).toBe(true);
+    expect(isIOSDevice({ navigator: { platform: "Win32", userAgent: "Chrome" } })).toBe(false);
+  });
+
+  it("detects Android devices", () => {
+    expect(isAndroidDevice({
+      navigator: { userAgent: "Mozilla/5.0 (Linux; Android 15; Pixel 9)" },
+    })).toBe(true);
+    expect(isAndroidDevice({ navigator: { userAgent: "Mozilla/5.0 (iPhone)" } })).toBe(false);
   });
 
   it("defaults safely to a normal browser", () => {

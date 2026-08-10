@@ -298,6 +298,18 @@
   margin: 0 auto;
   display: grid;
   gap: 18px;
+  color: var(--theme-text);
+  color-scheme: inherit;
+}
+
+/* Keep Notifications on the same app canvas as Calendar. The global
+   data-theme tokens update this route immediately when the theme changes. */
+.admin-dashboard-page:has(> .notifications-page) {
+  background: var(--theme-bg);
+}
+
+.notification-popover {
+  color-scheme: inherit;
 }
 
 .notifications-page-header {

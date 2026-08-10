@@ -33,6 +33,14 @@ import {
 describe("explicit browser Push enablement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 (Windows NT 10.0)",
+    });
+    Object.defineProperty(navigator, "standalone", {
+      configurable: true,
+      value: false,
+    });
     Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: {},
@@ -54,6 +62,34 @@ describe("explicit browser Push enablement", () => {
         ? { enabled: true, public_key: "AQID" }
         : { success: true },
     }));
+  });
+
+  it("guides iPhone Safari users to install the Home Screen app before requesting Push", async () => {
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+    });
+
+    await expect(enableBrowserPushNotifications()).resolves.toEqual({
+      enabled: false,
+      reason: "ios_home_screen_required",
+    });
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    expect(getMadarServiceWorkerRegistration).not.toHaveBeenCalled();
+  });
+
+  it("gives Android users a supported-browser message when Push APIs are absent", async () => {
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 (Linux; Android 15; Pixel 9)",
+    });
+    Reflect.deleteProperty(window, "PushManager");
+
+    await expect(enableBrowserPushNotifications()).resolves.toEqual({
+      enabled: false,
+      reason: "android_browser_unsupported",
+    });
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
   });
 
   it("requests permission only in the explicit flow and reuses the central registration", async () => {

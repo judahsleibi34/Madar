@@ -2,7 +2,21 @@ import { getBrandedMadarSubdomain } from "../utils/hostedAddress";
 
 export const MADAR_MANIFEST_PATH = "/manifest.webmanifest";
 export const MADAR_THEME_COLOR = "#852c21";
-export const MADAR_APPLE_TOUCH_ICON_PATH = "/pwa-icon-192.png";
+export const MADAR_APPLE_TOUCH_ICON_PATH = "/madar-apple-touch-icon-180.png";
+
+export function isIOSDevice(windowLike = globalThis.window) {
+  const navigatorLike = windowLike?.navigator;
+  const userAgent = navigatorLike?.userAgent || "";
+  const platform = navigatorLike?.platform || "";
+
+  return /iPad|iPhone|iPod/i.test(userAgent)
+    || /iPad|iPhone|iPod/i.test(platform)
+    || (platform === "MacIntel" && Number(navigatorLike?.maxTouchPoints || 0) > 1);
+}
+
+export function isAndroidDevice(windowLike = globalThis.window) {
+  return /Android/i.test(windowLike?.navigator?.userAgent || "");
+}
 
 export function isMadarPwaHost(locationLike = globalThis.location) {
   return !getBrandedMadarSubdomain(locationLike?.hostname);

@@ -13,6 +13,11 @@ import {
   clearPushRotationNeeded,
   readPushRotationNeeded,
 } from "../pwa/pushLifecycle";
+import {
+  getMadarLaunchContext,
+  isAndroidDevice,
+  isIOSDevice,
+} from "../pwa/pwaContext";
 
 export const fetchNotifications = async ({ limit = 30, unreadOnly = false, signal } = {}) => {
   const params = new URLSearchParams();
@@ -132,8 +137,15 @@ export const urlBase64ToUint8Array = (base64String) => {
 };
 
 export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
+  if (isIOSDevice() && !getMadarLaunchContext().isStandalone) {
+    return { enabled: false, reason: "ios_home_screen_required" };
+  }
+
   if (!browserSupportsPush()) {
-    return { enabled: false, reason: "unsupported" };
+    return {
+      enabled: false,
+      reason: isAndroidDevice() ? "android_browser_unsupported" : "unsupported",
+    };
   }
 
   const config = await getPushPublicKey();
@@ -167,8 +179,8 @@ export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
   if (typeof registration.showNotification === "function") {
     await registration.showNotification("Madar notifications enabled", {
       body: "Calendar reminders can now appear on this device when Madar is closed.",
-      icon: "/pwa-icon-192.png",
-      badge: "/pwa-icon-192.png",
+      icon: "/madar-app-icon-192.png",
+      badge: "/madar-app-icon-192.png",
       tag: "madar-push-enabled",
       data: {
         action: { kind: "notification_center", path: "/notifications" },

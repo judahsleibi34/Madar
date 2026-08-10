@@ -60,6 +60,7 @@ import {
   taskPlacementStart,
 } from "./utils/calendarTaskSchedule";
 import { enableBrowserPushNotifications } from "../../services/notificationsApi";
+import { isAndroidDevice } from "../../pwa/pwaContext";
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
 const VIEWS = ["day", "week", "month", "agenda"];
@@ -449,7 +450,11 @@ export default function ReservationCalendarPage({ user = null }) {
     setPushState("loading");
     try {
       const result = await enableBrowserPushNotifications({ tenantId: tenantScope });
-      setPushState(result.enabled ? "enabled" : result.reason || "failed");
+      setPushState(
+        result.enabled
+          ? isAndroidDevice() ? "android_enabled" : "enabled"
+          : result.reason || "failed"
+      );
     } catch {
       setPushState("failed");
     }
@@ -457,11 +462,21 @@ export default function ReservationCalendarPage({ user = null }) {
   const pushButtonLabel = {
     loading: "Enabling alerts...",
     enabled: "System alerts on",
+    android_enabled: "Android alerts on",
     permission_denied: "Allow alerts in Chrome",
     server_not_configured: "Alerts unavailable",
+    ios_home_screen_required: "Add Madar to Home Screen",
+    android_browser_unsupported: "Open Madar in Chrome",
     unsupported: "Alerts unsupported",
     failed: "Retry system alerts",
   }[pushState] || "Enable system alerts";
+  const pushGuidance = pushState === "ios_home_screen_required"
+    ? "On iPhone: tap Safari's Share button, choose Add to Home Screen, open Madar from its new icon, then enable system alerts again. Requires iOS 16.4 or later."
+    : pushState === "android_enabled"
+      ? "Android alerts are enabled. For Lock Screen delivery, allow notifications for Madar or Chrome in Android Settings. You can also use Chrome's menu and choose Install app for an app-like icon and badge."
+      : pushState === "android_browser_unsupported"
+        ? "Open Madar in an up-to-date Chrome browser on Android, then enable system alerts again."
+        : "";
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
@@ -925,13 +940,14 @@ export default function ReservationCalendarPage({ user = null }) {
       <header className="reservation-calendar-toolbar">
         <div className="calendar-toolbar-copy"><span className="reservation-calendar-eyebrow">Workspace</span><h1>Calendar</h1><p>Bookings, events, tasks, reminders, and sync health in one place.</p></div>
         <div className="reservation-calendar-toolbar-actions">
-          <button type="button" className="calendar-toolbar-action calendar-notification-action" onClick={enableSystemNotifications} disabled={pushState === "loading" || pushState === "enabled"} title="Allow system notifications for calendar reminders"><BellRing size={16} /><span>{pushButtonLabel}</span></button>
+          <button type="button" className="calendar-toolbar-action calendar-notification-action" onClick={enableSystemNotifications} disabled={pushState === "loading" || pushState === "enabled" || pushState === "android_enabled"} title="Allow system notifications for calendar reminders"><BellRing size={16} /><span>{pushButtonLabel}</span></button>
           <button type="button" className="calendar-toolbar-action is-icon-only" onClick={() => setRefreshKey((value) => value + 1)} aria-label="Refresh calendar" title="Refresh calendar"><RefreshCw size={17} /></button>
           <label className={`calendar-toolbar-action calendar-import${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable}><Plus size={16} /><span>Import</span><input type="file" accept=".ics,text/calendar" onChange={importIcs} disabled={!calendarFeaturesAvailable} /></label>
           <a className={`calendar-toolbar-action${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable} onClick={(event) => { if (!calendarFeaturesAvailable) event.preventDefault(); }} href={getCalendarExportUrl({ start: rangeStart.toISOString(), end: rangeEnd.toISOString() })}><Download size={16} /><span>Export</span></a>
           <button type="button" className="calendar-toolbar-action is-primary" onClick={() => openNewEvent()} disabled={!calendarFeaturesAvailable}><Plus size={17} /><span>New event</span></button>
         </div>
       </header>
+      {pushGuidance && <p className="calendar-push-guidance" role="status">{pushGuidance}</p>}
 
       <section className="calendar-summary-grid" aria-label="Calendar summary">
         <article><span>Calendars</span><strong>{(workspace.calendars?.length || 0) + 1}</strong></article>
