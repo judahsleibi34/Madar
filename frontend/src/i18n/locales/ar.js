@@ -61,6 +61,8 @@ const ar = {
     enablePush: "تفعيل إشعارات المتصفح",
     markAllRead: "تحديد الكل كمقروء",
     fallbackTitle: "إشعار مساحة العمل",
+    newToastRegion: "إشعارات جديدة",
+    dismissToast: "إغلاق الإشعار",
     emptyTitle: "لا توجد إشعارات بعد",
     emptyDetail: "ستظهر ردود النماذج وأحداث المنشئ هنا.",
     pushEnabledButton: "System notifications on",

@@ -10,7 +10,6 @@ import {
   syncCalendarTask,
   updateCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
-import { archiveItem } from "../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage";
 import {
   readCalendarWorkspaceCacheEntry,
   writeCalendarWorkspaceCache,
@@ -37,11 +36,6 @@ vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
   updateCalendarEvent: vi.fn(),
   updateCalendarTask: vi.fn(),
   upgradeCalendarConnection: vi.fn(),
-}));
-
-vi.mock("../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage", () => ({
-  archiveItem: vi.fn(),
-  deleteArchiveItem: vi.fn(),
 }));
 
 vi.mock("./utils/calendarWorkspaceCache", () => ({
@@ -120,7 +114,6 @@ beforeEach(() => {
   deleteCalendarTask.mockResolvedValue({});
   syncCalendarTask.mockResolvedValue({});
   archiveCalendarTask.mockResolvedValue({});
-  archiveItem.mockResolvedValue("calendar-task-scheduled-task");
   updateCalendarTask.mockResolvedValue({});
 });
 
@@ -295,12 +288,6 @@ describe("calendar task UI", () => {
     expect(screen.getByRole("dialog", { name: "Archive this task?" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Archive task" }));
 
-    await waitFor(() => expect(archiveItem).toHaveBeenCalledWith(expect.objectContaining({
-      id: "calendar-task-scheduled-task",
-      type: "task",
-      scope: "user-operator-fixture",
-      title: "Scheduled fixture task",
-    })));
     expect(archiveCalendarTask).toHaveBeenCalledWith("scheduled-task", 1);
     await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(2));
   });

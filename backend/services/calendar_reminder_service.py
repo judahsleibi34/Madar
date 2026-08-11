@@ -191,7 +191,12 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
             .execute()
         )
         task = task_rows[0] if task_rows else None
-        if not task or task.get("status") in {"done", "cancelled"} or not task.get("scheduled_start"):
+        if (
+            not task
+            or task.get("status") in {"done", "cancelled"}
+            or task.get("archived_at")
+            or not task.get("scheduled_start")
+        ):
             database_client.table("calendar_task_reminders").update(
                 {"delivery_status": "cancelled"}
             ).eq("id", reminder.get("id")).execute()

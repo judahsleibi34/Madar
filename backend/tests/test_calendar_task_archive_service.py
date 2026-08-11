@@ -41,10 +41,13 @@ class Client:
     def __init__(self):
         self.tables = {
             "calendar_tasks": [
-                {"id": "ended", "tenant_id": 7, "status": "todo", "version": 2, "scheduled_end": "2026-08-10T11:00:00+00:00", "recurrence_rule": None},
-                {"id": "future", "tenant_id": 7, "status": "todo", "version": 1, "scheduled_end": "2026-08-10T13:00:00+00:00", "recurrence_rule": None},
-                {"id": "recurring", "tenant_id": 7, "status": "todo", "version": 1, "scheduled_end": "2026-08-10T11:00:00+00:00", "recurrence_rule": "FREQ=DAILY"},
-                {"id": "unscheduled", "tenant_id": 7, "status": "todo", "version": 1, "scheduled_end": None, "recurrence_rule": None},
+                {"id": "ended", "tenant_id": 7, "status": "done", "version": 2, "scheduled_end": "2026-08-10T11:00:00+00:00", "recurrence_rule": None, "archived_at": None},
+                {"id": "future", "tenant_id": 7, "status": "done", "version": 1, "scheduled_end": "2026-08-10T13:00:00+00:00", "recurrence_rule": None, "archived_at": None},
+                {"id": "recurring", "tenant_id": 7, "status": "done", "version": 1, "scheduled_end": "2026-08-10T11:00:00+00:00", "recurrence_rule": "FREQ=DAILY", "archived_at": None},
+                {"id": "unscheduled", "tenant_id": 7, "status": "done", "version": 1, "scheduled_end": None, "recurrence_rule": None, "archived_at": None},
+                {"id": "overdue-todo", "tenant_id": 7, "status": "todo", "version": 1, "scheduled_end": "2026-08-10T11:00:00+00:00", "recurrence_rule": None, "archived_at": None},
+                {"id": "overdue-progress", "tenant_id": 7, "status": "in_progress", "version": 1, "scheduled_end": "2026-08-10T11:00:00+00:00", "recurrence_rule": None, "archived_at": None},
+                {"id": "overdue-blocked", "tenant_id": 7, "status": "blocked", "version": 1, "scheduled_end": "2026-08-10T11:00:00+00:00", "recurrence_rule": None, "archived_at": None},
             ],
             "calendar_task_reminders": [
                 {"id": "reminder", "task_id": "ended", "tenant_id": 7, "delivery_status": "scheduled", "failure_code": None},
@@ -63,10 +66,18 @@ class CalendarTaskArchiveServiceTests(unittest.TestCase):
 
         self.assertEqual(count, 1)
         tasks = {task["id"]: task for task in client.tables["calendar_tasks"]}
-        self.assertEqual(tasks["ended"]["status"], "cancelled")
+        self.assertEqual(tasks["ended"]["status"], "done")
+        self.assertEqual(tasks["ended"]["archived_at"], "2026-08-10T12:00:00+00:00")
         self.assertEqual(tasks["ended"]["version"], 3)
-        self.assertEqual(tasks["future"]["status"], "todo")
-        self.assertEqual(tasks["recurring"]["status"], "todo")
-        self.assertEqual(tasks["unscheduled"]["status"], "todo")
+        self.assertEqual(tasks["future"]["status"], "done")
+        self.assertEqual(tasks["recurring"]["status"], "done")
+        self.assertEqual(tasks["unscheduled"]["status"], "done")
+        for task_id, expected_status in (
+            ("overdue-todo", "todo"),
+            ("overdue-progress", "in_progress"),
+            ("overdue-blocked", "blocked"),
+        ):
+            self.assertEqual(tasks[task_id]["status"], expected_status)
+            self.assertIsNone(tasks[task_id]["archived_at"])
         self.assertEqual(client.tables["calendar_task_reminders"][0]["delivery_status"], "cancelled")
         invalidate.assert_called_once_with(7)

@@ -124,6 +124,67 @@ describe("Page Builder image uploads", () => {
     expect(showToast).toHaveBeenCalledWith("File uploaded.");
   });
 
+  it("accepts a video at exactly 250 MiB and rejects the next byte", async () => {
+    const uploadBuilderAsset = vi.fn().mockResolvedValue("/uploads/tenant_1/builder_assets/hash.mp4");
+    const showToast = vi.fn();
+    const updateSelectedElement = vi.fn();
+    const handlers = createUploadHandlers({
+      selectedElement: { id: "video-1", type: "video", name: "Video" },
+      carouselElementTypes: new Set(),
+      builderVideoMimeTypes: new Set(["video/mp4"]),
+      builderVideoMaxBytes: 250 * 1024 * 1024,
+      uploadBuilderAsset,
+      readMediaAspectRatio: vi.fn().mockResolvedValue(16 / 9),
+      setAssetUploadBusy: vi.fn(),
+      updateSelectedElement,
+      showToast,
+      user: { id: "user-1" },
+    });
+
+    await handlers.handleSelectedElementVideoUpload({
+      target: {
+        files: [{ name: "boundary.mp4", type: "video/mp4", size: 250 * 1024 * 1024 }],
+        value: "selected",
+      },
+    });
+    expect(uploadBuilderAsset).toHaveBeenCalledTimes(1);
+    expect(updateSelectedElement).toHaveBeenCalledOnce();
+
+    await handlers.handleSelectedElementVideoUpload({
+      target: {
+        files: [{ name: "too-large.mp4", type: "video/mp4", size: 250 * 1024 * 1024 + 1 }],
+        value: "selected",
+      },
+    });
+    expect(uploadBuilderAsset).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith("Video is too large. Use a video under 250 MB.");
+  });
+
+  it("rejects a document above 50 MiB before upload", async () => {
+    const uploadBuilderAsset = vi.fn();
+    const showToast = vi.fn();
+    const handlers = createUploadHandlers({
+      selectedElement: { id: "document-1", type: "document" },
+      carouselElementTypes: new Set(),
+      builderDocumentMimeTypes: new Set(["application/pdf"]),
+      builderDocumentMaxBytes: 50 * 1024 * 1024,
+      uploadBuilderAsset,
+      setAssetUploadBusy: vi.fn(),
+      updateSelectedElement: vi.fn(),
+      showToast,
+    });
+
+    await handlers.handleSelectedElementDocumentUpload({
+      target: {
+        files: [{ name: "large.pdf", type: "application/pdf", size: 50 * 1024 * 1024 + 1 }],
+        value: "selected",
+      },
+    });
+
+    expect(uploadBuilderAsset).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith("File is too large. Use a file under 50 MB.");
+  });
+
   it("rejects unsupported File Viewer uploads before sending them", async () => {
     const uploadBuilderAsset = vi.fn();
     const showToast = vi.fn();

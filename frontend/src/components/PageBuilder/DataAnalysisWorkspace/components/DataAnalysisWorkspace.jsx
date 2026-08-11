@@ -7,6 +7,7 @@ import { downloadCsv, downloadXlsxFromCsv, sanitizeSpreadsheetCell } from "../ut
 import { cleanObject, escapeCsvValue } from "../utils/formatters";
 import {
   archiveItem,
+  getTenantUserArchiveScope,
   loadDataset as loadSavedDataset,
   saveDataset as saveDatasetLocally,
 } from "../utils/datasetStorage";
@@ -98,7 +99,7 @@ export default function DataAnalysisWorkspace({
   const isArabic = activeLang === "ar";
   const t = uiText[activeLang];
   const dataWorkspaceCacheKey = getDataWorkspaceCacheKey(user, project);
-  const archiveScope = user?.id ? `user-${user.id}` : "";
+  const archiveScope = getTenantUserArchiveScope(user);
   const cachedWorkspace = useMemo(
     () => safeReadDataWorkspaceCache(dataWorkspaceCacheKey),
     [dataWorkspaceCacheKey]

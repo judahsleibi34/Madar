@@ -18,11 +18,17 @@ from database import service_supabase
 from services.asset_registry_service import (
     reconcile_project_asset_references,
     register_builder_asset,
+    require_builder_asset_tenant_ownership,
 )
 from services.builder_asset_storage import (
     BuilderAssetStorageError,
     delete_builder_asset,
     store_builder_asset,
+)
+from services.builder_asset_validation import (
+    BuilderAssetValidationError,
+    detect_builder_asset_content_type,
+    validate_builder_asset_file,
 )
 from services.audit_service import record_audit_event
 from services.api_errors import error_detail
@@ -347,34 +353,6 @@ def normalize_published_page_routes(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-def detect_builder_asset_content_type(content: bytes) -> str | None:
-    if content.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "image/png"
-
-    if content.startswith(b"\xff\xd8\xff"):
-        return "image/jpeg"
-
-    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
-        return "image/webp"
-
-    if len(content) >= 12 and content[4:8] == b"ftyp":
-        return "video/mp4"
-
-    if content.startswith(b"\x1a\x45\xdf\xa3"):
-        return "video/webm"
-
-    if content.startswith(b"%PDF-"):
-        return "application/pdf"
-
-    if content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
-        return "application/msword"
-
-    if content.startswith(b"PK\x03\x04"):
-        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-
-    return None
-
-
 def normalize_tenant_asset_directory(tenant_id: int | str) -> str:
     try:
         tenant_value = int(tenant_id)
@@ -634,6 +612,19 @@ def _validate_smart_responsive_geometry(schema: dict[str, Any]) -> None:
                                 ),
                             )
                     active.append(current)
+
+
+def require_schema_asset_tenant(schema: dict[str, Any], tenant_id: int) -> None:
+    try:
+        require_builder_asset_tenant_ownership(schema, tenant_id=tenant_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail(
+                "builder_asset_tenant_mismatch",
+                "Managed assets must belong to the active workspace.",
+            ),
+        ) from error
 
 
 def validate_publish_schema(
@@ -1466,12 +1457,15 @@ async def upload_builder_asset(
     enforce_builder_asset_upload_rate_limit(request, context.user_id, context.tenant_id)
 
     declared_content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
-    is_declared_video = declared_content_type.startswith("video/")
+    source_extension = Path(file.filename or "").suffix.lower()
+    is_declared_video = declared_content_type.startswith("video/") or (
+        not declared_content_type and source_extension in {".mp4", ".webm"}
+    )
     is_declared_document = declared_content_type in {
         "application/pdf",
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }
+    } or (not declared_content_type and source_extension in {".pdf", ".doc", ".docx"})
     asset_kind = "video" if is_declared_video else "document" if is_declared_document else "image"
 
     if declared_content_type and declared_content_type not in BUILDER_ASSET_EXTENSIONS:
@@ -1483,6 +1477,25 @@ async def upload_builder_asset(
             else "Please upload a PNG, JPG, or WebP image"
         )
         raise HTTPException(status_code=400, detail=detail)
+
+    accepted_source_extensions = {
+        "image/png": {".png"},
+        "image/jpeg": {".jpg", ".jpeg"},
+        "image/webp": {".webp"},
+        "video/mp4": {".mp4"},
+        "video/webm": {".webm"},
+        "application/pdf": {".pdf"},
+        "application/msword": {".doc"},
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {".docx"},
+    }
+    if (
+        declared_content_type
+        and source_extension not in accepted_source_extensions[declared_content_type]
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{asset_kind.title()} filename does not match the declared file type",
+        )
 
     read_limit = (
         BUILDER_VIDEO_MAX_BYTES
@@ -1530,6 +1543,19 @@ async def upload_builder_asset(
         detail = f"{asset_kind.title()} content does not match the declared file type"
         raise HTTPException(status_code=400, detail=detail)
 
+    if source_extension not in accepted_source_extensions[detected_content_type]:
+        detected_kind = (
+            "video"
+            if detected_content_type.startswith("video/")
+            else "document"
+            if detected_content_type.startswith("application/")
+            else "image"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"{detected_kind.title()} filename does not match the file content",
+        )
+
     extension = BUILDER_ASSET_EXTENSIONS[detected_content_type]
     filename = f"{uuid4().hex}{extension}"
     target_dir, target_path, tenant_dir = get_builder_asset_target(context.tenant_id, filename)
@@ -1561,7 +1587,15 @@ async def upload_builder_asset(
                 destination.write(chunk)
         if bytes_written != file_size:
             raise OSError("Uploaded asset size changed while saving")
+        validate_builder_asset_file(target_path, detected_content_type)
         sha256_hex = digest.hexdigest()
+    except BuilderAssetValidationError as error:
+        target_path.unlink(missing_ok=True)
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        raise HTTPException(
+            status_code=400,
+            detail=f"{asset_kind.title()} file content is invalid",
+        ) from error
     except ValueError as error:
         target_path.unlink(missing_ok=True)
         finish_storage(reservation_id=storage_reservation_id, succeeded=False)
@@ -1574,6 +1608,7 @@ async def upload_builder_asset(
         )
         raise HTTPException(status_code=413, detail=detail) from error
     except OSError as error:
+        target_path.unlink(missing_ok=True)
         try:
             finish_storage(reservation_id=storage_reservation_id, succeeded=False)
         except Exception as accounting_error:
@@ -1598,6 +1633,22 @@ async def upload_builder_asset(
                 "Asset storage is temporarily unavailable.",
             ),
         ) from error
+    except BaseException:
+        # Upload cancellation (including a disconnected client) is not an
+        # Exception on every Python version. Always remove partial local data
+        # and release the reservation before propagating cancellation/failure.
+        target_path.unlink(missing_ok=True)
+        try:
+            finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        except Exception as accounting_error:
+            logger.error(
+                "builder.asset_reservation_release_failed",
+                extra={
+                    "tenant_id": context.tenant_id,
+                    "error_type": type(accounting_error).__name__,
+                },
+            )
+        raise
 
     storage_key = f"{tenant_dir}/builder_assets/{filename}"
     asset_url = f"/uploads/{storage_key}"
@@ -1929,6 +1980,7 @@ def create_builder_project(
     )
 
     draft_schema = assert_json_object(project.draft_schema)
+    require_schema_asset_tenant(draft_schema, context.tenant_id)
     payload = {
         "tenant_id": context.tenant_id,
         "owner_user_id": context.user_id,
@@ -2308,6 +2360,7 @@ def update_builder_project(
 
     if project.draft_schema is not None:
         update_payload["draft_schema"] = assert_json_object(project.draft_schema)
+        require_schema_asset_tenant(update_payload["draft_schema"], context.tenant_id)
 
     if not update_payload:
         return {
@@ -2638,6 +2691,7 @@ def publish_builder_project(
         project_schema_version=project.get("schema_version"),
         tenant_id=context.tenant_id,
     )
+    require_schema_asset_tenant(validated_schema, context.tenant_id)
     if schema_contains_element_type(validated_schema, "reservationBlock"):
         require_entitlement(
             context.tenant_id,

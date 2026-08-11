@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveMediaUrl } from "./media";
+import { resolveDocumentUrl, resolveMediaUrl } from "./media";
 
 
 describe("resolveMediaUrl", () => {
@@ -27,5 +27,36 @@ describe("resolveMediaUrl", () => {
     expect(resolveMediaUrl("https://images.example.com/photo.png")).toBe(
       "https://images.example.com/photo.png"
     );
+  });
+});
+
+describe("resolveDocumentUrl", () => {
+  it.each(["pdf", "doc", "docx"])("resolves managed %s documents", (extension) => {
+    expect(resolveDocumentUrl(
+      `/uploads/tenant_7/builder_assets/56fee3e0f73c4110abdf423d501fb835.${extension}`
+    )).toMatch(new RegExp(`56fee3e0f73c4110abdf423d501fb835\\.${extension}\\?v=3$`));
+  });
+
+  it("keeps document and visual media categories explicit", () => {
+    expect(resolveDocumentUrl("/files/guide.pdf")).toContain("/files/guide.pdf");
+    expect(resolveMediaUrl("/files/guide.pdf")).toBe("");
+    expect(resolveDocumentUrl("/files/archive.zip")).toBe("");
+  });
+
+  it("accepts HTTPS documents and rejects unsafe URL forms", () => {
+    expect(resolveDocumentUrl("https://media.example.com/guide.docx")).toBe(
+      "https://media.example.com/guide.docx"
+    );
+    for (const unsafeUrl of [
+      "http://media.example.com/guide.pdf",
+      "//evil.example/guide.pdf",
+      "javascript:alert(1)",
+      "data:application/pdf;base64,AA==",
+      "file:///tmp/guide.pdf",
+      "https://media.example.com/archive.zip",
+      "https://user:password@media.example.com/guide.pdf",
+    ]) {
+      expect(resolveDocumentUrl(unsafeUrl)).toBe("");
+    }
   });
 });

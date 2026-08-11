@@ -112,7 +112,7 @@ class CalendarReminderServiceTests(unittest.TestCase):
         self.assertEqual(payloads[0]["data"]["action"], {
             "kind": "calendar_task",
             "object_id": "task-good",
-            "path": "/notifications",
+            "path": "/calendar",
         })
         bad = next(row for row in client.tables["calendar_task_reminders"] if row["id"] == "bad")
         good = next(row for row in client.tables["calendar_task_reminders"] if row["id"] == "good")

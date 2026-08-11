@@ -3,6 +3,7 @@ const DATABASE_VERSION = 2;
 const STORE_NAME = "datasets";
 const ARCHIVE_STORE_NAME = "archive_items";
 const DEFAULT_SCOPE = "current-dataset";
+const ARCHIVE_SCHEMA_VERSION = 2;
 
 const openDatabase = () =>
   new Promise((resolve, reject) => {
@@ -175,16 +176,24 @@ export async function clearDataset(options = {}) {
 }
 
 export async function archiveItem(item) {
+  const scope = String(item?.scope || "").trim();
+  if (!scope.startsWith("archive:v2:tenant:") || !scope.includes(":user:")) {
+    throw new Error("A tenant- and user-scoped archive identity is required.");
+  }
   const now = Date.now();
-  const id =
+  const logicalId =
     item.id ||
     `archive-${item.type || "item"}-${now}-${Math.random().toString(36).slice(2, 8)}`;
+  const storageId = `${scope}:${logicalId}`;
 
   await runRequest("readwrite", (store) =>
     store.put(
       {
         ...item,
-        id,
+        id: storageId,
+        itemId: logicalId,
+        scope,
+        archiveSchemaVersion: ARCHIVE_SCHEMA_VERSION,
         createdAt: item.createdAt || now,
         updatedAt: now,
       }
@@ -192,22 +201,42 @@ export async function archiveItem(item) {
     ARCHIVE_STORE_NAME
   );
 
-  return id;
+  return logicalId;
+}
+
+export function getTenantUserArchiveScope(user) {
+  const tenantId = String(user?.tenant_id || "").trim();
+  const userId = String(user?.id || user?.auth_id || "").trim();
+  if (!tenantId || !userId) return "";
+  return `archive:v2:tenant:${tenantId}:user:${userId}`;
 }
 
 export async function listArchiveItems(options = {}) {
+  const scope = String(options.scope || "").trim();
+  if (!scope) return [];
+
   const items = await runRequest(
     "readonly",
     (store) => store.getAll(),
     ARCHIVE_STORE_NAME
   );
-  const scope = options.scope || "";
-
   return (Array.isArray(items) ? items : [])
-    .filter((item) => !scope || item.scope === scope)
+    .filter((item) => (
+      item.scope === scope
+      && item.archiveSchemaVersion === ARCHIVE_SCHEMA_VERSION
+      && String(item.id || "").startsWith(`${scope}:`)
+      && item.itemId
+    ))
+    .map((item) => ({ ...item, id: item.itemId }))
     .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 }
 
-export async function deleteArchiveItem(id) {
-  await runRequest("readwrite", (store) => store.delete(id), ARCHIVE_STORE_NAME);
+export async function deleteArchiveItem(id, options = {}) {
+  const scope = String(options.scope || "").trim();
+  if (!scope) return;
+  await runRequest(
+    "readwrite",
+    (store) => store.delete(`${scope}:${id}`),
+    ARCHIVE_STORE_NAME
+  );
 }

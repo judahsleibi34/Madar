@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   BarChart3,
@@ -13,6 +13,7 @@ import {
 
 import {
   deleteArchiveItem,
+  getTenantUserArchiveScope,
   listArchiveItems,
 } from "../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage";
 import { fetchArchivedCalendarTasks } from "../PageBuilder/services/PageBuilder.api";
@@ -95,7 +96,7 @@ function getItemMeta(item) {
   if (item.type === "task") {
     const task = item.payload?.task || {};
     return [
-      task.status_before_archive ? `Was: ${task.status_before_archive.replaceAll("_", " ")}` : "Archived task",
+      task.status ? `Status: ${task.status.replaceAll("_", " ")}` : "Archived task",
       task.scheduled_start ? `Scheduled: ${formatDate(task.scheduled_start)}` : "Unscheduled",
       task.priority ? `Priority: ${task.priority}` : "",
     ].filter(Boolean);
@@ -155,12 +156,15 @@ function archivedTaskItem(task) {
 
 export default function ArchivePage({ user }) {
   const [items, setItems] = useState([]);
+  const [loadedScope, setLoadedScope] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [status, setStatus] = useState("loading");
-  const archiveScope = user?.id ? `user-${user.id}` : "";
+  const archiveScope = getTenantUserArchiveScope(user);
+  const loadGenerationRef = useRef(0);
   const workspaceName = useMemo(() => getArchiveWorkspaceName(user?.id), [user?.id]);
 
   const loadArchive = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     setStatus("loading");
     try {
       const archiveItems = await listArchiveItems({
@@ -181,27 +185,41 @@ export default function ArchivePage({ user }) {
       archiveItems.forEach((item) => {
         combined.set(item.id, { ...combined.get(item.id), ...item });
       });
+      if (generation !== loadGenerationRef.current) return;
       setItems([...combined.values()].sort(
         (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
       ));
+      setLoadedScope(archiveScope);
       setStatus("ready");
     } catch {
+      if (generation !== loadGenerationRef.current) return;
+      setLoadedScope(archiveScope);
       setStatus("error");
     }
   }, [archiveScope]);
 
   useEffect(() => {
+    loadGenerationRef.current += 1;
     const timer = window.setTimeout(() => {
       loadArchive();
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      loadGenerationRef.current += 1;
+    };
   }, [loadArchive]);
+
+  const visibleItems = useMemo(
+    () => (loadedScope === archiveScope ? items : []),
+    [archiveScope, items, loadedScope]
+  );
+  const visibleStatus = loadedScope === archiveScope ? status : "loading";
 
   const filteredItems = useMemo(
     () =>
-      items.filter((item) => matchesFilter(item, activeFilter)),
-    [activeFilter, items]
+      visibleItems.filter((item) => matchesFilter(item, activeFilter)),
+    [activeFilter, visibleItems]
   );
 
   const counts = useMemo(
@@ -209,15 +227,15 @@ export default function ArchivePage({ user }) {
       FILTERS.reduce((summary, filter) => {
         summary[filter.id] =
           filter.id === "all"
-            ? items.length
-            : items.filter((item) => matchesFilter(item, filter.id)).length;
+            ? visibleItems.length
+            : visibleItems.filter((item) => matchesFilter(item, filter.id)).length;
         return summary;
       }, {}),
-    [items]
+    [visibleItems]
   );
 
   const removeItem = async (id) => {
-    await deleteArchiveItem(id);
+    await deleteArchiveItem(id, { scope: archiveScope });
     setItems((current) => current.filter((item) => item.id !== id));
   };
 
@@ -270,15 +288,15 @@ export default function ArchivePage({ user }) {
             <h2 id="archive-browse-title">Browse archive</h2>
           </div>
           <div className="archive-section-actions">
-            <p>{filteredItems.length} of {items.length} items</p>
+            <p>{filteredItems.length} of {visibleItems.length} items</p>
             <button
               type="button"
               className="archive-refresh-button"
               onClick={loadArchive}
-              disabled={status === "loading"}
+              disabled={visibleStatus === "loading"}
             >
-              <RefreshCw className={status === "loading" ? "is-spinning" : ""} size={15} aria-hidden="true" />
-              {status === "loading" ? "Refreshing..." : "Refresh"}
+              <RefreshCw className={visibleStatus === "loading" ? "is-spinning" : ""} size={15} aria-hidden="true" />
+              {visibleStatus === "loading" ? "Refreshing..." : "Refresh"}
             </button>
           </div>
         </div>
@@ -311,7 +329,7 @@ export default function ArchivePage({ user }) {
           </div>
           <span>{filteredItems.length}</span>
         </div>
-        {status === "loading" && !items.length ? (
+        {visibleStatus === "loading" && !visibleItems.length ? (
           <div className="archive-empty-state" role="status">
             <span className="archive-empty-icon" aria-hidden="true"><RefreshCw className="is-spinning" size={24} /></span>
             <h3>Loading saved work</h3>
@@ -319,7 +337,7 @@ export default function ArchivePage({ user }) {
           </div>
         ) : null}
 
-        {status === "error" ? (
+        {visibleStatus === "error" ? (
           <div className="archive-empty-state" role="alert">
             <span className="archive-empty-icon" aria-hidden="true"><Archive size={24} /></span>
             <h3>Archive unavailable</h3>
@@ -328,7 +346,7 @@ export default function ArchivePage({ user }) {
           </div>
         ) : null}
 
-        {status === "ready" && !filteredItems.length ? (
+        {visibleStatus === "ready" && !filteredItems.length ? (
           <div className="archive-empty-state">
             <span className="archive-empty-icon" aria-hidden="true"><Archive size={24} /></span>
             <h3>{activeFilter === "all" ? "Your archive is ready" : `No ${FILTERS.find((filter) => filter.id === activeFilter)?.label.toLowerCase()} yet`}</h3>

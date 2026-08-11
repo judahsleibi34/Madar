@@ -12,7 +12,7 @@ import database as _database_config  # noqa: F401
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from data_analysis.routes.analysis_routes import router as analysis_router
 from data_analysis.routes.cleaning_routes import router as cleaning_router
@@ -40,7 +40,10 @@ from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
 
 from services.auth_service import get_authenticated_user_row, require_regular_user
-from services.builder_asset_storage import load_builder_asset
+from services.builder_asset_storage import (
+    BuilderAssetStorageError,
+    create_builder_asset_signed_url,
+)
 from services.request_body_limits import RequestBodyLimitMiddleware
 from services.observability_service import (
     CORRELATION_ID,
@@ -215,7 +218,10 @@ def get_public_builder_asset(tenant_id: int, filename: str):
     response_headers = {
         "Cache-Control": "public, max-age=31536000, immutable",
         "Content-Disposition": "inline",
-        "Accept-Ranges": "bytes",
+        # Media byte ranges describe the stored representation. Prevent the
+        # global GZip middleware from changing its length after FileResponse
+        # has calculated Content-Range and Content-Length.
+        "Content-Encoding": "identity",
     }
     media_type = PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()]
 
@@ -228,14 +234,13 @@ def get_public_builder_asset(tenant_id: int, filename: str):
 
     storage_key = f"tenant_{tenant_id}/builder_assets/{safe_filename}"
     try:
-        content = load_builder_asset(storage_key=storage_key)
-    except FileNotFoundError as error:
+        signed_url = create_builder_asset_signed_url(storage_key=storage_key, expires_in=60)
+    except BuilderAssetStorageError as error:
         raise HTTPException(status_code=404, detail="Asset was not found.") from error
-
-    return Response(
-        content=content,
-        media_type=media_type,
-        headers=response_headers,
+    return RedirectResponse(
+        url=signed_url,
+        status_code=307,
+        headers={"Cache-Control": "private, no-store"},
     )
 
 

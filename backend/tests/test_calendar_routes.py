@@ -43,6 +43,9 @@ class Query:
         expected = None if value == "null" else value
         self.rows = [row for row in self.rows if row.get(field) is expected]
         return self
+    @property
+    def not_(self):
+        return NegatedQuery(self)
     def order(self, field, desc=False):
         self.rows.sort(key=lambda row: (row.get(field) is None, row.get(field)), reverse=desc)
         return self
@@ -52,6 +55,16 @@ class Query:
         self.rows = self.rows[:count]
         return self
     def execute(self): return SimpleNamespace(data=self.rows)
+
+
+class NegatedQuery:
+    def __init__(self, query):
+        self.query = query
+
+    def is_(self, field, value):
+        expected = None if value == "null" else value
+        self.query.rows = [row for row in self.query.rows if row.get(field) is not expected]
+        return self.query
 
 
 class CalendarRouteTests(unittest.TestCase):
@@ -330,7 +343,7 @@ class CalendarRouteTests(unittest.TestCase):
         )
         self.assertEqual(linked_event_ids, {"provider-event-1"})
 
-    def test_archive_task_marks_it_cancelled_without_deleting_it(self):
+    def test_archive_task_preserves_workflow_status(self):
         context = SimpleNamespace(tenant_id=7, user_id=12, role="member")
         existing = {
             "id": "task-1", "tenant_id": 7, "calendar_id": "calendar-1",
@@ -344,6 +357,8 @@ class CalendarRouteTests(unittest.TestCase):
                 self.values = dict(values)
                 return self
             def eq(self, *_args):
+                return self
+            def is_(self, *_args):
                 return self
             def execute(self):
                 return SimpleNamespace(data=[{**existing, **self.values}])
@@ -368,12 +383,39 @@ class CalendarRouteTests(unittest.TestCase):
             )
 
         self.assertTrue(result["success"])
-        self.assertEqual(result["task"]["status"], "cancelled")
+        self.assertEqual(result["task"]["status"], "todo")
+        self.assertIsNotNone(result["task"]["archived_at"])
         self.assertEqual(result["task"]["version"], 4)
         sync_reminder.assert_called_once()
-        self.assertEqual(sync_reminder.call_args.args[0]["status"], "cancelled")
+        self.assertEqual(sync_reminder.call_args.args[0]["status"], "todo")
+        self.assertIsNotNone(sync_reminder.call_args.args[0]["archived_at"])
         self.assertIsNone(sync_reminder.call_args.args[1])
         self.assertEqual(audit.call_args.args[2], "calendar.task_archived")
+
+    def test_archived_task_api_uses_archive_state_and_tenant_scope(self):
+        rows = [
+            {"id": "linked", "tenant_id": 7, "calendar_id": "calendar-1", "owner_user_id": 12, "status": "done", "archived_at": "2026-08-10T12:00:00Z"},
+            {"id": "own-unassigned", "tenant_id": 7, "calendar_id": None, "owner_user_id": 12, "status": "in_progress", "archived_at": "2026-08-10T11:00:00Z"},
+            {"id": "other-unassigned", "tenant_id": 7, "calendar_id": None, "owner_user_id": 20, "status": "done", "archived_at": "2026-08-10T10:00:00Z"},
+            {"id": "cancelled-only", "tenant_id": 7, "calendar_id": "calendar-1", "owner_user_id": 12, "status": "cancelled", "archived_at": None},
+            {"id": "cross-tenant", "tenant_id": 8, "calendar_id": "calendar-1", "owner_user_id": 12, "status": "done", "archived_at": "2026-08-10T13:00:00Z"},
+        ]
+        context = SimpleNamespace(tenant_id=7, user_id=12, role="member")
+        client = SimpleNamespace(table=lambda _name: Query(rows))
+        accessible = [SimpleNamespace(role="viewer", calendar={"id": "calendar-1"})]
+        with patch.object(calendar_routes, "service_supabase", client), patch.object(
+            calendar_routes, "require_calendar_feature"
+        ), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "list_accessible_calendars", return_value=accessible
+        ):
+            result = calendar_routes.list_archived_tasks(object(), object())
+
+        tasks = {task["id"]: task for task in result["tasks"]}
+        self.assertEqual(set(tasks), {"linked", "own-unassigned"})
+        self.assertEqual(tasks["linked"]["status"], "done")
+        self.assertEqual(tasks["own-unassigned"]["status"], "in_progress")
 
     def test_recurring_task_reminder_rolls_forward_after_delivery(self):
         next_time = next_task_reminder_time({

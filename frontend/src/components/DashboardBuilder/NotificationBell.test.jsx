@@ -3,10 +3,13 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import NotificationBell from "./NotificationBell";
+import { NotificationProvider } from "../../notifications/NotificationProvider";
 import { fetchNotifications } from "../../services/notificationsApi";
 
 vi.mock("../../services/notificationsApi", () => ({
   fetchNotifications: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+  markNotificationRead: vi.fn(),
 }));
 
 const translate = (key, values = {}) => {
@@ -38,7 +41,13 @@ const response = (id, title, unreadCount = 1) => ({
 
 const renderBell = (props) => render(
   <MemoryRouter>
-    <NotificationBell tenantId={props.tenantId} userId="7" />
+    <NotificationProvider
+      user={{ id: "7", tenant_id: props.tenantId }}
+      pollIntervalMs={0}
+      claimToast={vi.fn().mockResolvedValue(true)}
+    >
+      <NotificationBell />
+    </NotificationProvider>
   </MemoryRouter>,
 );
 
@@ -70,7 +79,13 @@ describe("NotificationBell tenant safety", () => {
 
     view.rerender(
       <MemoryRouter>
-        <NotificationBell tenantId="tenant-b" userId="7" />
+        <NotificationProvider
+          user={{ id: "7", tenant_id: "tenant-b" }}
+          pollIntervalMs={0}
+          claimToast={vi.fn().mockResolvedValue(true)}
+        >
+          <NotificationBell />
+        </NotificationProvider>
       </MemoryRouter>,
     );
 
@@ -91,7 +106,13 @@ describe("NotificationBell tenant safety", () => {
     const view = renderBell({ tenantId: "tenant-a" });
     view.rerender(
       <MemoryRouter>
-        <NotificationBell tenantId="tenant-b" userId="7" />
+        <NotificationProvider
+          user={{ id: "7", tenant_id: "tenant-b" }}
+          pollIntervalMs={0}
+          claimToast={vi.fn().mockResolvedValue(true)}
+        >
+          <NotificationBell />
+        </NotificationProvider>
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
@@ -120,12 +141,14 @@ describe("NotificationBell tenant safety", () => {
 
     render(
       <MemoryRouter initialEntries={["/dashboard"]}>
-        <NotificationBell
-          onNavigate={onNavigate}
-          tenantId="tenant-a"
-          userId="7"
-        />
-        <CurrentPath />
+        <NotificationProvider
+          user={{ id: "7", tenant_id: "tenant-a" }}
+          pollIntervalMs={0}
+          claimToast={vi.fn().mockResolvedValue(true)}
+        >
+          <NotificationBell onNavigate={onNavigate} />
+          <CurrentPath />
+        </NotificationProvider>
       </MemoryRouter>,
     );
 

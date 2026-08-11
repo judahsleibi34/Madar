@@ -43,10 +43,6 @@ import {
   updateCalendarEvent,
   updateCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
-import {
-  archiveItem,
-  deleteArchiveItem,
-} from "../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage";
 import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
 import {
   clearCalendarWorkspaceCache,
@@ -946,26 +942,11 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
     setTaskConfirmation(null);
     setSaving(true);
     setTaskEditorError("");
-    const archiveId = `calendar-task-${selectedTask.id}`;
     try {
-      await archiveItem({
-        id: archiveId,
-        type: "task",
-        scope: user?.id ? `user-${user.id}` : "",
-        title: selectedTask.title || "Untitled task",
-        description: selectedTask.description || "Archived from the Calendar agenda.",
-        payload: {
-          task: {
-            ...selectedTask,
-            status_before_archive: selectedTask.status,
-          },
-        },
-      });
       await archiveCalendarTask(selectedTask.id, selectedTask.version);
       setTaskEditor(null);
       setRefreshKey((value) => value + 1);
     } catch (taskError) {
-      await deleteArchiveItem(archiveId).catch(() => {});
       setTaskEditorError(taskError?.message || "The task could not be archived.");
     } finally {
       setSaving(false);

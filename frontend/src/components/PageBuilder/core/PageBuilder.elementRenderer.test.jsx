@@ -222,6 +222,42 @@ describe("document rendering", () => {
     expect(screen.getByTitle("Session guide").getAttribute("src")).toContain("session-guide.pdf");
   });
 
+  it("passes a managed PDF URL to the document viewer", () => {
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "", id: "" },
+      preview: true,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag: vi.fn(),
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText: vi.fn(),
+      runElementAction: vi.fn(),
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
+
+    render(renderElement({
+      id: "document-managed",
+      type: "document",
+      content: "/uploads/tenant_7/builder_assets/56fee3e0f73c4110abdf423d501fb835.pdf",
+      assetFileName: "guide.pdf",
+      documentMimeType: "application/pdf",
+      document: { title: "Managed guide" },
+      styles: {},
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /open/i }));
+
+    expect(screen.getByTitle("Managed guide").getAttribute("src")).toMatch(
+      /\/uploads\/tenant_7\/builder_assets\/56fee3e0f73c4110abdf423d501fb835\.pdf\?v=3$/
+    );
+  });
+
   it("opens the viewer from the editing canvas without starting a drag", () => {
     const startDrag = vi.fn();
     const renderElement = createElementRenderer({

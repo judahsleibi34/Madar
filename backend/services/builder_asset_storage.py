@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 from threading import Lock
+from urllib.parse import urlsplit
 
 from database import service_supabase
 
@@ -85,19 +86,43 @@ def store_builder_asset(
         raise BuilderAssetStorageError("builder_asset_durable_write_failed") from error
 
 
-def load_builder_asset(*, storage_key: str, client=None) -> bytes:
+def create_builder_asset_signed_url(
+    *, storage_key: str, expires_in: int = 60, client=None
+) -> str:
     database_client = client or service_supabase
     ensure_builder_asset_bucket(client=database_client)
-
     try:
-        content = database_client.storage.from_(BUILDER_ASSET_BUCKET).download(storage_key)
+        result = database_client.storage.from_(BUILDER_ASSET_BUCKET).create_signed_url(
+            storage_key,
+            max(15, min(int(expires_in), 300)),
+        )
+        if isinstance(result, dict):
+            signed_url = result.get("signedURL") or result.get("signedUrl") or result.get("signed_url")
+        else:
+            signed_url = getattr(result, "signed_url", None) or getattr(result, "signedURL", None)
+        signed_url = str(signed_url or "").strip()
+        expected_url = str(os.getenv("SUPABASE_URL") or "").strip()
+        signed = urlsplit(signed_url)
+        expected = urlsplit(expected_url)
+        if (
+            not signed_url
+            or signed.scheme not in {"http", "https"}
+            or not signed.netloc
+            or signed.username
+            or signed.password
+            or signed.fragment
+            or not expected.netloc
+            or signed.scheme != expected.scheme
+            or signed.netloc != expected.netloc
+        ):
+            raise ValueError("builder_asset_signed_url_invalid")
+        return signed_url
     except Exception as error:
-        raise FileNotFoundError(storage_key) from error
-
-    if not isinstance(content, bytes) or not content:
-        raise FileNotFoundError(storage_key)
-
-    return content
+        logger.error(
+            "builder.asset_signed_url_failed",
+            extra={"storage_key": storage_key, "error_type": type(error).__name__},
+        )
+        raise BuilderAssetStorageError("builder_asset_signed_url_failed") from error
 
 
 def delete_builder_asset(*, storage_key: str, client=None) -> None:

@@ -2,17 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCircle2, Circle } from "lucide-react";
 
 import { useLanguage } from "../../i18n";
+import { useNotifications } from "../../notifications/NotificationContext";
 import { isAndroidDevice } from "../../pwa/pwaContext";
 import {
   enableBrowserPushNotifications,
-  fetchNotifications,
   getBrowserPushStatus,
   getPushPublicKey,
-  markAllNotificationsRead,
-  markNotificationRead,
 } from "../../services/notificationsApi";
-
-const EMPTY_NOTIFICATIONS = [];
 
 const formatNotificationTime = (value) => {
   if (!value) return "";
@@ -31,7 +27,7 @@ const normalizeNotification = (item, t) => ({
   id: item.id,
   title: item.title || t("notifications.fallbackTitle"),
   detail: item.body || item.detail || "",
-  time: item.time || formatNotificationTime(item.created_at),
+  time: item.time || formatNotificationTime(item.createdAt || item.created_at),
   group: item.group || t("notifications.groups.today"),
   source: item.source || item.event_type || t("notifications.sourcesList.system"),
   unread: item.unread !== false,
@@ -39,18 +35,17 @@ const normalizeNotification = (item, t) => ({
 
 export default function NotificationsPage({ user }) {
   const { direction, t } = useLanguage();
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const {
+    loading,
+    markAllRead,
+    markRead,
+    notifications,
+    unreadCount,
+  } = useNotifications();
   const [pushState, setPushState] = useState("checking");
   const [pushConfig, setPushConfig] = useState(null);
-  const [loadedIdentity, setLoadedIdentity] = useState("");
   const notificationIdentity = `${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`;
-  const hasNotificationIdentity = Boolean(user?.tenant_id && (user?.id || user?.auth_id));
-  const identityMatches = loadedIdentity === notificationIdentity;
-  const visibleNotifications = identityMatches ? notifications : EMPTY_NOTIFICATIONS;
-  const visibleUnreadCount = identityMatches ? unreadCount : 0;
-  const visibleLoading = hasNotificationIdentity && (identityMatches ? loading : true);
+  const visibleNotifications = notifications.map((item) => normalizeNotification(item, t));
 
   useEffect(() => {
     let cancelled = false;
@@ -75,52 +70,6 @@ export default function NotificationsPage({ user }) {
       cancelled = true;
     };
   }, [notificationIdentity]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-
-    if (!hasNotificationIdentity) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const loadNotifications = async () => {
-      setLoading(true);
-
-      try {
-        const data = await fetchNotifications({ limit: 50, signal: controller.signal });
-        const items = (data.notifications || data.items || []).map((item) =>
-          normalizeNotification(item, t)
-        );
-
-        if (cancelled) return;
-
-        setNotifications(items);
-        setUnreadCount(Number(data.unread_count || 0));
-        setLoadedIdentity(notificationIdentity);
-      } catch (error) {
-        if (cancelled) return;
-        if (error?.name !== "AbortError") {
-          setNotifications([]);
-          setUnreadCount(0);
-          setLoadedIdentity(notificationIdentity);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadNotifications();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [hasNotificationIdentity, notificationIdentity, t, user?.auth_id, user?.id, user?.tenant_id]);
 
   const groupedNotifications = useMemo(() => visibleNotifications.reduce((groups, item) => {
     const key = item.group || t("notifications.groups.earlier");
@@ -152,30 +101,8 @@ export default function NotificationsPage({ user }) {
     }
   };
 
-  const markOneRead = async (item) => {
-    if (!item.unread) return;
-
-    try {
-      await markNotificationRead(item.id);
-      setNotifications((current) =>
-        current.map((candidate) =>
-          candidate.id === item.id ? { ...candidate, unread: false } : candidate
-        )
-      );
-      setUnreadCount((current) => Math.max(0, current - 1));
-    } catch {
-      // Keep the current UI state; a later refresh will reconcile it.
-    }
-  };
-
-  const markAllRead = async () => {
-    try {
-      await markAllNotificationsRead();
-      setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
-      setUnreadCount(0);
-    } catch {
-      // Keep the current UI state; a later refresh will reconcile it.
-    }
+  const markOneRead = (item) => {
+    if (item.unread) markRead(item.id);
   };
 
   return (
@@ -195,10 +122,10 @@ export default function NotificationsPage({ user }) {
 
         <div
           className="notifications-header-count"
-          aria-label={t("notifications.unreadCount", { count: visibleUnreadCount })}
+          aria-label={t("notifications.unreadCount", { count: unreadCount })}
         >
           <Bell size={18} aria-hidden="true" />
-          <strong>{visibleUnreadCount}</strong>
+          <strong>{unreadCount}</strong>
           <span>{t("notifications.unread")}</span>
         </div>
       </header>
@@ -213,7 +140,7 @@ export default function NotificationsPage({ user }) {
             ? t("notifications.pushEnabledButton")
             : t("notifications.enablePush")}
         </button>
-        <button type="button" onClick={markAllRead} disabled={visibleUnreadCount === 0}>
+        <button type="button" onClick={markAllRead} disabled={unreadCount === 0}>
           {t("notifications.markAllRead")}
         </button>
         {pushState && (
@@ -231,7 +158,7 @@ export default function NotificationsPage({ user }) {
         </article>
         <article>
           <span>{t("notifications.unread")}</span>
-          <strong>{visibleUnreadCount}</strong>
+          <strong>{unreadCount}</strong>
         </article>
         <article>
           <span>{t("notifications.sources")}</span>
@@ -240,7 +167,7 @@ export default function NotificationsPage({ user }) {
       </div>
 
       <div className="notifications-board">
-        {!visibleLoading && visibleNotifications.length === 0 && (
+        {!loading && visibleNotifications.length === 0 && (
           <section className="notifications-group">
             <div className="notifications-list">
               <article>
