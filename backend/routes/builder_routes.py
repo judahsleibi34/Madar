@@ -858,7 +858,7 @@ def validate_publish_schema(
                     "A reservation block has invalid configuration.",
                 ),
             )
-        if element_type == "button":
+        if element_type in {"button", "imageButton"}:
             raw_action = element.get("action")
             action = raw_action if isinstance(raw_action, dict) else {}
             raw_action_type = str(

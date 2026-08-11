@@ -31,6 +31,18 @@ describe("published button actions", () => {
     expect(goToPage).toHaveBeenCalledWith(pages[0]);
   });
 
+  it("applies the same validated page navigation contract to image buttons", () => {
+    const goToPage = vi.fn();
+    const result = runPublicElementAction({
+      element: { type: "imageButton", action: { type: "goToPage", pageId: "form" } },
+      pages,
+      goToPage,
+      getStoredUrlError,
+    });
+    expect(result).toEqual({ handled: true, type: "goToPage" });
+    expect(goToPage).toHaveBeenCalledWith(pages[1]);
+  });
+
   it("reports a missing internal target without navigating", () => {
     const goToPage = vi.fn();
     const showUnavailable = vi.fn();

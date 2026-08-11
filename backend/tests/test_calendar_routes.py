@@ -17,6 +17,7 @@ from routes.calendar_routes import (
     parse_ics_datetime,
     parse_ics_events,
     parse_range,
+    reservation_events_for_range,
     reservation_payload,
     truncated_recurrence_rule,
     validate_timezone,
@@ -48,6 +49,9 @@ class Query:
         return self
     def lt(self, *_args): return self
     def gt(self, *_args): return self
+    def gte(self, field, value):
+        self.rows = [row for row in self.rows if str(row.get(field) or "") >= str(value)]
+        return self
     def limit(self, count):
         self.rows = self.rows[:count]
         return self
@@ -127,7 +131,9 @@ class CalendarRouteTests(unittest.TestCase):
             calendar_routes, "require_active_tenant_member", return_value=context
         ), patch.object(
             calendar_routes, "_calendar_workspace_payload", return_value=payload
-        ) as loader, patch.dict(
+        ) as loader, patch.object(
+            calendar_routes, "reservation_events_for_range", return_value=[]
+        ), patch.dict(
             os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False
         ):
             first = calendar_routes.calendar_bootstrap(object(), first_response, start, end)
@@ -139,6 +145,48 @@ class CalendarRouteTests(unittest.TestCase):
         self.assertEqual(second_response.headers["X-Calendar-Cache"], "hit")
         self.assertEqual(second_response.headers["Cache-Control"], "private, no-store")
 
+    def test_cached_bootstrap_refreshes_reservations_on_every_request(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="member", membership_status="active",
+            user={"timezone": "UTC"},
+        )
+        start = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 9, 1, tzinfo=timezone.utc)
+        payload = {
+            "success": True, "calendars": [], "events": [], "tasks": [],
+            "connections": [],
+        }
+        reservation = {
+            "id": "reservation::booking-1",
+            "source_type": "reservation",
+            "calendar_id": "reservations",
+            "title": "New reservation request",
+            "starts_at": "2026-08-12T07:30:00+00:00",
+            "ends_at": "2026-08-12T08:00:00+00:00",
+        }
+        with patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "_calendar_workspace_payload", return_value=payload
+        ) as loader, patch.object(
+            calendar_routes, "reservation_events_for_range",
+            side_effect=[[], [reservation]],
+        ), patch.dict(
+            os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False
+        ):
+            first = calendar_routes.calendar_bootstrap(
+                object(), SimpleNamespace(headers={}), start, end
+            )
+            second_response = SimpleNamespace(headers={})
+            second = calendar_routes.calendar_bootstrap(
+                object(), second_response, start, end
+            )
+
+        self.assertEqual(first["events"], [])
+        self.assertEqual(second["events"], [reservation])
+        self.assertEqual(loader.call_count, 1)
+        self.assertEqual(second_response.headers["X-Calendar-Cache"], "hit")
+
         bypass_response = SimpleNamespace(headers={})
         bypass_request = SimpleNamespace(
             headers={"X-Calendar-Cache-Bypass": "1"}
@@ -147,7 +195,9 @@ class CalendarRouteTests(unittest.TestCase):
             calendar_routes, "require_active_tenant_member", return_value=context
         ), patch.object(
             calendar_routes, "_calendar_workspace_payload", return_value=payload
-        ) as bypass_loader, patch.dict(
+        ) as bypass_loader, patch.object(
+            calendar_routes, "reservation_events_for_range", return_value=[reservation]
+        ), patch.dict(
             os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}, clear=False
         ):
             calendar_routes.calendar_bootstrap(
@@ -188,6 +238,46 @@ class CalendarRouteTests(unittest.TestCase):
         })
         self.assertEqual(event["id"], "reservation::reservation-1")
         self.assertTrue(event["read_only"])
+
+    def test_start_only_reservations_receive_a_visible_calendar_duration(self):
+        event = reservation_payload({
+            "id": "reservation-legacy",
+            "starts_at": "2026-07-22T08:00:00+00:00",
+            "ends_at": None,
+        })
+
+        self.assertEqual(event["ends_at"], "2026-07-22T08:30:00+00:00")
+
+    def test_legacy_reservation_payload_is_projected_into_calendar_range(self):
+        context = SimpleNamespace(tenant_id=7, role="owner")
+        rows = [{
+            "id": "reservation-legacy",
+            "tenant_id": 7,
+            "reservation_title": "Existing consultation",
+            "starts_at": None,
+            "ends_at": None,
+            "timezone": None,
+            "created_at": "2026-07-20T08:00:00+00:00",
+            "payload": {
+                "date": "2026-07-22",
+                "time": "11:00",
+                "timezone": "Asia/Jerusalem",
+            },
+        }]
+        client = SimpleNamespace(table=lambda _name: Query(rows))
+
+        with patch.object(calendar_routes, "service_supabase", client):
+            events = reservation_events_for_range(
+                context,
+                datetime(2026, 7, 22, tzinfo=timezone.utc),
+                datetime(2026, 7, 23, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["title"], "Existing consultation")
+        self.assertEqual(events[0]["calendar_id"], "reservations")
+        self.assertEqual(events[0]["starts_at"], "2026-07-22T11:00:00+03:00")
+        self.assertEqual(events[0]["ends_at"], "2026-07-22T11:30:00+03:00")
 
     def test_ics_text_is_escaped_without_leaking_delimiters(self):
         self.assertEqual(ics_escape("One, two; three\\four\nfive"), "One\\, two\\; three\\\\four\\nfive")

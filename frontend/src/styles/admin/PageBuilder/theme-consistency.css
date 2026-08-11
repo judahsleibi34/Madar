@@ -774,7 +774,7 @@
   .builder-modal,
   .template-picker-modal,
   .quiz-options-drawer
-) button:not(.builder-element-button):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger) {
+) button:not(.builder-element-button):not(.builder-element-imageButton):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger) {
   border-color: var(--pb-border) !important;
   background: var(--pb-surface-raised) !important;
   color: var(--pb-text) !important;
@@ -792,7 +792,7 @@
   .builder-modal,
   .template-picker-modal,
   .quiz-options-drawer
-) button:not(.builder-element-button):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger):hover {
+) button:not(.builder-element-button):not(.builder-element-imageButton):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger):hover {
   border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
   background: var(--pb-accent-soft) !important;
   color: var(--pb-accent) !important;

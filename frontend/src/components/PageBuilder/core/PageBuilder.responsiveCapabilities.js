@@ -96,6 +96,16 @@ register(["image"], {
   aspectRatio: 380 / 260,
   responsivePriority: 35,
 });
+register(["imageButton"], {
+  sizingX: "relative",
+  sizingY: "aspect",
+  minWidth: 80,
+  minHeight: 48,
+  preferredWidth: 380,
+  preferredHeight: 180,
+  aspectRatio: 19 / 9,
+  responsivePriority: 85,
+});
 register(["divider", "thinDivider"], {
   sizingX: "fill",
   sizingY: "fixed",

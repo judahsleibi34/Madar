@@ -58,6 +58,7 @@ import {
   createWorkflow,
   cloneWithNewIds,
   createPosition,
+  createAction,
 } from "../core/PageBuilder.factories";
 import {
   formSection,
@@ -135,7 +136,9 @@ import {
 } from "../core/PageBuilder.errors";
 import {
   applyThemeModeToProject,
+  getThemeFontStack,
   getPageBuilderThemeClassName,
+  pageBuilderFontFamilyOptions,
 } from "../core/PageBuilder.theme";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
@@ -2080,6 +2083,8 @@ export default function PageBuilder({
         ? "restricted"
         : "";
     const elementType = reservationPlacementMode ? "reservationBlock" : type;
+    const activePageIndex = project.pages.findIndex((page) => page.id === activePage?.id);
+    const defaultNextPage = activePageIndex >= 0 ? project.pages[activePageIndex + 1] : null;
     const preferredReservationDefinition = reservationPlacementMode
       ? reservationDefinitions.find(({ element: candidate }) => {
           const candidateMode = candidate.reservation?.bookingMode === "flexible" ? "flexible" : "restricted";
@@ -2090,6 +2095,8 @@ export default function PageBuilder({
       elementType,
       elementType === "formBlock"
         ? { connectedFormId: project.activeFormId }
+        : elementType === "imageButton"
+          ? { action: createAction("goToPage", { pageId: defaultNextPage?.id || "" }) }
         : {}
     );
     const reservationPlacementOverrides = reservationPlacementMode
@@ -4721,7 +4728,8 @@ export default function PageBuilder({
   };
 
   const applyTextFontSize = (value) => {
-    const numericValue = Math.max(8, Math.min(120, Number.parseInt(value, 10) || 17));
+    const parsedValue = Number.parseInt(value, 10);
+    const numericValue = Number.isFinite(parsedValue) ? Math.max(8, parsedValue) : 17;
     const fontSize = `${numericValue}px`;
     const selectedRange = getSelectedTextRange();
 
@@ -4741,6 +4749,43 @@ export default function PageBuilder({
         { ...selectedRange, fontSize },
       ],
       styles: { selectedTextFontSize: fontSize },
+    });
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const applyTextOpacity = (value) => {
+    const numericValue = Math.max(0, Math.min(100, Number.parseInt(value, 10) || 0));
+    const opacity = String(numericValue / 100);
+    const selectedRange = getSelectedTextRange();
+
+    if (!selectedRange) {
+      updateSelectedElement({ styles: { opacity: Number(opacity) } });
+      return;
+    }
+
+    updateSelectedElement({
+      richTextStyles: [
+        ...(selectedElement.richTextStyles || []),
+        { ...selectedRange, opacity },
+      ],
+    });
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const applyTextFontFamily = (value) => {
+    const fontFamily = getThemeFontStack(value);
+    const selectedRange = getSelectedTextRange();
+
+    if (!selectedRange) {
+      updateSelectedElement({ styles: { fontFamily } });
+      return;
+    }
+
+    updateSelectedElement({
+      richTextStyles: [
+        ...(selectedElement.richTextStyles || []),
+        { ...selectedRange, fontFamily },
+      ],
     });
     window.getSelection()?.removeAllRanges();
   };
@@ -4982,6 +5027,14 @@ export default function PageBuilder({
     if (!selectedElementSupportsInlineTextToolbar || !inlineToolbarPosition) return null;
 
     const selectedRangeFontSize = getSelectedTextRangeStyle("fontSize");
+    const selectedRangeFontFamily = getSelectedTextRangeStyle("fontFamily");
+    const selectedRangeOpacity = getSelectedTextRangeStyle("opacity");
+    const activeFontFamily = selectedRangeFontFamily ||
+      selectedElement.styles?.fontFamily ||
+      getThemeFontStack(project.theme?.fontFamily);
+    const activeTextOpacity = selectedRangeOpacity !== ""
+      ? Number(selectedRangeOpacity)
+      : Number(selectedElement.styles?.opacity ?? 1);
     const selectedRangeBackgroundColor = getSelectedTextRangeStyle("backgroundColor");
     const activeTextFormat = getInlineTextFormatValue();
     const blockDefaultFontSize = ({ h1: 46, h2: 36, h3: 28, text: 17, bullets: 17, numbers: 17 })[activeTextFormat];
@@ -5040,12 +5093,28 @@ export default function PageBuilder({
           <option value="bullets">Bullets</option>
           <option value="numbers">Numbers</option>
         </select>
+        <select
+          aria-label="Font family"
+          className="builder-inline-toolbar-font-family"
+          value={
+            pageBuilderFontFamilyOptions.find((fontFamily) =>
+              activeFontFamily === fontFamily || String(activeFontFamily).startsWith(`"${fontFamily}"`)
+            ) || "Inter"
+          }
+          onChange={(event) => applyTextFontFamily(event.target.value)}
+          style={{ fontFamily: activeFontFamily }}
+        >
+          {pageBuilderFontFamilyOptions.map((fontFamily) => (
+            <option key={fontFamily} value={fontFamily} style={{ fontFamily: getThemeFontStack(fontFamily) }}>
+              {fontFamily}
+            </option>
+          ))}
+        </select>
         <label className="builder-inline-toolbar-size" title="Text size">
           <span>Size</span>
           <input
             type="number"
             min="8"
-            max="120"
             step="1"
             value={inlineFontSizeDraft ?? toolbarFontSize}
             onFocus={() => setInlineFontSizeDraft(String(toolbarFontSize))}
@@ -5053,7 +5122,7 @@ export default function PageBuilder({
               const nextValue = event.target.value;
               setInlineFontSizeDraft(nextValue);
               const parsedValue = Number.parseInt(nextValue, 10);
-              if (Number.isFinite(parsedValue) && parsedValue >= 8 && parsedValue <= 120) {
+              if (Number.isFinite(parsedValue) && parsedValue >= 8) {
                 applyTextFontSize(nextValue);
               }
             }}
@@ -5062,6 +5131,19 @@ export default function PageBuilder({
               setInlineFontSizeDraft(null);
             }}
           />
+        </label>
+        <label className="builder-inline-toolbar-size" title="Text opacity">
+          <span>Opacity</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            aria-label="Text opacity"
+            value={Math.round(Math.max(0, Math.min(1, activeTextOpacity)) * 100)}
+            onChange={(event) => applyTextOpacity(event.target.value)}
+          />
+          <span aria-hidden="true">%</span>
         </label>
         {inlineTextToolbarButtons.map((item) => {
           const Icon = item.icon;
@@ -5118,7 +5200,7 @@ export default function PageBuilder({
           <Baseline size={16} aria-hidden="true" />
           <input
             type="color"
-            value={selectedElement.styles?.selectedTextColor || selectedElement.styles?.color || "#162033"}
+            value={selectedElement.styles?.selectedTextColor || selectedElement.styles?.color || "#000000"}
             onChange={(event) => applyTextColor(event.target.value)}
           />
         </label>
@@ -6773,6 +6855,7 @@ export default function PageBuilder({
             selectedElement.type !== "loginBlock" &&
             selectedElement.type !== "registrationBlock" &&
             selectedElement.type !== "image" &&
+            selectedElement.type !== "imageButton" &&
             selectedElement.type !== "document" &&
             selectedElement.type !== "divider" &&
             selectedElement.type !== "thinDivider" && (
@@ -6956,7 +7039,7 @@ export default function PageBuilder({
               </div>
             );
           })()}
-          {selectedElement.type === "image" && (
+          {["image", "imageButton"].includes(selectedElement.type) && (
             <>
               <label>
                 File name
@@ -7015,7 +7098,7 @@ export default function PageBuilder({
               >
                 Reset image scale
               </button>
-              {selectedElement.mode === "direct" ? (
+              {selectedElement.type === "image" && (selectedElement.mode === "direct" ? (
                 <label className="inspector-toggle-row image-layer-toggle">
                   <input
                     type="checkbox"
@@ -7026,8 +7109,8 @@ export default function PageBuilder({
                 </label>
               ) : (
                 <p className="builder-note">Place the image on the free canvas to layer it behind text.</p>
-              )}
-              {selectedElement.layer === "behindText" && (
+              ))}
+              {selectedElement.type === "image" && selectedElement.layer === "behindText" && (
                 <p className="builder-note">Image editing mode is active. Elements above it are click-through so you can move or resize this image.</p>
               )}
             </>
@@ -7119,9 +7202,11 @@ export default function PageBuilder({
             </>
           )}
 
-          {selectedElement.type === "button" && (
+          {["button", "imageButton"].includes(selectedElement.type) && (
             <>
-              <ButtonColorControls key={selectedElement.id} element={selectedElement} onChange={updateSelectedElement} />
+              {selectedElement.type === "button" && (
+                <ButtonColorControls key={selectedElement.id} element={selectedElement} onChange={updateSelectedElement} />
+              )}
               <details>
                 <summary>Interaction</summary>
               <label>Action<select value={selectedElement.action?.type || "none"} onChange={(event) => updateSelectedElement({ action: { type: event.target.value, pageId: "", url: "", message: "" } })}>

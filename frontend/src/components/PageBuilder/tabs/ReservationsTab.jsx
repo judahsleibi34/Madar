@@ -1,12 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, ListPlus, Plus, Trash2 } from "lucide-react";
 
+const toCalendarValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const futureDateValue = (daysAhead) => {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  return toCalendarValue(date);
+};
+
 const fallbackReservation = {
   title: "Book an appointment",
   description: "Choose a service, date, and time. We will confirm your appointment shortly.",
   bookingMode: "restricted",
   services: ["Consultation", "Follow-up", "Project planning"],
-  availableDates: ["2026-07-08", "2026-07-10", "2026-07-12"],
+  availableDates: [futureDateValue(1), futureDateValue(3), futureDateValue(5)],
   timeSlots: ["09:00", "10:30", "13:00", "15:30"],
   submitLabel: "Request appointment",
 };
@@ -48,13 +61,6 @@ const calendarDayFormatter = new Intl.DateTimeFormat(undefined, {
   month: "long",
   year: "numeric",
 });
-
-const toCalendarValue = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const getCalendarMonthDays = (visibleMonth) => {
   const year = visibleMonth.getFullYear();

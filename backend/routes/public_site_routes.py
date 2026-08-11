@@ -51,6 +51,7 @@ from services.hosted_address_service import (
     normalize_hosted_address,
 )
 from services.notification_action_service import build_notification_action
+from services.calendar_workspace_cache_service import invalidate_calendar_workspace_cache
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ MIN_PUBLIC_SUBMISSION_ELAPSED_MS = int(
 RESERVATION_CANCELLATION_TTL_DAYS = int(
     os.getenv("RESERVATION_CANCELLATION_TTL_DAYS", "30")
 )
+DEFAULT_RESERVATION_DURATION_MINUTES = 30
 FRONTEND_URL = resolve_frontend_url()
 
 
@@ -1039,6 +1041,8 @@ def normalize_reservation_timing(payload: dict[str, Any]) -> dict[str, str | Non
         parsed_values.append(parsed)
 
     parsed_start, parsed_end = parsed_values
+    if parsed_start and parsed_end is None:
+        parsed_end = parsed_start + timedelta(minutes=DEFAULT_RESERVATION_DURATION_MINUTES)
     if parsed_start and parsed_end and parsed_start >= parsed_end:
         raise api_error(
             400,
@@ -2506,6 +2510,7 @@ def submit_public_builder_block_event(
     if not duplicate:
         if block_type == "reservationBlock":
             increment_operational_usage(tenant_id, "reservation_requests")
+            invalidate_calendar_workspace_cache(tenant_id)
 
     logger.info(
         "public.builder_block_event_created",

@@ -143,9 +143,11 @@ export const renderRichText = (value, ranges = []) => {
   let runColor = null;
   let runBackgroundColor = null;
   let runFontSize = null;
+  let runFontFamily = null;
   let runFontWeight = null;
   let runFontStyle = null;
   let runTextDecoration = null;
+  let runOpacity = null;
   let runHighlight = false;
 
   for (let index = 0; index <= text.length; index += 1) {
@@ -156,27 +158,33 @@ export const renderRichText = (value, ranges = []) => {
     const color = activeRanges.find((range) => range.color)?.color || null;
     const backgroundColor = activeRanges.find((range) => range.backgroundColor)?.backgroundColor || null;
     const fontSize = activeRanges.find((range) => range.fontSize)?.fontSize || null;
+    const fontFamily = activeRanges.find((range) => range.fontFamily)?.fontFamily || null;
     const fontWeight = activeRanges.find((range) => range.fontWeight)?.fontWeight || null;
     const fontStyle = activeRanges.find((range) => range.fontStyle)?.fontStyle || null;
     const textDecoration = activeRanges.find((range) => range.textDecoration)?.textDecoration || null;
+    const opacity = activeRanges.find((range) => range.opacity !== undefined)?.opacity ?? null;
     const highlight = activeRanges.some((range) => range.highlight);
 
     if (index === 0) {
       runColor = color;
       runBackgroundColor = backgroundColor;
       runFontSize = fontSize;
+      runFontFamily = fontFamily;
       runFontWeight = fontWeight;
       runFontStyle = fontStyle;
       runTextDecoration = textDecoration;
+      runOpacity = opacity;
       runHighlight = highlight;
     }
     if (
       color === runColor &&
       backgroundColor === runBackgroundColor &&
       fontSize === runFontSize &&
+      fontFamily === runFontFamily &&
       fontWeight === runFontWeight &&
       fontStyle === runFontStyle &&
       textDecoration === runTextDecoration &&
+      opacity === runOpacity &&
       highlight === runHighlight &&
       index < text.length
     ) continue;
@@ -190,9 +198,11 @@ export const renderRichText = (value, ranges = []) => {
         ...(runFontSize
           ? { fontSize: `calc(${runFontSize} * var(--builder-text-fit-scale, 1))` }
           : {}),
+        ...(runFontFamily ? { fontFamily: runFontFamily } : {}),
         ...(runFontWeight ? { fontWeight: runFontWeight } : {}),
         ...(runFontStyle ? { fontStyle: runFontStyle } : {}),
         ...(runTextDecoration ? { textDecoration: runTextDecoration } : {}),
+        ...(runOpacity !== null ? { opacity: runOpacity } : {}),
         ...(runHighlight
           ? {
               backgroundColor: "rgba(133, 44, 33, 0.22)",
@@ -203,7 +213,7 @@ export const renderRichText = (value, ranges = []) => {
 
       parts.push(
         Object.keys(style).length > 0 ? (
-          <span style={style} key={`${runStart}_${runColor || ""}_${runBackgroundColor || ""}_${runFontSize || ""}_${runFontWeight || ""}_${runFontStyle || ""}_${runTextDecoration || ""}_${runHighlight ? "editing" : ""}`}>
+          <span style={style} key={`${runStart}_${runColor || ""}_${runBackgroundColor || ""}_${runFontSize || ""}_${runFontFamily || ""}_${runFontWeight || ""}_${runFontStyle || ""}_${runTextDecoration || ""}_${runOpacity ?? ""}_${runHighlight ? "editing" : ""}`}>
             {content}
           </span>
         ) : (
@@ -216,9 +226,11 @@ export const renderRichText = (value, ranges = []) => {
     runColor = color;
     runBackgroundColor = backgroundColor;
     runFontSize = fontSize;
+    runFontFamily = fontFamily;
     runFontWeight = fontWeight;
     runFontStyle = fontStyle;
     runTextDecoration = textDecoration;
+    runOpacity = opacity;
     runHighlight = highlight;
   }
 

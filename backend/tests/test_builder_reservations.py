@@ -164,6 +164,7 @@ class PublicBuilderReservationTests(unittest.TestCase):
         self.assertEqual(saved["customer_email"], "ada@example.com")
         self.assertEqual(saved["customer_phone"], "+123")
         self.assertEqual(saved["starts_at"], "2026-07-10T19:00:00+03:00")
+        self.assertEqual(saved["ends_at"], "2026-07-10T19:30:00+03:00")
         self.assertEqual(saved["timezone"], "Asia/Jerusalem")
         self.assertEqual(saved["status"], "new")
         self.assertEqual(saved["user_agent"], "reservation-agent")

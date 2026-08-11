@@ -28,7 +28,7 @@ export const normalizeElementAction = (value = {}) => {
 };
 
 export const getButtonActionIssue = ({ element, pages = [], getStoredUrlError }) => {
-  if (element?.type !== "button") return null;
+  if (!["button", "imageButton"].includes(element?.type)) return null;
   const action = normalizeElementAction(element.action);
 
   if (action.type === "goToPage" && !pages.some((page) => String(page?.id || "") === action.pageId)) {

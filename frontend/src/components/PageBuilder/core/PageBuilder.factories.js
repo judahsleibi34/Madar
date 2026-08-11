@@ -167,7 +167,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.text.content,
       styles: {
         ...base.styles,
-        color: "var(--theme-text-soft)",
+        color: "var(--theme-text)",
         fontSize: "17px",
         lineHeight: "1.7",
       },
@@ -181,6 +181,17 @@ export const createElement = (type = "text", overrides = {}) => {
         borderRadius: "8px",
         fontSize: "14px",
         fontWeight: "900",
+      },
+    },
+    imageButton: {
+      name: factoryCopy.elements.imageButton.name,
+      content: "",
+      action: createAction("goToPage"),
+      styles: {
+        ...base.styles,
+        backgroundColor: "transparent",
+        borderRadius: "8px",
+        alignSelf: "stretch",
       },
     },
     image: {

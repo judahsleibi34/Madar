@@ -225,11 +225,11 @@ export const createElementRenderer = ({
     if (overridden !== undefined) return overridden;
 
     if (element.type === "heading") {
-      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
+      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "text") {
-      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
+      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "button") {
@@ -243,7 +243,7 @@ export const createElementRenderer = ({
       return (
         <AutoFitDirectText
           as="button"
-          fitKey={`${element.content}:${element.styles?.fontSize || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`}
+          fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`}
           key={element.id}
           type="button"
           {...buttonProps}
@@ -255,6 +255,28 @@ export const createElementRenderer = ({
         >
           {renderRichText(element.content, getTextRanges(element, "content"))}
         </AutoFitDirectText>
+      );
+    }
+
+    if (element.type === "imageButton") {
+      const imageSrc = resolveMediaUrl(element.content);
+      return (
+        <button
+          key={element.id}
+          type="button"
+          {...commonProps}
+          aria-label={element.name || "Image button"}
+          onClick={(event) => {
+            commonProps.onClick(event);
+            if (preview) runElementAction(element);
+          }}
+        >
+          {imageSrc ? (
+            <img src={imageSrc} alt="" loading="lazy" decoding="async" />
+          ) : (
+            <span>Upload button image</span>
+          )}
+        </button>
       );
     }
 
@@ -441,7 +463,7 @@ export const createElementRenderer = ({
             availableDates={reservation.availableDates}
             timeSlots={reservation.timeSlots}
             submitLabel={reservation.submitLabel}
-            disabled={!preview}
+            disabled
           />
         </div>
       );

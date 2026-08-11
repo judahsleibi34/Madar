@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { RotateCcw, Wand2 } from "lucide-react";
 import { defaultTheme } from "../core/PageBuilder.constants";
+import { pageBuilderFontFamilyOptions } from "../core/PageBuilder.theme";
 import {
   RESPONSIVE_LAYOUT_ENGINE_VERSION,
   RESPONSIVE_LAYOUT_MODES,
@@ -19,24 +20,13 @@ const websiteColorControls = [
   ["buttonText", "Button text"],
 ];
 
-const fontFamilyOptions = [
-  "Inter",
-  "Arial",
-  "Verdana",
-  "Tahoma",
-  "Trebuchet MS",
-  "Georgia",
-  "Times New Roman",
-  "Courier New",
-];
-
 const colorFallbacks = {
   background: "#f4f0e8",
   surface: "#fffdfa",
   headerBackground: "#fffdfa",
   softSurface: "#f8f4ed",
   inputBackground: "#f8f4ed",
-  text: "#162033",
+  text: "#000000",
   muted: "#6f7787",
   primary: "#162033",
   accent: "#852c21",
@@ -344,7 +334,7 @@ export default function PageBuilderThemeTab({
                   value={websiteTheme.fontFamily || "Inter"}
                   onChange={(event) => updateThemeValue("fontFamily", event.target.value)}
                 >
-                  {fontFamilyOptions.map((fontFamily) => (
+                  {pageBuilderFontFamilyOptions.map((fontFamily) => (
                     <option key={fontFamily} value={fontFamily}>
                       {fontFamily}
                     </option>
@@ -412,7 +402,7 @@ export default function PageBuilderThemeTab({
               value={websiteTheme.fontFamily || "Inter"}
               onChange={(event) => updateThemeValue("fontFamily", event.target.value)}
             >
-              {fontFamilyOptions.map((fontFamily) => (
+              {pageBuilderFontFamilyOptions.map((fontFamily) => (
                 <option key={fontFamily} value={fontFamily}>
                   {fontFamily}
                 </option>

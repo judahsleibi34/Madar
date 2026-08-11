@@ -26,7 +26,7 @@ export const defaultWebsiteTheme = {
   softSurface: "#f8f4ed",
   surface: "#fffdfa",
   headerBackground: "",
-  text: "#162033",
+  text: "#000000",
   muted: "#6f7787",
   primary: "#162033",
   accent: "#852c21",
@@ -39,7 +39,7 @@ export const defaultFormTheme = {
   background: "#f4f0e8",
   surface: "#fffdfa",
   inputBackground: "#f8f4ed",
-  text: "#162033",
+  text: "#000000",
   muted: "#6f7787",
   border: "#ddd6ca",
   accent: "#852c21",
@@ -72,9 +72,37 @@ const getSafeWebsiteTheme = (theme = {}) => ({
   ...theme,
 });
 
-const getThemeFontStack = (fontFamily) => {
+export const pageBuilderFontFamilyOptions = [
+  "Inter",
+  "Arial",
+  "Verdana",
+  "Tahoma",
+  "Trebuchet MS",
+  "Georgia",
+  "Times New Roman",
+  "Courier New",
+  "Lobster Two",
+  "EB Garamond",
+  "Cormorant Garamond",
+  "Playfair Display",
+  "Lora",
+  "Montserrat",
+  "Poppins",
+  "Raleway",
+  "Oswald",
+  "Bebas Neue",
+];
+
+export const getThemeFontStack = (fontFamily) => {
   const selectedFont = String(fontFamily || "Inter").trim() || "Inter";
-  return `${JSON.stringify(selectedFont)}, "IBM Plex Sans Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  const genericFamily = selectedFont === "Lobster Two"
+    ? "cursive"
+    : ["EB Garamond", "Cormorant Garamond", "Playfair Display", "Lora", "Georgia", "Times New Roman"].includes(selectedFont)
+      ? "serif"
+      : selectedFont === "Courier New"
+        ? "monospace"
+        : "sans-serif";
+  return `${JSON.stringify(selectedFont)}, "IBM Plex Sans Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", ${genericFamily}`;
 };
 
 const getSafeFormTheme = (theme = {}) => ({
