@@ -10,22 +10,23 @@ from database import service_supabase
 from services.upload_config import assert_path_within_root
 from services.storage_quota_service import release_storage
 
-ASSET_URL_PATTERN = re.compile(r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp))$")
+ASSET_URL_PATTERN = re.compile(r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp|mp4|webm|pdf|doc|docx))$")
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def register_builder_asset(*, tenant_id: int, uploader_user_id: int | None, storage_key: str, original_filename: str, managed_filename: str, mime_type: str, content: bytes, client=None) -> dict[str, Any]:
+def register_builder_asset(*, tenant_id: int, uploader_user_id: int | None, storage_key: str, original_filename: str, managed_filename: str, mime_type: str, content: bytes | None = None, size_bytes: int | None = None, sha256_hex: str | None = None, client=None) -> dict[str, Any]:
     match = ASSET_URL_PATTERN.fullmatch(f"/uploads/{storage_key}")
     if not match or int(match.group("tenant")) != int(tenant_id):
         raise ValueError("asset_storage_key_invalid")
     row = {
         "tenant_id": int(tenant_id), "uploader_user_id": int(uploader_user_id) if uploader_user_id is not None else None,
         "storage_key": storage_key, "original_filename": Path(original_filename or "asset").name[:255],
-        "managed_filename": managed_filename, "mime_type": mime_type, "size_bytes": len(content),
-        "sha256": hashlib.sha256(content).hexdigest(), "status": "unreferenced", "reference_count": 0,
+        "managed_filename": managed_filename, "mime_type": mime_type,
+        "size_bytes": int(size_bytes if size_bytes is not None else len(content or b"")),
+        "sha256": sha256_hex or hashlib.sha256(content or b"").hexdigest(), "status": "unreferenced", "reference_count": 0,
         "retention_until": (_now() + timedelta(days=7)).isoformat(), "metadata": {},
     }
     response = (client or service_supabase).table("builder_assets").insert(row).execute()

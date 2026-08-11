@@ -42,6 +42,9 @@ export const createSiteChromeRenderers = ({
     const site = project.siteChrome || defaultSiteChrome;
     if (!site.showHeader) return null;
 
+    const headerBackgroundColor = /^#[0-9a-f]{6}$/i.test(String(site.headerBackgroundColor || ""))
+      ? site.headerBackgroundColor
+      : "";
     const logoSrc = resolveMediaUrl(site.logoUrl);
     const brandLabel = String(site.brand ?? "").trim();
     const headerButtonLabel = String(site.headerButtonLabel ?? "").trim();
@@ -69,6 +72,7 @@ export const createSiteChromeRenderers = ({
     return (
       <header
         className={`built-site-header header-align-${site.headerAlign || "center"} ${selected.type === "siteHeader" ? "is-selected" : ""}`}
+        style={headerBackgroundColor ? { backgroundColor: headerBackgroundColor } : undefined}
         onClick={(event) => {
           event.stopPropagation();
           if (!preview) setSelected({ type: "siteHeader", id: "site-header" });

@@ -51,6 +51,7 @@ export const getBuilderElementStyle = ({
   const layoutWidth =
     getElementLayoutWidth(element.styles.width, element.styles.alignSelf) ||
     (carouselElementTypes.has(element.type) ? "100%" : undefined);
+  const sourceStyles = element.styles || {};
   const elementStyles =
     element.type === "formBlock"
       ? Object.fromEntries(
@@ -58,22 +59,28 @@ export const getBuilderElementStyle = ({
             ([key]) => key !== "backgroundColor" && key !== "borderRadius"
           )
         )
-      : element.styles;
+      : element.type === "button"
+        ? Object.fromEntries(
+            Object.entries(sourceStyles).filter(
+              ([key]) => key !== "backgroundColor" && key !== "color"
+            )
+          )
+        : sourceStyles;
 
   return {
     ...elementStyles,
     "--builder-element-width": layoutWidth || "auto",
     "--builder-element-align": normalizeElementAlignSelf(element.styles.alignSelf) || "auto",
-    "--builder-element-color": element.styles.color || "inherit",
-    "--builder-element-bg": element.type === "formBlock" ? "transparent" : element.styles.backgroundColor || "transparent",
-    "--builder-element-radius": element.type === "formBlock" ? "0" : element.styles.borderRadius || "0",
-    "--builder-element-font-size": element.styles.fontSize || "inherit",
-    "--builder-element-line-height": element.styles.lineHeight || "inherit",
-    "--builder-element-text-align": element.styles.textAlign || "inherit",
+    "--builder-element-color": element.type === "button" ? "inherit" : sourceStyles.color || "inherit",
+    "--builder-element-bg": ["formBlock", "button"].includes(element.type) ? "transparent" : sourceStyles.backgroundColor || "transparent",
+    "--builder-element-radius": element.type === "formBlock" ? "0" : sourceStyles.borderRadius || "0",
+    "--builder-element-font-size": sourceStyles.fontSize || "inherit",
+    "--builder-element-line-height": sourceStyles.lineHeight || "inherit",
+    "--builder-element-text-align": sourceStyles.textAlign || "inherit",
     position: "relative",
     transform: undefined,
     width: layoutWidth,
-    minHeight: element.styles.minHeight || undefined,
+    minHeight: sourceStyles.minHeight || undefined,
     maxWidth: "100%",
     alignSelf: normalizeElementAlignSelf(element.styles.alignSelf),
     ...placementMargins,

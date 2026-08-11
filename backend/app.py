@@ -90,6 +90,11 @@ PUBLIC_UPLOAD_MEDIA_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
 FRONTEND_URLS = os.getenv(
@@ -197,7 +202,7 @@ def get_public_builder_asset(tenant_id: int, filename: str):
     except ValueError as error:
         raise HTTPException(status_code=404, detail="Asset was not found.") from error
 
-    if not re.fullmatch(r"[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)", safe_filename):
+    if not re.fullmatch(r"[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm|pdf|doc|docx)", safe_filename):
         raise HTTPException(status_code=404, detail="Asset was not found.")
 
     public_root = PUBLIC_UPLOADS_DIR.resolve()
@@ -210,6 +215,7 @@ def get_public_builder_asset(tenant_id: int, filename: str):
     response_headers = {
         "Cache-Control": "public, max-age=31536000, immutable",
         "Content-Disposition": "inline",
+        "Accept-Ranges": "bytes",
     }
     media_type = PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()]
 

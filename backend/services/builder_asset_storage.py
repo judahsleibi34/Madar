@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from threading import Lock
 
 from database import service_supabase
@@ -55,7 +56,8 @@ def ensure_builder_asset_bucket(*, client=None) -> None:
 def store_builder_asset(
     *,
     storage_key: str,
-    content: bytes,
+    content: bytes | None = None,
+    source_path: Path | None = None,
     content_type: str,
     client=None,
 ) -> None:
@@ -63,9 +65,12 @@ def store_builder_asset(
     ensure_builder_asset_bucket(client=database_client)
 
     try:
+        upload_source = source_path if source_path is not None else content
+        if upload_source is None:
+            raise ValueError("builder_asset_content_required")
         database_client.storage.from_(BUILDER_ASSET_BUCKET).upload(
             path=storage_key,
-            file=content,
+            file=upload_source,
             file_options={
                 "content-type": content_type,
                 "cache-control": "31536000",

@@ -18,7 +18,7 @@ CAROUSEL_ELEMENT_TYPES = {
 }
 URL_LIKE_KEYS = {"href", "image", "imageUrl", "logoUrl", "madarLink", "src", "url"}
 MANAGED_UPLOAD_ASSET_PATTERN = re.compile(
-    r"^/uploads/tenant_[1-9][0-9]*/builder_assets/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$"
+    r"^/uploads/tenant_[1-9][0-9]*/builder_assets/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm|pdf|doc|docx)$"
 )
 
 
@@ -158,7 +158,7 @@ def walk_builder_schema(value, path: str) -> None:
 def validate_builder_element(element: dict, path: str) -> None:
     element_type = element.get("type")
 
-    if element_type == "image":
+    if element_type in {"image", "video"}:
         validate_public_url(
             element.get("content"),
             field_name=f"{path}.content",

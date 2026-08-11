@@ -7,6 +7,7 @@ import {
   enableBrowserPushNotifications,
   fetchNotifications,
   getBrowserPushStatus,
+  getPushPublicKey,
   markAllNotificationsRead,
   markNotificationRead,
 } from "../../services/notificationsApi";
@@ -42,6 +43,7 @@ export default function NotificationsPage({ user }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [pushState, setPushState] = useState("checking");
+  const [pushConfig, setPushConfig] = useState(null);
   const [loadedIdentity, setLoadedIdentity] = useState("");
   const notificationIdentity = `${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`;
   const hasNotificationIdentity = Boolean(user?.tenant_id && (user?.id || user?.auth_id));
@@ -52,17 +54,22 @@ export default function NotificationsPage({ user }) {
 
   useEffect(() => {
     let cancelled = false;
-    getBrowserPushStatus()
-      .then((result) => {
+    Promise.all([getBrowserPushStatus(), getPushPublicKey()])
+      .then(([result, config]) => {
         if (cancelled) return;
+        setPushConfig(config);
         setPushState(
           result.enabled
             ? isAndroidDevice() ? "android_enabled" : "enabled"
+            : !config.enabled || !config.public_key ? "server_not_configured"
             : result.reason === "subscription_missing" ? "" : result.reason || ""
         );
       })
       .catch(() => {
-        if (!cancelled) setPushState("");
+        if (!cancelled) {
+          setPushConfig(null);
+          setPushState("unavailable");
+        }
       });
     return () => {
       cancelled = true;
@@ -131,7 +138,10 @@ export default function NotificationsPage({ user }) {
     setPushState("loading");
 
     try {
-      const result = await enableBrowserPushNotifications({ tenantId: user?.tenant_id });
+      const result = await enableBrowserPushNotifications({
+        tenantId: user?.tenant_id,
+        pushConfig,
+      });
       setPushState(
         result.enabled
           ? isAndroidDevice() ? "android_enabled" : "enabled"
@@ -197,7 +207,7 @@ export default function NotificationsPage({ user }) {
         <button
           type="button"
           onClick={enablePush}
-          disabled={["checking", "loading", "enabled", "android_enabled"].includes(pushState)}
+          disabled={["checking", "loading", "enabled", "android_enabled", "server_not_configured", "unavailable"].includes(pushState)}
         >
           {pushState === "enabled" || pushState === "android_enabled"
             ? t("notifications.pushEnabledButton")

@@ -56,6 +56,33 @@ describe("getResponsiveDirectCanvasStyles", () => {
 });
 
 describe("getBuilderElementStyle", () => {
+  it("does not let legacy inline button colors override the website theme", () => {
+    const style = getBuilderElementStyle({
+      element: {
+        id: "button-1",
+        type: "button",
+        styles: {
+          backgroundColor: "var(--action-primary, var(--theme-primary))",
+          color: "#ffffff",
+          borderRadius: "8px",
+          fontSize: "14px",
+        },
+      },
+      selected: { type: "", id: "" },
+      carouselElementTypes: new Set(),
+      getElementPlacementMargins: () => ({}),
+      getElementLayoutWidth: () => undefined,
+      normalizeElementAlignSelf: () => undefined,
+    });
+
+    expect(style.backgroundColor).toBeUndefined();
+    expect(style.color).toBeUndefined();
+    expect(style["--builder-element-bg"]).toBe("transparent");
+    expect(style["--builder-element-color"]).toBe("inherit");
+    expect(style.borderRadius).toBe("8px");
+    expect(style.fontSize).toBe("14px");
+  });
+
   it("preserves independent image scale variables", () => {
     const style = getBuilderElementStyle({
       element: {

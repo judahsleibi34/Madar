@@ -25,6 +25,7 @@ export const defaultWebsiteTheme = {
   background: "#f4f0e8",
   softSurface: "#f8f4ed",
   surface: "#fffdfa",
+  headerBackground: "",
   text: "#162033",
   muted: "#6f7787",
   primary: "#162033",
@@ -87,6 +88,10 @@ export const getWebsiteThemeVars = (theme = {}) => {
     background: resolveThemeColor(safeTheme.background, defaultWebsiteTheme.background),
     softSurface: resolveThemeColor(safeTheme.softSurface, defaultWebsiteTheme.softSurface),
     surface: resolveThemeColor(safeTheme.surface, defaultWebsiteTheme.surface),
+    headerBackground: resolveThemeColor(
+      safeTheme.headerBackground,
+      resolveThemeColor(safeTheme.surface, defaultWebsiteTheme.headerBackground)
+    ),
     text: resolveThemeColor(safeTheme.text, defaultWebsiteTheme.text),
     muted: resolveThemeColor(safeTheme.muted, defaultWebsiteTheme.muted),
     primary: resolveThemeColor(safeTheme.primary, defaultWebsiteTheme.primary),
@@ -105,6 +110,7 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--theme-bg": websiteTheme.background,
     "--theme-bg-soft": websiteTheme.softSurface,
     "--theme-surface": websiteTheme.surface,
+    "--theme-header-background": websiteTheme.headerBackground,
     "--theme-surface-elevated": websiteTheme.softSurface,
     "--theme-surface-2": websiteTheme.softSurface,
     "--theme-surface-3": websiteTheme.softSurface,

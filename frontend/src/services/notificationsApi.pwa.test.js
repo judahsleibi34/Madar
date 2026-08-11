@@ -127,6 +127,17 @@ describe("explicit browser Push enablement", () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
+  it("does not ask Apple for permission when preloaded server configuration is unavailable", async () => {
+    await expect(enableBrowserPushNotifications({
+      pushConfig: { enabled: false, public_key: "" },
+    })).resolves.toEqual({
+      enabled: false,
+      reason: "server_not_configured",
+    });
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    expect(getMadarServiceWorkerRegistration).not.toHaveBeenCalled();
+  });
+
   it("restores enabled state from the browser permission and saved subscription", async () => {
     window.Notification.permission = "granted";
     getExistingMadarPushEndpoint.mockResolvedValue("https://push.example/ios-device");

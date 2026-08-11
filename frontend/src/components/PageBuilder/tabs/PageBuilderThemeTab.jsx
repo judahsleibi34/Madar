@@ -10,6 +10,7 @@ import {
 const websiteColorControls = [
   ["background", "Site background"],
   ["surface", "Content area"],
+  ["headerBackground", "Header color"],
   ["softSurface", "Alternate area"],
   ["text", "Main text"],
   ["muted", "Supporting text"],
@@ -32,6 +33,7 @@ const fontFamilyOptions = [
 const colorFallbacks = {
   background: "#f4f0e8",
   surface: "#fffdfa",
+  headerBackground: "#fffdfa",
   softSurface: "#f8f4ed",
   inputBackground: "#f8f4ed",
   text: "#162033",
@@ -137,11 +139,10 @@ const getThemeElementStyles = (element = {}) => {
   }
 
   if (element.type === "button") {
-    return {
-      ...baseStyles,
-      color: "var(--theme-text-inverse)",
-      backgroundColor: "var(--theme-primary)",
-    };
+    const themeNeutralStyles = { ...baseStyles };
+    delete themeNeutralStyles.color;
+    delete themeNeutralStyles.backgroundColor;
+    return themeNeutralStyles;
   }
 
   if (
@@ -153,6 +154,7 @@ const getThemeElementStyles = (element = {}) => {
       "loginBlock",
       "registrationBlock",
       "formBlock",
+      "document",
       "photoProofing",
       "reservationBlock",
       "responsesTable",

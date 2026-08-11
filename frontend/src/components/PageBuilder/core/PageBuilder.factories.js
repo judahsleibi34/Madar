@@ -178,8 +178,6 @@ export const createElement = (type = "text", overrides = {}) => {
       action: createAction("goToPage"),
       styles: {
         ...base.styles,
-        color: "#ffffff",
-        backgroundColor: "var(--action-primary, var(--theme-primary))",
         borderRadius: "8px",
         fontSize: "14px",
         fontWeight: "900",
@@ -190,7 +188,32 @@ export const createElement = (type = "text", overrides = {}) => {
       content: "",
       styles: {
         ...base.styles,
-        borderRadius: "22px",
+        borderRadius: "0",
+        alignSelf: "stretch",
+      },
+    },
+    video: {
+      name: factoryCopy.elements.video.name,
+      content: "",
+      video: { controls: true, muted: false, loop: false },
+      styles: {
+        ...base.styles,
+        backgroundColor: "var(--theme-text)",
+        borderRadius: "0",
+        alignSelf: "stretch",
+      },
+    },
+    document: {
+      name: factoryCopy.elements.document.name,
+      content: "",
+      document: {
+        title: factoryCopy.elements.document.title,
+        description: factoryCopy.elements.document.description,
+      },
+      styles: {
+        ...base.styles,
+        backgroundColor: "var(--theme-surface)",
+        borderRadius: "18px",
         alignSelf: "stretch",
       },
     },

@@ -35,4 +35,19 @@ export const builderAssetMimeTypes = new Set([
   "image/webp",
 ]);
 
+export const builderVideoMaxBytes = 250 * 1024 * 1024;
+
+export const builderVideoMimeTypes = new Set([
+  "video/mp4",
+  "video/webm",
+]);
+
+export const builderDocumentMaxBytes = 50 * 1024 * 1024;
+
+export const builderDocumentMimeTypes = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
 export const builderInitialProjectLoadPromises = new Map();

@@ -44,6 +44,14 @@ export const factoryContent = {
       image: {
         name: "Image",
       },
+      video: {
+        name: "Video",
+      },
+      document: {
+        name: "File Viewer",
+        title: "View document",
+        description: "Open this file in a focused viewer.",
+      },
       photoProofing: {
         name: "Photo Proofing",
         content:

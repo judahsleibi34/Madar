@@ -1,5 +1,7 @@
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import AutoFitDirectText from "./PageBuilder.autoFitText";
+import LazyBuilderVideo from "./LazyBuilderVideo";
+import DocumentViewerElement from "./DocumentViewerElement";
 import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
@@ -259,9 +261,48 @@ export const createElementRenderer = ({
     if (element.type === "image") {
       const imageSrc = resolveMediaUrl(element.content);
       return imageSrc ? (
-        <img key={element.id} {...commonProps} src={imageSrc} alt={element.name} />
+        <img
+          key={element.id}
+          {...commonProps}
+          src={imageSrc}
+          alt={element.name}
+          loading="lazy"
+          decoding="async"
+        />
       ) : (
         <div key={element.id} {...commonProps}>Image URL unavailable</div>
+      );
+    }
+
+    if (element.type === "video") {
+      const videoSrc = resolveMediaUrl(element.content);
+      return videoSrc ? (
+        <LazyBuilderVideo
+          key={`${element.id}:${element.video?.controls !== false}:${Boolean(element.video?.muted)}:${Boolean(element.video?.loop)}`}
+          {...commonProps}
+          src={videoSrc}
+          controls={element.video?.controls !== false}
+          muted={Boolean(element.video?.muted)}
+          loop={Boolean(element.video?.loop)}
+          aria-label={element.name || "Video"}
+        />
+      ) : (
+        <div key={element.id} {...commonProps}>Upload an MP4 or WebM video</div>
+      );
+    }
+
+    if (element.type === "document") {
+      return (
+        <DocumentViewerElement
+          key={element.id}
+          {...commonProps}
+          src={resolveMediaUrl(element.content)}
+          fileName={element.assetFileName}
+          mimeType={element.documentMimeType}
+          title={element.document?.title}
+          description={element.document?.description}
+          interactive
+        />
       );
     }
 

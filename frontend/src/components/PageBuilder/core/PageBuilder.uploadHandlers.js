@@ -33,11 +33,60 @@ export const serializePhotoProofingContent = (photos = []) =>
     ].filter(Boolean).join("\n"))
     .join("\n\n");
 
+export const fitMediaPositionsToAspectRatio = (positions = {}, aspectRatio = 0) => {
+  const ratio = Number(aspectRatio);
+  if (!Number.isFinite(ratio) || ratio <= 0) return positions;
+
+  return Object.fromEntries(Object.entries(positions || {}).map(([viewportName, position]) => {
+    const width = Number(position?.width) || 0;
+    if (!width) return [viewportName, position];
+    return [viewportName, {
+      ...position,
+      height: Math.max(48, Math.round(width / ratio)),
+    }];
+  }));
+};
+
+export const readBuilderMediaAspectRatio = async (file, mediaType) => {
+  if (typeof Blob === "undefined" || !(file instanceof Blob)) return 0;
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    if (mediaType === "image") {
+      const image = new Image();
+      const dimensions = await new Promise((resolve) => {
+        image.onload = () => resolve([image.naturalWidth, image.naturalHeight]);
+        image.onerror = () => resolve([0, 0]);
+        image.src = objectUrl;
+      });
+      return dimensions[0] > 0 && dimensions[1] > 0 ? dimensions[0] / dimensions[1] : 0;
+    }
+
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    const dimensions = await new Promise((resolve) => {
+      const finish = () => resolve([video.videoWidth, video.videoHeight]);
+      video.onloadedmetadata = finish;
+      video.onerror = () => resolve([0, 0]);
+      video.src = objectUrl;
+    });
+    video.removeAttribute("src");
+    video.load();
+    return dimensions[0] > 0 && dimensions[1] > 0 ? dimensions[0] / dimensions[1] : 0;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
 export const createUploadHandlers = ({  selectedElement,
   carouselElementTypes,
   defaultSiteChrome,
   builderAssetMimeTypes,
   builderAssetMaxBytes,
+  builderVideoMimeTypes,
+  builderVideoMaxBytes,
+  builderDocumentMimeTypes,
+  builderDocumentMaxBytes,
   uploadBuilderAsset,
   user,
   setAssetUploadBusy,
@@ -46,6 +95,7 @@ export const createUploadHandlers = ({  selectedElement,
   showToast,
   parseCarouselSlides,
   serializeCarouselSlides,
+  readMediaAspectRatio = readBuilderMediaAspectRatio,
 }) => {
   const uploadBuilderImageFile = async (file) => {
     if (!file) return "";
@@ -105,13 +155,20 @@ export const createUploadHandlers = ({  selectedElement,
     event.target.value = "";
     if (!file || !selectedElement || selectedElement.type !== "image") return;
 
-    const assetUrl = await uploadBuilderImageFile(file);
+    const [assetUrl, aspectRatio] = await Promise.all([
+      uploadBuilderImageFile(file),
+      readMediaAspectRatio(file, "image"),
+    ]);
     if (!assetUrl) return;
 
     updateSelectedElement({
       content: assetUrl,
       assetFileName: file.name || getBuilderAssetFileName(assetUrl),
       name: selectedElement.name || file.name || "Image",
+      mediaAspectRatio: aspectRatio || selectedElement.mediaAspectRatio || undefined,
+      ...(selectedElement.mode === "direct" && aspectRatio
+        ? { position: fitMediaPositionsToAspectRatio(selectedElement.position, aspectRatio) }
+        : {}),
     });
 
     showToast("Image uploaded.");
@@ -172,6 +229,76 @@ export const createUploadHandlers = ({  selectedElement,
     showToast("Carousel image uploaded.");
   };
 
+  const handleSelectedElementVideoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedElement || selectedElement.type !== "video") return;
+
+    if (!builderVideoMimeTypes.has(file.type)) {
+      showToast("Use an MP4 or WebM video.");
+      return;
+    }
+    if (file.size > builderVideoMaxBytes) {
+      showToast("Video is too large. Use a video under 250 MB.");
+      return;
+    }
+
+    setAssetUploadBusy(true);
+    try {
+      const [assetUrl, aspectRatio] = await Promise.all([
+        uploadBuilderAsset(file, user?.id),
+        readMediaAspectRatio(file, "video"),
+      ]);
+      if (!assetUrl) throw new Error("Upload did not return a URL.");
+      updateSelectedElement({
+        content: assetUrl,
+        assetFileName: file.name || getBuilderAssetFileName(assetUrl),
+        name: selectedElement.name || file.name || "Video",
+        mediaAspectRatio: aspectRatio || selectedElement.mediaAspectRatio || undefined,
+        ...(selectedElement.mode === "direct" && aspectRatio
+          ? { position: fitMediaPositionsToAspectRatio(selectedElement.position, aspectRatio) }
+          : {}),
+      });
+      showToast("Video uploaded.");
+    } catch {
+      showToast("Video upload failed.");
+    } finally {
+      setAssetUploadBusy(false);
+    }
+  };
+
+  const handleSelectedElementDocumentUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedElement || selectedElement.type !== "document") return;
+
+    if (!builderDocumentMimeTypes.has(file.type)) {
+      showToast("Use a PDF, DOC, or DOCX file.");
+      return;
+    }
+    if (file.size > builderDocumentMaxBytes) {
+      showToast("File is too large. Use a file under 50 MB.");
+      return;
+    }
+
+    setAssetUploadBusy(true);
+    try {
+      const assetUrl = await uploadBuilderAsset(file, user?.id);
+      if (!assetUrl) throw new Error("Upload did not return a URL.");
+      updateSelectedElement({
+        content: assetUrl,
+        assetFileName: file.name || getBuilderAssetFileName(assetUrl),
+        documentMimeType: file.type,
+        name: selectedElement.name || file.name || "File Viewer",
+      });
+      showToast("File uploaded.");
+    } catch {
+      showToast("File upload failed.");
+    } finally {
+      setAssetUploadBusy(false);
+    }
+  };
+
   const uploadPhotoProofingFiles = async (files, { replaceCover = false } = {}) => {
     const selectedFiles = Array.from(files || []);
     if (!selectedFiles.length || !selectedElement || selectedElement.type !== "photoProofing") return;
@@ -208,6 +335,8 @@ export const createUploadHandlers = ({  selectedElement,
 
   return {
     handleSelectedElementImageUpload,
+    handleSelectedElementVideoUpload,
+    handleSelectedElementDocumentUpload,
     handleSiteLogoUpload,
     handleLoadingImageUpload,
     handleCarouselSlideImageUpload,

@@ -5,12 +5,14 @@ import NotificationsPage from "./NotificationsPage";
 import {
   fetchNotifications,
   getBrowserPushStatus,
+  getPushPublicKey,
 } from "../../services/notificationsApi";
 
 vi.mock("../../services/notificationsApi", () => ({
   enableBrowserPushNotifications: vi.fn(),
   fetchNotifications: vi.fn(),
   getBrowserPushStatus: vi.fn(),
+  getPushPublicKey: vi.fn(),
   markAllNotificationsRead: vi.fn(),
   markNotificationRead: vi.fn(),
 }));
@@ -56,6 +58,8 @@ describe("NotificationsPage tenant safety", () => {
     fetchNotifications.mockReset();
     getBrowserPushStatus.mockReset();
     getBrowserPushStatus.mockResolvedValue({ enabled: false, reason: "" });
+    getPushPublicKey.mockReset();
+    getPushPublicKey.mockResolvedValue({ enabled: true, public_key: "AQID" });
   });
 
   it("restores the enabled Push state after a page refresh", async () => {
@@ -64,6 +68,15 @@ describe("NotificationsPage tenant safety", () => {
     render(<NotificationsPage user={{ id: 7, tenant_id: "tenant-a" }} />);
     expect((await screen.findByRole("button", { name: "Push enabled" })).disabled).toBe(true);
     expect(screen.getByText("Push is enabled")).toBeTruthy();
+  });
+
+  it("shows server unavailability without leaving an active permission button", async () => {
+    getPushPublicKey.mockResolvedValue({ enabled: false, public_key: "" });
+    fetchNotifications.mockResolvedValue(response("a", "Notification"));
+    render(<NotificationsPage user={{ id: 7, tenant_id: "tenant-a" }} />);
+
+    const button = await screen.findByRole("button", { name: "Enable push" });
+    expect(button.disabled).toBe(true);
   });
 
   it("clears old tenant content while loading the next tenant", async () => {

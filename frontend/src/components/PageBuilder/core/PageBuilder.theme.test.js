@@ -31,4 +31,11 @@ describe("Page Builder typography theme", () => {
     expect(variables["--theme-on-primary"]).toBe("#ffe1e1");
     expect(variables["--theme-text-inverse"]).toBe("#ffe1e1");
   });
+
+  it("exposes a dedicated header background color with a safe default", () => {
+    expect(getPageBuilderThemeVars({ headerBackground: "#123456" })["--theme-header-background"])
+      .toBe("#123456");
+    expect(getPageBuilderThemeVars({ surface: "#abcdef", headerBackground: "" })["--theme-header-background"])
+      .toBe("#abcdef");
+  });
 });

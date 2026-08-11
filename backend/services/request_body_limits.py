@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 DEFAULT_MAX_REQUEST_BODY_BYTES = 12 * 1024 * 1024
+DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES = 252 * 1024 * 1024
 DEFAULT_MAX_JSON_BODY_BYTES = 3 * 1024 * 1024
 DEFAULT_MAX_SMALL_JSON_BODY_BYTES = 256 * 1024
 DEFAULT_MAX_DATA_JSON_BODY_BYTES = 1024 * 1024
@@ -29,6 +30,7 @@ class RequestBodyTooLarge(Exception):
 @dataclass(frozen=True)
 class RequestBodyLimitConfig:
     max_request_body_bytes: int
+    max_builder_asset_request_body_bytes: int
     max_json_body_bytes: int
     max_small_json_body_bytes: int
     max_data_json_body_bytes: int
@@ -131,6 +133,9 @@ def select_request_body_limit(
     if method.upper() in SAFE_METHODS:
         return None
 
+    if path == "/builder/assets/upload" and _is_multipart_content_type(content_type):
+        return config.max_builder_asset_request_body_bytes
+
     if _is_multipart_content_type(content_type) or _is_upload_path(path):
         return config.max_request_body_bytes
 
@@ -155,6 +160,7 @@ class RequestBodyLimitMiddleware:
         app,
         *,
         max_request_body_bytes: int | None = None,
+        max_builder_asset_request_body_bytes: int | None = None,
         max_json_body_bytes: int | None = None,
         max_small_json_body_bytes: int | None = None,
         max_data_json_body_bytes: int | None = None,
@@ -165,6 +171,11 @@ class RequestBodyLimitMiddleware:
                 max_request_body_bytes,
                 "MAX_REQUEST_BODY_BYTES",
                 DEFAULT_MAX_REQUEST_BODY_BYTES,
+            ),
+            max_builder_asset_request_body_bytes=_limit_value(
+                max_builder_asset_request_body_bytes,
+                "MAX_BUILDER_ASSET_REQUEST_BODY_BYTES",
+                DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES,
             ),
             max_json_body_bytes=_limit_value(
                 max_json_body_bytes,

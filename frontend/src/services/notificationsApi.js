@@ -161,7 +161,7 @@ export const urlBase64ToUint8Array = (base64String) => {
   return outputArray;
 };
 
-export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
+export const enableBrowserPushNotifications = async ({ tenantId, pushConfig = null } = {}) => {
   if (isIOSDevice() && !getMadarLaunchContext().isStandalone) {
     return { enabled: false, reason: "ios_home_screen_required" };
   }
@@ -177,6 +177,12 @@ export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
     };
   }
 
+  // Pages can preload this before the user taps. That prevents iOS from
+  // showing a permission prompt when the server cannot complete enrollment.
+  if (pushConfig && (!pushConfig.enabled || !pushConfig.public_key)) {
+    return { enabled: false, reason: "server_not_configured" };
+  }
+
   // iOS requires the permission request to run directly from the user's tap.
   // A network or service-worker await before this call consumes that gesture.
   const permission = await Notification.requestPermission();
@@ -185,7 +191,7 @@ export const enableBrowserPushNotifications = async ({ tenantId } = {}) => {
     return { enabled: false, reason: "permission_denied" };
   }
 
-  const config = await getPushPublicKey();
+  const config = pushConfig || await getPushPublicKey();
 
   if (!config.enabled || !config.public_key) {
     return { enabled: false, reason: "server_not_configured" };

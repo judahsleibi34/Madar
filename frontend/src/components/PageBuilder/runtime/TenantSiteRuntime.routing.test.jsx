@@ -68,6 +68,7 @@ const renderPublic = ({
   footerShopLinks = "",
   footerHelpLinks = "",
   headerButtonLabel = "",
+  headerBackgroundColor = "",
   contactEmail = "",
   phone = "",
   teamSections = [],
@@ -90,6 +91,7 @@ const renderPublic = ({
           footerShopLinks,
           footerHelpLinks,
           headerButtonLabel,
+          headerBackgroundColor,
           contactEmail,
           phone,
         },
@@ -186,6 +188,15 @@ describe("TenantSiteRuntime explicit project preview", () => {
       expect(Boolean(document.querySelector(".built-site-footer"))).toBe(expectsFooter);
     }
   );
+
+  it("applies the saved header color in the public runtime", async () => {
+    renderPublic({ headerBackgroundColor: "#123456" });
+    await waitFor(() => {
+      expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
+    });
+
+    expect(document.querySelector(".built-site-header")?.style.backgroundColor).toBe("rgb(18, 52, 86)");
+  });
 
   it.each([
     [true, true, true, true],

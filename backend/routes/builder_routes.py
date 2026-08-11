@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import os
 import re
@@ -90,12 +91,20 @@ def schema_contains_element_type(value: Any, element_type: str) -> bool:
         )
     return False
 BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
+BUILDER_VIDEO_MAX_BYTES = int(os.getenv("BUILDER_VIDEO_MAX_BYTES", str(250 * 1024 * 1024)))
+BUILDER_DOCUMENT_MAX_BYTES = int(os.getenv("BUILDER_DOCUMENT_MAX_BYTES", str(50 * 1024 * 1024)))
+BUILDER_ASSET_COPY_CHUNK_BYTES = 1024 * 1024
 BUILDER_ASSET_UPLOAD_DIR = get_public_uploads_dir()
 BUILDER_CLIENT_CONTRACT = "cloud-draft-v1"
 BUILDER_ASSET_EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/webp": ".webp",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "application/pdf": ".pdf",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 MANAGED_TENANT_ASSET_PATTERN = re.compile(r"^/uploads/tenant_(\d+)/")
 
@@ -347,6 +356,21 @@ def detect_builder_asset_content_type(content: bytes) -> str | None:
 
     if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
         return "image/webp"
+
+    if len(content) >= 12 and content[4:8] == b"ftyp":
+        return "video/mp4"
+
+    if content.startswith(b"\x1a\x45\xdf\xa3"):
+        return "video/webm"
+
+    if content.startswith(b"%PDF-"):
+        return "application/pdf"
+
+    if content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        return "application/msword"
+
+    if content.startswith(b"PK\x03\x04"):
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
     return None
 
@@ -1442,25 +1466,69 @@ async def upload_builder_asset(
     enforce_builder_asset_upload_rate_limit(request, context.user_id, context.tenant_id)
 
     declared_content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
+    is_declared_video = declared_content_type.startswith("video/")
+    is_declared_document = declared_content_type in {
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    asset_kind = "video" if is_declared_video else "document" if is_declared_document else "image"
 
     if declared_content_type and declared_content_type not in BUILDER_ASSET_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Please upload a PNG, JPG, or WebP image")
+        detail = (
+            "Please upload an MP4 or WebM video"
+            if is_declared_video
+            else "Please upload a PDF, DOC, or DOCX document"
+            if declared_content_type.startswith("application/")
+            else "Please upload a PNG, JPG, or WebP image"
+        )
+        raise HTTPException(status_code=400, detail=detail)
 
-    content = await file.read(BUILDER_ASSET_MAX_BYTES + 1)
+    read_limit = (
+        BUILDER_VIDEO_MAX_BYTES
+        if asset_kind == "video"
+        else BUILDER_DOCUMENT_MAX_BYTES
+        if asset_kind == "document"
+        else BUILDER_ASSET_MAX_BYTES
+    )
+    file_size = file.size
+    if file_size is None:
+        current_position = file.file.tell()
+        file.file.seek(0, os.SEEK_END)
+        file_size = file.file.tell()
+        file.file.seek(current_position)
 
-    if not content:
-        raise HTTPException(status_code=400, detail="Image file is required")
+    if not file_size:
+        detail = f"{asset_kind.title()} file is required"
+        raise HTTPException(status_code=400, detail=detail)
 
-    if len(content) > BUILDER_ASSET_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Image file must be 5MB or smaller")
+    if file_size > read_limit:
+        detail = (
+            "Video file must be 250MB or smaller"
+            if asset_kind == "video"
+            else "Document file must be 50MB or smaller"
+            if asset_kind == "document"
+            else "Image file must be 5MB or smaller"
+        )
+        raise HTTPException(status_code=413, detail=detail)
 
-    detected_content_type = detect_builder_asset_content_type(content)
+    header = await file.read(32)
+    await file.seek(0)
+    detected_content_type = detect_builder_asset_content_type(header)
 
     if not detected_content_type:
-        raise HTTPException(status_code=400, detail="Please upload a PNG, JPG, or WebP image")
+        detail = (
+            "Please upload an MP4 or WebM video"
+            if asset_kind == "video"
+            else "Please upload a PDF, DOC, or DOCX document"
+            if asset_kind == "document"
+            else "Please upload a PNG, JPG, or WebP image"
+        )
+        raise HTTPException(status_code=400, detail=detail)
 
     if declared_content_type and declared_content_type != detected_content_type:
-        raise HTTPException(status_code=400, detail="Image content does not match the declared file type")
+        detail = f"{asset_kind.title()} content does not match the declared file type"
+        raise HTTPException(status_code=400, detail=detail)
 
     extension = BUILDER_ASSET_EXTENSIONS[detected_content_type]
     filename = f"{uuid4().hex}{extension}"
@@ -1471,7 +1539,7 @@ async def upload_builder_asset(
             tenant_id=context.tenant_id,
             user_id=context.user_id,
             category="builder_asset",
-            size_bytes=len(content),
+            size_bytes=file_size,
             storage_root=BUILDER_ASSET_UPLOAD_DIR,
         )
     except StorageSafetyError as error:
@@ -1482,7 +1550,29 @@ async def upload_builder_asset(
 
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
-        target_path.write_bytes(content)
+        digest = hashlib.sha256()
+        bytes_written = 0
+        with target_path.open("xb") as destination:
+            while chunk := await file.read(BUILDER_ASSET_COPY_CHUNK_BYTES):
+                bytes_written += len(chunk)
+                if bytes_written > read_limit:
+                    raise ValueError("builder_asset_too_large")
+                digest.update(chunk)
+                destination.write(chunk)
+        if bytes_written != file_size:
+            raise OSError("Uploaded asset size changed while saving")
+        sha256_hex = digest.hexdigest()
+    except ValueError as error:
+        target_path.unlink(missing_ok=True)
+        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        detail = (
+            "Video file must be 250MB or smaller"
+            if asset_kind == "video"
+            else "Document file must be 50MB or smaller"
+            if asset_kind == "document"
+            else "Image file must be 5MB or smaller"
+        )
+        raise HTTPException(status_code=413, detail=detail) from error
     except OSError as error:
         try:
             finish_storage(reservation_id=storage_reservation_id, succeeded=False)
@@ -1505,7 +1595,7 @@ async def upload_builder_asset(
             status_code=503,
             detail=error_detail(
                 "asset_storage_unavailable",
-                "Image storage is temporarily unavailable.",
+                "Asset storage is temporarily unavailable.",
             ),
         ) from error
 
@@ -1514,7 +1604,7 @@ async def upload_builder_asset(
     try:
         store_builder_asset(
             storage_key=storage_key,
-            content=content,
+            source_path=target_path,
             content_type=detected_content_type,
         )
     except BuilderAssetStorageError as error:
@@ -1524,7 +1614,7 @@ async def upload_builder_asset(
             status_code=503,
             detail=error_detail(
                 "asset_storage_unavailable",
-                "Image storage is temporarily unavailable.",
+                "Asset storage is temporarily unavailable.",
             ),
         ) from error
 
@@ -1536,7 +1626,8 @@ async def upload_builder_asset(
             original_filename=file.filename or "asset",
             managed_filename=filename,
             mime_type=detected_content_type,
-            content=content,
+            size_bytes=bytes_written,
+            sha256_hex=sha256_hex,
         )
     except Exception as error:
         target_path.unlink(missing_ok=True)
@@ -1561,7 +1652,7 @@ async def upload_builder_asset(
             reservation_id=storage_reservation_id,
             succeeded=True,
             storage_key=storage_key,
-            content=content,
+            sha256_hex=sha256_hex,
         )
     except Exception as error:
         target_path.unlink(missing_ok=True)
@@ -1585,7 +1676,7 @@ async def upload_builder_asset(
         metadata={
             "asset_url": asset_url,
             "content_type": detected_content_type,
-            "size_bytes": len(content),
+            "size_bytes": bytes_written,
             "extension": extension,
         },
     )

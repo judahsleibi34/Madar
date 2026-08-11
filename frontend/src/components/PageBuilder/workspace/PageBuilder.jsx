@@ -176,6 +176,10 @@ import {
   carouselElementTypes,
   builderAssetMaxBytes,
   builderAssetMimeTypes,
+  builderVideoMaxBytes,
+  builderVideoMimeTypes,
+  builderDocumentMaxBytes,
+  builderDocumentMimeTypes,
   builderInitialProjectLoadPromises,
 } from "../core/PageBuilder.config";
 import {
@@ -4227,6 +4231,8 @@ export default function PageBuilder({
 
   const {
     handleSelectedElementImageUpload,
+    handleSelectedElementVideoUpload,
+    handleSelectedElementDocumentUpload,
     handleSiteLogoUpload,
     handleLoadingImageUpload,
     handleCarouselSlideImageUpload,
@@ -4240,6 +4246,10 @@ export default function PageBuilder({
       defaultSiteChrome,
       builderAssetMimeTypes,
       builderAssetMaxBytes,
+      builderVideoMimeTypes,
+      builderVideoMaxBytes,
+      builderDocumentMimeTypes,
+      builderDocumentMaxBytes,
       uploadBuilderAsset,
       user,
       setAssetUploadBusy,
@@ -6763,6 +6773,7 @@ export default function PageBuilder({
             selectedElement.type !== "loginBlock" &&
             selectedElement.type !== "registrationBlock" &&
             selectedElement.type !== "image" &&
+            selectedElement.type !== "document" &&
             selectedElement.type !== "divider" &&
             selectedElement.type !== "thinDivider" && (
             <label>Content<textarea value={selectedElement.content} onSelect={(event) => captureTextSelection(event, "content")} onChange={(event) => updateSelectedElement({ content: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "content") })} /></label>
@@ -7022,6 +7033,92 @@ export default function PageBuilder({
             </>
           )}
 
+          {selectedElement.type === "video" && (
+            <>
+              <label>
+                File name
+                <input
+                  readOnly
+                  value={selectedElement.assetFileName || getBuilderAssetFileName(selectedElement.content)}
+                  placeholder="No video selected"
+                />
+              </label>
+              <label className="upload-image-button">
+                {assetUploadBusy ? "Uploading..." : "Upload video"}
+                <input type="file" accept="video/mp4,video/webm" hidden disabled={assetUploadBusy} onChange={handleSelectedElementVideoUpload} />
+              </label>
+              <p className="builder-note">MP4 or WebM, up to 250 MB.</p>
+              <label className="inspector-toggle-row">
+                <input
+                  type="checkbox"
+                  checked={selectedElement.video?.controls !== false}
+                  onChange={(event) => updateSelectedElement({ video: { ...selectedElement.video, controls: event.target.checked } })}
+                />
+                <span>Show playback controls</span>
+              </label>
+              <label className="inspector-toggle-row">
+                <input
+                  type="checkbox"
+                  checked={Boolean(selectedElement.video?.muted)}
+                  onChange={(event) => updateSelectedElement({ video: { ...selectedElement.video, muted: event.target.checked } })}
+                />
+                <span>Muted</span>
+              </label>
+              <label className="inspector-toggle-row">
+                <input
+                  type="checkbox"
+                  checked={Boolean(selectedElement.video?.loop)}
+                  onChange={(event) => updateSelectedElement({ video: { ...selectedElement.video, loop: event.target.checked } })}
+                />
+                <span>Loop video</span>
+              </label>
+            </>
+          )}
+
+          {selectedElement.type === "document" && (
+            <>
+              <label>
+                Viewer title
+                <input
+                  value={selectedElement.document?.title || ""}
+                  placeholder="View document"
+                  onChange={(event) => updateSelectedElement({
+                    document: { ...selectedElement.document, title: event.target.value },
+                  })}
+                />
+              </label>
+              <label>
+                Description
+                <textarea
+                  value={selectedElement.document?.description || ""}
+                  placeholder="Open this file in a focused viewer."
+                  onChange={(event) => updateSelectedElement({
+                    document: { ...selectedElement.document, description: event.target.value },
+                  })}
+                />
+              </label>
+              <label>
+                File name
+                <input
+                  readOnly
+                  value={selectedElement.assetFileName || getBuilderAssetFileName(selectedElement.content)}
+                  placeholder="No file selected"
+                />
+              </label>
+              <label className="upload-image-button">
+                {assetUploadBusy ? "Uploading..." : "Upload file"}
+                <input
+                  type="file"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.doc,.docx"
+                  hidden
+                  disabled={assetUploadBusy}
+                  onChange={handleSelectedElementDocumentUpload}
+                />
+              </label>
+              <p className="builder-note">PDF, DOC, or DOCX, up to 50 MB. PDFs preview inside the viewer; Word files open with a compatible app.</p>
+            </>
+          )}
+
           {selectedElement.type === "button" && (
             <>
               <ButtonColorControls key={selectedElement.id} element={selectedElement} onChange={updateSelectedElement} />
@@ -7175,6 +7272,33 @@ export default function PageBuilder({
                       <option value="center">Centered navigation</option>
                       <option value="split">Split navigation</option>
                     </select>
+                  </label>
+                  <label className="span-2">
+                    Header color
+                    <span className="site-chrome-color-control">
+                      <input
+                        aria-label="Header color"
+                        type="color"
+                        value={getColorInputValue(
+                          siteChrome.headerBackgroundColor,
+                          getColorInputValue(
+                            project.theme?.headerBackground,
+                            getColorInputValue(project.theme?.surface, "#FFFDFA")
+                          )
+                        )}
+                        onChange={(event) => updateSiteChrome({
+                          headerBackgroundColor: event.target.value.toUpperCase(),
+                        })}
+                      />
+                      <output>{siteChrome.headerBackgroundColor || "Theme color"}</output>
+                      <button
+                        type="button"
+                        onClick={() => updateSiteChrome({ headerBackgroundColor: "" })}
+                        disabled={!siteChrome.headerBackgroundColor}
+                      >
+                        Use theme color
+                      </button>
+                    </span>
                   </label>
                 </div>
               </div>

@@ -2,12 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createUploadHandlers,
+  fitMediaPositionsToAspectRatio,
   getBuilderAssetFileName,
   parsePhotoProofingContent,
   serializePhotoProofingContent,
 } from "./PageBuilder.uploadHandlers";
 
 describe("Page Builder image uploads", () => {
+  it("fits every responsive boundary to the uploaded media aspect ratio", () => {
+    expect(fitMediaPositionsToAspectRatio({
+      desktop: { x: 10, y: 20, width: 600, height: 100 },
+      mobile: { x: 5, y: 10, width: 300, height: 100 },
+    }, 1.5)).toEqual({
+      desktop: { x: 10, y: 20, width: 600, height: 400 },
+      mobile: { x: 5, y: 10, width: 300, height: 200 },
+    });
+  });
+
   it("keeps descriptions only on the Photo Proofing cover", () => {
     const serialized = serializePhotoProofingContent([
       { title: "Cover", description: "Cover description", image: "/cover.jpg" },
@@ -80,6 +91,89 @@ describe("Page Builder image uploads", () => {
     expect(updateSelectedElement).toHaveBeenCalledWith(expect.objectContaining({
       content: "/uploads/hash.png",
       assetFileName: "team-photo.png",
+    }));
+  });
+
+  it("uploads a PDF into the selected File Viewer", async () => {
+    const updateSelectedElement = vi.fn();
+    const showToast = vi.fn();
+    const handlers = createUploadHandlers({
+      selectedElement: { id: "document-1", type: "document", name: "File Viewer" },
+      carouselElementTypes: new Set(),
+      builderDocumentMimeTypes: new Set(["application/pdf"]),
+      builderDocumentMaxBytes: 50_000_000,
+      uploadBuilderAsset: vi.fn().mockResolvedValue("/uploads/tenant_1/builder_assets/hash.pdf"),
+      setAssetUploadBusy: vi.fn(),
+      updateSelectedElement,
+      showToast,
+      user: { id: "user-1" },
+    });
+
+    await handlers.handleSelectedElementDocumentUpload({
+      target: {
+        files: [{ name: "session-guide.pdf", type: "application/pdf", size: 1200 }],
+        value: "selected",
+      },
+    });
+
+    expect(updateSelectedElement).toHaveBeenCalledWith(expect.objectContaining({
+      content: "/uploads/tenant_1/builder_assets/hash.pdf",
+      assetFileName: "session-guide.pdf",
+      documentMimeType: "application/pdf",
+    }));
+    expect(showToast).toHaveBeenCalledWith("File uploaded.");
+  });
+
+  it("rejects unsupported File Viewer uploads before sending them", async () => {
+    const uploadBuilderAsset = vi.fn();
+    const showToast = vi.fn();
+    const handlers = createUploadHandlers({
+      selectedElement: { id: "document-1", type: "document" },
+      carouselElementTypes: new Set(),
+      builderDocumentMimeTypes: new Set(["application/pdf"]),
+      builderDocumentMaxBytes: 50_000_000,
+      uploadBuilderAsset,
+      setAssetUploadBusy: vi.fn(),
+      updateSelectedElement: vi.fn(),
+      showToast,
+    });
+
+    await handlers.handleSelectedElementDocumentUpload({
+      target: { files: [{ name: "archive.zip", type: "application/zip", size: 100 }], value: "selected" },
+    });
+
+    expect(uploadBuilderAsset).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith("Use a PDF, DOC, or DOCX file.");
+  });
+
+  it("resizes a direct image boundary using the uploaded image dimensions", async () => {
+    const updateSelectedElement = vi.fn();
+    const handlers = createUploadHandlers({
+      selectedElement: {
+        id: "image-1",
+        type: "image",
+        mode: "direct",
+        name: "Image",
+        position: { desktop: { x: 20, y: 30, width: 800, height: 260 } },
+      },
+      carouselElementTypes: new Set(),
+      builderAssetMimeTypes: new Set(["image/png"]),
+      builderAssetMaxBytes: 5_000_000,
+      uploadBuilderAsset: vi.fn().mockResolvedValue({ url: "/uploads/hash.png" }),
+      readMediaAspectRatio: vi.fn().mockResolvedValue(2),
+      setAssetUploadBusy: vi.fn(),
+      updateSelectedElement,
+      showToast: vi.fn(),
+      user: { id: "user-1" },
+    });
+
+    await handlers.handleSelectedElementImageUpload({
+      target: { files: [{ name: "wide.png", type: "image/png", size: 100 }], value: "selected" },
+    });
+
+    expect(updateSelectedElement).toHaveBeenCalledWith(expect.objectContaining({
+      mediaAspectRatio: 2,
+      position: { desktop: { x: 20, y: 30, width: 800, height: 400 } },
     }));
   });
   it("stores a custom loading image in site chrome", async () => {

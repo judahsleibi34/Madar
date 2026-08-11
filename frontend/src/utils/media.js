@@ -3,9 +3,9 @@ const API_BASE_URL = API_URL.replace(/\/+$/, "");
 const BLOCKED_MEDIA_SCHEMES = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
-  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
-const RELATIVE_MEDIA_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i;
-const MANAGED_ASSET_CACHE_VERSION = "2";
+  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm)$/;
+const RELATIVE_MEDIA_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp|mp4|webm)(?:[?#].*)?$/i;
+const MANAGED_ASSET_CACHE_VERSION = "3";
 
 const isSvgPath = (value) => {
   const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();

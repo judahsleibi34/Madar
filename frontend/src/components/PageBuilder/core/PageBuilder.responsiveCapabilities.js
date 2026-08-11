@@ -106,7 +106,7 @@ register(["divider", "thinDivider"], {
   canGrowY: false,
   responsivePriority: 20,
 });
-register(["metric", "list"], {
+register(["metric", "list", "document"], {
   sizingX: "relative",
   sizingY: "auto",
   minWidth: 160,

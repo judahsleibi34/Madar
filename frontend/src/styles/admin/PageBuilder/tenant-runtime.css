@@ -908,12 +908,12 @@ body.theme-dark .tenant-site-runtime .tenant-site-cta,
 html.theme-dark .tenant-site-runtime .builder-element-button,
 body.theme-dark .tenant-site-runtime .builder-element-button,
 .tenant-site-runtime .builder-element-button {
-  background: var(--action-primary, var(--theme-primary)) !important;
+  background: var(--madar-red) !important;
   color: var(--theme-text-inverse) !important;
 }
 
 .tenant-site-runtime .builder-element-button:hover {
-  background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
+  background: var(--madar-red-dark) !important;
   color: var(--theme-text-inverse) !important;
 }
 
@@ -927,15 +927,15 @@ body.theme-dark .tenant-site-runtime .tenant-runtime-page .builder-element,
 }
 
 .tenant-site-runtime .tenant-runtime-page .builder-element-button {
-  background: var(--action-primary, var(--theme-primary)) !important;
-  background-color: var(--action-primary, var(--theme-primary)) !important;
+  background: var(--madar-red) !important;
+  background-color: var(--madar-red) !important;
   color: var(--theme-text-inverse) !important;
   -webkit-text-fill-color: var(--theme-text-inverse) !important;
 }
 
 .tenant-site-runtime .tenant-runtime-page .builder-element-button:hover {
-  background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
-  background-color: var(--action-primary-hover, var(--theme-primary-hover)) !important;
+  background: var(--madar-red-dark) !important;
+  background-color: var(--madar-red-dark) !important;
 }
 
 :root[data-theme="dark"] .tenant-site-runtime .tenant-runtime-page .builder-element-heading,

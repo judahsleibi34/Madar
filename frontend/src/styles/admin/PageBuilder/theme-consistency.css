@@ -1402,6 +1402,52 @@
   line-height: 1.45;
 }
 
+.page-builder .site-chrome-color-control {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 42px minmax(90px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border: 1px solid var(--pb-border-strong);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface);
+}
+
+.page-builder .site-chrome-color-control input[type="color"] {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 2px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.page-builder .site-chrome-color-control output {
+  color: var(--pb-text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.page-builder .site-chrome-color-control button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--pb-border-strong);
+  border-radius: 8px;
+  background: var(--pb-surface-raised);
+  color: var(--pb-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.page-builder .site-chrome-color-control button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .page-builder .site-chrome-footer-structure {
   min-width: 0;
   display: grid;
@@ -2459,8 +2505,8 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
 /* Canvas content buttons are site content, not neutral workspace controls. */
 .page-builder .workspace-page .builder-canvas .builder-element-button,
 .page-builder .workspace-page .direct-element-frame-button .builder-element-button {
-  background: var(--action-primary) !important;
-  background-color: var(--action-primary) !important;
+  background: var(--madar-red) !important;
+  background-color: var(--madar-red) !important;
   background-image: none !important;
   border-color: transparent !important;
   border-radius: 8px !important;
@@ -2472,8 +2518,8 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
 
 .page-builder .workspace-page .builder-canvas .builder-element-button:hover,
 .page-builder .workspace-page .direct-element-frame-button .builder-element-button:hover {
-  background: var(--action-primary-hover) !important;
-  background-color: var(--action-primary-hover) !important;
+  background: var(--madar-red-dark) !important;
+  background-color: var(--madar-red-dark) !important;
   color: var(--theme-text-inverse) !important;
   -webkit-text-fill-color: var(--theme-text-inverse) !important;
 }

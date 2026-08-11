@@ -1,9 +1,12 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createElementRenderer } from "./PageBuilder.elementRenderer";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("mixed text blocks", () => {
   it("continues an H1 as normal text inside the same element", () => {
@@ -102,5 +105,158 @@ describe("button color rendering", () => {
     const button = screen.getByRole("button", { name: "Legacy" });
     expect(button.className).not.toContain("has-button-");
     expect(button.getAttribute("style")).toContain("font-size");
+  });
+});
+
+describe("video rendering", () => {
+  it("defers the video source until it is near the viewport", async () => {
+    let intersectionCallback;
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback) {
+        intersectionCallback = callback;
+      }
+      observe() {}
+      disconnect() {}
+    });
+
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "", id: "" },
+      preview: true,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag: vi.fn(),
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText: vi.fn(),
+      runElementAction: vi.fn(),
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
+
+    render(renderElement({
+      id: "video-1",
+      type: "video",
+      name: "Product demo",
+      content: "https://media.example.com/product-demo.mp4",
+      styles: {},
+      video: { controls: true },
+    }));
+
+    const video = screen.getByLabelText("Product demo");
+    expect(video.getAttribute("src")).toBeNull();
+    intersectionCallback([{ isIntersecting: true }]);
+    await waitFor(() => expect(video.getAttribute("src")).toContain(".mp4"));
+    expect(video.preload).toBe("metadata");
+    expect(video.playsInline).toBe(true);
+  });
+});
+
+describe("document rendering", () => {
+  it("shows upload guidance instead of a restricted Open button before a file exists", () => {
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "element", id: "document-empty" },
+      preview: false,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag: vi.fn(),
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText: vi.fn(),
+      runElementAction: vi.fn(),
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
+
+    render(renderElement({
+      id: "document-empty",
+      type: "document",
+      content: "",
+      document: { title: "View document" },
+      styles: {},
+    }));
+
+    expect(screen.getByText("Upload first")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /open/i })).toBeNull();
+  });
+
+  it("opens a PDF in an accessible modal in preview mode", () => {
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "", id: "" },
+      preview: true,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag: vi.fn(),
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText: vi.fn(),
+      runElementAction: vi.fn(),
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
+
+    render(renderElement({
+      id: "document-1",
+      type: "document",
+      content: "https://media.example.com/session-guide.pdf",
+      assetFileName: "session-guide.pdf",
+      documentMimeType: "application/pdf",
+      document: { title: "Session guide", description: "Everything clients need." },
+      styles: {},
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /open/i }));
+
+    expect(screen.getByRole("dialog", { name: "Session guide" })).toBeTruthy();
+    expect(screen.getByTitle("Session guide").getAttribute("src")).toContain("session-guide.pdf");
+  });
+
+  it("opens the viewer from the editing canvas without starting a drag", () => {
+    const startDrag = vi.fn();
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "element", id: "document-1" },
+      preview: false,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag,
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText: vi.fn(),
+      runElementAction: vi.fn(),
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
+
+    render(renderElement({
+      id: "document-1",
+      type: "document",
+      content: "https://media.example.com/guide.pdf",
+      assetFileName: "guide.pdf",
+      documentMimeType: "application/pdf",
+      document: { title: "Guide" },
+      styles: {},
+    }));
+
+    const openButton = screen.getByRole("button", { name: /open/i });
+    fireEvent.pointerDown(openButton);
+    fireEvent.click(openButton);
+
+    expect(startDrag).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Guide" })).toBeTruthy();
   });
 });

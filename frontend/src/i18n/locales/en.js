@@ -73,7 +73,7 @@ const en = {
       android_browser_unsupported: "Open Madar in an up-to-date Chrome browser on Android, then enable system notifications again.",
       secure_context_required: "Lock Screen notifications require the installed Madar app to use a secure HTTPS address. HTTP and local-network addresses are not supported.",
       unsupported: "This browser does not support web push.",
-      server_not_configured: "Web push is not configured on the server yet.",
+      server_not_configured: "System notifications are temporarily unavailable.",
       permission_denied: "Notification permission was not granted.",
       unavailable: "Browser notifications are unavailable.",
       failed: "Could not enable browser notifications.",

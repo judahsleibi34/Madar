@@ -17,6 +17,11 @@ PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 16
 WEBP_BYTES = b"RIFF" + b"\x10\x00\x00\x00" + b"WEBP" + b"\x00" * 16
 SVG_BYTES = b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"
+MP4_BYTES = bytes.fromhex("00000018667479706d703432") + bytes(16)
+WEBM_BYTES = bytes.fromhex("1a45dfa3") + bytes(20)
+PDF_BYTES = b"%PDF-1.7\n" + bytes(20)
+DOC_BYTES = bytes.fromhex("d0cf11e0a1b11ae1") + bytes(20)
+DOCX_BYTES = bytes.fromhex("504b0304") + bytes(24)
 
 
 def build_client():
@@ -185,6 +190,57 @@ class BuilderAssetUploadTests(unittest.TestCase):
             )
             self.assertTrue((self.upload_dir / asset_url.removeprefix("/uploads/")).exists())
 
+    def test_accepts_optimized_browser_video_formats(self):
+        cases = [
+            (MP4_BYTES, "clip.mp4", "video/mp4", ".mp4"),
+            (WEBM_BYTES, "clip.webm", "video/webm", ".webm"),
+        ]
+
+        for content, filename, content_type, extension in cases:
+            with self.subTest(content_type=content_type):
+                response = self.post_asset(content, filename, content_type)
+
+            self.assertEqual(response.status_code, 200)
+            asset_url = response.json()["asset_url"]
+            self.assertRegex(
+                asset_url,
+                rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
+            )
+
+    def test_accepts_pdf_and_word_documents(self):
+        cases = [
+            (PDF_BYTES, "guide.pdf", "application/pdf", ".pdf"),
+            (DOC_BYTES, "guide.doc", "application/msword", ".doc"),
+            (
+                DOCX_BYTES,
+                "guide.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ".docx",
+            ),
+        ]
+
+        for content, filename, content_type, extension in cases:
+            with self.subTest(content_type=content_type):
+                response = self.post_asset(content, filename, content_type)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertRegex(
+                response.json()["asset_url"],
+                rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
+            )
+
+    def test_rejects_document_with_spoofed_content_type(self):
+        response = self.post_asset(PNG_BYTES, "guide.pdf", "application/pdf")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Document content does not match the declared file type")
+
+    def test_rejects_video_with_spoofed_content_type(self):
+        response = self.post_asset(PNG_BYTES, "clip.mp4", "video/mp4")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Video content does not match the declared file type")
+
     def test_upload_creates_missing_tenant_directory(self):
         tenant_asset_dir = self.upload_dir / "tenant_1" / "builder_assets"
         self.assertFalse(tenant_asset_dir.exists())
@@ -202,11 +258,11 @@ class BuilderAssetUploadTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         storage_key = response.json()["asset_url"].removeprefix("/uploads/")
-        durable_store.assert_called_once_with(
-            storage_key=storage_key,
-            content=PNG_BYTES,
-            content_type="image/png",
-        )
+        durable_store.assert_called_once()
+        durable_kwargs = durable_store.call_args.kwargs
+        self.assertEqual(durable_kwargs["storage_key"], storage_key)
+        self.assertEqual(durable_kwargs["content_type"], "image/png")
+        self.assertEqual(durable_kwargs["source_path"].read_bytes(), PNG_BYTES)
 
     def test_durable_storage_failure_does_not_publish_a_broken_url(self):
         with patch.object(
@@ -221,7 +277,7 @@ class BuilderAssetUploadTests(unittest.TestCase):
         self.assertEqual(list(self.upload_dir.rglob("*.png")), [])
 
     def test_unwritable_storage_returns_controlled_cors_error(self):
-        with patch.object(Path, "write_bytes", side_effect=PermissionError("denied")):
+        with patch.object(Path, "open", side_effect=PermissionError("denied")):
             response = self.post_asset(
                 PNG_BYTES,
                 headers={"Origin": "https://madarportal.com"},

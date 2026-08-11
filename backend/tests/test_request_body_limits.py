@@ -18,6 +18,7 @@ from services.request_security import (
 def build_body_limit_client(
     *,
     max_request_body_bytes=2048,
+    max_builder_asset_request_body_bytes=4096,
     max_json_body_bytes=256,
     max_small_json_body_bytes=64,
     max_data_json_body_bytes=128,
@@ -26,6 +27,7 @@ def build_body_limit_client(
     app.add_middleware(
         RequestBodyLimitMiddleware,
         max_request_body_bytes=max_request_body_bytes,
+        max_builder_asset_request_body_bytes=max_builder_asset_request_body_bytes,
         max_json_body_bytes=max_json_body_bytes,
         max_small_json_body_bytes=max_small_json_body_bytes,
         max_data_json_body_bytes=max_data_json_body_bytes,
@@ -49,6 +51,11 @@ def build_body_limit_client(
 
     @app.post("/users/1/data/upload")
     async def upload_data(file: UploadFile = File(...)):
+        content = await file.read()
+        return {"size": len(content)}
+
+    @app.post("/builder/assets/upload")
+    async def upload_builder_asset(file: UploadFile = File(...)):
         content = await file.read()
         return {"size": len(content)}
 
@@ -128,6 +135,20 @@ class RequestBodyLimitTests(unittest.TestCase):
         )
 
         self.assert_payload_too_large(response)
+
+    def test_builder_asset_upload_uses_dedicated_larger_limit(self):
+        client = build_body_limit_client(
+            max_request_body_bytes=512,
+            max_builder_asset_request_body_bytes=4096,
+        )
+
+        response = client.post(
+            "/builder/assets/upload",
+            files={"file": ("clip.mp4", b"x" * 2000, "video/mp4")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["size"], 2000)
 
     def test_misleading_content_length_is_enforced_by_stream_count(self):
         async def body_reader_app(scope, receive, send):
