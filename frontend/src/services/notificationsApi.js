@@ -8,7 +8,7 @@ import {
   getExistingMadarPushEndpoint,
   getMadarServiceWorkerRegistration,
 } from "../pwa/serviceWorker";
-import { registerInstallation } from "../pwa/installation";
+import { registerInstallation, rotateInstallationId } from "../pwa/installation";
 import {
   clearPushRotationNeeded,
   readPushRotationNeeded,
@@ -207,10 +207,24 @@ export const enableBrowserPushNotifications = async ({ tenantId, pushConfig = nu
     applicationServerKey: urlBase64ToUint8Array(config.public_key),
   });
 
-  const installation = tenantId
-    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
-    : null;
+  let installation = null;
+  if (tenantId) {
+    try {
+      installation = await registerInstallation({ tenantId, force: true });
+    } catch (error) {
+      // A remote removal remains durable during passive reconciliation. A new
+      // client identity is created only from this explicit Enable action.
+      if (error?.status === 409 && rotateInstallationId()) {
+        installation = await registerInstallation({ tenantId, force: true });
+      } else {
+        return { enabled: false, reason: "installation_unavailable" };
+      }
+    }
+  }
   const installationId = installation?.installationId || null;
+  if (tenantId && !installationId) {
+    return { enabled: false, reason: "installation_unavailable" };
+  }
   await savePushSubscription(subscription.toJSON(), installationId);
   await clearPushRotationNeeded().catch(() => false);
   if (typeof registration.showNotification === "function") {
@@ -267,6 +281,10 @@ export const reconcileBrowserPushLifecycle = async ({
       reconciled: false,
       reason: rotationNeeded ? "rotation_without_opt_in" : "subscription_missing",
     };
+  }
+
+  if (tenantId && !installationId) {
+    return { reconciled: false, reason: "installation_unavailable" };
   }
 
   await savePushSubscription(subscription.toJSON(), installationId);

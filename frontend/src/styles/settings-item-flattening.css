@@ -568,6 +568,184 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   min-width: 0;
 }
 
+/* Account-scoped device and PWA installation controls. */
+.device-settings-panel {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+
+.admin-dashboard-page .settings-page .device-settings-card {
+  padding: 22px 24px;
+}
+
+.device-settings-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.device-settings-card h2,
+.device-settings-item h3 {
+  margin: 0;
+  color: var(--theme-text);
+}
+
+.device-settings-card header p,
+.device-settings-item p,
+.device-install-card p {
+  margin: 5px 0 0;
+  color: var(--theme-text-muted);
+}
+
+.device-settings-list {
+  display: grid;
+}
+
+.device-settings-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0;
+  border-top: 1px solid var(--theme-border);
+}
+
+.device-settings-item:first-child {
+  border-top: 0;
+}
+
+.device-settings-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: rgba(var(--theme-primary-rgb), 0.11) !important;
+  color: var(--theme-primary);
+}
+
+.device-settings-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.device-settings-heading h3 {
+  font-size: 1rem;
+}
+
+.device-settings-heading span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(var(--theme-primary-rgb), 0.12) !important;
+  color: var(--theme-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.device-settings-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+.device-settings-status.is-enabled {
+  color: var(--theme-success, #2f7d4a);
+}
+
+.device-settings-status.is-blocked,
+.device-settings-message.is-error {
+  color: var(--theme-danger);
+}
+
+.device-settings-copy small {
+  display: block;
+  margin-top: 6px;
+  color: var(--theme-text-muted);
+}
+
+.device-settings-guidance {
+  max-width: 46rem;
+}
+
+.device-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.device-settings-actions button,
+.device-install-card > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 13px;
+  border-radius: var(--app-radius-control);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.device-settings-secondary,
+.device-settings-danger {
+  background: transparent;
+  border: 1px solid var(--theme-border);
+  color: var(--theme-text);
+}
+
+.device-settings-danger {
+  color: var(--theme-danger);
+}
+
+.device-settings-actions button:focus-visible,
+.device-install-card > button:focus-visible {
+  outline: 2px solid var(--theme-primary);
+  outline-offset: 2px;
+}
+
+.device-settings-actions button:disabled,
+.device-install-card > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.device-settings-message {
+  margin: 18px 0 4px;
+  color: var(--theme-text-muted);
+}
+
+.device-install-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+@media (max-width: 720px) {
+  .device-settings-item,
+  .device-install-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .device-settings-actions,
+  .device-install-card > button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .device-settings-actions button {
+    flex: 1 1 auto;
+  }
+}
+
 .admin-dashboard-page .settings-page .settings-security-panel .security-mfa-page {
   width: 100%;
   gap: 0;
