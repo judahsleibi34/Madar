@@ -118,6 +118,40 @@ beforeEach(() => {
 });
 
 describe("calendar task UI", () => {
+  it("revalidates fresh cache and shows a reservation in Calendar and Agenda", async () => {
+    const reservation = {
+      id: "reservation::existing",
+      source_id: "existing",
+      source_type: "reservation",
+      source_label: "Reservation",
+      calendar_id: "reservations",
+      title: "Existing consultation",
+      starts_at: localIsoAt(10),
+      ends_at: localIsoAt(10, 30),
+      read_only: true,
+    };
+    readCalendarWorkspaceCacheEntry.mockReturnValueOnce({
+      freshness: "fresh",
+      workspace: { ...workspace, events: [] },
+    });
+    fetchCalendarWorkspace.mockResolvedValue({
+      ...workspace,
+      events: [reservation],
+    });
+
+    render(<ReservationCalendarPage user={operator} />);
+
+    expect(await screen.findByRole("button", { name: /Existing consultation/ })).toBeTruthy();
+    expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: /CalendarsChoose what appears/ }));
+    const reservationSource = screen.getByRole("checkbox", { name: /Reservations/ });
+    expect(reservationSource.checked).toBe(true);
+    expect(reservationSource.disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "agenda" }));
+    expect(await screen.findByText("Existing consultation")).toBeTruthy();
+  });
+
   it("offers both Calendar and Agenda views on phones", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({
       matches: true,

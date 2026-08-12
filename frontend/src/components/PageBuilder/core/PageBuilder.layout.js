@@ -113,6 +113,7 @@ export const directElementHeight = (element) => {
     heading: 112,
     text: 104,
     button: 42,
+    imageButton: 180,
     image: 260,
     video: 320,
     document: 150,

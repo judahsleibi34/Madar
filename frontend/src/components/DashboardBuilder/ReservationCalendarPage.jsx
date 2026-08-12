@@ -618,8 +618,6 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
       }
     });
 
-    if (cachedEntry?.freshness === "fresh") return () => { active = false; };
-
     getOrCreateCalendarWorkspaceRequest(
       cacheKey,
       () => fetchCalendarWorkspace({ start, end, force: forceRefresh })
@@ -654,7 +652,9 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
 
   const calendarById = useMemo(() => new Map((workspace.calendars || []).map((item) => [item.id, item])), [workspace.calendars]);
   const visibleEvents = useMemo(
-    () => (workspace.events || []).filter((event) => enabledCalendars.has(event.calendar_id)),
+    () => (workspace.events || []).filter(
+      (event) => event.source_type === "reservation" || enabledCalendars.has(event.calendar_id)
+    ),
     [enabledCalendars, workspace.events]
   );
   const openTasks = useMemo(
@@ -1117,7 +1117,7 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
           <div className="calendar-sidebar-category"><span>My calendars</span></div>
           <section className="calendar-sidebar-group calendar-calendars-panel">
             <SidebarSectionHeading section="calendars" icon={<CalendarDays size={16} />} title="Calendars" subtitle="Choose what appears" count={(workspace.calendars?.length || 0) + 1} expanded={expandedSidebarSections.has("calendars")} onToggle={toggleSidebarSection} />
-            {expandedSidebarSections.has("calendars") && <div id="calendar-sidebar-calendars" className="calendar-sidebar-card calendar-source-list">{[...(workspace.calendars || []), { id: "reservations", name: "Reservations", color: "#f26b4a" }].map((calendar) => <label className="calendar-source-toggle" key={calendar.id}><input type="checkbox" checked={enabledCalendars.has(calendar.id)} onChange={() => toggleCalendar(calendar.id)} /><i style={{ background: calendar.color }} /><span>{calendar.name}</span>{calendar.is_default && <small>Default</small>}</label>)}</div>}
+            {expandedSidebarSections.has("calendars") && <div id="calendar-sidebar-calendars" className="calendar-sidebar-card calendar-source-list">{[...(workspace.calendars || []), { id: "reservations", name: "Reservations", color: "#f26b4a" }].map((calendar) => <label className="calendar-source-toggle" key={calendar.id}><input type="checkbox" checked={calendar.id === "reservations" || enabledCalendars.has(calendar.id)} disabled={calendar.id === "reservations"} onChange={() => toggleCalendar(calendar.id)} /><i style={{ background: calendar.color }} /><span>{calendar.name}</span>{calendar.is_default && <small>Default</small>}</label>)}</div>}
           </section>
 
           <div className="calendar-sidebar-category"><span>Planning</span></div>

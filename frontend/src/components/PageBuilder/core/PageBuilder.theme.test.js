@@ -17,6 +17,7 @@ describe("Page Builder typography theme", () => {
     expect(variables.fontFamily).toContain('"Inter"');
     expect(variables.fontFamily).toContain('"IBM Plex Sans Arabic"');
     expect(variables["--theme-font-family"]).toBe(variables.fontFamily);
+    expect(variables["--theme-text"]).toBe("#000000");
   });
 
   it("isolates site action colors from the surrounding application theme", () => {

@@ -153,7 +153,7 @@ export const createUploadHandlers = ({  selectedElement,
   const handleSelectedElementImageUpload = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || !selectedElement || selectedElement.type !== "image") return;
+    if (!file || !selectedElement || !["image", "imageButton"].includes(selectedElement.type)) return;
 
     const [assetUrl, aspectRatio] = await Promise.all([
       uploadBuilderImageFile(file),

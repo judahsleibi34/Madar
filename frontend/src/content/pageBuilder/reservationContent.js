@@ -17,7 +17,7 @@ const reservationContentEn = {
   required: "Required",
   kicker: "Reservation",
   servicesLabel: "Services",
-  disabledHelper: "Enable Preview to test reservations.",
+  disabledHelper: "Publish the site to accept real reservations. Builder preview does not add calendar events.",
 };
 
 export const reservationContent = {

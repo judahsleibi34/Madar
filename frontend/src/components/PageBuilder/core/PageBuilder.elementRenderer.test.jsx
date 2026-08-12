@@ -108,6 +108,43 @@ describe("button color rendering", () => {
   });
 });
 
+describe("image button rendering", () => {
+  it("renders the uploaded image as a button and runs its action in preview", () => {
+    const runElementAction = vi.fn();
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "", id: "" },
+      preview: true,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag: vi.fn(),
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText: vi.fn(),
+      runElementAction,
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
+    const imageButton = {
+      id: "image-button-1",
+      type: "imageButton",
+      name: "Continue to details",
+      content: "https://media.example.com/continue.webp",
+      action: { type: "goToPage", pageId: "details" },
+      styles: {},
+    };
+
+    render(renderElement(imageButton));
+    const button = screen.getByRole("button", { name: "Continue to details" });
+    expect(button.querySelector("img")?.getAttribute("src")).toContain("continue.webp");
+    fireEvent.click(button);
+    expect(runElementAction).toHaveBeenCalledWith(imageButton);
+  });
+});
+
 describe("video rendering", () => {
   it("defers the video source until it is near the viewport", async () => {
     let intersectionCallback;

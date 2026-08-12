@@ -116,6 +116,8 @@ describe("renderRichText", () => {
             start: 11,
             end: 19,
             fontStyle: "italic",
+            fontFamily: '"EB Garamond", serif',
+            opacity: "0.42",
             textDecoration: "underline",
             color: "#123456",
             backgroundColor: "rgba(254, 220, 186, 0.5)",
@@ -127,6 +129,8 @@ describe("renderRichText", () => {
     const formattedRange = container.querySelector("span");
     expect(formattedRange.textContent).toBe("business");
     expect(formattedRange.style.fontStyle).toBe("italic");
+    expect(formattedRange.style.fontFamily).toBe('"EB Garamond", serif');
+    expect(formattedRange.style.opacity).toBe("0.42");
     expect(formattedRange.style.textDecoration).toBe("underline");
     expect(formattedRange.style.color).toBe("rgb(18, 52, 86)");
     expect(formattedRange.style.backgroundColor).toBe("rgba(254, 220, 186, 0.5)");

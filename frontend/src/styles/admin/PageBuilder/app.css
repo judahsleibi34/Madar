@@ -1242,6 +1242,10 @@
   padding: 0 10px;
 }
 
+.builder-inline-text-toolbar .builder-inline-toolbar-font-family {
+  width: 150px;
+}
+
 .builder-inline-text-toolbar button,
 .builder-inline-toolbar-size,
 .builder-inline-toolbar-color {

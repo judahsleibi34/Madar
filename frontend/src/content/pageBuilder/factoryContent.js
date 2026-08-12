@@ -41,6 +41,9 @@ export const factoryContent = {
         name: "Button",
         content: "Get started",
       },
+      imageButton: {
+        name: "Image Button",
+      },
       image: {
         name: "Image",
       },

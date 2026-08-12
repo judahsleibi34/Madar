@@ -469,6 +469,45 @@ def expand_events(rows: list[dict[str, Any]], start: datetime, end: datetime) ->
 
 
 def reservation_payload(row: dict[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    timezone_name = str(
+        row.get("timezone") or payload.get("timezone") or payload.get("timeZone") or "UTC"
+    ).strip() or "UTC"
+    starts_at = row.get("starts_at") or payload.get("starts_at") or payload.get("startsAt")
+    ends_at = row.get("ends_at") or payload.get("ends_at") or payload.get("endsAt")
+    if not starts_at:
+        date_value = payload.get("date") or payload.get("reservation_date") or payload.get("reservationDate")
+        time_value = payload.get("time") or payload.get("start_time") or payload.get("startTime")
+        if date_value and time_value:
+            starts_at = f"{date_value}T{time_value}"
+
+    if starts_at:
+        try:
+            parsed_start = datetime.fromisoformat(str(starts_at).replace("Z", "+00:00"))
+            if parsed_start.tzinfo is None:
+                try:
+                    parsed_start = parsed_start.replace(tzinfo=ZoneInfo(timezone_name))
+                except ZoneInfoNotFoundError:
+                    parsed_start = parsed_start.replace(tzinfo=timezone.utc)
+            starts_at = parsed_start.isoformat()
+        except ValueError:
+            starts_at = None
+
+    if starts_at and not ends_at:
+        parsed_start = datetime.fromisoformat(str(starts_at).replace("Z", "+00:00"))
+        ends_at = (parsed_start + timedelta(minutes=30)).isoformat()
+    elif ends_at:
+        try:
+            parsed_end = datetime.fromisoformat(str(ends_at).replace("Z", "+00:00"))
+            if parsed_end.tzinfo is None:
+                try:
+                    parsed_end = parsed_end.replace(tzinfo=ZoneInfo(timezone_name))
+                except ZoneInfoNotFoundError:
+                    parsed_end = parsed_end.replace(tzinfo=timezone.utc)
+            ends_at = parsed_end.isoformat()
+        except ValueError:
+            ends_at = starts_at
+
     return {
         "id": f"reservation::{row['id']}",
         "source_id": row["id"],
@@ -478,9 +517,9 @@ def reservation_payload(row: dict[str, Any]) -> dict[str, Any]:
         "title": row.get("reservation_title") or row.get("customer_name") or "Reservation",
         "description": "",
         "location": row.get("site_subdomain") or "",
-        "starts_at": row.get("starts_at"),
-        "ends_at": row.get("ends_at") or row.get("starts_at"),
-        "timezone": row.get("timezone") or "UTC",
+        "starts_at": starts_at,
+        "ends_at": ends_at,
+        "timezone": timezone_name,
         "status": "cancelled" if row.get("status") in {"cancelled", "rejected"} else "confirmed",
         "reservation_status": row.get("status") or "new",
         "customer_name": row.get("customer_name"),
@@ -489,6 +528,39 @@ def reservation_payload(row: dict[str, Any]) -> dict[str, Any]:
         "read_only": True,
         "version": 1,
     }
+
+
+def reservation_events_for_range(context, start: datetime, end: datetime) -> list[dict[str, Any]]:
+    if str(context.role or "").lower() not in {"owner", "admin", "member"}:
+        return []
+
+    scheduled_rows = getattr(
+        service_supabase.table("builder_reservations").select("*")
+        .eq("tenant_id", context.tenant_id).gte("starts_at", iso(start))
+        .lt("starts_at", iso(end)).limit(1000).execute(), "data", None,
+    ) or []
+    legacy_rows = getattr(
+        service_supabase.table("builder_reservations").select("*")
+        .eq("tenant_id", context.tenant_id).is_("starts_at", "null")
+        .order("created_at", desc=True).limit(1000).execute(), "data", None,
+    ) or []
+    rows_by_id = {
+        str(row.get("id") or f"row-{index}"): row
+        for index, row in enumerate([*scheduled_rows, *legacy_rows])
+    }
+    events = []
+    for row in rows_by_id.values():
+        event = reservation_payload(row)
+        if not event.get("starts_at"):
+            continue
+        try:
+            event_start = datetime.fromisoformat(str(event["starts_at"]).replace("Z", "+00:00"))
+            event_end = datetime.fromisoformat(str(event["ends_at"]).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            continue
+        if event_start < end and event_end > start:
+            events.append(event)
+    return events
 
 
 def write_change(context, event_id: str, action: str, scope: str, before, after) -> None:
@@ -1027,13 +1099,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
     events = expand_events(detail_event_rows, start, end)
     events.extend(availability_event(row) for row in expand_events(availability_rows, start, end))
 
-    if str(context.role or "").lower() in {"owner", "admin", "member"}:
-        reservations = getattr(
-            service_supabase.table("builder_reservations").select("*")
-            .eq("tenant_id", context.tenant_id).lt("starts_at", iso(end))
-            .gt("ends_at", iso(start)).limit(1000).execute(), "data", None,
-        ) or []
-        events.extend(reservation_payload(row) for row in reservations if row.get("starts_at"))
+    events.extend(reservation_events_for_range(context, start, end))
 
     tasks = workspace_task_rows(context, detail_ids)
     linked_task_event_ids = workspace_linked_task_event_ids(context, detail_ids)
@@ -1129,6 +1195,12 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
             context.tenant_id,
             lambda: _calendar_workspace_payload(context, start, end),
         )
+        fresh_reservations = reservation_events_for_range(context, start, end)
+        cached_events = [event for event in (payload.get("events") or []) if event.get("source_type") != "reservation"]
+        payload = {
+            **payload,
+            "events": sorted([*cached_events, *fresh_reservations], key=lambda item: item.get("starts_at") or ""),
+        }
         payload["calendar_features_available"] = True
         response.headers["X-Calendar-Cache"] = "hit" if cache_hit else "miss"
         response.headers["Cache-Control"] = "private, no-store"
@@ -1151,15 +1223,7 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
 
 
 def _calendar_disabled_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
-    reservations = []
-    if str(context.role or "").lower() in {"owner", "admin", "member"}:
-        reservations = getattr(
-            service_supabase.table("builder_reservations")
-            .select("*").eq("tenant_id", context.tenant_id)
-            .lt("starts_at", iso(end)).gt("ends_at", iso(start)).limit(1000).execute(),
-            "data", None,
-        ) or []
-    events = [reservation_payload(row) for row in reservations if row.get("starts_at")]
+    events = reservation_events_for_range(context, start, end)
     return {
         "success": True,
         "calendar_features_available": False,

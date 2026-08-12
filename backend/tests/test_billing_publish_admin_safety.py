@@ -899,6 +899,14 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
             validated, _ = builder_routes.validate_publish_schema(schema_for(action))
             self.assertEqual(validated["pages"][0]["sections"][0]["freeElements"][0]["action"]["type"], action["type"])
 
+        image_button_schema = schema_for({"type": "goToPage", "pageId": "home"})
+        image_button_schema["pages"][0]["sections"][0]["freeElements"][0]["type"] = "imageButton"
+        validated, _ = builder_routes.validate_publish_schema(image_button_schema)
+        self.assertEqual(
+            validated["pages"][0]["sections"][0]["freeElements"][0]["action"]["pageId"],
+            "home",
+        )
+
         invalid_actions = [
             ({"type": "goToPage", "pageId": "missing"}, "invalid_button_page_target"),
             ({"type": "openUrl", "url": "javascript:alert(1)"}, "invalid_button_url"),
