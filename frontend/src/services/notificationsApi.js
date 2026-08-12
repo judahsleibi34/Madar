@@ -8,7 +8,7 @@ import {
   getExistingMadarPushEndpoint,
   getMadarServiceWorkerRegistration,
 } from "../pwa/serviceWorker";
-import { registerInstallation } from "../pwa/installation";
+import { registerInstallation, rotateInstallationId } from "../pwa/installation";
 import {
   clearPushRotationNeeded,
   readPushRotationNeeded,
@@ -69,6 +69,27 @@ export const markAllNotificationsRead = async () => {
   }
 
   return data;
+};
+
+export const fetchNotificationPreferences = async () => {
+  const response = await apiFetch(getApiUrl("/notifications/preferences"), {
+    method: "GET",
+    cache: "no-store",
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok) throw new Error(readApiError(data, "Could not load notification preferences."));
+  return data.preferences || [];
+};
+
+export const saveNotificationPreference = async ({ category, channel, enabled }) => {
+  const response = await apiFetch(getApiUrl("/notifications/preferences"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ category, channel, enabled }),
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok) throw new Error(readApiError(data, "Could not save notification preference."));
+  return data.preference;
 };
 
 export const getPushPublicKey = async () => {
@@ -207,10 +228,24 @@ export const enableBrowserPushNotifications = async ({ tenantId, pushConfig = nu
     applicationServerKey: urlBase64ToUint8Array(config.public_key),
   });
 
-  const installation = tenantId
-    ? await registerInstallation({ tenantId, force: true }).catch(() => null)
-    : null;
+  let installation = null;
+  if (tenantId) {
+    try {
+      installation = await registerInstallation({ tenantId, force: true });
+    } catch (error) {
+      // A remote removal remains durable during passive reconciliation. A new
+      // client identity is created only from this explicit Enable action.
+      if (error?.status === 409 && rotateInstallationId()) {
+        installation = await registerInstallation({ tenantId, force: true });
+      } else {
+        return { enabled: false, reason: "installation_unavailable" };
+      }
+    }
+  }
   const installationId = installation?.installationId || null;
+  if (tenantId && !installationId) {
+    return { enabled: false, reason: "installation_unavailable" };
+  }
   await savePushSubscription(subscription.toJSON(), installationId);
   await clearPushRotationNeeded().catch(() => false);
   if (typeof registration.showNotification === "function") {
@@ -267,6 +302,10 @@ export const reconcileBrowserPushLifecycle = async ({
       reconciled: false,
       reason: rotationNeeded ? "rotation_without_opt_in" : "subscription_missing",
     };
+  }
+
+  if (tenantId && !installationId) {
+    return { reconciled: false, reason: "installation_unavailable" };
   }
 
   await savePushSubscription(subscription.toJSON(), installationId);

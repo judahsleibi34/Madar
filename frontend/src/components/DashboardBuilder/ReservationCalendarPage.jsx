@@ -43,10 +43,6 @@ import {
   updateCalendarEvent,
   updateCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
-import {
-  archiveItem,
-  deleteArchiveItem,
-} from "../PageBuilder/DataAnalysisWorkspace/utils/datasetStorage";
 import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
 import {
   clearCalendarWorkspaceCache,
@@ -490,6 +486,7 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
   const [expandedSidebarSections, setExpandedSidebarSections] = useState(() => new Set());
   const [rangeStart, rangeEnd] = useMemo(() => rangeForView(focusDate, view), [focusDate, view]);
   const lastHandledRefreshRef = useRef(0);
+  const lastVisibilityRefreshRef = useRef(0);
   const hasLoadedWorkspaceRef = useRef(false);
   const tenantScope = user?.tenant_id ?? user?.tenantId ?? "";
   const userScope = user?.id || user?.auth_id || user?.authId || "";
@@ -622,6 +619,10 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
       }
     });
 
+    if (cachedEntry?.freshness === "fresh") {
+      return () => { active = false; };
+    }
+
     getOrCreateCalendarWorkspaceRequest(
       cacheKey,
       () => fetchCalendarWorkspace({ start, end, force: forceRefresh })
@@ -638,6 +639,26 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [cacheIdentity, rangeEnd, rangeStart, refreshKey]);
+
+  useEffect(() => {
+    const refreshVisibleCalendar = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (now - lastVisibilityRefreshRef.current < 1000) return;
+      lastVisibilityRefreshRef.current = now;
+      setRefreshKey((value) => value + 1);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshVisibleCalendar();
+    };
+
+    window.addEventListener("focus", refreshVisibleCalendar);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshVisibleCalendar);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
 
   useEffect(() => {
     const taskSyncPending = (workspace.tasks || []).some(
@@ -946,26 +967,11 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
     setTaskConfirmation(null);
     setSaving(true);
     setTaskEditorError("");
-    const archiveId = `calendar-task-${selectedTask.id}`;
     try {
-      await archiveItem({
-        id: archiveId,
-        type: "task",
-        scope: user?.id ? `user-${user.id}` : "",
-        title: selectedTask.title || "Untitled task",
-        description: selectedTask.description || "Archived from the Calendar agenda.",
-        payload: {
-          task: {
-            ...selectedTask,
-            status_before_archive: selectedTask.status,
-          },
-        },
-      });
       await archiveCalendarTask(selectedTask.id, selectedTask.version);
       setTaskEditor(null);
       setRefreshKey((value) => value + 1);
     } catch (taskError) {
-      await deleteArchiveItem(archiveId).catch(() => {});
       setTaskEditorError(taskError?.message || "The task could not be archived.");
     } finally {
       setSaving(false);

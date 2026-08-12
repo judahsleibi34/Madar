@@ -63,6 +63,21 @@ class UrlValidationTests(unittest.TestCase):
             "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.webp",
         )
 
+        validate_builder_schema_urls({
+            "pages": [{
+                "elements": [{
+                    "type": "document",
+                    "content": "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.docx",
+                }],
+            }],
+        })
+
+    def test_rejects_unsafe_document_element_url(self):
+        with self.assertRaises(HTTPException):
+            validate_builder_schema_urls({
+                "pages": [{"elements": [{"type": "document", "content": "javascript:alert(1)"}]}],
+            })
+
     def test_rejects_unmanaged_upload_paths(self):
         unmanaged_paths = [
             "/uploads/logo.png",

@@ -1,7 +1,9 @@
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+import zipfile
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,9 +21,23 @@ WEBP_BYTES = b"RIFF" + b"\x10\x00\x00\x00" + b"WEBP" + b"\x00" * 16
 SVG_BYTES = b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"
 MP4_BYTES = bytes.fromhex("00000018667479706d703432") + bytes(16)
 WEBM_BYTES = bytes.fromhex("1a45dfa3") + bytes(20)
-PDF_BYTES = b"%PDF-1.7\n" + bytes(20)
+PDF_BYTES = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
 DOC_BYTES = bytes.fromhex("d0cf11e0a1b11ae1") + bytes(20)
-DOCX_BYTES = bytes.fromhex("504b0304") + bytes(24)
+
+
+def build_docx_bytes():
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<Types><Override ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+        )
+        archive.writestr("_rels/.rels", "<Relationships/>")
+        archive.writestr("word/document.xml", "<w:document/>")
+    return output.getvalue()
+
+
+DOCX_BYTES = build_docx_bytes()
 
 
 def build_client():
@@ -207,10 +223,9 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
             )
 
-    def test_accepts_pdf_and_word_documents(self):
+    def test_accepts_pdf_and_docx_documents(self):
         cases = [
             (PDF_BYTES, "guide.pdf", "application/pdf", ".pdf"),
-            (DOC_BYTES, "guide.doc", "application/msword", ".doc"),
             (
                 DOCX_BYTES,
                 "guide.docx",
@@ -228,6 +243,28 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 response.json()["asset_url"],
                 rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
             )
+
+    def test_accepts_validated_legacy_doc(self):
+        with patch.object(builder_routes, "validate_builder_asset_file", return_value=None):
+            response = self.post_asset(DOC_BYTES, "guide.doc", "application/msword")
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(response.json()["asset_url"], r"[a-f0-9]{32}\.doc$")
+
+    def test_rejects_arbitrary_zip_as_docx(self):
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w") as archive:
+            archive.writestr("payload.txt", "not a Word document")
+        response = self.post_asset(
+            output.getvalue(),
+            "guide.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_rejects_filename_and_mime_mismatch(self):
+        response = self.post_asset(PDF_BYTES, "guide.docx", "application/pdf")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("filename", response.json()["detail"].lower())
 
     def test_rejects_document_with_spoofed_content_type(self):
         response = self.post_asset(PNG_BYTES, "guide.pdf", "application/pdf")

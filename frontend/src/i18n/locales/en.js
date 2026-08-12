@@ -62,6 +62,8 @@ const en = {
     pushEnabledButton: "System notifications on",
     markAllRead: "Mark all read",
     fallbackTitle: "Workspace notification",
+    newToastRegion: "New notifications",
+    dismissToast: "Dismiss notification",
     emptyTitle: "No notifications yet",
     emptyDetail: "New form responses and builder events will appear here.",
     pushState: {

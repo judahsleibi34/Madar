@@ -63,20 +63,25 @@ def list_user_notifications(
     response = query.execute()
     notifications = [_format_notification(row) for row in _rows(response)]
 
+    try:
+        unread_query = service_supabase.table("user_notifications").select("id", count="exact")
+    except TypeError:
+        # Lightweight test adapters may not implement PostgREST's count kwarg.
+        unread_query = service_supabase.table("user_notifications").select("id")
     unread_response = (
-        service_supabase.table("user_notifications")
-        .select("id")
+        unread_query
         .eq("tenant_id", int(tenant_id))
         .eq("user_id", int(user_id))
         .is_("read_at", "null")
-        .limit(1000)
         .execute()
     )
+
+    exact_count = getattr(unread_response, "count", None)
 
     return {
         "items": notifications,
         "notifications": notifications,
-        "unread_count": len(_rows(unread_response)),
+        "unread_count": int(exact_count) if exact_count is not None else len(_rows(unread_response)),
     }
 
 
@@ -202,6 +207,7 @@ def create_tenant_notification_event(
                 event_type=event_type, source_type=source_type
             ),
             object_id=source_id,
+            tenant_id=tenant_id,
         ),
     }
     deduplication_material = ":".join(

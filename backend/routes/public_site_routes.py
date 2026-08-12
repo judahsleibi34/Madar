@@ -2327,7 +2327,7 @@ def submit_public_builder_form(
                 "form_title": form.get("title"),
                 "subdomain": clean_subdomain,
                 "action": build_notification_action(
-                    kind="form_submission"
+                    kind="form_submission", tenant_id=tenant_id
                 ),
             },
         },
@@ -2498,6 +2498,7 @@ def submit_public_builder_block_event(
                         if block_type == "reservationBlock"
                         else "notification_center"
                     ),
+                    tenant_id=tenant_id,
                 ),
             },
         },

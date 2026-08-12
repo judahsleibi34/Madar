@@ -44,11 +44,24 @@ class Query:
         expected = None if value == "null" else value
         self.rows = [row for row in self.rows if row.get(field) is expected]
         return self
+    @property
+    def not_(self):
+        return NegatedQuery(self)
     def order(self, field, desc=False):
         self.rows.sort(key=lambda row: (row.get(field) is None, row.get(field)), reverse=desc)
         return self
-    def lt(self, *_args): return self
-    def gt(self, *_args): return self
+    def lt(self, field, value):
+        self.rows = [
+            row for row in self.rows
+            if row.get(field) is not None and str(row.get(field)) < str(value)
+        ]
+        return self
+    def gt(self, field, value):
+        self.rows = [
+            row for row in self.rows
+            if row.get(field) is not None and str(row.get(field)) > str(value)
+        ]
+        return self
     def gte(self, field, value):
         self.rows = [row for row in self.rows if str(row.get(field) or "") >= str(value)]
         return self
@@ -56,6 +69,16 @@ class Query:
         self.rows = self.rows[:count]
         return self
     def execute(self): return SimpleNamespace(data=self.rows)
+
+
+class NegatedQuery:
+    def __init__(self, query):
+        self.query = query
+
+    def is_(self, field, value):
+        expected = None if value == "null" else value
+        self.query.rows = [row for row in self.query.rows if row.get(field) is not expected]
+        return self.query
 
 
 class CalendarRouteTests(unittest.TestCase):
@@ -279,6 +302,103 @@ class CalendarRouteTests(unittest.TestCase):
         self.assertEqual(events[0]["starts_at"], "2026-07-22T11:00:00+03:00")
         self.assertEqual(events[0]["ends_at"], "2026-07-22T11:30:00+03:00")
 
+    def test_reservation_range_uses_interval_overlap_semantics(self):
+        context = SimpleNamespace(tenant_id=7, role="owner")
+        rows = [
+            {
+                "id": "starts-inside",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T10:30:00+00:00",
+                "ends_at": "2026-07-22T11:00:00+00:00",
+            },
+            {
+                "id": "starts-before-ends-inside",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T09:30:00+00:00",
+                "ends_at": "2026-07-22T10:30:00+00:00",
+            },
+            {
+                "id": "spans-range",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T09:00:00+00:00",
+                "ends_at": "2026-07-22T13:00:00+00:00",
+            },
+            {
+                "id": "ends-before-range",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T08:00:00+00:00",
+                "ends_at": "2026-07-22T09:00:00+00:00",
+            },
+            {
+                "id": "ends-at-range-start",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T09:30:00+00:00",
+                "ends_at": "2026-07-22T10:00:00+00:00",
+            },
+            {
+                "id": "starts-at-range-end",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T12:00:00+00:00",
+                "ends_at": "2026-07-22T12:30:00+00:00",
+            },
+            {
+                "id": "starts-after-range",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T12:30:00+00:00",
+                "ends_at": "2026-07-22T13:00:00+00:00",
+            },
+            {
+                "id": "legacy-start-only",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T11:30:00+00:00",
+                "ends_at": None,
+            },
+            {
+                "id": "legacy-outside",
+                "tenant_id": 7,
+                "starts_at": None,
+                "ends_at": None,
+                "payload": {
+                    "date": "2026-07-21",
+                    "time": "11:00",
+                    "timezone": "UTC",
+                },
+            },
+            {
+                "id": "cross-tenant",
+                "tenant_id": 8,
+                "starts_at": "2026-07-22T11:00:00+00:00",
+                "ends_at": "2026-07-22T11:30:00+00:00",
+            },
+        ]
+        client = SimpleNamespace(table=lambda _name: Query(rows))
+
+        with patch.object(calendar_routes, "service_supabase", client):
+            events = reservation_events_for_range(
+                context,
+                datetime(2026, 7, 22, 10, tzinfo=timezone.utc),
+                datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(
+            {event["source_id"] for event in events},
+            {
+                "starts-inside",
+                "starts-before-ends-inside",
+                "spans-range",
+                "legacy-start-only",
+            },
+        )
+        self.assertEqual(
+            [event["source_id"] for event in events],
+            [
+                "spans-range",
+                "starts-before-ends-inside",
+                "starts-inside",
+                "legacy-start-only",
+            ],
+        )
+
     def test_ics_text_is_escaped_without_leaking_delimiters(self):
         self.assertEqual(ics_escape("One, two; three\\four\nfive"), "One\\, two\\; three\\\\four\\nfive")
 
@@ -420,7 +540,7 @@ class CalendarRouteTests(unittest.TestCase):
         )
         self.assertEqual(linked_event_ids, {"provider-event-1"})
 
-    def test_archive_task_marks_it_cancelled_without_deleting_it(self):
+    def test_archive_task_preserves_workflow_status(self):
         context = SimpleNamespace(tenant_id=7, user_id=12, role="member")
         existing = {
             "id": "task-1", "tenant_id": 7, "calendar_id": "calendar-1",
@@ -434,6 +554,8 @@ class CalendarRouteTests(unittest.TestCase):
                 self.values = dict(values)
                 return self
             def eq(self, *_args):
+                return self
+            def is_(self, *_args):
                 return self
             def execute(self):
                 return SimpleNamespace(data=[{**existing, **self.values}])
@@ -458,12 +580,93 @@ class CalendarRouteTests(unittest.TestCase):
             )
 
         self.assertTrue(result["success"])
-        self.assertEqual(result["task"]["status"], "cancelled")
+        self.assertEqual(result["task"]["status"], "todo")
+        self.assertIsNotNone(result["task"]["archived_at"])
         self.assertEqual(result["task"]["version"], 4)
         sync_reminder.assert_called_once()
-        self.assertEqual(sync_reminder.call_args.args[0]["status"], "cancelled")
+        self.assertEqual(sync_reminder.call_args.args[0]["status"], "todo")
+        self.assertIsNotNone(sync_reminder.call_args.args[0]["archived_at"])
         self.assertIsNone(sync_reminder.call_args.args[1])
         self.assertEqual(audit.call_args.args[2], "calendar.task_archived")
+
+    def test_archive_task_replay_is_a_safe_conflict_without_duplicate_side_effects(self):
+        context = SimpleNamespace(tenant_id=7, user_id=12, role="member")
+        existing = {
+            "id": "task-1", "tenant_id": 7, "calendar_id": "calendar-1",
+            "owner_user_id": 12, "status": "in_progress", "version": 3,
+            "archived_at": None,
+        }
+
+        class StatefulArchiveQuery:
+            def __init__(self):
+                self.values = None
+                self.require_unarchived = False
+            def update(self, values): self.values = dict(values); return self
+            def eq(self, *_args): return self
+            def is_(self, field, value):
+                self.require_unarchived = field == "archived_at" and value == "null"
+                return self
+            def execute(self):
+                if self.require_unarchived and existing.get("archived_at") is not None:
+                    return SimpleNamespace(data=[])
+                existing.update(self.values or {})
+                return SimpleNamespace(data=[dict(existing)])
+
+        query = StatefulArchiveQuery()
+        with patch.object(calendar_routes, "service_supabase", SimpleNamespace(table=lambda _name: query)), \
+             patch.object(calendar_routes, "require_calendar_feature"), \
+             patch.object(calendar_routes, "require_active_tenant_member", return_value=context), \
+             patch.object(calendar_routes, "tenant_task", return_value=existing), \
+             patch.object(calendar_routes, "require_task_access"), \
+             patch.object(calendar_routes, "sync_task_reminder") as sync_reminder, \
+             patch.object(calendar_routes, "record_calendar_audit") as audit:
+            first = calendar_routes.archive_task("task-1", object(), object(), expected_version=3)
+            with self.assertRaises(HTTPException) as replay:
+                calendar_routes.archive_task("task-1", object(), object(), expected_version=3)
+
+        self.assertEqual(first["task"]["status"], "in_progress")
+        self.assertEqual(replay.exception.status_code, 409)
+        self.assertEqual(sync_reminder.call_count, 1)
+        self.assertEqual(audit.call_count, 1)
+
+    def test_archive_task_cannot_target_another_tenants_task(self):
+        context = SimpleNamespace(tenant_id=7, user_id=12, role="member")
+        client = SimpleNamespace(table=lambda _name: Query([{
+            "id": "task-b", "tenant_id": 8, "calendar_id": "calendar-b",
+            "owner_user_id": 12, "status": "done", "version": 1,
+            "archived_at": None,
+        }]))
+        with patch.object(calendar_routes, "service_supabase", client), \
+             patch.object(calendar_routes, "require_calendar_feature"), \
+             patch.object(calendar_routes, "require_active_tenant_member", return_value=context):
+            with self.assertRaises(HTTPException) as denied:
+                calendar_routes.archive_task("task-b", object(), object(), expected_version=1)
+        self.assertEqual(denied.exception.status_code, 404)
+
+    def test_archived_task_api_uses_archive_state_and_tenant_scope(self):
+        rows = [
+            {"id": "linked", "tenant_id": 7, "calendar_id": "calendar-1", "owner_user_id": 12, "status": "done", "archived_at": "2026-08-10T12:00:00Z"},
+            {"id": "own-unassigned", "tenant_id": 7, "calendar_id": None, "owner_user_id": 12, "status": "in_progress", "archived_at": "2026-08-10T11:00:00Z"},
+            {"id": "other-unassigned", "tenant_id": 7, "calendar_id": None, "owner_user_id": 20, "status": "done", "archived_at": "2026-08-10T10:00:00Z"},
+            {"id": "cancelled-only", "tenant_id": 7, "calendar_id": "calendar-1", "owner_user_id": 12, "status": "cancelled", "archived_at": None},
+            {"id": "cross-tenant", "tenant_id": 8, "calendar_id": "calendar-1", "owner_user_id": 12, "status": "done", "archived_at": "2026-08-10T13:00:00Z"},
+        ]
+        context = SimpleNamespace(tenant_id=7, user_id=12, role="member")
+        client = SimpleNamespace(table=lambda _name: Query(rows))
+        accessible = [SimpleNamespace(role="viewer", calendar={"id": "calendar-1"})]
+        with patch.object(calendar_routes, "service_supabase", client), patch.object(
+            calendar_routes, "require_calendar_feature"
+        ), patch.object(
+            calendar_routes, "require_active_tenant_member", return_value=context
+        ), patch.object(
+            calendar_routes, "list_accessible_calendars", return_value=accessible
+        ):
+            result = calendar_routes.list_archived_tasks(object(), object())
+
+        tasks = {task["id"]: task for task in result["tasks"]}
+        self.assertEqual(set(tasks), {"linked", "own-unassigned"})
+        self.assertEqual(tasks["linked"]["status"], "done")
+        self.assertEqual(tasks["own-unassigned"]["status"], "in_progress")
 
     def test_recurring_task_reminder_rolls_forward_after_delivery(self):
         next_time = next_task_reminder_time({

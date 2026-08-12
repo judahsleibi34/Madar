@@ -158,7 +158,7 @@ def walk_builder_schema(value, path: str) -> None:
 def validate_builder_element(element: dict, path: str) -> None:
     element_type = element.get("type")
 
-    if element_type in {"image", "video"}:
+    if element_type in {"image", "video", "document"}:
         validate_public_url(
             element.get("content"),
             field_name=f"{path}.content",

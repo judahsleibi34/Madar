@@ -50,6 +50,9 @@ function normalizeNotificationAction(value) {
   ) {
     action.object_id = candidate.object_id;
   }
+  if (typeof candidate.tenant_id === "string" && /^[1-9][0-9]{0,18}$/.test(candidate.tenant_id)) {
+    action.tenant_id = candidate.tenant_id;
+  }
   return action;
 }
 
@@ -102,13 +105,16 @@ self.addEventListener("push", (event) => {
     payload = {};
   }
   const action = normalizeNotificationAction(payload.data?.action);
+  const eventId = typeof payload.event_id === "string" && /^[A-Za-z0-9-]{1,100}$/.test(payload.event_id)
+    ? payload.event_id
+    : "";
   const options = {
     body: typeof payload.body === "string" && payload.body
       ? payload.body.slice(0, 240)
       : "Open Madar to view details.",
     icon: "/madar-app-icon-192.png",
     badge: "/madar-app-icon-192.png",
-    data: { action },
+    data: eventId ? { action, event_id: eventId } : { action },
   };
   if (typeof payload.tag === "string" && /^madar-event:[A-Za-z0-9-]{1,100}$/.test(payload.tag)) {
     options.tag = payload.tag;
@@ -116,7 +122,21 @@ self.addEventListener("push", (event) => {
   const title = typeof payload.title === "string" && payload.title
     ? payload.title.slice(0, 120)
     : "Madar notification";
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      if (!eventId) return;
+      for (const client of clients) {
+        try {
+          if (new URL(client.url).origin === self.location.origin) {
+            client.postMessage({ type: "MADAR_PUSH_PRESENTED", event_id: eventId });
+          }
+        } catch {
+          // Ignore invalid client URLs.
+        }
+      }
+    }),
+  ]));
 });
 
 self.addEventListener("pushsubscriptionchange", (event) => {

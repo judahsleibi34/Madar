@@ -71,6 +71,7 @@ narwhals==2.24.0
 numpy==2.5.1
 openai==2.45.0
 openpyxl==3.1.5
+olefile==0.47
 packaging==26.2
 pandas==3.0.3
 parso==0.8.7

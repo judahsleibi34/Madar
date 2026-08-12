@@ -55,6 +55,7 @@ def build_notification_action(
     *,
     kind: str = "notification_center",
     object_id: Any = None,
+    tenant_id: Any = None,
     path: str | None = None,
 ) -> dict[str, str]:
     safe_kind = kind if kind in ACTION_KINDS else "notification_center"
@@ -68,6 +69,12 @@ def build_notification_action(
     candidate_id = str(object_id or "").strip()
     if candidate_id and _OBJECT_ID_PATTERN.fullmatch(candidate_id):
         action["object_id"] = candidate_id[:MAX_OBJECT_ID_LENGTH]
+    try:
+        safe_tenant_id = int(tenant_id)
+    except (TypeError, ValueError):
+        safe_tenant_id = None
+    if safe_tenant_id and safe_tenant_id > 0:
+        action["tenant_id"] = str(safe_tenant_id)
     return action
 
 
@@ -76,6 +83,7 @@ def normalize_notification_data(
     *,
     default_kind: str = "notification_center",
     object_id: Any = None,
+    tenant_id: Any = None,
 ) -> dict[str, Any]:
     normalized = dict(data) if isinstance(data, dict) else {}
     candidate = normalized.get("action")
@@ -83,10 +91,11 @@ def normalize_notification_data(
         kind = candidate.get("kind")
         path = candidate.get("path")
         candidate_id = candidate.get("object_id", object_id)
+        candidate_tenant_id = candidate.get("tenant_id", tenant_id)
         valid = kind in ACTION_KINDS and validate_notification_action_path(path)
         if valid:
             normalized["action"] = build_notification_action(
-                kind=str(kind), object_id=candidate_id, path=str(path)
+                kind=str(kind), object_id=candidate_id, tenant_id=candidate_tenant_id, path=str(path)
             )
             return normalized
         logger.warning(
@@ -96,6 +105,7 @@ def normalize_notification_data(
     normalized["action"] = build_notification_action(
         kind=default_kind,
         object_id=object_id,
+        tenant_id=tenant_id,
     )
     return normalized
 

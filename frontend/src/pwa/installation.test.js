@@ -15,6 +15,7 @@ import {
   MADAR_INSTALLATION_STORAGE_KEY,
   registerInstallation,
   resetInstallationRegistrationForTests,
+  rotateInstallationId,
 } from "./installation";
 
 const UUID = "123e4567-e89b-42d3-a456-426614174000";
@@ -90,5 +91,16 @@ describe("Madar installation identity", () => {
     };
     await registerInstallation({ tenantId: 1, installedConfirmed: true, windowLike });
     expect(JSON.parse(apiFetch.mock.calls[0][1].body).installed_confirmed).toBe(true);
+  });
+
+  it("rotates a revoked local identity only when explicitly requested", () => {
+    const nextUuid = "223e4567-e89b-42d3-a456-426614174000";
+    localStorage.setItem(MADAR_INSTALLATION_STORAGE_KEY, UUID);
+    expect(rotateInstallationId({
+      storage: localStorage,
+      cryptoLike: { randomUUID: () => nextUuid },
+      locationLike: appLocation,
+    })).toBe(nextUuid);
+    expect(localStorage.getItem(MADAR_INSTALLATION_STORAGE_KEY)).toBe(nextUuid);
   });
 });

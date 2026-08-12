@@ -77,6 +77,16 @@ class AssetRegistryTests(unittest.TestCase):
         refs = asset_registry_service.extract_builder_asset_references(schema, tenant_id=7)
         self.assertEqual(list(refs), ["tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"])
 
+    def test_cross_tenant_managed_document_reference_is_rejected(self):
+        schema = {
+            "document": "/uploads/tenant_8/builder_assets/abcdefabcdefabcdefabcdefabcdefab.pdf",
+        }
+        with self.assertRaisesRegex(ValueError, "builder_asset_tenant_mismatch"):
+            asset_registry_service.require_builder_asset_tenant_ownership(
+                schema,
+                tenant_id=7,
+            )
+
     def test_reconcile_activates_then_unreferences_with_grace(self):
         client = Client()
         key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"

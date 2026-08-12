@@ -4,7 +4,11 @@ import unittest
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.testclient import TestClient
 
-from services.request_body_limits import RequestBodyLimitMiddleware
+from routes import builder_routes
+from services.request_body_limits import (
+    DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES,
+    RequestBodyLimitMiddleware,
+)
 from services.request_security import (
     CSRF_COOKIE_NAME,
     CSRF_HEADER_NAME,
@@ -149,6 +153,47 @@ class RequestBodyLimitTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["size"], 2000)
+
+    def test_default_builder_request_limit_has_multipart_headroom_above_250_mib(self):
+        multipart_headroom = (
+            DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES
+            - builder_routes.BUILDER_VIDEO_MAX_BYTES
+        )
+
+        self.assertEqual(builder_routes.BUILDER_VIDEO_MAX_BYTES, 250 * 1024 * 1024)
+        self.assertEqual(DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES, 252 * 1024 * 1024)
+        self.assertGreaterEqual(multipart_headroom, 2 * 1024 * 1024)
+
+    def test_content_length_at_250_mib_plus_bounded_multipart_overhead_is_allowed(self):
+        reached_app = []
+
+        async def app(scope, receive, send):
+            reached_app.append(scope["path"])
+            await send({"type": "http.response.start", "status": 204, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
+
+        middleware = RequestBodyLimitMiddleware(app)
+        content_length = builder_routes.BUILDER_VIDEO_MAX_BYTES + 64 * 1024
+        sent_messages = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message):
+            sent_messages.append(message)
+
+        asyncio.run(middleware({
+            "type": "http",
+            "method": "POST",
+            "path": "/builder/assets/upload",
+            "headers": [
+                (b"content-type", b"multipart/form-data; boundary=madar-boundary"),
+                (b"content-length", str(content_length).encode("ascii")),
+            ],
+        }, receive, send))
+
+        self.assertEqual(reached_app, ["/builder/assets/upload"])
+        self.assertEqual(sent_messages[0]["status"], 204)
 
     def test_misleading_content_length_is_enforced_by_stream_count(self):
         async def body_reader_app(scope, receive, send):

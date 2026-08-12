@@ -30,10 +30,16 @@ import {
   getBrowserPushStatus,
   reconcileBrowserPushLifecycle,
 } from "./notificationsApi";
+import {
+  MADAR_INSTALLATION_STORAGE_KEY,
+  resetInstallationRegistrationForTests,
+} from "../pwa/installation";
 
 describe("explicit browser Push enablement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    resetInstallationRegistrationForTests();
     Object.defineProperty(navigator, "userAgent", {
       configurable: true,
       value: "Mozilla/5.0 (Windows NT 10.0)",
@@ -185,6 +191,39 @@ describe("explicit browser Push enablement", () => {
     expect(apiFetch.mock.calls.indexOf(installationCall)).toBeLessThan(
       apiFetch.mock.calls.indexOf(subscriptionCall)
     );
+  });
+
+  it("creates a fresh identity only from explicit enable after remote revoke", async () => {
+    const revokedId = "123e4567-e89b-42d3-a456-426614174000";
+    localStorage.setItem(MADAR_INSTALLATION_STORAGE_KEY, revokedId);
+    const subscription = { toJSON: () => ({ endpoint: "https://push.example/re-enabled" }) };
+    getMadarServiceWorkerRegistration.mockResolvedValue({
+      pushManager: {
+        getSubscription: vi.fn().mockResolvedValue(subscription),
+        subscribe: vi.fn(),
+      },
+    });
+    let registrationAttempts = 0;
+    apiFetch.mockImplementation(async (url) => {
+      if (url === "/installations/register") {
+        registrationAttempts += 1;
+        if (registrationAttempts === 1) {
+          return { ok: false, status: 409, data: { detail: "Installation is revoked" } };
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        data: url.includes("push-public-key")
+          ? { enabled: true, public_key: "AQID" }
+          : { success: true },
+      };
+    });
+
+    await expect(enableBrowserPushNotifications({ tenantId: 7 })).resolves.toEqual({ enabled: true });
+    expect(registrationAttempts).toBe(2);
+    const subscriptionCall = apiFetch.mock.calls.find(([url]) => url === "/notifications/push-subscriptions");
+    expect(JSON.parse(subscriptionCall[1].body).installation_id).not.toBe(revokedId);
   });
 
   it("reconciles an existing subscription without prompting", async () => {

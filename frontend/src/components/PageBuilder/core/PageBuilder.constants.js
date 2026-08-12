@@ -1,4 +1,20 @@
 export const STORAGE_KEY = "madar_app_builder_frontend_v4";
+export const MIN_BUILDER_TEXT_FONT_SIZE_PX = 8;
+export const MAX_BUILDER_TEXT_FONT_SIZE_PX = 256;
+
+export const parseBuilderTextFontSize = (value) => {
+  const normalized = String(value ?? "").trim();
+  if (!/^\d+(?:\.\d+)?(?:px)?$/i.test(normalized)) return null;
+  const parsed = Number.parseFloat(normalized);
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < MIN_BUILDER_TEXT_FONT_SIZE_PX ||
+    parsed > MAX_BUILDER_TEXT_FONT_SIZE_PX
+  ) {
+    return null;
+  }
+  return parsed;
+};
 
 export const getBuilderStorageKey = (userId) => {
   const normalizedUserId = String(userId ?? "").trim();

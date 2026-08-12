@@ -185,6 +185,24 @@ class CalendarInboundSyncTests(unittest.TestCase):
             "2026-07-23T12:00:00+00:00",
         )
 
+    def test_same_provider_identifier_is_isolated_by_connection_and_tenant(self):
+        database = Database(calendar_events=[], calendar_event_attendees=[])
+        first = self.connection(id="connection-a", tenant_id=7, local_calendar_id="calendar-a")
+        second = self.connection(id="connection-b", tenant_id=8, local_calendar_id="calendar-b")
+        with patch.object(calendar_sync_service, "service_supabase", database):
+            self.assertEqual(
+                calendar_sync_service._upsert_external_event(first, google_event("shared"), "google", None),
+                "created",
+            )
+            self.assertEqual(
+                calendar_sync_service._upsert_external_event(second, google_event("shared"), "google", None),
+                "created",
+            )
+        self.assertEqual(len(database.tables["calendar_events"]), 2)
+        self.assertEqual({row["tenant_id"] for row in database.tables["calendar_events"]}, {7, 8})
+        self.assertEqual(len({row["source_id"] for row in database.tables["calendar_events"]}), 2)
+
+
     def test_cancelled_provider_event_is_soft_deleted_not_duplicated(self):
         database = Database(calendar_events=[], calendar_event_attendees=[])
         connection = self.connection()

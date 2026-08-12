@@ -16,6 +16,11 @@ from services.notification_service import (
     revoke_web_push_subscription,
     upsert_web_push_subscription,
 )
+from services.notification_preference_service import (
+    PREFERENCE_CATEGORIES,
+    list_notification_preferences,
+    set_notification_preference,
+)
 
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -35,6 +40,12 @@ class PushSubscriptionRequest(BaseModel):
 
 class PushSubscriptionDeleteRequest(BaseModel):
     endpoint: str = Field(..., min_length=1, max_length=2000)
+
+
+class NotificationPreferenceRequest(BaseModel):
+    category: str = Field(..., min_length=1, max_length=40)
+    channel: str = Field(..., min_length=1, max_length=20)
+    enabled: bool
 
 
 def _current_context(request: Request, response: Response):
@@ -93,6 +104,48 @@ def mark_all_read(request: Request, response: Response):
         "success": True,
         "updated_count": count,
     }
+
+
+@router.get("/preferences")
+def get_preferences(request: Request, response: Response):
+    context = _current_context(request, response)
+    overrides = list_notification_preferences(
+        tenant_id=context.tenant_id, user_id=context.user_id
+    )
+    override_map = {
+        f"{row.get('category')}:{row.get('channel')}": bool(row.get("enabled", True))
+        for row in overrides
+    }
+    preferences = [
+        {
+            "category": category,
+            "channel": channel,
+            "enabled": override_map.get(f"{category}:{channel}", True),
+        }
+        for category, channels in PREFERENCE_CATEGORIES.items()
+        for channel in sorted(channels)
+    ]
+    return {"success": True, "preferences": preferences}
+
+
+@router.put("/preferences")
+def update_preferences(
+    preference: NotificationPreferenceRequest,
+    request: Request,
+    response: Response,
+):
+    context = _current_context(request, response)
+    try:
+        saved = set_notification_preference(
+            tenant_id=context.tenant_id,
+            user_id=context.user_id,
+            category=preference.category,
+            channel=preference.channel,
+            enabled=preference.enabled,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Unsupported notification preference") from error
+    return {"success": True, "preference": saved}
 
 
 @router.get("/push-public-key")

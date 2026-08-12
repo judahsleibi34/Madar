@@ -9,7 +9,7 @@ from services.calendar_workspace_cache_service import invalidate_calendar_worksp
 
 
 logger = logging.getLogger(__name__)
-ACTIVE_TASK_STATUSES = ["todo", "in_progress", "blocked", "done"]
+AUTO_ARCHIVE_TASK_STATUS = "done"
 
 
 def _rows(response) -> list[dict[str, Any]]:
@@ -19,13 +19,14 @@ def _rows(response) -> list[dict[str, Any]]:
 def archive_ended_calendar_tasks(
     *, limit: int = 100, now: datetime | None = None, client=None
 ) -> int:
-    """Archive non-recurring tasks after their scheduled end time."""
+    """Archive completed, non-recurring tasks after their scheduled end time."""
     database_client = client or service_supabase
     cutoff = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     due_tasks = _rows(
         database_client.table("calendar_tasks")
-        .select("id,tenant_id,status,version,scheduled_end,recurrence_rule")
-        .in_("status", ACTIVE_TASK_STATUSES)
+        .select("id,tenant_id,status,version,scheduled_end,recurrence_rule,archived_at")
+        .eq("status", AUTO_ARCHIVE_TASK_STATUS)
+        .is_("archived_at", "null")
         .is_("recurrence_rule", "null")
         .lte("scheduled_end", cutoff)
         .order("scheduled_end")
@@ -42,11 +43,12 @@ def archive_ended_calendar_tasks(
             continue
         updated = _rows(
             database_client.table("calendar_tasks")
-            .update({"status": "cancelled", "version": version + 1})
+            .update({"archived_at": cutoff, "version": version + 1})
             .eq("id", task_id)
             .eq("tenant_id", tenant_id)
             .eq("version", version)
-            .in_("status", ACTIVE_TASK_STATUSES)
+            .eq("status", AUTO_ARCHIVE_TASK_STATUS)
+            .is_("archived_at", "null")
             .execute()
         )
         if not updated:

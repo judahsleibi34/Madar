@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Globe2, ImagePlus, KeyRound, Save, ShieldCheck, UserRound, X } from "lucide-react";
+import { Bell, Globe2, ImagePlus, KeyRound, MonitorSmartphone, Save, ShieldCheck, UserRound, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SmartLink from "../SmartLink";
 import {
@@ -24,6 +24,8 @@ import { resolveMediaUrl } from "../../utils/media";
 import { getSettingsContent } from "../../content";
 import { buildProfilePayload } from "./profilePayload";
 import SecurityMfaPage from "./SecurityMfaPage";
+import DeviceSettingsPanel from "./DeviceSettingsPanel";
+import NotificationPreferencesPanel from "./NotificationPreferencesPanel";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -278,7 +280,7 @@ export default function SettingsPage({
       };
   const requestedTab = new URLSearchParams(location.search).get("tab");
   const initialAllowedTab =
-    initialTab === "security" || (initialTab === "website" && !accountOnly)
+    initialTab === "security" || (!accountOnly && ["website", "devices", "notifications"].includes(initialTab))
       ? initialTab
       : "profile";
   const activeTab = location.pathname.startsWith("/settings/security")
@@ -287,14 +289,22 @@ export default function SettingsPage({
       ? "security"
       : requestedTab === "website" && !accountOnly
         ? "website"
+        : requestedTab === "devices" && !accountOnly
+          ? "devices"
+          : requestedTab === "notifications" && !accountOnly
+            ? "notifications"
         : initialAllowedTab;
   const tabLabels = isArabic
-    ? { profile: "الملف الشخصي", website: "الموقع", security: "الأمان" }
-    : { profile: "Profile", website: "Website", security: "Security" };
+    ? { profile: "الملف الشخصي", website: "الموقع", security: "الأمان", devices: t.devices.tab, notifications: t.notificationPreferences.tab }
+    : { profile: "Profile", website: "Website", security: "Security", devices: t.devices.tab, notifications: t.notificationPreferences.tab };
   const settingsTabs = [
     { id: "profile", label: tabLabels.profile, icon: UserRound },
     ...(!accountOnly
-      ? [{ id: "website", label: tabLabels.website, icon: Globe2 }]
+      ? [
+          { id: "website", label: tabLabels.website, icon: Globe2 },
+          { id: "devices", label: tabLabels.devices, icon: MonitorSmartphone },
+          { id: "notifications", label: tabLabels.notifications, icon: Bell },
+        ]
       : []),
     { id: "security", label: tabLabels.security, icon: ShieldCheck },
   ];
@@ -306,6 +316,15 @@ export default function SettingsPage({
 
     if (tabId === "website") {
       navigate("/settings?tab=website");
+      return;
+    }
+
+    if (tabId === "devices") {
+      navigate("/settings?tab=devices");
+      return;
+    }
+    if (tabId === "notifications") {
+      navigate("/settings?tab=notifications");
       return;
     }
 
@@ -1169,10 +1188,22 @@ export default function SettingsPage({
             <SecurityMfaPage lang={lang} embedded cacheKey={user?.id} />
           </div>
         )}
+
+        {activeTab === "devices" && !accountOnly && (
+          <DeviceSettingsPanel
+            lang={lang}
+            tenantId={user?.tenant_id}
+            copy={t.devices}
+            showNotification={showNotification}
+          />
+        )}
+        {activeTab === "notifications" && !accountOnly && (
+          <NotificationPreferencesPanel
+            copy={t.notificationPreferences}
+            showNotification={showNotification}
+          />
+        )}
       </div>
     </section>
   );
 }
-
-
-

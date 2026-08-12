@@ -41,6 +41,23 @@ export function getInstallationId({
   return volatileInstallationId;
 }
 
+export function rotateInstallationId({
+  storage = globalThis.localStorage,
+  cryptoLike = globalThis.crypto,
+  locationLike = globalThis.location,
+} = {}) {
+  if (!isMadarPwaHost(locationLike)) return null;
+  try {
+    storage?.removeItem(MADAR_INSTALLATION_STORAGE_KEY);
+  } catch {
+    // Storage denial remains non-fatal.
+  }
+  volatileInstallationId = null;
+  lastRegistrationSignature = null;
+  registrationPromise = null;
+  return getInstallationId({ storage, cryptoLike, locationLike });
+}
+
 export function detectPlatform(navigatorLike = globalThis.navigator) {
   const value = `${navigatorLike?.userAgentData?.platform || navigatorLike?.platform || navigatorLike?.userAgent || ""}`.toLowerCase();
   if (/iphone|ipad|ipod/.test(value) || (/mac/.test(value) && navigatorLike?.maxTouchPoints > 1)) return "ios";
@@ -96,7 +113,11 @@ export async function registerInstallation({
       body: JSON.stringify(payload),
     });
     const data = await readApiResponse(response);
-    if (!response.ok) throw new Error(readApiError(data, "Could not register installation."));
+    if (!response.ok) {
+      const error = new Error(readApiError(data, "Could not register installation."));
+      error.status = response.status;
+      throw error;
+    }
     return { ...data, installationId };
   };
   // Serialize tenant transitions so an older tenant heartbeat cannot reach

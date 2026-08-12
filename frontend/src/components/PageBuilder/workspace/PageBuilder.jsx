@@ -33,6 +33,8 @@ import {
 } from "./pageBuilderWorkspace.helpers";
 import {
   STORAGE_KEY,
+  MAX_BUILDER_TEXT_FONT_SIZE_PX,
+  parseBuilderTextFontSize,
   getBuilderStorageKey,
   viewports,
   builderTabs,
@@ -4728,8 +4730,8 @@ export default function PageBuilder({
   };
 
   const applyTextFontSize = (value) => {
-    const parsedValue = Number.parseInt(value, 10);
-    const numericValue = Number.isFinite(parsedValue) ? Math.max(8, parsedValue) : 17;
+    const numericValue = parseBuilderTextFontSize(value);
+    if (numericValue === null) return;
     const fontSize = `${numericValue}px`;
     const selectedRange = getSelectedTextRange();
 
@@ -5115,14 +5117,14 @@ export default function PageBuilder({
           <input
             type="number"
             min="8"
+            max={MAX_BUILDER_TEXT_FONT_SIZE_PX}
             step="1"
             value={inlineFontSizeDraft ?? toolbarFontSize}
             onFocus={() => setInlineFontSizeDraft(String(toolbarFontSize))}
             onChange={(event) => {
               const nextValue = event.target.value;
               setInlineFontSizeDraft(nextValue);
-              const parsedValue = Number.parseInt(nextValue, 10);
-              if (Number.isFinite(parsedValue) && parsedValue >= 8) {
+              if (parseBuilderTextFontSize(nextValue) !== null) {
                 applyTextFontSize(nextValue);
               }
             }}

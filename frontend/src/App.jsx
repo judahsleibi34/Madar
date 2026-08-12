@@ -27,6 +27,8 @@ import { getInstallationId, registerInstallation } from "./pwa/installation";
 import { isMadarPwaHost } from "./pwa/pwaContext";
 import { getExistingMadarPushEndpoint } from "./pwa/serviceWorker";
 import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
+import { NotificationProvider } from "./notifications/NotificationProvider";
+import NotificationToastViewport from "./notifications/NotificationToastViewport";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -702,7 +704,17 @@ export default function App() {
           homePath={isDashboardRoute ? "/dashboard" : "/"}
           homeLabel={isDashboardRoute ? "Return to dashboard" : "Return home"}
         >
-          {routeContent}
+          {isDashboardRoute
+            && authChecked
+            && isLoggedIn
+            && user?.tenant_id
+            && (user?.id || user?.auth_id)
+            && isMadarPwaHost(window.location) ? (
+              <NotificationProvider user={user}>
+                {routeContent}
+                <NotificationToastViewport />
+              </NotificationProvider>
+            ) : routeContent}
         </RouteErrorBoundary>
       </RouteSuspense>
     </>

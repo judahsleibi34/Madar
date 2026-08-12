@@ -50,6 +50,23 @@ def extract_builder_asset_references(schema: Any, *, tenant_id: int) -> dict[str
     return found
 
 
+def require_builder_asset_tenant_ownership(schema: Any, *, tenant_id: int) -> None:
+    """Reject managed asset references whose path names another tenant."""
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            for nested in value.values():
+                visit(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                visit(nested)
+        elif isinstance(value, str):
+            match = ASSET_URL_PATTERN.fullmatch(value.strip())
+            if match and int(match.group("tenant")) != int(tenant_id):
+                raise ValueError("builder_asset_tenant_mismatch")
+
+    visit(schema)
+
+
 def reconcile_project_asset_references(*, project_id: str, tenant_id: int, schema: dict[str, Any], client=None) -> dict[str, int]:
     database_client = client or service_supabase
     desired = extract_builder_asset_references(schema, tenant_id=tenant_id)

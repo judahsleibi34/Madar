@@ -5,7 +5,7 @@ import DocumentViewerElement from "./DocumentViewerElement";
 import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
-import { resolveMediaUrl } from "../../../utils/media";
+import { resolveDocumentUrl, resolveMediaUrl } from "../../../utils/media";
 import {
   collapseAccidentalTextDuplication,
   getEditableTextBlockFormats,
@@ -318,7 +318,7 @@ export const createElementRenderer = ({
         <DocumentViewerElement
           key={element.id}
           {...commonProps}
-          src={resolveMediaUrl(element.content)}
+          src={resolveDocumentUrl(element.content)}
           fileName={element.assetFileName}
           mimeType={element.documentMimeType}
           title={element.document?.title}

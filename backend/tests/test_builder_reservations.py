@@ -1,5 +1,6 @@
 import copy
 import unittest
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -72,6 +73,51 @@ def seed_reservations(fake_supabase):
 
 
 class PublicBuilderReservationTests(unittest.TestCase):
+    def test_reservation_timing_defaults_and_preserves_explicit_end(self):
+        defaulted = public_site_routes.normalize_reservation_timing({
+            "starts_at": "2026-07-10T19:00:00+03:00",
+        })
+        self.assertEqual(defaulted["ends_at"], "2026-07-10T19:30:00+03:00")
+        self.assertEqual(
+            datetime.fromisoformat(defaulted["ends_at"]).timestamp()
+            - datetime.fromisoformat(defaulted["starts_at"]).timestamp(),
+            30 * 60,
+        )
+
+        explicit = public_site_routes.normalize_reservation_timing({
+            "starts_at": "2026-07-10T19:00:00+03:00",
+            "ends_at": "2026-07-10T20:15:00+03:00",
+        })
+        self.assertEqual(explicit["ends_at"], "2026-07-10T20:15:00+03:00")
+
+    def test_reservation_timing_rejects_zero_negative_and_malformed_ranges(self):
+        for ends_at in (
+            "2026-07-10T19:00:00+03:00",
+            "2026-07-10T18:59:00+03:00",
+            "not-a-time",
+        ):
+            with self.subTest(ends_at=ends_at), self.assertRaises(HTTPException) as raised:
+                public_site_routes.normalize_reservation_timing({
+                    "starts_at": "2026-07-10T19:00:00+03:00",
+                    "ends_at": ends_at,
+                })
+            self.assertEqual(raised.exception.status_code, 400)
+
+    def test_naive_reservation_timing_requires_timezone_and_retains_zone(self):
+        with self.assertRaises(HTTPException) as raised:
+            public_site_routes.normalize_reservation_timing({
+                "starts_at": "2026-07-10T19:00:00",
+            })
+        self.assertEqual(raised.exception.detail["code"], "reservation_timezone_required")
+
+        normalized = public_site_routes.normalize_reservation_timing({
+            "date": "2026-07-10",
+            "time": "19:00",
+            "timezone": "Asia/Jerusalem",
+        })
+        self.assertEqual(normalized["starts_at"], "2026-07-10T19:00:00+03:00")
+        self.assertEqual(normalized["ends_at"], "2026-07-10T19:30:00+03:00")
+
     def test_role_restricted_reservation_requires_login(self):
         fake_supabase = FakeSupabase()
         add_published_reservation_block(fake_supabase)

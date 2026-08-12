@@ -155,7 +155,9 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
                 "starts_at": event.get("starts_at"),
                 "reminder_id": reminder.get("id"),
                 "action": build_notification_action(
-                    kind="calendar_event", object_id=event.get("id")
+                    kind="calendar_event",
+                    object_id=event.get("id"),
+                    tenant_id=reminder.get("tenant_id"),
                 ),
             },
             "reminder_id": reminder.get("id"),
@@ -191,7 +193,12 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
             .execute()
         )
         task = task_rows[0] if task_rows else None
-        if not task or task.get("status") in {"done", "cancelled"} or not task.get("scheduled_start"):
+        if (
+            not task
+            or task.get("status") in {"done", "cancelled"}
+            or task.get("archived_at")
+            or not task.get("scheduled_start")
+        ):
             database_client.table("calendar_task_reminders").update(
                 {"delivery_status": "cancelled"}
             ).eq("id", reminder.get("id")).execute()
@@ -239,7 +246,9 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
                 "scheduled_start": occurrence_start.isoformat(),
                 "reminder_id": reminder.get("id"),
                 "action": build_notification_action(
-                    kind="calendar_task", object_id=task.get("id")
+                    kind="calendar_task",
+                    object_id=task.get("id"),
+                    tenant_id=reminder.get("tenant_id"),
                 ),
             },
             "reminder_id": reminder.get("id"),

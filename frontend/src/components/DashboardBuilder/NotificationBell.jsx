@@ -4,13 +4,9 @@ import { Bell } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useLanguage } from "../../i18n";
-import {
-  fetchNotifications,
-} from "../../services/notificationsApi";
+import { useNotifications } from "../../notifications/NotificationContext";
 
-const NOTIFICATION_POLL_MS = 15_000;
 const MOBILE_SIDEBAR_QUERY = "(max-width: 900px)";
-const EMPTY_NOTIFICATIONS = [];
 
 const formatNotificationTime = (value) => {
   if (!value) return "";
@@ -29,7 +25,7 @@ const normalizeNotification = (item, t) => ({
   id: item.id,
   title: item.title || t("notifications.fallbackTitle"),
   detail: item.body || item.detail || "",
-  time: item.time || formatNotificationTime(item.created_at),
+  time: item.time || formatNotificationTime(item.createdAt || item.created_at),
   unread: item.unread !== false,
 });
 
@@ -38,8 +34,6 @@ export default function NotificationBell({
   compact = false,
   label,
   onNavigate,
-  tenantId,
-  userId,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,70 +43,10 @@ export default function NotificationBell({
   const panelRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loadedIdentity, setLoadedIdentity] = useState("");
-  const notificationIdentity = `${tenantId || ""}:${userId || ""}`;
-  const identityMatches = loadedIdentity === notificationIdentity;
-  const visibleNotifications = identityMatches ? notifications : EMPTY_NOTIFICATIONS;
-  const visibleUnreadCount = identityMatches ? unreadCount : 0;
+  const { notifications, unreadCount } = useNotifications();
+  const visibleNotifications = notifications.map((item) => normalizeNotification(item, t));
   const active = location.pathname.startsWith("/notifications");
   const resolvedLabel = label || t("notifications.title");
-
-  useEffect(() => {
-    let cancelled = false;
-    let requestInFlight = false;
-    let activeController = null;
-
-    if (!tenantId || !userId) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const loadNotifications = async () => {
-      if (requestInFlight) return;
-      requestInFlight = true;
-      activeController = new AbortController();
-      try {
-        const data = await fetchNotifications({ limit: 4, signal: activeController.signal });
-        const items = (data.notifications || data.items || []).map((item) =>
-          normalizeNotification(item, t)
-        );
-
-        if (cancelled) return;
-        setNotifications(items);
-        setUnreadCount(Number(data.unread_count || 0));
-        setLoadedIdentity(notificationIdentity);
-      } catch (error) {
-        if (cancelled) return;
-        if (error?.name !== "AbortError") {
-          setNotifications([]);
-          setUnreadCount(0);
-          setLoadedIdentity(notificationIdentity);
-        }
-      } finally {
-        requestInFlight = false;
-        activeController = null;
-      }
-    };
-
-    loadNotifications();
-    const poll = () => {
-      if (document.visibilityState !== "hidden") loadNotifications();
-    };
-    const interval = window.setInterval(poll, NOTIFICATION_POLL_MS);
-    window.addEventListener("focus", poll);
-    document.addEventListener("visibilitychange", poll);
-
-    return () => {
-      cancelled = true;
-      activeController?.abort();
-      window.clearInterval(interval);
-      window.removeEventListener("focus", poll);
-      document.removeEventListener("visibilitychange", poll);
-    };
-  }, [notificationIdentity, t, tenantId, userId]);
 
   const getPanelPosition = useCallback((rect) => {
     const viewportWidth = window.innerWidth;
@@ -259,8 +193,8 @@ export default function NotificationBell({
         ref={buttonRef}
       >
         <Bell size={compact ? 18 : 20} aria-hidden="true" />
-        {visibleUnreadCount > 0 && (
-          <span className="notification-bell-badge">{visibleUnreadCount}</span>
+        {unreadCount > 0 && (
+          <span className="notification-bell-badge">{unreadCount}</span>
         )}
         {!compact && (
           <span className="notification-bell-label">{resolvedLabel}</span>
@@ -285,7 +219,7 @@ export default function NotificationBell({
         >
           <div className="notification-popover-header">
             <strong>{resolvedLabel}</strong>
-            <span>{t("notifications.unreadCount", { count: visibleUnreadCount })}</span>
+            <span>{t("notifications.unreadCount", { count: unreadCount })}</span>
           </div>
 
           <div className="notification-popover-list">

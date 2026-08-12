@@ -116,6 +116,30 @@ describe("cleanBuilderProject", () => {
     ]);
   });
 
+  it("removes persisted text sizes outside the supported builder range", () => {
+    const normalized = normalizeBuilderProjectShape({
+      pages: [{
+        id: "home",
+        sections: [{ freeElements: [{
+          id: "copy",
+          type: "text",
+          styles: { fontSize: "257px" },
+          richTextSizes: [
+            { field: "content", start: 0, end: 4, fontSize: "256px" },
+            { field: "content", start: 4, end: 8, fontSize: "999px" },
+          ],
+        }] }],
+      }],
+    });
+    const element = normalized.pages[0].sections[0].freeElements[0];
+
+    expect(element.styles).not.toHaveProperty("fontSize");
+    expect(element.richTextSizes).toEqual([
+      { field: "content", start: 0, end: 4, fontSize: "256px" },
+      { field: "content", start: 4, end: 8 },
+    ]);
+  });
+
   it("repairs the doubled newline produced by an empty editable paragraph", () => {
     const normalized = normalizeBuilderProjectShape({
       pages: [{

@@ -72,4 +72,5 @@ scipy==1.18.0
 scikit-learn==1.9.0
 statsmodels==0.14.6
 openpyxl==3.1.5
+olefile==0.47
 psycopg[binary]==3.2.3

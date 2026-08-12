@@ -331,7 +331,8 @@ def workspace_task_rows(context, detail_ids: list[str]) -> list[dict[str, Any]]:
         tasks = getattr(
             service_supabase.table("calendar_tasks").select("*")
             .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
-            .neq("status", "cancelled").order("due_at").limit(1000).execute(),
+            .neq("status", "cancelled").is_("archived_at", "null")
+            .order("due_at").limit(1000).execute(),
             "data", None,
         ) or []
     unassigned_query = (
@@ -339,6 +340,7 @@ def workspace_task_rows(context, detail_ids: list[str]) -> list[dict[str, Any]]:
         .eq("tenant_id", context.tenant_id)
         .is_("calendar_id", "null")
         .neq("status", "cancelled")
+        .is_("archived_at", "null")
     )
     if str(context.role or "").lower() not in {"owner", "admin"}:
         unassigned_query = unassigned_query.eq("owner_user_id", context.user_id)
@@ -358,6 +360,7 @@ def workspace_linked_task_event_ids(context, detail_ids: list[str]) -> set[str]:
         rows = getattr(
             service_supabase.table("calendar_tasks").select("sync_event_id")
             .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
+            .is_("archived_at", "null")
             .limit(1000).execute(),
             "data", None,
         ) or []
@@ -403,7 +406,7 @@ def sync_task_reminder(
         else None
     )
     scheduled_for = iso(scheduled_start_dt - timedelta(minutes=minutes_before)) if scheduled_start_dt else None
-    inactive = task.get("status") in {"done", "cancelled"}
+    inactive = task.get("status") in {"done", "cancelled"} or bool(task.get("archived_at"))
     reminder_changed = not existing or int(existing.get("minutes_before") or 0) != minutes_before
     values = {
         "task_id": task_id,
@@ -533,8 +536,14 @@ def reservation_events_for_range(context, start: datetime, end: datetime) -> lis
 
     scheduled_rows = getattr(
         service_supabase.table("builder_reservations").select("*")
-        .eq("tenant_id", context.tenant_id).gte("starts_at", iso(start))
-        .lt("starts_at", iso(end)).limit(1000).execute(), "data", None,
+        .eq("tenant_id", context.tenant_id).lt("starts_at", iso(end))
+        .gt("ends_at", iso(start)).limit(1000).execute(), "data", None,
+    ) or []
+    start_only_rows = getattr(
+        service_supabase.table("builder_reservations").select("*")
+        .eq("tenant_id", context.tenant_id).lt("starts_at", iso(end))
+        .is_("ends_at", "null").not_.is_("starts_at", "null")
+        .limit(1000).execute(), "data", None,
     ) or []
     legacy_rows = getattr(
         service_supabase.table("builder_reservations").select("*")
@@ -543,7 +552,7 @@ def reservation_events_for_range(context, start: datetime, end: datetime) -> lis
     ) or []
     rows_by_id = {
         str(row.get("id") or f"row-{index}"): row
-        for index, row in enumerate([*scheduled_rows, *legacy_rows])
+        for index, row in enumerate([*scheduled_rows, *start_only_rows, *legacy_rows])
     }
     events = []
     for row in rows_by_id.values():
@@ -557,7 +566,10 @@ def reservation_events_for_range(context, start: datetime, end: datetime) -> lis
             continue
         if event_start < end and event_end > start:
             events.append(event)
-    return events
+    return sorted(
+        events,
+        key=lambda event: (str(event.get("starts_at") or ""), str(event.get("source_id") or "")),
+    )
 
 
 def write_change(context, event_id: str, action: str, scope: str, before, after) -> None:
@@ -1446,13 +1458,32 @@ def list_archived_tasks(request: Request, response: Response):
         tasks = getattr(
             service_supabase.table("calendar_tasks").select("*")
             .eq("tenant_id", context.tenant_id).in_("calendar_id", detail_ids)
-            .eq("status", "cancelled").order("updated_at", desc=True)
+            .not_.is_("archived_at", "null").order("archived_at", desc=True)
             .limit(1000).execute(),
             "data", None,
         ) or []
+    unassigned_query = (
+        service_supabase.table("calendar_tasks").select("*")
+        .eq("tenant_id", context.tenant_id)
+        .is_("calendar_id", "null")
+        .not_.is_("archived_at", "null")
+    )
+    if str(context.role or "").lower() not in {"owner", "admin"}:
+        unassigned_query = unassigned_query.eq("owner_user_id", context.user_id)
+    unassigned_tasks = getattr(
+        unassigned_query.order("archived_at", desc=True).limit(1000).execute(),
+        "data",
+        None,
+    ) or []
+    archived_tasks = list({
+        str(task.get("id")): task
+        for task in [*tasks, *unassigned_tasks]
+        if task.get("id")
+    }.values())
+    archived_tasks.sort(key=lambda task: str(task.get("archived_at") or ""), reverse=True)
     return {
         "success": True,
-        "tasks": [safe_task_payload(task) for task in tasks],
+        "tasks": [safe_task_payload(task) for task in archived_tasks],
     }
 
 
@@ -1552,10 +1583,10 @@ def archive_task(
     require_task_access(context, task)
     updated = getattr(
         service_supabase.table("calendar_tasks").update({
-            "status": "cancelled",
+            "archived_at": iso(utc_now()),
             "version": expected_version + 1,
         }).eq("id", task_id).eq("tenant_id", context.tenant_id)
-        .eq("version", expected_version).execute(),
+        .eq("version", expected_version).is_("archived_at", "null").execute(),
         "data", None,
     ) or []
     if not updated:
