@@ -72,6 +72,8 @@ SUBMISSION_STATUS_VALUES = {label.lower(): value for value, label in SUBMISSION_
 RESERVATION_STATUSES = {"new", "confirmed", "cancelled", "completed", "rejected"}
 SITE_MEMBER_STATUSES = {"active", "disabled"}
 MAX_BUILDER_SCHEMA_BYTES = int(os.getenv("MAX_BUILDER_SCHEMA_BYTES", str(2 * 1024 * 1024)))
+MIN_BUILDER_TEXT_FONT_SIZE_PX = 8
+MAX_BUILDER_TEXT_FONT_SIZE_PX = 256
 UNSAFE_BUILDER_ELEMENT_TYPES = {"html", "rawhtml", "script", "iframe"}
 PUBLIC_PAGE_SLUG_PATTERN = re.compile(
     r"^/[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*$"
@@ -80,6 +82,64 @@ RESERVED_PUBLIC_PAGE_SLUGS = {
     "admin", "api", "auth", "builder", "dashboard", "forgot-password",
     "login", "reset-password", "settings", "signup", "verify-email",
 }
+
+
+def validate_builder_text_font_sizes(value: Any) -> None:
+    """Reject builder text sizes outside the editor's finite persisted range."""
+
+    def validate_size(raw_value: Any, field_name: str) -> None:
+        if raw_value in (None, ""):
+            return
+        if isinstance(raw_value, bool):
+            numeric_value = None
+        elif isinstance(raw_value, (int, float)):
+            numeric_value = float(raw_value)
+        else:
+            match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)px", str(raw_value).strip(), re.IGNORECASE)
+            numeric_value = float(match.group(1)) if match else None
+        if (
+            numeric_value is None
+            or not math.isfinite(numeric_value)
+            or numeric_value < MIN_BUILDER_TEXT_FONT_SIZE_PX
+            or numeric_value > MAX_BUILDER_TEXT_FONT_SIZE_PX
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=error_detail(
+                    "publish_validation_failed",
+                    f"{field_name} must be between {MIN_BUILDER_TEXT_FONT_SIZE_PX}px and "
+                    f"{MAX_BUILDER_TEXT_FONT_SIZE_PX}px.",
+                    context={"issue_type": "invalid_text_font_size", "field": field_name},
+                ),
+            )
+
+    def inspect(node: Any, path: str) -> None:
+        if isinstance(node, list):
+            for index, item in enumerate(node):
+                inspect(item, f"{path}[{index}]")
+            return
+        if not isinstance(node, dict):
+            return
+
+        styles = node.get("styles")
+        if isinstance(styles, dict):
+            for key in ("fontSize", "selectedTextFontSize"):
+                if key in styles:
+                    validate_size(styles.get(key), f"{path}.styles.{key}")
+        for collection_name in ("richTextSizes", "richTextStyles"):
+            ranges = node.get(collection_name)
+            if isinstance(ranges, list):
+                for index, text_range in enumerate(ranges):
+                    if isinstance(text_range, dict) and "fontSize" in text_range:
+                        validate_size(
+                            text_range.get("fontSize"),
+                            f"{path}.{collection_name}[{index}].fontSize",
+                        )
+        for key, child in node.items():
+            if key not in {"styles", "richTextSizes", "richTextStyles"}:
+                inspect(child, f"{path}.{key}")
+
+    inspect(value, "draft_schema")
 
 
 def schema_contains_element_type(value: Any, element_type: str) -> bool:
@@ -638,6 +698,7 @@ def validate_publish_schema(
     schema = copy.deepcopy(
         assert_json_object(value, field_name="draft_schema", validate_urls=False)
     )
+    validate_builder_text_font_sizes(schema)
     raw_schema_version = schema.get(
         "schema_version",
         schema.get("version", project_schema_version if project_schema_version is not None else 1),
@@ -956,7 +1017,9 @@ class BuilderProjectCreate(BaseModel):
     @field_validator("draft_schema")
     @classmethod
     def validate_draft_schema(cls, value):
-        return assert_json_object(value)
+        validated = assert_json_object(value)
+        validate_builder_text_font_sizes(validated)
+        return validated
 
 
 class BuilderProjectUpdate(BaseModel):
@@ -969,7 +1032,9 @@ class BuilderProjectUpdate(BaseModel):
     @field_validator("draft_schema")
     @classmethod
     def validate_draft_schema(cls, value):
-        return assert_json_object(value)
+        validated = assert_json_object(value)
+        validate_builder_text_font_sizes(validated)
+        return validated
 
 
 class BuilderProjectPublish(BaseModel):

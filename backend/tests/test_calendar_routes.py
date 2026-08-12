@@ -50,8 +50,18 @@ class Query:
     def order(self, field, desc=False):
         self.rows.sort(key=lambda row: (row.get(field) is None, row.get(field)), reverse=desc)
         return self
-    def lt(self, *_args): return self
-    def gt(self, *_args): return self
+    def lt(self, field, value):
+        self.rows = [
+            row for row in self.rows
+            if row.get(field) is not None and str(row.get(field)) < str(value)
+        ]
+        return self
+    def gt(self, field, value):
+        self.rows = [
+            row for row in self.rows
+            if row.get(field) is not None and str(row.get(field)) > str(value)
+        ]
+        return self
     def gte(self, field, value):
         self.rows = [row for row in self.rows if str(row.get(field) or "") >= str(value)]
         return self
@@ -291,6 +301,54 @@ class CalendarRouteTests(unittest.TestCase):
         self.assertEqual(events[0]["calendar_id"], "reservations")
         self.assertEqual(events[0]["starts_at"], "2026-07-22T11:00:00+03:00")
         self.assertEqual(events[0]["ends_at"], "2026-07-22T11:30:00+03:00")
+
+    def test_reservation_range_uses_interval_overlap_semantics(self):
+        context = SimpleNamespace(tenant_id=7, role="owner")
+        rows = [
+            {
+                "id": "starts-inside",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T10:30:00+00:00",
+                "ends_at": "2026-07-22T11:00:00+00:00",
+            },
+            {
+                "id": "starts-before-ends-inside",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T09:30:00+00:00",
+                "ends_at": "2026-07-22T10:30:00+00:00",
+            },
+            {
+                "id": "spans-range",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T09:00:00+00:00",
+                "ends_at": "2026-07-22T13:00:00+00:00",
+            },
+            {
+                "id": "ends-before-range",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T08:00:00+00:00",
+                "ends_at": "2026-07-22T09:00:00+00:00",
+            },
+            {
+                "id": "starts-after-range",
+                "tenant_id": 7,
+                "starts_at": "2026-07-22T12:30:00+00:00",
+                "ends_at": "2026-07-22T13:00:00+00:00",
+            },
+        ]
+        client = SimpleNamespace(table=lambda _name: Query(rows))
+
+        with patch.object(calendar_routes, "service_supabase", client):
+            events = reservation_events_for_range(
+                context,
+                datetime(2026, 7, 22, 10, tzinfo=timezone.utc),
+                datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(
+            {event["source_id"] for event in events},
+            {"starts-inside", "starts-before-ends-inside", "spans-range"},
+        )
 
     def test_ics_text_is_escaped_without_leaking_delimiters(self):
         self.assertEqual(ics_escape("One, two; three\\four\nfive"), "One\\, two\\; three\\\\four\\nfive")

@@ -317,6 +317,35 @@ class _ProjectMutationSupabase:
 
 
 class BuilderRevisionSafetyTests(unittest.TestCase):
+    def test_builder_text_size_boundary_is_enforced_for_drafts_and_publication(self):
+        def schema_for(font_size):
+            return {
+                "pages": [{
+                    "id": "home",
+                    "sections": [{"freeElements": [{
+                        "id": "copy",
+                        "type": "text",
+                        "styles": {"fontSize": font_size},
+                    }]}],
+                }],
+                "forms": [],
+            }
+
+        validated, _ = builder_routes.validate_publish_schema(schema_for("256px"))
+        self.assertEqual(
+            validated["pages"][0]["sections"][0]["freeElements"][0]["styles"]["fontSize"],
+            "256px",
+        )
+        builder_routes.BuilderProjectUpdate(draft_schema=schema_for("72px"))
+
+        for invalid_size in ("257px", "huge", "7px"):
+            with self.subTest(invalid_size=invalid_size), self.assertRaises(HTTPException) as raised:
+                builder_routes.validate_publish_schema(schema_for(invalid_size))
+            self.assertEqual(raised.exception.detail["context"]["issue_type"], "invalid_text_font_size")
+
+        with self.assertRaises(HTTPException):
+            builder_routes.BuilderProjectUpdate(draft_schema=schema_for("257px"))
+
     @staticmethod
     def _contract_request(value=None):
         headers = []

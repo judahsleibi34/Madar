@@ -536,8 +536,14 @@ def reservation_events_for_range(context, start: datetime, end: datetime) -> lis
 
     scheduled_rows = getattr(
         service_supabase.table("builder_reservations").select("*")
-        .eq("tenant_id", context.tenant_id).gte("starts_at", iso(start))
-        .lt("starts_at", iso(end)).limit(1000).execute(), "data", None,
+        .eq("tenant_id", context.tenant_id).lt("starts_at", iso(end))
+        .gt("ends_at", iso(start)).limit(1000).execute(), "data", None,
+    ) or []
+    start_only_rows = getattr(
+        service_supabase.table("builder_reservations").select("*")
+        .eq("tenant_id", context.tenant_id).lt("starts_at", iso(end))
+        .is_("ends_at", "null").not_.is_("starts_at", "null")
+        .limit(1000).execute(), "data", None,
     ) or []
     legacy_rows = getattr(
         service_supabase.table("builder_reservations").select("*")
@@ -546,7 +552,7 @@ def reservation_events_for_range(context, start: datetime, end: datetime) -> lis
     ) or []
     rows_by_id = {
         str(row.get("id") or f"row-{index}"): row
-        for index, row in enumerate([*scheduled_rows, *legacy_rows])
+        for index, row in enumerate([*scheduled_rows, *start_only_rows, *legacy_rows])
     }
     events = []
     for row in rows_by_id.values():

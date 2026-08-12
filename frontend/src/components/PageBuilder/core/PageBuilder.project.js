@@ -1,4 +1,8 @@
-import { defaultSiteChrome, defaultTheme } from "./PageBuilder.constants";
+import {
+  defaultSiteChrome,
+  defaultTheme,
+  parseBuilderTextFontSize,
+} from "./PageBuilder.constants";
 import { normalizeProjectPageRouting } from "./PageBuilder.routing";
 import { normalizeElementAction } from "./PageBuilder.actions";
 import { BUTTON_COLOR_FIELDS, normalizeButtonColor } from "./PageBuilder.buttonColors";
@@ -180,6 +184,14 @@ const normalizeBuilderElementShape = (element, path = "element") => {
     id: String(element.id || deterministicRoutineId("element", path)),
   });
   normalized.id = String(normalized.id || "");
+  if (normalized.styles && typeof normalized.styles === "object") {
+    for (const key of ["fontSize", "selectedTextFontSize"]) {
+      if (!Object.hasOwn(normalized.styles, key) || normalized.styles[key] === "") continue;
+      const parsed = parseBuilderTextFontSize(normalized.styles[key]);
+      if (parsed === null) delete normalized.styles[key];
+      else normalized.styles[key] = `${parsed}px`;
+    }
+  }
   if (normalized.type === "button") {
     BUTTON_COLOR_FIELDS.forEach((field) => {
       const value = normalizeButtonColor(element[field]);
@@ -191,6 +203,18 @@ const normalizeBuilderElementShape = (element, path = "element") => {
   normalized.richTextColors = compactRichTextRanges(element.richTextColors);
   normalized.richTextSizes = compactRichTextRanges(element.richTextSizes);
   normalized.richTextStyles = compactRichTextRanges(element.richTextStyles);
+  for (const collectionName of ["richTextSizes", "richTextStyles"]) {
+    normalized[collectionName] = normalized[collectionName].map((range) => {
+      if (!Object.hasOwn(range, "fontSize")) return range;
+      const parsed = parseBuilderTextFontSize(range.fontSize);
+      if (parsed === null) {
+        const safeRange = { ...range };
+        delete safeRange.fontSize;
+        return safeRange;
+      }
+      return { ...range, fontSize: `${parsed}px` };
+    });
+  }
   if (Array.isArray(normalized.textBlockFormats) && normalized.textBlockFormats.length) {
     let repairedContent = String(normalized.content || "");
     while (
