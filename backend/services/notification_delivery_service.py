@@ -19,6 +19,10 @@ from services.notification_action_service import (
     action_kind_for_source,
     normalize_notification_data,
 )
+from services.notification_preference_service import (
+    notification_category,
+    preference_enabled,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +75,7 @@ def build_web_push_payload(row: dict[str, Any]) -> str:
             event_type=event_type, source_type=source_type
         ),
         object_id=payload.get("source_id"),
+        tenant_id=row.get("tenant_id"),
     )
     kind = action_data["action"]["kind"]
     if kind == "form_submission":
@@ -91,6 +96,7 @@ def build_web_push_payload(row: dict[str, Any]) -> str:
     document = {
         "title": title,
         "body": body,
+        "event_id": event_id,
         "data": {"action": action_data["action"]},
     }
     if event_id and len(event_id) <= 100:
@@ -123,6 +129,7 @@ def _deliver_internal(row: dict[str, Any]) -> None:
             source_type=payload.get("source_type"),
         ),
         object_id=source_id,
+        tenant_id=tenant_id,
     )
     event_id = row.get("event_id") or payload.get("event_id")
     if event_id:
@@ -206,9 +213,25 @@ def _deliver_internal(row: dict[str, Any]) -> None:
             source_type=event.get("source_type") or payload.get("source_type"),
         ),
         object_id=event.get("source_id") or source_id,
+        tenant_id=tenant_id,
     )
     for recipient in recipients:
         if recipient.get("user_id") is None:
+            continue
+        category = notification_category(
+            event_type=event.get("event_type") or payload.get("event_type"),
+            source_type=event.get("source_type") or payload.get("source_type"),
+        )
+        if not preference_enabled(
+            tenant_id=tenant_id,
+            user_id=recipient["user_id"],
+            category=category,
+            channel="in_app",
+        ):
+            logger.info(
+                "notifications.delivery_skipped_preference",
+                extra={"tenant_id": tenant_id, "user_id": recipient["user_id"], "channel": "internal", "category": category},
+            )
             continue
         service_supabase.table("user_notifications").upsert({
             "event_id": event.get("id"),
@@ -258,6 +281,14 @@ def _deliver_email(row: dict[str, Any]) -> None:
             raise DeliveryError("recipient_inactive", retryable=False)
         users = _rows(service_supabase.table("users").select("email").eq("id", user_id).limit(1).execute())
         recipient = str(users[0].get("email") if users else "").strip()
+        payload = row.get("payload") or {}
+        category = notification_category(
+            event_type=payload.get("event_type"), source_type=payload.get("source_type")
+        )
+        if not preference_enabled(
+            tenant_id=row.get("tenant_id"), user_id=user_id, category=category, channel="email"
+        ):
+            raise DeliveryError("email_preference_disabled", retryable=False, terminal_outcome="revoked")
     else:
         raise DeliveryError("email_recipient_reference_unsupported", retryable=False)
     if not recipient:
@@ -326,6 +357,14 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
         recipient_ids = [int(target_user_id)]
     data = build_web_push_payload(row)
     recipient_id = recipient_ids[0]
+    payload = row.get("payload") or {}
+    category = notification_category(
+        event_type=payload.get("event_type"), source_type=payload.get("source_type")
+    )
+    if not preference_enabled(
+        tenant_id=tenant_id, user_id=recipient_id, category=category, channel="push"
+    ):
+        raise DeliveryError("web_push_preference_disabled", retryable=False, terminal_outcome="revoked")
     query = (
         service_supabase.table("web_push_subscriptions")
         .select("id,endpoint,p256dh,auth,app_installation_id")

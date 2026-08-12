@@ -71,6 +71,27 @@ export const markAllNotificationsRead = async () => {
   return data;
 };
 
+export const fetchNotificationPreferences = async () => {
+  const response = await apiFetch(getApiUrl("/notifications/preferences"), {
+    method: "GET",
+    cache: "no-store",
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok) throw new Error(readApiError(data, "Could not load notification preferences."));
+  return data.preferences || [];
+};
+
+export const saveNotificationPreference = async ({ category, channel, enabled }) => {
+  const response = await apiFetch(getApiUrl("/notifications/preferences"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ category, channel, enabled }),
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok) throw new Error(readApiError(data, "Could not save notification preference."));
+  return data.preference;
+};
+
 export const getPushPublicKey = async () => {
   const response = await apiFetch(getApiUrl("/notifications/push-public-key"), {
     method: "GET",

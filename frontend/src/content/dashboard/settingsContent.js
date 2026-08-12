@@ -116,6 +116,17 @@ export const settingsContent = {
         installation_unavailable: "This device could not be registered. Please try again.",
       },
     },
+    notificationPreferences: {
+      tab: "Notifications",
+      title: "Notification preferences",
+      description: "Choose which kinds of notifications you receive in Madar.",
+      loading: "Loading notification preferences...",
+      loadError: "Could not load notification preferences.",
+      saveError: "Could not save notification preference.",
+      deviceNote: "Push choices apply to eligible devices. Device notification settings remain separate.",
+      categories: { calendar: "Calendar reminders", reservations: "Reservations", forms: "Form submissions", general: "General" },
+      channels: { in_app: "In-app", push: "Push", email: "Email" },
+    },
   },
 
   ar: {
@@ -233,6 +244,17 @@ export const settingsContent = {
         android_browser_unsupported: "متصفح Android هذا لا يدعم إشعارات Push.",
         installation_unavailable: "تعذر تسجيل هذا الجهاز. حاول مرة أخرى.",
       },
+    },
+    notificationPreferences: {
+      tab: "الإشعارات",
+      title: "تفضيلات الإشعارات",
+      description: "اختر أنواع الإشعارات التي تتلقاها في مدار.",
+      loading: "جارٍ تحميل تفضيلات الإشعارات...",
+      loadError: "تعذر تحميل تفضيلات الإشعارات.",
+      saveError: "تعذر حفظ تفضيل الإشعارات.",
+      deviceNote: "تنطبق اختيارات Push على الأجهزة المؤهلة. تبقى إعدادات إشعارات الجهاز منفصلة.",
+      categories: { calendar: "تذكيرات التقويم", reservations: "الحجوزات", forms: "إرسالات النماذج", general: "عام" },
+      channels: { in_app: "داخل التطبيق", push: "Push", email: "البريد الإلكتروني" },
     },
   },
 };

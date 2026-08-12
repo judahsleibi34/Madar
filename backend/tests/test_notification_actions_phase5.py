@@ -66,6 +66,13 @@ class NotificationActionContractTests(unittest.TestCase):
         )
         self.assertNotIn("object_id", invalid)
 
+    def test_tenant_hint_is_normalized_but_never_changes_the_allowlisted_route(self):
+        action = build_notification_action(
+            kind="calendar_task", object_id="task-1", tenant_id=22, path="/calendar"
+        )
+        self.assertEqual(action["tenant_id"], "22")
+        self.assertEqual(action["path"], "/calendar")
+
 
 class WebPushPayloadPrivacyTests(unittest.TestCase):
     def test_form_payload_excludes_public_answers_and_contact_details(self):

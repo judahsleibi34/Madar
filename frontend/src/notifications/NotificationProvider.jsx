@@ -12,6 +12,7 @@ import {
   markNotificationRead,
 } from "../services/notificationsApi";
 import { createToastCoordinator } from "./toastCoordinator";
+import { createNotificationPollingLeader } from "./pollingLeader";
 import { NotificationContext } from "./NotificationContext";
 import {
   chronologicalNotifications,
@@ -47,9 +48,11 @@ export function NotificationProvider({
     error: null,
   });
   const [toastQueue, setToastQueue] = useState([]);
+  const [isPollingLeader, setIsPollingLeader] = useState(false);
   const baselineRef = useRef({ identity: "", established: false, ids: new Set() });
   const inFlightRef = useRef(null);
   const coordinatorRef = useRef(null);
+  const pollingLeaderRef = useRef(null);
 
   useEffect(() => {
     if (claimToast) return undefined;
@@ -64,7 +67,9 @@ export function NotificationProvider({
   const enqueueNewToasts = useCallback(async (items, requestIdentity) => {
     const sessionDedup = readSessionDedup(requestIdentity);
     const candidates = chronologicalNotifications(items).filter((item) => (
-      item.id && !sessionDedup.has(notificationKey(requestIdentity, item.id))
+      item.id
+      && !sessionDedup.has(notificationKey(requestIdentity, item.id))
+      && !(item.eventId && sessionDedup.has(notificationKey(requestIdentity, `event:${item.eventId}`)))
     ));
     const claim = claimToast || coordinatorRef.current?.claim;
     const results = await Promise.all(candidates.map(async (item) => {
@@ -158,6 +163,25 @@ export function NotificationProvider({
   }, [enqueueNewToasts, identity]);
 
   useEffect(() => {
+    if (!identity) {
+      setIsPollingLeader(false);
+      return undefined;
+    }
+    const leader = createNotificationPollingLeader({
+      identity,
+      onLeadershipChange: setIsPollingLeader,
+      onRefreshRequested: refreshNotifications,
+    });
+    pollingLeaderRef.current = leader;
+    if (!leader.supported) setIsPollingLeader(true);
+    leader.start();
+    return () => {
+      leader.stop();
+      if (pollingLeaderRef.current === leader) pollingLeaderRef.current = null;
+    };
+  }, [identity, refreshNotifications]);
+
+  useEffect(() => {
     inFlightRef.current?.controller?.abort();
     baselineRef.current = { identity, established: false, ids: new Set() };
     const resetTimer = window.setTimeout(() => {
@@ -174,11 +198,16 @@ export function NotificationProvider({
     }, 0);
     if (!identity) return () => window.clearTimeout(resetTimer);
 
-    refreshNotifications();
+    if (isPollingLeader) refreshNotifications();
     const poll = () => {
-      if (document.visibilityState !== "hidden") refreshNotifications();
+      if (document.visibilityState === "hidden") return;
+      const leader = pollingLeaderRef.current;
+      if (leader?.supported) leader.requestRefresh();
+      else refreshNotifications();
     };
-    const interval = pollIntervalMs > 0 ? window.setInterval(poll, pollIntervalMs) : null;
+    const interval = isPollingLeader && pollIntervalMs > 0
+      ? window.setInterval(poll, pollIntervalMs)
+      : null;
     window.addEventListener("focus", poll);
     document.addEventListener("visibilitychange", poll);
     return () => {
@@ -188,7 +217,19 @@ export function NotificationProvider({
       window.removeEventListener("focus", poll);
       document.removeEventListener("visibilitychange", poll);
     };
-  }, [identity, pollIntervalMs, refreshNotifications]);
+  }, [identity, isPollingLeader, pollIntervalMs, refreshNotifications]);
+
+  useEffect(() => {
+    const rememberPushPresentation = (event) => {
+      if (event.data?.type !== "MADAR_PUSH_PRESENTED" || !identity) return;
+      const eventId = String(event.data.event_id || "");
+      if (/^[A-Za-z0-9-]{1,100}$/.test(eventId)) {
+        rememberSessionDedup(identity, notificationKey(identity, `event:${eventId}`));
+      }
+    };
+    navigator.serviceWorker?.addEventListener?.("message", rememberPushPresentation);
+    return () => navigator.serviceWorker?.removeEventListener?.("message", rememberPushPresentation);
+  }, [identity]);
 
   const markRead = useCallback(async (notificationId) => {
     const requestIdentity = identity;
@@ -253,6 +294,7 @@ export function NotificationProvider({
     notifications: identityMatches ? state.notifications : [],
     refreshNotifications,
     toastQueue: toastQueue.filter((item) => item.identity === identity),
+    tenantId: String(user?.tenant_id || ""),
     unreadCount: identityMatches ? state.unreadCount : 0,
   }), [
     dismissToast,
@@ -263,6 +305,7 @@ export function NotificationProvider({
     refreshNotifications,
     state,
     toastQueue,
+    user?.tenant_id,
   ]);
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;

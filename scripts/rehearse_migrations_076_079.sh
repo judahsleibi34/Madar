@@ -164,4 +164,56 @@ do $$ begin
 end $$;
 SQL
 
-echo "migrations 076-079 rehearsal passed"
+# Migration 080 is deliberately applied explicitly and twice. It is additive,
+# sparse (no backfill), and must be safe to replay under this repository's
+# migration convention.
+docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q \
+  < "$REPO_ROOT/database/migrations/080_create_notification_preferences.sql"
+docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q \
+  < "$REPO_ROOT/database/migrations/080_create_notification_preferences.sql"
+docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q <<'SQL'
+do $$
+declare member_id integer;
+begin
+  select id into member_id from public.users where tenant_id=501;
+  insert into public.notification_preferences (tenant_id,user_id,category,channel,enabled)
+  values (501,member_id,'calendar','push',false);
+
+  begin
+    insert into public.notification_preferences (tenant_id,user_id,category,channel,enabled)
+    values (501,member_id,'calendar','push',true);
+    raise exception 'preference_unique_constraint_missing';
+  exception when unique_violation then null;
+  end;
+
+  begin
+    insert into public.notification_preferences (tenant_id,user_id,category,channel,enabled)
+    values (501,member_id,'forms','email',false);
+    raise exception 'unsupported_preference_pair_accepted';
+  exception when check_violation then null;
+  end;
+end $$;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname='notification_preferences_tenant_user_category_channel_unique'
+  ) then raise exception 'preference_unique_constraint_not_found'; end if;
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname='public' and indexname='notification_preferences_tenant_user_idx'
+  ) then raise exception 'preference_index_not_found'; end if;
+  if not exists (
+    select 1 from pg_tables
+    where schemaname='public' and tablename='notification_preferences' and rowsecurity
+  ) then raise exception 'preference_rls_not_enabled'; end if;
+  if not has_table_privilege('service_role','public.notification_preferences','select,insert,update,delete')
+  then raise exception 'service_role_preference_grant_missing'; end if;
+  if has_table_privilege('authenticated','public.notification_preferences','select')
+  then raise exception 'authenticated_preference_grant_too_broad'; end if;
+  if (select enabled from public.notification_preferences limit 1) is distinct from false
+  then raise exception 'explicit_disabled_preference_not_retained'; end if;
+end $$;
+SQL
+
+echo "migrations 076-080 rehearsal passed"

@@ -59,6 +59,47 @@ class RpcClient:
 
 
 class CalendarReminderServiceTests(unittest.TestCase):
+    def test_task_state_controls_future_reminders_without_silencing_overdue_active_work(self):
+        client = Client()
+        client.tables["calendar_task_reminders"] = [
+            {"id": "archived-reminder", "task_id": "archived", "tenant_id": 7, "channel": "in_app", "minutes_before": 10, "scheduled_for": "2026-07-22T08:50:00+00:00", "delivery_status": "scheduled"},
+            {"id": "cancelled-reminder", "task_id": "cancelled", "tenant_id": 7, "channel": "in_app", "minutes_before": 10, "scheduled_for": "2026-07-22T08:50:00+00:00", "delivery_status": "scheduled"},
+            {"id": "overdue-reminder", "task_id": "overdue", "tenant_id": 7, "channel": "in_app", "minutes_before": 10, "scheduled_for": "2026-07-22T08:50:00+00:00", "delivery_status": "scheduled"},
+        ]
+        client.tables["calendar_tasks"] = [
+            {"id": "archived", "tenant_id": 7, "owner_user_id": 12, "status": "done", "archived_at": "2026-07-22T10:00:00+00:00", "scheduled_start": "2026-07-22T09:00:00+00:00"},
+            {"id": "cancelled", "tenant_id": 7, "owner_user_id": 12, "status": "cancelled", "archived_at": None, "scheduled_start": "2026-07-22T09:00:00+00:00"},
+            {"id": "overdue", "tenant_id": 7, "owner_user_id": 12, "status": "in_progress", "archived_at": None, "scheduled_start": "2026-07-22T09:00:00+00:00"},
+        ]
+        queued = []
+        with patch.object(
+            calendar_reminder_service,
+            "enqueue_notification",
+            side_effect=lambda **kwargs: queued.append(kwargs) or {"id": "outbox"},
+        ):
+            count = calendar_reminder_service.enqueue_due_calendar_reminders(client=client)
+
+        self.assertEqual(count, 1)
+        self.assertEqual(queued[0]["payload"]["source_id"], "overdue")
+        statuses = {row["id"]: row["delivery_status"] for row in client.tables["calendar_task_reminders"]}
+        self.assertEqual(statuses["archived-reminder"], "cancelled")
+        self.assertEqual(statuses["cancelled-reminder"], "cancelled")
+        self.assertEqual(statuses["overdue-reminder"], "queued")
+
+    def test_reprocessing_one_recurring_occurrence_does_not_enqueue_twice(self):
+        client = Client()
+        client.tables["calendar_task_reminders"] = [client.tables["calendar_task_reminders"][1]]
+        client.tables["calendar_tasks"][1]["recurrence_rule"] = "FREQ=WEEKLY"
+        queued = []
+        with patch.object(
+            calendar_reminder_service,
+            "enqueue_notification",
+            side_effect=lambda **kwargs: queued.append(kwargs) or {"id": "outbox"},
+        ):
+            self.assertEqual(calendar_reminder_service.enqueue_due_calendar_reminders(client=client), 1)
+            self.assertEqual(calendar_reminder_service.enqueue_due_calendar_reminders(client=client), 0)
+        self.assertEqual(len(queued), 1)
+
     def test_due_reminder_enqueue_uses_transactional_rpc(self):
         client = RpcClient()
         queued = calendar_reminder_service._enqueue_reminder_notification(
@@ -113,6 +154,7 @@ class CalendarReminderServiceTests(unittest.TestCase):
             "kind": "calendar_task",
             "object_id": "task-good",
             "path": "/calendar",
+            "tenant_id": "7",
         })
         bad = next(row for row in client.tables["calendar_task_reminders"] if row["id"] == "bad")
         good = next(row for row in client.tables["calendar_task_reminders"] if row["id"] == "good")

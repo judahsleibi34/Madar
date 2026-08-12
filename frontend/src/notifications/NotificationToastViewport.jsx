@@ -44,12 +44,12 @@ function NotificationToast({ dismissLabel, fallbackTitle, item, onDismiss, onOpe
 export default function NotificationToastViewport() {
   const navigate = useNavigate();
   const { direction, t } = useLanguage();
-  const { dismissToast, toastQueue } = useNotifications();
+  const { dismissToast, toastQueue, tenantId } = useNotifications();
   const visibleToasts = toastQueue.slice(0, MAX_VISIBLE_TOASTS);
 
   const openToast = (item) => {
     dismissToast(item.key);
-    navigate(getSafeNotificationActionPath(item.data?.action));
+    navigate(getSafeNotificationActionPath(item.data?.action, { tenantId }));
   };
 
   if (!visibleToasts.length || typeof document === "undefined") return null;

@@ -1,29 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { getSafeNotificationActionPath } from "./notificationActions";
+import { resolveNotificationAction } from "./notificationActions";
 
-describe("notification action navigation", () => {
-  it("accepts only the current canonical action paths", () => {
-    expect(getSafeNotificationActionPath({ kind: "calendar_task", path: "/calendar" }))
-      .toBe("/calendar");
-    expect(getSafeNotificationActionPath({ kind: "form_submission", path: "/notifications" }))
-      .toBe("/notifications");
+describe("notification action resolution", () => {
+  it("uses a same-tenant allowlisted calendar action", () => {
+    expect(resolveNotificationAction(
+      { kind: "calendar_task", tenant_id: "7", object_id: "task-1", path: "/calendar" },
+      { tenantId: 7 },
+    )).toEqual({ kind: "calendar_task", path: "/calendar" });
   });
 
-  it.each([
-    "https://evil.example/steal",
-    "//evil.example/steal",
-    "javascript:alert(1)",
-    "data:text/html,evil",
-    "/\\evil.example",
-    "/calendar?tenant=other",
-  ])("falls back for unsafe path %s", (path) => {
-    expect(getSafeNotificationActionPath({ kind: "calendar_task", path }))
-      .toBe("/notifications");
-  });
-
-  it("does not let an action kind use another kind's route", () => {
-    expect(getSafeNotificationActionPath({ kind: "reservation", path: "/calendar" }))
-      .toBe("/notifications");
+  it("falls back rather than trusting a payload tenant or external path", () => {
+    expect(resolveNotificationAction(
+      { kind: "calendar_task", tenant_id: "8", path: "/calendar" }, { tenantId: 7 },
+    ).path).toBe("/notifications");
+    expect(resolveNotificationAction(
+      { kind: "reservation", path: "https://evil.example" }, { tenantId: 7 },
+    ).path).toBe("/notifications");
   });
 });

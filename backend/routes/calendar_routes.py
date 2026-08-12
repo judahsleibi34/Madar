@@ -566,7 +566,10 @@ def reservation_events_for_range(context, start: datetime, end: datetime) -> lis
             continue
         if event_start < end and event_end > start:
             events.append(event)
-    return events
+    return sorted(
+        events,
+        key=lambda event: (str(event.get("starts_at") or ""), str(event.get("source_id") or "")),
+    )
 
 
 def write_change(context, event_id: str, action: str, scope: str, before, after) -> None:
