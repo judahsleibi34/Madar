@@ -373,7 +373,7 @@ describe("page builder scaled canvas coordinates", () => {
     expect(result.width / result.height).toBe(2);
   });
 
-  it("caps image resizing at the builder image width limit", async () => {
+  it("lets an image grow to the canvas right edge instead of a fixed width limit", async () => {
     const { getDragCandidatePosition } = await import("./PageBuilder.layout");
     const result = getDragCandidatePosition({
       dragState: {
@@ -392,6 +392,28 @@ describe("page builder scaled canvas coordinates", () => {
       snapToGrid: (value) => value,
     });
 
-    expect(result).toMatchObject({ width: 960, height: 480 });
+    expect(result).toMatchObject({ width: 1400, height: 700 });
+  });
+
+  it("uses the image x position to calculate its remaining horizontal canvas space", async () => {
+    const { getDragCandidatePosition } = await import("./PageBuilder.layout");
+    const result = getDragCandidatePosition({
+      dragState: {
+        interaction: "resize",
+        startX: 260,
+        startY: 20,
+        startWidth: 400,
+        startHeight: 200,
+        deltaX: 1000,
+        deltaY: 0,
+      },
+      selectedElement: { type: "image", mediaAspectRatio: 2 },
+      canvasWidth: 1400,
+      canvasHeight: 800,
+      allowBottomOverflow: true,
+      snapToGrid: (value) => value,
+    });
+
+    expect(result).toMatchObject({ x: 260, width: 1140, height: 570 });
   });
 });

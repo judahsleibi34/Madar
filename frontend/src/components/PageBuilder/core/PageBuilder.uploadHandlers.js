@@ -33,15 +33,29 @@ export const serializePhotoProofingContent = (photos = []) =>
     ].filter(Boolean).join("\n"))
     .join("\n\n");
 
-export const fitMediaPositionsToAspectRatio = (positions = {}, aspectRatio = 0) => {
+export const fitMediaPositionsToAspectRatio = (
+  positions = {},
+  aspectRatio = 0,
+  canvasWidths = viewports
+) => {
   const ratio = Number(aspectRatio);
   if (!Number.isFinite(ratio) || ratio <= 0) return positions;
 
   return Object.fromEntries(Object.entries(positions || {}).map(([viewportName, position]) => {
-    const width = Number(position?.width) || 0;
-    if (!width) return [viewportName, position];
+    const requestedWidth = Number(position?.width) || 0;
+    if (!requestedWidth) return [viewportName, position];
+    const canvasWidth = Number(canvasWidths?.[viewportName]);
+    const width = Number.isFinite(canvasWidth) && canvasWidth > 0
+      ? Math.min(requestedWidth, canvasWidth)
+      : requestedWidth;
+    const requestedX = Number(position?.x) || 0;
+    const x = Number.isFinite(canvasWidth) && canvasWidth > 0
+      ? Math.max(0, Math.min(requestedX, canvasWidth - width))
+      : requestedX;
     return [viewportName, {
       ...position,
+      x,
+      width,
       height: Math.max(48, Math.round(width / ratio)),
     }];
   }));
@@ -344,3 +358,4 @@ export const createUploadHandlers = ({  selectedElement,
     uploadPhotoProofingFiles,
   };
 };
+import { viewports } from "./PageBuilder.constants";

@@ -19,6 +19,18 @@ describe("Page Builder image uploads", () => {
     });
   });
 
+  it("fits every loaded image inside that device's canvas without changing its ratio", () => {
+    expect(fitMediaPositionsToAspectRatio({
+      desktop: { x: 900, y: 20, width: 600, height: 100 },
+      tablet: { x: 600, y: 10, width: 500, height: 100 },
+      mobile: { x: 80, y: 5, width: 500, height: 100 },
+    }, 2)).toEqual({
+      desktop: { x: 600, y: 20, width: 600, height: 300 },
+      tablet: { x: 268, y: 10, width: 500, height: 250 },
+      mobile: { x: 0, y: 5, width: 390, height: 195 },
+    });
+  });
+
   it("keeps descriptions only on the Photo Proofing cover", () => {
     const serialized = serializePhotoProofingContent([
       { title: "Cover", description: "Cover description", image: "/cover.jpg" },

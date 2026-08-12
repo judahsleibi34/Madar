@@ -7,7 +7,7 @@ import {
   getDirectElementFrameStyle,
   getResponsiveDirectCanvasStyles,
 } from "./PageBuilder.styles";
-import { MAX_BUILDER_IMAGE_WIDTH_PX, viewports } from "./PageBuilder.constants";
+import { viewports } from "./PageBuilder.constants";
 import { createElement, createPosition } from "./PageBuilder.factories";
 import {
   directElementHeight,
@@ -117,7 +117,7 @@ describe("getBuilderElementStyle", () => {
     });
 
     expect(style["--image-scale"]).toBe("1.75");
-    expect(style.maxWidth).toBe(`min(100%, ${MAX_BUILDER_IMAGE_WIDTH_PX}px)`);
+    expect(style.maxWidth).toBe("100%");
   });
 });
 
@@ -267,8 +267,24 @@ describe("getBuilderFreeElementStyle", () => {
     });
 
     expect(style.zIndex).toBe(0);
-    expect(Number.parseFloat(style.width)).toBeLessThanOrEqual(MAX_BUILDER_IMAGE_WIDTH_PX);
-    expect(style.maxWidth).toBe(`${MAX_BUILDER_IMAGE_WIDTH_PX}px`);
+    expect(style.width).toBe("400px");
+    expect(style.maxWidth).toBe("1200px");
+  });
+
+  it("fits an oversized loaded image to the active device canvas without squashing it", () => {
+    const style = getDirectElementFrameStyle({
+      element: { id: "image-mobile", type: "image", mediaAspectRatio: 2 },
+      position: { x: 80, y: 20, width: 500, height: 500 },
+      viewportWidth: 390,
+      sectionHeight: 800,
+      getMetricMinimumHeight: () => 80,
+      getDirectElementMinimumSize: () => ({ width: 80, height: 48 }),
+    });
+
+    expect(style.width).toBe("390px");
+    expect(style.height).toBe("195px");
+    expect(style.transform).toBe("translate3d(0px, 20px, 0)");
+    expect(style.maxWidth).toBe("390px");
   });
 
   it("keeps normal direct elements above behind-text images", () => {

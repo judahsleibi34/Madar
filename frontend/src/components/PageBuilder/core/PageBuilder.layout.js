@@ -1,4 +1,4 @@
-import { MAX_BUILDER_IMAGE_WIDTH_PX, viewports } from "./PageBuilder.constants";
+import { viewports } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
 import { clampElementToBounds } from "./PageBuilder.bounds";
 import { withManualResponsiveOverride } from "./PageBuilder.responsiveCapabilities";
@@ -942,7 +942,6 @@ export const getDragCandidatePosition = ({
     ? Number.POSITIVE_INFINITY
     : Math.max(0, bounds.y + bounds.height - dragState.startY);
   const maximumImageWidth = Math.min(
-    MAX_BUILDER_IMAGE_WIDTH_PX,
     availableImageWidth,
     availableImageHeight * imageAspectRatio
   );
@@ -974,7 +973,6 @@ export const getDragCandidatePosition = ({
 
   return clampElementToBounds(candidate, bounds, {
     minWidth: minimumSize.width,
-    maxWidth: resizingImage ? MAX_BUILDER_IMAGE_WIDTH_PX : undefined,
     minHeight: minimumSize.height,
     mode: resizing ? "resize" : "move",
     allowBottomOverflow,

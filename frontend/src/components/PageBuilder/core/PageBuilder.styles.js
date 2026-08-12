@@ -1,5 +1,4 @@
 import { clampElementToBounds } from "./PageBuilder.bounds";
-import { MAX_BUILDER_IMAGE_WIDTH_PX } from "./PageBuilder.constants";
 
 export const getDirectCanvasScaleStyles = ({ logicalWidth, logicalHeight, scale = 1 }) => {
   const width = Math.max(1, Number(logicalWidth) || 1);
@@ -53,7 +52,6 @@ export const getBuilderElementStyle = ({
     getElementLayoutWidth(element.styles.width, element.styles.alignSelf) ||
     (carouselElementTypes.has(element.type) ? "100%" : undefined);
   const sourceStyles = element.styles || {};
-  const isBoundedImage = element.type === "image";
   const sourceTextColor = String(sourceStyles.color || "").trim();
   const resolvedElementColor = element.type === "text" && [
     "",
@@ -92,9 +90,7 @@ export const getBuilderElementStyle = ({
     ...(element.type === "text" ? { color: resolvedElementColor } : {}),
     width: layoutWidth,
     minHeight: sourceStyles.minHeight || undefined,
-    maxWidth: isBoundedImage
-      ? `min(100%, ${MAX_BUILDER_IMAGE_WIDTH_PX}px)`
-      : "100%",
+    maxWidth: "100%",
     alignSelf: normalizeElementAlignSelf(element.styles.alignSelf),
     ...placementMargins,
     zIndex: isSelected ? 5 : 1,
@@ -139,20 +135,27 @@ export const getDirectElementFrameStyle = ({
   canvasScale = 1,
 }) => {
   const minimumSize = getDirectElementMinimumSize(element);
+  const requestedPosition = {
+    ...(position || {}),
+    width: Number(position?.width) || 240,
+    height: Number(position?.height) || 80,
+  };
   let clamped = clampElementToBounds(
-    {
-      ...(position || {}),
-      width: Number(position?.width) || 240,
-      height: Number(position?.height) || 80,
-    },
+    requestedPosition,
     { x: 0, y: 0, width: viewportWidth, height: sectionHeight },
     {
       minWidth: minimumSize.width,
-      maxWidth: element.type === "image" ? MAX_BUILDER_IMAGE_WIDTH_PX : undefined,
       minHeight: minimumSize.height,
       allowBottomOverflow: true,
     }
   );
+  const imageAspectRatio = Number(element?.mediaAspectRatio);
+  if (element.type === "image" && Number.isFinite(imageAspectRatio) && imageAspectRatio > 0) {
+    clamped = {
+      ...clamped,
+      height: Math.max(minimumSize.height, Math.round(clamped.width / imageAspectRatio)),
+    };
+  }
   // Headings should use the space that is actually available in their row.
   // Older saved headings do not have directWidthMode, so they inherit the
   // improved auto-width behavior too. A resize interaction marks the heading
@@ -185,10 +188,7 @@ export const getDirectElementFrameStyle = ({
         : element.type === "reservationBlock"
           ? `${getDirectElementMinimumSize(element).height * canvasScale}px`
         : undefined,
-    maxWidth: `${Math.min(
-      Math.max(1, viewportWidth - x),
-      element.type === "image" ? MAX_BUILDER_IMAGE_WIDTH_PX : Number.POSITIVE_INFINITY
-    ) * canvasScale}px`,
+    maxWidth: `${Math.max(1, viewportWidth - x) * canvasScale}px`,
     transform: `translate3d(${x * canvasScale}px, ${y * canvasScale}px, 0)`,
     zIndex: element.layer === "behindText" ? 0 : 1,
   };

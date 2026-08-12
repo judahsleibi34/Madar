@@ -1,7 +1,6 @@
 export const STORAGE_KEY = "madar_app_builder_frontend_v4";
 export const MIN_BUILDER_TEXT_FONT_SIZE_PX = 8;
 export const MAX_BUILDER_TEXT_FONT_SIZE_PX = 256;
-export const MAX_BUILDER_IMAGE_WIDTH_PX = 960;
 
 export const parseBuilderTextFontSize = (value) => {
   const normalized = String(value ?? "").trim();
