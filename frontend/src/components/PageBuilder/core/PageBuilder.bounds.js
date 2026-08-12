@@ -24,6 +24,7 @@ export const clampElementToBounds = (
   bounds,
   {
     minWidth = 0,
+    maxWidth = Number.POSITIVE_INFINITY,
     minHeight = 0,
     mode = "move",
     allowBottomOverflow = false,
@@ -36,6 +37,10 @@ export const clampElementToBounds = (
   const boundRight = boundX + boundWidth;
   const boundBottom = boundY + boundHeight;
   const safeMinWidth = Math.min(nonNegative(minWidth), boundWidth);
+  const safeMaxWidth = Math.max(
+    safeMinWidth,
+    Math.min(nonNegative(maxWidth, boundWidth), boundWidth)
+  );
   const safeMinHeight = allowBottomOverflow
     ? nonNegative(minHeight)
     : Math.min(nonNegative(minHeight), boundHeight);
@@ -51,6 +56,7 @@ export const clampElementToBounds = (
     const availableHeight = Math.max(0, boundBottom - y);
     const width = Math.min(
       availableWidth,
+      safeMaxWidth,
       Math.max(Math.min(safeMinWidth, availableWidth), requestedWidth)
     );
     const height = allowBottomOverflow
@@ -69,7 +75,7 @@ export const clampElementToBounds = (
     };
   }
 
-  const width = Math.min(boundWidth, Math.max(safeMinWidth, requestedWidth));
+  const width = Math.min(safeMaxWidth, Math.max(safeMinWidth, requestedWidth));
   const height = allowBottomOverflow
     ? Math.max(safeMinHeight, requestedHeight)
     : Math.min(boundHeight, Math.max(safeMinHeight, requestedHeight));

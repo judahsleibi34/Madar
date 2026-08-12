@@ -1,4 +1,5 @@
 import { clampElementToBounds } from "./PageBuilder.bounds";
+import { MAX_BUILDER_IMAGE_WIDTH_PX } from "./PageBuilder.constants";
 
 export const getDirectCanvasScaleStyles = ({ logicalWidth, logicalHeight, scale = 1 }) => {
   const width = Math.max(1, Number(logicalWidth) || 1);
@@ -52,6 +53,15 @@ export const getBuilderElementStyle = ({
     getElementLayoutWidth(element.styles.width, element.styles.alignSelf) ||
     (carouselElementTypes.has(element.type) ? "100%" : undefined);
   const sourceStyles = element.styles || {};
+  const isBoundedImage = element.type === "image";
+  const sourceTextColor = String(sourceStyles.color || "").trim();
+  const resolvedElementColor = element.type === "text" && [
+    "",
+    "var(--theme-text)",
+    "var(--theme-text-soft)",
+  ].includes(sourceTextColor)
+    ? "#000000"
+    : sourceStyles.color || "inherit";
   const elementStyles =
     element.type === "formBlock"
       ? Object.fromEntries(
@@ -71,7 +81,7 @@ export const getBuilderElementStyle = ({
     ...elementStyles,
     "--builder-element-width": layoutWidth || "auto",
     "--builder-element-align": normalizeElementAlignSelf(element.styles.alignSelf) || "auto",
-    "--builder-element-color": element.type === "button" ? "inherit" : sourceStyles.color || "inherit",
+    "--builder-element-color": element.type === "button" ? "inherit" : resolvedElementColor,
     "--builder-element-bg": ["formBlock", "button"].includes(element.type) ? "transparent" : sourceStyles.backgroundColor || "transparent",
     "--builder-element-radius": element.type === "formBlock" ? "0" : sourceStyles.borderRadius || "0",
     "--builder-element-font-size": sourceStyles.fontSize || "inherit",
@@ -79,9 +89,12 @@ export const getBuilderElementStyle = ({
     "--builder-element-text-align": sourceStyles.textAlign || "inherit",
     position: "relative",
     transform: undefined,
+    ...(element.type === "text" ? { color: resolvedElementColor } : {}),
     width: layoutWidth,
     minHeight: sourceStyles.minHeight || undefined,
-    maxWidth: "100%",
+    maxWidth: isBoundedImage
+      ? `min(100%, ${MAX_BUILDER_IMAGE_WIDTH_PX}px)`
+      : "100%",
     alignSelf: normalizeElementAlignSelf(element.styles.alignSelf),
     ...placementMargins,
     zIndex: isSelected ? 5 : 1,
@@ -135,6 +148,7 @@ export const getDirectElementFrameStyle = ({
     { x: 0, y: 0, width: viewportWidth, height: sectionHeight },
     {
       minWidth: minimumSize.width,
+      maxWidth: element.type === "image" ? MAX_BUILDER_IMAGE_WIDTH_PX : undefined,
       minHeight: minimumSize.height,
       allowBottomOverflow: true,
     }
@@ -171,9 +185,11 @@ export const getDirectElementFrameStyle = ({
         : element.type === "reservationBlock"
           ? `${getDirectElementMinimumSize(element).height * canvasScale}px`
         : undefined,
-    maxWidth: `${Math.max(1, viewportWidth - x) * canvasScale}px`,
+    maxWidth: `${Math.min(
+      Math.max(1, viewportWidth - x),
+      element.type === "image" ? MAX_BUILDER_IMAGE_WIDTH_PX : Number.POSITIVE_INFINITY
+    ) * canvasScale}px`,
     transform: `translate3d(${x * canvasScale}px, ${y * canvasScale}px, 0)`,
     zIndex: element.layer === "behindText" ? 0 : 1,
   };
 };
-

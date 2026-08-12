@@ -47,6 +47,16 @@ describe("clampElementToBounds resizing", () => {
       })
     ).toMatchObject(expected);
   });
+
+  it("stops resizing at an explicit maximum width", () => {
+    expect(
+      clampElementToBounds(
+        { x: 20, y: 30, width: 280, height: 80 },
+        bounds,
+        { minWidth: 40, maxWidth: 180, mode: "resize" }
+      )
+    ).toMatchObject({ x: 20, width: 180 });
+  });
 });
 
 describe("clampElementToBounds downward canvas growth", () => {

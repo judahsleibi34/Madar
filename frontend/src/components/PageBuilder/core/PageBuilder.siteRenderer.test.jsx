@@ -123,11 +123,14 @@ describe("SiteRenderer artboard camera", () => {
     const section = view.container.querySelector(".site-section");
     const bleed = view.container.querySelector(".site-section-bleed-background");
     const frame = view.container.querySelector(".direct-layout-frame");
+    const artboard = view.container.querySelector(".site-renderer-artboard");
 
     expect(section.classList.contains("has-full-bleed")).toBe(true);
     expect(section.style.backgroundColor).toBe("transparent");
     expect(bleed.style.width).toBe("1920px");
     expect(frame.style.width).toBe("1200px");
+    expect(artboard.style.getPropertyValue("--site-bleed-logical-width")).toBe("1920px");
+    expect(artboard.style.getPropertyValue("--site-bleed-offset-x")).toBe("-360px");
   });
 
   it("changes only camera presentation for Editor Fit workspace widths", () => {

@@ -168,6 +168,7 @@ import {
   createInputTextSelection,
   getTextBlockFormats,
   getTextBlockIndexesForRange,
+  replaceRichTextRangeStyle,
 } from "../core/PageBuilder.text";
 import {
   singleAnswerQuizTypes,
@@ -4741,15 +4742,12 @@ export default function PageBuilder({
     }
 
     updateSelectedElement({
-      richTextSizes: [
-        ...(selectedElement.richTextSizes || []).filter((range) =>
-          range.field !== selectedRange.field ||
-          (range.itemIndex ?? null) !== selectedRange.itemIndex ||
-          range.end <= selectedRange.start ||
-          range.start >= selectedRange.end
-        ),
-        { ...selectedRange, fontSize },
-      ],
+      richTextSizes: replaceRichTextRangeStyle(
+        selectedElement.richTextSizes,
+        selectedRange,
+        "fontSize",
+        fontSize
+      ),
       styles: { selectedTextFontSize: fontSize },
     });
     window.getSelection()?.removeAllRanges();
@@ -4947,13 +4945,12 @@ export default function PageBuilder({
         const currentValue = getSelectedTextRangeStyle(property);
 
         updateSelectedElement({
-          richTextStyles: [
-            ...(selectedElement.richTextStyles || []),
-            {
-              ...selectedRange,
-              [property]: isActive(currentValue) ? inactiveValue : activeValue,
-            },
-          ],
+          richTextStyles: replaceRichTextRangeStyle(
+            selectedElement.richTextStyles,
+            selectedRange,
+            property,
+            isActive(currentValue) ? inactiveValue : activeValue
+          ),
         });
         window.getSelection()?.removeAllRanges();
         return true;
@@ -5154,14 +5151,19 @@ export default function PageBuilder({
           const selectedRangeTextDecoration = getSelectedTextRangeStyle("textDecoration");
           const isActive =
             (item.id === "bold" &&
-              (String(selectedRangeFontWeight || "").includes("700") ||
-                String(selectedRangeFontWeight || "").includes("bold") ||
-                String(selectedElement.styles?.fontWeight || "").includes("700") ||
-                String(selectedElement.styles?.fontWeight || "").includes("bold"))) ||
+              (selectedRangeFontWeight !== ""
+                ? String(selectedRangeFontWeight).includes("700") ||
+                  String(selectedRangeFontWeight).includes("bold")
+                : String(selectedElement.styles?.fontWeight || "").includes("700") ||
+                  String(selectedElement.styles?.fontWeight || "").includes("bold"))) ||
             (item.id === "italic" &&
-              (selectedRangeFontStyle === "italic" || selectedElement.styles?.fontStyle === "italic")) ||
+              (selectedRangeFontStyle !== ""
+                ? selectedRangeFontStyle === "italic"
+                : selectedElement.styles?.fontStyle === "italic")) ||
             (item.id === "underline" &&
-              (selectedRangeTextDecoration === "underline" || selectedElement.styles?.textDecoration === "underline")) ||
+              (selectedRangeTextDecoration !== ""
+                ? selectedRangeTextDecoration === "underline"
+                : selectedElement.styles?.textDecoration === "underline")) ||
             (item.id === "bullets" &&
               (activeTextFormat === "bullets" ||
                 (selectedElement.type === "list" && selectedElement.listStyle !== "decimal"))) ||

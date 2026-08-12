@@ -7,7 +7,7 @@ import {
   getDirectElementFrameStyle,
   getResponsiveDirectCanvasStyles,
 } from "./PageBuilder.styles";
-import { viewports } from "./PageBuilder.constants";
+import { MAX_BUILDER_IMAGE_WIDTH_PX, viewports } from "./PageBuilder.constants";
 import { createElement, createPosition } from "./PageBuilder.factories";
 import {
   directElementHeight,
@@ -56,6 +56,25 @@ describe("getResponsiveDirectCanvasStyles", () => {
 });
 
 describe("getBuilderElementStyle", () => {
+  it("renders normal text as black while preserving intentional custom colors", () => {
+    const getStyle = (color) => getBuilderElementStyle({
+      element: {
+        id: "text-1",
+        type: "text",
+        styles: { color },
+      },
+      selected: { type: "", id: "" },
+      carouselElementTypes: new Set(),
+      getElementPlacementMargins: () => ({}),
+      getElementLayoutWidth: () => undefined,
+      normalizeElementAlignSelf: () => undefined,
+    });
+
+    expect(getStyle("var(--theme-text)").color).toBe("#000000");
+    expect(getStyle("var(--theme-text-soft)")["--builder-element-color"]).toBe("#000000");
+    expect(getStyle("#b42318").color).toBe("#b42318");
+  });
+
   it("does not let legacy inline button colors override the website theme", () => {
     const style = getBuilderElementStyle({
       element: {
@@ -98,6 +117,7 @@ describe("getBuilderElementStyle", () => {
     });
 
     expect(style["--image-scale"]).toBe("1.75");
+    expect(style.maxWidth).toBe(`min(100%, ${MAX_BUILDER_IMAGE_WIDTH_PX}px)`);
   });
 });
 
@@ -247,6 +267,8 @@ describe("getBuilderFreeElementStyle", () => {
     });
 
     expect(style.zIndex).toBe(0);
+    expect(Number.parseFloat(style.width)).toBeLessThanOrEqual(MAX_BUILDER_IMAGE_WIDTH_PX);
+    expect(style.maxWidth).toBe(`${MAX_BUILDER_IMAGE_WIDTH_PX}px`);
   });
 
   it("keeps normal direct elements above behind-text images", () => {

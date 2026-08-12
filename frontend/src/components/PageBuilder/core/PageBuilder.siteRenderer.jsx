@@ -254,6 +254,8 @@ const SiteRenderer = forwardRef(function SiteRenderer({
     transformOrigin: "top left",
     "--site-presentation-zoom": zoom,
     "--site-logical-width": `${logicalWidth}px`,
+    "--site-bleed-logical-width": `${bleedLogicalWidth}px`,
+    "--site-bleed-offset-x": `${(logicalWidth - bleedLogicalWidth) / 2}px`,
   };
 
   return (

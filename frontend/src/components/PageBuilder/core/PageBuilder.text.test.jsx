@@ -8,10 +8,40 @@ import {
   getEditableTextWithLineBreaks,
   getTextBlockFormats,
   getTextBlockIndexesForRange,
+  replaceRichTextRangeStyle,
   renderRichText,
   renderRichTextBlocks,
   splitEditableLines,
 } from "./PageBuilder.text";
+
+describe("replaceRichTextRangeStyle", () => {
+  it("preserves the surrounding normal-text size when a selected word is resized", () => {
+    expect(replaceRichTextRangeStyle(
+      [{ field: "content", itemIndex: null, start: 0, end: 20, fontSize: "17px" }],
+      { field: "content", itemIndex: null, start: 6, end: 10 },
+      "fontSize",
+      "24px"
+    )).toEqual([
+      { field: "content", itemIndex: null, start: 0, end: 6, fontSize: "17px" },
+      { field: "content", itemIndex: null, start: 10, end: 20, fontSize: "17px" },
+      { field: "content", itemIndex: null, start: 6, end: 10, fontSize: "24px" },
+    ]);
+  });
+
+  it("replaces bold without removing another style on the same range", () => {
+    expect(replaceRichTextRangeStyle(
+      [{ field: "content", start: 0, end: 12, fontWeight: "700", fontStyle: "italic" }],
+      { field: "content", itemIndex: null, start: 3, end: 8 },
+      "fontWeight",
+      "400"
+    )).toEqual([
+      { field: "content", start: 0, end: 3, fontWeight: "700", fontStyle: "italic" },
+      { field: "content", start: 3, end: 8, fontStyle: "italic" },
+      { field: "content", start: 8, end: 12, fontWeight: "700", fontStyle: "italic" },
+      { field: "content", itemIndex: null, start: 3, end: 8, fontWeight: "400" },
+    ]);
+  });
+});
 
 afterEach(cleanup);
 

@@ -167,7 +167,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.text.content,
       styles: {
         ...base.styles,
-        color: "var(--theme-text)",
+        color: "#000000",
         fontSize: "17px",
         lineHeight: "1.7",
       },

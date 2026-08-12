@@ -21,6 +21,65 @@ export const getRichTextRanges = (element, field, itemIndex = null) =>
     ...(element?.richTextStyles || []),
   ].filter((range) => range.field === field && (range.itemIndex ?? null) === itemIndex);
 
+const richTextPresentationProperties = new Set([
+  "color",
+  "backgroundColor",
+  "fontSize",
+  "fontFamily",
+  "fontWeight",
+  "fontStyle",
+  "textDecoration",
+  "opacity",
+  "highlight",
+]);
+
+export const replaceRichTextRangeStyle = (
+  ranges = [],
+  targetRange,
+  property,
+  value
+) => {
+  if (!targetRange || !richTextPresentationProperties.has(property)) return ranges;
+
+  const targetStart = Number(targetRange.start) || 0;
+  const targetEnd = Number(targetRange.end) || 0;
+  if (targetEnd <= targetStart) return ranges;
+
+  const sameTarget = (range) =>
+    range.field === targetRange.field &&
+    (range.itemIndex ?? null) === (targetRange.itemIndex ?? null);
+  const hasPresentation = (range) =>
+    [...richTextPresentationProperties].some((key) => range[key] !== undefined);
+
+  const nextRanges = (ranges || []).flatMap((range) => {
+    const rangeStart = Number(range.start) || 0;
+    const rangeEnd = Number(range.end) || 0;
+    if (!sameTarget(range) || rangeEnd <= targetStart || rangeStart >= targetEnd) {
+      return [range];
+    }
+
+    const fragments = [];
+    if (rangeStart < targetStart) {
+      fragments.push({ ...range, end: targetStart });
+    }
+
+    const overlap = {
+      ...range,
+      start: Math.max(rangeStart, targetStart),
+      end: Math.min(rangeEnd, targetEnd),
+    };
+    delete overlap[property];
+    if (hasPresentation(overlap)) fragments.push(overlap);
+
+    if (rangeEnd > targetEnd) {
+      fragments.push({ ...range, start: targetEnd });
+    }
+    return fragments;
+  });
+
+  return [...nextRanges, { ...targetRange, [property]: value }];
+};
+
 export const collapseAccidentalTextDuplication = (value) => {
   const text = String(value ?? "");
   if (text.length < 48) return text;

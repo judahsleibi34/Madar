@@ -1,4 +1,4 @@
-import { viewports } from "./PageBuilder.constants";
+import { MAX_BUILDER_IMAGE_WIDTH_PX, viewports } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
 import { clampElementToBounds } from "./PageBuilder.bounds";
 import { withManualResponsiveOverride } from "./PageBuilder.responsiveCapabilities";
@@ -917,12 +917,53 @@ export const getDragCandidatePosition = ({
   const minimumSize = getDirectElementMinimumSize(selectedElement);
   const roundPixel = (value) => Math.round(Number(value) || 0);
   const resizing = dragState.interaction === "resize";
+  const resizingImage = resizing && selectedElement?.type === "image";
+  const storedImageAspectRatio = Number(selectedElement?.mediaAspectRatio);
+  const currentImageAspectRatio = Number(dragState.startWidth) / Number(dragState.startHeight);
+  const imageAspectRatio = storedImageAspectRatio > 0
+    ? storedImageAspectRatio
+    : currentImageAspectRatio > 0
+      ? currentImageAspectRatio
+      : 1;
+  const requestedWidth = roundPixel(dragState.startWidth + dragState.deltaX);
+  const requestedHeight = roundPixel(dragState.startHeight + dragState.deltaY);
+  const horizontalResizeChange = Math.abs(
+    (Number(dragState.deltaX) || 0) / Math.max(1, Number(dragState.startWidth) || 1)
+  );
+  const verticalResizeChange = Math.abs(
+    (Number(dragState.deltaY) || 0) / Math.max(1, Number(dragState.startHeight) || 1)
+  );
+  const resizeImageFromHeight = resizingImage && verticalResizeChange > horizontalResizeChange;
+  const unconstrainedImageWidth = resizeImageFromHeight
+    ? requestedHeight * imageAspectRatio
+    : requestedWidth;
+  const availableImageWidth = Math.max(0, bounds.x + bounds.width - dragState.startX);
+  const availableImageHeight = allowBottomOverflow
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, bounds.y + bounds.height - dragState.startY);
+  const maximumImageWidth = Math.min(
+    MAX_BUILDER_IMAGE_WIDTH_PX,
+    availableImageWidth,
+    availableImageHeight * imageAspectRatio
+  );
+  const minimumAspectLockedImageWidth = Math.min(
+    maximumImageWidth,
+    Math.max(minimumSize.width, minimumSize.height * imageAspectRatio)
+  );
+  const imageWidth = resizingImage
+    ? roundPixel(Math.max(
+        minimumAspectLockedImageWidth,
+        Math.min(unconstrainedImageWidth, maximumImageWidth)
+      ))
+    : requestedWidth;
   const candidate = resizing
     ? {
         x: dragState.startX,
         y: dragState.startY,
-        width: roundPixel(dragState.startWidth + dragState.deltaX),
-        height: roundPixel(dragState.startHeight + dragState.deltaY),
+        width: imageWidth,
+        height: resizingImage
+          ? roundPixel(imageWidth / imageAspectRatio)
+          : requestedHeight,
       }
     : {
         x: snapToGrid(dragState.startX + dragState.deltaX),
@@ -933,6 +974,7 @@ export const getDragCandidatePosition = ({
 
   return clampElementToBounds(candidate, bounds, {
     minWidth: minimumSize.width,
+    maxWidth: resizingImage ? MAX_BUILDER_IMAGE_WIDTH_PX : undefined,
     minHeight: minimumSize.height,
     mode: resizing ? "resize" : "move",
     allowBottomOverflow,

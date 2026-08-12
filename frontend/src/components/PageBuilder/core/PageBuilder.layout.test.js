@@ -327,4 +327,71 @@ describe("page builder scaled canvas coordinates", () => {
 
     expect(result).toMatchObject({ width: 400, height: 220 });
   });
+
+  it("resizes images from their width while preserving the media aspect ratio", async () => {
+    const { getDragCandidatePosition } = await import("./PageBuilder.layout");
+    const result = getDragCandidatePosition({
+      dragState: {
+        interaction: "resize",
+        startX: 20,
+        startY: 20,
+        startWidth: 400,
+        startHeight: 200,
+        deltaX: 200,
+        deltaY: 50,
+      },
+      selectedElement: { type: "image", mediaAspectRatio: 2 },
+      canvasWidth: 1200,
+      canvasHeight: 800,
+      allowBottomOverflow: true,
+      snapToGrid: (value) => value,
+    });
+
+    expect(result).toMatchObject({ width: 600, height: 300 });
+  });
+
+  it("resizes images from their height without stretching or compressing them", async () => {
+    const { getDragCandidatePosition } = await import("./PageBuilder.layout");
+    const result = getDragCandidatePosition({
+      dragState: {
+        interaction: "resize",
+        startX: 20,
+        startY: 20,
+        startWidth: 400,
+        startHeight: 200,
+        deltaX: 20,
+        deltaY: 100,
+      },
+      selectedElement: { type: "image", mediaAspectRatio: 2 },
+      canvasWidth: 1200,
+      canvasHeight: 800,
+      allowBottomOverflow: true,
+      snapToGrid: (value) => value,
+    });
+
+    expect(result).toMatchObject({ width: 600, height: 300 });
+    expect(result.width / result.height).toBe(2);
+  });
+
+  it("caps image resizing at the builder image width limit", async () => {
+    const { getDragCandidatePosition } = await import("./PageBuilder.layout");
+    const result = getDragCandidatePosition({
+      dragState: {
+        interaction: "resize",
+        startX: 0,
+        startY: 0,
+        startWidth: 400,
+        startHeight: 200,
+        deltaX: 1000,
+        deltaY: 0,
+      },
+      selectedElement: { type: "image", mediaAspectRatio: 2 },
+      canvasWidth: 1400,
+      canvasHeight: 800,
+      allowBottomOverflow: true,
+      snapToGrid: (value) => value,
+    });
+
+    expect(result).toMatchObject({ width: 960, height: 480 });
+  });
 });
