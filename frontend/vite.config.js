@@ -9,13 +9,16 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     build: {
+      // Safari 14 cannot parse some modern syntax shipped by dependencies such as Three.js.
+      // Transpile the complete production bundle, including vendor chunks, to that browser level.
+      target: "safari14",
       rolldownOptions: {
         output: {
           manualChunks(id) {
             if (id.includes("node_modules/three") || id.includes("node_modules\\three")) {
               return "vendor-three";
             }
-          }
+          },
         },
       },
     },
