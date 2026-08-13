@@ -40,6 +40,7 @@ vi.mock("../../pwa/installation", async (importOriginal) => ({
 
 import { getSettingsContent } from "../../content";
 import DeviceSettingsPanel from "./DeviceSettingsPanel";
+import { resetInstallPromptCaptureForTests } from "../../pwa/installPromptStore";
 
 const copy = getSettingsContent("en").devices;
 const current = {
@@ -77,6 +78,7 @@ function renderPanel(props = {}) {
 
 describe("DeviceSettingsPanel", () => {
   beforeEach(() => {
+    resetInstallPromptCaptureForTests();
     vi.clearAllMocks();
     listInstallations.mockResolvedValue([remote, current]);
     revokeInstallation.mockResolvedValue({ success: true });
@@ -149,6 +151,39 @@ describe("DeviceSettingsPanel", () => {
     expect(prompt).not.toHaveBeenCalled();
     fireEvent.click(installButton);
     await waitFor(() => expect(prompt).toHaveBeenCalledTimes(1));
+  });
+
+  it("retains a globally captured prompt until Devices is opened", async () => {
+    const prompt = vi.fn().mockResolvedValue(undefined);
+    const event = new Event("beforeinstallprompt");
+    Object.defineProperty(event, "prompt", { value: prompt });
+    Object.defineProperty(event, "userChoice", { value: Promise.resolve({ outcome: "dismissed" }) });
+    const { initializeInstallPromptCapture } = await import("../../pwa/installPromptStore");
+    initializeInstallPromptCapture(window);
+    fireEvent(window, event);
+
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Install Madar" }));
+    await waitFor(() => expect(prompt).toHaveBeenCalledTimes(1));
+  });
+
+  it("shows manual Chromium guidance when no deferred prompt is available", async () => {
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 Chrome/140.0" });
+    renderPanel();
+    expect(await screen.findByText(/install icon.*address bar or menu/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Install Madar" })).toBeNull();
+  });
+
+  it("clears the CTA when appinstalled is emitted", async () => {
+    renderPanel();
+    const event = new Event("beforeinstallprompt");
+    Object.defineProperty(event, "prompt", { value: vi.fn() });
+    Object.defineProperty(event, "userChoice", { value: Promise.resolve({ outcome: "accepted" }) });
+    fireEvent(window, event);
+    expect(await screen.findByRole("button", { name: "Install Madar" })).toBeTruthy();
+    fireEvent(window, new Event("appinstalled"));
+    expect(await screen.findByText(/running as an installed app/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Install Madar" })).toBeNull();
   });
 
   it("shows installed state in standalone mode and no install button", async () => {

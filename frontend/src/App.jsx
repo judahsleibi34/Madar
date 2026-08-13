@@ -26,6 +26,7 @@ import { clearAllCalendarWorkspaceCaches } from "./components/DashboardBuilder/u
 import { getInstallationId, registerInstallation } from "./pwa/installation";
 import { isMadarPwaHost } from "./pwa/pwaContext";
 import { getExistingMadarPushEndpoint } from "./pwa/serviceWorker";
+import { subscribeAppInstalled } from "./pwa/installPromptStore";
 import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
 import { NotificationProvider } from "./notifications/NotificationProvider";
 import NotificationToastViewport from "./notifications/NotificationToastViewport";
@@ -286,13 +287,13 @@ export default function App() {
         reconcile();
       }
     };
-    window.addEventListener("appinstalled", handleInstalled);
+    const unsubscribeInstalled = subscribeAppInstalled(handleInstalled);
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
     navigator.serviceWorker?.addEventListener?.("message", handleServiceWorkerMessage);
     return () => {
       cancelled = true;
-      window.removeEventListener("appinstalled", handleInstalled);
+      unsubscribeInstalled();
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
       navigator.serviceWorker?.removeEventListener?.("message", handleServiceWorkerMessage);

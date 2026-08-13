@@ -89,6 +89,7 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [installError, setInstallError] = useState("");
   const [pushConfig, setPushConfig] = useState(null);
   const installationId = useMemo(() => getInstallationId(), []);
   const localContext = useMemo(() => getInstallationContext(), []);
@@ -118,6 +119,15 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
     await loadDevices();
   }, [loadDevices, tenantId]);
   const install = useInstallPrompt({ onInstalled: handleInstalled });
+
+  const promptInstall = async () => {
+    setInstallError("");
+    const result = await install.promptInstall();
+    if (result.outcome === "error") {
+      setInstallError(copy.installError);
+      showNotification?.("error", copy.installError);
+    }
+  };
 
   useEffect(() => {
     if (!install.supportedHost) return undefined;
@@ -227,19 +237,27 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
         <div className="device-settings-icon" aria-hidden="true"><Download size={22} /></div>
         <div>
           <h2 id="install-madar-title">{copy.installMadar}</h2>
-          {install.isStandalone ? (
+          {install.installState === "installed" ? (
             <p>{copy.alreadyInstalled}</p>
-          ) : install.isIOS ? (
+          ) : install.installState === "ios_manual" ? (
             <p>{copy.iosInstallGuidance}</p>
-          ) : install.canPrompt ? (
+          ) : install.installState === "prompt_available" ? (
             <p>{copy.installDescription}</p>
+          ) : install.installState === "manual_install_available" ? (
+            <p>{copy.browserInstallGuidance}</p>
           ) : (
             <p>{copy.installUnavailable}</p>
           )}
+          {installError ? <small role="alert">{installError}</small> : null}
         </div>
         {install.canPrompt && (
-          <button type="button" className="settings-save-button" onClick={() => install.promptInstall()}>
-            <Download size={16} /> {copy.installMadar}
+          <button
+            type="button"
+            className="settings-save-button"
+            disabled={install.isPrompting}
+            onClick={promptInstall}
+          >
+            <Download size={16} /> {install.isPrompting ? copy.installing : copy.installMadar}
           </button>
         )}
       </section>
