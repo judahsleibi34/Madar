@@ -5,8 +5,9 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from data_analysis import services as data_services
-from data_analysis.routes.data_routes import get_storage_scope
+from data_analysis.routes.data_routes import get_storage_scope as _get_storage_scope
 from services.rate_limit_service import enforce_data_workspace_rate_limit
+from services.entitlement_service import require_entitlement
 
 
 router = APIRouter(
@@ -14,6 +15,12 @@ router = APIRouter(
     tags=["Cleaning"],
 )
 logger = logging.getLogger(__name__)
+
+
+def get_storage_scope(request: Request, response: Response, user_id: int):
+    tenant_id, scoped_user_id = _get_storage_scope(request, response, user_id)
+    require_entitlement(tenant_id, "data_cleaning")
+    return tenant_id, scoped_user_id
 
 
 class InputPathRequest(BaseModel):
@@ -168,3 +175,28 @@ def apply_cleaning(user_id: int, request: CleaningApplyRequest, fastapi_request:
     except Exception as error:
         logger.warning("data.cleaning.apply_failed", extra={"user_id": user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=400, detail="Could not apply cleaning actions.")
+
+
+@router.post("/export")
+def export_cleaned_dataframe(user_id: int, request: CleaningApplyRequest, fastapi_request: Request, response: Response):
+    try:
+        tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "cleaning_export",
+            tenant_id=tenant_id,
+        )
+        return data_services.export_cleaned_dataframe(
+            request.input_path,
+            request.actions,
+            tenant_id=tenant_id,
+            user_id=scoped_user_id,
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        logger.warning("data.cleaning.export_failed", extra={"user_id": user_id, "error_type": type(error).__name__})
+        raise HTTPException(status_code=400, detail="Could not export cleaned data.")

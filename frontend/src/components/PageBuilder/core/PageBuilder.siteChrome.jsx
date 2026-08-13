@@ -1,14 +1,40 @@
+import {
+  Mail,
+  Phone,
+} from "lucide-react";
 import { resolveMediaUrl } from "../../../utils/media";
 import { defaultSiteChrome } from "./PageBuilder.constants";
 import { splitLines } from "./PageBuilder.text";
+import {
+  getFooterLinkItems,
+  getSafeFooterLinkUrl,
+  isExternalFooterLink,
+} from "./PageBuilder.footerLinks";
+import {
+  findPageByNavigationReference,
+  getNavigablePages,
+  getPageNavigationLabel,
+} from "./PageBuilder.navigation";
 
-const MADAR_ATTRIBUTION_URL = "https://madar.app/";
+const MADAR_ATTRIBUTION_URL = "https://madarportal.com/";
+
+const getFooterSocialMark = (label = "") => {
+  const value = String(label).toLowerCase();
+  if (value.includes("instagram")) return "IG";
+  if (value.includes("linkedin")) return "in";
+  if (value.includes("youtube")) return "▶";
+  if (value.includes("facebook")) return "f";
+  if (value.includes("tiktok")) return "TT";
+  if (value === "x" || value.includes("twitter")) return "X";
+  return "@";
+};
 
 export const createSiteChromeRenderers = ({
   project,
   activePage,
   selected,
   preview,
+  publicRuntime = false,
   selectPage,
   setSelected,
 }) => {
@@ -16,18 +42,29 @@ export const createSiteChromeRenderers = ({
     const site = project.siteChrome || defaultSiteChrome;
     if (!site.showHeader) return null;
 
+    const headerBackgroundColor = /^#[0-9a-f]{6}$/i.test(String(site.headerBackgroundColor || ""))
+      ? site.headerBackgroundColor
+      : "";
     const logoSrc = resolveMediaUrl(site.logoUrl);
+    const brandLabel = String(site.brand ?? "").trim();
+    const headerButtonLabel = String(site.headerButtonLabel ?? "").trim();
+    const headerActionPage = headerButtonLabel
+      ? findPageByNavigationReference(
+          project.pages,
+          site.headerButtonPageId || site.headerButtonHref || headerButtonLabel
+        )
+      : null;
+    const navigablePages = getNavigablePages(project.pages, {
+      excludePageIds: [headerActionPage?.id],
+    });
+    const closeMobileMenu = (event) => {
+      event.currentTarget.closest("details")?.removeAttribute("open");
+    };
     const navigateHeaderButton = (event) => {
       event.stopPropagation();
 
       const targetValue = String(site.headerButtonPageId || site.headerButtonHref || site.headerButtonLabel || "").trim();
-      const normalizedTarget = targetValue.toLowerCase().replace(/^\//, "").trim();
-      const targetPage = project.pages.find((page) => {
-        const normalizedId = String(page.id || "").toLowerCase();
-        const normalizedName = String(page.name || "").toLowerCase().trim();
-        const normalizedSlug = String(page.slug || "").toLowerCase().replace(/^\//, "").trim();
-        return normalizedId === normalizedTarget || normalizedName === normalizedTarget || normalizedSlug === normalizedTarget;
-      });
+      const targetPage = findPageByNavigationReference(project.pages, targetValue);
 
       if (targetPage) selectPage(targetPage.id);
     };
@@ -35,6 +72,7 @@ export const createSiteChromeRenderers = ({
     return (
       <header
         className={`built-site-header header-align-${site.headerAlign || "center"} ${selected.type === "siteHeader" ? "is-selected" : ""}`}
+        style={headerBackgroundColor ? { backgroundColor: headerBackgroundColor } : undefined}
         onClick={(event) => {
           event.stopPropagation();
           if (!preview) setSelected({ type: "siteHeader", id: "site-header" });
@@ -50,12 +88,12 @@ export const createSiteChromeRenderers = ({
               if (homePage) selectPage(homePage.id);
             }}
           >
-            {logoSrc ? <img src={logoSrc} alt={`${site.brand || "Website"} logo`} /> : <span className="logo-fallback">M</span>}
-            <span>{site.brand || "Website"}</span>
+            {logoSrc ? <img src={logoSrc} alt={`${brandLabel || "Website"} logo`} /> : brandLabel ? <span className="logo-fallback">{brandLabel.slice(0, 1).toUpperCase()}</span> : null}
+            {brandLabel && <span>{brandLabel}</span>}
           </button>
 
           <nav className="built-site-nav">
-            {project.pages.map((page) => (
+            {navigablePages.map((page) => (
               <button
                 type="button"
                 key={page.id}
@@ -65,14 +103,54 @@ export const createSiteChromeRenderers = ({
                   selectPage(page.id);
                 }}
               >
-                {page.name}
+                {getPageNavigationLabel(page)}
               </button>
             ))}
           </nav>
 
-          <button type="button" className="built-site-cta" onClick={navigateHeaderButton}>
-            {site.headerButtonLabel || "Contact"}
-          </button>
+          {headerButtonLabel && (
+            <button type="button" className="built-site-cta" onClick={navigateHeaderButton}>
+              {headerButtonLabel}
+            </button>
+          )}
+
+          {publicRuntime && (
+            <details className="built-site-mobile-menu">
+              <summary aria-label="Open navigation menu">
+                <span aria-hidden="true" />
+                <span aria-hidden="true" />
+                <span aria-hidden="true" />
+              </summary>
+              <div className="built-site-mobile-menu-panel">
+                {navigablePages.map((page) => (
+                  <button
+                    type="button"
+                    key={page.id}
+                    className={activePage?.id === page.id ? "active" : ""}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closeMobileMenu(event);
+                      selectPage(page.id);
+                    }}
+                  >
+                    {getPageNavigationLabel(page)}
+                  </button>
+                ))}
+                {headerButtonLabel && (
+                  <button
+                    type="button"
+                    className="built-site-mobile-menu-cta"
+                    onClick={(event) => {
+                      closeMobileMenu(event);
+                      navigateHeaderButton(event);
+                    }}
+                  >
+                    {headerButtonLabel}
+                  </button>
+                )}
+              </div>
+            </details>
+          )}
         </div>
       </header>
     );
@@ -83,10 +161,19 @@ export const createSiteChromeRenderers = ({
     if (!site.showFooter) return null;
 
     const pageLinks = splitLines(site.footerShopLinks || "");
-    const helpLinks = splitLines(site.footerHelpLinks || "About Us\nPolicies\nContact");
-    const socialLinks = splitLines(site.footerSocialLinks || "Facebook\nLinkedIn\nX\nInstagram");
-    const paymentMethods = splitLines(site.footerPaymentMethods || "");
-    const footerBrand = site.footerStoreName || site.brand || "Your Brand";
+    const helpLinks = splitLines(site.footerHelpLinks || "");
+    const socialLinks = getFooterLinkItems(
+      site.footerSocialItems,
+      site.footerSocialLinks || ""
+    );
+    const paymentMethods = getFooterLinkItems(
+      site.footerPaymentItems,
+      site.footerPaymentMethods || ""
+    );
+    const footerBrand = String(site.footerStoreName ?? "").trim();
+    const contactEmail = String(site.contactEmail ?? "").trim();
+    const contactPhone = String(site.phone ?? "").trim();
+    const footerRights = String(site.rights ?? "").trim();
     const footerInitial = footerBrand.trim().slice(0, 1).toUpperCase() || "B";
     const resolveFooterPageLink = (value) => {
       const normalizedValue = String(value || "").toLowerCase().replace(/^\//, "").trim();
@@ -102,6 +189,13 @@ export const createSiteChromeRenderers = ({
         );
       });
     };
+    const isVisibleFooterItem = (value) => {
+      const normalizedValue = String(value || "").trim();
+      return !/^page_[a-z0-9-]{8,}$/i.test(normalizedValue) || Boolean(resolveFooterPageLink(normalizedValue));
+    };
+    const visiblePageLinks = pageLinks.filter(isVisibleFooterItem);
+    const visibleHelpLinks = helpLinks.filter(isVisibleFooterItem);
+    const visibleQuickLinks = Array.from(new Set([...visiblePageLinks, ...visibleHelpLinks]));
     const navigateFooterLink = (label) => {
       const target = resolveFooterPageLink(label);
 
@@ -124,53 +218,87 @@ export const createSiteChromeRenderers = ({
             <div className="ecommerce-footer-logo-row">
               {resolveMediaUrl(site.logoUrl) ? (
                 <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={`${footerBrand} logo`} />
-              ) : (
+              ) : footerBrand ? (
                 <div className="ecommerce-footer-logo footer-logo-fallback">{footerInitial}</div>
-              )}
-              <h3>{footerBrand}</h3>
+              ) : null}
+              {footerBrand && <h3>{footerBrand}</h3>}
             </div>
 
             <p>{site.description}</p>
 
             <div className="ecommerce-social-row">
-              {socialLinks.map((item) => (
-                <button type="button" key={item} aria-label={item}>
-                  {item.slice(0, 2).toUpperCase()}
-                </button>
-              ))}
+              {socialLinks.map((item) => {
+                const href = getSafeFooterLinkUrl(item.url, item.label);
+                const socialMark = getFooterSocialMark(item.label);
+                return href ? (
+                  <a
+                    href={href}
+                    key={`${item.label}-${href}`}
+                    aria-label={item.label}
+                    target={isExternalFooterLink(href) ? "_blank" : undefined}
+                    rel={isExternalFooterLink(href) ? "noopener noreferrer" : undefined}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (!preview) event.preventDefault();
+                    }}
+                  >
+                    <span className="ecommerce-social-mark" aria-hidden="true">{socialMark}</span>
+                  </a>
+                ) : (
+                  <span key={item.label} aria-label={item.label}><span className="ecommerce-social-mark" aria-hidden="true">{socialMark}</span></span>
+                );
+              })}
             </div>
 
           </div>
 
-          <div className="ecommerce-footer-column ecommerce-footer-links-column">
-            <h4>{site.footerShopTitle || "Pages"}</h4>
+          <div className="ecommerce-footer-column ecommerce-footer-quick-links">
+            <h4>Quick Links</h4>
             <div className="ecommerce-footer-links-grid">
-              {pageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
-            </div>
-            <h4>{site.footerHelpTitle || "Help"}</h4>
-            <div className="ecommerce-footer-links-grid">
-              {helpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{item}</button>)}
+              {visibleQuickLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
             </div>
           </div>
 
           <div className="ecommerce-footer-contact">
-            <h4>Contact</h4>
-            <div className="footer-language-pill">
-              <span>|</span>
-              <strong>{site.footerLanguageLabel || "AR"}</strong>
-            </div>
-            <p>{site.contactEmail || "info@madar.com"}</p>
-            <p dir="ltr">{site.phone || "+972599203857"}</p>
+            <h4>Contact Info</h4>
+            {contactEmail && (
+              <a className="ecommerce-contact-row" href={`mailto:${contactEmail}`} onClick={(event) => event.stopPropagation()}>
+                <Mail size={19} aria-hidden="true" />
+                <span>{contactEmail}</span>
+              </a>
+            )}
+            {contactPhone && (
+              <a className="ecommerce-contact-row" href={`tel:${contactPhone.replace(/\s+/g, "")}`} dir="ltr" onClick={(event) => event.stopPropagation()}>
+                <Phone size={19} aria-hidden="true" />
+                <span>{contactPhone}</span>
+              </a>
+            )}
             {paymentMethods.length > 0 && (
               <div className="ecommerce-payment-row">
-                {paymentMethods.map((item) => <span key={item}>{item}</span>)}
+                {paymentMethods.map((item) => {
+                  const href = getSafeFooterLinkUrl(item.url, item.label);
+                  return href ? (
+                    <a
+                      href={href}
+                      key={`${item.label}-${href}`}
+                      target={isExternalFooterLink(href) ? "_blank" : undefined}
+                      rel={isExternalFooterLink(href) ? "noopener noreferrer" : undefined}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!preview) event.preventDefault();
+                      }}
+                    >
+                      {item.label}
+                    </a>
+                  ) : <span key={item.label}>{item.label}</span>;
+                })}
               </div>
             )}
           </div>
         </div>
 
         <div className="ecommerce-footer-bottom">
-          <p>(c) 2026 {site.footerStoreName || site.brand || "Your Website"}. {site.rights || "All rights reserved."}</p>
+          <p>© 2026{footerBrand ? ` ${footerBrand}.` : ""}{footerRights ? ` ${footerRights}` : ""}</p>
           <button type="button" className="powered-by-madar">Powered by Madar</button>
         </div>
       </footer>

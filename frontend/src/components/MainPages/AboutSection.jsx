@@ -1,43 +1,42 @@
 import { Database, FileText, ShieldCheck, Workflow } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import FadeIn from "../Animations/FadeIn";
-import { getAboutContent } from "../../content";
 import { SectionBlock } from "../../blocks";
 
 const aboutIcons = [FileText, Workflow, Database];
 
 export default function AboutSection({ lang }) {
-  const t = getAboutContent(lang);
+  const { t } = useTranslation("public");
+  const content = t("about", { returnObjects: true });
+  const isRTL = lang === "ar";
 
   return (
-    <SectionBlock id="about" className="about-section">
+    <SectionBlock id="about" className="about-section" dir={isRTL ? "rtl" : "ltr"}>
       <FadeIn delay={0}>
         <div className="about-hero">
           <div className="about-hero-copy">
-            <span className="about-eyebrow">{t.hero.eyebrow}</span>
+            <span className="about-eyebrow">{content.hero.eyebrow}</span>
             <h1>
-              {t.hero.titlePrefix} <span>{t.hero.titleHighlight}</span>
+              {content.hero.titlePrefix} <span>{content.hero.titleHighlight}</span>
             </h1>
             <p>
-              <strong>{t.hero.name}</strong> {t.hero.description}
+              <strong>{content.hero.name}</strong> {content.hero.description}
             </p>
-            <p>{t.hero.secondDescription}</p>
+            <p>{content.hero.secondDescription}</p>
           </div>
 
-          <div className="about-hero-panel" aria-label="Madar digitalization focus">
+          <div className="about-hero-panel" aria-label={content.panel.ariaLabel}>
             <div className="about-panel-icon">
               <ShieldCheck size={26} />
             </div>
-            <h2>Digital operations, without the clutter</h2>
-            <p>
-              Replace scattered paperwork with structured pages, forms, records,
-              and workflows your team can actually use every day.
-            </p>
+            <h2>{content.panel.title}</h2>
+            <p>{content.panel.description}</p>
           </div>
         </div>
       </FadeIn>
 
-      <div className="about-metrics" aria-label="Madar platform strengths">
-        {t.metrics.map((metric, index) => {
+      <div className="about-metrics" aria-label={content.metricsAriaLabel}>
+        {content.metrics.map((metric, index) => {
           const Icon = aboutIcons[index] || FileText;
 
           return (
@@ -53,7 +52,7 @@ export default function AboutSection({ lang }) {
       </div>
 
       <div className="about-grid">
-        {t.sections.map((section, index) => (
+        {content.sections.map((section, index) => (
           <FadeIn delay={0.25 + index * 0.08} key={section.title}>
             <article className="about-card">
               <span>{String(index + 1).padStart(2, "0")}</span>
@@ -65,7 +64,7 @@ export default function AboutSection({ lang }) {
       </div>
 
       <FadeIn delay={0.55}>
-        <p className="about-closing">{t.closing}</p>
+        <p className="about-closing">{content.closing}</p>
       </FadeIn>
     </SectionBlock>
   );

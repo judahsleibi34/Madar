@@ -5,21 +5,36 @@ import RouteSuspense from "../components/common/RouteSuspense";
 import MainLayout from "../components/MainPages/MainLayout";
 
 const loadHomePage = () => import("../components/MainPages/HeroSection");
-const loadProductTourPage = () => import("../components/MainPages/FeaturesPage");
 const loadBasePlansPage = () => import("../components/MainPages/BasePlansPage");
 
 const HomePage = lazy(loadHomePage);
-const ProductTourPage = lazy(loadProductTourPage);
 const BasePlansPage = lazy(loadBasePlansPage);
 const TeamPage = lazy(() => import("../components/MainPages/TeamPage"));
 const AboutSection = lazy(() => import("../components/MainPages/AboutSection"));
 const ContactPage = lazy(() => import("../components/MainPages/ContactPage"));
+const PrivacyPolicyPage = lazy(() => import("../components/MainPages/PrivacyPolicyPage"));
+const TermsAndConditionsPage = lazy(() => import("../components/MainPages/TermsAndConditionsPage"));
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
+
+const AboutTeamPage = ({ lang }) => (
+  <>
+    <AboutSection key={`about-${lang}`} lang={lang} />
+    <TeamPage key={`team-${lang}`} lang={lang} />
+  </>
+);
+
+const PrivacyAndTermsPage = ({ lang }) => (
+  <>
+    <PrivacyPolicyPage key={`privacy-policy-${lang}`} lang={lang} />
+    <TermsAndConditionsPage key={`terms-and-conditions-${lang}`} lang={lang} />
+  </>
+);
 
 const LoginPage = lazy(() => import("../components/AuthPages/LoginPage"));
 const SignUpPage = lazy(() => import("../components/AuthPages/SignUpPage"));
 const ForgotPasswordPage = lazy(() => import("../components/AuthPages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../components/AuthPages/ResetPasswordPage"));
+const EmailVerificationPage = lazy(() => import("../components/AuthPages/EmailVerificationPage"));
 
 const canPrefetchRoutes = () => {
   if (typeof navigator === "undefined") return true;
@@ -45,7 +60,8 @@ export default function PublicRoutes({
     location.pathname.startsWith("/login") ||
     location.pathname.startsWith("/signup") ||
     location.pathname.startsWith("/forgot-password") ||
-    location.pathname.startsWith("/reset-password");
+    location.pathname.startsWith("/reset-password") ||
+    location.pathname.startsWith("/verify-email");
   const isDemoPath = location.pathname.startsWith("/demo");
   const skeletonVariant = isAuthPath ? "auth" : isDemoPath ? "public-page" : "public-page";
 
@@ -53,7 +69,6 @@ export default function PublicRoutes({
     if (location.pathname !== "/" || !canPrefetchRoutes()) return undefined;
 
     const prefetchLikelyPublicRoutes = () => {
-      loadProductTourPage();
       loadBasePlansPage();
     };
 
@@ -92,11 +107,6 @@ export default function PublicRoutes({
           <Route index element={<HomePage key={`home-${lang}`} lang={lang} />} />
 
         <Route
-          path="product-tour"
-          element={<ProductTourPage key={`product-tour-${lang}`} lang={lang} />}
-        />
-
-        <Route
           path="demo"
           element={
             <main className="builder-demo-main">
@@ -129,17 +139,27 @@ export default function PublicRoutes({
 
         <Route
           path="team"
-          element={<TeamPage key={`team-${lang}`} lang={lang} />}
+          element={<Navigate to="/about#team" replace />}
         />
 
         <Route
           path="about"
-          element={<AboutSection key={`about-${lang}`} lang={lang} />}
+          element={<AboutTeamPage key={`about-team-${lang}`} lang={lang} />}
         />
 
           <Route
             path="contact"
             element={<ContactPage key={`contact-${lang}`} lang={lang} />}
+          />
+
+          <Route
+            path="privacy-policy"
+            element={<PrivacyAndTermsPage key={`privacy-terms-${lang}`} lang={lang} />}
+          />
+
+          <Route
+            path="terms-and-conditions"
+            element={<Navigate to="/privacy-policy#terms" replace />}
           />
 
           <Route
@@ -159,23 +179,30 @@ export default function PublicRoutes({
 
           <Route
             path="signup"
-            element={<SignUpPage key={`signup-${lang}`} lang={lang} />}
+            element={<SignUpPage key={`signup-${lang}`} lang={lang} mode="tenant" />}
+          />
+
+          <Route
+            path="forgot-password"
+            element={
+              <ForgotPasswordPage key={`forgot-password-${lang}`} lang={lang} />
+            }
+          />
+
+          <Route
+            path="reset-password"
+            element={
+              <ResetPasswordPage key={`reset-password-${lang}`} lang={lang} />
+            }
+          />
+
+          <Route
+            path="verify-email"
+            element={
+              <EmailVerificationPage key={`verify-email-${lang}`} lang={lang} />
+            }
           />
         </Route>
-
-      <Route
-        path="forgot-password"
-        element={
-          <ForgotPasswordPage key={`forgot-password-${lang}`} lang={lang} />
-        }
-      />
-
-      <Route
-        path="reset-password"
-        element={
-          <ResetPasswordPage key={`reset-password-${lang}`} lang={lang} />
-        }
-      />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

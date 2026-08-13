@@ -10,11 +10,11 @@
 @import "./core/tokens.css";
 @import "./variables.css";
 @import "./core/base.css";
+@import "./core/theme-contract.css";
 
 @import "./public layout/header.css";
 @import "./public pages/home.css";
 @import "./public pages/contact.css";
-@import "./public pages/features.css";
 @import "./public layout/footer.css";
 
 @import "./utils/rtl.css";
@@ -34,8 +34,16 @@
 @import "./admin/dashboard/index.css";
 @import "./admin/MyPlanPage.css";
 @import "./admin/PageBuilder/index.css";
+@import "/src/styles/admin/PageBuilder/project-chooser.css";
 @import "./theme-refinement.css";
 @import "./route-refinement.css";
+@import "/src/styles/dark-compact-summaries.css";
+@import "/src/styles/settings-item-flattening.css";
+@import "/src/styles/preview-theme-isolation.css";
+@import "/src/styles/theme-transition.css";
+/* Canonical Page Builder geometry must follow legacy route refinements. */
+@import "./admin/PageBuilder/workspace-stability.css";
+@import "/src/styles/admin/PageBuilder/footer-responsive.css";
 
 /* ============================================================
    TEMP: Builder demo route styles
@@ -132,7 +140,7 @@
   flex-wrap: wrap;
 }
 
-.tenant-site-nav button {
+.tenant-site-nav :is(button, a) {
   border: 0;
   border-radius: 999px;
   padding: 9px 14px;
@@ -140,10 +148,11 @@
   color: var(--theme-text-soft);
   font-weight: 900;
   cursor: pointer;
+  text-decoration: none;
 }
 
-.tenant-site-nav button:hover,
-.tenant-site-nav button.active {
+.tenant-site-nav :is(button, a):hover,
+.tenant-site-nav :is(button, a).active {
   background: var(--theme-surface-2);
   color: var(--theme-text);
 }
@@ -158,6 +167,7 @@
   background: var(--theme-gradient);
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18);
   font-weight: 950;
+  text-decoration: none;
 }
 
 .tenant-login-runtime {
@@ -313,9 +323,13 @@
   justify-content: center;
 }
 
-.tenant-social-row button {
+.tenant-social-row button,
+.tenant-social-row a,
+.tenant-social-row > span {
   width: 36px;
   height: 36px;
+  display: grid;
+  place-items: center;
   border-radius: 999px;
   border: 1px solid var(--theme-border);
   color: var(--theme-text);
@@ -323,6 +337,26 @@
   font-size: 11px;
   font-weight: 900;
   cursor: pointer;
+  text-decoration: none;
+}
+
+.tenant-payment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tenant-payment-row a,
+.tenant-payment-row span {
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .tenant-footer-column h4,
@@ -339,7 +373,7 @@
   gap: 8px;
 }
 
-.tenant-footer-links-grid button {
+.tenant-footer-links-grid :is(button, a) {
   justify-self: start;
   border: 0;
   background: transparent;
@@ -348,9 +382,10 @@
   padding: 0;
   font-weight: 800;
   text-align: left;
+  text-decoration: none;
 }
 
-.tenant-footer-links-grid button:hover {
+.tenant-footer-links-grid :is(button, a):hover {
   color: var(--theme-primary);
 }
 
@@ -397,15 +432,16 @@
   margin: 0;
 }
 
-.tenant-footer-bottom button {
+.tenant-footer-bottom :is(button, a) {
   border: 0;
   background: transparent;
   color: var(--theme-surface);
   font-weight: 900;
   cursor: pointer;
+  text-decoration: none;
 }
 
-.tenant-footer-bottom button:hover {
+.tenant-footer-bottom :is(button, a):hover {
   color: var(--theme-primary);
 }
 

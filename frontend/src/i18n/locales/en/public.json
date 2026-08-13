@@ -1,7 +1,6 @@
 {
   "nav": {
     "home": "Home",
-    "features": "Product Tour",
     "pricing": "Plans and Pricing",
     "team": "Madar Team",
     "about": "About Us",
@@ -10,9 +9,106 @@
     "login": "Log In",
     "signup": "Sign Up",
     "logout": "Logout",
-    "privacy": "Privacy Policy"
+    "privacy": "Privacy Policy",
+    "terms": "Terms and Conditions"
   },
-  "hero": { "titleRich": "Digitize Your Business with <brand>Confidence.</brand>", "name": "Madar", "description": "helps organizations replace manual paperwork with reliable digital workflows that save time, reduce operational errors, and give teams better control over every process."
+  "hero": {
+    "titleRich": "Digitize Your Business with <brand>Confidence.</brand>",
+    "name": "Madar",
+    "description": "helps organizations replace manual paperwork with reliable digital workflows that save time, reduce operational errors, and give teams better control over every process."
+  },
+  "about": {
+    "hero": {
+      "eyebrow": "About Madar",
+      "titlePrefix": "About",
+      "titleHighlight": "Madar",
+      "name": "Madar",
+      "description": "helps organizations replace paper forms, scattered files, and manual follow-ups with clear digital workflows that teams can manage from one place.",
+      "secondDescription": "It is built for teams that want to modernize daily operations without losing the way they already work. Madar turns requests, approvals, records, users, and internal processes into organized digital systems that are easier to track, update, and grow."
+    },
+    "panel": {
+      "ariaLabel": "Madar digitalization focus",
+      "title": "Digital operations, without the clutter",
+      "description": "Replace scattered paperwork with structured pages, forms, records, and workflows your team can actually use every day."
+    },
+    "metricsAriaLabel": "Madar platform strengths",
+    "metrics": [
+      { "value": "Paperless", "label": "Move forms, records, and approvals into one digital workspace." },
+      { "value": "Connected", "label": "Keep teams, requests, files, and decisions linked together." },
+      { "value": "Flexible", "label": "Shape pages, workflows, and data around how your organization works." }
+    ],
+    "sections": [
+      {
+        "title": "Digitize the Work You Already Do",
+        "body": "Madar helps your organization turn printed forms, notebooks, spreadsheets, and repeated manual steps into structured digital workflows. Your team can collect information, follow requests, manage approvals, and keep important records in a cleaner, more reliable workspace."
+      },
+      {
+        "title": "Built for Real Operations",
+        "body": "Every organization has its own departments, services, forms, and approval paths. Madar gives you the flexibility to shape the system around those needs, so your digital workspace feels practical for your team instead of forcing everyone into a rigid process."
+      },
+      {
+        "title": "A Smarter Way to Manage Growth",
+        "body": "By keeping information connected, searchable, and easier to update, Madar helps teams save time, reduce mistakes, respond faster, and make better decisions. It gives your organization a strong digital foundation for smoother work today and more scalable operations tomorrow."
+      }
+    ],
+    "closing": "Madar is not just about replacing paper with screens. It is about giving your organization a clearer way to work, communicate, and manage information with confidence."
+  },
+  "contact": {
+    "hero": {
+      "title": "Contact Us",
+      "subtitle": "We'd love to hear from you. Send us a message and we'll get back to you soon."
+    },
+    "form": {
+      "name": "Full Name",
+      "phone": "Phone Number",
+      "message": "Issue / Message",
+      "button": "Send Message",
+      "sending": "Sending...",
+      "success": "Thanks. Your message has been received.",
+      "error": "Could not send your message. Please check the form and try again.",
+      "errors": {
+        "CONTACT_NAME_REQUIRED": "Name is required.",
+        "CONTACT_MESSAGE_REQUIRED": "Message is required.",
+        "CONTACT_SUBMIT_FAILED": "Could not send your message. Please try again."
+      }
+    },
+    "info": {
+      "title": "Contact Information",
+      "emailLabel": "Email",
+      "phoneLabel": "Phone",
+      "email": "info@madar.com",
+      "phone": "+972599203857"
+    }
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "updated": "Last updated: July 13, 2026",
+    "intro": "Madar collects the information needed to provide accounts, tenant workspaces, website builder features, contact forms, and support workflows.",
+    "sections": [
+      { "title": "Information we process", "body": "Account details may include name, email, phone, tenant profile data, website settings, uploaded assets, form submissions, billing selections, and operational logs such as IP address and user agent." },
+      { "title": "How we use information", "body": "We use this data to authenticate users, operate tenant workspaces, publish customer sites, process contact and form submissions, secure the service, troubleshoot issues, and respond to support requests." },
+      { "title": "Cookies and security", "body": "The application uses first-party authentication and CSRF cookies to keep sessions working and protect unsafe requests. Analytics and payment SDK cookies are not currently integrated in the frontend." },
+      { "title": "Third-party services", "body": "The application uses Supabase-backed authentication and data services. Public links may open Instagram, and builder starter content may reference external Unsplash image URLs until replaced by workspace content." },
+      { "title": "Contact", "body": "For privacy or security questions, contact info@madar.com." }
+    ]
+  },
+  "terms": {
+    "title": "Terms and Conditions",
+    "updated": "Last updated: July 13, 2026",
+    "intro": "These terms explain the rules for creating an account and using Madar's workspaces, website builder, forms, reports, and related services.",
+    "sections": [
+      { "title": "Acceptance of these terms", "body": "By creating an account, accessing Madar, or using the service, you agree to these Terms and Conditions. If you use Madar for an organization, you confirm that you are authorized to accept these terms on its behalf." },
+      { "title": "Accounts and security", "body": "You must provide accurate account information, keep your credentials confidential, and promptly tell us if you suspect unauthorized access. You are responsible for activity performed through your account and workspace." },
+      { "title": "Your content and responsibilities", "body": "You remain responsible for the text, files, images, forms, submissions, and other material placed in your workspace or published through Madar. You must have the rights and permissions needed to use that content and to collect information from your visitors." },
+      { "title": "Acceptable use", "body": "You may not use Madar for unlawful, fraudulent, abusive, deceptive, or harmful activity; interfere with the service; attempt unauthorized access; distribute malicious code; or infringe another person's privacy, intellectual property, or other rights." },
+      { "title": "Plans, billing, and third-party services", "body": "Paid features are governed by the plan and price shown when you subscribe. Some functionality depends on third-party infrastructure and services. Their availability and separate terms may affect features provided through Madar." },
+      { "title": "Service availability and changes", "body": "We may maintain, improve, replace, or discontinue features and may temporarily limit access for security, maintenance, legal, or operational reasons. We will make reasonable efforts to protect service continuity and stored workspace data." },
+      { "title": "Suspension and termination", "body": "We may restrict or end access when these terms are materially violated, the service is placed at risk, or the law requires it. You may stop using Madar at any time, subject to any active plan or payment obligations." },
+      { "title": "Disclaimers and liability", "body": "Madar is provided on an as-available basis. To the extent permitted by applicable law, we do not guarantee uninterrupted or error-free operation and are not responsible for indirect or consequential losses arising from use of the service." },
+      { "title": "Changes and contact", "body": "We may update these terms as the service changes. The latest version and its update date will remain available on this page. For questions about these terms, contact info@madar.com." }
+    ],
+    "privacyPrefix": "Please also review our",
+    "privacyLink": "Privacy Policy"
   },
   "footer": {
     "brandAria": "Madar footer brand",
@@ -30,4 +126,3 @@
     "copyright": "© 2026 {{brand}}. {{rights}}"
   }
 }
-

@@ -4,8 +4,9 @@ from fastapi import APIRouter, HTTPException, Request, Response, UploadFile, Fil
 from pydantic import BaseModel
 
 from data_analysis import services as data_services
-from services.auth_service import require_regular_user_id
 from services.rate_limit_service import enforce_data_workspace_rate_limit
+from services.tenant_service import require_active_tenant_user_id
+from services.entitlement_service import require_entitlement
 
 
 router = APIRouter(
@@ -23,14 +24,17 @@ def get_storage_scope(
     response: Response,
     user_id: int,
 ) -> tuple[str, str]:
-    _, user_data = require_regular_user_id(user_id, request, response)
-    tenant_id = user_data.get("tenant_id")
-    user_id = user_data.get("id")
+    context = require_active_tenant_user_id(user_id, request, response)
+    require_entitlement(
+        context.tenant_id,
+        "data_import",
+        message="This plan does not include the data workspace.",
+    )
 
-    if tenant_id is None or user_id is None:
-        raise HTTPException(status_code=400, detail="User storage scope is not available.")
-
-    return data_services.safe_scope_value(tenant_id), data_services.safe_scope_value(user_id)
+    return (
+        data_services.safe_scope_value(context.tenant_id),
+        data_services.safe_scope_value(context.user_id),
+    )
 
 
 @router.post("/read")
@@ -62,6 +66,39 @@ def read_data(
         raise HTTPException(
             status_code=400,
             detail="Could not read data file.",
+        )
+
+
+@router.post("/export")
+def export_data(
+    user_id: int,
+    request: ReadDataRequest,
+    fastapi_request: Request,
+    response: Response,
+):
+    try:
+        tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        require_entitlement(tenant_id, "data_exports")
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "data_export",
+            tenant_id=tenant_id,
+        )
+        return data_services.export_dataset(
+            request.input_path,
+            tenant_id=tenant_id,
+            user_id=scoped_user_id,
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        logger.warning("data.export.failed", extra={"user_id": user_id, "error_type": type(error).__name__})
+        raise HTTPException(
+            status_code=400,
+            detail="Could not export data file.",
         )
 
 

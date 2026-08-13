@@ -1,13 +1,18 @@
-.page-builder-carousel {
-  --carousel-height: 360px;
-  --gallery-depth: 360px;
+.page-builder-carousel.workspace-card-carousel {
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
   display: grid;
-  gap: 14px;
-  color: var(--theme-text-inverse);
-  container-type: inline-size;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px;
   overflow: hidden;
+  padding: clamp(24px, 4cqw, 42px) clamp(46px, 7cqw, 76px) 20px;
+  border-radius: inherit;
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
+  container-type: inline-size;
 }
 
 .carousel-position-inner,
@@ -15,903 +20,145 @@
   height: 100%;
 }
 
-.carousel-position-inner > .page-builder-carousel {
-  grid-template-rows: minmax(0, 1fr) auto;
-}
-
-.carousel-position-inner > .page-builder-carousel > .carousel-stage,
-.carousel-position-inner > .page-builder-carousel > .stack-carousel-stage {
+.product-carousel-rail {
+  position: relative;
+  min-width: 0;
   min-height: 0;
-  height: 100%;
+  display: flex;
+  align-items: center;
 }
 
-.page-builder-carousel .carousel-stage {
-  position: relative;
-  min-height: var(--carousel-height);
-  overflow: hidden;
-  border-radius: inherit;
-  background: var(--theme-text);
-  isolation: isolate;
-}
-
-.page-builder-carousel .carousel-stage::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(var(--theme-shadow-rgb), 0.86), rgba(var(--theme-shadow-rgb), 0.18)),
-    linear-gradient(180deg, transparent, rgba(var(--theme-shadow-rgb), 0.38));
-  z-index: 1;
-}
-
-.page-builder-carousel img {
-  position: absolute;
-  inset: 0;
+.product-carousel-grid {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scale(1.02);
+  min-width: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: clamp(16px, 2.4cqw, 28px);
 }
 
-.page-builder-carousel .carousel-copy {
+.product-carousel-card {
+  min-width: 0;
+  color: var(--theme-text);
+}
+
+.product-carousel-image {
   position: relative;
-  z-index: 2;
-  min-height: var(--carousel-height);
-  width: min(560px, 72%);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: clamp(24px, 5vw, 46px);
-}
-
-.page-builder-carousel .carousel-copy span {
-  width: fit-content;
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: color-mix(in srgb, var(--theme-text-inverse) 16%, transparent);
-  color: color-mix(in srgb, var(--theme-text-inverse) 86%, transparent);
-  font-size: 12px;
-  font-weight: 950;
-}
-
-.page-builder-carousel h3 {
-  margin: 0;
-  color: var(--theme-text-inverse) !important;
-  font-size: clamp(24px, 7cqw, 58px);
-  line-height: 0.98;
-  font-weight: 950;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-}
-
-.page-builder-carousel p {
-  margin: 0;
-  color: color-mix(in srgb, var(--theme-text-inverse) 82%, transparent) !important;
-  font-size: clamp(12px, 2.5cqw, 17px);
-  line-height: 1.6;
-}
-
-.page-builder-carousel .carousel-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.page-builder-carousel .carousel-controls > button {
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--theme-border);
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: var(--theme-surface);
-  color: var(--theme-text);
-  box-shadow: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.08);
-  font-weight: 950;
-}
-
-.page-builder-carousel .carousel-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.page-builder-carousel .carousel-dots button {
-  width: 10px;
-  height: 10px;
-  border: 0;
-  border-radius: 999px;
-  padding: 0;
-  background: rgba(var(--theme-shadow-rgb), 0.2);
-}
-
-.page-builder-carousel .carousel-dots button.active {
-  width: 28px;
-  background: var(--theme-primary);
-}
-
-.page-builder-carousel.carousel-variant-lightswind .carousel-stage {
-  border: 1px solid var(--theme-border);
-  background:
-    radial-gradient(circle at 82% 18%, rgba(var(--theme-primary-rgb), 0.22), transparent 28%),
-    var(--theme-gradient);
-  box-shadow: 0 24px 70px rgba(var(--theme-shadow-rgb), 0.18);
-}
-
-.page-builder-carousel.carousel-variant-lightswind .carousel-stage::before {
-  content: "";
-  position: absolute;
-  inset: 18px;
-  border: 1px solid color-mix(in srgb, var(--theme-text-inverse) 18%, transparent);
-  border-radius: 18px;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.page-builder-carousel.carousel-variant-lightswind .carousel-stage::after {
-  background:
-    linear-gradient(90deg, rgba(17, 26, 48, 0.9), rgba(17, 26, 48, 0.22)),
-    linear-gradient(180deg, transparent, rgba(17, 26, 48, 0.36));
-}
-
-.page-builder-carousel.carousel-variant-lightswind img {
-  inset: 28px 28px 28px auto;
-  width: min(48%, 520px);
-  height: calc(100% - 56px);
-  border-radius: 24px;
-  box-shadow: 0 30px 70px rgba(var(--theme-black-rgb), 0.28);
-}
-
-.page-builder-carousel.carousel-variant-lightswind .carousel-copy {
-  justify-content: center;
-}
-
-.page-builder-carousel.carousel-variant-lightswind .carousel-controls {
-  justify-content: center;
-  padding: 4px;
-  border: 1px solid var(--theme-border);
-  border-radius: 999px;
-  background: var(--theme-surface);
-  box-shadow: 0 14px 30px rgba(var(--theme-shadow-rgb), 0.08);
-}
-
-.page-builder-carousel.carousel-variant-lightswind .carousel-controls > button {
-  min-width: 44px;
-  border: 0;
-  box-shadow: none;
-  background: var(--theme-text);
-  color: var(--theme-text-inverse);
-}
-
-.page-builder-carousel.carousel-variant-cards {
-  color: var(--theme-text);
-}
-
-.page-builder-carousel.carousel-variant-cards .carousel-stage {
-  border: 1px solid var(--theme-border);
-  background: var(--theme-surface);
-  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
-}
-
-.page-builder-carousel.carousel-variant-cards .carousel-stage::after {
-  background: linear-gradient(
-    90deg,
-    var(--theme-surface) 0%,
-    color-mix(in srgb, var(--theme-surface) 94%, transparent) 48%,
-    color-mix(in srgb, var(--theme-surface) 16%, transparent) 100%
-  );
-}
-
-.page-builder-carousel.carousel-variant-cards img {
-  inset: 18px 18px 18px auto;
-  width: 42%;
-  height: auto;
-  border-radius: 18px;
-  box-shadow: 0 18px 36px rgba(var(--theme-shadow-rgb), 0.14);
-}
-
-.page-builder-carousel.carousel-variant-cards .carousel-copy {
-  width: min(520px, 62%);
-  justify-content: center;
-}
-
-.page-builder-carousel.carousel-variant-cards .carousel-copy span {
-  background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--theme-primary);
-}
-
-.page-builder-carousel.carousel-variant-cards h3 {
-  color: var(--theme-text) !important;
-  font-size: clamp(28px, 4vw, 44px);
-}
-
-.page-builder-carousel.carousel-variant-cards p {
-  color: var(--theme-text-soft) !important;
-}
-
-.page-builder-carousel .carousel-stage > img {
-  animation: carousel-image-enter 650ms cubic-bezier(.2,.8,.2,1) both;
-}
-
-.page-builder-carousel .carousel-copy {
-  animation: carousel-copy-enter 520ms cubic-bezier(.2,.8,.2,1) both;
-}
-
-@keyframes carousel-image-enter {
-  from { opacity: 0; transform: scale(1.08); }
-  to { opacity: 1; transform: scale(1.02); }
-}
-
-@keyframes carousel-copy-enter {
-  from { opacity: 0; transform: translateY(22px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.carousel-arrow-controls > span {
-  min-width: 52px;
-  text-align: center;
-  font-weight: 900;
-}
-
-.page-builder-carousel.carousel-variant-spotlight .carousel-stage {
-  border: 1px solid rgba(var(--theme-text-inverse-rgb), 0.15);
-  background: var(--theme-bg);
-  box-shadow: 0 28px 80px rgba(65, 38, 144, 0.35);
-}
-
-.page-builder-carousel.carousel-variant-spotlight .carousel-stage::before {
-  content: "";
-  position: absolute;
-  inset: -35%;
-  z-index: 1;
-  background: conic-gradient(from 180deg, transparent, rgba(125, 92, 255, 0.45), transparent 35%, rgba(255, 90, 155, 0.35), transparent 70%);
-  animation: carousel-spotlight-spin 14s linear infinite;
-}
-
-.page-builder-carousel.carousel-variant-spotlight img {
-  inset: 9% 5% 9% auto;
-  width: 52%;
-  height: 82%;
-  border-radius: 50% 22px 50% 22px;
-  filter: saturate(1.15) contrast(1.05);
-  box-shadow: 0 0 70px rgba(122, 92, 255, 0.42);
-}
-
-.page-builder-carousel.carousel-variant-spotlight .carousel-copy {
-  justify-content: center;
-}
-
-@keyframes carousel-spotlight-spin {
-  to { transform: rotate(360deg); }
-}
-
-.page-builder-carousel.carousel-variant-editorial .carousel-stage {
-  border: 0;
-  border-radius: 6px;
-  background: var(--theme-bg-soft);
-}
-
-.page-builder-carousel.carousel-variant-editorial .carousel-stage::after {
-  background: linear-gradient(90deg, var(--theme-bg-soft) 0 46%, transparent 66%);
-}
-
-.page-builder-carousel.carousel-variant-editorial img {
-  inset: 22px 22px 22px auto;
-  width: 52%;
-  height: calc(100% - 44px);
-  filter: grayscale(0.18) contrast(1.08);
-}
-
-.page-builder-carousel.carousel-variant-editorial .carousel-copy {
-  width: 50%;
-  justify-content: center;
-  color: var(--theme-text);
-}
-
-.page-builder-carousel.carousel-variant-editorial .carousel-copy > span {
-  border: 1px solid var(--theme-text);
-  background: transparent;
-  color: var(--theme-text);
-}
-
-.page-builder-carousel.carousel-variant-editorial h3 {
-  color: var(--theme-text) !important;
-  font-family: Georgia, serif;
-  font-weight: 500;
-}
-
-.page-builder-carousel.carousel-variant-editorial p {
-  color: var(--theme-text-soft) !important;
-}
-
-.page-builder-carousel.carousel-variant-stack {
-  color: var(--theme-text);
-}
-
-.stack-carousel-stage {
-  position: relative;
-  min-height: var(--carousel-height);
-  perspective: 1100px;
-}
-
-.stack-carousel-card {
-  position: absolute;
-  inset: 12px 8% 12px 8%;
-  overflow: hidden;
-  border: 0;
-  border-radius: 26px;
-  padding: 0;
-  background: var(--theme-bg);
-  color: var(--theme-text-inverse);
-  box-shadow: 0 28px 65px rgba(31, 22, 72, 0.26);
-  text-align: left;
-  transition: transform 450ms cubic-bezier(.2,.8,.2,1), opacity 450ms ease;
-}
-
-.stack-carousel-card.stack-offset-0 { z-index: 3; transform: translateX(-5%) rotate(-2deg); }
-.stack-carousel-card.stack-offset-1 { z-index: 2; transform: translateX(5%) translateY(8px) rotate(3deg) scale(.95); }
-.stack-carousel-card.stack-offset-2 { z-index: 1; transform: translateX(12%) translateY(18px) rotate(6deg) scale(.89); opacity: .72; }
-
-.stack-carousel-card img {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.stack-carousel-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 20%, rgba(var(--theme-shadow-rgb), .88));
-}
-
-.stack-carousel-card > span,
-.stack-carousel-card > div {
-  position: absolute;
-  z-index: 2;
-  left: 28px;
-}
-
-.stack-carousel-card > span { top: 24px; font-weight: 900; }
-.stack-carousel-card > div { right: 28px; bottom: 26px; }
-.stack-carousel-card strong { display: block; font-size: clamp(24px, 5vw, 48px); }
-.stack-carousel-card p { margin: 8px 0 0; color: color-mix(in srgb, var(--theme-text-inverse) 78%, transparent) !important; }
-
-@container (max-width: 640px) {
-  .page-builder-carousel .carousel-stage::after {
-    background: linear-gradient(180deg, rgba(var(--theme-shadow-rgb), 0.12), rgba(var(--theme-shadow-rgb), 0.9));
-  }
-
-  .page-builder-carousel .carousel-copy,
-  .page-builder-carousel.carousel-variant-cards .carousel-copy,
-  .page-builder-carousel.carousel-variant-editorial .carousel-copy {
-    width: 100%;
-    min-height: 100%;
-    justify-content: flex-end;
-    padding: clamp(18px, 6cqw, 34px);
-  }
-
-  .page-builder-carousel.carousel-variant-lightswind img,
-  .page-builder-carousel.carousel-variant-cards img,
-  .page-builder-carousel.carousel-variant-spotlight img,
-  .page-builder-carousel.carousel-variant-editorial img {
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    box-shadow: none;
-  }
-
-  .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after,
-  .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
-  .page-builder-carousel.carousel-variant-editorial .carousel-stage::after {
-    background: linear-gradient(180deg, rgba(var(--theme-shadow-rgb), 0.08), rgba(var(--theme-shadow-rgb), 0.92));
-  }
-
-  .page-builder-carousel.carousel-variant-cards h3,
-  .page-builder-carousel.carousel-variant-cards p,
-  .page-builder-carousel.carousel-variant-editorial h3,
-  .page-builder-carousel.carousel-variant-editorial p {
-    color: var(--theme-text-inverse) !important;
-  }
-
-  .page-builder-carousel .carousel-controls {
-    gap: 8px;
-  }
-
-  .page-builder-carousel .carousel-controls > button {
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
-    padding: 0;
-  }
-
-  .stack-carousel-card {
-    inset: 10px 10% 10px 5%;
-  }
-
-  .stack-carousel-card strong {
-    font-size: clamp(21px, 8cqw, 38px);
-  }
-}
-
-@container (max-width: 380px) {
-  .page-builder-carousel p,
-  .stack-carousel-card p {
-    display: none;
-  }
-
-  .page-builder-carousel .carousel-copy {
-    gap: 6px;
-  }
-
-  .page-builder-carousel .carousel-controls {
-    gap: 6px;
-  }
-
-  .page-builder-carousel .carousel-dots {
-    gap: 5px;
-  }
-}
-
-.page-builder-carousel.carousel-variant-split .carousel-stage {
-  background: var(--theme-surface-2);
-}
-
-.page-builder-carousel.carousel-variant-split .carousel-stage::after {
-  background: linear-gradient(
-    90deg,
-    rgba(var(--theme-shadow-rgb), 0.94) 0%,
-    rgba(var(--theme-shadow-rgb), 0.9) 46%,
-    rgba(var(--theme-shadow-rgb), 0.08) 46%,
-    rgba(var(--theme-shadow-rgb), 0.02) 100%
-  );
-}
-
-.page-builder-carousel.carousel-variant-split img {
-  left: 46%;
-  width: 54%;
-}
-
-.page-builder-carousel.carousel-variant-split .carousel-copy {
-  width: 46%;
-  justify-content: center;
-}
-
-.page-builder-carousel.carousel-variant-circular {
-  gap: 18px;
-  color: var(--theme-text);
-  user-select: none;
-}
-
-.circular-gallery-header,
-.circular-gallery-caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.circular-gallery-header span,
-.circular-gallery-caption strong {
-  font-size: 18px;
-  font-weight: 950;
-}
-
-.circular-gallery-header strong {
-  border-radius: 999px;
-  padding: 8px 12px;
-  background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--theme-primary);
-  font-size: 12px;
-  font-weight: 950;
-}
-
-.circular-gallery-stage {
-  height: var(--carousel-height);
+  aspect-ratio: 4 / 3;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at center, rgba(var(--theme-primary-rgb), 0.12), transparent 34%),
-    linear-gradient(180deg, var(--theme-surface-2), var(--theme-surface));
-  perspective: 1100px;
-  cursor: grab;
-}
-
-@container (max-width: 640px) {
-  .page-builder-carousel .carousel-stage,
-  .page-builder-carousel .carousel-copy {
-    min-height: min(var(--carousel-height), 340px);
-  }
-
-  .page-builder-carousel .carousel-copy,
-  .page-builder-carousel.carousel-variant-lightswind .carousel-copy,
-  .page-builder-carousel.carousel-variant-cards .carousel-copy,
-  .page-builder-carousel.carousel-variant-split .carousel-copy {
-    width: 100%;
-    padding: 24px;
-  }
-
-  .page-builder-carousel h3 {
-    font-size: clamp(26px, 12cqw, 38px);
-    line-height: 1.05;
-  }
-
-  .page-builder-carousel p {
-    font-size: 15px;
-    line-height: 1.55;
-  }
-
-  .page-builder-carousel.carousel-variant-lightswind img,
-  .page-builder-carousel.carousel-variant-cards img,
-  .page-builder-carousel.carousel-variant-split img {
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-  }
-
-  .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after,
-  .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
-  .page-builder-carousel.carousel-variant-split .carousel-stage::after {
-    background:
-      linear-gradient(90deg, rgba(var(--theme-shadow-rgb), 0.88), rgba(var(--theme-shadow-rgb), 0.3)),
-      linear-gradient(180deg, transparent, rgba(var(--theme-shadow-rgb), 0.4));
-  }
-
-  .page-builder-carousel.carousel-variant-cards h3,
-  .page-builder-carousel.carousel-variant-cards p {
-    color: var(--theme-text-inverse) !important;
-  }
-
-  .page-builder-carousel .carousel-controls {
-    gap: 8px;
-  }
-
-  .page-builder-carousel .carousel-controls > button {
-    min-width: 0;
-    padding: 10px 12px;
-  }
-
-  .circular-gallery-ring {
-    width: 150px;
-    height: 210px;
-  }
-
-  .circular-gallery-header,
-  .circular-gallery-caption {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .circular-gallery-caption p {
-    text-align: left;
-  }
-}
-
-@container (max-width: 360px) {
-  .page-builder-carousel .carousel-stage,
-  .page-builder-carousel .carousel-copy {
-    min-height: min(var(--carousel-height), 300px);
-  }
-
-  .page-builder-carousel .carousel-copy,
-  .page-builder-carousel.carousel-variant-lightswind .carousel-copy,
-  .page-builder-carousel.carousel-variant-cards .carousel-copy,
-  .page-builder-carousel.carousel-variant-split .carousel-copy {
-    padding: 18px;
-  }
-
-  .page-builder-carousel h3 {
-    font-size: clamp(22px, 13cqw, 32px);
-  }
-
-  .page-builder-carousel p {
-    font-size: 14px;
-    line-height: 1.45;
-  }
-}
-
-.circular-gallery-stage.is-dragging {
-  cursor: grabbing;
-}
-
-.circular-gallery-ring {
-  position: relative;
-  width: 220px;
-  height: 280px;
-  transform-style: preserve-3d;
-  transition: transform 180ms ease-out;
-}
-
-.circular-gallery-stage.is-dragging .circular-gallery-ring {
-  transition: none;
-}
-
-.circular-gallery-item {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
   border: 1px solid var(--theme-border);
-  border-radius: 18px;
-  padding: 0;
+  border-radius: 14px;
   background: var(--theme-surface);
-  box-shadow: 0 24px 54px rgba(var(--theme-shadow-rgb), 0.18);
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
+  color: var(--theme-text-soft);
+  font-size: 12px;
+  font-weight: 800;
 }
 
-.circular-gallery-item img {
+.product-carousel-image img {
   position: static;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  image-rendering: auto;
   transform: none;
 }
 
-.circular-gallery-item span {
+@supports (image-rendering: -webkit-optimize-contrast) {
+  .product-carousel-image img {
+    image-rendering: -webkit-optimize-contrast;
+  }
+}
+
+.product-carousel-card h3 {
+  min-height: 0;
+  margin: 14px 0 0;
+  color: var(--theme-text) !important;
+  font-size: clamp(16px, 2cqw, 22px);
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.product-carousel-card > p {
+  margin: 7px 0 0;
+  color: var(--theme-text-soft) !important;
+  font-size: clamp(12px, 1.35cqw, 14px);
+  line-height: 1.45;
+}
+
+.product-carousel-arrow {
   position: absolute;
-  left: 12px;
-  top: 12px;
+  z-index: 2;
+  top: 42%;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--theme-border-strong);
   border-radius: 999px;
-  padding: 6px 9px;
-  background: color-mix(in srgb, var(--theme-surface) 88%, transparent);
-  color: var(--theme-text);
-  font-size: 12px;
-  font-weight: 950;
-}
-
-.circular-gallery-caption {
-  align-items: flex-start;
-}
-
-.circular-gallery-caption p {
-  max-width: 560px;
-  margin: 0;
-  color: var(--theme-text-soft);
-  text-align: right;
-}
-
-@media (max-width: 720px) {
-  .page-builder-carousel .carousel-copy,
-  .page-builder-carousel.carousel-variant-cards .carousel-copy,
-  .page-builder-carousel.carousel-variant-split .carousel-copy {
-    width: 100%;
-  }
-
-  .page-builder-carousel.carousel-variant-cards img,
-  .page-builder-carousel.carousel-variant-split img {
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-  }
-
-  .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
-  .page-builder-carousel.carousel-variant-split .carousel-stage::after {
-    background:
-      linear-gradient(90deg, rgba(var(--theme-shadow-rgb), 0.86), rgba(var(--theme-shadow-rgb), 0.18)),
-      linear-gradient(180deg, transparent, rgba(var(--theme-shadow-rgb), 0.38));
-  }
-
-  .page-builder-carousel.carousel-variant-cards h3,
-  .page-builder-carousel.carousel-variant-cards p {
-    color: var(--theme-text-inverse) !important;
-  }
-
-  .page-builder-carousel.carousel-variant-lightswind img {
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-  }
-
-  .circular-gallery-stage {
-    height: 360px;
-  }
-
-  .circular-gallery-ring {
-    width: 160px;
-    height: 220px;
-  }
-
-  .circular-gallery-item {
-    transform: rotateY(var(--angle, 0deg)) translateZ(250px);
-  }
-
-  .circular-gallery-caption,
-  .circular-gallery-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .circular-gallery-caption p {
-    text-align: left;
-  }
-}
-
-:root[data-theme="dark"] .page-builder-carousel,
-html.theme-dark .page-builder-carousel,
-body.theme-dark .page-builder-carousel {
-  color: var(--theme-text);
-}
-
-:root[data-theme="dark"] .page-builder-carousel .carousel-stage,
-html.theme-dark .page-builder-carousel .carousel-stage,
-body.theme-dark .page-builder-carousel .carousel-stage {
-  border-color: rgba(244, 240, 232, 0.18);
-  background: var(--theme-bg);
-  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.28);
-}
-
-:root[data-theme="dark"] .page-builder-carousel .carousel-stage::after,
-html.theme-dark .page-builder-carousel .carousel-stage::after,
-body.theme-dark .page-builder-carousel .carousel-stage::after {
-  background:
-    linear-gradient(90deg, rgba(15, 13, 18, 0.9), rgba(15, 13, 18, 0.24)),
-    linear-gradient(180deg, transparent, rgba(15, 13, 18, 0.42));
-}
-
-:root[data-theme="dark"] .page-builder-carousel .carousel-copy span,
-html.theme-dark .page-builder-carousel .carousel-copy span,
-body.theme-dark .page-builder-carousel .carousel-copy span,
-:root[data-theme="dark"] .circular-gallery-header strong,
-html.theme-dark .circular-gallery-header strong,
-body.theme-dark .circular-gallery-header strong {
-  background: rgba(var(--theme-primary-rgb), 0.18);
-  color: var(--theme-primary-hover);
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
-}
-
-:root[data-theme="dark"] .page-builder-carousel .carousel-controls > button,
-html.theme-dark .page-builder-carousel .carousel-controls > button,
-body.theme-dark .page-builder-carousel .carousel-controls > button {
-  border-color: rgba(244, 240, 232, 0.2);
+  padding: 0;
   background: var(--theme-surface);
-  color: var(--theme-text-muted);
-  box-shadow: 0 12px 28px rgba(var(--theme-black-rgb), 0.22);
-}
-
-:root[data-theme="dark"] .page-builder-carousel .carousel-controls > button:hover,
-html.theme-dark .page-builder-carousel .carousel-controls > button:hover,
-body.theme-dark .page-builder-carousel .carousel-controls > button:hover {
-  border-color: rgba(var(--theme-primary-rgb), 0.42);
-  background: var(--theme-surface-2);
-  color: var(--theme-primary-hover);
-}
-
-:root[data-theme="dark"] .page-builder-carousel .carousel-dots button,
-html.theme-dark .page-builder-carousel .carousel-dots button,
-body.theme-dark .page-builder-carousel .carousel-dots button {
-  background: rgba(244, 240, 232, 0.28);
-}
-
-:root[data-theme="dark"] .page-builder-carousel .carousel-dots button.active,
-html.theme-dark .page-builder-carousel .carousel-dots button.active,
-body.theme-dark .page-builder-carousel .carousel-dots button.active {
-  background: var(--theme-primary-hover);
-}
-
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-stage,
-html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage,
-body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage {
-  border-color: rgba(244, 240, 232, 0.2);
-  background:
-    radial-gradient(circle at 82% 18%, rgba(var(--theme-primary-rgb), 0.18), transparent 28%),
-    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-surface) 52%, var(--theme-surface-2) 100%);
-  box-shadow: 0 24px 70px rgba(var(--theme-black-rgb), 0.32);
-}
-
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after,
-html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after,
-body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-stage::after {
-  background:
-    linear-gradient(90deg, rgba(15, 13, 18, 0.9), rgba(15, 13, 18, 0.22)),
-    linear-gradient(180deg, transparent, rgba(15, 13, 18, 0.42));
-}
-
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-controls,
-html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls,
-body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls {
-  border-color: rgba(244, 240, 232, 0.18);
-  background: rgba(15, 13, 18, 0.86);
-  box-shadow: 0 16px 36px rgba(var(--theme-black-rgb), 0.28);
-}
-
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button,
-html.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button,
-body.theme-dark .page-builder-carousel.carousel-variant-lightswind .carousel-controls > button {
-  background: var(--theme-surface-2);
   color: var(--theme-text);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--theme-text) 10%, transparent);
+  cursor: pointer;
 }
 
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards,
-html.theme-dark .page-builder-carousel.carousel-variant-cards,
-body.theme-dark .page-builder-carousel.carousel-variant-cards,
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-circular,
-html.theme-dark .page-builder-carousel.carousel-variant-circular,
-body.theme-dark .page-builder-carousel.carousel-variant-circular {
-  color: var(--theme-text);
+.product-carousel-arrow:hover {
+  border-color: var(--theme-primary);
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
 }
 
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards .carousel-stage,
-html.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage,
-body.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage {
-  border-color: rgba(244, 240, 232, 0.18);
-  background: var(--theme-surface);
+.product-carousel-arrow.is-previous {
+  left: -18px;
+  transform: translateX(-50%);
 }
 
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
-html.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage::after,
-body.theme-dark .page-builder-carousel.carousel-variant-cards .carousel-stage::after {
-  background: linear-gradient(
-    90deg,
-    rgba(15, 13, 18, 0.94) 0%,
-    rgba(15, 13, 18, 0.8) 48%,
-    rgba(15, 13, 18, 0.18) 100%
-  );
+.product-carousel-arrow.is-next {
+  right: -18px;
+  transform: translateX(50%);
 }
 
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards h3,
-html.theme-dark .page-builder-carousel.carousel-variant-cards h3,
-body.theme-dark .page-builder-carousel.carousel-variant-cards h3 {
-  color: var(--theme-text-inverse) !important;
+.product-carousel-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
 
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-cards p,
-html.theme-dark .page-builder-carousel.carousel-variant-cards p,
-body.theme-dark .page-builder-carousel.carousel-variant-cards p,
-:root[data-theme="dark"] .circular-gallery-caption p,
-html.theme-dark .circular-gallery-caption p,
-body.theme-dark .circular-gallery-caption p {
-  color: var(--theme-text-muted) !important;
+.product-carousel-dots button {
+  width: 7px;
+  height: 7px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: color-mix(in srgb, var(--theme-text) 18%, transparent);
+  cursor: pointer;
 }
 
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-split .carousel-stage,
-html.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage,
-body.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage,
-:root[data-theme="dark"] .circular-gallery-stage,
-html.theme-dark .circular-gallery-stage,
-body.theme-dark .circular-gallery-stage {
-  background:
-    radial-gradient(circle at center, rgba(var(--theme-primary-rgb), 0.16), transparent 34%),
-    linear-gradient(180deg, var(--theme-surface), var(--theme-bg));
+.product-carousel-dots button.is-active {
+  width: 17px;
+  background: var(--theme-primary);
 }
 
-:root[data-theme="dark"] .page-builder-carousel.carousel-variant-split .carousel-stage::after,
-html.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage::after,
-body.theme-dark .page-builder-carousel.carousel-variant-split .carousel-stage::after {
-  background: linear-gradient(
-    90deg,
-    rgba(15, 13, 18, 0.94) 0%,
-    rgba(15, 13, 18, 0.9) 46%,
-    rgba(15, 13, 18, 0.08) 46%,
-    rgba(15, 13, 18, 0.02) 100%
-  );
+@container (max-width: 680px) {
+  .page-builder-carousel.workspace-card-carousel {
+    padding-inline: 48px;
+  }
+
+  .product-carousel-card:nth-child(n + 3) {
+    display: none;
+  }
 }
 
-:root[data-theme="dark"] .circular-gallery-item,
-html.theme-dark .circular-gallery-item,
-body.theme-dark .circular-gallery-item {
-  border-color: rgba(244, 240, 232, 0.18);
-  background: var(--theme-surface);
-  box-shadow: 0 24px 54px rgba(var(--theme-black-rgb), 0.28);
-}
-
-:root[data-theme="dark"] .circular-gallery-item span,
-html.theme-dark .circular-gallery-item span,
-body.theme-dark .circular-gallery-item span {
-  background: rgba(15, 13, 18, 0.86);
-  color: var(--theme-text-muted);
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
+@container (max-width: 390px) {
+  .product-carousel-card:nth-child(n + 2) {
+    display: none;
+  }
 }

@@ -1,3 +1,9 @@
+import {
+  arePersistableProjectsEqual,
+  getPersistableProject,
+  serializePersistableProject,
+} from "./PageBuilder.editorState";
+
 export const persistBuilderProject = ({
   nextProject,
   message = "",
@@ -6,9 +12,27 @@ export const persistBuilderProject = ({
   setProject,
   showToast,
   silent = false,
+  writeBrowserDraft = true,
 }) => {
-  if (!demoMode) {
-    localStorage.setItem(storageKey, JSON.stringify(nextProject));
+  if (!demoMode && writeBrowserDraft) {
+    const serializedProject = JSON.stringify(getPersistableProject(nextProject));
+    const semanticSnapshot = serializePersistableProject(nextProject);
+    const previousDraft = localStorage.getItem(storageKey);
+    let previousSnapshot = "";
+
+    try {
+      previousSnapshot = previousDraft
+        ? serializePersistableProject(JSON.parse(previousDraft))
+        : "";
+    } catch {
+      // Preserve malformed legacy browser data as a backup instead of treating
+      // it as semantically equal to a valid project.
+    }
+
+    if (previousDraft && previousSnapshot !== semanticSnapshot) {
+      localStorage.setItem(`${storageKey}:backup`, previousDraft);
+    }
+    localStorage.setItem(storageKey, serializedProject);
   }
 
   setProject(nextProject);
@@ -25,11 +49,47 @@ export const createBuilderProjectPayload = ({
   builderProjectRecord,
   getBuilderProjectName,
   getBuilderProjectSlug,
-}) => ({
-  name: getBuilderProjectName(project),
-  slug: getBuilderProjectSlug(project, builderProjectRecord),
-  draft_schema: project,
-});
+}) => {
+  const expectedRevision = Number(builderProjectRecord?.draft_revision);
+  const draftSchema = getPersistableProject(project);
+
+  return {
+    name: getBuilderProjectName(project),
+    slug: getBuilderProjectSlug(project, builderProjectRecord),
+    draft_schema: draftSchema,
+    ...(Number.isInteger(expectedRevision) && expectedRevision >= 0
+      ? { expected_revision: expectedRevision }
+      : {}),
+  };
+};
+
+export const validateBuilderSaveAcknowledgement = ({
+  projectId,
+  previousRevision,
+  savedRecord,
+} = {}) => {
+  const savedRevision = Number(savedRecord?.draft_revision);
+  const priorRevision = Number(previousRevision);
+  if (
+    !projectId ||
+    savedRecord?.id !== projectId ||
+    !Number.isInteger(savedRevision) ||
+    (Number.isInteger(priorRevision) && savedRevision <= priorRevision)
+  ) {
+    throw new Error("Backend save acknowledgement is incomplete");
+  }
+  return savedRevision;
+};
+
+export const validateBuilderSchemaAcknowledgement = ({ savedRecord, submittedProject } = {}) => {
+  if (
+    savedRecord?.draft_schema &&
+    !arePersistableProjectsEqual(savedRecord.draft_schema, submittedProject)
+  ) {
+    throw new Error("Backend save acknowledgement does not match the requested draft");
+  }
+  return true;
+};
 
 const downloadBuilderProjectJson = (payload) => {
   if (typeof document === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
@@ -53,7 +113,7 @@ const downloadBuilderProjectJson = (payload) => {
 };
 
 export const exportBuilderProjectJson = async ({ project, showToast }) => {
-  const payload = JSON.stringify(project, null, 2);
+  const payload = JSON.stringify(getPersistableProject(project), null, 2);
 
   try {
     await navigator.clipboard.writeText(payload);

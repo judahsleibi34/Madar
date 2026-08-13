@@ -4,7 +4,30 @@ import { Bell } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useLanguage } from "../../i18n";
-import { getDummyNotifications } from "./notificationsData";
+import { useNotifications } from "../../notifications/NotificationContext";
+
+const MOBILE_SIDEBAR_QUERY = "(max-width: 900px)";
+
+const formatNotificationTime = (value) => {
+  if (!value) return "";
+
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return String(value);
+  }
+};
+
+const normalizeNotification = (item, t) => ({
+  id: item.id,
+  title: item.title || t("notifications.fallbackTitle"),
+  detail: item.body || item.detail || "",
+  time: item.time || formatNotificationTime(item.createdAt || item.created_at),
+  unread: item.unread !== false,
+});
 
 export default function NotificationBell({
   className = "",
@@ -20,8 +43,8 @@ export default function NotificationBell({
   const panelRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState(null);
-  const dummyNotifications = getDummyNotifications(t);
-  const unreadCount = dummyNotifications.filter((item) => item.unread).length;
+  const { notifications, unreadCount } = useNotifications();
+  const visibleNotifications = notifications.map((item) => normalizeNotification(item, t));
   const active = location.pathname.startsWith("/notifications");
   const resolvedLabel = label || t("notifications.title");
 
@@ -137,6 +160,15 @@ export default function NotificationBell({
     }
   };
 
+  const handleBellClick = (event) => {
+    if (window.matchMedia?.(MOBILE_SIDEBAR_QUERY).matches) {
+      viewAllNotifications();
+      return;
+    }
+
+    togglePanel(event);
+  };
+
   return (
     <div
       className={[
@@ -153,7 +185,7 @@ export default function NotificationBell({
       <button
         type="button"
         className="notification-bell-button"
-        onClick={togglePanel}
+        onClick={handleBellClick}
         aria-label={resolvedLabel}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -191,7 +223,7 @@ export default function NotificationBell({
           </div>
 
           <div className="notification-popover-list">
-            {dummyNotifications.slice(0, 4).map((item) => (
+            {visibleNotifications.slice(0, 4).map((item) => (
               <article
                 className={item.unread ? "is-unread" : ""}
                 key={item.id}

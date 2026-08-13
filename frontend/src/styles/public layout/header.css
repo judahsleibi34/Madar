@@ -809,15 +809,15 @@ html[data-darkreader-scheme] .hamburger span {
   .site-header {
     --header-height: 86px;
     min-height: var(--header-height);
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: 0 24px;
-    column-gap: 16px;
+    column-gap: clamp(16px, 1.5vw, 24px);
   }
 
   .brand {
     justify-self: start;
     min-width: 0;
-    max-width: 70vw;
+    gap: 14px;
   }
 
   .logo {
@@ -826,7 +826,91 @@ html[data-darkreader-scheme] .hamburger span {
   }
 
   .brand-name {
-    font-size: 20px;
+    font-size: 19px;
+  }
+
+  .nav-menu {
+    display: flex;
+    width: 100%;
+    justify-content: space-evenly;
+    gap: clamp(16px, 1.8vw, 28px);
+  }
+
+  .nav-menu a {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .header-right {
+    display: flex;
+    justify-self: end;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .site-header .btn-login,
+  .site-header .btn-signup {
+    min-height: 40px;
+    padding-inline: 16px;
+    font-size: 15px;
+  }
+
+  .hamburger {
+    display: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .site-header {
+    padding-inline: 18px;
+    column-gap: 12px;
+  }
+
+  .brand {
+    gap: 10px;
+  }
+
+  .logo {
+    width: 64px;
+    height: 64px;
+  }
+
+  .brand-name {
+    font-size: 18px;
+  }
+
+  .nav-menu {
+    gap: 10px;
+  }
+
+  .nav-menu a {
+    min-height: 38px;
+    font-size: 14px;
+  }
+
+  .header-right {
+    gap: 6px;
+  }
+
+  .site-header .btn-login,
+  .site-header .btn-signup {
+    padding-inline: 12px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .site-header {
+    grid-template-columns: auto 1fr;
+    padding: 0 24px;
+    column-gap: 16px;
+  }
+
+  .brand {
+    max-width: 70vw;
+  }
+
+  .brand-name {
     max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -834,12 +918,6 @@ html[data-darkreader-scheme] .hamburger span {
 
   .nav-menu {
     display: none;
-  }
-
-  .header-right {
-    display: flex;
-    justify-self: end;
-    align-items: center;
   }
 
   .header-right > .btn-login,

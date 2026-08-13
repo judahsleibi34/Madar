@@ -57,6 +57,14 @@
   padding: 20px;
 }
 
+.page-builder .daw-source-card {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  padding: 16px 18px;
+}
+
 .page-builder .daw-section-heading {
   margin-bottom: 16px;
 }
@@ -202,6 +210,24 @@
   box-shadow: none !important;
 }
 
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool {
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary {
+  padding: 16px 18px !important;
+}
+
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool[open] > summary {
+  border-bottom: 1px solid var(--theme-border);
+  background: transparent !important;
+}
+
 .page-builder .daw-analysis-domain-grid button.active,
 .page-builder .daw-stepper button.active {
   background: var(--theme-surface) !important;
@@ -212,6 +238,30 @@
 .page-builder .daw-analysis-generator-heading em {
   background: var(--theme-surface-2) !important;
   color: var(--theme-text-soft) !important;
+}
+
+.page-builder .daw-cleaning-stack:hover,
+.page-builder .daw-cleaning-stack details:hover,
+.page-builder .daw-cleaning-stack summary:hover,
+.page-builder .daw-advanced-cleaning-grid:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.page-builder .daw-cleaning-option:hover,
+.page-builder .daw-cleaning-tool:hover {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool:hover,
+.page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 @media (max-width: 900px) {

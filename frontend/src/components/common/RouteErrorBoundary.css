@@ -1,0 +1,75 @@
+.route-error {
+  align-items: center;
+  background: var(--color-bg, #f5f7fb);
+  color: var(--color-text, #172033);
+  display: flex;
+  justify-content: center;
+  min-height: 70vh;
+  padding: 2rem 1rem;
+}
+
+.route-error__card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #dfe4ec);
+  border-radius: 1rem;
+  box-shadow: 0 1rem 3rem rgb(15 23 42 / 10%);
+  max-width: 36rem;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  width: 100%;
+}
+
+.route-error__eyebrow {
+  color: var(--color-primary, #4759c5);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.route-error__card h1 {
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  margin: 0.5rem 0 1rem;
+}
+
+.route-error__note,
+.route-error__reference {
+  font-size: 0.9rem;
+}
+
+.route-error__reference code {
+  overflow-wrap: anywhere;
+}
+
+.route-error__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.route-error__actions button,
+.route-error__actions a {
+  border: 1px solid var(--color-primary, #4759c5);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7rem 1rem;
+  text-decoration: none;
+}
+
+.route-error__actions button {
+  background: var(--color-primary, #4759c5);
+  color: #fff;
+}
+
+.route-error__actions a {
+  background: transparent;
+  color: var(--color-primary, #4759c5);
+}
+
+.route-error__actions button:focus-visible,
+.route-error__actions a:focus-visible {
+  outline: 3px solid var(--color-focus, #8da2fb);
+  outline-offset: 2px;
+}

@@ -2,18 +2,42 @@
    REGISTER / SIGN UP PAGE
    ============================================================ */
 
+.login-page,
+.register-page {
+  position: relative;
+  isolation: isolate;
+}
+
+.login-page::after,
+.register-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url("../../assets/MadarTemplates/madar_header.svg") center / clamp(320px, 50vw, 680px) auto no-repeat;
+  opacity: 0.055;
+  pointer-events: none;
+}
+
+.login-page > *,
+.register-page > * {
+  position: relative;
+  z-index: 1;
+}
+
 .register-page {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  gap: clamp(28px, 5vw, 88px);
   padding: 60px 5% 90px;
   color: var(--theme-text);
 }
 
 .register-card {
   width: 100%;
-  max-width: 460px;
+  max-width: 780px;
   background: var(--theme-surface);
   border: 1px solid var(--theme-border);
   border-radius: 18px;
@@ -21,7 +45,7 @@
   box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .register-card h1 {
@@ -62,6 +86,26 @@
 .register-card input:focus {
   border-color: var(--theme-primary);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
+}
+
+.register-card input.auth-field-error-input,
+.login-card input.auth-field-error-input {
+  border-color: var(--theme-danger, #dc2626);
+  background: color-mix(in srgb, var(--theme-surface) 94%, #dc2626);
+}
+
+.register-card input.auth-field-error-input:focus,
+.login-card input.auth-field-error-input:focus {
+  border-color: var(--theme-danger, #dc2626);
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.12);
+}
+
+.auth-field-error {
+  color: var(--theme-danger, #dc2626);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .password-field {
@@ -132,7 +176,7 @@ html[dir="rtl"] .register-card h1 {
 }
 
 .register-card.login-card {
-  max-width: 480px;
+  max-width: 780px;
 }
 
 .register-card.login-card .register-row {
@@ -152,18 +196,92 @@ html[dir="rtl"] .register-card h1 {
   text-align: right;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 980px) {
+  .login-page::after,
+  .register-page::after {
+    background-size: min(82vw, 520px) auto;
+  }
+}
+
+@media (max-width: 720px) {
   .register-page {
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
     padding: 40px 5% 70px;
   }
 
   .register-card {
+    max-width: 480px;
     padding: 24px;
+    gap: 18px;
   }
 
   .register-row {
     grid-template-columns: 1fr;
   }
+}
+
+.verification-card {
+  max-width: 520px;
+  text-align: center;
+}
+
+.verification-icon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--theme-primary);
+  background: color-mix(in srgb, var(--theme-primary) 12%, transparent);
+}
+
+.verification-icon-success {
+  color: var(--theme-success, #15803d);
+  background: color-mix(in srgb, var(--theme-success, #15803d) 12%, transparent);
+}
+
+.verification-icon-error {
+  color: var(--theme-danger, #dc2626);
+  background: color-mix(in srgb, var(--theme-danger, #dc2626) 10%, transparent);
+}
+
+.verification-destination,
+.verification-help {
+  margin: 0;
+  color: var(--theme-text-muted);
+  line-height: 1.6;
+}
+
+.verification-destination strong {
+  color: var(--theme-text);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.verification-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.verification-actions .login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.verification-secondary {
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
 }
 
 /* ============================================================
@@ -433,6 +551,102 @@ body.theme-dark .register-card input:focus,
   unicode-bidi: plaintext;
   box-shadow: none;
   align-self: center;
+}
+
+.auth-toast {
+  position: fixed;
+  top: 116px;
+  right: 28px;
+  z-index: 9999;
+  width: min(360px, calc(100vw - 56px));
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--theme-surface) 92%, var(--theme-primary-soft));
+  color: var(--theme-text);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
+  border-left: 3px solid var(--theme-primary);
+  box-shadow: 0 12px 30px rgba(var(--theme-shadow-rgb), 0.16);
+  pointer-events: none;
+  animation: auth-toast-enter 180ms ease-out both;
+}
+
+.auth-toast-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--theme-primary-soft);
+  color: var(--theme-primary);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.auth-toast-message {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.auth-toast-message strong {
+  color: var(--theme-text);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.auth-toast-message > span {
+  color: var(--theme-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.auth-toast-error {
+  border-left-color: var(--theme-primary);
+}
+
+.auth-toast-success .auth-toast-icon {
+  background: rgba(var(--theme-success-rgb, 16, 185, 129), 0.14);
+  color: var(--theme-success, #10b981);
+}
+
+.auth-toast[dir="rtl"] {
+  right: auto;
+  left: 28px;
+  border-right: 3px solid var(--theme-primary);
+  border-left: 1px solid rgba(var(--theme-primary-rgb), 0.22);
+  text-align: right;
+}
+
+@keyframes auth-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .auth-toast {
+    top: 76px;
+    right: 16px;
+    width: min(340px, calc(100vw - 32px));
+  }
+
+  .auth-toast[dir="rtl"] {
+    right: auto;
+    left: 16px;
+  }
 }
 
 
@@ -784,6 +998,55 @@ html[dir="rtl"] .forgot-card .form-status-message {
   font-weight: 750;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.auth-terms-consent {
+  display: grid;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.register-card .auth-terms-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.register-card .auth-terms-row input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  border-radius: 5px;
+  accent-color: var(--theme-primary);
+  cursor: pointer;
+}
+
+.register-card .auth-terms-row .auth-terms-copy {
+  color: var(--theme-text-soft);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.register-card .auth-terms-copy a {
+  color: var(--theme-primary);
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.register-card .auth-terms-copy a:hover {
+  color: var(--theme-primary-hover);
+}
+
+.auth-terms-consent.has-error input[type="checkbox"] {
+  outline: 2px solid var(--theme-danger, #dc2626);
+  outline-offset: 2px;
 }
 
 .login-card[dir="rtl"] .auth-section-title,

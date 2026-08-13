@@ -5,10 +5,19 @@ import hashlib
 import hmac
 import time
 import threading
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, Request, Response
 
 from database import service_supabase, supabase
+from services.account_lifecycle_service import (
+    ACTIVE_ACCOUNT_STATUS,
+    effective_account_status,
+    is_platform_account,
+    synchronize_verified_account,
+)
+from services.identity_service import canonical_auth_email, normalize_email
+from services.api_errors import api_error
 from services.request_security import (
     create_csrf_token,
     delete_csrf_cookie,
@@ -84,7 +93,7 @@ IS_PRODUCTION = APP_ENV in {"prod", "production"}
 
 SESSION_ACTIVITY_COOKIE_NAME = "madar_session_activity"
 SESSION_INACTIVITY_TIMEOUT_SECONDS = int(
-    os.getenv("SESSION_INACTIVITY_TIMEOUT_SECONDS", "3600")
+    os.getenv("SESSION_INACTIVITY_TIMEOUT_SECONDS", "0")
 )
 
 COOKIE_SECURE = os.getenv(
@@ -158,7 +167,18 @@ def is_session_activity_valid(value: str | None, now: int | None = None) -> bool
 
     current_time = int(time.time()) if now is None else int(now)
     age = current_time - last_activity_at
-    return 0 <= age <= SESSION_INACTIVITY_TIMEOUT_SECONDS
+
+    if age < 0:
+        return False
+
+    # Authentication cookies are session cookies, so the browser owns the
+    # lifetime of the signed-in session. A zero timeout keeps the session alive
+    # while the browser is open; deployments that require an inactivity policy
+    # can still opt in with a positive timeout.
+    return (
+        SESSION_INACTIVITY_TIMEOUT_SECONDS <= 0
+        or age <= SESSION_INACTIVITY_TIMEOUT_SECONDS
+    )
 
 
 def set_session_activity_cookie(response: Response):
@@ -228,6 +248,15 @@ def delete_auth_cookies(response: Response):
     )
     delete_csrf_cookie(response)
     delete_session_activity_cookie(response)
+    try:
+        from services.admin_account_access_service import delete_admin_account_access_cookie
+
+        delete_admin_account_access_cookie(response)
+    except Exception as error:
+        logger.warning(
+            "auth.admin_access_cookie_delete_failed",
+            extra={"error_type": type(error).__name__},
+        )
 
 
 def build_user_payload(user_data):
@@ -248,8 +277,47 @@ def build_user_payload(user_data):
         "subscription_type": user_data.get("subscription_type") or "",
         "payment_status": user_data.get("payment_status") or "",
         "user_type": normalize_user_type(user_data.get("user_type")),
+        "email_verified": user_data.get("email_verified") is not False,
+        "email_verified_at": user_data.get("email_verified_at"),
+        "account_status": effective_account_status(user_data),
+        "account_kind": user_data.get("account_kind") or "platform",
+        "pending_email": user_data.get("pending_email"),
         "created_at": user_data.get("created_at"),
         "updated_at": user_data.get("updated_at"),
+    }
+
+
+def auth_user_email_is_verified(auth_user) -> bool:
+    return bool(
+        _get_auth_value(auth_user, "email_confirmed_at")
+        or _get_auth_value(auth_user, "confirmed_at")
+    )
+
+
+def mark_local_email_verified(user_data):
+    if user_data.get("email_verified") is not False:
+        return user_data
+
+    verified_at = datetime.now(timezone.utc).isoformat()
+    update_response = (
+        service_supabase.table("users")
+        .update(
+            {
+                "email_verified": True,
+                "email_verified_at": verified_at,
+            }
+        )
+        .eq("id", user_data.get("id"))
+        .execute()
+    )
+
+    if update_response.data:
+        return update_response.data[0]
+
+    return {
+        **user_data,
+        "email_verified": True,
+        "email_verified_at": verified_at,
     }
 
 
@@ -258,6 +326,8 @@ def get_authenticated_user_row(
     response: Response | None = None,
     *,
     allow_refresh: bool = True,
+    allow_admin_account_access: bool = True,
+    reject_admin_account_access: bool = True,
 ):
     access_token = request.cookies.get("madar_access_token")
     refresh_token = request.cookies.get("madar_refresh_token")
@@ -333,25 +403,157 @@ def get_authenticated_user_row(
     if not user_response.data:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return auth_user, user_response.data
+    user_data = user_response.data
+
+    if auth_user_email_is_verified(auth_user):
+        provider_email = canonical_auth_email(auth_user)
+        if (
+            effective_account_status(user_data) != ACTIVE_ACCOUNT_STATUS
+            or (
+                provider_email
+                and normalize_email(user_data.get("email")) != provider_email
+            )
+        ):
+            user_data, _ = synchronize_verified_account(auth_user, user_data)
+        else:
+            user_data = mark_local_email_verified(user_data)
+    else:
+        if response:
+            delete_auth_cookies(response)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "email_verification_required",
+                "message": "Verify your email before logging in.",
+            },
+        )
+
+    if normalize_user_type(user_data.get("user_type")) == "admin":
+        try:
+            from services.admin_account_access_service import resolve_admin_account_access_user
+
+            target_user = resolve_admin_account_access_user(
+                request=request,
+                response=response,
+                admin_user=user_data,
+            )
+
+            if target_user:
+                if not allow_admin_account_access:
+                    if reject_admin_account_access:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Admin account access is not allowed for this route",
+                        )
+
+                    return auth_user, user_data
+
+                if response is not None:
+                    response.headers["X-Madar-Admin-Account-Access"] = "true"
+
+                return auth_user, target_user
+
+        except HTTPException:
+            raise
+        except Exception as error:
+            logger.warning(
+                "auth.admin_access_session_resolve_failed",
+                extra={"admin_user_id": user_data.get("id"), "error_type": type(error).__name__},
+            )
+
+    return auth_user, user_data
 
 
-def require_system_admin(request: Request, response: Response | None = None):
-    auth_user, user_data = get_authenticated_user_row(request, response)
+def require_system_admin(
+    request: Request,
+    response: Response | None = None,
+    *,
+    reject_admin_account_access: bool = True,
+    require_aal2: bool = False,
+):
+    auth_user, user_data = get_authenticated_user_row(
+        request,
+        response,
+        allow_admin_account_access=False,
+        reject_admin_account_access=reject_admin_account_access,
+    )
     user_type = normalize_user_type(user_data.get("user_type"))
 
     if user_type != "admin":
         raise HTTPException(status_code=403, detail="Admin access is required")
 
+    if require_aal2:
+        require_current_session_aal2()
+
     return auth_user, user_data
 
 
-def require_regular_user(request: Request, response: Response | None = None):
-    auth_user, user_data = get_authenticated_user_row(request, response)
+def get_current_aal() -> dict:
+    try:
+        get_aal = getattr(supabase.auth.mfa, "get_authenticator_assurance_level", None)
+
+        if not get_aal:
+            return {}
+
+        aal_response = get_aal()
+        data = _get_auth_value(aal_response, "data") or aal_response
+
+        return {
+            "current_level": _get_auth_value(data, "current_level")
+            or _get_auth_value(data, "currentLevel")
+            or _get_auth_value(data, "aal"),
+            "next_level": _get_auth_value(data, "next_level")
+            or _get_auth_value(data, "nextLevel"),
+        }
+
+    except Exception as error:
+        logger.warning(
+            "auth.admin_aal2.lookup_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return {}
+
+
+def require_current_session_aal2() -> dict:
+    aal = get_current_aal()
+
+    if aal.get("current_level") != "aal2":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "aal2_required",
+                "message": "MFA verification is required for this admin action",
+            },
+        )
+
+    return aal
+
+
+def get_admin_account_access_context(request: Request) -> dict | None:
+    return getattr(request.state, "admin_account_access_context", None)
+
+
+def require_regular_user(
+    request: Request,
+    response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
+):
+    auth_user, user_data = get_authenticated_user_row(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
     user_type = normalize_user_type(user_data.get("user_type"))
 
-    if user_type == "admin":
+    if user_type != "user":
         raise HTTPException(status_code=403, detail="User access is required")
+    if not is_platform_account(user_data):
+        raise api_error(
+            403,
+            "platform_account_required",
+            "This account is limited to the website where it was created.",
+        )
 
     return auth_user, user_data
 
@@ -360,8 +562,14 @@ def require_regular_user_id(
     user_id: int,
     request: Request,
     response: Response | None = None,
+    *,
+    allow_admin_account_access: bool = True,
 ):
-    auth_user, user_data = require_regular_user(request, response)
+    auth_user, user_data = require_regular_user(
+        request,
+        response,
+        allow_admin_account_access=allow_admin_account_access,
+    )
 
     try:
         path_user_id = int(user_id)

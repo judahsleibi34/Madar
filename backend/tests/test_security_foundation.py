@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -5,9 +6,10 @@ from unittest.mock import patch
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
+from fastapi.middleware.cors import CORSMiddleware
 
 from routes import auth_routes
-from services import rate_limit_service
+from services import auth_service, rate_limit_service
 from services.rate_limit_service import InMemoryRateLimitStore, enforce_rate_limit
 from services.auth_service import (
     SESSION_ACTIVITY_COOKIE_NAME,
@@ -19,6 +21,7 @@ from services.auth_service import (
 from services.request_security import (
     CSRF_COOKIE_NAME,
     CSRF_HEADER_NAME,
+    add_cors_headers_for_allowed_origin,
     create_csrf_token,
     get_allowed_origins,
     validate_cookie_write_origin,
@@ -37,21 +40,47 @@ class SecurityFoundationTests(unittest.TestCase):
 
     def build_origin_client(self):
         app = FastAPI()
-        allowed_origins = get_allowed_origins(["https://app.example.com"])
+        frontend_urls = ["https://app.example.com"]
+        allowed_origins = get_allowed_origins(frontend_urls)
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=frontend_urls,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=[CSRF_HEADER_NAME],
+        )
 
         @app.middleware("http")
         async def csrf_middleware(request: Request, call_next):
             blocked_response = validate_cookie_write_origin(request, allowed_origins)
             if blocked_response is not None:
-                return blocked_response
+                return add_cors_headers_for_allowed_origin(
+                    blocked_response,
+                    request,
+                    allowed_origins,
+                )
             blocked_response = validate_csrf_token(request)
             if blocked_response is not None:
-                return blocked_response
+                return add_cors_headers_for_allowed_origin(
+                    blocked_response,
+                    request,
+                    allowed_origins,
+                )
             return await call_next(request)
 
         @app.post("/protected-write")
         def protected_write():
             return {"ok": True}
+
+        @app.put("/builder/projects/{project_id}")
+        def update_builder_project(project_id: str):
+            return {"ok": True, "project_id": project_id}
+
+        @app.patch("/builder/reservations/{reservation_id}/status")
+        def update_builder_reservation_status(reservation_id: str):
+            return {"ok": True, "reservation_id": reservation_id}
 
         @app.get("/safe-read")
         def safe_read():
@@ -67,6 +96,26 @@ class SecurityFoundationTests(unittest.TestCase):
 
         @app.post("/public/sites/example/forms/form-1/submissions")
         def public_form_submission():
+            return {"ok": True}
+
+        @app.post("/public/sites/example/auth/{action}")
+        def public_tenant_auth(action: str):
+            return {"ok": True}
+
+        @app.post("/public/sites/example/events")
+        def public_site_event():
+            return {"ok": True}
+
+        @app.post("/public/reservations/33333333-3333-4333-8333-333333333333/cancel")
+        def public_reservation_cancel():
+            return {"ok": True}
+
+        @app.post("/auth/email-verification/resend")
+        def resend_email_verification():
+            return {"ok": True}
+
+        @app.post("/public/sites/example/not-events")
+        def unrelated_public_site_post():
             return {"ok": True}
 
         @app.post("/issue-cookies")
@@ -106,6 +155,84 @@ class SecurityFoundationTests(unittest.TestCase):
                 CSRF_COOKIE_NAME: csrf_token,
             },
         }
+
+    def test_builder_put_preflight_allows_frontend_origin_and_csrf_header(self):
+        client = self.build_origin_client()
+
+        response = client.options(
+            "/builder/projects/project-1",
+            headers={
+                "Origin": "https://app.example.com",
+                "Access-Control-Request-Method": "PUT",
+                "Access-Control-Request-Headers": "content-type,x-csrf-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get("access-control-allow-origin"),
+            "https://app.example.com",
+        )
+        self.assertEqual(response.headers.get("access-control-allow-credentials"), "true")
+        self.assertIn("PUT", response.headers.get("access-control-allow-methods", ""))
+        self.assertIn("x-csrf-token", response.headers.get("access-control-allow-headers", "").lower())
+
+    def test_builder_put_missing_csrf_rejects_with_cors_headers(self):
+        client = self.build_origin_client()
+
+        response = client.put(
+            "/builder/projects/project-1",
+            headers={
+                "Origin": "https://app.example.com",
+                "Content-Type": "application/json",
+            },
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+            },
+            json={"draft_schema": {}},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Invalid CSRF token")
+        self.assertEqual(
+            response.headers.get("access-control-allow-origin"),
+            "https://app.example.com",
+        )
+        self.assertEqual(response.headers.get("access-control-allow-credentials"), "true")
+
+    def test_builder_put_valid_csrf_reaches_route_logic(self):
+        client = self.build_origin_client()
+        request_parts = self.build_csrf_request_parts()
+
+        response = client.put(
+            "/builder/projects/project-1",
+            headers={
+                **request_parts["headers"],
+                "Content-Type": "application/json",
+            },
+            cookies=request_parts["cookies"],
+            json={"draft_schema": {}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True, "project_id": "project-1"})
+
+    def test_builder_reservation_status_patch_requires_csrf(self):
+        client = self.build_origin_client()
+
+        response = client.patch(
+            "/builder/reservations/reservation-1/status",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+            },
+            json={"status": "confirmed"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Invalid CSRF token")
 
     def test_invalid_origin_rejected_for_cookie_authenticated_write(self):
         client = self.build_origin_client()
@@ -196,6 +323,12 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/contact",
             "/billing/webhook",
             "/public/sites/example/forms/form-1/submissions",
+            "/public/sites/example/auth/register",
+            "/public/sites/example/auth/login",
+            "/public/sites/example/auth/logout",
+            "/public/sites/example/events",
+            "/public/reservations/33333333-3333-4333-8333-333333333333/cancel",
+            "/auth/email-verification/resend",
         ]:
             with self.subTest(path=path):
                 response = client.post(
@@ -208,6 +341,21 @@ class SecurityFoundationTests(unittest.TestCase):
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json(), {"ok": True})
+
+    def test_unrelated_public_site_post_is_not_csrf_exempt(self):
+        client = self.build_origin_client()
+
+        response = client.post(
+            "/public/sites/example/not-events",
+            headers={"Origin": "https://app.example.com"},
+            cookies={
+                "madar_access_token": "access-token",
+                "madar_refresh_token": "refresh-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Invalid CSRF token")
 
     def test_auth_cookies_issue_csrf_token(self):
         client = self.build_origin_client()
@@ -250,11 +398,18 @@ class SecurityFoundationTests(unittest.TestCase):
             )
         )
 
-    def test_session_activity_is_valid_for_one_hour(self):
+    def test_session_activity_remains_valid_while_browser_session_is_open(self):
         activity = create_session_activity_value(now=1_000)
 
         self.assertTrue(is_session_activity_valid(activity, now=4_600))
-        self.assertFalse(is_session_activity_valid(activity, now=4_601))
+        self.assertTrue(is_session_activity_valid(activity, now=31_537_000))
+
+    def test_session_activity_supports_an_opt_in_inactivity_timeout(self):
+        activity = create_session_activity_value(now=1_000)
+
+        with patch.object(auth_service, "SESSION_INACTIVITY_TIMEOUT_SECONDS", 3_600):
+            self.assertTrue(is_session_activity_valid(activity, now=4_600))
+            self.assertFalse(is_session_activity_valid(activity, now=4_601))
 
     def test_session_activity_rejects_tampering(self):
         activity = create_session_activity_value(now=1_000)
@@ -417,7 +572,8 @@ class SecurityFoundationTests(unittest.TestCase):
 
         with patch.object(rate_limit_service, "_store", store), \
              patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
-             patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "127.0.0.1,::1"):
+             patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "127.0.0.1,::1"), \
+             patch("services.audit_service.record_security_event"):
             first = client.post("/limited", headers={"x-forwarded-for": "203.0.113.1"})
             second = client.post("/limited", headers={"x-forwarded-for": "203.0.113.2"})
             response = client.post("/limited", headers={"x-forwarded-for": "203.0.113.3"})
@@ -443,7 +599,9 @@ class SecurityFoundationTests(unittest.TestCase):
 
         client = TestClient(app)
 
-        with patch.object(rate_limit_service, "_store", store),              patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True):
+        with patch.object(rate_limit_service, "_store", store), \
+             patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
+             patch("services.audit_service.record_security_event"):
             self.assertEqual(client.post("/limited").status_code, 200)
             self.assertEqual(client.post("/limited").status_code, 200)
             response = client.post("/limited")
@@ -451,22 +609,87 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response.json()["detail"], "Too many requests. Please try again later.")
 
+    def test_rate_limit_backend_outage_returns_service_unavailable(self):
+        app = FastAPI()
+
+        class UnavailableStore:
+            def incr_with_ttl(self, _key, _window_seconds):
+                raise ConnectionError("Redis unavailable")
+
+        @app.post("/limited")
+        def limited(request: Request):
+            enforce_rate_limit(
+                request,
+                "test",
+                limit=2,
+                window_seconds=60,
+            )
+            return {"ok": True}
+
+        client = TestClient(app)
+
+        with patch.object(rate_limit_service, "_store", UnavailableStore()), \
+             patch.object(rate_limit_service, "RATE_LIMIT_ENABLED", True), \
+             patch.object(rate_limit_service, "RATE_LIMIT_FAIL_OPEN", False):
+            response = client.post("/limited")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["detail"],
+            "Request protection service is temporarily unavailable. Please try again.",
+        )
     def get_migrations_dir(self):
-        candidates = [
-            Path(__file__).resolve().parents[2] / "database" / "migrations",
-            Path(__file__).resolve().parents[1] / "database" / "migrations",
-        ]
+        candidates = []
+        configured_dir = os.getenv("MADAR_MIGRATIONS_DIR")
+        if configured_dir:
+            candidates.append(Path(configured_dir))
 
+        test_path = Path(__file__).resolve()
+        for parent in test_path.parents:
+            candidates.append(parent / "database" / "migrations")
+
+        cwd = Path.cwd().resolve()
+        candidates.append(cwd / "database" / "migrations")
+        for parent in cwd.parents:
+            candidates.append(parent / "database" / "migrations")
+
+        checked = []
+        seen = set()
         for candidate in candidates:
-            if candidate.exists():
-                return candidate
+            resolved = candidate.resolve(strict=False)
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            checked.append(str(resolved))
+            if resolved.is_dir():
+                return resolved
 
-        self.skipTest("database migrations are not available in this test environment")
+        self.fail(
+            "database migrations are required for security tests; checked: "
+            + ", ".join(checked)
+        )
+
+    def read_migration_by_suffix(self, migrations_dir: Path, suffix: str) -> str:
+        matches = sorted(migrations_dir.glob(f"*_{suffix}"))
+        if not matches:
+            self.fail(f"missing migration matching *_{suffix} in {migrations_dir}")
+        if len(matches) > 1:
+            self.fail(
+                f"multiple migrations match *_{suffix} in {migrations_dir}: "
+                + ", ".join(match.name for match in matches)
+            )
+        return matches[0].read_text().lower()
 
     def test_builder_rls_migrations_are_tenant_scoped(self):
         migrations_dir = self.get_migrations_dir()
-        builder_projects_sql = (migrations_dir / "023_create_builder_projects.sql").read_text().lower()
-        submissions_sql = (migrations_dir / "025_create_builder_form_submissions.sql").read_text().lower()
+        builder_projects_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "create_builder_projects.sql",
+        )
+        submissions_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "create_builder_form_submissions.sql",
+        )
 
         self.assertIn("alter table public.builder_projects enable row level security", builder_projects_sql)
         self.assertIn("alter table public.builder_form_submissions enable row level security", submissions_sql)
@@ -478,11 +701,29 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertNotIn("for insert", submissions_sql.split("create policy", 1)[-1])
         self.assertNotIn("for update", submissions_sql.split("create policy", 1)[-1])
 
+    def test_form_idempotency_rpc_is_service_role_only_and_concurrency_safe(self):
+        migrations_dir = self.get_migrations_dir()
+        sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "add_form_submission_idempotency.sql",
+        )
+        self.assertIn("pg_advisory_xact_lock", sql)
+        self.assertIn("builder_form_submissions_idempotency_unique_idx", sql)
+        self.assertIn("idempotency_conflict", sql)
+        self.assertIn("set search_path = public", sql)
+        self.assertIn(
+            "revoke all on function public.create_builder_form_submission_safe",
+            sql,
+        )
+        self.assertIn("from public, anon, authenticated", sql)
+        self.assertIn("to service_role", sql)
+
     def test_website_settings_rls_cleanup_removes_user_id_compatibility(self):
         migrations_dir = self.get_migrations_dir()
-        website_settings_sql = (
-            migrations_dir / "032_harden_website_settings_rls_tenant_only.sql"
-        ).read_text().lower()
+        website_settings_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "harden_website_settings_rls_tenant_only.sql",
+        )
 
         self.assertIn("alter table public.website_settings enable row level security", website_settings_sql)
         self.assertIn("create policy website_settings_select_member", website_settings_sql)
@@ -498,7 +739,7 @@ class SecurityFoundationTests(unittest.TestCase):
 
     def test_audit_logs_migration_is_backend_only(self):
         migrations_dir = self.get_migrations_dir()
-        audit_sql = (migrations_dir / "028_create_audit_logs.sql").read_text().lower()
+        audit_sql = self.read_migration_by_suffix(migrations_dir, "create_audit_logs.sql")
 
         self.assertIn("create table if not exists public.audit_logs", audit_sql)
         self.assertIn("tenant_id integer references public.tenants", audit_sql)
@@ -517,7 +758,10 @@ class SecurityFoundationTests(unittest.TestCase):
 
     def test_features_rls_migration_is_tenant_scoped_and_read_only(self):
         migrations_dir = self.get_migrations_dir()
-        features_sql = (migrations_dir / "027_harden_features_rls.sql").read_text().lower()
+        features_sql = self.read_migration_by_suffix(
+            migrations_dir,
+            "harden_features_rls.sql",
+        )
 
         self.assertIn("alter table public.features enable row level security", features_sql)
         self.assertIn("revoke all on table public.features from anon", features_sql)

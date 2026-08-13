@@ -39,7 +39,7 @@ def build_mfa_client():
 
 def auth_response(auth_id="auth-1"):
     return SimpleNamespace(
-        user=SimpleNamespace(id=auth_id),
+        user=SimpleNamespace(id=auth_id, email_confirmed_at="2026-01-01T00:00:00Z"),
         session=SimpleNamespace(access_token="aal1-access", refresh_token="aal1-refresh"),
     )
 
@@ -156,6 +156,7 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
              patch.object(mfa_routes, "set_auth_cookies", return_value="csrf") as set_auth_cookies, \
              patch.object(mfa_routes, "clear_pending_mfa_cookie") as clear_pending_mfa_cookie, \
              patch.object(mfa_routes, "mark_aal2_verified"), \
+             patch.object(mfa_routes, "record_security_event"), \
              patch.object(mfa_routes, "record_mfa_event"):
             response = client.post(
                 "/auth/mfa/login/verify",

@@ -1,11 +1,11 @@
-import { DASHBOARD_ROUTES, POST_LOGIN_FALLBACK_ROUTE } from "../config/routes";
+﻿import { DASHBOARD_ROUTES, POST_LOGIN_FALLBACK_ROUTE } from "../config/routes";
 
 export function normalizeUserType(value) {
   return String(value || "user").trim().toLowerCase();
 }
 
 export function isTenantSiteRoutePath(pathname) {
-  return pathname.startsWith("/site/");
+  return pathname.startsWith("/site/") || pathname.startsWith("/forms/");
 }
 
 export function isDashboardRoutePath(pathname) {
@@ -14,6 +14,9 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith(DASHBOARD_ROUTES.pageBuilder) ||
     pathname.startsWith(DASHBOARD_ROUTES.builderResponses) ||
     pathname.startsWith(DASHBOARD_ROUTES.builderData) ||
+    pathname.startsWith(DASHBOARD_ROUTES.calendar) ||
+    pathname.startsWith(DASHBOARD_ROUTES.archive) ||
+    pathname.startsWith(DASHBOARD_ROUTES.ecommerce) ||
     pathname.startsWith(DASHBOARD_ROUTES.notifications) ||
     pathname.startsWith(DASHBOARD_ROUTES.myPlan) ||
     pathname.startsWith(DASHBOARD_ROUTES.adminUsers) ||
@@ -40,8 +43,10 @@ export function getSafePostLoginPath(userInfo, returnTo) {
     DASHBOARD_ROUTES.pageBuilder,
     DASHBOARD_ROUTES.builderResponses,
     DASHBOARD_ROUTES.builderData,
+    DASHBOARD_ROUTES.calendar,
+    DASHBOARD_ROUTES.archive,
+    DASHBOARD_ROUTES.ecommerce,
     DASHBOARD_ROUTES.myPlan,
-    DASHBOARD_ROUTES.settings,
   ];
 
   const isAdminOnlyPath = adminOnlyPaths.some((path) =>

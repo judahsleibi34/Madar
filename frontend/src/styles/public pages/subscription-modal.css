@@ -10,11 +10,12 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(8, 12, 24, 0.58);
+  background: rgba(0, 0, 0, 0.58);
   backdrop-filter: blur(8px);
 }
 
 .subscription-modal {
+  position: relative;
   width: min(430px, 100%);
   border-radius: 28px;
   background: var(--theme-surface);
@@ -23,6 +24,33 @@
   padding: 30px;
   text-align: center;
   animation: subscription-modal-in 0.22s ease-out;
+}
+
+.subscription-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--theme-surface) 88%, transparent);
+  color: var(--theme-text-muted);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.subscription-modal-close:hover,
+.subscription-modal-close:focus-visible {
+  background: var(--theme-primary-soft);
+  color: var(--theme-primary);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .subscription-modal-icon {
@@ -91,6 +119,12 @@
 .subscription-modal-backdrop[dir="rtl"],
 .subscription-modal[dir="rtl"] {
   direction: rtl;
+}
+
+.subscription-modal-backdrop[dir="rtl"] .subscription-modal-close,
+.subscription-modal[dir="rtl"] .subscription-modal-close {
+  right: auto;
+  left: 14px;
 }
 
 @keyframes subscription-modal-in {

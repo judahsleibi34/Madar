@@ -1,34 +1,65 @@
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     container_name: madar-redis
     restart: unless-stopped
+    user: "999:1000"
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /data:rw,noexec,nosuid,uid=999,gid=1000,size=64m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    cpus: 0.50
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    ports:
+      - "127.0.0.1:6379:6379"
 
   backend:
     build:
       context: ./backend
     container_name: madar-backend
     restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
     env_file:
       - .env
     environment:
-      FRONTEND_URLS: ${FRONTEND_URLS}
+      APP_ENV: production
+      FRONTEND_URLS: ${FRONTEND_URLS:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-none}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       AVATAR_UPLOAD_DIR: ${AVATAR_UPLOAD_DIR:-avatar_uploads}
-      UPLOADS_DIR: ${UPLOADS_DIR:-uploads}
+      PUBLIC_UPLOADS_DIR: ${PUBLIC_UPLOADS_DIR:-uploads}
+      DATA_UPLOAD_DIR: ${DATA_UPLOAD_DIR:-private_uploads}
+      PRIVATE_CHARTS_DIR: ${PRIVATE_CHARTS_DIR:-private_generated_charts}
       BUILDER_ASSET_MAX_BYTES: ${BUILDER_ASSET_MAX_BYTES:-5242880}
+      BUILDER_VIDEO_MAX_BYTES: ${BUILDER_VIDEO_MAX_BYTES:-262144000}
+      BUILDER_DOCUMENT_MAX_BYTES: ${BUILDER_DOCUMENT_MAX_BYTES:-52428800}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-12582912}
+      MAX_BUILDER_ASSET_REQUEST_BODY_BYTES: ${MAX_BUILDER_ASSET_REQUEST_BODY_BYTES:-264241152}
       MAX_JSON_BODY_BYTES: ${MAX_JSON_BODY_BYTES:-3145728}
       MAX_SMALL_JSON_BODY_BYTES: ${MAX_SMALL_JSON_BODY_BYTES:-262144}
       MAX_DATA_JSON_BODY_BYTES: ${MAX_DATA_JSON_BODY_BYTES:-1048576}
       ALLOW_INSECURE_HTTP_URLS: ${ALLOW_INSECURE_HTTP_URLS:-false}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
-      RATE_LIMIT_FAIL_OPEN: ${RATE_LIMIT_FAIL_OPEN:-true}
+      RATE_LIMIT_FAIL_OPEN: ${RATE_LIMIT_FAIL_OPEN:-false}
       AUTH_RATE_LIMIT_LIMIT: ${AUTH_RATE_LIMIT_LIMIT:-20}
       AUTH_RATE_LIMIT_WINDOW_SECONDS: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:-300}
       PASSWORD_RATE_LIMIT_LIMIT: ${PASSWORD_RATE_LIMIT_LIMIT:-10}
@@ -49,22 +80,187 @@ services:
       CSRF_ORIGIN_CHECK_ENABLED: ${CSRF_ORIGIN_CHECK_ENABLED:-true}
       CSRF_ALLOW_MISSING_ORIGIN: ${CSRF_ALLOW_MISSING_ORIGIN:-false}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+      MADAR_MIGRATIONS_DIR: ${MADAR_MIGRATIONS_DIR:-/app/database/migrations}
+      MADAR_TEST_REPOSITORY_ROOT: /test-repository
+      STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      STORAGE_DISK_FREE_FLOOR_BYTES: ${STORAGE_DISK_FREE_FLOOR_BYTES:-2147483648}
+      BACKUP_FRESHNESS_REQUIRED: ${BACKUP_FRESHNESS_REQUIRED:-false}
+      BACKUP_FRESHNESS_MARKER: ${BACKUP_FRESHNESS_MARKER:-}
+      BACKUP_MAX_AGE_SECONDS: ${BACKUP_MAX_AGE_SECONDS:-129600}
+      NOTIFICATION_WORKER_REQUIRED: ${NOTIFICATION_WORKER_REQUIRED:-false}
+      NOTIFICATION_WORKER_ENABLED: ${NOTIFICATION_WORKER_ENABLED:-false}
+      NOTIFICATION_WORKER_HEALTH_URL: ${NOTIFICATION_WORKER_HEALTH_URL:-}
+      NOTIFICATION_QUEUE_MAX_DEPTH: ${NOTIFICATION_QUEUE_MAX_DEPTH:-1000}
+      NOTIFICATION_QUEUE_MAX_AGE_SECONDS: ${NOTIFICATION_QUEUE_MAX_AGE_SECONDS:-900}
+      NOTIFICATION_QUEUE_MAX_DEAD: ${NOTIFICATION_QUEUE_MAX_DEAD:-0}
+      MPLCONFIGDIR: /tmp/matplotlib
+      XDG_CACHE_HOME: /tmp/.cache
+      CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-false}
+      CALENDAR_SYNC_REQUIRED: ${CALENDAR_SYNC_REQUIRED:-false}
+      CALENDAR_SYNC_WORKER_ENABLED: ${CALENDAR_SYNC_WORKER_ENABLED:-true}
+      CALENDAR_SYNC_WORKER_HEALTH_URL: ${CALENDAR_SYNC_WORKER_HEALTH_URL:-http://calendar-sync-worker:8091/health}
+      CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
+      GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
+      GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
+      MICROSOFT_CALENDAR_CLIENT_ID: ${MICROSOFT_CALENDAR_CLIENT_ID:-}
+      MICROSOFT_CALENDAR_CLIENT_SECRET: ${MICROSOFT_CALENDAR_CLIENT_SECRET:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      FRONTEND_PRIMARY_URL: ${FRONTEND_PRIMARY_URL:-}
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8001:8000"
     volumes:
       - ./backend/avatar_uploads:/app/avatar_uploads
-      - ./backend/uploads:/app/uploads
+      - type: bind
+        source: ./backend/uploads
+        target: /app/uploads
+        bind:
+          create_host_path: false
+      - ./backend/private_uploads:/app/private_uploads
+      - ./backend/private_generated_charts:/app/private_generated_charts
+      - ./database:/app/database:ro
+      - ./supabase:/app/supabase:ro
+      - ./scripts:/scripts:ro
+      - ./backend/Dockerfile:/test-repository/backend/Dockerfile:ro
+      - ./frontend/Dockerfile:/test-repository/frontend/Dockerfile:ro
+      - ./frontend/security_headers.conf.template:/test-repository/frontend/security_headers.conf.template:ro
+      - ./docker-compose.yml:/test-repository/docker-compose.yml:ro
+      - ./docker-compose.dev.yml:/test-repository/docker-compose.dev.yml:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    cpus: 2.00
+    mem_limit: 2g
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  notification-worker:
+    build:
+      context: ./backend
+    container_name: madar-notification-worker
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    profiles: ["workers"]
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      NOTIFICATION_WORKER_ENABLED: "true"
+      NOTIFICATION_WORKER_BATCH_SIZE: ${NOTIFICATION_WORKER_BATCH_SIZE:-25}
+      NOTIFICATION_WORKER_CONCURRENCY: ${NOTIFICATION_WORKER_CONCURRENCY:-2}
+      NOTIFICATION_WORKER_POLL_SECONDS: ${NOTIFICATION_WORKER_POLL_SECONDS:-5}
+      NOTIFICATION_WORKER_HEALTH_HOST: 0.0.0.0
+      STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
+    command: ["python", "-m", "workers.notification_worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    cpus: 1.00
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  calendar-sync-worker:
+    build:
+      context: ./backend
+    container_name: madar-calendar-sync-worker
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
+      CALENDAR_SYNC_WORKER_ENABLED: ${CALENDAR_SYNC_WORKER_ENABLED:-true}
+      CALENDAR_SYNC_BATCH_SIZE: ${CALENDAR_SYNC_BATCH_SIZE:-10}
+      CALENDAR_SYNC_POLL_SECONDS: ${CALENDAR_SYNC_POLL_SECONDS:-5}
+      CALENDAR_INBOUND_SYNC_INTERVAL_SECONDS: ${CALENDAR_INBOUND_SYNC_INTERVAL_SECONDS:-300}
+      CALENDAR_INBOUND_SYNC_BATCH_SIZE: ${CALENDAR_INBOUND_SYNC_BATCH_SIZE:-2}
+      CALENDAR_SYNC_WORKER_HEALTH_HOST: 0.0.0.0
+      CALENDAR_SYNC_WORKER_HEALTH_PORT: 8091
+      GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
+      GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
+      MICROSOFT_CALENDAR_CLIENT_ID: ${MICROSOFT_CALENDAR_CLIENT_ID:-}
+      MICROSOFT_CALENDAR_CLIENT_SECRET: ${MICROSOFT_CALENDAR_CLIENT_SECRET:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      FRONTEND_PRIMARY_URL: ${FRONTEND_PRIMARY_URL:-}
+      STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
+    command: ["python", "-m", "workers.calendar_sync_worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    cpus: 1.00
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
 
   frontend:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_URL: ${VITE_API_URL:-}
     container_name: madar-frontend
     restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/cache/nginx:rw,noexec,nosuid,uid=101,gid=101,size=32m
+      - /etc/nginx/conf.d:rw,noexec,nosuid,uid=101,gid=101,size=1m
+    environment:
+      APP_ENV: production
+      MADAR_CSP_CONNECT_SRC: ${MADAR_CSP_CONNECT_SRC:-https://api.madarportal.com}
+      MADAR_HSTS: ${MADAR_HSTS:-}
     ports:
-      - "127.0.0.1:3000:80"
+      - "127.0.0.1:3000:8080"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    cpus: 0.50
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

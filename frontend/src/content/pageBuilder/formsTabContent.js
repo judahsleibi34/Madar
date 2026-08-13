@@ -128,7 +128,7 @@ export const formsTabContent = {
       logicHelp: "If a question equals an answer, show or hide another question.",
       noLogicRules: "No logic rules yet.",
       deleteFormTitle: "Delete this form?",
-      deleteFormMessage: "and its questions, translations, placements, and workflows will be removed. This cannot be undone.",
+      deleteFormMessage: "and its questions, translations, and workflows will be removed. Connected blocks will remain visibly disconnected until you explicitly reconnect or remove them. This cannot be undone.",
       deleteFormPageTitle: "Delete this form page?",
       deleteFormPageMessage: "and its questions will be removed from this form. This cannot be undone.",
       keepForm: "Keep form",

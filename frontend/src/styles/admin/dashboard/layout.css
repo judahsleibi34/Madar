@@ -293,11 +293,141 @@
   background: var(--theme-primary-soft);
 }
 
+.notification-toast-viewport {
+  position: fixed;
+  z-index: 120;
+  top: 20px;
+  inset-inline-end: 20px;
+  width: min(380px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.notification-toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  box-shadow: 0 18px 48px rgba(var(--theme-shadow-rgb), 0.2);
+  pointer-events: auto;
+  animation: notification-toast-enter 180ms ease-out;
+}
+
+.notification-toast-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--theme-primary-soft);
+  color: var(--theme-primary);
+}
+
+.notification-toast-content,
+.notification-toast-dismiss {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.notification-toast-content {
+  min-width: 0;
+  padding: 1px 0;
+  text-align: start;
+}
+
+.notification-toast-content strong,
+.notification-toast-content span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.notification-toast-content strong {
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1.3;
+}
+
+.notification-toast-content span {
+  margin-top: 4px;
+  color: var(--theme-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.notification-toast-dismiss {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-text-soft);
+}
+
+.notification-toast-content:focus-visible,
+.notification-toast-dismiss:focus-visible {
+  outline: 2px solid var(--theme-primary);
+  outline-offset: 2px;
+}
+
+.notification-toast-dismiss:hover {
+  background: var(--theme-primary-soft);
+  color: var(--theme-primary);
+}
+
+@keyframes notification-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-toast {
+    animation: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .notification-toast-viewport {
+    top: 12px;
+    inset-inline: 12px;
+    width: auto;
+  }
+}
+
 .notifications-page {
   width: min(1120px, 100%);
   margin: 0 auto;
   display: grid;
   gap: 18px;
+  color: var(--theme-text);
+  color-scheme: inherit;
+}
+
+/* Keep Notifications on the same app canvas as Calendar. The global
+   data-theme tokens update this route immediately when the theme changes. */
+.admin-dashboard-page:has(> .notifications-page) {
+  background: var(--theme-bg);
+}
+
+.notification-popover {
+  color-scheme: inherit;
 }
 
 .notifications-page-header {
@@ -361,6 +491,40 @@
   color: var(--theme-text-soft);
   font-size: 12px;
   font-weight: 900;
+}
+
+.notifications-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.notifications-actions button {
+  min-height: 40px;
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  font-weight: 900;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.notifications-actions button:hover:not(:disabled) {
+  border-color: var(--theme-primary);
+  color: var(--theme-primary);
+}
+
+.notifications-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.notifications-actions span {
+  color: var(--theme-text-soft);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .notifications-summary-grid {
@@ -859,7 +1023,6 @@
   width: 100% !important;
   max-width: 100% !important;
   display: grid !important;
-  grid-template-columns: 340px minmax(0, 1fr) 320px !important;
   overflow: hidden !important;
 }
 
@@ -889,18 +1052,6 @@
   max-width: 100%;
 }
 
-/* Responsive builder columns */
-@media (max-width: 1280px) {
-  .admin-dashboard-layout-builder .builder-layout {
-    grid-template-columns: 300px minmax(0, 1fr) 290px !important;
-  }
-}
-
-@media (max-width: 1100px) {
-  .admin-dashboard-layout-builder .builder-layout {
-    grid-template-columns: 280px minmax(0, 1fr) 260px !important;
-  }
-}
 
 /* Mobile safety */
 @media (max-width: 900px) {

@@ -52,7 +52,15 @@ The backend is the trust boundary. It owns cookie/session validation, CSRF check
 
 ## Required Environment Variables
 
-The backend loads configuration from `.env` and Docker Compose. Do not commit secrets.
+The backend loads configuration from the repository-root `.env` and Docker
+Compose. Local development explicitly reloads that file with override enabled,
+so stale variables inherited from an old terminal cannot silently point the API
+at a different Supabase project. Production keeps deployment-provided
+environment variables authoritative.
+
+Use `MADAR_ENV_FILE` to select another env file. Use
+`MADAR_ENV_OVERRIDE=false` only when you intentionally want shell variables to
+win during local development. Do not commit secrets.
 
 Core required values:
 
@@ -70,15 +78,39 @@ Common security and session settings:
 - `CSRF_ALLOW_MISSING_ORIGIN`
 - `CSRF_TRUSTED_ORIGINS`
 - `SESSION_ACTIVITY_SECRET`
-- `SESSION_INACTIVITY_TIMEOUT_SECONDS`
+- `SESSION_INACTIVITY_TIMEOUT_SECONDS` (optional; defaults to `0`, which keeps
+  the session active for the lifetime of the browser session; set a positive
+  number to enforce an inactivity timeout)
 - `ADMIN_MFA_LOGIN_ENFORCEMENT`
 - `TRUSTED_PROXY_IPS`
+
+Calendar integrations and workers:
+
+- `CALENDAR_CREDENTIALS_SECRET` (a dedicated high-entropy secret used to encrypt provider tokens)
+- `PUBLIC_API_URL` and `FRONTEND_PRIMARY_URL` (must match the registered OAuth redirect hosts)
+- `GOOGLE_CALENDAR_CLIENT_ID` and `GOOGLE_CALENDAR_CLIENT_SECRET`
+- `MICROSOFT_CALENDAR_CLIENT_ID` and `MICROSOFT_CALENDAR_CLIENT_SECRET`
+- `CALENDAR_SYNC_WORKER_ENABLED`
+- `CALENDAR_SYNC_INTERVAL_SECONDS`
+- `NOTIFICATION_WORKER_ENABLED` (also dispatches scheduled calendar reminders)
+
+Native browser/operating-system notifications:
+
+- `WEB_PUSH_VAPID_PUBLIC_KEY`
+- `WEB_PUSH_VAPID_PRIVATE_KEY`
+- `WEB_PUSH_VAPID_SUBJECT` (a contact URI such as `mailto:ops@example.com`)
+- Run the notification worker (`docker compose --profile workers up`) so queued
+  notifications and calendar reminders are delivered while the Madar page is
+  closed.
+- Each user must click **Enable system notifications** on the Notifications
+  page once per browser/device and grant the browser permission prompt.
 
 Rate limiting and request-size controls:
 
 - `REDIS_URL`
 - `RATE_LIMIT_ENABLED`
 - `RATE_LIMIT_FAIL_OPEN`
+  - Production should use `false` so Redis/rate-limiter failures do not silently allow abusive traffic. Local development may override this to `true` if Redis is intentionally unavailable.
 - `AUTH_RATE_LIMIT_LIMIT`
 - `AUTH_RATE_LIMIT_WINDOW_SECONDS`
 - `PASSWORD_RATE_LIMIT_LIMIT`
@@ -96,15 +128,18 @@ Rate limiting and request-size controls:
 - `BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT`
 - `BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS`
 - `MAX_REQUEST_BODY_BYTES`
+- `MAX_BUILDER_ASSET_REQUEST_BODY_BYTES`
 - `MAX_JSON_BODY_BYTES`
 - `MAX_SMALL_JSON_BODY_BYTES`
 - `MAX_DATA_JSON_BODY_BYTES`
 
 Builder and public-site settings:
 
-- `UPLOADS_DIR`
+- `PUBLIC_UPLOADS_DIR`
 - `AVATAR_UPLOAD_DIR`
 - `BUILDER_ASSET_MAX_BYTES`
+- `BUILDER_VIDEO_MAX_BYTES`
+- `BUILDER_DOCUMENT_MAX_BYTES`
 - `MAX_BUILDER_SCHEMA_BYTES`
 - `ALLOW_INSECURE_HTTP_URLS`
 
@@ -115,9 +150,19 @@ Billing and deployment helpers:
 
 Data-analysis and remote dataset controls:
 
-- `CHART_OUTPUT_DIR`
 - `DATA_UPLOAD_DIR`
+- `PRIVATE_CHARTS_DIR` / `GENERATED_CHARTS_DIR`
+- `AI_FREE_DAILY_MESSAGES`
+- `AI_PRO_DAILY_MESSAGES`
+- `AI_ENTERPRISE_DAILY_MESSAGES`
 - `MAX_UPLOAD_BYTES`
+- `MAX_DATASET_UPLOAD_BYTES`
+- `LARGE_DATASET_THRESHOLD_BYTES`
+- `MAX_FULL_DATAFRAME_BYTES`
+- `CSV_CHUNK_SIZE_ROWS`
+- `MAX_PREVIEW_ROWS`
+- `CSV_DUPLICATE_TRACK_ROWS`
+- `MAX_EXCEL_UPLOAD_BYTES`
 - `ALLOW_REMOTE_DATASET_URLS`
 - `ALLOW_INSECURE_REMOTE_DATASET_HTTP`
 - `DATAFRAME_CACHE_MAX_ITEMS`
@@ -132,6 +177,31 @@ Data-analysis and remote dataset controls:
 - `MAX_EXCEL_ROWS`
 - `MAX_EXCEL_COLUMNS`
 - `MAX_EXCEL_CELL_CHARS`
+
+Upload storage is intentionally split by trust level:
+
+- `PUBLIC_UPLOADS_DIR` backs managed public `/uploads/tenant_{id}/builder_assets/...` routes. It is for intentionally public files such as builder image assets.
+- `DATA_UPLOAD_DIR` backs private CSV/XLS/XLSX data-analysis uploads and exported/user dataset files. It defaults to `private_uploads` and must never be mounted as static files in production.
+- `PRIVATE_CHARTS_DIR` backs private dataset-derived generated charts. It defaults to `private_generated_charts` and is served only through authenticated `/users/{user_id}/visualization/charts/{chart_id}` routes.
+
+The backend fails startup if `DATA_UPLOAD_DIR` or `PRIVATE_CHARTS_DIR` is configured inside the public upload tree, because filename secrecy is not a security boundary.
+
+Large CSV uploads are streamed to private storage and summarized with chunked
+metadata extraction instead of full in-memory DataFrames. Defaults are
+`MAX_DATASET_UPLOAD_BYTES=209715200`, `LARGE_DATASET_THRESHOLD_BYTES=52428800`,
+`MAX_FULL_DATAFRAME_BYTES=52428800`, `CSV_CHUNK_SIZE_ROWS=3000`, and
+`MAX_PREVIEW_ROWS=120`. Duplicate tracking defaults to
+`CSV_DUPLICATE_TRACK_ROWS=100000` row signatures. Excel files above
+`MAX_EXCEL_UPLOAD_BYTES=52428800` are
+rejected with guidance to convert to CSV because Excel parsing is not chunked.
+
+AI provider usage is enforced at `POST /users/{user_id}/analysis/ai` in
+`backend/data_analysis/routes/analysis_routes.py` before provider calls are
+made. Free users default to `AI_FREE_DAILY_MESSAGES=5`; pro and enterprise
+limits default to 100 and 1000. Unsafe prompts and unauthenticated or
+tenant-mismatched requests are rejected before usage is incremented. Accepted
+requests reserve one daily message before the planner provider call, so provider
+failures after that point still count as attempted usage.
 
 ## Docker Setup
 
@@ -223,29 +293,72 @@ Madar uses a layered security model:
 
 ## Billing Limitation
 
-Billing is currently limited to internal feature-state handling and pending checkout records.
+The server-authoritative commercial catalog is exposed at `GET /billing/catalog`.
+Canonical base-plan, add-on, storage, hosted-address, workspace-seat, and AI
+standard-token primitives are introduced by migration `071`. Customer plan and
+add-on requests remain pending until an AAL2-authenticated administrator reviews
+and activates them.
 
-There is no real payment provider integration yet, so this branch should be treated as billing-preparation work rather than a production payment system.
+There is no payment-provider integration, automatic renewal, card storage, or
+invoice generation. Migrations `071` and `072` were applied to the shared live
+database on 2026-07-31. Legacy billing and branded-route review records must
+still be reconciled before strict canonical entitlements are enabled in an
+application rollout. See
+`docs/madar-pricing-entitlements-implementation.md` for the compatibility and
+deployment sequence.
 
 ## Testing Commands
 
-Use Docker-based validation from the repository root:
+Use Docker-based validation from the repository root. For backend unit tests, include the test override and `--no-deps` so the test container does not try to create the fixed-name Redis containers used by the running production/dev stacks:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps backend python -m unittest tests.test_security_foundation -v
+```
+
+For the broader backend stabilization suite:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps backend python -m unittest \
+  tests.test_security_foundation \
+  tests.test_website_routes \
+  tests.test_builder_backend_hardening \
+  tests.test_builder_form_submissions \
+  tests.test_builder_archived_projects \
+  tests.test_builder_asset_upload \
+  -v
+```
+
+The test override uses a separate Compose project name, removes fixed `container_name` values for test services, avoids publishing backend/frontend ports, and keeps the read-only migration mounts available at `/app/database` and `/app/supabase`.
+
+For full image validation, still run:
 
 ```bash
 docker compose build backend frontend
-docker compose run --rm backend python -m unittest tests.test_onboarding_routes -v
-docker compose run --rm backend python -m unittest tests.test_website_routes tests.test_billing_routes tests.test_user_profile_url_validation tests.test_security_foundation tests.test_builder_backend_hardening tests.test_builder_form_submissions -v
 docker compose build frontend
 git diff --check
 ```
 
 If you are working on a smaller change, run the most relevant backend test module(s) first and expand from there.
 
+## Backend Smoke Tests
+
+Run the backend smoke script after deploys or container rebuilds to verify safe read-only endpoints, expected unauthenticated failures, and CORS preflight behavior. The script does not use credentials and does not send mutating requests.
+
+```bash
+./scripts/backend_smoke.sh prod-local
+./scripts/backend_smoke.sh dev-local
+./scripts/backend_smoke.sh prod-public
+```
+
+Use `prod-local` for the production backend bound to `127.0.0.1:8001`, `dev-local` for the development backend bound to `127.0.0.1:8002`, and `prod-public` for `https://api.madarportal.com`.
+
 ## Deployment Checklist
 
 Before merging or deploying:
 
 - confirm the branch is clean enough for release
+- complete the production launch checklist in `docs/production-launch-checklist.md`
+- confirm backup/restore readiness using `docs/production-backup-restore.md`
 - verify the Docker build succeeds for backend and frontend
 - run the backend test modules relevant to the change
 - confirm migrations are applied in the target environment

@@ -1,332 +1,187 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Database,
-  FileText,
-  Globe2,
-  HardDrive,
-} from "lucide-react";
+
 import { getPricingContent } from "../../content";
-import { PUBLIC_ROUTES, DASHBOARD_ROUTES } from "../../config/routes";
+import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
 import { BILLING_API_ROUTES } from "../../services/apiRoutes";
-import { apiFetch, getApiUrl } from "../../utils/apiClient";
+import { apiFetch, getApiUrl, readApiError } from "../../utils/apiClient";
 import SubscriptionStatusModal from "./SubscriptionStatusModal";
 
-const MODULE_ICONS = {
-  cms: Globe2,
-  forms: FileText,
-  reservations: CalendarDays,
-};
+const formatPrice = (minor, currency) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency || "USD",
+    maximumFractionDigits: 0,
+  }).format(Number(minor || 0) / 100);
 
-function getFriendlySubscriptionError(errorDetail, lang = "en") {
-  const text =
-    typeof errorDetail === "string"
-      ? errorDetail
-      : JSON.stringify(errorDetail || "");
-
-  const isArabic = lang === "ar";
-
-  if (text.includes("duplicate key value") || text.includes("already exists")) {
-    return isArabic
-      ? "ظ‡ط°ط§ ط§ظ„ط§ط´طھط±ط§ظƒ ظ…ظˆط¬ظˆط¯ ط¨ط§ظ„ظپط¹ظ„ ظپظٹ ط­ط³ط§ط¨ظƒ."
-      : "This subscription is already active on your account.";
-  }
-
-  if (text.includes("User does not have a tenant_id")) {
-    return isArabic
-      ? "ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ط¹ط«ظˆط± ط¹ظ„ظ‰ ظ…ط³ط§ط­ط© ط§ظ„ط¹ظ…ظ„ ط§ظ„ط®ط§طµط© ط¨ط­ط³ط§ط¨ظƒ. ظٹط±ط¬ظ‰ طھط³ط¬ظٹظ„ ط§ظ„ط¯ط®ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰."
-      : "We could not find your workspace. Please log in again.";
-  }
-
-  return isArabic
-    ? "طھط¹ط°ط± ط­ظپط¸ ط§ظ„ط§ط´طھط±ط§ظƒ. ظٹط±ط¬ظ‰ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰."
-    : "Could not save your subscription. Please try again.";
-}
-
-function getPlanForTools(tools) {
-  if (tools.cms && tools.forms && tools.reservations) return "complete";
-  if (tools.cms && (tools.forms || tools.reservations)) return "cms-plus";
-  if (tools.cms) return "cms";
-  if (tools.forms) return "forms-data";
-  return "cms";
-}
-
-function getToolsForPlan(planId) {
-  if (planId === "forms-data") {
-    return { cms: false, forms: true, reservations: false };
-  }
-
-  if (planId === "cms-plus") {
-    return { cms: true, forms: true, reservations: false };
-  }
-
-  if (planId === "complete") {
-    return { cms: true, forms: true, reservations: true };
-  }
-
-  return { cms: true, forms: false, reservations: false };
-}
+const formatStorage = (bytes) => `${Math.round(Number(bytes || 0) / 1024 ** 3)} GB`;
 
 export default function BasePlansPage({ lang = "en" }) {
   const activeLang = lang === "ar" ? "ar" : "en";
-  const isArabic = activeLang === "ar";
   const t = getPricingContent(activeLang);
   const navigate = useNavigate();
   const location = useLocation();
-  const showBackButton = location.pathname !== PUBLIC_ROUTES.pricing;
+  const [catalog, setCatalog] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [submittingId, setSubmittingId] = useState("");
+  const [modalState, setModalState] = useState({ open: false, type: "success", message: "" });
 
-  const [selectedTools, setSelectedTools] = useState({
-    cms: true,
-    forms: true,
-    reservations: false,
-  });
-  const [submittingId, setSubmittingId] = useState(null);
-  const [modalState, setModalState] = useState({
-    open: false,
-    type: "success",
-    message: "",
-  });
-
-  const selectedPlanId = getPlanForTools(selectedTools);
-  const selectedPlan =
-    t.basePlans.find((plan) => plan.id === selectedPlanId) || t.basePlans[0];
-
-  const toggleTool = (toolId) => {
-    setSelectedTools((current) => {
-      const next = {
-        ...current,
-        [toolId]: !current[toolId],
-      };
-
-      if (toolId === "reservations" && next.reservations) {
-        next.cms = true;
-      }
-
-      if (toolId === "cms" && !next.cms) {
-        next.reservations = false;
-      }
-
-      if (!next.cms && !next.forms && !next.reservations) {
-        next[toolId] = true;
-      }
-
-      return next;
-    });
-  };
-
-  const handleSubscribe = async (plan) => {
-    setSubmittingId(plan.id);
-
-    try {
-      const response = await apiFetch(getApiUrl(BILLING_API_ROUTES.checkout), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          subscription_type: "full_platform",
-          plan: plan.billingPlan || plan.id,
-          builder_type: null,
-        }),
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch(getApiUrl(BILLING_API_ROUTES.catalog), { method: "GET", cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(readApiError(data, t.catalogError));
+        if (!cancelled) setCatalog(data.catalog);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.message || t.catalogError);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
+    return () => { cancelled = true; };
+  }, [t.catalogError]);
 
-      const data = await response.json().catch(() => null);
+  const plans = useMemo(
+    () => (catalog?.products || []).filter((product) => product.type === "base_plan"),
+    [catalog]
+  );
+  const addons = useMemo(
+    () => (catalog?.products || []).filter((product) =>
+      ["add_on", "token_pack"].includes(product.type)
+    ),
+    [catalog]
+  );
 
+  const requestPlan = async (plan) => {
+    setSubmittingId(plan.id);
+    try {
+      const response = await apiFetch(getApiUrl(BILLING_API_ROUTES.planRequest), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: plan.id }),
+      });
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setModalState({
           open: true,
           type: response.status === 401 ? "login" : "error",
-          message:
-            response.status === 401
-              ? t.loginRequired
-              : getFriendlySubscriptionError(data?.detail, activeLang),
+          message: readApiError(data, t.requestError),
         });
         return;
       }
-
       setModalState({
         open: true,
         type: "success",
-        message: t.success,
+        message: data.message || t.requestSaved,
       });
-    } catch (error) {
-      console.error("Subscription request failed:", error);
-
-      setModalState({
-        open: true,
-        type: "error",
-        message: t.serverError,
-      });
+    } catch {
+      setModalState({ open: true, type: "error", message: t.requestError });
     } finally {
-      setSubmittingId(null);
+      setSubmittingId("");
     }
   };
 
-  const handleModalConfirm = () => {
+  const closeModal = () => {
     const type = modalState.type;
-
-    setModalState({
-      open: false,
-      type: "success",
-      message: "",
-    });
-
+    setModalState({ open: false, type: "success", message: "" });
     if (type === "success") navigate(DASHBOARD_ROUTES.myPlan);
     if (type === "login") navigate(PUBLIC_ROUTES.login);
   };
 
   return (
-    <main className="pricing-page" dir={isArabic ? "rtl" : "ltr"}>
+    <main className="pricing-page" dir={activeLang === "ar" ? "rtl" : "ltr"}>
       <section className="pricing-inner-header">
-        {showBackButton && (
-          <button
-            type="button"
-            className="pricing-back-button"
-            onClick={() => navigate(PUBLIC_ROUTES.pricing)}
-          >
-            {"<- "}{isArabic ? "ط±ط¬ظˆط¹" : "Back"}
+        {location.pathname !== PUBLIC_ROUTES.pricing && (
+          <button className="pricing-back-button" type="button" onClick={() => navigate(PUBLIC_ROUTES.pricing)}>
+            {t.back}
           </button>
         )}
-
         <div className="pricing-section-heading">
-          <h2>{t.basePlansTitle}</h2>
-          <p>{t.basePlansSubtitle}</p>
+          <span className="pricing-eyebrow">{t.eyebrow}</span>
+          <h1>{t.title}</h1>
+          <p>{t.subtitle}</p>
+          <p role="note"><strong>{t.manualActivation}</strong></p>
         </div>
       </section>
 
-      <section className="pricing-base-section">
-        <div className="pricing-builder">
-          <section
-            className="pricing-tool-panel"
-            aria-labelledby="pricing-tool-title"
-          >
-            <div className="pricing-panel-heading">
-              <h3 id="pricing-tool-title">{t.chooserTitle}</h3>
-              <p>{t.chooserSubtitle}</p>
-            </div>
+      {loading && <section className="pricing-base-section" role="status">{t.loading}</section>}
+      {!loading && error && <section className="pricing-base-section" role="alert">{error}</section>}
 
-            <div className="pricing-tool-list">
-              {t.modules.map((module) => {
-                const Icon = MODULE_ICONS[module.id] || Database;
-                const checked = selectedTools[module.id];
-
-                return (
+      {!loading && !error && (
+        <section className="pricing-base-section">
+          <div className="pricing-plan-strip">
+            {plans.map((plan) => {
+              const copy = t.plans[plan.id];
+              return (
+                <article className={`pricing-mini-plan ${plan.id === "business" ? "is-selected" : ""}`} key={plan.id}>
+                  <span>{copy?.name || plan.name}</span>
+                  <strong>{formatPrice(plan.price_minor, plan.currency)}{t.perMonth}</strong>
+                  <small>{copy?.summary || plan.summary}</small>
+                  <ul className="pricing-feature-list">
+                    {(plan.public_feature_keys || []).map((featureKey) => (
+                      <li className="included" key={featureKey}>
+                        <CheckCircle2 size={15} aria-hidden="true" /> {t.featureLabels[featureKey] || featureKey}
+                      </li>
+                    ))}
+                    <li className="included">
+                      <CheckCircle2 size={15} aria-hidden="true" />
+                      {formatStorage(plan.allowances?.storage_bytes)} {t.hostedStorage}
+                    </li>
+                    <li className="included">
+                      <CheckCircle2 size={15} aria-hidden="true" /> {t.oneOperator}
+                    </li>
+                  </ul>
                   <button
-                    key={module.id}
+                    className="pricing-plan-button primary"
                     type="button"
-                    className={`pricing-tool-toggle ${checked ? "is-on" : ""}`}
-                    onClick={() => toggleTool(module.id)}
-                    aria-pressed={checked}
+                    disabled={submittingId === plan.id}
+                    onClick={() => requestPlan(plan)}
                   >
-                    <span className="pricing-tool-icon" aria-hidden="true">
-                      <Icon size={20} />
-                    </span>
-
-                    <span className="pricing-tool-copy">
-                      <strong>{module.name}</strong>
-                      <small>{module.description}</small>
-                    </span>
-
-                    <span className="pricing-switch" aria-hidden="true">
-                      <span />
-                    </span>
+                    {submittingId === plan.id ? t.saving : t.requestPlan}
                   </button>
-                );
-              })}
-            </div>
+                </article>
+              );
+            })}
+          </div>
 
-            {selectedTools.reservations && (
-              <p className="pricing-tool-note">{t.reservationNeedsCms}</p>
-            )}
+          <section className="pricing-compare" aria-labelledby="pricing-addons-title">
+            <h2 id="pricing-addons-title">{t.addonsTitle}</h2>
+            <div className="pricing-plan-strip">
+              {addons.map((addon) => (
+                <article className="pricing-mini-plan" key={addon.id}>
+                  <span>{t.addons[addon.id]?.name || addon.name}</span>
+                  <strong>
+                    {addon.price_minor == null
+                      ? t.comingSoon
+                      : `${formatPrice(addon.price_minor, addon.currency)}${
+                          addon.billing_interval === "month" ? t.perMonth : ""
+                        }`}
+                  </strong>
+                  <small>{t.addons[addon.id]?.summary || addon.summary}</small>
+                  {addon.coming_soon && <small role="note">{t.comingSoon}</small>}
+                </article>
+              ))}
+            </div>
           </section>
 
-          <aside className="pricing-recommendation" aria-label={t.yourPlan}>
-            <h3>{selectedPlan.name}</h3>
-            <p className="pricing-plan-description">
-              {selectedPlan.description}
-            </p>
-
-            <div className="pricing-price-row">
-              <strong>{selectedPlan.price}</strong>
-              <span>{t.perMonth}</span>
-            </div>
-
-            <div className="pricing-plan-meta">
-              <div>
-                <span>{t.bestFor}</span>
-                <p>{selectedPlan.bestFor}</p>
-              </div>
-
-              <div>
-                <span>{t.workflow}</span>
-                <p>{selectedPlan.workflow}</p>
-              </div>
-            </div>
-
-            <div className="pricing-limit-list">
-              <span>{t.includedInPlan}</span>
-              <ul>
-                {selectedPlan.includes.map((item) => (
-                  <li key={item}>
-                    <CheckCircle2 size={15} aria-hidden="true" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {selectedPlan.id === "complete" && (
-              <div className="pricing-storage-callout">
-                <HardDrive size={18} aria-hidden="true" />
-                <p>
-                  Save files on your device when you want local copies, or keep
-                  them on the server so your team can access them from the
-                  workspace.
-                </p>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="pricing-plan-button primary"
-              disabled={submittingId === selectedPlan.id}
-              onClick={() => handleSubscribe(selectedPlan)}
-            >
-              {submittingId === selectedPlan.id ? t.saving : selectedPlan.cta}
-            </button>
+          <aside className="pricing-storage-callout" role="note">
+            <p>{t.fairUse}</p>
+            <p>{t.addressNote}</p>
+            <p>{t.exclusions}</p>
           </aside>
-        </div>
-
-        <div className="pricing-compare">
-          <span className="pricing-eyebrow">{t.comparePlans}</span>
-
-          <div className="pricing-plan-strip">
-            {t.basePlans.map((plan) => (
-              <button
-                key={plan.id}
-                type="button"
-                className={`pricing-mini-plan ${
-                  plan.id === selectedPlan.id ? "is-selected" : ""
-                }`}
-                onClick={() => setSelectedTools(getToolsForPlan(plan.id))}
-              >
-                <span>{plan.name}</span>
-                <strong>{plan.price}</strong>
-                <small>{plan.description}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <SubscriptionStatusModal
         open={modalState.open}
         type={modalState.type}
         lang={activeLang}
         message={modalState.message}
-        onConfirm={handleModalConfirm}
+        onConfirm={closeModal}
       />
     </main>
   );

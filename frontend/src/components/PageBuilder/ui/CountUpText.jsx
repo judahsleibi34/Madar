@@ -3,7 +3,7 @@ import { animate, useInView, useMotionValue, useTransform, motion } from "framer
 
 const numberPattern = /-?[\d,.]+/;
 
-export default function CountUpText({ value, duration = 2 }) {
+export default function CountUpText({ value, duration = 2, animateValue = true }) {
   const text = String(value ?? "0");
   const match = text.match(numberPattern);
   const target = Number(String(match?.[0] || "0").replace(/,/g, ""));
@@ -21,10 +21,12 @@ export default function CountUpText({ value, duration = 2 }) {
   );
 
   useEffect(() => {
-    if (!isInView || !Number.isFinite(target)) return undefined;
+    if (!animateValue || !isInView || !Number.isFinite(target)) return undefined;
     const controls = animate(count, target, { duration, ease: "easeOut" });
     return () => controls.stop();
-  }, [count, duration, isInView, target]);
+  }, [animateValue, count, duration, isInView, target]);
+
+  if (!animateValue) return <span className="count-up-number">{text}</span>;
 
   if (!match || !Number.isFinite(target)) return <span ref={ref}>{text}</span>;
 

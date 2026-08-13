@@ -1,7 +1,10 @@
 import { createId, slugify, defaultPermissions, defaultTheme, defaultSiteChrome, fieldTypes } from "./PageBuilder.constants";
 import { getFactoryContent } from "../../../content/pageBuilder";
+import { RESPONSIVE_LAYOUT_ENGINE_VERSION, RESPONSIVE_LAYOUT_MODES } from "./PageBuilder.responsiveCapabilities";
 
 const factoryCopy = getFactoryContent("en");
+const createFactoryId = (prefix, overrides = {}) =>
+  Object.hasOwn(overrides, "id") ? String(overrides.id ?? "") : createId(prefix);
 
 export const createPosition = () => ({
   desktop: { x: 56, y: 56, width: 380, height: 96 },
@@ -34,6 +37,9 @@ export const createField = (label = factoryCopy.fields.untitled, type = "shortTe
     required: false,
     helpText: "",
     placeholder: meta?.label || "",
+    showDescriptionEditor: false,
+    showExampleEditor: false,
+    showDetailsEditor: false,
     options: choiceDefaults,
     defaultValue: "",
     scaleMin: 1,
@@ -87,9 +93,12 @@ export const createForm = (title = factoryCopy.form.title, fields = [], override
 
   return {
     id: createId("form"),
+    name: title,
     title,
     description: factoryCopy.form.description,
     successMessage: factoryCopy.form.successMessage,
+    languageMode: "en",
+    defaultLanguage: "en",
     connectedCollectionId: "",
     mode: "form",
     quiz: {
@@ -121,7 +130,7 @@ export const getFormFields = (form) =>
 
 export const createElement = (type = "text", overrides = {}) => {
   const base = {
-    id: createId("element"),
+    id: createFactoryId("element", overrides),
     type,
     name: type,
     content: "",
@@ -145,6 +154,7 @@ export const createElement = (type = "text", overrides = {}) => {
     heading: {
       name: factoryCopy.elements.heading.name,
       content: factoryCopy.elements.heading.content,
+      directWidthMode: "auto",
       styles: {
         ...base.styles,
         fontSize: "46px",
@@ -157,7 +167,7 @@ export const createElement = (type = "text", overrides = {}) => {
       content: factoryCopy.elements.text.content,
       styles: {
         ...base.styles,
-        color: "var(--theme-text-soft)",
+        color: "#000000",
         fontSize: "17px",
         lineHeight: "1.7",
       },
@@ -168,18 +178,53 @@ export const createElement = (type = "text", overrides = {}) => {
       action: createAction("goToPage"),
       styles: {
         ...base.styles,
-        color: "var(--theme-text-inverse)",
-        backgroundColor: "var(--theme-primary)",
+        borderRadius: "8px",
+        fontSize: "14px",
         fontWeight: "900",
+      },
+    },
+    imageButton: {
+      name: factoryCopy.elements.imageButton.name,
+      content: "",
+      action: createAction("goToPage"),
+      styles: {
+        ...base.styles,
+        backgroundColor: "transparent",
+        borderRadius: "8px",
+        alignSelf: "stretch",
       },
     },
     image: {
       name: factoryCopy.elements.image.name,
-      content:
-        "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop",
+      content: "",
       styles: {
         ...base.styles,
-        borderRadius: "22px",
+        borderRadius: "0",
+        alignSelf: "stretch",
+      },
+    },
+    video: {
+      name: factoryCopy.elements.video.name,
+      content: "",
+      video: { controls: true, muted: false, loop: false },
+      styles: {
+        ...base.styles,
+        backgroundColor: "var(--theme-text)",
+        borderRadius: "0",
+        alignSelf: "stretch",
+      },
+    },
+    document: {
+      name: factoryCopy.elements.document.name,
+      content: "",
+      document: {
+        title: factoryCopy.elements.document.title,
+        description: factoryCopy.elements.document.description,
+      },
+      styles: {
+        ...base.styles,
+        backgroundColor: "var(--theme-surface)",
+        borderRadius: "18px",
         alignSelf: "stretch",
       },
     },
@@ -199,16 +244,28 @@ export const createElement = (type = "text", overrides = {}) => {
     },
     carousel: {
       name: factoryCopy.elements.carousel.name,
-      carouselVariant: "lightswind",
+      carouselVariant: "cards",
       autoScroll: true,
       autoScrollMs: 4000,
       content: factoryCopy.elements.carousel.content,
       styles: {
         ...base.styles,
-        backgroundColor: "var(--theme-surface)",
-        borderRadius: "26px",
+        backgroundColor: "var(--theme-surface-2)",
+        borderRadius: "18px",
         alignSelf: "stretch",
-        "--carousel-height": "410px",
+        "--carousel-height": "390px",
+      },
+    },
+    photoProofing: {
+      name: factoryCopy.elements.photoProofing.name,
+      content: factoryCopy.elements.photoProofing.content,
+      proofing: { ...factoryCopy.elements.photoProofing.settings },
+      styles: {
+        ...base.styles,
+        backgroundColor: "var(--theme-surface)",
+        borderRadius: "24px",
+        alignSelf: "stretch",
+        width: "100%",
       },
     },
     carouselCards: {
@@ -301,6 +358,18 @@ export const createElement = (type = "text", overrides = {}) => {
         alignSelf: "stretch",
       },
     },
+    thinDivider: {
+      name: factoryCopy.elements.thinDivider.name,
+      content: "",
+      styles: {
+        ...base.styles,
+        color: "var(--theme-border-strong)",
+        backgroundColor: "transparent",
+        borderRadius: "0px",
+        alignSelf: "stretch",
+        "--divider-thickness": "1px",
+      },
+    },
     embed: {
       name: factoryCopy.elements.embed.name,
       content: factoryCopy.elements.embed.content,
@@ -315,14 +384,14 @@ export const createElement = (type = "text", overrides = {}) => {
       name: factoryCopy.elements.metric.name,
       content: factoryCopy.elements.metric.content,
       metricColumns: 4,
-      metrics: factoryCopy.elements.metric.metrics,
+      metrics: (factoryCopy.elements.metric.metrics || []).map((metric) => ({ ...metric })),
       styles: {
         ...base.styles,
         backgroundColor: "var(--theme-surface)",
         borderRadius: "22px",
         alignSelf: "stretch",
-        metricTextColor: "var(--theme-text)",
-        metricSymbolColor: "var(--theme-warning)",
+        metricTextColor: "#162033",
+        metricSymbolColor: "#f1b84b",
       },
     },
     loginBlock: {
@@ -361,6 +430,7 @@ export const createElement = (type = "text", overrides = {}) => {
       name: factoryCopy.elements.reservationBlock.name,
       content: factoryCopy.elements.reservationBlock.content,
       reservation: factoryCopy.elements.reservationBlock.reservation,
+      directSizeMode: "auto",
       styles: {
         ...base.styles,
         backgroundColor: "var(--theme-surface)",
@@ -388,7 +458,7 @@ export const createElement = (type = "text", overrides = {}) => {
 };
 
 export const createColumn = (elements = [], overrides = {}) => ({
-  id: createId("column"),
+  id: createFactoryId("column", overrides),
   name: factoryCopy.structure.column,
   layout: {
     align: "left",
@@ -398,7 +468,7 @@ export const createColumn = (elements = [], overrides = {}) => ({
 });
 
 export const createRow = (columns = [createColumn()], overrides = {}) => ({
-  id: createId("row"),
+  id: createFactoryId("row", overrides),
   layout: {
     columns: String(columns.length),
     align: "center",
@@ -409,13 +479,14 @@ export const createRow = (columns = [createColumn()], overrides = {}) => ({
 });
 
 export const createSection = ({
+  id,
   name = factoryCopy.structure.section,
   mode = "auto",
   layout = {},
   rows = [createRow()],
   freeElements = [],
 } = {}) => ({
-  id: createId("section"),
+  id: id === undefined ? createId("section") : String(id ?? ""),
   name,
   mode,
   layout: {
@@ -430,9 +501,10 @@ export const createSection = ({
 });
 
 export const createPage = (name = factoryCopy.structure.page, sections = [], overrides = {}) => ({
-  id: createId("page"),
+  id: createFactoryId("page", overrides),
   name,
   slug: name.toLowerCase() === "home" ? "/" : `/${slugify(name)}`,
+  isDefault: name.toLowerCase() === "home",
   backgroundColor: "var(--theme-surface)",
   visibility: "public",
   showInNavigation: true,
@@ -470,6 +542,11 @@ export const createRole = (name = factoryCopy.structure.role, permissions = {}) 
   permissions: {
     ...defaultPermissions,
     ...permissions,
+  },
+  resourceAccess: {
+    pageIds: [],
+    formIds: [],
+    reservationBlockIds: [],
   },
 });
 
@@ -510,6 +587,10 @@ export const createProject = ({
   id: createId("project"),
   name,
   status: "draft",
+  responsiveLayout: {
+    mode: RESPONSIVE_LAYOUT_MODES.legacy,
+    engineVersion: RESPONSIVE_LAYOUT_ENGINE_VERSION,
+  },
   activePageId: pages[0]?.id || "",
   activeFormId: forms[0]?.id || "",
   activeCollectionId: collections[0]?.id || "",

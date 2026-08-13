@@ -5,7 +5,6 @@ export * from "./footerContent";
 export * from "./pages/homeContent";
 export * from "./pages/aboutContent";
 export * from "./pages/contactContent";
-export * from "./pages/featuresContent";
 export * from "./pages/pricingContent";
 export * from "./pages/myPlanContent";
 export * from "./pages/teamContent";

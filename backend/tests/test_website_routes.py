@@ -100,7 +100,9 @@ class FakeSupabase:
                     "tenant_id": 7,
                     "user_id": 3,
                     "subdomain": "fresh-site",
+                    "standard_path_slug": "standard-site",
                     "brand": "Fresh Brand",
+                    "published_project_id": "project-1",
                 }
             ],
             "builder_projects": [
@@ -110,7 +112,12 @@ class FakeSupabase:
                     "name": "Fresh Project",
                     "slug": "fresh-project",
                     "status": "published",
-                    "published_schema": {"pages": [], "forms": []},
+                    "published_schema": {
+                        "defaultPageId": "home",
+                        "siteChrome": {"brand": "Fresh Brand"},
+                        "pages": [{"id": "home", "name": "Home", "slug": "/", "isDefault": True}],
+                        "forms": [],
+                    },
                     "published_version": 2,
                     "last_published_at": "2026-06-12T10:00:00+00:00",
                     "updated_at": "2026-06-12T10:00:00+00:00",
@@ -123,6 +130,18 @@ class FakeSupabase:
 
 
 class WebsiteRoutesTests(unittest.TestCase):
+    def setUp(self):
+        self.entitlement_patches = [
+            patch.object(website_routes, "require_any_entitlement", return_value={}),
+            patch.object(website_routes, "require_branded_subdomain", return_value=None),
+        ]
+        for entitlement_patch in self.entitlement_patches:
+            entitlement_patch.start()
+
+    def tearDown(self):
+        for entitlement_patch in reversed(self.entitlement_patches):
+            entitlement_patch.stop()
+
     def test_canonical_get_returns_tenant_settings(self):
         client = build_website_client()
         user_data = {"id": 3, "tenant_id": 7, "user_type": "user"}
@@ -182,6 +201,48 @@ class WebsiteRoutesTests(unittest.TestCase):
             update_payload={"subdomain": "fresh-site", "brand": "Fresh Brand"},
         )
         self.assertEqual(response.json()["website"], website)
+
+    def test_canonical_put_allows_clearing_optional_contact_email(self):
+        client = build_website_client()
+        website = {
+            "id": 1,
+            "tenant_id": 7,
+            "user_id": 3,
+            "subdomain": "fresh-site",
+            "contact_email": "",
+        }
+
+        with patch.object(
+            website_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(tenant_id=7, user_id=3),
+        ), patch.object(
+            website_routes,
+            "get_settings_for_tenant",
+            return_value={"id": 1, "tenant_id": 7, "user_id": 3},
+        ), patch.object(
+            website_routes,
+            "save_settings_for_tenant",
+            return_value=website,
+        ) as save_settings, patch.object(
+            website_routes,
+            "record_audit_event",
+        ):
+            response = client.put(
+                "/website/settings",
+                json={
+                    "subdomain": "fresh-site",
+                    "brand": "Ibtikar Shipment Portal",
+                    "contact_email": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["website"]["contact_email"], "")
+        self.assertEqual(
+            save_settings.call_args.kwargs["update_payload"]["contact_email"],
+            "",
+        )
 
     def test_canonical_get_rejects_stale_user_tenant_without_active_membership(self):
         client = build_website_client()
@@ -530,7 +591,45 @@ class WebsiteRoutesTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["site"]["subdomain"], "fresh-site")
         self.assertEqual(body["site"]["brand"], "Fresh Brand")
-        self.assertEqual(body["project"]["published_schema"], {"pages": [], "forms": []})
+        self.assertEqual(
+            body["project"]["published_schema"],
+            {
+                "defaultPageId": "home",
+                "siteChrome": {"brand": "Fresh Brand"},
+                "pages": [{"id": "home", "name": "Home", "slug": "/", "isDefault": True}],
+                "forms": [],
+            },
+        )
+
+    def test_standard_path_resolves_published_content_without_premium_addon(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(public_site_routes, "require_branded_subdomain") as branded_gate:
+            response = client.get("/public/sites/standard-site")
+
+        self.assertEqual(response.status_code, 200)
+        branded_gate.assert_not_called()
+        self.assertEqual(response.json()["project"]["published_schema"]["defaultPageId"], "home")
+
+    def test_branded_hostname_invokes_backend_entitlement_gate(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"), \
+             patch.object(public_site_routes, "require_branded_subdomain") as branded_gate:
+            response = client.get(
+                "/public/sites/fresh-site",
+                headers={"Host": "fresh-site.madarportal.com"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(branded_gate.call_count, 1)
+        for call in branded_gate.call_args_list:
+            self.assertEqual(call.args[0]["tenant_id"], 7)
 
 
 
@@ -584,6 +683,29 @@ class TestWebsiteSettingsServiceLegacyFallback(unittest.TestCase):
             settings = website_settings_service.get_settings_for_tenant(tenant_id=7, user_id=99)
 
         self.assertIsNone(settings)
+
+class TenantSiteOwnerAccessTests(unittest.TestCase):
+    def test_subdomain_owner_can_use_existing_main_account(self):
+        settings = {"tenant_id": 7, "user_id": 3, "subdomain": "owner-site"}
+        user = {"id": 3, "tenant_id": 7, "email": "owner@example.com"}
+
+        with patch.object(public_site_routes, "get_active_tenant_membership", return_value=None), \
+             patch.object(public_site_routes, "get_tenant_staff_membership", return_value=None):
+            access = public_site_routes.get_tenant_site_access(settings, user)
+
+        self.assertEqual(access["role"], "owner")
+        self.assertEqual(access["tenant_id"], 7)
+
+    def test_unrelated_main_account_cannot_access_tenant_site(self):
+        settings = {"tenant_id": 7, "user_id": 3, "subdomain": "owner-site"}
+        user = {"id": 9, "tenant_id": 8, "email": "other@example.com"}
+
+        with patch.object(public_site_routes, "get_active_tenant_membership", return_value=None), \
+             patch.object(public_site_routes, "get_tenant_staff_membership", return_value=None):
+            access = public_site_routes.get_tenant_site_access(settings, user)
+
+        self.assertIsNone(access)
+
 
 if __name__ == "__main__":
     unittest.main()

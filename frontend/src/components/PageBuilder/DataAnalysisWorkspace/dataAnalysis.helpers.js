@@ -131,6 +131,94 @@ export const isNumericLikeValue = (value) => {
 
   return Number.isFinite(Number(normalized));
 };
+
+const normalizeColumnKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const hasAnyColumnHint = (column, hints) => {
+  const normalized = normalizeColumnKey(column);
+  return hints.some((hint) => normalized.includes(hint));
+};
+
+const phoneHints = ["phone", "mobile", "tel", "telephone", "whatsapp", "contact number"];
+const idHints = [" id", "id ", "identifier", "code", "reference", "ref", "serial", "number"];
+const moneyHints = [
+  "amount",
+  "budget",
+  "cost",
+  "expense",
+  "fund",
+  "funding",
+  "price",
+  "revenue",
+  "salary",
+  "payroll",
+  "income",
+  "payment",
+  "paid",
+  "donation",
+  "grant",
+];
+const countHints = [
+  "count",
+  "quantity",
+  "qty",
+  "total",
+  "team size",
+  "people",
+  "beneficiaries",
+  "registered",
+  "attended",
+  "completed",
+  "planned",
+  "working days",
+];
+const ratingHints = ["rating", "score", "satisfaction", "readiness", "target", "scale"];
+const dateHints = ["date", "time", "timestamp", "year", "month", "week", "day", "period"];
+
+export const buildColumnProfiles = (columns = [], previewRows = []) =>
+  columns.map((column) => {
+    const values = previewRows
+      .map((row) => row?.[column])
+      .filter((value) => value !== null && value !== undefined && value !== "");
+    const numericValues = values
+      .filter(isNumericLikeValue)
+      .map((value) => Number(normalizeNumericText(value)))
+      .filter(Number.isFinite);
+    const numericRatio = values.length ? numericValues.length / values.length : 0;
+    const uniqueValues = new Set(values.map((value) => String(value).trim())).size;
+    const normalized = normalizeColumnKey(column);
+    const isPhone = hasAnyColumnHint(column, phoneHints);
+    const isIdentifier =
+      !isPhone &&
+      (normalized === "id" ||
+        normalized.endsWith(" id") ||
+        normalized.startsWith("id ") ||
+        hasAnyColumnHint(column, idHints));
+    const isNumeric = numericRatio >= 0.6 && !isPhone && !isIdentifier;
+    const min = numericValues.length ? Math.min(...numericValues) : null;
+    const max = numericValues.length ? Math.max(...numericValues) : null;
+
+    return {
+      name: column,
+      isNumeric,
+      isText: !isNumeric,
+      isPhone,
+      isIdentifier,
+      isMoney: isNumeric && hasAnyColumnHint(column, moneyHints),
+      isCount: isNumeric && hasAnyColumnHint(column, countHints),
+      isRating:
+        isNumeric &&
+        (hasAnyColumnHint(column, ratingHints) ||
+          (numericValues.length > 0 && min >= 0 && max <= 10 && uniqueValues <= 11)),
+      isDate: hasAnyColumnHint(column, dateHints),
+      uniqueValues,
+    };
+  });
+
 export const singleVariableCharts = ["histogram", "count"];
 export const singlePairCharts = ["pie", "violin"];
 export const multiSeriesCharts = ["bar", "line", "scatter", "box"];

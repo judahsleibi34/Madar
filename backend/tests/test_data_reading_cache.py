@@ -101,6 +101,16 @@ class DataReadingCacheTests(unittest.TestCase):
 class DataReadingRemoteUrlSecurityTests(unittest.TestCase):
     def setUp(self):
         DataReadingNormal.clear_shared_cache()
+        self.remote_url_env = patch.dict(
+            "os.environ",
+            {
+                "ALLOW_REMOTE_DATASET_URLS": "false",
+                "ALLOW_INSECURE_REMOTE_DATASET_HTTP": "false",
+            },
+            clear=False,
+        )
+        self.remote_url_env.start()
+        self.addCleanup(self.remote_url_env.stop)
 
     def test_remote_https_url_is_disabled_by_default(self):
         reader = DataReadingNormal("https://example.com/file.csv")

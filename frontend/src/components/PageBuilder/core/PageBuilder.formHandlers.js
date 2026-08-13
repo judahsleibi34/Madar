@@ -34,14 +34,21 @@ export const createFormHandlers = ({
   const deleteActiveForm = () => {
     if (!activeForm) return;
 
-    const remainingForms = (project.forms || []).filter((form) => form.id !== activeForm.id);
+    const activeFormId = String(activeForm.id || "");
+    const remainingForms = (project.forms || []).filter(
+      (form) => String(form.id || "") !== activeFormId
+    );
     const nextForm = remainingForms[0] || null;
 
     updateProject((prev) => ({
       ...prev,
-      forms: (prev.forms || []).filter((form) => form.id !== activeForm.id),
+      forms: (prev.forms || []).filter(
+        (form) => String(form.id || "") !== activeFormId
+      ),
       activeFormId: nextForm?.id || "",
-      workflows: (prev.workflows || []).filter((workflow) => workflow.formId !== activeForm.id),
+      workflows: (prev.workflows || []).filter(
+        (workflow) => String(workflow.formId || "") !== activeFormId
+      ),
       pages: (prev.pages || []).map((page) => ({
         ...page,
         sections: (page.sections || []).map((section) => ({
@@ -51,15 +58,15 @@ export const createFormHandlers = ({
             columns: (row.columns || []).map((column) => ({
               ...column,
               elements: (column.elements || []).map((element) =>
-                element.connectedFormId === activeForm.id
-                  ? { ...element, connectedFormId: nextForm?.id || "" }
+                String(element.connectedFormId || "") === activeFormId
+                  ? { ...element, connectedFormId: "" }
                   : element
               ),
             })),
           })),
           freeElements: (section.freeElements || []).map((element) =>
-            element.connectedFormId === activeForm.id
-              ? { ...element, connectedFormId: nextForm?.id || "" }
+            String(element.connectedFormId || "") === activeFormId
+              ? { ...element, connectedFormId: "" }
               : element
           ),
         })),
@@ -69,7 +76,7 @@ export const createFormHandlers = ({
     setSelected({ type: "form", id: nextForm?.id || "" });
   };
 
-  const addFormSection = () => {
+  const addFormSection = (afterSectionId = null) => {
     updateActiveForm((form) => {
       const sections = getFormSections(form);
       const usedPageNumbers = sections
@@ -80,19 +87,23 @@ export const createFormHandlers = ({
         .filter((value) => Number.isFinite(value));
       const nextPageNumber = Math.max(1, ...usedPageNumbers) + 1;
 
+      const newSection = {
+        id: createId("formSection"),
+        title: `Page ${nextPageNumber}`,
+        description: "",
+        collapsed: false,
+        fields: [],
+      };
+      const insertionIndex = afterSectionId
+        ? sections.findIndex((section) => section.id === afterSectionId) + 1
+        : sections.length;
+      const nextSections = [...sections];
+      nextSections.splice(insertionIndex > 0 ? insertionIndex : sections.length, 0, newSection);
+
       return {
         ...form,
         pageMode: "paged",
-        sections: [
-          ...sections,
-          {
-            id: createId("formSection"),
-            title: `Page ${nextPageNumber}`,
-            description: "",
-            collapsed: false,
-            fields: [],
-          },
-        ],
+        sections: nextSections,
       };
     });
   };
@@ -224,19 +235,23 @@ export const createFormHandlers = ({
       const rootField = (form.fields || []).find((field) => field.id === fieldId);
 
       if (rootField) {
+        const fields = [...(form.fields || [])];
+        const fieldIndex = fields.findIndex((item) => item.id === fieldId);
+        fields.splice(fieldIndex + 1, 0, cloneField(rootField));
         return {
           ...form,
-          fields: [...(form.fields || []), cloneField(rootField)],
+          fields,
         };
       }
 
       return {
         ...form,
         sections: getFormSections(form).map((section) => {
-          const field = (section.fields || []).find((item) => item.id === fieldId);
-          return field
-            ? { ...section, fields: [...(section.fields || []), cloneField(field)] }
-            : section;
+          const fields = [...(section.fields || [])];
+          const fieldIndex = fields.findIndex((item) => item.id === fieldId);
+          if (fieldIndex < 0) return section;
+          fields.splice(fieldIndex + 1, 0, cloneField(fields[fieldIndex]));
+          return { ...section, fields };
         }),
       };
     });

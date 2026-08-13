@@ -7,7 +7,7 @@ export const reportBlockTypes = [
   { type: "text", label: "Text", description: "Notes or findings.", icon: FileText },
   { type: "spacer", label: "Space", description: "Blank space between items.", icon: Minus },
   { type: "image", label: "Image", description: "Logo, photo, or attachment.", icon: Image },
-  { type: "metric", label: "Key number", description: "Saved calculation.", icon: LayoutDashboard },
+  { type: "metric", label: "Key number", description: "Report variable.", icon: LayoutDashboard },
   { type: "chart", label: "Chart", description: "Saved chart.", icon: BarChart3 },
   { type: "table", label: "Table", description: "Saved table.", icon: Table2 },
 ];

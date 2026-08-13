@@ -53,12 +53,14 @@ function LazyOrbitVisual({ lang }) {
 
 export default function HeroSection({ lang }) {
   const { t } = useTranslation("public");
+  const isRTL = lang === "ar";
 
   return (
-    <section id="home" className="hero-section">
+    <section id="home" className="hero-section" dir={isRTL ? "rtl" : "ltr"}>
       <div className="hero-content">
         <motion.h1
           className="hero-title"
+          dir={isRTL ? "rtl" : "ltr"}
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0, ease: [0.25, 0.1, 0.25, 1] }}
@@ -77,7 +79,11 @@ export default function HeroSection({ lang }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
         >
-          <SplitText className="arabic-name">{t("hero.name")}</SplitText>{" "}
+          {isRTL ? (
+            <span className="arabic-name">{t("hero.name")}</span>
+          ) : (
+            <SplitText className="arabic-name">{t("hero.name")}</SplitText>
+          )}{" "}
           {t("hero.description")}
         </motion.p>
       </div>

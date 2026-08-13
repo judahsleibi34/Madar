@@ -1,4 +1,25 @@
 export const STORAGE_KEY = "madar_app_builder_frontend_v4";
+export const MIN_BUILDER_TEXT_FONT_SIZE_PX = 8;
+export const MAX_BUILDER_TEXT_FONT_SIZE_PX = 256;
+
+export const parseBuilderTextFontSize = (value) => {
+  const normalized = String(value ?? "").trim();
+  if (!/^\d+(?:\.\d+)?(?:px)?$/i.test(normalized)) return null;
+  const parsed = Number.parseFloat(normalized);
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < MIN_BUILDER_TEXT_FONT_SIZE_PX ||
+    parsed > MAX_BUILDER_TEXT_FONT_SIZE_PX
+  ) {
+    return null;
+  }
+  return parsed;
+};
+
+export const getBuilderStorageKey = (userId) => {
+  const normalizedUserId = String(userId ?? "").trim();
+  return normalizedUserId ? `${STORAGE_KEY}:user:${normalizedUserId}` : `${STORAGE_KEY}:anonymous`;
+};
 
 export const createId = (prefix = "id") => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -90,25 +111,25 @@ export const alignmentOptions = [
 ];
 
 export const elementTypes = [
+  { id: "reservationRequest", label: "Date request", group: "Bookings" },
+  { id: "reservationFixedSlots", label: "Fixed slots", group: "Bookings" },
   { id: "heading", label: "Heading", group: "Content" },
   { id: "text", label: "Text", group: "Content" },
   { id: "button", label: "Button", group: "Content" },
+  { id: "imageButton", label: "Image Button", group: "Content" },
   { id: "image", label: "Image", group: "Content" },
+  { id: "video", label: "Video", group: "Media" },
+  { id: "document", label: "File Viewer", group: "Media" },
+  { id: "photoProofing", label: "Photo Proofing", group: "Media" },
   { id: "card", label: "Card", group: "Content" },
-  { id: "carousel", label: "Glow Carousel", group: "Content" },
-  { id: "carouselCards", label: "Card Carousel", group: "Content" },
-  { id: "carouselSplit", label: "Split Story Carousel", group: "Content" },
-  { id: "carouselSpotlight", label: "Spotlight Carousel", group: "Content" },
-  { id: "carouselStack", label: "Stacked Cards Carousel", group: "Content" },
-  { id: "carouselEditorial", label: "Editorial Carousel", group: "Content" },
-  { id: "circularGallery", label: "Circular Gallery", group: "Content" },
+  { id: "carousel", label: "Card Carousel", group: "Content" },
   { id: "list", label: "List", group: "Content" },
   { id: "divider", label: "Divider", group: "Content" },
+  { id: "thinDivider", label: "Horizontal Line", group: "Content" },
   { id: "embed", label: "Embed", group: "Content" },
   { id: "metric", label: "Metric", group: "Dashboard" },
   { id: "loginBlock", label: "Login Form", group: "Auth" },
   { id: "registrationBlock", label: "Registration Form", group: "Auth" },
-  { id: "reservationBlock", label: "Reservation", group: "Bookings" },
   { id: "formBlock", label: "Form Block", group: "Connected" },
 ];
 
@@ -134,52 +155,32 @@ export const workflowStepTypes = [
 
 export const permissionGroups = [
   {
-    title: "Design",
+    title: "Site access",
     permissions: [
-      { key: "editPages", label: "Edit pages" },
-      { key: "editTheme", label: "Edit theme" },
-    ],
-  },
-  {
-    title: "Data",
-    permissions: [
-      { key: "editCollections", label: "Edit collections" },
-      { key: "viewResponses", label: "View responses" },
-      { key: "exportData", label: "Export data" },
-    ],
-  },
-  {
-    title: "Operations",
-    permissions: [
-      { key: "editWorkflows", label: "Edit workflows" },
-      { key: "approveResponses", label: "Approve responses" },
-      { key: "manageUsers", label: "Manage users" },
-      { key: "publish", label: "Publish" },
+      { key: "viewProtectedPages", label: "View allowed protected pages" },
+      { key: "submitForms", label: "Submit allowed forms" },
+      { key: "makeReservations", label: "Book allowed reservations" },
+
     ],
   },
 ];
 
 export const defaultPermissions = {
-  editPages: false,
-  editTheme: false,
-  editCollections: false,
-  viewResponses: false,
-  exportData: false,
-  editWorkflows: false,
-  approveResponses: false,
-  manageUsers: false,
-  publish: false,
-};
+  viewProtectedPages: false,
+  submitForms: false,
+  makeReservations: false,
 
+};
 export const defaultTheme = {
   mode: "light",
   name: "Madar Light",
-  background: "#fafaf7",
-  surface: "#ffffff",
-  softSurface: "#f7f5ef",
-  text: "#1b2a4a",
+  background: "#f4f0e8",
+  surface: "#fffdfa",
+  headerBackground: "",
+  softSurface: "#f8f4ed",
+  text: "#000000",
   muted: "#6f7787",
-  primary: "#1b2a4a",
+  primary: "#162033",
   accent: "#852c21",
   accentDark: "#6f241b",
   buttonText: "#ffffff",
@@ -192,12 +193,13 @@ export const themePresets = {
   light: {
     mode: "light",
     name: "Madar Light",
-    background: "#fafaf7",
-    surface: "#ffffff",
-    softSurface: "#f7f5ef",
-    text: "#1b2a4a",
+    background: "#f4f0e8",
+    surface: "#fffdfa",
+    headerBackground: "#fffdfa",
+    softSurface: "#f8f4ed",
+    text: "#000000",
     muted: "#6f7787",
-    primary: "#1b2a4a",
+    primary: "#162033",
     accent: "#852c21",
     accentDark: "#6f241b",
     buttonText: "#ffffff",
@@ -209,12 +211,13 @@ export const themePresets = {
   dark: {
     mode: "dark",
     name: "Madar Dark",
-    background: "#0f0d12",
-    surface: "#1b1720",
-    softSurface: "#241d27",
-    text: "#f4f0e8",
-    muted: "#98a4b7",
-    primary: "#f4f0e8",
+    background: "#101317",
+    surface: "#181d23",
+    headerBackground: "#181d23",
+    softSurface: "#232a32",
+    text: "#f4f6f8",
+    muted: "#9ca6b2",
+    primary: "#f4f6f8",
     accent: "#852c21",
     accentDark: "#c94730",
     buttonText: "#ffffff",
@@ -229,7 +232,9 @@ export const defaultSiteChrome = {
   showFooter: true,
   brand: "Madar",
   logoUrl: "",
+  loadingImageUrl: "",
   headerAlign: "center",
+  headerBackgroundColor: "",
   headerButtonLabel: "Contact",
   headerButtonHref: "Contact",
   headerButtonPageId: "",
@@ -244,7 +249,9 @@ export const defaultSiteChrome = {
   footerHelpTitle: "Help",
   footerHelpLinks: "About Us\nPolicies\nContact",
   footerSocialLinks: "Facebook\nLinkedIn\nX\nInstagram",
+  footerSocialItems: [],
   footerPaymentMethods: "Visa\nMastercard\nApple Pay\nGoogle Pay",
+  footerPaymentItems: [],
   footerLanguageLabel: "AR",
 };
 

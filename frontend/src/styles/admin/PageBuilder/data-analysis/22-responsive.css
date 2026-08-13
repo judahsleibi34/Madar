@@ -15,6 +15,10 @@
     grid-template-columns: 1fr;
   }
 
+  .page-builder .daw-variable-builder {
+    grid-template-columns: 1fr;
+  }
+
   .page-builder .daw-canvas-column {
     position: static;
   }
@@ -42,6 +46,15 @@
   .page-builder .daw-generate-metrics-row .daw-primary,
   .page-builder .daw-cleaning-confirm .daw-confirm-button,
   .page-builder .daw-analysis-generator-action .daw-primary {
+    width: 100%;
+  }
+
+  .page-builder .daw-dataframe-download-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .page-builder .daw-dataframe-download-actions .daw-secondary {
     width: 100%;
   }
 

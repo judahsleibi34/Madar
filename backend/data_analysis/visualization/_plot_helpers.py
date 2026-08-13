@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from ._deps import Line2D, Patch, math, os, pd, plt, sns
 
 
@@ -655,24 +657,28 @@ class PlotHelpersMixin:
             plt.tight_layout()
 
     def _save_plot(self, save_path: str) -> str:
-        output_root = os.getenv("CHART_OUTPUT_DIR", "generated_charts")
-        output_dir = os.path.abspath(output_root)
-        os.makedirs(output_dir, exist_ok=True)
+        output_root = os.getenv(
+            "PRIVATE_CHARTS_DIR",
+            os.getenv("GENERATED_CHARTS_DIR", "private_generated_charts"),
+        )
+        requested = Path(save_path or "chart.png")
 
-        requested_path = os.path.basename(save_path)
-        if not requested_path:
-            requested_path = "chart.png"
+        if requested.is_absolute():
+            output_path = requested.resolve()
+        else:
+            output_dir = Path(output_root).resolve()
+            output_path = (output_dir / requested.name).resolve()
 
-        if not requested_path.lower().endswith((".png", ".jpg", ".jpeg", ".svg", ".pdf")):
-            requested_path = f"{requested_path}.png"
+        if output_path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".svg", ".pdf"}:
+            output_path = output_path.with_suffix(".png")
 
-        output_path = os.path.join(output_dir, requested_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         plt.savefig(
-            output_path,
+            str(output_path),
             dpi=180,
             bbox_inches="tight",
             facecolor="white",
         )
 
-        return output_path
+        return str(output_path)

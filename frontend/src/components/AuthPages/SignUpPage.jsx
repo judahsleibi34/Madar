@@ -3,16 +3,22 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { postAuthJson, readApiError } from "../../utils/apiClient";
+import AuthToast from "./AuthToast";
+import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
+import { rememberPendingVerificationEmail } from "./emailVerification";
+import { meetsMinimumPasswordPolicy, PASSWORD_MIN_LENGTH } from "./passwordPolicy";
 
 const PUBLIC_SITE_DOMAIN = import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
+const DIGIT_PATTERN = /\p{N}/u;
+const SAFE_PERSON_NAME_PATTERN = /^[\p{L}\s.'\u2019-]+$/u;
+const SAFE_BUSINESS_TEXT_PATTERN = /^[\p{L}\s.'\u2019&/(),-]+$/u;
 
 export default function SignUpPage({
   lang = "en",
   loginPath = "/login",
-  onSignupSuccess,
-  mode = "tenant",
+  mode = "account",
 }) {
   const { t } = useTranslation("auth");
   const navigate = useNavigate();
@@ -28,10 +34,12 @@ export default function SignUpPage({
     businessName: "",
     businessType: "",
     subdomain: "",
+    acceptedTerms: false,
   });
 
   const [errors, setErrors] = useState({});
-  const [statusMessage, setStatusMessage] = useState("");
+  const [, setStatusMessage] = useState("");
+  const [authToast, setAuthToast] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -43,98 +51,289 @@ export default function SignUpPage({
 
   const previewSubdomain = normalizedSubdomain || "your-site";
   const publicUrlPreview = PUBLIC_SITE_DOMAIN
-    ? `${previewSubdomain}.${PUBLIC_SITE_DOMAIN}`
+    ? `${PUBLIC_SITE_DOMAIN}/site/${previewSubdomain}`
     : previewSubdomain;
   const publicUrlPreviewLabel = PUBLIC_SITE_DOMAIN
     ? t("signup.publicUrlAfterPublishing")
     : t("signup.subdomainPreview");
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    const nextValue = name === "subdomain" ? value.toLowerCase() : value;
-
-    setFormData((prev) => ({ ...prev, [name]: nextValue }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
-    setStatusMessage("");
+  const errorFieldLabels = {
+    firstName: t("signup.firstName"),
+    lastName: t("signup.lastName"),
+    email: t("signup.email"),
+    password: t("signup.password"),
+    confirmPassword: t("signup.confirmPassword"),
+    businessName: t("signup.businessName"),
+    businessType: t("signup.businessType"),
+    subdomain: t("signup.subdomain"),
+    acceptedTerms: t("signup.termsAndConditions"),
+  };
+  const showAuthToast = ({ type = "error", title, message, kind = "status" }) => {
+    setAuthToast({
+      id: Date.now(),
+      type,
+      title,
+      message,
+      kind,
+    });
   };
 
-  const validateSubdomain = (newErrors) => {
-    if (!isTenantOnboarding) return;
+  const showValidationToast = (validationErrors) => {
+    showAuthToast({
+      type: "error",
+      title: t("signup.checkFields", { defaultValue: "Please check these fields" }),
+      message: formatAuthValidationToastMessage(validationErrors, errorFieldLabels),
+      kind: "validation",
+    });
+  };
 
-    if (!normalizedSubdomain) {
-      newErrors.subdomain = t("validation.required");
+  const getErrorProps = (fieldName) => {
+    const message = errors[fieldName];
+
+    if (!message) {
+      return {};
+    }
+
+    return {
+      "aria-invalid": "true",
+      "aria-describedby": `signup-${fieldName}-error`,
+      className: "auth-field-error-input",
+    };
+  };
+
+  const renderFieldError = (fieldName) => {
+    const message = errors[fieldName];
+
+    if (!message) return null;
+
+    return (
+      <span className="auth-field-error" id={`signup-${fieldName}-error`} role="alert">
+        {message}
+      </span>
+    );
+  };
+
+  const validateSubdomain = (newErrors, values = formData) => {
+    if (!isTenantOnboarding) return;
+    const cleanSubdomain = values.subdomain.trim().toLowerCase();
+
+    if (!cleanSubdomain) {
       return;
     }
 
-    if (normalizedSubdomain.length < 3) {
+    if (cleanSubdomain.length < 3) {
       newErrors.subdomain = t("signup.subdomainTooShort");
       return;
     }
 
-    if (!SUBDOMAIN_PATTERN.test(normalizedSubdomain)) {
+    if (!SUBDOMAIN_PATTERN.test(cleanSubdomain)) {
       newErrors.subdomain = t("signup.subdomainInvalid");
     }
   };
 
-  const validateForm = () => {
+  const getTextOnlyMessage = (fieldLabel) =>
+    t("validation.textOnly", {
+      defaultValue: `${fieldLabel} can only contain letters and normal punctuation.`,
+    });
+
+  const validateTextValue = (
+    newErrors,
+    value,
+    fieldName,
+    fieldLabel,
+    pattern,
+    { required = true } = {}
+  ) => {
+    const cleanValue = value.trim();
+
+    if (!cleanValue) {
+      if (required) newErrors[fieldName] = t("validation.required");
+      return;
+    }
+
+    if (
+      DIGIT_PATTERN.test(cleanValue) ||
+      !/\p{L}/u.test(cleanValue) ||
+      !pattern.test(cleanValue)
+    ) {
+      newErrors[fieldName] = getTextOnlyMessage(fieldLabel);
+    }
+  };
+
+  const applyFriendlyDetailError = (detail) => {
+    const safeDetail = String(detail || "").toLowerCase();
+    const nextErrors = {};
+
+    if (safeDetail.includes("already registered")) {
+      setStatusMessage(t("signup.alreadyRegistered"));
+      showAuthToast({
+        type: "error",
+        title: t("signup.signupFailed"),
+        message: t("signup.alreadyRegistered"),
+      });
+      return true;
+    }
+
+    if (safeDetail.includes("first name")) {
+      nextErrors.firstName = safeDetail.includes("required")
+        ? t("validation.required")
+        : getTextOnlyMessage(t("signup.firstName"));
+    }
+
+    if (safeDetail.includes("last name")) {
+      nextErrors.lastName = safeDetail.includes("required")
+        ? t("validation.required")
+        : getTextOnlyMessage(t("signup.lastName"));
+    }
+
+    if (safeDetail.includes("business name")) {
+      nextErrors.businessName = getTextOnlyMessage(t("signup.businessName"));
+    }
+
+    if (safeDetail.includes("business type")) {
+      nextErrors.businessType = getTextOnlyMessage(t("signup.businessType"));
+    }
+
+    if (safeDetail.includes("password")) {
+      nextErrors.password = safeDetail.includes("8 characters")
+        ? t("signup.passwordInvalid")
+        : t("validation.required");
+    }
+
+    if (safeDetail.includes("terms")) {
+      nextErrors.acceptedTerms = t("signup.termsRequired");
+    }
+
+    if (safeDetail.includes("email")) {
+      nextErrors.email = safeDetail.includes("registered")
+        ? ""
+        : t("validation.invalidEmail");
+    }
+
+    if (safeDetail.includes("subdomain") && safeDetail.includes("taken")) {
+      nextErrors.subdomain = t("signup.subdomainTaken");
+    } else if (safeDetail.includes("reserved")) {
+      nextErrors.subdomain = t("signup.subdomainReserved");
+    } else if (safeDetail.includes("subdomain") || safeDetail.includes("invalid subdomain")) {
+      nextErrors.subdomain = t("signup.subdomainInvalid");
+    }
+
+    const cleanErrors = Object.fromEntries(
+      Object.entries(nextErrors).filter(([, message]) => message)
+    );
+
+    if (Object.keys(cleanErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...cleanErrors }));
+      setStatusMessage("");
+      showValidationToast(cleanErrors);
+      return true;
+    }
+
+    return false;
+  };
+
+  const getValidationErrors = (values = formData) => {
     const newErrors = {};
 
-    if (!formData.firstName.trim()) newErrors.firstName = t("validation.required");
-    if (!formData.lastName.trim()) newErrors.lastName = t("validation.required");
-    if (!formData.email.trim()) newErrors.email = t("validation.required");
-    if (!formData.password.trim()) newErrors.password = t("validation.required");
-    if (!formData.confirmPassword.trim()) {
+    validateTextValue(
+      newErrors,
+      values.firstName,
+      "firstName",
+      t("signup.firstName"),
+      SAFE_PERSON_NAME_PATTERN
+    );
+    validateTextValue(
+      newErrors,
+      values.lastName,
+      "lastName",
+      t("signup.lastName"),
+      SAFE_PERSON_NAME_PATTERN
+    );
+    if (!values.email.trim()) newErrors.email = t("validation.required");
+    if (!values.password.trim()) newErrors.password = t("validation.required");
+    if (!values.confirmPassword.trim()) {
       newErrors.confirmPassword = t("validation.required");
+    }
+    if (!values.acceptedTerms) {
+      newErrors.acceptedTerms = t("signup.termsRequired");
     }
 
     if (isTenantOnboarding) {
-      if (!formData.businessName.trim()) {
-        newErrors.businessName = t("validation.required");
-      }
-      if (!formData.businessType.trim()) {
-        newErrors.businessType = t("validation.required");
-      }
-      validateSubdomain(newErrors);
+      validateTextValue(
+        newErrors,
+        values.businessName,
+        "businessName",
+        t("signup.businessName"),
+        SAFE_BUSINESS_TEXT_PATTERN,
+        { required: false }
+      );
+      validateTextValue(
+        newErrors,
+        values.businessType,
+        "businessType",
+        t("signup.businessType"),
+        SAFE_BUSINESS_TEXT_PATTERN,
+        { required: false }
+      );
+      validateSubdomain(newErrors, values);
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
       newErrors.email = t("validation.invalidEmail");
     }
 
-    const passwordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
-    if (formData.password && !passwordRegex.test(formData.password)) {
+    if (
+      values.password &&
+      !meetsMinimumPasswordPolicy(values.password)
+    ) {
       newErrors.password = t("signup.passwordInvalid");
     }
 
     if (
-      formData.password &&
-      formData.confirmPassword &&
-      formData.password !== formData.confirmPassword
+      values.password &&
+      values.confirmPassword &&
+      values.password !== values.confirmPassword
     ) {
       newErrors.confirmPassword = t("signup.passwordMismatch");
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
+  };
+
+  const handleChange = (event) => {
+    const { checked, name, type, value } = event.target;
+    const nextValue = type === "checkbox"
+      ? checked
+      : name === "subdomain"
+        ? value.toLowerCase()
+        : value;
+    const nextFormData = { ...formData, [name]: nextValue };
+
+    setFormData(nextFormData);
+    const nextErrors = getValidationErrors(nextFormData);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) setAuthToast(null);
+    else if (authToast?.kind === "validation") {
+      showValidationToast(nextErrors);
+    }
+    setStatusMessage("");
   };
 
   const getRequestPayload = () => {
-    const basePayload = {
+    const payload = {
       first_name: formData.firstName.trim(),
       last_name: formData.lastName.trim(),
       email: formData.email.trim(),
       password: formData.password,
+      terms_accepted: formData.acceptedTerms,
     };
 
-    if (!isTenantOnboarding) return basePayload;
+    if (isTenantOnboarding) {
+      payload.business_name = formData.businessName.trim() || null;
+      payload.business_type = formData.businessType.trim() || null;
+      payload.subdomain = normalizedSubdomain || null;
+    }
 
-    return {
-      ...basePayload,
-      business_name: formData.businessName.trim(),
-      business_type: formData.businessType.trim(),
-      subdomain: normalizedSubdomain,
-    };
+    return payload;
   };
 
   const applyApiErrors = (response, data) => {
@@ -147,41 +346,22 @@ export default function SignUpPage({
         if (field === "email") newErrors.email = t("validation.invalidEmail");
         if (field === "first_name") newErrors.firstName = t("validation.required");
         if (field === "last_name") newErrors.lastName = t("validation.required");
-        if (field === "business_name") newErrors.businessName = t("validation.required");
-        if (field === "business_type") newErrors.businessType = t("validation.required");
-        if (field === "subdomain") newErrors.subdomain = error.msg || t("signup.subdomainInvalid");
+        if (field === "business_name") newErrors.businessName = getTextOnlyMessage(t("signup.businessName"));
+        if (field === "business_type") newErrors.businessType = getTextOnlyMessage(t("signup.businessType"));
+        if (field === "subdomain") newErrors.subdomain = t("signup.subdomainInvalid");
         if (field === "password") newErrors.password = error.msg || t("validation.required");
+        if (field === "terms_accepted") newErrors.acceptedTerms = t("signup.termsRequired");
       });
 
       setErrors((prev) => ({ ...prev, ...newErrors }));
       setStatusMessage("");
+      showValidationToast(newErrors);
       return true;
     }
 
     const detail = readApiError(data, "").toLowerCase();
 
-    if (detail.includes("already registered")) {
-      setStatusMessage(t("signup.alreadyRegistered"));
-      return true;
-    }
-
-    if (detail.includes("subdomain") && detail.includes("taken")) {
-      setErrors((prev) => ({ ...prev, subdomain: t("signup.subdomainTaken") }));
-      setStatusMessage("");
-      return true;
-    }
-
-    if (detail.includes("reserved")) {
-      setErrors((prev) => ({ ...prev, subdomain: t("signup.subdomainReserved") }));
-      setStatusMessage("");
-      return true;
-    }
-
-    if (detail.includes("subdomain") || detail.includes("invalid")) {
-      setErrors((prev) => ({ ...prev, subdomain: t("signup.subdomainInvalid") }));
-      setStatusMessage("");
-      return true;
-    }
+    if (applyFriendlyDetailError(detail)) return true;
 
     return false;
   };
@@ -189,44 +369,67 @@ export default function SignUpPage({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    const newErrors = getValidationErrors(formData);
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      showValidationToast(newErrors);
+      return;
+    }
 
     setIsSubmitting(true);
     setStatusMessage("");
 
     try {
       const { response, data } = await postAuthJson(
-        isTenantOnboarding ? "/auth/signup/onboard" : "/auth/signup",
+        "/auth/signup",
         getRequestPayload()
       );
 
       if (!response.ok) {
         if (applyApiErrors(response, data)) return;
 
-        setStatusMessage(
-          readApiError(data, t("signup.signupFailed"))
-        );
+        const message = normalizeAuthMessage(readApiError(data, ""), t("signup.signupFailed"));
+        setStatusMessage(message);
+        showAuthToast({
+          type: "error",
+          title: t("signup.signupFailed"),
+          message,
+        });
         return;
       }
 
-      setStatusMessage(
-        isTenantOnboarding ? t("signup.onboardingSuccess") : t("signup.success")
-      );
-      setTimeout(() => {
-        if (onSignupSuccess) {
-          onSignupSuccess();
-          return;
-        }
+      const message = data.requires_email_verification
+        ? t("signup.verifyEmail")
+        : t("signup.success");
+      setStatusMessage(message);
 
-        navigate(loginPath, {
-          state: isTenantOnboarding
-            ? { message: t("signup.onboardingSuccess") }
-            : undefined,
+      if (data.requires_email_verification) {
+        setAuthToast(null);
+        const email = rememberPendingVerificationEmail(formData.email);
+        navigate("/verify-email", {
+          replace: true,
+          state: {
+            email,
+            resendAvailableAfter: Number(data.resend_available_after || 0),
+          },
         });
-      }, 1500);
+        return;
+      }
+
+      showAuthToast({
+        type: "success",
+        title: t("signup.success"),
+        message,
+      });
     } catch (error) {
       console.error(error);
       setStatusMessage(t("login.serverError"));
+      showAuthToast({
+        type: "error",
+        title: t("signup.signupFailed"),
+        message: t("login.serverError"),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -239,10 +442,6 @@ export default function SignUpPage({
           <h1>{t("signup.title")}</h1>
           <p>{t("signup.subtitle")}</p>
         </div>
-
-        {statusMessage && (
-          <p className="form-status-message">{statusMessage}</p>
-        )}
 
         {isTenantOnboarding && (
           <div className="auth-section-title">{t("signup.accountSection")}</div>
@@ -257,8 +456,9 @@ export default function SignUpPage({
               placeholder={t("signup.firstName")}
               value={formData.firstName}
               onChange={handleChange}
+              {...getErrorProps("firstName")}
             />
-            {errors.firstName && <span>{errors.firstName}</span>}
+            {renderFieldError("firstName")}
           </label>
 
           <label>
@@ -269,8 +469,9 @@ export default function SignUpPage({
               placeholder={t("signup.lastName")}
               value={formData.lastName}
               onChange={handleChange}
+              {...getErrorProps("lastName")}
             />
-            {errors.lastName && <span>{errors.lastName}</span>}
+            {renderFieldError("lastName")}
           </label>
         </div>
 
@@ -283,81 +484,92 @@ export default function SignUpPage({
             value={formData.email}
             onChange={handleChange}
             dir="ltr"
+            {...getErrorProps("email")}
           />
-          {errors.email && <span>{errors.email}</span>}
+          {renderFieldError("email")}
         </label>
 
-        <label>
-          {t("signup.password")}
-          <div className="password-field">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder={t("signup.password")}
-              value={formData.password}
-              onChange={handleChange}
-              dir="ltr"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={t("signup.togglePassword")}
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-          {errors.password && <span>{errors.password}</span>}
-        </label>
+        <div className="register-row">
+          <label>
+            {t("signup.password")}
+            <div className="password-field">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder={t("signup.password")}
+                value={formData.password}
+                minLength={PASSWORD_MIN_LENGTH}
+                onChange={handleChange}
+                dir="ltr"
+                {...getErrorProps("password")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={t("signup.togglePassword")}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {renderFieldError("password")}
+          </label>
 
-        <label>
-          {t("signup.confirmPassword")}
-          <div className="password-field">
-            <input
-              type={showConfirmPassword ? "text" : "password"}
-              name="confirmPassword"
-              placeholder={t("signup.confirmPassword")}
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              dir="ltr"
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label={t("signup.toggleConfirmPassword")}
-            >
-              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-          {errors.confirmPassword && <span>{errors.confirmPassword}</span>}
-        </label>
+          <label>
+            {t("signup.confirmPassword")}
+            <div className="password-field">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                placeholder={t("signup.confirmPassword")}
+                value={formData.confirmPassword}
+                minLength={PASSWORD_MIN_LENGTH}
+                onChange={handleChange}
+                dir="ltr"
+                {...getErrorProps("confirmPassword")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                aria-label={t("signup.toggleConfirmPassword")}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {renderFieldError("confirmPassword")}
+          </label>
+        </div>
 
         {isTenantOnboarding && (
           <>
             <div className="auth-section-title">{t("signup.businessSection")}</div>
 
-            <label>
-              {t("signup.businessName")}
-              <input
-                type="text"
-                name="businessName"
-                placeholder={t("signup.businessNamePlaceholder")}
-                value={formData.businessName}
-                onChange={handleChange}
-              />
-              {errors.businessName && <span>{errors.businessName}</span>}
-            </label>
+            <div className="register-row">
+              <label>
+                {t("signup.businessName")}
+                <input
+                  type="text"
+                  name="businessName"
+                  placeholder={t("signup.businessNamePlaceholder")}
+                  value={formData.businessName}
+                  onChange={handleChange}
+                  {...getErrorProps("businessName")}
+                />
+                {renderFieldError("businessName")}
+              </label>
 
-            <label>
-              {t("signup.businessType")}
-              <input
-                type="text"
-                name="businessType"
-                placeholder={t("signup.businessTypePlaceholder")}
-                value={formData.businessType}
-                onChange={handleChange}
-              />
-              {errors.businessType && <span>{errors.businessType}</span>}
-            </label>
+              <label>
+                {t("signup.businessType")}
+                <input
+                  type="text"
+                  name="businessType"
+                  placeholder={t("signup.businessTypePlaceholder")}
+                  value={formData.businessType}
+                  onChange={handleChange}
+                  {...getErrorProps("businessType")}
+                />
+                {renderFieldError("businessType")}
+              </label>
+            </div>
 
             <label>
               {t("signup.subdomain")}
@@ -370,14 +582,36 @@ export default function SignUpPage({
                 dir="ltr"
                 autoCapitalize="none"
                 autoCorrect="off"
+                {...getErrorProps("subdomain")}
               />
+              {renderFieldError("subdomain")}
               <small className="subdomain-preview">
                 {publicUrlPreviewLabel}: {publicUrlPreview}
               </small>
-              {errors.subdomain && <span>{errors.subdomain}</span>}
             </label>
           </>
         )}
+
+        <div className={`auth-terms-consent${errors.acceptedTerms ? " has-error" : ""}`}>
+          <label className="auth-terms-row" htmlFor="signup-accepted-terms">
+            <input
+              id="signup-accepted-terms"
+              type="checkbox"
+              name="acceptedTerms"
+              checked={formData.acceptedTerms}
+              onChange={handleChange}
+              aria-required="true"
+              {...getErrorProps("acceptedTerms")}
+            />
+            <span className="auth-terms-copy">
+              {t("signup.agreeToTerms")} {" "}
+              <Link to="/terms-and-conditions" target="_blank" rel="noopener noreferrer">
+                {t("signup.termsAndConditions")}
+              </Link>
+            </span>
+          </label>
+          {renderFieldError("acceptedTerms")}
+        </div>
 
         <button
           className="login-submit register-submit"
@@ -391,6 +625,16 @@ export default function SignUpPage({
           {t("signup.hasAccount")} <Link to={loginPath}>{t("signup.login")}</Link>
         </p>
       </form>
+
+      <AuthToast
+        key={authToast?.id}
+        type={authToast?.type}
+        title={authToast?.title}
+        message={authToast?.message}
+        dir={pageDir}
+        onDismiss={() => setAuthToast(null)}
+      />
+
     </main>
   );
 }

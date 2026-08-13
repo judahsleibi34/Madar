@@ -1,19 +1,84 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
 
 from database import service_supabase
+from services.api_errors import error_detail
+from services.user_security_settings_service import set_mfa_required
 
 logger = logging.getLogger(__name__)
 
 
 USER_SELECT_COLUMNS = (
     "id, auth_id, tenant_id, first_name, last_name, email, phone, avatar, "
-    "user_type, subscription_type, payment_status, created_at, updated_at"
+    "user_type, email_verified, account_status, subscription_type, payment_status, created_at, updated_at"
 )
+
+
+def _load_admin_target(user_id: int) -> dict[str, Any]:
+    try:
+        response = (
+            service_supabase
+            .table("users")
+            .select("id, auth_id, tenant_id, email, email_verified, account_status, user_type")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as error:
+        logger.warning(
+            "admin.user.fetch_failed",
+            extra={"target_user_id": user_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(status_code=500, detail="Could not load user.")
+
+    if not response.data:
+        raise HTTPException(status_code=404, detail="User was not found.")
+    return response.data[0]
+
+
+def _assert_not_last_system_admin(target_user: dict[str, Any]) -> None:
+    if str(target_user.get("user_type") or "user").strip().lower() != "admin":
+        return
+    if str(target_user.get("account_status") or "").strip().lower() != "active":
+        return
+
+    try:
+        response = (
+            service_supabase
+            .table("users")
+            .select("id", count="exact")
+            .eq("user_type", "admin")
+            .eq("account_status", "active")
+            .neq("id", target_user.get("id"))
+            .limit(1)
+            .execute()
+        )
+    except Exception as error:
+        logger.warning(
+            "admin.last_admin_check_failed",
+            extra={
+                "target_user_id": target_user.get("id"),
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(status_code=500, detail="Could not verify system admin safety.")
+
+    remaining_admins = getattr(response, "count", None)
+    if remaining_admins is None:
+        remaining_admins = len(response.data or [])
+    if int(remaining_admins or 0) < 1:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "last_system_admin_required",
+                "At least one active system administrator is required.",
+            ),
+        )
 
 
 def list_users_with_features(
@@ -63,6 +128,7 @@ def list_users_with_features(
         })
 
         features_by_tenant: dict[str, list[dict[str, Any]]] = {}
+        subscriptions_by_tenant: dict[str, dict[str, Any]] = {}
 
         if tenant_ids:
             features_response = (
@@ -77,6 +143,32 @@ def list_users_with_features(
                 tenant_key = str(feature.get("tenant_id"))
                 features_by_tenant.setdefault(tenant_key, []).append(feature)
 
+            try:
+                subscription_response = (
+                    service_supabase
+                    .table("tenant_subscriptions")
+                    .select("id,tenant_id,plan_id,state,catalog_version,price_minor,currency,billing_interval,updated_at")
+                    .in_("tenant_id", tenant_ids)
+                    .order("updated_at", desc=True)
+                    .execute()
+                )
+                for subscription in subscription_response.data or []:
+                    tenant_key = str(subscription.get("tenant_id"))
+                    current = subscriptions_by_tenant.get(tenant_key)
+                    if current is None or (
+                        subscription.get("state") == "active"
+                        and current.get("state") != "active"
+                    ):
+                        subscriptions_by_tenant[tenant_key] = subscription
+            except Exception as error:
+                # Compatibility for the short deployment window before migration
+                # 071. Legacy feature data remains visible, but canonical writes
+                # must not be enabled until the migration is applied.
+                logger.info(
+                    "admin.users.commercial_subscriptions_unavailable",
+                    extra={"error_type": type(error).__name__},
+                )
+
     except Exception as error:
         logger.warning("admin.users.list_failed", extra={"error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not load users.")
@@ -86,6 +178,9 @@ def list_users_with_features(
             **user,
             "user_type": user.get("user_type") or "user",
             "features": features_by_tenant.get(str(user.get("tenant_id")), []),
+            "commercial_subscription": subscriptions_by_tenant.get(
+                str(user.get("tenant_id"))
+            ),
         }
         for user in users
     ]
@@ -113,25 +208,98 @@ def update_user_type(*, user_id: int, user_type: str) -> dict[str, Any]:
     if normalized_user_type not in {"admin", "user"}:
         raise HTTPException(status_code=400, detail="Invalid user type.")
 
-    try:
-        result = (
-            service_supabase
-            .table("users")
-            .update({"user_type": normalized_user_type})
-            .eq("id", user_id)
-            .execute()
+    target_user = _load_admin_target(user_id)
+    old_user_type = str(target_user.get("user_type") or "user").strip().lower()
+    if old_user_type == normalized_user_type:
+        return {**target_user, "user_type": normalized_user_type, "old_user_type": old_user_type}
+
+    if normalized_user_type == "user":
+        _assert_not_last_system_admin(target_user)
+    elif target_user.get("email_verified") is not True:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "email_verification_required",
+                "The account email must be verified before admin promotion.",
+            ),
+        )
+    elif target_user.get("account_status") not in {None, "active"}:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail(
+                "account_inactive",
+                "Only an active account can be promoted to system administrator.",
+            ),
         )
 
+    required_at = datetime.now(timezone.utc).isoformat()
+    rpc = getattr(service_supabase, "rpc", None)
+    try:
+        if callable(rpc):
+            result = rpc(
+                "admin_update_user_type_safely",
+                {
+                    "p_user_id": user_id,
+                    "p_new_user_type": normalized_user_type,
+                    "p_required_at": required_at,
+                },
+            ).execute()
+        else:
+            # Kept for focused unit-test doubles. Deployed Supabase clients use the
+            # transaction-safe RPC and database last-admin trigger.
+            if normalized_user_type == "admin":
+                set_mfa_required(
+                    user_id=user_id,
+                    auth_id=str(target_user.get("auth_id") or ""),
+                    required=True,
+                    required_at=required_at,
+                )
+            result = (
+                service_supabase
+                .table("users")
+                .update({"user_type": normalized_user_type})
+                .eq("id", user_id)
+                .execute()
+            )
+
     except Exception as error:
+        error_text = str(error).lower()
+        if "last_system_admin_required" in error_text:
+            raise HTTPException(
+                status_code=409,
+                detail=error_detail(
+                    "last_system_admin_required",
+                    "At least one active system administrator is required.",
+                ),
+            )
+        if "email_verification_required" in error_text:
+            raise HTTPException(
+                status_code=409,
+                detail=error_detail(
+                    "email_verification_required",
+                    "The account email must be verified before admin promotion.",
+                ),
+            )
+        if "user_not_found" in error_text:
+            raise HTTPException(status_code=404, detail="User was not found.")
         logger.warning("admin.user_type.update_failed", extra={"target_user_id": user_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not update user type.")
 
-    if not result.data:
+    result_data = result.data or []
+    if isinstance(result_data, dict):
+        updated_row = result_data.get("result") if isinstance(result_data.get("result"), dict) else result_data
+    else:
+        updated_row = result_data[0] if result_data else None
+        if isinstance(updated_row, dict) and isinstance(updated_row.get("result"), dict):
+            updated_row = updated_row["result"]
+
+    if not updated_row:
         raise HTTPException(status_code=404, detail="User was not found.")
 
     updated_user = {
-        **result.data[0],
-        "user_type": result.data[0].get("user_type") or "user",
+        **updated_row,
+        "user_type": updated_row.get("user_type") or "user",
+        "old_user_type": old_user_type,
     }
     logger.info(
         "admin.user_type_changed",
@@ -148,7 +316,7 @@ def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) 
         user_result = (
             service_supabase
             .table("users")
-            .select("id, auth_id, tenant_id, email, first_name, last_name")
+            .select("id, auth_id, tenant_id, email, first_name, last_name, account_status, user_type")
             .eq("id", user_id)
             .limit(1)
             .execute()
@@ -162,6 +330,7 @@ def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) 
         raise HTTPException(status_code=404, detail="User was not found.")
 
     target_user = user_result.data[0]
+    _assert_not_last_system_admin(target_user)
     auth_id = str(target_user.get("auth_id") or "").strip()
     tenant_id = target_user.get("tenant_id")
     tenant_should_be_deleted = False
@@ -205,6 +374,14 @@ def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) 
             )
 
     except Exception as error:
+        if "last_system_admin_required" in str(error).lower():
+            raise HTTPException(
+                status_code=409,
+                detail=error_detail(
+                    "last_system_admin_required",
+                    "At least one active system administrator is required.",
+                ),
+            )
         logger.warning("admin.user_delete.failed", extra={"target_user_id": user_id, "tenant_id": tenant_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=500, detail="Could not delete user.")
 
@@ -223,5 +400,6 @@ def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) 
         "auth_id": auth_id,
         "tenant_id": tenant_id,
         "email": target_user.get("email"),
+        "user_type": target_user.get("user_type") or "user",
         "tenant_deleted": tenant_should_be_deleted,
     }

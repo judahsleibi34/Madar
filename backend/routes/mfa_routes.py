@@ -127,7 +127,11 @@ def aal_payload_from_response(response: Any) -> dict[str, Any]:
 
 
 def authenticated_mfa_context(request: Request, response: Response):
-    auth_user, user_data = get_authenticated_user_row(request, response)
+    auth_user, user_data = get_authenticated_user_row(
+        request,
+        response,
+        allow_admin_account_access=False,
+    )
     settings = get_user_security_settings(user_data.get("id"))
 
     return auth_user, user_data, settings

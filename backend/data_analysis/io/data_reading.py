@@ -19,6 +19,12 @@ import openpyxl
 import pandas as pd
 import requests
 
+from services.upload_config import (
+    get_data_upload_dir,
+    resolve_private_user_file_path,
+    safe_scope_part,
+)
+
 
 class RemoteDatasetUrlsDisabledError(ValueError):
     pass
@@ -37,12 +43,12 @@ class DataReadingNormal:
     SHARED_CACHE_MAX_ITEMS = int(os.getenv("DATAFRAME_CACHE_MAX_ITEMS", "16"))
     URL_CACHE_SECONDS = int(os.getenv("DATAFRAME_URL_CACHE_SECONDS", "60"))
     MAX_REMOTE_BYTES = int(os.getenv("MAX_REMOTE_DATA_BYTES", str(10 * 1024 * 1024)))
-    MAX_CSV_BYTES = int(os.getenv("MAX_CSV_BYTES", str(10 * 1024 * 1024)))
+    MAX_CSV_BYTES = int(os.getenv("MAX_CSV_BYTES", os.getenv("MAX_FULL_DATAFRAME_BYTES", str(50 * 1024 * 1024))))
     MAX_ROWS = int(os.getenv("DATAFRAME_MAX_ROWS", "100000"))
     MAX_COLUMNS = int(os.getenv("DATAFRAME_MAX_COLUMNS", "500"))
     MAX_CELL_CHARS = int(os.getenv("DATAFRAME_MAX_CELL_CHARS", "10000"))
     MAX_TOTAL_CELL_CHARS = int(os.getenv("DATAFRAME_MAX_TOTAL_CELL_CHARS", str(10 * 1024 * 1024)))
-    MAX_EXCEL_FILE_BYTES = int(os.getenv("MAX_EXCEL_FILE_BYTES", str(10 * 1024 * 1024)))
+    MAX_EXCEL_FILE_BYTES = int(os.getenv("MAX_EXCEL_FILE_BYTES", os.getenv("MAX_EXCEL_UPLOAD_BYTES", str(50 * 1024 * 1024))))
     MAX_EXCEL_UNCOMPRESSED_BYTES = int(os.getenv("MAX_EXCEL_UNCOMPRESSED_BYTES", str(50 * 1024 * 1024)))
     MAX_EXCEL_ZIP_ENTRIES = int(os.getenv("MAX_EXCEL_ZIP_ENTRIES", "200"))
     MAX_EXCEL_ZIP_ENTRY_NAME_CHARS = int(os.getenv("MAX_EXCEL_ZIP_ENTRY_NAME_CHARS", "240"))
@@ -570,18 +576,37 @@ class DataReadingNormal:
         )
 
     def _resolve_uploaded_file(self, file_path: str) -> Path:
-        upload_root = Path(os.getenv("DATA_UPLOAD_DIR", "uploads")).resolve()
-        requested = Path(file_path)
-        resolved = (Path.cwd() / requested).resolve() if not requested.is_absolute() else requested.resolve()
-        allowed_root = self._scoped_upload_root(upload_root)
+        if self.tenant_id is None or self.user_id is None:
+            upload_root = get_data_upload_dir().resolve()
+            requested = Path(file_path)
+            resolved = (Path.cwd() / requested).resolve() if not requested.is_absolute() else requested.resolve()
 
-        if allowed_root != resolved and allowed_root not in resolved.parents:
-            raise ValueError("Only uploaded data files can be read")
+            if upload_root != resolved and upload_root not in resolved.parents:
+                raise ValueError("Only uploaded data files can be read")
 
-        if not resolved.is_file():
-            raise ValueError("Uploaded data file was not found")
+            if not resolved.is_file():
+                raise ValueError("Uploaded data file was not found")
 
-        return resolved
+            return resolved
+
+        try:
+            requested = Path(file_path)
+            if not requested.is_absolute() and len(requested.parts) == 1:
+                file_path = str(
+                    self._scoped_upload_root(get_data_upload_dir())
+                    / requested.name
+                )
+            return resolve_private_user_file_path(
+                file_path,
+                storage_root=get_data_upload_dir(),
+                tenant_id=self.tenant_id,
+                user_id=self.user_id,
+                allowed_extensions=self.SUPPORTED_EXTENSIONS,
+            )
+        except FileNotFoundError as error:
+            raise ValueError("Uploaded data file was not found") from error
+        except (PermissionError, ValueError) as error:
+            raise ValueError("Only uploaded data files can be read") from error
 
     def _scoped_upload_root(self, upload_root: Path) -> Path:
         if self.tenant_id is None or self.user_id is None:
@@ -589,17 +614,15 @@ class DataReadingNormal:
 
         return (
             upload_root
-            / self._safe_scope_part("tenant", self.tenant_id)
-            / self._safe_scope_part("user", self.user_id)
+            / safe_scope_part("tenant", self.tenant_id)
+            / safe_scope_part("user", self.user_id)
         ).resolve()
 
     def _safe_scope_part(self, prefix: str, value: str | int) -> str:
-        text = str(value).strip()
-
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", text):
-            raise ValueError("Invalid upload storage scope")
-
-        return f"{prefix}_{text}"
+        try:
+            return safe_scope_part(prefix, value)
+        except ValueError as error:
+            raise ValueError("Invalid upload storage scope") from error
 
     def _fetch_public_url(self, url: str) -> requests.Response:
         self._assert_remote_dataset_urls_enabled()

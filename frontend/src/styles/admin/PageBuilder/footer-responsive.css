@@ -1,0 +1,341 @@
+/* Shared workspace footer: the same structure is used in the builder and Go Live. */
+.builder-canvas .ecommerce-style-footer {
+  --workspace-footer-bg: var(--theme-primary);
+  --workspace-footer-text: #fff;
+  --workspace-footer-muted: #fff;
+  container-name: site-footer;
+  container-type: inline-size;
+  min-width: 0;
+  padding: clamp(38px, 5cqi, 68px) clamp(18px, 5cqi, 72px) clamp(22px, 3cqi, 36px);
+  border: 0;
+  background: var(--workspace-footer-bg) !important;
+  color: var(--workspace-footer-text) !important;
+}
+
+/* Keep footer foregrounds readable even when legacy builder/theme rules target
+   the same descendants with more specific selectors. */
+.builder-canvas .ecommerce-style-footer :is(
+  .ecommerce-footer-logo-row h3,
+  .ecommerce-footer-column h4,
+  .ecommerce-footer-contact h4,
+  .ecommerce-footer-links-grid button,
+  .ecommerce-contact-row,
+  .ecommerce-contact-row span,
+  .ecommerce-contact-row svg,
+  .ecommerce-social-row a,
+  .ecommerce-social-row span,
+  .ecommerce-payment-row a,
+  .ecommerce-payment-row span,
+  .ecommerce-footer-bottom,
+  .ecommerce-footer-bottom p,
+  .powered-by-madar
+) {
+  color: var(--workspace-footer-text) !important;
+  -webkit-text-fill-color: var(--workspace-footer-text) !important;
+  opacity: 1;
+}
+
+.ecommerce-style-footer .ecommerce-social-mark {
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ecommerce-style-footer .ecommerce-footer-grid {
+  width: min(100%, 1200px);
+  max-width: none;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(360px, 1.45fr) minmax(240px, 1fr);
+  align-items: start;
+  gap: clamp(32px, 5cqi, 72px);
+}
+
+.ecommerce-style-footer .ecommerce-footer-brand,
+.ecommerce-style-footer .ecommerce-footer-column,
+.ecommerce-style-footer .ecommerce-footer-contact {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  text-align: start;
+}
+
+.ecommerce-style-footer .ecommerce-footer-brand {
+  gap: 20px;
+}
+
+.ecommerce-style-footer .ecommerce-footer-logo-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  gap: 12px;
+}
+
+.ecommerce-style-footer .ecommerce-footer-logo {
+  width: clamp(50px, 6cqi, 72px);
+  height: clamp(50px, 6cqi, 72px);
+  object-fit: contain;
+}
+
+.ecommerce-style-footer .ecommerce-footer-logo-row h3 {
+  margin: 0;
+  color: var(--workspace-footer-text) !important;
+  font-size: clamp(22px, 2.6cqi, 32px);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.ecommerce-style-footer .ecommerce-footer-brand > p {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--workspace-footer-muted) !important;
+  font-size: clamp(13px, 1.3cqi, 16px);
+  line-height: 1.65;
+}
+
+.ecommerce-style-footer .ecommerce-social-row,
+.ecommerce-style-footer .ecommerce-payment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ecommerce-style-footer .ecommerce-social-row > :is(a, span) {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--workspace-footer-text) 45%, transparent);
+  border-radius: 8px;
+  background: transparent !important;
+  color: var(--workspace-footer-text) !important;
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.ecommerce-style-footer .ecommerce-social-row > :is(a, span):hover {
+  transform: translateY(-2px);
+  border-color: var(--theme-accent);
+  background: color-mix(in srgb, var(--theme-accent) 20%, transparent);
+}
+
+.ecommerce-style-footer .ecommerce-footer-column,
+.ecommerce-style-footer .ecommerce-footer-contact {
+  gap: 12px;
+}
+
+.ecommerce-style-footer .ecommerce-footer-quick-links {
+  justify-items: center;
+  text-align: center;
+}
+
+.ecommerce-style-footer .ecommerce-footer-quick-links h4 {
+  width: 100%;
+  text-align: center;
+}
+
+.ecommerce-style-footer :is(.ecommerce-footer-column, .ecommerce-footer-contact) h4 {
+  margin: 0 0 14px;
+  color: var(--workspace-footer-text) !important;
+  font-size: clamp(15px, 1.55cqi, 19px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.ecommerce-style-footer .ecommerce-footer-links-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  justify-items: center;
+  gap: 12px 20px;
+}
+
+.ecommerce-style-footer .ecommerce-footer-links-grid button {
+  max-width: 100%;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--workspace-footer-muted) !important;
+  font-size: clamp(13px, 1.3cqi, 16px);
+  font-weight: 550;
+  line-height: 1.45;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.ecommerce-style-footer .ecommerce-footer-links-grid button:hover {
+  color: var(--workspace-footer-text) !important;
+}
+
+.ecommerce-style-footer .ecommerce-contact-row {
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  color: var(--workspace-footer-muted) !important;
+  font-size: clamp(13px, 1.3cqi, 16px);
+  line-height: 1.45;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.ecommerce-style-footer .ecommerce-contact-row svg {
+  color: var(--workspace-footer-text);
+}
+
+.builder-canvas .ecommerce-style-footer .ecommerce-contact-row span {
+  color: var(--workspace-footer-text) !important;
+  -webkit-text-fill-color: var(--workspace-footer-text) !important;
+  opacity: 1 !important;
+}
+
+.ecommerce-style-footer .ecommerce-contact-row:hover {
+  color: var(--workspace-footer-text) !important;
+}
+
+.ecommerce-style-footer .ecommerce-payment-row {
+  margin-top: 8px;
+}
+
+.ecommerce-style-footer .ecommerce-payment-row :is(a, span) {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--theme-text-inverse) 18%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--theme-text-inverse) 4%, transparent);
+  color: var(--workspace-footer-muted) !important;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.ecommerce-style-footer .ecommerce-footer-bottom {
+  width: min(100%, 1200px);
+  max-width: none;
+  margin: clamp(40px, 6cqi, 72px) auto 0;
+  padding-top: clamp(20px, 2.4cqi, 30px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  border-top: 1px solid color-mix(in srgb, var(--theme-text-inverse) 28%, transparent);
+  color: var(--workspace-footer-muted) !important;
+  font-size: clamp(11px, 1.15cqi, 14px);
+  text-align: center;
+}
+
+.ecommerce-style-footer .ecommerce-footer-bottom p {
+  margin: 0;
+  grid-column: 2;
+  justify-self: center;
+}
+
+.ecommerce-style-footer .powered-by-madar {
+  grid-column: 3;
+  justify-self: end;
+  margin: 0;
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--theme-accent);
+  color: var(--theme-text-inverse);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.24);
+}
+
+@container site-footer (max-width: 760px) {
+  .ecommerce-style-footer .ecommerce-footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 38px 28px;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-brand {
+    grid-column: 1 / -1;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-links-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container site-footer (max-width: 520px) {
+  .ecommerce-style-footer {
+    padding: 32px 24px 24px;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-grid,
+  .ecommerce-style-footer .ecommerce-footer-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-grid {
+    gap: 36px;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-brand {
+    grid-column: auto;
+  }
+
+  .ecommerce-style-footer :is(
+    .ecommerce-footer-brand,
+    .ecommerce-footer-column,
+    .ecommerce-footer-contact
+  ) {
+    width: 100%;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-logo-row {
+    justify-content: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-social-row,
+  .ecommerce-style-footer .ecommerce-payment-row {
+    justify-content: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-links-grid {
+    width: min(100%, 290px);
+    gap: 14px 24px;
+  }
+
+  .ecommerce-style-footer .ecommerce-contact-row {
+    width: min(100%, 220px);
+    grid-template-columns: 22px minmax(0, 1fr);
+    justify-self: center;
+    text-align: start;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-bottom {
+    width: 100%;
+    margin-top: 32px;
+    padding-top: 22px;
+    gap: 16px;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-bottom p,
+  .ecommerce-style-footer .powered-by-madar {
+    grid-column: 1;
+  }
+
+  .ecommerce-style-footer .powered-by-madar {
+    justify-self: center;
+  }
+
+  .ecommerce-style-footer .ecommerce-footer-links-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

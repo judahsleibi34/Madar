@@ -1,7 +1,71 @@
+import { useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 
 import DashboardSidebar from "../components/DashboardBuilder/DashboardSidebar";
+import PageSkeleton from "../components/common/PageSkeleton";
 import { appShellContent } from "../content";
+
+const AUTHENTICATED_REFERENCE_WIDTH = 1440;
+const AUTHENTICATED_REFERENCE_HEIGHT = 900;
+const AUTHENTICATED_MIN_LAYOUT_SCALE = 0.67;
+const AUTHENTICATED_MIN_TEXT_SCALE = 0.82;
+
+function useAuthenticatedReferenceScale() {
+  const shellRef = useRef(null);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell || typeof ResizeObserver === "undefined") return undefined;
+
+    let animationFrame = 0;
+    let previousLayoutScale = "";
+    let previousTextScale = "";
+
+    const updateScale = () => {
+      animationFrame = 0;
+      const { width, height } = shell.getBoundingClientRect();
+      if (!width || !height) return;
+
+      const rawScale = Math.min(
+        width / AUTHENTICATED_REFERENCE_WIDTH,
+        height / AUTHENTICATED_REFERENCE_HEIGHT
+      );
+      const layoutScale = Math.max(
+        AUTHENTICATED_MIN_LAYOUT_SCALE,
+        Math.min(1, rawScale)
+      ).toFixed(4);
+      const textScale = Math.max(
+        AUTHENTICATED_MIN_TEXT_SCALE,
+        Number(layoutScale)
+      ).toFixed(4);
+
+      if (layoutScale !== previousLayoutScale) {
+        shell.style.setProperty("--ui-layout-scale", layoutScale);
+        previousLayoutScale = layoutScale;
+      }
+      if (textScale !== previousTextScale) {
+        shell.style.setProperty("--ui-text-scale", textScale);
+        previousTextScale = textScale;
+      }
+    };
+
+    const scheduleScaleUpdate = () => {
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(updateScale);
+    };
+
+    const observer = new ResizeObserver(scheduleScaleUpdate);
+    observer.observe(shell);
+    shell.querySelectorAll(":scope > .admin-sidebar, :scope > .admin-dashboard-page").forEach((element) => observer.observe(element));
+    scheduleScaleUpdate();
+
+    return () => {
+      observer.disconnect();
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, []);
+
+  return shellRef;
+}
 
 export function RestrictedAccessWindow({
   title = appShellContent.restrictedAccess.title,
@@ -439,30 +503,19 @@ export function PageBuilderSkeleton({ lang, pathname = "/page-builder" }) {
 }
 
 export function DashboardLoadingElement({ pathname, labels, lang }) {
-  if (pathname.startsWith("/page-builder/form-preview")) {
-    return <FormPreviewSkeleton lang={lang} />;
-  }
-
-  if (
-    pathname.startsWith("/page-builder") ||
-    pathname.startsWith("/builder-responses") ||
-    pathname.startsWith("/builder-data")
-  ) {
-    return <PageBuilderSkeleton lang={lang} pathname={pathname} />;
-  }
-
   const safeLabels = labels || appShellContent.loading || {};
   let label = safeLabels.dashboard || "Loading dashboard";
 
   if (pathname.startsWith("/page-builder")) label = safeLabels.pageBuilder || label;
   if (pathname.startsWith("/builder-responses")) label = safeLabels.submissions || label;
   if (pathname.startsWith("/builder-data")) label = safeLabels.dataLogs || label;
+  if (pathname.startsWith("/archive")) label = safeLabels.archive || "Loading archive";
   if (pathname.startsWith("/my-plan")) label = safeLabels.myPlan || label;
   if (pathname.startsWith("/admin/users")) label = safeLabels.userManagement || label;
   if (pathname.startsWith("/settings/change-password")) label = safeLabels.passwordSettings || label;
   if (pathname.startsWith("/settings")) label = safeLabels.settings || label;
 
-  return <DashboardSkeleton label={label} lang={lang} />;
+  return <PageSkeleton label={label} lang={lang} variant="dashboard" />;
 }
 
 export function DashboardShell({
@@ -483,14 +536,19 @@ export function DashboardShell({
   themeMode,
   user,
 }) {
-  const activeLang = shellLang || lang;
-  const isShellRtl = activeLang === "ar";
+  const navigationLang = lang || shellLang;
+  const contentLang = shellLang || lang;
+  const isShellRtl = navigationLang === "ar";
+  const isContentRtl = contentLang === "ar";
   const useCompactBuilderSidebar = isPageBuilderShell || compactSidebar;
 
+  const shellRef = useAuthenticatedReferenceScale();
   return (
     <div
+      ref={shellRef}
       className={[
         "admin-dashboard-layout",
+        "authenticated-shell",
         useCompactBuilderSidebar ? "admin-dashboard-layout-builder" : "",
         isShellRtl ? "is-rtl" : "is-ltr",
         open ? "sidebar-open" : "",
@@ -519,7 +577,7 @@ export function DashboardShell({
 
       <DashboardSidebar
         id="dashboard-sidebar"
-        lang={activeLang}
+        lang={navigationLang}
         user={user}
         onLogout={onLogout}
         onLanguageChange={hideLanguage ? undefined : onLanguageChange}
@@ -534,11 +592,12 @@ export function DashboardShell({
       <main
         className={[
           "admin-dashboard-page",
+          "authenticated-main",
           isPageBuilderShell ? "page-builder-dashboard-page" : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        dir={isShellRtl ? "rtl" : "ltr"}
+        dir={isContentRtl ? "rtl" : "ltr"}
       >
         {children}
       </main>

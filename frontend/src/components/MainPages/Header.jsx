@@ -63,7 +63,7 @@ export default function Header({
 
   useEffect(() => {
     function handleResize() {
-      if (window.innerWidth > 1400) {
+      if (window.innerWidth > 1024) {
         setMenuOpen(false);
       }
     }

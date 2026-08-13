@@ -3,6 +3,9 @@
    ============================================================ */
 
 .hero-section {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   flex: 1;
   padding: 80px 5% 0 5%;
   display: flex;
@@ -10,12 +13,26 @@
   gap: 48px;
 }
 
+.hero-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url("../../assets/MadarTemplates/madar_header.svg") center / clamp(420px, 48vw, 720px) auto no-repeat;
+  opacity: 0.045;
+  pointer-events: none;
+}
+
 .hero-content {
+  position: relative;
+  z-index: 1;
   flex: 1.05;
   max-width: 720px;
 }
 
 .hero-visual {
+  position: relative;
+  z-index: 1;
   flex: 0.95;
   display: flex;
   justify-content: center;
@@ -108,6 +125,11 @@
   font-family: var(--font-heading);
 }
 
+.hero-title .gradient-text,
+.hero-description .arabic-name {
+  unicode-bidi: isolate;
+}
+
 .hero-subtitle {
   margin: 40px 0 12px 0;
   color: var(--color-text-main);
@@ -125,6 +147,7 @@
 }
 
 .arabic-name {
+  display: inline;
   color: var(--color-primary);
   font-weight: var(--font-weight-bold);
   font-size: 22px;
@@ -187,6 +210,12 @@ body.theme-dark .arabic-name {
 }
 
 @media (max-width: 640px) {
+  .hero-section::before {
+    background-size: min(110vw, 480px) auto;
+    background-position: center 32%;
+    opacity: 0.04;
+  }
+
   .hero-title {
     font-size: 34px;
   }

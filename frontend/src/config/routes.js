@@ -1,6 +1,5 @@
 export const PUBLIC_ROUTES = {
   home: "/",
-  productTour: "/product-tour",
   pricing: "/pricing",
   pricingBasePlans: "/pricing/base-plans",
   pricingCustomPlan: "/pricing/custom-plan",
@@ -8,9 +7,11 @@ export const PUBLIC_ROUTES = {
   about: "/about",
   contact: "/contact",
   privacyPolicy: "/privacy-policy",
+  termsAndConditions: "/terms-and-conditions",
   demo: "/demo",
   login: "/login",
   signup: "/signup",
+  verifyEmail: "/verify-email",
 };
 
 export const DASHBOARD_ROUTES = {
@@ -18,6 +19,14 @@ export const DASHBOARD_ROUTES = {
   pageBuilder: "/page-builder",
   builderResponses: "/builder-responses",
   builderData: "/builder-data",
+  calendar: "/calendar",
+  archive: "/archive",
+  ecommerce: "/ecommerce",
+  ecommerceTags: "/ecommerce/tags",
+  ecommerceCategories: "/ecommerce/categories",
+  ecommerceProducts: "/ecommerce/products",
+  ecommerceCvRerank: "/ecommerce/cv-rerank",
+  ecommerceStore: "/ecommerce/store",
   notifications: "/notifications",
   myPlan: "/my-plan",
   settings: "/settings",
@@ -27,4 +36,3 @@ export const DASHBOARD_ROUTES = {
 };
 
 export const POST_LOGIN_FALLBACK_ROUTE = DASHBOARD_ROUTES.dashboard;
-

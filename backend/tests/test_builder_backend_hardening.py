@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -7,6 +8,7 @@ from unittest.mock import patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+import database
 from routes import builder_routes
 from services.tenant_service import TenantContext, require_builder_admin_access
 
@@ -90,6 +92,23 @@ def builder_schema_with_element(element):
 
 
 class BuilderBackendHardeningTests(unittest.TestCase):
+    def test_publish_validation_preserves_nested_page_routes(self):
+        schema, _ = builder_routes.validate_publish_schema({
+            "defaultPageId": "home",
+            "pages": [
+                {"id": "home", "name": "Home", "slug": "/", "sections": []},
+                {
+                    "id": "team",
+                    "name": "Team",
+                    "slug": "/about/team",
+                    "sections": [],
+                },
+            ],
+            "forms": [],
+        })
+
+        self.assertEqual(schema["pages"][1]["slug"], "/about/team")
+
     def test_publish_accepts_no_body(self):
         fake_supabase = FakeSupabase()
         client = build_client(fake_supabase)
@@ -435,8 +454,29 @@ class BuilderBackendHardeningTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["site"], {"subdomain": "tenant-site", "tenant_id": 1})
-        self.assertEqual(body["project"]["published_schema"], draft_schema)
+        self.assertEqual(
+            body["site"],
+            {
+                "subdomain": "tenant-site",
+                "standard_path_slug": "tenant-site",
+                "tenant_id": 1,
+                "published_project_id": "project-1",
+            },
+        )
+        self.assertEqual(
+            body["project"]["published_schema"],
+            {
+                "defaultPageId": "page-1",
+                "pages": [{
+                    "id": "page-1",
+                    "slug": "/",
+                    "isDefault": True,
+                    "showInNavigation": True,
+                    "order": 0,
+                }],
+            },
+        )
+        self.assertEqual(draft_schema, {"pages": [{"id": "page-1"}]})
         self.assertEqual(body["project"]["published_version"], 4)
         self.assertEqual(body["project"]["status"], "published")
         self.assertTrue(body["project"]["last_published_at"])
@@ -562,6 +602,7 @@ class BuilderBackendHardeningTests(unittest.TestCase):
                      "status": "published",
                  },
              ), \
+             patch.object(builder_routes, "get_website_settings_record", return_value=None), \
              patch.object(builder_routes, "record_audit_event") as record_audit:
             response = client.delete("/builder/projects/project-1")
 
@@ -655,6 +696,54 @@ class BuilderBackendHardeningTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "User id does not match session")
+
+    def test_local_environment_file_overrides_stale_shell_values(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            env_path = Path(temporary_directory) / ".env"
+            env_path.write_text(
+                "SUPABASE_URL=https://fresh-project.supabase.co\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "development",
+                    "SUPABASE_URL": "https://stale-project.supabase.co",
+                },
+                clear=True,
+            ), patch.object(database, "DEFAULT_ENV_PATH", env_path):
+                loaded_path = database.load_backend_environment()
+
+                self.assertEqual(loaded_path, env_path.resolve())
+                self.assertEqual(
+                    os.environ["SUPABASE_URL"],
+                    "https://fresh-project.supabase.co",
+                )
+
+    def test_production_environment_keeps_deployment_values(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            env_path = Path(temporary_directory) / ".env"
+            env_path.write_text(
+                "SUPABASE_URL=https://local-file.supabase.co\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "production",
+                    "SUPABASE_URL": "https://deployment.supabase.co",
+                },
+                clear=True,
+            ), patch.object(database, "DEFAULT_ENV_PATH", env_path):
+                database.load_backend_environment()
+
+                self.assertEqual(
+                    os.environ["SUPABASE_URL"],
+                    "https://deployment.supabase.co",
+                )
+
 
     def test_database_requires_service_key(self):
         database_path = Path(__file__).resolve().parents[1] / "database.py"

@@ -20,6 +20,30 @@ def fake_tenant_context(tenant_id=7, user_id=3):
 
 
 class BillingRoutesTests(unittest.TestCase):
+    def test_current_billing_is_tenant_scoped_and_returns_persisted_state(self):
+        client = build_client()
+        state = {
+            "state": "pending",
+            "current": {"id": 11, "plan": "complete", "payment_status": "pending"},
+            "active": None,
+            "pending_request": {"id": 11, "plan": "complete", "payment_status": "pending"},
+            "features": [],
+        }
+        with patch.object(
+            billing_routes,
+            "require_active_tenant_member",
+            return_value=fake_tenant_context(tenant_id=7, user_id=3),
+        ), patch.object(
+            billing_routes,
+            "get_current_billing_state",
+            return_value=state,
+        ) as get_state:
+            response = client.get("/billing/current")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["billing"], state)
+        get_state.assert_called_once_with(7)
+
     def test_canonical_checkout_requires_auth(self):
         client = build_client()
 
@@ -81,7 +105,9 @@ class BillingRoutesTests(unittest.TestCase):
         )
         body = response.json()
         self.assertTrue(body["success"])
-        self.assertTrue(body["requires_payment"])
+        self.assertFalse(body["requires_payment"])
+        self.assertFalse(body["checkout_available"])
+        self.assertEqual(body["code"], "billing_not_configured")
         self.assertIn("saved", body["message"].lower())
         self.assertEqual(body["data"], feature)
         self.assertEqual(
@@ -565,6 +591,154 @@ class FakeBillingSupabase:
 
 
 class BillingServiceTests(unittest.TestCase):
+    def test_equivalent_pending_checkout_reuses_existing_row_without_write(self):
+        existing = {
+            "id": 43,
+            "tenant_id": 7,
+            "subscription_type": "full_platform",
+            "plan": "complete",
+            "builder_type": None,
+            "payment_status": "pending",
+            "updated_at": "2026-07-01T00:00:00+00:00",
+        }
+        fake_supabase = FakeBillingSupabase()
+
+        with patch.object(
+            billing_service,
+            "get_existing_feature_for_tenant",
+            return_value=existing,
+        ), patch.object(billing_service, "service_supabase", fake_supabase):
+            feature = billing_service.apply_pending_checkout_selection(
+                tenant_id=7,
+                subscription_type="full_platform",
+                plan="complete",
+                builder_type=None,
+                updated_by_user_id=3,
+            )
+
+        self.assertEqual(feature, existing)
+        self.assertEqual(fake_supabase.tables, [])
+
+    def test_concurrent_equivalent_pending_checkout_reuses_winning_row(self):
+        winner = {
+            "id": 44,
+            "tenant_id": 7,
+            "subscription_type": "full_platform",
+            "plan": "complete",
+            "builder_type": None,
+            "payment_status": "pending",
+        }
+
+        class ConcurrentInsert:
+            def insert(self, _payload):
+                return self
+
+            def execute(self):
+                raise RuntimeError("unique constraint")
+
+        class ConcurrentSupabase:
+            def table(self, name):
+                self.table_name = name
+                return ConcurrentInsert()
+
+        with patch.object(
+            billing_service,
+            "get_existing_feature_for_tenant",
+            side_effect=[None, winner],
+        ), patch.object(
+            billing_service,
+            "service_supabase",
+            ConcurrentSupabase(),
+        ):
+            feature = billing_service.apply_pending_checkout_selection(
+                tenant_id=7,
+                subscription_type="full_platform",
+                plan="complete",
+                builder_type=None,
+            )
+
+        self.assertEqual(feature, winner)
+
+    def test_current_state_collapses_historical_pending_duplicates_deterministically(self):
+        older = {
+            "id": 10,
+            "subscription_type": "full_platform",
+            "plan": "complete",
+            "builder_type": None,
+            "payment_status": "pending",
+            "created_at": "2026-06-01T00:00:00+00:00",
+        }
+        newest = {
+            **older,
+            "id": 11,
+            "updated_at": "2026-07-01T00:00:00+00:00",
+        }
+
+        state = billing_service.normalize_current_billing_features([older, newest])
+
+        self.assertEqual(state["pending_request"]["id"], 11)
+        self.assertEqual(state["current"]["id"], 11)
+        self.assertEqual([feature["id"] for feature in state["features"]], [11])
+        self.assertEqual(state["other_states"], [])
+
+    def test_current_state_preserves_active_and_distinct_pending_upgrade(self):
+        active = {
+            "id": 20,
+            "subscription_type": "individual_builder",
+            "plan": "pro",
+            "builder_type": "website",
+            "payment_status": "active",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+        }
+        pending = {
+            "id": 21,
+            "subscription_type": "full_platform",
+            "plan": "complete",
+            "builder_type": None,
+            "payment_status": "pending",
+            "updated_at": "2026-07-01T00:00:00+00:00",
+        }
+
+        state = billing_service.normalize_current_billing_features([active, pending])
+
+        self.assertEqual(state["active"]["id"], 20)
+        self.assertEqual(state["pending_request"]["id"], 21)
+        self.assertEqual(state["state"], "active")
+
+    def test_current_state_collapses_identical_pending_beside_active(self):
+        active = {
+            "id": 30,
+            "subscription_type": "full_platform",
+            "plan": "complete",
+            "builder_type": None,
+            "payment_status": "active",
+            "updated_at": "2026-07-02T00:00:00+00:00",
+        }
+        stale_pending = {
+            **active,
+            "id": 29,
+            "payment_status": "pending",
+            "updated_at": "2026-07-01T00:00:00+00:00",
+        }
+
+        state = billing_service.normalize_current_billing_features([stale_pending, active])
+
+        self.assertEqual(state["active"]["id"], 30)
+        self.assertIsNone(state["pending_request"])
+        self.assertEqual([feature["id"] for feature in state["features"]], [30])
+
+    def test_current_state_deduplicates_terminal_states(self):
+        rows = [
+            {"id": 1, "subscription_type": "full_platform", "plan": "pro", "payment_status": "canceled", "updated_at": "2026-01-01"},
+            {"id": 2, "subscription_type": "full_platform", "plan": "pro", "payment_status": "canceled", "updated_at": "2026-02-01"},
+            {"id": 3, "subscription_type": "individual_builder", "builder_type": "forms", "plan": "basic", "payment_status": "past_due", "updated_at": "2026-03-01"},
+        ]
+
+        state = billing_service.normalize_current_billing_features(rows)
+
+        self.assertEqual([feature["id"] for feature in state["other_states"]], [3, 2])
+        self.assertEqual(state["state"], "past_due")
+
     def test_apply_pending_checkout_inserts_new_feature(self):
         fake_supabase = FakeBillingSupabase()
 
@@ -623,6 +797,38 @@ class BillingServiceTests(unittest.TestCase):
         self.assertEqual(feature["plan"], "premium")
         self.assertEqual(feature["builder_type"], "forms")
         self.assertEqual(feature["payment_status"], "pending")
+
+    def test_placeholder_checkout_never_downgrades_active_feature(self):
+        fake_supabase = FakeBillingSupabase()
+        active_feature = {
+            "id": 46,
+            "tenant_id": 7,
+            "subscription_type": "full_platform",
+            "plan": "pro",
+            "builder_type": None,
+            "payment_status": "active",
+        }
+
+        with patch.object(
+            billing_service,
+            "get_existing_feature_for_tenant",
+            return_value=active_feature,
+        ), patch.object(
+            billing_service,
+            "service_supabase",
+            fake_supabase,
+        ):
+            feature = billing_service.apply_pending_checkout_selection(
+                tenant_id=7,
+                subscription_type="full_platform",
+                plan="business",
+                builder_type=None,
+                updated_by_user_id=3,
+            )
+
+        self.assertEqual(feature, active_feature)
+        self.assertEqual(feature["payment_status"], "active")
+        self.assertEqual(fake_supabase.tables, [])
 
     def test_verified_billing_update_can_mark_feature_active(self):
         fake_supabase = FakeBillingSupabase()

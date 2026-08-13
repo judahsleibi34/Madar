@@ -96,25 +96,9 @@ export default function Dashboard({
       data-language={safeLang}
       data-theme={themeMode}
     >
-      <section className="admin-dashboard-hero">
-        <div>
-          <span className="admin-dashboard-eyebrow">{t.eyebrow}</span>
-          <h1>{t.heroTitle}</h1>
-          <p>{t.heroSubtitle}</p>
-          <div className="admin-dashboard-hero-meta">
-            <span>{t.todayOrders}</span>
-            <span>{t.todayRevenue}</span>
-          </div>
-        </div>
-
-        <button type="button" className="admin-dashboard-hero-action">
-          {t.viewReports}
-          <TrendingUp size={17} aria-hidden="true" />
-        </button>
-      </section>
-
       <header className="admin-dashboard-header">
         <div>
+          <span className="admin-dashboard-eyebrow">{t.eyebrow}</span>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
           <div className="admin-dashboard-header-meta" aria-label={t.platformHealth}>
@@ -124,6 +108,8 @@ export default function Dashboard({
             </span>
             <span>{t.lastUpdated}</span>
             <span>{t.platformHealth}</span>
+            <span>{t.todayOrders}</span>
+            <span>{t.todayRevenue}</span>
           </div>
         </div>
       </header>

@@ -1,3 +1,4 @@
+import { Download } from 'lucide-react';
 import EmptyState from './EmptyState';
 import Field from './Field';
 import Toggle from './Toggle';
@@ -7,21 +8,21 @@ import MultiColumnSelect from './MultiColumnSelect';
 export default function PrepareDataStep({
   dataset,
   columns,
-  textColumns,
   cleaning,
   updateCleaning,
-  onGenerateMetrics,
-  isGeneratingMetrics,
-  metricsReady,
-  metricCount = 0,
+  onSaveDataframes,
+  onDownloadDataframe,
+  dataframesSaved = false,
+  canDownloadDataframes = false,
+  isSavingDataframes = false,
   t,
 }) {
   const labellingHelp =
     cleaning.encodeMethod === "label"
       ? t.labelEncodingHint ||
-        "Best when one answer should become one code. Example: Red, Blue, Green become 1, 2, 3."
+        "Use this when each row has one choice, like Status, Department, Priority, or Rating."
       : t.oneHotEncodingHint ||
-        "Best for answer choices. Example: Red creates a Red yes/no column, Blue creates a Blue yes/no column.";
+        "Use this when one answer can include several choices, like Needed services = Website; Forms; Reports.";
 
   return (
     <section className="daw-card daw-section-card">
@@ -89,9 +90,13 @@ export default function PrepareDataStep({
             </summary>
 
             <div className="daw-advanced-cleaning-grid">
-              <section className="daw-cleaning-tool">
-                <strong>{t.fillMissing}</strong>
-                <p>{t.fillMissingHint || "Choose one column and decide what should replace empty cells."}</p>
+              <details className="daw-cleaning-tool" open={Boolean(cleaning.fillColumn)}>
+                <summary>
+                  <div>
+                    <strong>{t.fillMissing}</strong>
+                    <p>{t.fillMissingHint || "Choose one column and decide what should replace empty cells."}</p>
+                  </div>
+                </summary>
 
                 <div className="daw-form-grid">
                   <ColumnSelect
@@ -133,11 +138,15 @@ export default function PrepareDataStep({
                     </>
                   ) : null}
                 </div>
-              </section>
+              </details>
 
-              <section className="daw-cleaning-tool">
-                <strong>{t.changeColumnType || "Fix a column type"}</strong>
-                <p>{t.changeColumnTypeHint || "Use this if a number, date, or yes/no field was detected incorrectly."}</p>
+              <details className="daw-cleaning-tool" open={Boolean(cleaning.convertColumn)}>
+                <summary>
+                  <div>
+                    <strong>{t.changeColumnType || "Fix a column type"}</strong>
+                    <p>{t.changeColumnTypeHint || "Use this if a number, date, or yes/no field was detected incorrectly."}</p>
+                  </div>
+                </summary>
 
                 <div className="daw-form-grid">
                   <ColumnSelect
@@ -164,11 +173,15 @@ export default function PrepareDataStep({
                     </Field>
                   ) : null}
                 </div>
-              </section>
+              </details>
 
-              <section className="daw-cleaning-tool">
-                <strong>{t.renameColumn}</strong>
-                <p>{t.renameColumnHint || "Give a column a clearer name for the report."}</p>
+              <details className="daw-cleaning-tool" open={Boolean(cleaning.renameColumn)}>
+                <summary>
+                  <div>
+                    <strong>{t.renameColumn}</strong>
+                    <p>{t.renameColumnHint || "Give a column a clearer name for the report."}</p>
+                  </div>
+                </summary>
 
                 <div className="daw-form-grid">
                   <ColumnSelect
@@ -190,11 +203,15 @@ export default function PrepareDataStep({
                     </Field>
                   ) : null}
                 </div>
-              </section>
+              </details>
 
-              <section className="daw-cleaning-tool daw-cleaning-tool-wide">
-                <strong>{t.excludeColumns}</strong>
-                <p>{t.excludeColumnsHint || "Remove columns you do not want to use in the cleaned data."}</p>
+              <details className="daw-cleaning-tool daw-cleaning-tool-wide" open={Boolean(cleaning.dropColumns?.length)}>
+                <summary>
+                  <div>
+                    <strong>{t.excludeColumns}</strong>
+                    <p>{t.excludeColumnsHint || "Remove columns you do not want to use in the cleaned data."}</p>
+                  </div>
+                </summary>
 
                 <MultiColumnSelect
                   label={t.excludeColumns}
@@ -232,34 +249,40 @@ export default function PrepareDataStep({
                     </button>
                   </div>
                 ) : null}
-              </section>
+              </details>
 
-              <section className="daw-cleaning-tool daw-cleaning-tool-wide">
-                <strong>{t.labellingCard || "Make answers usable in charts"}</strong>
-                <p>{t.labellingCardHint || "Use this when text answers need to become number fields."}</p>
+              <details className="daw-cleaning-tool daw-cleaning-tool-wide" open={Boolean(cleaning.encodeColumns?.length)}>
+                <summary>
+                  <div>
+                    <strong>{t.labellingCard || "Encode a column for reports"}</strong>
+                    <p>
+                      {t.labellingCardHint ||
+                        "Choose the dataframe column and the encoding type to use in reports."}
+                    </p>
+                  </div>
+                </summary>
 
-                <div className="daw-form-grid daw-form-grid-single">
-                  <Field label={t.encodingMethod || "Choose how labels are created"}>
+                <div className="daw-form-grid">
+                  <ColumnSelect
+                    label={t.columnsToEncode || "Column"}
+                    value={cleaning.encodeColumns?.[0] || ""}
+                    columns={columns}
+                    onChange={(value) => updateCleaning("encodeColumns", value ? [value] : [])}
+                    t={t}
+                  />
+
+                  <Field label={t.encodingMethod || "Encoding type"}>
                     <select
                       value={cleaning.encodeMethod}
                       onChange={(event) => updateCleaning("encodeMethod", event.target.value)}
                     >
-                      <option value="one_hot">{t.oneHotEncoding || "Create a yes/no column for each answer"}</option>
-                      <option value="label">{t.labelEncoding || "Create one number column"}</option>
+                      <option value="one_hot">{t.oneHotEncoding || "One-hot encoding"}</option>
+                      <option value="label">{t.labelEncoding || "Label encoding"}</option>
                     </select>
                   </Field>
                 </div>
                 <p className="daw-cleaning-note">{labellingHelp}</p>
-
-                <MultiColumnSelect
-                  label={t.columnsToEncode || "Choose answer columns"}
-                  value={cleaning.encodeColumns}
-                  columns={textColumns?.length ? textColumns : columns}
-                  hideLabel
-                  onChange={(value) => updateCleaning("encodeColumns", value)}
-                  t={t}
-                />
-              </section>
+              </details>
             </div>
           </details>
 
@@ -273,39 +296,51 @@ export default function PrepareDataStep({
             </div>
             <button
               type="button"
-              className="daw-primary"
+              className={`daw-primary daw-save-dataframe-button ${
+                dataframesSaved ? "is-saved" : ""
+              }`}
               data-action="save-dataframes"
+              onClick={onSaveDataframes}
+              disabled={isSavingDataframes}
             >
-              {t.saveDataframes || "Save dataframes"}
+              {isSavingDataframes
+                ? t.working
+                : dataframesSaved
+                ? t.dataframesSaved || "Dataframes saved"
+                : t.saveDataframes || "Save dataframes"}
             </button>
           </div>
 
-          <div className={`daw-generate-metrics-row ${metricsReady ? "is-ready" : ""}`}>
-            <div>
-              <strong>
-                {metricsReady
-                  ? `${metricCount} report metric${metricCount === 1 ? " is" : "s are"} ready`
-                  : "Create report metrics"}
-              </strong>
-              <span>
-                {metricsReady
-                  ? "Metrics and tables are ready for the report builder."
-                  : "After choosing your cleaning options, create the KPIs and summary table used by the report builder."}
-              </span>
+          {dataframesSaved ? (
+            <div className="daw-generate-metrics-row is-ready">
+              <div>
+                <strong>{t.dataframesSaved || "Dataframes saved"}</strong>
+                <span>{t.dataframesSavedHint || "Charts and Report are ready to use this saved data."}</span>
+              </div>
+              <div className="daw-dataframe-download-actions" aria-label={t.downloadDataframes || "Download saved dataset"}>
+                <button
+                  type="button"
+                  className="daw-secondary"
+                  onClick={() => onDownloadDataframe?.("csv")}
+                  disabled={!canDownloadDataframes}
+                  title={t.downloadCsv || "Download CSV"}
+                >
+                  <Download size={16} />
+                  <span>{t.csv || "CSV"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="daw-secondary"
+                  onClick={() => onDownloadDataframe?.("xlsx")}
+                  disabled={!canDownloadDataframes}
+                  title={t.downloadXlsx || "Download XLSX"}
+                >
+                  <Download size={16} />
+                  <span>{t.xlsx || "XLSX"}</span>
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              className="daw-primary"
-              onClick={onGenerateMetrics}
-              disabled={isGeneratingMetrics}
-            >
-              {isGeneratingMetrics
-                ? t.working
-                : metricsReady
-                ? "Refresh metrics"
-                : "Create metrics"}
-            </button>
-          </div>
+          ) : null}
         </div>
       )}
     </section>

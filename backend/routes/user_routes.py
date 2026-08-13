@@ -8,12 +8,15 @@ from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFil
 from classes import UserProfileUpdate
 from database import service_supabase
 from services.billing_service import get_billing_summary_for_tenant
+from services.rate_limit_service import enforce_avatar_upload_rate_limit
 from services.auth_service import (
     build_user_payload,
     get_authenticated_user_row,
     require_regular_user,
     require_regular_user_id,
 )
+from services.api_errors import api_error
+from services.identity_service import canonical_auth_email
 from services.url_validation import validate_public_url
 
 router = APIRouter(prefix="/users/{user_id}", tags=["User"])
@@ -116,7 +119,7 @@ def is_duplicate_error(error: Exception) -> bool:
     )
 
 
-@router.post("/info")
+@router.get("/info")
 def user_info(user_id: int, request: Request, response: Response):
     try:
         _, user_data = require_regular_user_id(user_id, request, response)
@@ -136,6 +139,12 @@ def user_info(user_id: int, request: Request, response: Response):
         raise HTTPException(status_code=500, detail="Could not fetch user info")
 
 
+@router.post("/info", include_in_schema=False)
+def user_info_legacy(user_id: int, request: Request, response: Response):
+    """Compatibility alias for older clients; account reads are otherwise GET-only."""
+    return user_info(user_id, request, response)
+
+
 @router.put("/profile")
 def update_user_profile(
     user_id: int,
@@ -144,7 +153,27 @@ def update_user_profile(
     response: Response,
 ):
     try:
-        _, user_data = require_regular_user_id(user_id, request, response)
+        auth_user, user_data = require_regular_user_id(
+            user_id,
+            request,
+            response,
+            allow_admin_account_access=False,
+        )
+
+        if profile.email is not None:
+            clean_email = normalize_email(str(profile.email))
+            current_email = canonical_auth_email(auth_user) or normalize_email(
+                user_data.get("email")
+            )
+
+            if clean_email != current_email:
+                # Reject before constructing or issuing any update so a request
+                # cannot partially change names/avatar alongside an unsafe email.
+                raise api_error(
+                    409,
+                    "email_change_requires_verification_flow",
+                    "Email changes require a verified email-change flow.",
+                )
 
         update_payload = {}
 
@@ -153,31 +182,6 @@ def update_user_profile(
 
         if profile.last_name is not None:
             update_payload["last_name"] = profile.last_name.strip()
-
-        if profile.email is not None:
-            clean_email = normalize_email(str(profile.email))
-
-            if not clean_email:
-                raise HTTPException(status_code=400, detail="Email is required")
-
-            existing_user = (
-                service_supabase.table("users")
-                .select("id, auth_id, email")
-                .eq("email", clean_email)
-                .limit(1)
-                .execute()
-            )
-
-            if existing_user.data:
-                existing = existing_user.data[0]
-
-                if str(existing.get("auth_id")) != str(user_data.get("auth_id")):
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Email is already registered",
-                    )
-
-            update_payload["email"] = clean_email
 
         if profile.phone is not None:
             update_payload["phone"] = profile.phone.strip()
@@ -248,7 +252,13 @@ async def upload_user_avatar(
     file: UploadFile = File(...),
 ):
     try:
-        _, user_data = require_regular_user_id(user_id, request, response)
+        _, user_data = require_regular_user_id(
+            user_id,
+            request,
+            response,
+            allow_admin_account_access=False,
+        )
+        enforce_avatar_upload_rate_limit(request, user_id, user_data.get("tenant_id"))
 
         auth_id = str(user_data.get("auth_id") or "").strip()
 

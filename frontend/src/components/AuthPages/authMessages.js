@@ -3,7 +3,81 @@ const authSessionMessages = {
   "auth.session.invalid": "Your session is invalid or expired. Please log in again.",
 };
 
+const userSafeAuthMessages = new Set([
+  "account created. please verify your email before logging in.",
+  "could not create account",
+  "could not create user",
+  "could not prepare email verification",
+  "could not send verification email",
+  "could not start mfa challenge",
+  "could not verify mfa code",
+  "email is already registered",
+  "invalid email or password",
+  "invalid request origin",
+  "invalid or expired reset link.",
+  "mfa login session expired",
+  "password reset link expired. request a new link.",
+  "password must be at least 8 characters",
+  "please verify your email before logging in.",
+  "use the login page for the website where this account was created.",
+]);
+
+const technicalErrorPatterns = [
+  /\b\d{3}\b/,
+  /\bapierror\b/,
+  /\bbad gateway\b/,
+  /\bconnection\b/,
+  /\bdatabase\b/,
+  /\bexception\b/,
+  /\bfailed to fetch\b/,
+  /\bgateway\b/,
+  /\binternal server error\b/,
+  /\bnetwork\b/,
+  /\bproxy\b/,
+  /\bservice unavailable\b/,
+  /\btimeout\b/,
+  /\btraceback\b/,
+  /\bupstream\b/,
+];
+
 export const normalizeAuthMessage = (detail, fallback) => {
   if (typeof detail !== "string") return fallback;
-  return authSessionMessages[detail] || detail || fallback;
+
+  const message = detail.trim();
+  if (!message) return fallback;
+
+  if (authSessionMessages[message]) return authSessionMessages[message];
+
+  const normalizedMessage = message.toLowerCase();
+  if (userSafeAuthMessages.has(normalizedMessage)) return message;
+  if (technicalErrorPatterns.some((pattern) => pattern.test(normalizedMessage))) return fallback;
+
+  return fallback;
+};
+
+export const formatAuthValidationToastMessage = (errors, labels) => {
+  const entries = Object.keys(errors || {})
+    .filter((key) => Boolean(errors[key]))
+    .map((key) => ({
+      label: labels[key] || key,
+      message: String(errors[key]).trim(),
+    }));
+  const fields = entries.map((entry) => entry.label);
+
+  if (fields.length === 0) return "";
+
+  const messages = entries.map((entry) => entry.message.toLowerCase());
+  const allRequired = messages.every((message) => message.includes("required"));
+
+  if (allRequired) {
+    if (fields.length === 1) return `${fields[0]} is required.`;
+    if (fields.length === 2) return `${fields[0]} and ${fields[1]} are required.`;
+    return `${fields.slice(0, -1).join(", ")}, and ${fields[fields.length - 1]} are required.`;
+  }
+
+  if (entries.length === 1) return `${entries[0].label}: ${entries[0].message}`;
+
+  return entries
+    .map((entry) => `${entry.label}: ${entry.message}`)
+    .join(" ");
 };

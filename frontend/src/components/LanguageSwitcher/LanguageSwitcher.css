@@ -318,3 +318,20 @@
 body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button {
   box-shadow: none;
 }
+
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover .language-toggle-animation,
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation {
+  background: transparent !important;
+  box-shadow: none !important;
+}

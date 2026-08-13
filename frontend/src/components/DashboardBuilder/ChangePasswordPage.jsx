@@ -2,26 +2,11 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
 
-import { apiFetch } from "../../utils/apiClient";
+import { apiFetch, readApiError } from "../../utils/apiClient";
+import { meetsMinimumPasswordPolicy, PASSWORD_MIN_LENGTH } from "../AuthPages/passwordPolicy";
 import { getChangePasswordContent } from "../../content";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-
-const getApiErrorMessage = (detail, fallback) => {
-  if (typeof detail === "string") return detail;
-
-  if (Array.isArray(detail)) {
-    return detail
-      .map((error) => {
-        const field = Array.isArray(error.loc) ? error.loc.at(-1) : "";
-        return [field, error.msg].filter(Boolean).join(": ");
-      })
-      .filter(Boolean)
-      .join(" ");
-  }
-
-  return fallback;
-};
 
 export default function ChangePasswordPage({ lang = "en" }) {
   const navigate = useNavigate();
@@ -78,6 +63,7 @@ export default function ChangePasswordPage({ lang = "en" }) {
             value={form[field]}
             onChange={(event) => updateField(field, event.target.value)}
             autoComplete={autoComplete}
+            minLength={field === "currentPassword" ? undefined : PASSWORD_MIN_LENGTH}
           />
 
           <button
@@ -106,7 +92,7 @@ export default function ChangePasswordPage({ lang = "en" }) {
       return;
     }
 
-    if (newPassword.length < 8) {
+    if (!meetsMinimumPasswordPolicy(newPassword)) {
       setError(t.passwordTooShort);
       return;
     }
@@ -135,7 +121,7 @@ export default function ChangePasswordPage({ lang = "en" }) {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(getApiErrorMessage(data.detail, t.passwordUpdateError));
+        throw new Error(readApiError(data, t.passwordUpdateError));
       }
 
       setForm({
@@ -222,4 +208,3 @@ export default function ChangePasswordPage({ lang = "en" }) {
     </section>
   );
 }
-

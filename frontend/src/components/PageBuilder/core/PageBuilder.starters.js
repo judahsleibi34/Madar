@@ -106,9 +106,16 @@ export const loginSection = () =>
               alignSelf: "stretch",
             },
           }),
-          createElement("card", {
+          createElement("loginBlock", {
             name: "Login Form Card",
             content: starterText.defaults.loginCard,
+            auth: {
+              title: starterText.defaults.loginHeading,
+              subtitle: starterText.defaults.loginText,
+              buttonText: "Login",
+              switchText: "",
+              switchActionText: "",
+            },
             styles: {
               backgroundColor: "var(--theme-surface)",
               borderRadius: "24px",
@@ -118,6 +125,42 @@ export const loginSection = () =>
         ]),
       ]),
     ],
+  });
+
+export const createBlankCanvasSection = () => ({
+  ...createSection({
+    name: "Page Canvas",
+    mode: "direct",
+    layout: {
+      width: "full",
+      paddingY: "none",
+      background: "transparent",
+      minHeight: 720,
+      minHeightByViewport: {
+        desktop: 720,
+        tablet: 720,
+        mobile: 720,
+      },
+    },
+    rows: [],
+    freeElements: [],
+  }),
+  isPageCanvas: true,
+});
+
+export const createBlankWorkspaceProject = () =>
+  createProject({
+    name: "Untitled Site",
+    pages: [
+      createPage("Home", [createBlankCanvasSection()], {
+        canvasLayoutVersion: 1,
+      }),
+    ],
+    forms: [],
+    collections: [],
+    workflows: [],
+    roles: [],
+    users: [],
   });
 
 export const metricsSection = () =>
@@ -216,36 +259,14 @@ export const showcaseContentSection = () =>
 
 export const showcaseCarouselSection = () =>
   createSection({
-    name: "Carousel Gallery",
+    name: "Card Carousel",
     layout: {
       width: "large",
       paddingY: "large",
       background: "var(--theme-surface-2)",
-      minHeight: 980,
+      minHeight: 500,
     },
-    rows: [
-      createRow([
-        createColumn([
-          createElement("heading", {
-            content: "Carousel variants",
-            styles: { fontSize: "38px", textAlign: "center", alignSelf: "stretch" },
-          }),
-          createElement("text", {
-            content:
-              "Show offers, stories, featured services, galleries, and product collections with different carousel layouts.",
-            styles: { textAlign: "center", alignSelf: "stretch" },
-          }),
-        ]),
-      ]),
-      createRow([
-        createColumn([createElement("carousel")]),
-        createColumn([createElement("carouselCards")]),
-      ]),
-      createRow([
-        createColumn([createElement("carouselSplit")]),
-        createColumn([createElement("circularGallery")]),
-      ]),
-    ],
+    rows: [createRow([createColumn([createElement("carousel")])])],
   });
 
 export const showcaseConnectedSection = (formId = "") =>

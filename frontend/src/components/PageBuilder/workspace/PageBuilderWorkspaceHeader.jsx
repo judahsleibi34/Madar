@@ -5,6 +5,7 @@ export default function PageBuilderWorkspaceHeader({
   activeHelper,
   activeTab,
   activeTopbarAction,
+  artboardCameraControls,
   builderCopy,
   demoMode,
   displayName,
@@ -13,9 +14,7 @@ export default function PageBuilderWorkspaceHeader({
   openPreviewPage,
   preview,
   project,
-  publishProject,
   renderWorkspaceNavigator,
-  saveProject,
   setActiveTopbarAction,
   setModal,
   setPreview,
@@ -40,8 +39,6 @@ export default function PageBuilderWorkspaceHeader({
         setModal={setModal}
         openPreviewPage={openPreviewPage}
         setPreview={setPreview}
-        saveProject={saveProject}
-        publishProject={publishProject}
       />
 
       <PageBuilderSubbar
@@ -53,6 +50,7 @@ export default function PageBuilderWorkspaceHeader({
         copy={builderCopy.topbar}
         onPreviewClick={handlePreviewClick}
         renderWorkspaceNavigator={renderWorkspaceNavigator}
+        artboardCameraControls={artboardCameraControls}
       />
     </>
   );

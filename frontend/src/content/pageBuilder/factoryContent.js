@@ -41,8 +41,29 @@ export const factoryContent = {
         name: "Button",
         content: "Get started",
       },
+      imageButton: {
+        name: "Image Button",
+      },
       image: {
         name: "Image",
+      },
+      video: {
+        name: "Video",
+      },
+      document: {
+        name: "File Viewer",
+        title: "View document",
+        description: "Open this file in a focused viewer.",
+      },
+      photoProofing: {
+        name: "Photo Proofing",
+        content:
+          "Portrait by the window\nNatural light portrait\nhttps://images.unsplash.com/photo-1519741497674-611481863552?w=1400&q=88&auto=format&fit=crop\n\nGolden hour walk\nOutdoor couple session\nhttps://images.unsplash.com/photo-1606800052052-a08af7148866?w=1400&q=88&auto=format&fit=crop\n\nQuiet moment\nEditorial wedding detail\nhttps://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=1400&q=88&auto=format&fit=crop\n\nCelebration\nA candid favorite from the session\nhttps://images.unsplash.com/photo-1537633552985-df8429e8048b?w=1400&q=88&auto=format&fit=crop",
+        settings: {
+          title: "Choose your favorite photos",
+          description: "Drag right to keep a photo or left to pass. You can undo any choice.",
+          buttonText: "Start selecting",
+        },
       },
       card: {
         name: "Card Carousel",
@@ -50,9 +71,9 @@ export const factoryContent = {
           "Starter card\nUse this for services, offers, instructions, or dashboard blocks.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop\n\nSecond card\nRename every title, description, and image from the inspector.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop",
       },
       carousel: {
-        name: "Lightswind Carousel",
+        name: "Card Carousel",
         content:
-          "Launch faster\nShowcase products, services, or featured content with a clean carousel.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop\n\nCollect attention\nUse large visuals, concise copy, and simple navigation for high-impact sections.\nhttps://images.unsplash.com/photo-1497215728101-856f4ea42174?w=1200&auto=format&fit=crop\n\nStay flexible\nEdit slide text and image URLs directly from the Page Builder inspector.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop",
+          "Design pages\nBuild flexible page sections and arrange content visually.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1800&q=90&auto=format&fit=crop\n\nCollect responses\nCreate forms and keep structured requests in one workspace.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1800&q=90&auto=format&fit=crop\n\nManage operations\nCoordinate reservations, users, and daily work from one place.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1800&q=90&auto=format&fit=crop",
       },
       carouselCards: {
         name: "Card Carousel",
@@ -89,6 +110,7 @@ export const factoryContent = {
         items: ["First item", "Second item", "Third item"],
       },
       divider: { name: "Divider" },
+      thinDivider: { name: "Horizontal Line" },
       embed: {
         name: "Embed",
         content: "https://example.com",

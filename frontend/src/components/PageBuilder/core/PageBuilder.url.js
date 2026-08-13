@@ -6,7 +6,7 @@ const CONTROL_CHARS_PATTERN = new RegExp(
 );
 const urlSchemePattern = /^([a-z][a-z0-9+.-]*):/i;
 const managedUploadAssetPattern =
-  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
+  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm|pdf|doc|docx)$/;
 
 export const isSvgUrlPath = (value) => {
   const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();
@@ -57,8 +57,8 @@ export const getStoredUrlError = (
   return "";
 };
 
-export const collectSiteChromeUrlErrors = (siteChrome = {}) =>
-  Object.entries(siteChrome).flatMap(([key, value]) => {
+export const collectSiteChromeUrlErrors = (siteChrome = {}) => {
+  const directErrors = Object.entries(siteChrome).flatMap(([key, value]) => {
     if (!urlLikeSiteChromeKeys.has(key) || typeof value !== "string") return [];
 
     const error = getStoredUrlError(value, {
@@ -68,6 +68,23 @@ export const collectSiteChromeUrlErrors = (siteChrome = {}) =>
 
     return error ? [error] : [];
   });
+
+  const footerErrors = [
+    ["footerSocialItems", "Social link"],
+    ["footerPaymentItems", "Payment link"],
+  ].flatMap(([key, label]) => {
+    if (!Array.isArray(siteChrome[key])) return [];
+    return siteChrome[key].flatMap((item, index) => {
+      const error = getStoredUrlError(item?.url, {
+        fieldName: `${label} ${index + 1} destination`,
+        allowRelative: true,
+      });
+      return error ? [error] : [];
+    });
+  });
+
+  return [...directErrors, ...footerErrors];
+};
 
 export const collectCarouselImageUrlErrors = (content, fieldName) =>
   String(content || "")
@@ -95,9 +112,9 @@ export const collectBuilderUrlErrorsFromUtils = ({
   collectBuilderElements(project).forEach((element) => {
     const elementName = element?.name || element?.type || "Element";
 
-    if (element?.type === "image") {
+    if (["image", "video", "document"].includes(element?.type)) {
       const error = getStoredUrlError(element.content, {
-        fieldName: `${elementName} image URL`,
+        fieldName: `${elementName} asset URL`,
         allowRelative: true,
       });
       if (error) errors.push(error);

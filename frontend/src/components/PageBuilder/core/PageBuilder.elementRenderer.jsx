@@ -1,11 +1,19 @@
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
+import AutoFitDirectText from "./PageBuilder.autoFitText";
+import LazyBuilderVideo from "./LazyBuilderVideo";
+import DocumentViewerElement from "./DocumentViewerElement";
 import CountUpText from "../ui/CountUpText";
 import ReservationBlock from "../blocks/ReservationBlock";
-import { resolveMediaUrl } from "../../../utils/media";
+import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
+import { resolveDocumentUrl, resolveMediaUrl } from "../../../utils/media";
 import {
+  collapseAccidentalTextDuplication,
+  getEditableTextBlockFormats,
+  getEditableTextWithLineBreaks,
   getListItems,
   getRichTextRanges,
   renderRichText,
+  renderRichTextBlocks,
 } from "./PageBuilder.text";
 import {
   getMetricItems,
@@ -15,11 +23,14 @@ import {
   getCarouselWidthValue,
   getCarouselVariant,
 } from "./PageBuilder.elementLayout";
+import { getElementHeadingTag } from "./PageBuilder.heading";
+import { getButtonColorPresentation } from "./PageBuilder.buttonColors";
 
 export const createElementRenderer = ({
   carouselElementTypes,
   selected,
   preview,
+  renderMode = preview ? "preview" : "editing",
   getFreeElementStyle,
   getElementStyle,
   startDrag,
@@ -27,17 +38,161 @@ export const createElementRenderer = ({
   setInsertTarget,
   setSelected,
   captureCanvasTextSelection,
+  shouldIgnoreInlineTextBlur,
+  updateElementInlineText,
   runElementAction,
   renderConnectedForm,
   getReservationBlockValue,
+  renderElementOverride,
 }) => {
+  const getTextRanges = (element, field, itemIndex = null) =>
+    getRichTextRanges(element, field, itemIndex);
+
+  const getEditableTextProps = (element, field = "content", itemIndex = null) => {
+    if (preview) return {};
+
+    return {
+      contentEditable: true,
+      suppressContentEditableWarning: true,
+      role: "textbox",
+      tabIndex: 0,
+      onKeyDown: (event) => {
+        event.stopPropagation();
+        if (event.key === "Enter" && field === "content" && ["heading", "text"].includes(element.type)) {
+          event.preventDefault();
+          const selection = window.getSelection();
+          if (selection?.rangeCount) {
+            const range = selection.getRangeAt(0);
+            if (event.currentTarget.contains(range.startContainer)) {
+              range.deleteContents();
+              const currentBlock = (range.startContainer.nodeType === 1
+                ? range.startContainer
+                : range.startContainer.parentElement)?.closest?.("[data-builder-text-block]");
+              if (!currentBlock || !event.currentTarget.contains(currentBlock)) return;
+
+              const trailingRange = document.createRange();
+              trailingRange.setStart(range.startContainer, range.startOffset);
+              trailingRange.setEnd(currentBlock, currentBlock.childNodes.length);
+              const trailingContent = trailingRange.extractContents();
+              const nextBlock = document.createElement("p");
+              nextBlock.dataset.builderTextBlock = "text";
+              nextBlock.append(trailingContent);
+              if (!nextBlock.textContent && !nextBlock.querySelector("br")) nextBlock.append(document.createElement("br"));
+              currentBlock.after(nextBlock);
+              if (!currentBlock.textContent && !currentBlock.querySelector("br")) currentBlock.append(document.createElement("br"));
+
+              range.selectNodeContents(nextBlock);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+              event.currentTarget.dataset.builderTextEdited = "true";
+              captureCanvasTextSelection?.(event, "content", null, element.id, { silent: true });
+              const toolbarSelect = document.querySelector(
+                '.builder-inline-text-toolbar select[aria-label="Text style"]'
+              );
+              if (toolbarSelect) toolbarSelect.value = "text";
+            }
+          }
+        }
+      },
+      onKeyUp: (event) => {
+        if (field === "content" && ["heading", "text"].includes(element.type)) {
+          captureCanvasTextSelection?.(event, field, itemIndex, element.id, { silent: true });
+        }
+      },
+      onFocus: (event) => {
+        event.currentTarget.dataset.builderTextEdited = "false";
+        if (field !== "content") return;
+
+        const currentText = String(element.content || "");
+        const repairedText = collapseAccidentalTextDuplication(currentText);
+        if (repairedText === currentText) return;
+
+        updateElementInlineText?.(element.id, {
+          content: repairedText,
+          richTextColors: (element.richTextColors || []).filter(
+            (range) => range.field !== "content"
+          ),
+          richTextSizes: (element.richTextSizes || []).filter(
+            (range) => range.field !== "content"
+          ),
+          richTextStyles: (element.richTextStyles || []).filter(
+            (range) => range.field !== "content"
+          ),
+        });
+      },
+      onInput: (event) => {
+        event.currentTarget.dataset.builderTextEdited = "true";
+      },
+      onBlur: (event) => {
+        if (field === "content" && ["heading", "text"].includes(element.type)) {
+          captureCanvasTextSelection?.(event, field, itemIndex, element.id);
+        }
+        const wasEdited = event.currentTarget.dataset.builderTextEdited === "true";
+        if (shouldIgnoreInlineTextBlur?.(event) && !wasEdited) return;
+        if (!wasEdited) return;
+        event.currentTarget.dataset.builderTextEdited = "false";
+
+        const rawText = getEditableTextWithLineBreaks(event.currentTarget);
+        const nextText = field === "content"
+          ? collapseAccidentalTextDuplication(rawText)
+          : rawText;
+
+        if (field === "listTitle") {
+          if (nextText === (element.listTitle || "")) return;
+
+          updateElementInlineText?.(element.id, {
+            listTitle: nextText,
+            richTextColors: (element.richTextColors || []).filter((range) => range.field !== "listTitle"),
+            richTextSizes: (element.richTextSizes || []).filter((range) => range.field !== "listTitle"),
+            richTextStyles: (element.richTextStyles || []).filter((range) => range.field !== "listTitle"),
+          });
+          return;
+        }
+
+        if (field === "listItem") {
+          const listItems = getListItems(element);
+          if (nextText === (listItems[itemIndex] || "")) return;
+
+          const nextItems = listItems.map((item, index) => (index === itemIndex ? nextText : item));
+          updateElementInlineText?.(element.id, {
+            listItems: nextItems,
+            content: nextItems.join("\n"),
+            richTextColors: (element.richTextColors || []).filter(
+              (range) => !(range.field === "listItem" && range.itemIndex === itemIndex)
+            ),
+            richTextSizes: (element.richTextSizes || []).filter(
+              (range) => !(range.field === "listItem" && range.itemIndex === itemIndex)
+            ),
+            richTextStyles: (element.richTextStyles || []).filter(
+              (range) => !(range.field === "listItem" && range.itemIndex === itemIndex)
+            ),
+          });
+          return;
+        }
+
+        if (nextText === String(element.content || "")) return;
+
+        updateElementInlineText?.(element.id, {
+          content: nextText,
+          ...(["heading", "text"].includes(element.type)
+            ? { textBlockFormats: getEditableTextBlockFormats(event.currentTarget, element.type === "heading" ? getElementHeadingTag(element) : "text") }
+            : {}),
+          richTextColors: (element.richTextColors || []).filter((range) => range.field !== "content"),
+          richTextSizes: (element.richTextSizes || []).filter((range) => range.field !== "content"),
+          richTextStyles: (element.richTextStyles || []).filter((range) => range.field !== "content"),
+        });
+      },
+    };
+  };
+
   const renderElement = (element, isFree = false) => {
     const isSelected = selected.type === "element" && selected.id === element.id;
 
     const commonProps = {
       className: `builder-element builder-element-${element.type} ${isSelected ? "is-selected" : ""}`,
       style: isFree ? getFreeElementStyle(element) : getElementStyle(element),
-      onMouseDown: (event) => startDrag(event, element),
+      onPointerDown: (event) => startDrag(event, element),
       onClick: (event) => {
         event.stopPropagation();
         if (!preview) {
@@ -61,26 +216,66 @@ export const createElementRenderer = ({
       },
     };
 
+    const overridden = renderElementOverride?.(element, {
+      commonProps,
+      getEditableTextProps,
+      getTextRanges,
+      renderMode,
+    });
+    if (overridden !== undefined) return overridden;
+
     if (element.type === "heading") {
-      return <h1 key={element.id} {...commonProps} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</h1>;
+      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "text") {
-      return <p key={element.id} {...commonProps} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichText(element.content, getRichTextRanges(element, "content"))}</p>;
+      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "button") {
+      const presentation = getButtonColorPresentation(element);
+      const buttonProps = {
+        ...commonProps,
+        className: `${commonProps.className} ${presentation.className}`.trim(),
+        style: { ...commonProps.style, ...presentation.style },
+        ...(preview && element.disabled ? { disabled: true } : {}),
+      };
+      return (
+        <AutoFitDirectText
+          as="button"
+          fitKey={`${element.content}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`}
+          key={element.id}
+          type="button"
+          {...buttonProps}
+          onClick={(event) => {
+            commonProps.onClick(event);
+            if (preview) runElementAction(element);
+          }}
+          {...getEditableTextProps(element)}
+        >
+          {renderRichText(element.content, getTextRanges(element, "content"))}
+        </AutoFitDirectText>
+      );
+    }
+
+    if (element.type === "imageButton") {
+      const imageSrc = resolveMediaUrl(element.content);
       return (
         <button
           key={element.id}
           type="button"
           {...commonProps}
+          aria-label={element.name || "Image button"}
           onClick={(event) => {
             commonProps.onClick(event);
             if (preview) runElementAction(element);
           }}
         >
-          {renderRichText(element.content, getRichTextRanges(element, "content"))}
+          {imageSrc ? (
+            <img src={imageSrc} alt="" loading="lazy" decoding="async" />
+          ) : (
+            <span>Upload button image</span>
+          )}
         </button>
       );
     }
@@ -88,9 +283,56 @@ export const createElementRenderer = ({
     if (element.type === "image") {
       const imageSrc = resolveMediaUrl(element.content);
       return imageSrc ? (
-        <img key={element.id} {...commonProps} src={imageSrc} alt={element.name} />
+        <img
+          key={element.id}
+          {...commonProps}
+          src={imageSrc}
+          alt={element.name}
+          loading="lazy"
+          decoding="async"
+        />
       ) : (
         <div key={element.id} {...commonProps}>Image URL unavailable</div>
+      );
+    }
+
+    if (element.type === "video") {
+      const videoSrc = resolveMediaUrl(element.content);
+      return videoSrc ? (
+        <LazyBuilderVideo
+          key={`${element.id}:${element.video?.controls !== false}:${Boolean(element.video?.muted)}:${Boolean(element.video?.loop)}`}
+          {...commonProps}
+          src={videoSrc}
+          controls={element.video?.controls !== false}
+          muted={Boolean(element.video?.muted)}
+          loop={Boolean(element.video?.loop)}
+          aria-label={element.name || "Video"}
+        />
+      ) : (
+        <div key={element.id} {...commonProps}>Upload an MP4 or WebM video</div>
+      );
+    }
+
+    if (element.type === "document") {
+      return (
+        <DocumentViewerElement
+          key={element.id}
+          {...commonProps}
+          src={resolveDocumentUrl(element.content)}
+          fileName={element.assetFileName}
+          mimeType={element.documentMimeType}
+          title={element.document?.title}
+          description={element.document?.description}
+          interactive
+        />
+      );
+    }
+
+    if (element.type === "photoProofing") {
+      return (
+        <div key={element.id} {...commonProps}>
+          <PhotoProofingBlock content={element.content} settings={element.proofing} disabled={!preview} />
+        </div>
       );
     }
 
@@ -119,7 +361,7 @@ export const createElementRenderer = ({
             style={{ width: carouselWidth, maxWidth: carouselWidth }}
           >
             <PageBuilderCarousel
-              autoScroll={Boolean(element.autoScroll)}
+              autoScroll={renderMode !== "editing" && Boolean(element.autoScroll)}
               autoScrollMs={element.autoScrollMs}
               content={element.content}
               name={element.name}
@@ -133,15 +375,15 @@ export const createElementRenderer = ({
     if (element.type === "list") {
       return (
         <div key={element.id} {...commonProps} className={`${commonProps.className} list-style-${element.listStyle || "disc"}`} style={{ ...commonProps.style, "--list-count": Math.max(1, getListItems(element).length) }}>
-          {element.listTitle && <h3 className="builder-list-title" onMouseUp={(event) => captureCanvasTextSelection(event, "listTitle", null, element.id)}>{renderRichText(element.listTitle, getRichTextRanges(element, "listTitle"))}</h3>}
+          {element.listTitle && <h3 className="builder-list-title" {...getEditableTextProps(element, "listTitle")} onMouseUp={(event) => captureCanvasTextSelection(event, "listTitle", null, element.id)}>{renderRichText(element.listTitle, getTextRanges(element, "listTitle"))}</h3>}
           <ul>
-            {getListItems(element).map((item, index) => <li key={`${item}_${index}`} style={{ "--list-index": index }} onMouseUp={(event) => captureCanvasTextSelection(event, "listItem", index, element.id)}>{renderRichText(item, getRichTextRanges(element, "listItem", index))}</li>)}
+            {getListItems(element).map((item, index) => <li key={`${item}_${index}`} style={{ "--list-index": index }} {...getEditableTextProps(element, "listItem", index)} onMouseUp={(event) => captureCanvasTextSelection(event, "listItem", index, element.id)}>{renderRichText(item, getTextRanges(element, "listItem", index))}</li>)}
           </ul>
         </div>
       );
     }
 
-    if (element.type === "divider") {
+    if (element.type === "divider" || element.type === "thinDivider") {
       return <hr key={element.id} {...commonProps} />;
     }
 
@@ -161,7 +403,7 @@ export const createElementRenderer = ({
         <div key={element.id} {...commonProps} className={`${commonProps.className} metric-group`} style={{ ...commonProps.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "var(--theme-text)", "--metric-symbol-color": element.styles?.metricSymbolColor || "var(--theme-warning)" }}>
           {metrics.map((metric, index) => (
             <div className="metric-group-item" key={`${element.id}_${index}`}>
-              <strong className="metric-value"><CountUpText value={metric.value} /></strong>
+              <strong className="metric-value"><CountUpText value={metric.value} animateValue={renderMode !== "editing"} /></strong>
               <span className="metric-label">{metric.label}</span>
               {metric.description && <span className="metric-description">{metric.description}</span>}
             </div>
@@ -216,8 +458,12 @@ export const createElementRenderer = ({
             title={reservation.title}
             description={reservation.description}
             services={reservation.services}
+            fields={reservation.fields}
+            bookingMode={reservation.bookingMode}
+            availableDates={reservation.availableDates}
+            timeSlots={reservation.timeSlots}
             submitLabel={reservation.submitLabel}
-            disabled={!preview}
+            disabled
           />
         </div>
       );

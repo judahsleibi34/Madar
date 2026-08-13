@@ -1,13 +1,14 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import GradientText from "../Animations/GradientText";
-import { getContactContent } from "../../content";
 import { FormBlock, HeroBlock, SectionBlock } from "../../blocks";
 import { PUBLIC_API_ROUTES } from "../../services/apiRoutes";
 import { postPublicJson, readApiErrorCode } from "../../utils/apiClient";
 
 export default function ContactPage({ lang = "en" }) {
-  const t = getContactContent(lang);
+  const { t } = useTranslation("public");
+  const content = t("contact", { returnObjects: true });
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,31 +35,31 @@ export default function ContactPage({ lang = "en" }) {
 
       if (!response.ok) {
         const errorCode = readApiErrorCode(data);
-        throw new Error(t.form.errors?.[errorCode] || t.form.error);
+        throw new Error(content.form.errors?.[errorCode] || content.form.error);
       }
 
       setForm({ name: "", phone: "", message: "" });
-      setStatus({ type: "success", message: t.form.success });
+      setStatus({ type: "success", message: content.form.success });
     } catch (error) {
-      setStatus({ type: "error", message: error.message || t.form.error });
+      setStatus({ type: "error", message: error.message || content.form.error });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="contact-page">
+    <main className="contact-page" dir={lang === "ar" ? "rtl" : "ltr"}>
       <HeroBlock className="contact-hero">
         <h1>
-          <GradientText pauseOnHover>{t.hero.title}</GradientText>
+          <GradientText pauseOnHover>{content.hero.title}</GradientText>
         </h1>
-        <p>{t.hero.subtitle}</p>
+        <p>{content.hero.subtitle}</p>
       </HeroBlock>
 
       <SectionBlock className="contact-content">
         <FormBlock className="contact-form" onSubmit={submitContact}>
           <label>
-            {t.form.name}
+            {content.form.name}
             <input
               type="text"
               name="name"
@@ -70,7 +71,7 @@ export default function ContactPage({ lang = "en" }) {
           </label>
 
           <label>
-            {t.form.phone}
+            {content.form.phone}
             <input
               type="tel"
               name="phone"
@@ -82,7 +83,7 @@ export default function ContactPage({ lang = "en" }) {
           </label>
 
           <label>
-            {t.form.message}
+            {content.form.message}
             <textarea
               name="message"
               rows="6"
@@ -100,24 +101,24 @@ export default function ContactPage({ lang = "en" }) {
           )}
 
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t.form.sending : t.form.button}
+            {isSubmitting ? content.form.sending : content.form.button}
           </button>
         </FormBlock>
 
         <div className="contact-info-card">
           <h2>
-            <GradientText pauseOnHover>{t.info.title}</GradientText>
+            <GradientText pauseOnHover>{content.info.title}</GradientText>
           </h2>
 
           <div>
-            <strong>{t.info.emailLabel}</strong>
-            <p>{t.info.email}</p>
+            <strong>{content.info.emailLabel}</strong>
+            <p>{content.info.email}</p>
           </div>
 
           <div>
-            <strong>{t.info.phoneLabel}</strong>
+            <strong>{content.info.phoneLabel}</strong>
             <p dir="ltr" className="phone-number">
-              {t.info.phone}
+              {content.info.phone}
             </p>
           </div>
         </div>

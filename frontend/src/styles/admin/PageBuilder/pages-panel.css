@@ -190,11 +190,29 @@
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
+.page-builder .page-action-stack {
+  display: grid;
+  gap: 8px;
+}
+
 .page-builder .page-primary-action {
   width: 100%;
   background: var(--madar-gradient);
-  color: var(--theme-text-inverse);
+  color: #fff;
   box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.2);
+}
+
+.page-builder .page-primary-action,
+.page-builder .page-primary-action *,
+.page-builder .page-delete-action,
+.page-builder .page-delete-action * {
+  color: #fff !important;
+}
+
+.page-builder .page-primary-action svg,
+.page-builder .page-utility-actions button svg,
+.page-builder .page-delete-action svg {
+  stroke: currentColor;
 }
 
 .page-builder .page-primary-action:hover {
@@ -213,9 +231,30 @@
   color: var(--madar-text);
 }
 
+.page-builder .page-utility-actions button * {
+  color: var(--madar-text) !important;
+}
+
 .page-builder .page-utility-actions button:hover {
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--madar-red);
+  color: var(--madar-red) !important;
+}
+
+.page-builder .page-utility-actions button:hover * {
+  color: var(--madar-red) !important;
+}
+
+.page-builder.theme-dark .page-utility-actions button,
+.page-builder.theme-dark .page-utility-actions button *,
+.page-builder.theme-dark .page-delete-action:not(:disabled),
+.page-builder.theme-dark .page-delete-action:not(:disabled) * {
+  color: #fff !important;
+}
+
+.page-builder .page-danger-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .page-builder .page-danger-zone {
@@ -246,13 +285,16 @@
 
 .page-builder .page-delete-action {
   width: 100%;
-  border: 1px solid rgba(var(--theme-primary-rgb), 0.2);
-  background: transparent;
-  color: var(--madar-red);
+  border: 1px solid var(--theme-primary);
+  background: var(--theme-primary);
+  color: #fff;
 }
 
 .page-builder .page-delete-action:not(:disabled):hover {
-  background: rgba(var(--theme-primary-rgb), 0.1);
+  transform: translateY(-1px);
+  background: var(--theme-primary-hover);
+  border-color: var(--theme-primary-hover);
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
 
 .page-builder .page-preview-action {
@@ -272,9 +314,14 @@
 
 .page-builder .page-delete-action:disabled {
   border-color: var(--madar-border);
-  color: var(--madar-muted);
+  background: rgba(var(--theme-shadow-rgb), 0.08);
+  color: var(--madar-muted) !important;
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.page-builder .page-delete-action:disabled * {
+  color: var(--madar-muted) !important;
 }
 
 .page-builder .section-component-palette {

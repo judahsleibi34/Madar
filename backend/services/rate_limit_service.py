@@ -2,6 +2,7 @@ import os
 import time
 import ipaddress
 import logging
+import json
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request
@@ -22,7 +23,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 RATE_LIMIT_ENABLED = _env_bool("RATE_LIMIT_ENABLED", True)
-RATE_LIMIT_FAIL_OPEN = _env_bool("RATE_LIMIT_FAIL_OPEN", True)
+RATE_LIMIT_FAIL_OPEN = _env_bool("RATE_LIMIT_FAIL_OPEN", False)
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 DEFAULT_TRUSTED_PROXY_IPS = "127.0.0.1,::1"
@@ -43,12 +44,19 @@ DATA_UPLOAD_RATE_LIMIT_LIMIT = int(os.getenv("DATA_UPLOAD_RATE_LIMIT_LIMIT", "20
 DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_UPLOAD_RATE_LIMIT_WINDOW_SECONDS", "300"))
 DATA_ANALYSIS_RATE_LIMIT_LIMIT = int(os.getenv("DATA_ANALYSIS_RATE_LIMIT_LIMIT", "20"))
 DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_ANALYSIS_RATE_LIMIT_WINDOW_SECONDS", "300"))
-DATA_VISUALIZATION_RATE_LIMIT_LIMIT = int(os.getenv("DATA_VISUALIZATION_RATE_LIMIT_LIMIT", "20"))
+DATA_VISUALIZATION_RATE_LIMIT_LIMIT = int(os.getenv("DATA_VISUALIZATION_RATE_LIMIT_LIMIT", "60"))
 DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_VISUALIZATION_RATE_LIMIT_WINDOW_SECONDS", "300"))
+DATA_VISUALIZATION_TENANT_RATE_LIMIT_LIMIT = int(os.getenv("DATA_VISUALIZATION_TENANT_RATE_LIMIT_LIMIT", "300"))
+DATA_VISUALIZATION_TENANT_RATE_LIMIT_WINDOW_SECONDS = int(
+    os.getenv("DATA_VISUALIZATION_TENANT_RATE_LIMIT_WINDOW_SECONDS", "300")
+)
+DATA_WORKSPACE_RATE_LIMIT_USER_OVERRIDES_ENV = "DATA_WORKSPACE_RATE_LIMIT_USER_OVERRIDES"
 BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT = int(os.getenv("BUILDER_ASSET_UPLOAD_RATE_LIMIT_LIMIT", "30"))
 BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS = int(
     os.getenv("BUILDER_ASSET_UPLOAD_RATE_LIMIT_WINDOW_SECONDS", "300")
 )
+AVATAR_UPLOAD_RATE_LIMIT_LIMIT = int(os.getenv("AVATAR_UPLOAD_RATE_LIMIT_LIMIT", "20"))
+AVATAR_UPLOAD_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("AVATAR_UPLOAD_RATE_LIMIT_WINDOW_SECONDS", "300"))
 
 
 @dataclass
@@ -57,6 +65,14 @@ class RateLimitResult:
     count: int
     limit: int
     window_seconds: int
+
+
+class RateLimitBackendUnavailable(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=503,
+            detail="Request protection service is temporarily unavailable. Please try again.",
+        )
 
 
 class InMemoryRateLimitStore:
@@ -107,7 +123,7 @@ def get_rate_limit_store():
         _store = RedisRateLimitStore(REDIS_URL)
     except Exception as exc:
         if not RATE_LIMIT_FAIL_OPEN:
-            raise RuntimeError(f"Rate limiter Redis unavailable: {exc}") from exc
+            raise RateLimitBackendUnavailable() from exc
         logger.warning("rate_limit.redis_unavailable", extra={"error_type": type(exc).__name__})
         _store = _memory_store
 
@@ -229,13 +245,100 @@ def get_data_workspace_rate_limit(action: str) -> tuple[int, int]:
     return DATA_WORKSPACE_RATE_LIMIT_LIMIT, DATA_WORKSPACE_RATE_LIMIT_WINDOW_SECONDS
 
 
+def _positive_int(value, fallback: int) -> int:
+    try:
+        parsed_value = int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+    return parsed_value if parsed_value > 0 else fallback
+
+
+def _parse_data_workspace_user_overrides() -> dict:
+    raw_value = os.getenv(DATA_WORKSPACE_RATE_LIMIT_USER_OVERRIDES_ENV, "").strip()
+
+    if not raw_value:
+        return {}
+
+    try:
+        parsed_value = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        logger.warning(
+            "rate_limit.invalid_user_overrides",
+            extra={"error_type": type(exc).__name__},
+        )
+        return {}
+
+    if not isinstance(parsed_value, dict):
+        logger.warning("rate_limit.invalid_user_overrides_type")
+        return {}
+
+    return parsed_value
+
+
+def _read_data_workspace_override(
+    *,
+    overrides: dict,
+    user_id: int | str,
+    tenant_id: int | str | None,
+    action: str,
+):
+    tenant_part = normalize_identifier(str(tenant_id)) if tenant_id is not None else "none"
+    user_part = normalize_identifier(str(user_id))
+    action_part = normalize_identifier(action)
+    candidates = (
+        f"tenant:{tenant_part}:user:{user_part}",
+        user_part,
+    )
+    action_candidates = (action_part, "*", "default")
+
+    for candidate in candidates:
+        user_overrides = overrides.get(candidate)
+
+        if not isinstance(user_overrides, dict):
+            continue
+
+        for action_candidate in action_candidates:
+            override = user_overrides.get(action_candidate)
+
+            if override is not None:
+                return override
+
+    return None
+
+
+def get_data_workspace_user_rate_limit(
+    action: str,
+    user_id: int | str,
+    tenant_id: int | str | None = None,
+) -> tuple[int, int]:
+    default_limit, default_window_seconds = get_data_workspace_rate_limit(action)
+    override = _read_data_workspace_override(
+        overrides=_parse_data_workspace_user_overrides(),
+        user_id=user_id,
+        tenant_id=tenant_id,
+        action=action,
+    )
+
+    if isinstance(override, int):
+        return _positive_int(override, default_limit), default_window_seconds
+
+    if not isinstance(override, dict):
+        return default_limit, default_window_seconds
+
+    return (
+        _positive_int(override.get("limit"), default_limit),
+        _positive_int(override.get("window_seconds"), default_window_seconds),
+    )
+
+
 def enforce_data_workspace_rate_limit(
     request: Request,
     user_id: int | str,
     action: str,
     tenant_id: int | str | None = None,
 ):
-    limit, window_seconds = get_data_workspace_rate_limit(action)
+    limit, window_seconds = get_data_workspace_user_rate_limit(action, user_id, tenant_id)
     tenant_part = normalize_identifier(str(tenant_id)) if tenant_id is not None else "none"
     user_part = normalize_identifier(str(user_id))
     identifier = f"tenant:{tenant_part}:user:{user_part}"
@@ -247,6 +350,31 @@ def enforce_data_workspace_rate_limit(
         limit=limit,
         window_seconds=window_seconds,
     )
+
+
+def enforce_visualization_generation_rate_limit(
+    request: Request,
+    user_id: int | str,
+    tenant_id: int | str,
+):
+    user_result = enforce_data_workspace_rate_limit(
+        request,
+        user_id,
+        "visualization_create",
+        tenant_id=tenant_id,
+    )
+    tenant_part = normalize_identifier(str(tenant_id))
+
+    enforce_rate_limit(
+        request,
+        "data_workspace:visualization_create:tenant",
+        identifier=f"tenant:{tenant_part}",
+        limit=DATA_VISUALIZATION_TENANT_RATE_LIMIT_LIMIT,
+        window_seconds=DATA_VISUALIZATION_TENANT_RATE_LIMIT_WINDOW_SECONDS,
+        include_client_ip=False,
+    )
+
+    return user_result
 
 
 def enforce_builder_asset_upload_rate_limit(
@@ -267,6 +395,24 @@ def enforce_builder_asset_upload_rate_limit(
     )
 
 
+def enforce_avatar_upload_rate_limit(
+    request: Request,
+    user_id: int | str,
+    tenant_id: int | str | None = None,
+):
+    tenant_part = normalize_identifier(str(tenant_id)) if tenant_id is not None else "none"
+    user_part = normalize_identifier(str(user_id))
+    identifier = f"tenant:{tenant_part}:user:{user_part}"
+
+    return enforce_rate_limit(
+        request,
+        "avatar_upload",
+        identifier=identifier,
+        limit=AVATAR_UPLOAD_RATE_LIMIT_LIMIT,
+        window_seconds=AVATAR_UPLOAD_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
 def enforce_rate_limit(
     request: Request,
     scope: str,
@@ -274,6 +420,7 @@ def enforce_rate_limit(
     identifier: str | None = None,
     limit: int,
     window_seconds: int,
+    include_client_ip: bool = True,
 ) -> RateLimitResult | None:
     if not RATE_LIMIT_ENABLED:
         return None
@@ -284,13 +431,13 @@ def enforce_rate_limit(
 
     client_ip = get_client_ip(request)
     identity = normalize_identifier(identifier)
-    key = f"rl:{scope}:{client_ip}:{identity}"
+    key = f"rl:{scope}:{client_ip}:{identity}" if include_client_ip else f"rl:{scope}:{identity}"
 
     try:
         count = store.incr_with_ttl(key, window_seconds)
     except Exception as exc:
         if not RATE_LIMIT_FAIL_OPEN:
-            raise RuntimeError(f"Rate limiter Redis unavailable: {exc}") from exc
+            raise RateLimitBackendUnavailable() from exc
 
         logger.warning("rate_limit.fallback_used", extra={"error_type": type(exc).__name__})
         fallback_store = _memory_store

@@ -2,7 +2,7 @@ const publishContentEn = {
   scope: "Builder site",
   title: "Publish site",
   description:
-    "This publishes the full builder website. Individual form preview and placement stay in the Forms workspace.",
+    "Publishing controls the Builder website. Saved forms are shared independently from the Forms workspace.",
   statusTitle: "Site status",
   projectLabel: "Builder project",
   stateLabel: "Site state",
@@ -10,6 +10,12 @@ const publishContentEn = {
   lastPublishedLabel: "Last published",
   notSaved: "Not saved yet",
   notPublished: "Not published yet",
+  noPublicLink: "Configure a website subdomain before sharing the live site.",
+  siteNotPublished: "Publish the site to activate its public link.",
+  publishSite: "Publish site",
+  publishingSite: "Publishing...",
+  unpublishSite: "Take site offline",
+  unpublishingSite: "Taking site offline...",
   checklistTitle: "Site publish checklist",
   bilingualOptional: " (only for bilingual forms)",
   checklist: {
@@ -28,15 +34,16 @@ const publishContentEn = {
   previewSite: "Preview site",
   publicQrAlt: "QR code preview for public site link",
   qrPreview: "QR preview",
-  formLinkTitle: "Active form preview link",
+  formLinkTitle: "Live form link",
   formLabel: "Form",
   formPrefix: "Form:",
   untitledForm: "Untitled form",
   shareForm: "Share form",
   previewForm: "Preview form",
-  formQrAlt: "QR code preview for active form link",
+  formQrAlt: "QR code preview for live form link",
   formQrPreview: "Form QR preview",
-  noFormToShare: "Create a form before sharing a form preview link.",
+  noFormToShare: "Create and save a form before sharing its live link.",
+  noPublishedFormLink: "Configure a workspace address before sharing the live form.",
 };
 
 export const publishContent = {

@@ -4,16 +4,13 @@ import { PUBLIC_ROUTES } from "../config/routes";
 
 export const primaryNavigationItems = [
   { id: "home", labelKey: "home", path: PUBLIC_ROUTES.home },
-  { id: "features", labelKey: "features", path: PUBLIC_ROUTES.productTour },
   { id: "pricing", labelKey: "pricing", path: PUBLIC_ROUTES.pricing },
-  { id: "team", labelKey: "team", path: PUBLIC_ROUTES.team },
   { id: "about", labelKey: "about", path: PUBLIC_ROUTES.about },
   { id: "contact", labelKey: "contact", path: PUBLIC_ROUTES.contact },
 ];
 
 export const footerNavigationItems = [
   { id: "home", labelKey: "home", path: PUBLIC_ROUTES.home },
-  { id: "features", labelKey: "features", path: PUBLIC_ROUTES.productTour },
   { id: "pricing", labelKey: "pricing", path: PUBLIC_ROUTES.pricing },
   { id: "contact", labelKey: "contact", path: PUBLIC_ROUTES.contact },
 ];

@@ -1,13 +1,17 @@
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+import zipfile
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
 from routes import builder_routes
 from services.tenant_service import TenantContext
+from services.storage_quota_service import StorageSafetyError
 from services.url_validation import validate_public_url
 
 
@@ -15,10 +19,36 @@ PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 16
 WEBP_BYTES = b"RIFF" + b"\x10\x00\x00\x00" + b"WEBP" + b"\x00" * 16
 SVG_BYTES = b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"
+MP4_BYTES = bytes.fromhex("00000018667479706d703432") + bytes(16)
+WEBM_BYTES = bytes.fromhex("1a45dfa3") + bytes(20)
+PDF_BYTES = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
+DOC_BYTES = bytes.fromhex("d0cf11e0a1b11ae1") + bytes(20)
+
+
+def build_docx_bytes():
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<Types><Override ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+        )
+        archive.writestr("_rels/.rels", "<Relationships/>")
+        archive.writestr("word/document.xml", "<w:document/>")
+    return output.getvalue()
+
+
+DOCX_BYTES = build_docx_bytes()
 
 
 def build_client():
     app = FastAPI()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://madarportal.com"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(builder_routes.router)
     return TestClient(app)
 
@@ -76,6 +106,16 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 "enforce_builder_asset_upload_rate_limit",
                 return_value=None,
             ),
+            patch.object(
+                builder_routes,
+                "register_builder_asset",
+                return_value={"id": "asset-registry-1"},
+            ),
+            patch.object(builder_routes, "reserve_storage", return_value="reservation-1"),
+            patch.object(builder_routes, "finish_storage", return_value="object-1"),
+            patch.object(builder_routes, "store_builder_asset", return_value=None),
+            patch.object(builder_routes, "delete_builder_asset", return_value=None),
+            patch.object(builder_routes, "require_entitlement", return_value={}),
         ]
 
         for item in self.patches:
@@ -92,10 +132,11 @@ class BuilderAssetUploadTests(unittest.TestCase):
 
         self.temp_dir.cleanup()
 
-    def post_asset(self, content, filename="asset.png", content_type="image/png"):
+    def post_asset(self, content, filename="asset.png", content_type="image/png", headers=None):
         return self.client.post(
             "/builder/assets/upload",
             files={"file": (filename, content, content_type)},
+            headers=headers,
         )
 
     def test_unauthenticated_upload_is_rejected(self):
@@ -165,6 +206,127 @@ class BuilderAssetUploadTests(unittest.TestCase):
             )
             self.assertTrue((self.upload_dir / asset_url.removeprefix("/uploads/")).exists())
 
+    def test_accepts_optimized_browser_video_formats(self):
+        cases = [
+            (MP4_BYTES, "clip.mp4", "video/mp4", ".mp4"),
+            (WEBM_BYTES, "clip.webm", "video/webm", ".webm"),
+        ]
+
+        for content, filename, content_type, extension in cases:
+            with self.subTest(content_type=content_type):
+                response = self.post_asset(content, filename, content_type)
+
+            self.assertEqual(response.status_code, 200)
+            asset_url = response.json()["asset_url"]
+            self.assertRegex(
+                asset_url,
+                rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
+            )
+
+    def test_accepts_pdf_and_docx_documents(self):
+        cases = [
+            (PDF_BYTES, "guide.pdf", "application/pdf", ".pdf"),
+            (
+                DOCX_BYTES,
+                "guide.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ".docx",
+            ),
+        ]
+
+        for content, filename, content_type, extension in cases:
+            with self.subTest(content_type=content_type):
+                response = self.post_asset(content, filename, content_type)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertRegex(
+                response.json()["asset_url"],
+                rf"^/uploads/tenant_1/builder_assets/[a-f0-9]{{32}}{extension}$",
+            )
+
+    def test_accepts_validated_legacy_doc(self):
+        with patch.object(builder_routes, "validate_builder_asset_file", return_value=None):
+            response = self.post_asset(DOC_BYTES, "guide.doc", "application/msword")
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(response.json()["asset_url"], r"[a-f0-9]{32}\.doc$")
+
+    def test_rejects_arbitrary_zip_as_docx(self):
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w") as archive:
+            archive.writestr("payload.txt", "not a Word document")
+        response = self.post_asset(
+            output.getvalue(),
+            "guide.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_rejects_filename_and_mime_mismatch(self):
+        response = self.post_asset(PDF_BYTES, "guide.docx", "application/pdf")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("filename", response.json()["detail"].lower())
+
+    def test_rejects_document_with_spoofed_content_type(self):
+        response = self.post_asset(PNG_BYTES, "guide.pdf", "application/pdf")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Document content does not match the declared file type")
+
+    def test_rejects_video_with_spoofed_content_type(self):
+        response = self.post_asset(PNG_BYTES, "clip.mp4", "video/mp4")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Video content does not match the declared file type")
+
+    def test_upload_creates_missing_tenant_directory(self):
+        tenant_asset_dir = self.upload_dir / "tenant_1" / "builder_assets"
+        self.assertFalse(tenant_asset_dir.exists())
+
+        response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(tenant_asset_dir.is_dir())
+        asset_url = response.json()["asset_url"]
+        self.assertTrue((self.upload_dir / asset_url.removeprefix("/uploads/")).is_file())
+
+    def test_upload_is_copied_to_durable_storage(self):
+        with patch.object(builder_routes, "store_builder_asset") as durable_store:
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 200)
+        storage_key = response.json()["asset_url"].removeprefix("/uploads/")
+        durable_store.assert_called_once()
+        durable_kwargs = durable_store.call_args.kwargs
+        self.assertEqual(durable_kwargs["storage_key"], storage_key)
+        self.assertEqual(durable_kwargs["content_type"], "image/png")
+        self.assertEqual(durable_kwargs["source_path"].read_bytes(), PNG_BYTES)
+
+    def test_durable_storage_failure_does_not_publish_a_broken_url(self):
+        with patch.object(
+            builder_routes,
+            "store_builder_asset",
+            side_effect=builder_routes.BuilderAssetStorageError("unavailable"),
+        ):
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "asset_storage_unavailable")
+        self.assertEqual(list(self.upload_dir.rglob("*.png")), [])
+
+    def test_unwritable_storage_returns_controlled_cors_error(self):
+        with patch.object(Path, "open", side_effect=PermissionError("denied")):
+            response = self.post_asset(
+                PNG_BYTES,
+                headers={"Origin": "https://madarportal.com"},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "asset_storage_unavailable")
+        self.assertEqual(
+            response.headers.get("access-control-allow-origin"),
+            "https://madarportal.com",
+        )
+
 
     def test_successful_upload_records_audit_event(self):
         response = self.post_asset(PNG_BYTES, "asset.png", "image/png")
@@ -215,6 +377,18 @@ class BuilderAssetUploadTests(unittest.TestCase):
             response = self.post_asset(PNG_BYTES, "asset.png", "image/png")
 
         self.assertEqual(response.status_code, 413)
+
+    def test_quota_rejection_writes_no_file(self):
+        with patch.object(
+            builder_routes,
+            "reserve_storage",
+            side_effect=StorageSafetyError("tenant_storage_quota_exceeded"),
+        ):
+            response = self.post_asset(PNG_BYTES)
+        self.assertEqual(response.status_code, 507)
+        self.assertEqual(response.json()["detail"]["code"], "tenant_storage_quota_exceeded")
+        asset_dir = self.upload_dir / "tenant_1" / "builder_assets"
+        self.assertFalse(asset_dir.exists())
 
     def test_path_traversal_filename_does_not_affect_storage_path(self):
         response = self.post_asset(PNG_BYTES, "../../evil.png", "image/png")

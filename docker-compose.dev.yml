@@ -1,0 +1,42 @@
+services:
+  redis:
+    container_name: madar-dev-redis
+    ports: !override []
+
+  backend:
+    container_name: madar-dev-backend
+    ports: !override
+      - "127.0.0.1:8002:8000"
+    environment:
+      APP_ENV: development
+      FRONTEND_URLS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:3001,http://127.0.0.1:3001
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: lax
+      REDIS_URL: redis://redis:6379/0
+      CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-true}
+      PUBLIC_API_URL: http://127.0.0.1:8002
+      FRONTEND_PRIMARY_URL: http://127.0.0.1:3001
+    depends_on: !override
+      redis:
+        condition: service_healthy
+
+  notification-worker:
+    profiles: !override []
+    environment:
+      APP_ENV: development
+
+  calendar-sync-worker:
+    environment:
+      APP_ENV: development
+      PUBLIC_API_URL: http://127.0.0.1:8002
+      FRONTEND_PRIMARY_URL: http://127.0.0.1:3001
+
+  frontend:
+    container_name: madar-dev-frontend
+    build:
+      args:
+        VITE_API_URL: http://127.0.0.1:8002
+    ports: !override
+      - "127.0.0.1:3001:8080"
+    environment:
+      MADAR_CSP_CONNECT_SRC: http://127.0.0.1:8002

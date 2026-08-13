@@ -1,0 +1,43 @@
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    include /etc/nginx/conf.d/includes/security_headers.conf;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        include /etc/nginx/conf.d/includes/security_headers.conf;
+    }
+
+    location = /madar-push-sw.js {
+        try_files $uri =404;
+        access_log off;
+        default_type application/javascript;
+        add_header Cache-Control "no-cache, must-revalidate" always;
+        add_header Service-Worker-Allowed "/" always;
+        include /etc/nginx/conf.d/includes/security_headers.conf;
+    }
+
+    location = /manifest.webmanifest {
+        try_files $uri =404;
+        access_log off;
+        default_type application/manifest+json;
+        add_header Cache-Control "no-cache, must-revalidate" always;
+        include /etc/nginx/conf.d/includes/security_headers.conf;
+    }
+
+    location ~* \.(?:js|css|png|jpg|jpeg|gif|ico|svg|webp|woff2?|pdf)$ {
+        try_files $uri =404;
+        access_log off;
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        include /etc/nginx/conf.d/includes/security_headers.conf;
+    }
+}

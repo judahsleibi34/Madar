@@ -21,6 +21,8 @@ CSRF_EXEMPT_PATHS = {
     ("POST", "/auth/signup"),
     ("POST", "/auth/forgot-password"),
     ("POST", "/auth/password-reset"),
+    ("POST", "/auth/email-verification/resend"),
+    ("POST", "/auth/email-verification/clear-context"),
     ("POST", "/auth/refresh"),
     ("POST", "/auth/log_out"),
     ("POST", "/billing/webhook"),
@@ -28,6 +30,9 @@ CSRF_EXEMPT_PATHS = {
 }
 CSRF_EXEMPT_PATTERNS = (
     re.compile(r"^/public/sites/[^/]+/forms/[^/]+/submissions$"),
+    re.compile(r"^/public/sites/[^/]+/auth/(?:register|login|logout)$"),
+    re.compile(r"^/public/sites/[^/]+/events$"),
+    re.compile(r"^/public/reservations/[0-9a-fA-F-]+/cancel$"),
 )
 
 
@@ -98,6 +103,23 @@ def get_allowed_origins(frontend_urls: list[str] | None = None) -> set[str]:
 
     origins = {origin for origin in (normalize_origin(item) for item in configured) if origin}
     return origins
+
+
+def add_cors_headers_for_allowed_origin(
+    response: Response,
+    request: Request,
+    allowed_origins: set[str],
+) -> Response:
+    origin = normalize_origin(request.headers.get("origin"))
+
+    if not origin or origin not in allowed_origins:
+        return response
+
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Expose-Headers"] = CSRF_HEADER_NAME
+    response.headers.add_vary_header("Origin")
+    return response
 
 
 def request_has_auth_cookie(request: Request) -> bool:

@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import PageSkeleton from "./components/common/PageSkeleton";
+import RouteErrorBoundary from "./components/common/RouteErrorBoundary";
 import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
 import { DashboardLoadingElement } from "./routes/shared";
+import { getRouteErrorSurface } from "./routes/routeErrorSurface";
 import {
   getSafePostLoginPath,
   isDashboardRoutePath,
@@ -19,7 +21,14 @@ import {
   clearCsrfToken,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
-import { applyThemeMode, readStoredThemeMode } from "./utils/themeMode";
+import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
+import { clearAllCalendarWorkspaceCaches } from "./components/DashboardBuilder/utils/calendarWorkspaceCache";
+import { getInstallationId, registerInstallation } from "./pwa/installation";
+import { isMadarPwaHost } from "./pwa/pwaContext";
+import { getExistingMadarPushEndpoint } from "./pwa/serviceWorker";
+import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
+import { NotificationProvider } from "./notifications/NotificationProvider";
+import NotificationToastViewport from "./notifications/NotificationToastViewport";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -49,6 +58,7 @@ export default function App() {
   const isAdminUser = normalizedUserType === "admin";
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
+  const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
 
   const getCurrentReturnTo = () =>
     encodeURIComponent(
@@ -224,8 +234,70 @@ export default function App() {
   }, [i18n]);
 
   useEffect(() => {
-    applyThemeMode(themeMode);
+    applyThemeMode(themeMode, { emit: false });
   }, [themeMode]);
+
+  useEffect(() => {
+    if (authChecked && !isLoggedIn) clearAllCalendarWorkspaceCaches();
+  }, [authChecked, isLoggedIn]);
+
+  useEffect(() => {
+    if (
+      !authChecked
+      || !isLoggedIn
+      || !user?.id
+      || !user?.tenant_id
+      || !isMadarPwaHost(window.location)
+    ) return undefined;
+
+    let cancelled = false;
+    let inFlight = false;
+    const reconcile = async ({ force = false, installedConfirmed = false } = {}) => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        const installation = await registerInstallation({
+          tenantId: user.tenant_id,
+          installedConfirmed,
+          force,
+        });
+        if (!cancelled) {
+          await reconcileBrowserPushLifecycle({
+            tenantId: user.tenant_id,
+            installation,
+          });
+        }
+      } catch {
+        // Installation/Push lifecycle is optional and never blocks app boot.
+      } finally {
+        inFlight = false;
+      }
+    };
+    reconcile();
+    const handleInstalled = () => {
+      reconcile({ installedConfirmed: true, force: true });
+    };
+    const handleFocus = () => reconcile();
+    const handleVisibility = () => {
+      if (document.visibilityState !== "hidden") reconcile();
+    };
+    const handleServiceWorkerMessage = (event) => {
+      if (event.data?.type === "MADAR_PUSH_RECONCILE_REQUIRED") {
+        reconcile();
+      }
+    };
+    window.addEventListener("appinstalled", handleInstalled);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    navigator.serviceWorker?.addEventListener?.("message", handleServiceWorkerMessage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("appinstalled", handleInstalled);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      navigator.serviceWorker?.removeEventListener?.("message", handleServiceWorkerMessage);
+    };
+  }, [authChecked, isLoggedIn, user?.id, user?.tenant_id]);
 
   useEffect(() => {
     const closeSidebarTimer = window.setTimeout(() => {
@@ -245,7 +317,9 @@ export default function App() {
 
     const handleStorage = (event) => {
       if (event.key !== "madar-theme-mode") return;
-      setThemeMode(event.newValue === "dark" ? "dark" : "light");
+      const nextMode = event.newValue === "dark" ? "dark" : "light";
+      applyThemeMode(nextMode, { emit: false, persist: false });
+      setThemeMode(nextMode);
     };
 
     window.addEventListener("madar-theme-change", handleThemeEvent);
@@ -258,8 +332,7 @@ export default function App() {
   }, []);
 
   const handleThemeModeChange = useCallback((nextMode) => {
-    const safeMode = applyThemeMode(nextMode);
-    setThemeMode(safeMode);
+    transitionThemeMode(nextMode);
   }, []);
 
   useEffect(() => {
@@ -474,8 +547,14 @@ export default function App() {
     setDashboardSidebarOpen(false);
 
     try {
+      const pushEndpoint = await getExistingMadarPushEndpoint().catch(() => null);
       await apiFetch(`${API_URL}/auth/log_out`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          installation_id: getInstallationId(),
+          push_endpoint: pushEndpoint,
+        }),
       });
     } catch (error) {
       console.error("Logout failed:", error);
@@ -513,19 +592,6 @@ export default function App() {
     [isLoggedIn, normalizeUser]
   );
 
-  const shellProps = {
-    closeMenuLabel: t("common:navigation.closeMenu"),
-    lang,
-    onLanguageChange: handleLanguageChange,
-    onLogout: handleLogout,
-    onNavigate: () => setDashboardSidebarOpen(false),
-    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
-    onThemeModeChange: handleThemeModeChange,
-    open: dashboardSidebarOpen,
-    openMenuLabel: t("common:navigation.openMenu"),
-    themeMode,
-    user,
-  };
 
   const dashboardLoadingLabels = {
     dashboard: t("dashboard:loading.dashboard"),
@@ -557,6 +623,20 @@ export default function App() {
     <PageSkeleton label={t("common:actions.loading")} lang={lang} variant="public-page" />
   );
 
+  const shellProps = {
+    closeMenuLabel: t("common:navigation.closeMenu"),
+    lang,
+    onLanguageChange: handleLanguageChange,
+    onLogout: handleLogout,
+    onNavigate: () => setDashboardSidebarOpen(false),
+    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
+    onThemeModeChange: handleThemeModeChange,
+    open: dashboardSidebarOpen,
+    openMenuLabel: t("common:navigation.openMenu"),
+    themeMode,
+    user,
+  };
+
   let routeContent;
 
   if (isTenantSiteRoute) {
@@ -579,6 +659,7 @@ export default function App() {
         <AdminRoutes
           lang={lang}
           onGoToDashboard={() => navigate("/dashboard", { replace: true })}
+          onUserUpdated={handleUserUpdated}
           shellProps={shellProps}
           themeMode={themeMode}
           user={user}
@@ -616,7 +697,25 @@ export default function App() {
     <>
       <ScrollToTop />
       <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page">
-        {routeContent}
+        <RouteErrorBoundary
+          key={errorSurface}
+          surface={errorSurface}
+          resetKey={location.pathname}
+          homePath={isDashboardRoute ? "/dashboard" : "/"}
+          homeLabel={isDashboardRoute ? "Return to dashboard" : "Return home"}
+        >
+          {isDashboardRoute
+            && authChecked
+            && isLoggedIn
+            && user?.tenant_id
+            && (user?.id || user?.auth_id)
+            && isMadarPwaHost(window.location) ? (
+              <NotificationProvider user={user}>
+                {routeContent}
+                <NotificationToastViewport />
+              </NotificationProvider>
+            ) : routeContent}
+        </RouteErrorBoundary>
       </RouteSuspense>
     </>
   );

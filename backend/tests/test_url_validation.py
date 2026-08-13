@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from services.url_validation import validate_public_url
+from services.url_validation import validate_builder_schema_urls, validate_public_url
 
 
 class UrlValidationTests(unittest.TestCase):
@@ -63,6 +63,21 @@ class UrlValidationTests(unittest.TestCase):
             "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.webp",
         )
 
+        validate_builder_schema_urls({
+            "pages": [{
+                "elements": [{
+                    "type": "document",
+                    "content": "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.docx",
+                }],
+            }],
+        })
+
+    def test_rejects_unsafe_document_element_url(self):
+        with self.assertRaises(HTTPException):
+            validate_builder_schema_urls({
+                "pages": [{"elements": [{"type": "document", "content": "javascript:alert(1)"}]}],
+            })
+
     def test_rejects_unmanaged_upload_paths(self):
         unmanaged_paths = [
             "/uploads/logo.png",
@@ -83,6 +98,29 @@ class UrlValidationTests(unittest.TestCase):
                 validate_public_url(svg_url, field_name="Logo URL", allow_relative=True)
 
             self.assertEqual(error.exception.status_code, 400)
+
+    def test_rejects_unsafe_urls_in_all_supported_carousel_variants(self):
+        for element_type in ("carouselSpotlight", "carouselStack", "carouselEditorial"):
+            with self.subTest(element_type=element_type), self.assertRaises(HTTPException):
+                validate_builder_schema_urls(
+                    {
+                        "pages": [
+                            {
+                                "sections": [
+                                    {
+                                        "elements": [
+                                            {
+                                                "id": "carousel-1",
+                                                "type": element_type,
+                                                "content": "Title\nDescription\njavascript:alert(1)",
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                )
 
 
 if __name__ == "__main__":

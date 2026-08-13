@@ -1,7 +1,9 @@
 const DATABASE_NAME = "madar-sensitive-data";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const STORE_NAME = "datasets";
+const ARCHIVE_STORE_NAME = "archive_items";
 const DEFAULT_SCOPE = "current-dataset";
+const ARCHIVE_SCHEMA_VERSION = 2;
 
 const openDatabase = () =>
   new Promise((resolve, reject) => {
@@ -16,17 +18,20 @@ const openDatabase = () =>
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         database.createObjectStore(STORE_NAME);
       }
+      if (!database.objectStoreNames.contains(ARCHIVE_STORE_NAME)) {
+        database.createObjectStore(ARCHIVE_STORE_NAME, { keyPath: "id" });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("Could not open local dataset storage."));
   });
 
-const runRequest = async (mode, operation) => {
+const runRequest = async (mode, operation, storeName = STORE_NAME) => {
   const database = await openDatabase();
   try {
     return await new Promise((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, mode);
-      const store = transaction.objectStore(STORE_NAME);
+      const transaction = database.transaction(storeName, mode);
+      const store = transaction.objectStore(storeName);
       const request = operation(store);
       let result;
       request.onsuccess = () => {
@@ -168,4 +173,70 @@ export async function loadDataset(options = {}) {
 export async function clearDataset(options = {}) {
   const scope = options.scope || DEFAULT_SCOPE;
   await runRequest("readwrite", (store) => store.delete(scope));
+}
+
+export async function archiveItem(item) {
+  const scope = String(item?.scope || "").trim();
+  if (!scope.startsWith("archive:v2:tenant:") || !scope.includes(":user:")) {
+    throw new Error("A tenant- and user-scoped archive identity is required.");
+  }
+  const now = Date.now();
+  const logicalId =
+    item.id ||
+    `archive-${item.type || "item"}-${now}-${Math.random().toString(36).slice(2, 8)}`;
+  const storageId = `${scope}:${logicalId}`;
+
+  await runRequest("readwrite", (store) =>
+    store.put(
+      {
+        ...item,
+        id: storageId,
+        itemId: logicalId,
+        scope,
+        archiveSchemaVersion: ARCHIVE_SCHEMA_VERSION,
+        createdAt: item.createdAt || now,
+        updatedAt: now,
+      }
+    ),
+    ARCHIVE_STORE_NAME
+  );
+
+  return logicalId;
+}
+
+export function getTenantUserArchiveScope(user) {
+  const tenantId = String(user?.tenant_id || "").trim();
+  const userId = String(user?.id || user?.auth_id || "").trim();
+  if (!tenantId || !userId) return "";
+  return `archive:v2:tenant:${tenantId}:user:${userId}`;
+}
+
+export async function listArchiveItems(options = {}) {
+  const scope = String(options.scope || "").trim();
+  if (!scope) return [];
+
+  const items = await runRequest(
+    "readonly",
+    (store) => store.getAll(),
+    ARCHIVE_STORE_NAME
+  );
+  return (Array.isArray(items) ? items : [])
+    .filter((item) => (
+      item.scope === scope
+      && item.archiveSchemaVersion === ARCHIVE_SCHEMA_VERSION
+      && String(item.id || "").startsWith(`${scope}:`)
+      && item.itemId
+    ))
+    .map((item) => ({ ...item, id: item.itemId }))
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+}
+
+export async function deleteArchiveItem(id, options = {}) {
+  const scope = String(options.scope || "").trim();
+  if (!scope) return;
+  await runRequest(
+    "readwrite",
+    (store) => store.delete(`${scope}:${id}`),
+    ARCHIVE_STORE_NAME
+  );
 }

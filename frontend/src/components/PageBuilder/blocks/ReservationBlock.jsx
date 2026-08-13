@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getReservationContent } from "../../../content/pageBuilder";
+import { createReservationIdempotencyKey } from "../runtime/reservationSubmission";
+import FixedSlotPicker from "./FixedSlotPicker";
 import "./ReservationBlock.css";
 
 const reservationDefaults = getReservationContent("en");
@@ -10,6 +12,8 @@ const requiredFields = reservationDefaults.requiredFields;
 const initialValues = (service) => ({
   name: "",
   contact: "",
+  email: "",
+  phone: "",
   service,
   date: "",
   time: "",
@@ -22,14 +26,17 @@ const normalizeServices = (services) => {
     .map((service) => String(service || "").trim())
     .filter(Boolean);
 
-  return cleanServices.length > 0 ? cleanServices : defaultServices;
+  return Array.isArray(services) ? cleanServices : defaultServices;
 };
 
 export default function ReservationBlock({
   title = reservationDefaults.title,
   description = reservationDefaults.description,
-  services = defaultServices,
-  fields = defaultFields,
+  services,
+  fields,
+  bookingMode = "flexible",
+  availableDates = [],
+  timeSlots = [],
   disabled = false,
   submitLabel = reservationDefaults.submitLabel,
   lang = "en",
@@ -38,12 +45,26 @@ export default function ReservationBlock({
   const content = getReservationContent(lang);
   const fieldMeta = content.fieldMeta;
   const serviceOptions = useMemo(() => normalizeServices(services), [services]);
+  const isFixedSlots = bookingMode !== "flexible";
   const enabledFields = useMemo(
-    () => (Array.isArray(fields) && fields.length > 0 ? fields : defaultFields),
-    [fields]
+    () => Array.isArray(fields)
+      ? fields
+      : defaultFields.filter((key) => isFixedSlots || !["service", "guests"].includes(key)),
+    [fields, isFixedSlots]
   );
+  const hasContactFields = ["name", "contact"].some((key) => enabledFields.includes(key));
+  const hasScheduleFields = ["date", "time"].some((key) => enabledFields.includes(key));
   const [values, setValues] = useState(() => initialValues(serviceOptions[0]));
   const [errors, setErrors] = useState({});
+  const [idempotencyKey, setIdempotencyKey] = useState(createReservationIdempotencyKey);
+  const [honeypot, setHoneypot] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionStartedAtRef = useRef(0);
+  const submissionDisabled = disabled || isSubmitting;
+
+  useEffect(() => {
+    submissionStartedAtRef.current = Date.now();
+  }, []);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -56,31 +77,65 @@ export default function ReservationBlock({
     });
   };
 
-  const submitReservation = (event) => {
+  const selectFixedSlot = (date, time) => {
+    setValues((prev) => ({ ...prev, date, time }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.date;
+      delete next.time;
+      return next;
+    });
+  };
+
+  const submitReservation = async (event) => {
     event.preventDefault();
 
     const nextErrors = {};
-    requiredFields.filter((key) => enabledFields.includes(key)).forEach((key) => {
-      if (!String(values[key] || "").trim()) {
-        nextErrors[key] = content.required;
-      }
-    });
+    (isFixedSlots
+      ? ["name", "email", "phone", "date", "time"]
+      : requiredFields.filter((key) => enabledFields.includes(key)))
+      .filter((key) => key !== "service" || serviceOptions.length > 0)
+      .forEach((key) => {
+        if (!String(values[key] || "").trim()) {
+          nextErrors[key] = content.required;
+        }
+      });
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    onSubmit?.({
-      ...values,
-      guests: Number(values.guests) || 1,
-      submittedAt: new Date().toISOString(),
-    });
+    setIsSubmitting(true);
 
-    setValues(initialValues(serviceOptions[0]));
+    try {
+      const submitted = await onSubmit?.({
+        ...values,
+        ...(isFixedSlots ? { contact: values.phone } : {}),
+        guests: Number(values.guests) || 1,
+      }, idempotencyKey, honeypot, Math.min(
+        86_400_000,
+        Math.max(0, Date.now() - submissionStartedAtRef.current)
+      ));
+
+      if (submitted === "reset_idempotency") {
+        // The server confirmed this key belongs to different data. Preserve all
+        // fields, but let the user's next intentional submit start a new request.
+        setIdempotencyKey(createReservationIdempotencyKey());
+      } else if (submitted !== false) {
+        setValues(initialValues(serviceOptions[0]));
+        setIdempotencyKey(createReservationIdempotencyKey());
+        setHoneypot("");
+        submissionStartedAtRef.current = Date.now();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderField = (key) => {
     const meta = fieldMeta[key];
     if (!meta || !enabledFields.includes(key)) return null;
+    if (isFixedSlots && ["date", "time", "service", "guests"].includes(key)) return null;
+    if (key === "service" && serviceOptions.length === 0) return null;
 
     if (key === "service") {
       return (
@@ -88,7 +143,7 @@ export default function ReservationBlock({
           {meta.label}
           <select
             value={values.service}
-            disabled={disabled}
+            disabled={submissionDisabled}
             onChange={(event) => updateValue("service", event.target.value)}
           >
             {serviceOptions.map((service) => (
@@ -108,7 +163,7 @@ export default function ReservationBlock({
           {meta.label}
           <textarea
             value={values.notes}
-            disabled={disabled}
+            disabled={submissionDisabled}
             placeholder={meta.placeholder}
             onChange={(event) => updateValue("notes", event.target.value)}
           />
@@ -131,7 +186,7 @@ export default function ReservationBlock({
         <input
           {...inputProps}
           value={values[key]}
-          disabled={disabled}
+          disabled={submissionDisabled}
           placeholder={meta.placeholder}
           onChange={(event) => updateValue(key, event.target.value)}
         />
@@ -141,26 +196,116 @@ export default function ReservationBlock({
   };
 
   return (
-    <form className="reservation-block" onSubmit={submitReservation}>
+    <form className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"}`} onSubmit={submitReservation}>
+      <label className="runtime-honeypot" aria-hidden="true">
+        Website
+        <input
+          type="text"
+          name="website"
+          value={honeypot}
+          tabIndex={-1}
+          autoComplete="off"
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
+      </label>
       <div className="reservation-block-header">
         <div>
-          <span>{content.kicker}</span>
+          {isFixedSlots && <span>Book an appointment</span>}
           <h3>{title}</h3>
           <p>{description}</p>
         </div>
 
-        <div className="reservation-summary">
-          <strong>{serviceOptions.length}</strong>
-          <small>{content.servicesLabel}</small>
-        </div>
       </div>
 
-      <div className="reservation-grid">
-        {defaultFields.map((key) => renderField(key))}
-      </div>
+      {isFixedSlots && (
+        <FixedSlotPicker
+          dates={availableDates}
+          times={timeSlots}
+          selectedDate={values.date}
+          selectedTime={values.time}
+          disabled={submissionDisabled}
+          error={errors.date || errors.time || ""}
+          lang={lang}
+          onSelect={selectFixedSlot}
+        />
+      )}
+
+      {isFixedSlots ? (
+        <div className="reservation-grid fixed-slot-contact-grid">
+          <label className={`reservation-field reservation-field-name ${errors.name ? "has-error" : ""}`}>
+            Full name *
+            <input
+              value={values.name}
+              disabled={submissionDisabled}
+              placeholder="Enter your full name"
+              onChange={(event) => updateValue("name", event.target.value)}
+            />
+            {errors.name && <strong>{errors.name}</strong>}
+          </label>
+          <label className={`reservation-field reservation-field-email ${errors.email ? "has-error" : ""}`}>
+            Email address *
+            <input
+              type="email"
+              value={values.email}
+              disabled={submissionDisabled}
+              placeholder="you@example.com"
+              onChange={(event) => updateValue("email", event.target.value)}
+            />
+            {errors.email && <strong>{errors.email}</strong>}
+          </label>
+          <label className={`reservation-field reservation-field-phone ${errors.phone ? "has-error" : ""}`}>
+            Phone number *
+            <input
+              type="tel"
+              value={values.phone}
+              disabled={submissionDisabled}
+              placeholder="+1 555 123 4567"
+              onChange={(event) => updateValue("phone", event.target.value)}
+            />
+            {errors.phone && <strong>{errors.phone}</strong>}
+          </label>
+          {renderField("notes")}
+        </div>
+      ) : (
+        <div className="reservation-request-form">
+          {hasContactFields && <section className="reservation-request-section">
+            <div className="reservation-request-heading">
+              <h4>Your details</h4>
+              <p>Tell us how to contact you.</p>
+            </div>
+            <div className="reservation-request-grid reservation-request-contact">
+              {renderField("name")}
+              {renderField("contact")}
+            </div>
+          </section>}
+
+          {hasScheduleFields && <section className="reservation-request-section">
+            <div className="reservation-request-heading">
+              <h4>Appointment details</h4>
+              <p>Choose when you prefer to visit.</p>
+            </div>
+            <div className="reservation-request-grid reservation-request-schedule">
+              {renderField("date")}
+              {renderField("time")}
+            </div>
+          </section>}
+
+          {enabledFields.includes("notes") && (
+            <section className="reservation-request-section">
+              <div className="reservation-request-heading">
+                <h4>Additional notes</h4>
+                <p>Share anything that will help us prepare.</p>
+              </div>
+              <div className="reservation-request-grid reservation-request-notes">
+                {renderField("notes")}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
 
       <div className="reservation-footer">
-        <button type="submit" className="reservation-submit" disabled={disabled}>
+        <button type="submit" className="reservation-submit" disabled={submissionDisabled}>
           {submitLabel}
         </button>
 

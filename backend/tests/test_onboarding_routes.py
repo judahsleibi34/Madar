@@ -6,9 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import auth_routes
-
-
-ONBOARDING_PATH = "/auth/signup/onboard"
+from services import onboarding_service
 
 
 def build_client():
@@ -17,50 +15,69 @@ def build_client():
     return TestClient(app)
 
 
-def onboarding_payload(**overrides):
-    payload = {
-        "business_name": "Madar Demo Cafe",
-        "business_type": "restaurant",
-        "subdomain": "Madar-Demo",
-        "first_name": "Madar",
-        "last_name": "Owner",
-        "email": "Owner@Example.COM",
-        "owner_name": "Madar Owner",
-        "owner_email": "Owner@Example.COM",
-        "password": "super-secret-password",
-        "selected_base_plan": {
-            "subscription_type": "full_platform",
-            "plan": "starter",
-        },
-        "selected_features": [
-            {
-                "subscription_type": "individual_builder",
-                "plan": "basic",
-                "builder_type": "website",
-            }
-        ],
-    }
-    payload.update(overrides)
-    return payload
-
-
 class FakeAuthAdmin:
-    def __init__(self):
+    def __init__(self, auth):
+        self.auth = auth
         self.created_users = []
         self.deleted_users = []
+        self.updated_users = []
 
     def create_user(self, payload):
         self.created_users.append(payload)
-        return SimpleNamespace(user=SimpleNamespace(id=f"auth-user-{len(self.created_users)}"))
+        auth_user = SimpleNamespace(
+            id=f"auth-user-{len(self.created_users)}",
+            email=payload.get("email"),
+        )
+        self.auth.auth_users.append(auth_user)
+        return SimpleNamespace(user=auth_user)
 
     def delete_user(self, user_id):
         self.deleted_users.append(user_id)
+        self.auth.auth_users = [
+            user for user in self.auth.auth_users if str(getattr(user, "id", "")) != str(user_id)
+        ]
         return SimpleNamespace()
+
+    def update_user_by_id(self, user_id, payload):
+        self.updated_users.append((user_id, payload))
+        return SimpleNamespace(user=SimpleNamespace(id=user_id))
+
+    def list_users(self, page=None, per_page=None):
+        page = page or 1
+        per_page = per_page or len(self.auth.auth_users) or 1
+        start = (page - 1) * per_page
+        end = start + per_page
+        return self.auth.auth_users[start:end]
 
 
 class FakeAuth:
     def __init__(self):
-        self.admin = FakeAuthAdmin()
+        self.admin = FakeAuthAdmin(self)
+        self.signed_up_users = []
+        self.auth_users = []
+        self.resent_verifications = []
+
+    def sign_up(self, payload):
+        self.signed_up_users.append(payload)
+        auth_user = SimpleNamespace(
+            id=f"auth-user-{len(self.signed_up_users)}",
+            email=payload["email"],
+        )
+        self.auth_users.append(auth_user)
+        return SimpleNamespace(user=auth_user)
+
+    def sign_in_with_password(self, payload):
+        for auth_user in self.auth_users:
+            if (
+                auth_user.email == payload["email"]
+                and getattr(auth_user, "password", None) == payload["password"]
+            ):
+                return SimpleNamespace(user=auth_user)
+        raise RuntimeError("Invalid login credentials")
+
+    def resend(self, payload):
+        self.resent_verifications.append(payload)
+        return SimpleNamespace()
 
 
 class FakeResult:
@@ -114,44 +131,24 @@ class FakeQuery:
 
 
 class FakeSupabase:
-    def __init__(self, *, existing_subdomains=None, fail_insert_table=None):
+    def __init__(self):
         self.auth = FakeAuth()
-        self.fail_insert_table = fail_insert_table
         self.tables = {
             "tenants": [],
             "users": [],
             "tenant_memberships": [],
-            "website_settings": [],
-            "builder_projects": [],
-            "features": [],
+            "pending_account_onboarding": [],
         }
-        for index, subdomain in enumerate(existing_subdomains or [], start=1):
-            self.tables["website_settings"].append(
-                {
-                    "id": index,
-                    "tenant_id": 100 + index,
-                    "user_id": 200 + index,
-                    "subdomain": subdomain,
-                }
-            )
-        self.deleted_rows = []
 
     def table(self, table_name):
         return FakeQuery(self, table_name)
 
     def insert_row(self, table_name, payload):
-        if table_name == self.fail_insert_table:
-            raise RuntimeError(f"forced {table_name} insert failure")
-
         row = dict(payload)
         if table_name == "tenants":
             row.setdefault("tenant_id", len(self.tables[table_name]) + 1)
         elif table_name == "users":
             row.setdefault("id", len(self.tables[table_name]) + 1)
-        elif table_name in {"website_settings", "features"}:
-            row.setdefault("id", len(self.tables[table_name]) + 1)
-        elif table_name == "builder_projects":
-            row.setdefault("id", f"project-{len(self.tables[table_name]) + 1}")
 
         self.tables.setdefault(table_name, []).append(row)
         return FakeResult([row])
@@ -167,195 +164,144 @@ class FakeSupabase:
             else:
                 kept_rows.append(row)
         self.tables[table_name] = kept_rows
-        self.deleted_rows.append((table_name, filters, deleted))
         return FakeResult(deleted)
 
 
-class OnboardingRoutesTests(unittest.TestCase):
-    def test_successful_onboarding_creates_tenant_user_membership_settings_project_and_pending_features(self):
-        client = build_client()
-        fake_supabase = FakeSupabase()
-
-        with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
-            auth_routes,
-            "enforce_auth_rate_limit",
-        ):
-            response = client.post(ONBOARDING_PATH, json=onboarding_payload())
-
-        self.assertIn(response.status_code, (200, 201))
-
-        tenants = fake_supabase.tables["tenants"]
-        self.assertEqual(len(tenants), 1)
-        self.assertEqual(tenants[0]["brand_name"], "Madar Demo Cafe")
-        self.assertEqual(tenants[0]["business_type"], "restaurant")
-
-        users = fake_supabase.tables["users"]
-        self.assertEqual(len(users), 1)
-        self.assertEqual(users[0]["email"], "owner@example.com")
-        self.assertEqual(users[0]["tenant_id"], tenants[0]["tenant_id"])
-
-        memberships = fake_supabase.tables["tenant_memberships"]
-        self.assertEqual(len(memberships), 1)
-        self.assertEqual(memberships[0]["tenant_id"], tenants[0]["tenant_id"])
-        self.assertEqual(memberships[0]["user_id"], users[0]["id"])
-        self.assertEqual(memberships[0]["role"], "owner")
-        self.assertEqual(memberships[0]["status"], "active")
-
-        settings = fake_supabase.tables["website_settings"]
-        self.assertEqual(len(settings), 1)
-        self.assertEqual(settings[0]["tenant_id"], tenants[0]["tenant_id"])
-        self.assertEqual(settings[0]["user_id"], users[0]["id"])
-        self.assertEqual(settings[0]["subdomain"], "madar-demo")
-
-        projects = fake_supabase.tables["builder_projects"]
-        self.assertEqual(len(projects), 1)
-        self.assertEqual(projects[0]["tenant_id"], tenants[0]["tenant_id"])
-        self.assertEqual(projects[0]["owner_user_id"], users[0]["id"])
-        self.assertEqual(projects[0]["status"], "draft")
-        self.assertFalse(projects[0].get("published_schema"))
-        self.assertEqual(projects[0].get("published_version"), 0)
-
-        draft_schema = projects[0]["draft_schema"]
-        self.assertEqual(draft_schema["status"], "draft")
-        self.assertEqual(draft_schema["activePageId"], "home")
-        page = draft_schema["pages"][0]
-        self.assertEqual(page["id"], "home")
-        self.assertEqual(page["slug"], "/")
-        section = page["sections"][0]
-        self.assertEqual(section["mode"], "auto")
-        self.assertIn("width", section["layout"])
-        self.assertIn("paddingY", section["layout"])
-        self.assertIn("background", section["layout"])
-        row = section["rows"][0]
-        self.assertIn("columns", row["layout"])
-        self.assertIn("align", row["layout"])
-        self.assertIn("gap", row["layout"])
-        column = row["columns"][0]
-        self.assertIn("align", column["layout"])
-        element = column["elements"][0]
-        self.assertEqual(element["type"], "heading")
-        self.assertEqual(element["content"], "Madar Demo Cafe")
-        self.assertIn("styles", element)
-        self.assertIn("width", element["position"]["desktop"])
-
-        features = fake_supabase.tables["features"]
-        self.assertGreaterEqual(len(features), 1)
-        for feature in features:
-            self.assertEqual(feature["tenant_id"], tenants[0]["tenant_id"])
-            self.assertEqual(feature["payment_status"], "pending")
-
-    def test_onboarding_response_is_safe_and_requires_login(self):
-        client = build_client()
-        fake_supabase = FakeSupabase()
-
-        with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
-            auth_routes,
-            "enforce_auth_rate_limit",
-        ):
-            response = client.post(ONBOARDING_PATH, json=onboarding_payload())
-
-        self.assertIn(response.status_code, (200, 201))
-        body = response.json()
-        self.assertTrue(body["requires_login"])
-        self.assertIn("user_id", body)
-        self.assertIn("tenant_id", body)
-        self.assertEqual(body["subdomain"], "madar-demo")
-        self.assertNotIn("access_token", body)
-        self.assertNotIn("refresh_token", body)
-        self.assertNotIn("password", body)
-
-    def test_onboarding_rejects_invalid_reserved_and_duplicate_subdomains(self):
-        client = build_client()
-        invalid_cases = {
-            "spaces": "bad subdomain",
-            "too_short": "ab",
-            "reserved": "admin",
-        }
-
-        for label, subdomain in invalid_cases.items():
-            with self.subTest(label=label):
-                fake_supabase = FakeSupabase()
-                with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
-                    auth_routes,
-                    "enforce_auth_rate_limit",
-                ):
-                    response = client.post(
-                        ONBOARDING_PATH,
-                        json=onboarding_payload(subdomain=subdomain),
-                    )
-
-                self.assertEqual(response.status_code, 400)
-                self.assertEqual(fake_supabase.auth.admin.created_users, [])
-
-        duplicate_supabase = FakeSupabase(existing_subdomains=["madar-demo"])
-        with patch.object(auth_routes, "service_supabase", duplicate_supabase), patch.object(
-            auth_routes,
-            "enforce_auth_rate_limit",
-        ):
-            response = client.post(
-                ONBOARDING_PATH,
-                json=onboarding_payload(subdomain="MADAR-DEMO"),
+class SignupRoutesTests(unittest.TestCase):
+    def test_legacy_immediate_tenant_provisioning_is_blocked(self):
+        with self.assertRaises(onboarding_service.HTTPException) as raised:
+            onboarding_service.create_onboarded_tenant(
+                supabase_client=object(),
+                payload=object(),
             )
 
-        self.assertEqual(response.status_code, 409)
-        self.assertEqual(duplicate_supabase.auth.admin.created_users, [])
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(
+            raised.exception.detail["code"],
+            "pending_verification_flow_required",
+        )
 
-    def test_onboarding_ignores_or_rejects_protected_fields_and_keeps_billing_pending(self):
+    def test_signup_onboard_endpoint_is_removed(self):
+        client = build_client()
+
+        response = client.post(
+            "/auth/signup/onboard",
+            json={
+                "first_name": "Madar",
+                "last_name": "Owner",
+                "email": "Owner@Example.COM",
+                "password": "super-secret-password",
+            },
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_signup_requires_terms_acceptance_before_creating_identity(self):
         client = build_client()
         fake_supabase = FakeSupabase()
 
-        with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
-            auth_routes,
-            "enforce_auth_rate_limit",
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
         ):
             response = client.post(
-                ONBOARDING_PATH,
-                json=onboarding_payload(
-                    tenant_id=999,
-                    user_type="admin",
-                    billing_status="active",
-                    payment_status="active",
-                    selected_features=[
-                        {
-                            "subscription_type": "individual_builder",
-                            "plan": "premium",
-                            "builder_type": "forms",
-                            "payment_status": "active",
-                            "tenant_id": 999,
-                        }
-                    ],
-                ),
+                "/auth/signup",
+                json={
+                    "first_name": "Madar",
+                    "last_name": "Owner",
+                    "email": "owner@example.com",
+                    "password": "super-secret-password",
+                    "terms_accepted": False,
+                },
             )
-
-        self.assertIn(response.status_code, (200, 201))
-        self.assertEqual(fake_supabase.tables["users"][0]["tenant_id"], 1)
-        self.assertNotEqual(fake_supabase.tables["users"][0].get("user_type"), "admin")
-        for feature in fake_supabase.tables["features"]:
-            self.assertEqual(feature["tenant_id"], 1)
-            self.assertEqual(feature["payment_status"], "pending")
-
-    def test_onboarding_failure_after_auth_creation_cleans_up_partial_rows(self):
-        client = build_client()
-        fake_supabase = FakeSupabase(fail_insert_table="builder_projects")
-
-        with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
-            auth_routes,
-            "enforce_auth_rate_limit",
-        ):
-            response = client.post(ONBOARDING_PATH, json=onboarding_payload())
 
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "terms_acceptance_required",
+        )
+        self.assertEqual(fake_supabase.auth.admin.created_users, [])
         self.assertEqual(fake_supabase.tables["users"], [])
-        self.assertEqual(fake_supabase.tables["tenants"], [])
-        self.assertEqual(fake_supabase.tables["tenant_memberships"], [])
-        self.assertEqual(fake_supabase.tables["website_settings"], [])
-        self.assertIn("auth-user-1", fake_supabase.auth.admin.deleted_users)
 
-    def test_existing_signup_route_remains_unchanged(self):
+    def test_signup_creates_pending_user_without_active_tenant_resources(self):
         client = build_client()
         fake_supabase = FakeSupabase()
 
-        with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
+        ), patch.object(
+            auth_routes,
+            "enforce_auth_rate_limit",
+        ), patch.object(
+            auth_routes,
+            "FRONTEND_URL",
+            "http://localhost:5173",
+        ), patch.object(
+            auth_routes,
+            "send_verification_email",
+            return_value={"sent": True, "retry_after": 60},
+        ), patch.object(
+            auth_routes,
+            "set_pending_verification_cookie",
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
+        ):
+            response = client.post(
+                "/auth/signup",
+                json={
+                    "first_name": "Existing",
+                    "last_name": "Signup",
+                    "email": "Existing@Example.COM",
+                    "password": "super-secret-password",
+                    "terms_accepted": True,
+                    "business_name": "Ignored Business",
+                    "subdomain": "ignored-site",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(
+            body["message"],
+            "Account created. Please verify your email before logging in.",
+        )
+        self.assertTrue(body["requires_email_verification"])
+        self.assertEqual(body["user"]["email"], "existing@example.com")
+        self.assertEqual(len(fake_supabase.auth.admin.created_users), 1)
+        self.assertEqual(fake_supabase.auth.admin.created_users[0]["email"], "existing@example.com")
+        self.assertEqual(
+            fake_supabase.auth.admin.created_users[0]["email_confirm"],
+            False,
+        )
+        self.assertEqual(fake_supabase.auth.admin.updated_users, [])
+        self.assertEqual(fake_supabase.auth.signed_up_users, [])
+        self.assertEqual(fake_supabase.tables["tenants"], [])
+        self.assertEqual(len(fake_supabase.tables["users"]), 1)
+        self.assertIs(fake_supabase.tables["users"][0]["email_verified"], False)
+        self.assertIsNone(fake_supabase.tables["users"][0]["email_verified_at"])
+        self.assertIsNone(fake_supabase.tables["users"][0]["tenant_id"])
+        self.assertEqual(
+            fake_supabase.tables["users"][0]["account_status"],
+            "pending_verification",
+        )
+        self.assertEqual(
+            fake_supabase.tables["users"][0]["terms_version"],
+            auth_routes.CURRENT_TERMS_VERSION,
+        )
+        self.assertTrue(fake_supabase.tables["users"][0]["terms_accepted_at"])
+        self.assertEqual(fake_supabase.tables["tenant_memberships"], [])
+        self.assertEqual(len(fake_supabase.tables["pending_account_onboarding"]), 1)
+
+    def test_original_signup_rejects_email_that_already_exists_in_supabase_auth(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+        fake_supabase.auth.auth_users.append(
+            SimpleNamespace(id="auth-existing", email="existing@example.com")
+        )
+
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
+        ), patch.object(
             auth_routes,
             "enforce_auth_rate_limit",
         ):
@@ -366,17 +312,297 @@ class OnboardingRoutesTests(unittest.TestCase):
                     "last_name": "Signup",
                     "email": "Existing@Example.COM",
                     "password": "super-secret-password",
+                    "terms_accepted": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"], "Email is already registered")
+        self.assertEqual(fake_supabase.auth.admin.created_users, [])
+        self.assertEqual(fake_supabase.tables["tenants"], [])
+        self.assertEqual(fake_supabase.tables["users"], [])
+        self.assertEqual(fake_supabase.tables["tenant_memberships"], [])
+        self.assertEqual(fake_supabase.tables["pending_account_onboarding"], [])
+
+    def test_original_signup_recovers_unverified_auth_user_without_local_profile(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+        fake_supabase.auth.auth_users.append(
+            SimpleNamespace(
+                id="auth-orphaned",
+                email="orphaned@example.com",
+                email_confirmed_at=None,
+            )
+        )
+
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
+        ), patch.object(
+            auth_routes,
+            "enforce_auth_rate_limit",
+        ), patch.object(
+            auth_routes,
+            "send_verification_email",
+            return_value={"sent": True, "retry_after": 60},
+        ), patch.object(
+            auth_routes,
+            "set_pending_verification_cookie",
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
+        ):
+            response = client.post(
+                "/auth/signup",
+                json={
+                    "first_name": "Recovered",
+                    "last_name": "Signup",
+                    "email": "Orphaned@Example.COM",
+                    "password": "super-secret-password",
+                    "terms_accepted": True,
                 },
             )
 
         self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["message"], "Signup request sent successfully")
-        self.assertEqual(body["user"]["email"], "existing@example.com")
-        self.assertEqual(len(fake_supabase.tables["tenants"]), 1)
-        self.assertEqual(fake_supabase.tables["tenants"][0]["brand_name"], "")
-        self.assertEqual(fake_supabase.tables["website_settings"], [])
-        self.assertEqual(fake_supabase.tables["builder_projects"], [])
+        self.assertIn("auth-orphaned", fake_supabase.auth.admin.deleted_users)
+        self.assertEqual(len(fake_supabase.tables["users"]), 1)
+        self.assertEqual(fake_supabase.tables["users"][0]["email"], "orphaned@example.com")
+
+    def test_original_signup_recovers_verified_auth_user_after_password_check(self):
+        client = build_client()
+        fake_supabase = FakeSupabase()
+        fake_supabase.auth.auth_users.append(
+            SimpleNamespace(
+                id="auth-verified-orphan",
+                email="verified@example.com",
+                email_confirmed_at="2026-01-01T00:00:00+00:00",
+                password="super-secret-password",
+            )
+        )
+
+        def provision_verified(_auth_user, local_user):
+            return (
+                {
+                    **local_user,
+                    "tenant_id": 1,
+                    "email_verified": True,
+                    "account_status": "active",
+                },
+                True,
+            )
+
+        with patch.object(auth_routes, "supabase", fake_supabase), patch.object(
+            auth_routes, "service_supabase", fake_supabase
+        ), patch.object(
+            auth_routes,
+            "enforce_auth_rate_limit",
+        ), patch.object(
+            auth_routes,
+            "synchronize_verified_account",
+            side_effect=provision_verified,
+        ) as synchronize, patch.object(
+            auth_routes,
+            "record_verification_result",
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
+        ):
+            response = client.post(
+                "/auth/signup",
+                json={
+                    "first_name": "Verified",
+                    "last_name": "Owner",
+                    "email": "Verified@Example.COM",
+                    "password": "super-secret-password",
+                    "terms_accepted": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["requires_email_verification"])
+        self.assertEqual(response.json()["user"]["auth_id"], "auth-verified-orphan")
+        self.assertEqual(fake_supabase.auth.signed_up_users, [])
+        self.assertEqual(response.json()["user"]["account_status"], "active")
+        synchronize.assert_called_once()
+
+    def test_original_signup_rejects_numeric_names(self):
+        client = build_client()
+
+        for payload_overrides in ({"first_name": "123"}, {"last_name": "456"}):
+            with self.subTest(payload_overrides=payload_overrides):
+                fake_supabase = FakeSupabase()
+                payload = {
+                    "first_name": "Existing",
+                    "last_name": "Signup",
+                    "email": "Existing@Example.COM",
+                    "password": "super-secret-password",
+                    "terms_accepted": True,
+                }
+                payload.update(payload_overrides)
+
+                with patch.object(auth_routes, "service_supabase", fake_supabase), patch.object(
+                    auth_routes,
+                    "enforce_auth_rate_limit",
+                ):
+                    response = client.post("/auth/signup", json=payload)
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(fake_supabase.auth.admin.created_users, [])
+                self.assertEqual(fake_supabase.tables["tenants"], [])
+
+    def test_login_rejects_unverified_email_with_clear_message(self):
+        client = build_client()
+
+        with patch.object(auth_routes, "enforce_auth_rate_limit"), patch.object(
+            auth_routes.supabase.auth,
+            "sign_in_with_password",
+            side_effect=RuntimeError("Email not confirmed"),
+        ), patch.object(
+            auth_routes,
+            "get_login_audit_user",
+            return_value=None,
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
+        ):
+            response = client.post(
+                "/auth/login",
+                json={
+                    "email": "unverified@example.com",
+                    "password": "super-secret-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json()["detail"],
+            {
+                "code": "email_verification_required",
+                "message": "Verify your email before logging in.",
+                "context": {"resend_available_after": 0},
+            },
+        )
+
+    def test_login_rejects_session_when_supabase_user_is_not_email_confirmed(self):
+        client = build_client()
+        auth_response = SimpleNamespace(
+            user=SimpleNamespace(id="auth-1", email_confirmed_at=None, confirmed_at=None),
+            session=SimpleNamespace(access_token="access", refresh_token="refresh"),
+        )
+
+        with patch.object(auth_routes, "enforce_auth_rate_limit"), patch.object(
+            auth_routes.supabase.auth,
+            "sign_in_with_password",
+            return_value=auth_response,
+        ), patch.object(
+            auth_routes,
+            "get_local_user_by_auth_id",
+            return_value={
+                "id": 1,
+                "auth_id": "auth-1",
+                "tenant_id": 1,
+                "email": "unverified@example.com",
+                "email_verified": False,
+            },
+        ), patch.object(
+            auth_routes,
+            "get_login_audit_user",
+            return_value=None,
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
+        ), patch.object(
+            auth_routes,
+            "set_pending_verification_cookie",
+        ):
+            response = client.post(
+                "/auth/login",
+                json={
+                    "email": "unverified@example.com",
+                    "password": "super-secret-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json()["detail"],
+            {
+                "code": "email_verification_required",
+                "message": "Verify your email before logging in.",
+                "context": {"resend_available_after": 0},
+            },
+        )
+
+    def test_main_login_rejects_public_site_visitor_account(self):
+        client = build_client()
+        auth_response = SimpleNamespace(
+            user=SimpleNamespace(
+                id="auth-visitor",
+                email="visitor@example.com",
+                email_confirmed_at="2026-01-01T00:00:00Z",
+                confirmed_at="2026-01-01T00:00:00Z",
+            ),
+            session=SimpleNamespace(access_token="access", refresh_token="refresh"),
+        )
+        local_user = {
+            "id": 22,
+            "auth_id": "auth-visitor",
+            "tenant_id": None,
+            "email": "visitor@example.com",
+            "email_verified": True,
+            "account_kind": "site_visitor",
+            "account_status": "active",
+        }
+
+        with patch.object(auth_routes, "enforce_auth_rate_limit"), patch.object(
+            auth_routes.supabase.auth,
+            "sign_in_with_password",
+            return_value=auth_response,
+        ), patch.object(
+            auth_routes,
+            "get_local_user_by_auth_id",
+            return_value=local_user,
+        ), patch.object(
+            auth_routes,
+            "record_security_event",
+        ):
+            response = client.post(
+                "/auth/login",
+                json={
+                    "email": "visitor@example.com",
+                    "password": "super-secret-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json()["detail"]["code"],
+            "platform_account_required",
+        )
+
+    def test_main_user_status_does_not_authenticate_public_site_visitor(self):
+        client = build_client()
+        local_user = {
+            "id": 22,
+            "auth_id": "auth-visitor",
+            "tenant_id": None,
+            "email": "visitor@example.com",
+            "account_kind": "site_visitor",
+            "account_status": "active",
+        }
+
+        with patch.object(
+            auth_routes,
+            "get_authenticated_user_row",
+            return_value=(SimpleNamespace(id="auth-visitor"), local_user),
+        ):
+            response = client.get("/auth/user_status")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["logged_in"])
+        self.assertEqual(
+            response.json()["account_state"],
+            "platform_account_required",
+        )
 
 
 if __name__ == "__main__":

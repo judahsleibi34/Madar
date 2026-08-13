@@ -42,7 +42,7 @@ class AuthorizationBoundaryTests(unittest.TestCase):
         with patch.object(
             auth_service,
             "get_authenticated_user_row",
-            return_value=fake_auth_result({"id": 2, "user_type": "user"}),
+            return_value=fake_auth_result({"id": 2, "tenant_id": 10, "user_type": "user"}),
         ):
             response = client.get("/users/3/probe")
 
@@ -68,7 +68,7 @@ class AuthorizationBoundaryTests(unittest.TestCase):
         with patch.object(
             auth_service,
             "get_authenticated_user_row",
-            return_value=fake_auth_result({"id": 2, "user_type": "user"}),
+            return_value=fake_auth_result({"id": 2, "tenant_id": 10, "user_type": "user"}),
         ):
             response = client.get("/admin/probe")
 
@@ -82,6 +82,21 @@ class AuthorizationBoundaryTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"], "Not logged in")
+
+    def test_site_only_customer_cannot_access_product_user_api(self):
+        client = build_client()
+
+        with patch.object(
+            auth_service,
+            "get_authenticated_user_row",
+            return_value=fake_auth_result(
+                {"id": 2, "tenant_id": None, "user_type": "site_user"}
+            ),
+        ):
+            response = client.get("/users/2/probe")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "User access is required")
 
     def test_public_route_still_works_without_auth(self):
         client = build_client()

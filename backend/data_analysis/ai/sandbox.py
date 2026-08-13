@@ -1,57 +1,53 @@
 from __future__ import annotations
 
-from types import MappingProxyType
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 from typing import Any
 
-import math
-import statistics
-
-import numpy as np
 import pandas as pd
 
 from data_analysis.ai.code_validator import validate_generated_code
 from data_analysis.ai.result_validator import validate_analysis_result
 from data_analysis.ai.settings import is_local_ai_exec_allowed
 
+if os.name == "posix":
+    import resource
+else:
+    resource = None
+
 
 class SandboxExecutionError(RuntimeError):
     pass
 
 
-SAFE_BUILTINS = MappingProxyType(
-    {
-        "abs": abs,
-        "all": all,
-        "any": any,
-        "bool": bool,
-        "dict": dict,
-        "enumerate": enumerate,
-        "float": float,
-        "int": int,
-        "isinstance": isinstance,
-        "len": len,
-        "list": list,
-        "max": max,
-        "min": min,
-        "range": range,
-        "round": round,
-        "set": set,
-        "sorted": sorted,
-        "str": str,
-        "sum": sum,
-        "tuple": tuple,
-        "zip": zip,
-    }
-)
-
-
-SAFE_GLOBALS = {
-    "__builtins__": SAFE_BUILTINS,
-    "pd": pd,
-    "np": np,
-    "math": math,
-    "statistics": statistics,
+MAX_SANDBOX_INPUT_BYTES = int(os.getenv("AI_SANDBOX_MAX_INPUT_BYTES", str(5 * 1024 * 1024)))
+MAX_SANDBOX_OUTPUT_BYTES = int(os.getenv("AI_SANDBOX_MAX_OUTPUT_BYTES", str(1024 * 1024)))
+SANDBOX_MEMORY_BYTES = int(os.getenv("AI_SANDBOX_MEMORY_BYTES", str(1024 * 1024 * 1024)))
+MAX_SANDBOX_STDERR_BYTES = 8192
+WORKER_THREAD_ENV = {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+    "BLIS_NUM_THREADS": "1",
 }
+
+
+def _limit_child() -> None:
+    if resource is None:
+        return
+
+    resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
+    resource.setrlimit(resource.RLIMIT_AS, (SANDBOX_MEMORY_BYTES, SANDBOX_MEMORY_BYTES))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_SANDBOX_OUTPUT_BYTES, MAX_SANDBOX_OUTPUT_BYTES))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))
+    if hasattr(resource, "RLIMIT_NPROC"):
+        resource.setrlimit(resource.RLIMIT_NPROC, (16, 16))
 
 
 def run_generated_code_locally(
@@ -61,64 +57,55 @@ def run_generated_code_locally(
     timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     if not is_local_ai_exec_allowed():
-        raise SandboxExecutionError(
-            "Local generated-code execution is disabled in this environment."
-        )
-
+        raise SandboxExecutionError("Local generated-code execution is disabled in this environment.")
+    if os.getenv("AI_ISOLATED_WORKER_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
+        raise SandboxExecutionError("The isolated generated-code worker is not enabled.")
     if not isinstance(df, pd.DataFrame):
         raise SandboxExecutionError("Sandbox expected a pandas DataFrame")
-
-    approved_column_set = {str(column) for column in approved_columns}
-
-    validate_generated_code(
-        code=code,
-        approved_columns=approved_column_set,
-        require_result_variable=True,
-    )
-
-    safe_df = _copy_approved_dataframe(df, approved_column_set)
-
-    local_scope: dict[str, Any] = {
-        "df": safe_df,
-        "result": None,
-    }
-
+    approved = {str(column) for column in approved_columns}
+    validate_generated_code(code=code, approved_columns=approved, require_result_variable=True)
+    missing = [column for column in approved if column not in df.columns]
+    if missing:
+        raise SandboxExecutionError(f"Approved columns are missing from dataframe: {missing}")
+    payload = json.dumps({
+        "code": code,
+        "approved_columns": sorted(approved),
+        "dataframe": df[sorted(approved)].to_json(orient="split", date_format="iso"),
+    }, separators=(",", ":")).encode()
+    if len(payload) > MAX_SANDBOX_INPUT_BYTES:
+        raise SandboxExecutionError("Sandbox input is too large")
+    worker = Path(__file__).resolve().parents[2] / "workers" / "generated_code_worker.py"
+    timeout = max(1, min(int(timeout_seconds or 5), 30))
+    with tempfile.TemporaryDirectory(prefix="madar-ai-worker-") as workdir:
+        env = {
+            "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),
+            "PYTHONIOENCODING": "utf-8",
+            "MPLCONFIGDIR": str(Path(workdir) / "mpl"),
+            **WORKER_THREAD_ENV,
+        }
+        try:
+            process = subprocess.run(
+                [sys.executable, "-I", str(worker)],
+                input=payload,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=workdir,
+                env=env,
+                timeout=timeout,
+                check=False,
+                start_new_session=True,
+                preexec_fn=_limit_child if os.name == "posix" else None,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise SandboxExecutionError("Generated code timed out") from error
+    if len(process.stdout) > MAX_SANDBOX_OUTPUT_BYTES:
+        raise SandboxExecutionError("Generated code output is too large")
+    if len(process.stderr or b"") > MAX_SANDBOX_STDERR_BYTES:
+        raise SandboxExecutionError("worker_stderr_too_large")
     try:
-        # In-process exec cannot enforce a hard timeout safely. Production must
-        # use AI_ALLOW_LOCAL_EXEC=false and run generated code in an isolated worker.
-        _ = timeout_seconds
-        exec(
-            code,
-            dict(SAFE_GLOBALS),
-            local_scope,
-        )
-    except Exception as exc:
-        raise SandboxExecutionError("Generated code failed") from exc
-
-    result = local_scope.get("result")
-
-    if result is None:
-        raise SandboxExecutionError("Generated code did not produce result")
-
-    return validate_analysis_result(result)
-
-
-def _copy_approved_dataframe(
-    df: pd.DataFrame,
-    approved_columns: set[str],
-) -> pd.DataFrame:
-    missing_columns = [
-        column
-        for column in approved_columns
-        if column not in df.columns
-    ]
-
-    if missing_columns:
-        raise SandboxExecutionError(
-            f"Approved columns are missing from dataframe: {missing_columns}"
-        )
-
-    safe_df = df[list(approved_columns)].copy()
-    safe_df.columns = [str(column) for column in safe_df.columns]
-
-    return safe_df
+        response = json.loads(process.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise SandboxExecutionError("worker_protocol_invalid") from error
+    if process.returncode != 0 or not response.get("success"):
+        raise SandboxExecutionError(str(response.get("code") or "Generated code failed"))
+    return validate_analysis_result(response.get("result"))

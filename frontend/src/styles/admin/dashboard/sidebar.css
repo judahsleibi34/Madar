@@ -3,11 +3,11 @@
    ============================================================ */
 
 .admin-dashboard-layout {
-  --dashboard-sidebar-width: 260px;
+  --dashboard-sidebar-width: 232px;
 }
 
 .admin-dashboard-layout.admin-dashboard-layout-builder {
-  --dashboard-sidebar-width: 72px;
+  --dashboard-sidebar-width: 232px;
 }
 
 .admin-sidebar {
@@ -15,9 +15,9 @@
   top: 0;
   bottom: 0;
 
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
+  width: 232px;
+  min-width: 232px;
+  max-width: 232px;
   height: 100vh;
 
   background: var(--theme-surface);
@@ -195,8 +195,8 @@
   width: 100%;
   min-height: 0;
   flex: 0 1 auto;
-  max-height: min(560px, calc(100vh - 300px));
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
   overflow-x: hidden;
   padding-bottom: 6px;
   scrollbar-width: thin;
@@ -764,12 +764,13 @@ img.admin-sidebar-avatar {
    ============================================================ */
 
 .admin-dashboard-layout-builder .admin-sidebar {
-  width: 72px !important;
-  min-width: 72px !important;
-  max-width: 72px !important;
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
 
-  padding-inline: 8px !important;
-  overflow: hidden !important;
+  padding-inline: 18px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 }
 
 .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-brand-text,
@@ -780,7 +781,7 @@ img.admin-sidebar-avatar {
 .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-user-info,
 .admin-dashboard-layout-builder .admin-sidebar .language-toggle-current,
 .admin-dashboard-layout-builder .admin-sidebar .language-toggle-dot {
-  display: none !important;
+  display: initial;
 }
 
 .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-brand,
@@ -791,7 +792,7 @@ img.admin-sidebar-avatar {
 .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-user,
 .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-lang-switcher.language-toggle-button {
   justify-content: center !important;
-  margin-inline: auto !important;
+  margin-inline: 0 !important;
 }
 
 /* ============================================================

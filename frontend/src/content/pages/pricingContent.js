@@ -1,372 +1,121 @@
 export const pricingContent = {
   en: {
-    eyebrow: "Pricing",
-    header: "Choose a monthly plan",
-    subheader:
-      "Select the tools your business needs and see the matching plan.",
-
-    basePlansTab: "Plans",
-    customPlansTab: "Plans",
-
-    basePlansLabel: "Plans",
-    basePlansTitle: "Choose your tools",
-    basePlansSubtitle:
-      "Start with the modules you need now. You can move to a larger plan later.",
-
-    recommended: "Recommended",
-    bestFor: "Good for",
-    workflow: "How it helps",
-    includes: "What you get",
-    perMonth: "/ month",
-    chooserTitle: "Plan options",
-    chooserSubtitle:
-      "Turn modules on or off to find the right monthly plan. Reservations include the website CMS because customers need a public page to book from.",
-    yourPlan: "Selected plan",
-    comparePlans: "Compare all plans",
-    includedInPlan: "Included in this plan",
-    reservationNeedsCms:
-      "CMS is included with reservations so customers can book from a public page.",
+    eyebrow: "Plans and pricing",
+    title: "Choose the Madar plan that fits your work",
+    subtitle: "Forms, websites, data tools, and reservations with clear monthly pricing.",
+    manualActivation: "Plans are manually reviewed and activated. Requesting a plan does not charge you.",
+    loading: "Loading current plans...",
+    catalogError: "Current pricing is temporarily unavailable.",
+    requestError: "Could not save your plan request.",
+    requestSaved: "Your plan request was saved for manual review. No payment was taken.",
+    requestPlan: "Request this plan",
     saving: "Saving...",
-    success: "Subscription request saved. Payment setup is not connected yet.",
-    loginRequired: "Please log in before choosing a plan.",
-    serverError: "Could not connect to server.",
-
-    basePlans: [
-      {
-        id: "cms",
-        billingPlan: "cms",
-        name: "CMS Builder",
-        badge: "CMS only",
-        price: "$15",
-        recommended: false,
-        cta: "Choose CMS Builder",
-        description:
-          "For a website you can update yourself without forms, analysis, or bookings.",
-        bestFor:
-          "Service pages, landing pages, company profiles, and regular content updates.",
-        workflow:
-          "Edit pages, publish updates, and manage website content from one workspace.",
-        includes: [
-          "Website builder and CMS",
-          "Publish pages online",
-          "Edit text, sections, and theme settings",
-          "Workspace access",
-        ],
-        features: [
-          { text: "Build and update website pages", included: true },
-          { text: "Manage content from your workspace", included: true },
-          { text: "Forms and response tracking", included: false },
-          { text: "Data Analysis page", included: false },
-          { text: "Reservations", included: false },
-        ],
+    perMonth: "/month",
+    hostedStorage: "Madar-hosted storage",
+    oneOperator: "1 workspace operator",
+    addonsTitle: "Optional add-ons",
+    comingSoon: "Coming soon",
+    back: "Back",
+    fairUse: "Forms, submissions, and reservation requests are not billed by count. Fair-use, anti-abuse, security, payload, rate, and platform-stability controls still apply.",
+    addressNote: "Website plans include one standard madarportal.com/site/business-name address. A branded business-name.madarportal.com subdomain is $5/month.",
+    exclusions: "Customer-owned custom domains and hosted business email are not currently available. AI analytics is an optional token-based add-on.",
+    plans: {
+      forms: {
+        name: "Forms",
+        summary: "For public forms, responses, and standard data analysis.",
       },
-      {
-        id: "forms-data",
-        billingPlan: "forms_data",
-        name: "Forms + DA",
-        badge: "Forms and analysis",
-        price: "$10",
-        recommended: false,
-        cta: "Choose Forms + DA",
-        description:
-          "For collecting information and reviewing it without a full website.",
-        bestFor:
-          "Surveys, requests, internal forms, uploaded files, and simple reports.",
-        workflow:
-          "Create forms, collect responses, then clean and review the data in the analysis page.",
-        includes: [
-          "Forms builder",
-          "Responses dashboard",
-          "Data Analysis page",
-          "Workspace access",
-        ],
-        features: [
-          { text: "Create forms and collect answers", included: true },
-          { text: "Review and search responses", included: true },
-          { text: "Use the Data Analysis page", included: true },
-          { text: "Website CMS", included: false },
-          { text: "Reservations", included: false },
-        ],
+      website: {
+        name: "Website",
+        summary: "For a visual website with forms and image uploads.",
       },
-      {
-        id: "cms-plus",
-        billingPlan: "cms_plus",
-        name: "CMS Plus",
-        badge: "CMS + one module",
-        price: "$20",
-        recommended: true,
-        cta: "Choose CMS Plus",
-        description:
-          "For a website plus one extra workflow: forms or reservations.",
-        bestFor:
-          "Small teams that need a public website with either requests or bookings.",
-        workflow:
-          "Run your website and let visitors submit forms or make reservations.",
-        includes: [
-          "Website builder and CMS",
-          "Choose forms or reservations",
-          "Published pages",
-          "Workspace access",
-        ],
-        features: [
-          { text: "Build and update website pages", included: true },
-          { text: "Use forms with Data Analysis, or use reservations", included: true },
-          { text: "Keep customer activity in one workspace", included: true },
-          { text: "All tools together", included: false },
-        ],
+      business: {
+        name: "Business",
+        summary: "For a website with expanded data tools.",
       },
-      {
-        id: "complete",
-        billingPlan: "complete",
-        name: "Complete",
-        badge: "CMS + forms + reservations",
-        price: "$25",
-        recommended: false,
-        cta: "Choose Complete",
-        description:
-          "For teams that need the full setup: website, forms, analysis, and reservations.",
-        bestFor:
-          "Businesses that want one place for their site, customer data, files, and bookings.",
-        workflow:
-          "Run the website, collect forms, review data, manage reservations, and keep files organized.",
-        includes: [
-          "Website builder and CMS",
-          "Forms and Data Analysis",
-          "Reservations",
-          "File saving locally or on the server",
-        ],
-        features: [
-          { text: "Build and update website pages", included: true },
-          { text: "Create forms and analyze responses", included: true },
-          { text: "Manage reservations", included: true },
-          { text: "Save files on your device or keep them on the server", included: true },
-          { text: "Use all main Madar tools together", included: true },
-        ],
+      business_plus: {
+        name: "Business Plus",
+        summary: "For service businesses managing reservations and schedules.",
       },
-    ],
-
-    modules: [
-      {
-        id: "cms",
-        name: "Website CMS",
-        shortName: "CMS",
-        description: "Build pages and update website content.",
-      },
-      {
-        id: "forms",
-        name: "Forms + Data Analysis",
-        shortName: "Forms + DA",
-        description: "Collect answers, review responses, and analyze data.",
-      },
-      {
-        id: "reservations",
-        name: "Reservations",
-        shortName: "Reservations",
-        description: "Let customers book or request a time.",
-      },
-    ],
-
-    customPlans: {
-      label: "Plans",
-      title: "Static monthly plans",
-      subtitle:
-        "Madar now uses fixed plans based on the modules you need.",
-      summaryLabel: "Selected plan",
-      summaryTitle: "Fixed package",
-      summaryText:
-        "Choose one of the static monthly plans instead of building a custom package.",
-      estimatedPrice: "Monthly price",
-      selectedModules: "Included modules",
-      noModules: "No modules selected.",
-      requestPlan: "Choose a plan",
-      note: "For special limits or integrations, contact the Madar team.",
-      modules: [],
     },
+    featureLabels: {
+      unlimited_forms_submissions: "Unlimited forms and submissions",
+      hosted_public_form_links: "Hosted public form links",
+      response_management_overview: "Response management and overview",
+      data_import_standard_analysis: "Data import and standard analysis",
+      visual_page_builder: "Visual page builder",
+      one_published_website: "1 published website",
+      standard_hosted_address: "Standard hosted address",
+      image_uploads_response_management: "Image uploads and response management",
+      everything_website: "Everything in Website",
+      expanded_analytics: "Expanded analytics tools",
+      data_cleaning: "Data cleaning",
+      charts_data_exports: "Charts and data exports",
+      everything_business: "Everything in Business",
+      unlimited_reservation_requests: "Unlimited reservation requests",
+      reservation_management_analytics: "Reservation management and analytics",
+      internal_calendar: "Internal calendar",
+      priority_support: "Priority support designation",
+    },
+    addons: {},
   },
-
   ar: {
-    eyebrow: "Pricing",
-    header: "Choose a monthly plan",
-    subheader:
-      "Select the tools your business needs and see the matching plan.",
-
-    basePlansTab: "Plans",
-    customPlansTab: "Plans",
-
-    basePlansLabel: "Plans",
-    basePlansTitle: "Choose your tools",
-    basePlansSubtitle:
-      "Start with the modules you need now. You can move to a larger plan later.",
-
-    recommended: "Recommended",
-    bestFor: "Good for",
-    workflow: "How it helps",
-    includes: "What you get",
-    perMonth: "/ month",
-    chooserTitle: "Plan options",
-    chooserSubtitle:
-      "Turn modules on or off to find the right monthly plan. Reservations include the website CMS because customers need a public page to book from.",
-    yourPlan: "Selected plan",
-    comparePlans: "Compare all plans",
-    includedInPlan: "Included in this plan",
-    reservationNeedsCms:
-      "CMS is included with reservations so customers can book from a public page.",
-    saving: "Saving...",
-    success: "Subscription request saved. Payment setup is not connected yet.",
-    loginRequired: "Please log in before choosing a plan.",
-    serverError: "Could not connect to server.",
-
-    basePlans: [
-      {
-        id: "cms",
-        billingPlan: "cms",
-        name: "CMS Builder",
-        badge: "CMS only",
-        price: "$15",
-        recommended: false,
-        cta: "Choose CMS Builder",
-        description:
-          "For a website you can update yourself without forms, analysis, or bookings.",
-        bestFor:
-          "Service pages, landing pages, company profiles, and regular content updates.",
-        workflow:
-          "Edit pages, publish updates, and manage website content from one workspace.",
-        includes: [
-          "Website builder and CMS",
-          "Publish pages online",
-          "Edit text, sections, and theme settings",
-          "Workspace access",
-        ],
-        features: [
-          { text: "Build and update website pages", included: true },
-          { text: "Manage content from your workspace", included: true },
-          { text: "Forms and response tracking", included: false },
-          { text: "Data Analysis page", included: false },
-          { text: "Reservations", included: false },
-        ],
+    eyebrow: "الخطط والأسعار",
+    title: "اختر خطة مدار المناسبة لعملك",
+    subtitle: "نماذج ومواقع وأدوات بيانات وحجوزات بأسعار شهرية واضحة.",
+    manualActivation: "تتم مراجعة الخطط وتفعيلها يدوياً. طلب الخطة لا يؤدي إلى تحصيل أي مبلغ.",
+    loading: "جارٍ تحميل الخطط الحالية...",
+    catalogError: "الأسعار الحالية غير متاحة مؤقتاً.",
+    requestError: "تعذر حفظ طلب الخطة.",
+    requestSaved: "تم حفظ طلب خطتك للمراجعة اليدوية. لم يتم تحصيل أي مبلغ.",
+    requestPlan: "طلب هذه الخطة",
+    saving: "جارٍ الحفظ...",
+    perMonth: "/شهرياً",
+    hostedStorage: "تخزين مستضاف لدى مدار",
+    oneOperator: "مشغّل واحد لمساحة العمل",
+    addonsTitle: "إضافات اختيارية",
+    comingSoon: "قريباً",
+    back: "رجوع",
+    fairUse: "لا تتم محاسبة النماذج أو الردود أو طلبات الحجز حسب العدد. تبقى ضوابط الاستخدام العادل ومكافحة الإساءة والأمان ومعدلات الطلبات سارية.",
+    addressNote: "تشمل خطط المواقع عنواناً قياسياً على madarportal.com/site/business-name. النطاق الفرعي business-name.madarportal.com متاح مقابل 5 دولارات شهرياً.",
+    exclusions: "النطاقات المملوكة للعملاء والبريد التجاري المستضاف غير متاحة حالياً. تحليلات الذكاء الاصطناعي إضافة اختيارية تعتمد على الرموز.",
+    plans: {
+      forms: {
+        name: "النماذج",
+        summary: "للنماذج العامة وإدارة الردود وتحليل البيانات القياسي.",
       },
-      {
-        id: "forms-data",
-        billingPlan: "forms_data",
-        name: "Forms + DA",
-        badge: "Forms and analysis",
-        price: "$10",
-        recommended: false,
-        cta: "Choose Forms + DA",
-        description:
-          "For collecting information and reviewing it without a full website.",
-        bestFor:
-          "Surveys, requests, internal forms, uploaded files, and simple reports.",
-        workflow:
-          "Create forms, collect responses, then clean and review the data in the analysis page.",
-        includes: [
-          "Forms builder",
-          "Responses dashboard",
-          "Data Analysis page",
-          "Workspace access",
-        ],
-        features: [
-          { text: "Create forms and collect answers", included: true },
-          { text: "Review and search responses", included: true },
-          { text: "Use the Data Analysis page", included: true },
-          { text: "Website CMS", included: false },
-          { text: "Reservations", included: false },
-        ],
+      website: {
+        name: "الموقع",
+        summary: "لموقع مرئي مع النماذج ورفع الصور.",
       },
-      {
-        id: "cms-plus",
-        billingPlan: "cms_plus",
-        name: "CMS Plus",
-        badge: "CMS + one module",
-        price: "$20",
-        recommended: true,
-        cta: "Choose CMS Plus",
-        description:
-          "For a website plus one extra workflow: forms or reservations.",
-        bestFor:
-          "Small teams that need a public website with either requests or bookings.",
-        workflow:
-          "Run your website and let visitors submit forms or make reservations.",
-        includes: [
-          "Website builder and CMS",
-          "Choose forms or reservations",
-          "Published pages",
-          "Workspace access",
-        ],
-        features: [
-          { text: "Build and update website pages", included: true },
-          { text: "Use forms with Data Analysis, or use reservations", included: true },
-          { text: "Keep customer activity in one workspace", included: true },
-          { text: "All tools together", included: false },
-        ],
+      business: {
+        name: "الأعمال",
+        summary: "لموقع مع أدوات بيانات موسعة.",
       },
-      {
-        id: "complete",
-        billingPlan: "complete",
-        name: "Complete",
-        badge: "CMS + forms + reservations",
-        price: "$25",
-        recommended: false,
-        cta: "Choose Complete",
-        description:
-          "For teams that need the full setup: website, forms, analysis, and reservations.",
-        bestFor:
-          "Businesses that want one place for their site, customer data, files, and bookings.",
-        workflow:
-          "Run the website, collect forms, review data, manage reservations, and keep files organized.",
-        includes: [
-          "Website builder and CMS",
-          "Forms and Data Analysis",
-          "Reservations",
-          "File saving locally or on the server",
-        ],
-        features: [
-          { text: "Build and update website pages", included: true },
-          { text: "Create forms and analyze responses", included: true },
-          { text: "Manage reservations", included: true },
-          { text: "Save files on your device or keep them on the server", included: true },
-          { text: "Use all main Madar tools together", included: true },
-        ],
+      business_plus: {
+        name: "الأعمال بلس",
+        summary: "للأعمال الخدمية التي تدير الحجوزات والجداول.",
       },
-    ],
-
-    modules: [
-      {
-        id: "cms",
-        name: "Website CMS",
-        shortName: "CMS",
-        description: "Build pages and update website content.",
-      },
-      {
-        id: "forms",
-        name: "Forms + Data Analysis",
-        shortName: "Forms + DA",
-        description: "Collect answers, review responses, and analyze data.",
-      },
-      {
-        id: "reservations",
-        name: "Reservations",
-        shortName: "Reservations",
-        description: "Let customers book or request a time.",
-      },
-    ],
-
-    customPlans: {
-      label: "Plans",
-      title: "Static monthly plans",
-      subtitle:
-        "Madar now uses fixed plans based on the modules you need.",
-      summaryLabel: "Selected plan",
-      summaryTitle: "Fixed package",
-      summaryText:
-        "Choose one of the static monthly plans instead of building a custom package.",
-      estimatedPrice: "Monthly price",
-      selectedModules: "Included modules",
-      noModules: "No modules selected.",
-      requestPlan: "Choose a plan",
-      note: "For special limits or integrations, contact the Madar team.",
-      modules: [],
     },
+    featureLabels: {
+      unlimited_forms_submissions: "نماذج وردود غير محدودة",
+      hosted_public_form_links: "روابط نماذج عامة مستضافة",
+      response_management_overview: "إدارة الردود ونظرة عامة",
+      data_import_standard_analysis: "استيراد البيانات والتحليل القياسي",
+      visual_page_builder: "منشئ صفحات مرئي",
+      one_published_website: "موقع منشور واحد",
+      standard_hosted_address: "عنوان استضافة قياسي",
+      image_uploads_response_management: "رفع الصور وإدارة الردود",
+      everything_website: "كل ما في خطة الموقع",
+      expanded_analytics: "أدوات تحليل موسعة",
+      data_cleaning: "تنظيف البيانات",
+      charts_data_exports: "رسوم بيانية وتصدير البيانات",
+      everything_business: "كل ما في خطة الأعمال",
+      unlimited_reservation_requests: "طلبات حجز غير محدودة",
+      reservation_management_analytics: "إدارة وتحليل الحجوزات",
+      internal_calendar: "تقويم داخلي",
+      priority_support: "تصنيف دعم ذو أولوية",
+    },
+    addons: {},
   },
 };
 

@@ -22,12 +22,13 @@ export const getPageBuilderThemeClassName = ({ mode = "light", preview = false }
 };
 
 export const defaultWebsiteTheme = {
-  background: "#fafaf7",
-  softSurface: "#f7f5ef",
-  surface: "#ffffff",
-  text: "#1b2a4a",
+  background: "#f4f0e8",
+  softSurface: "#f8f4ed",
+  surface: "#fffdfa",
+  headerBackground: "",
+  text: "#000000",
   muted: "#6f7787",
-  primary: "#1b2a4a",
+  primary: "#162033",
   accent: "#852c21",
   accentDark: "#6f241b",
   buttonText: "#ffffff",
@@ -35,12 +36,12 @@ export const defaultWebsiteTheme = {
 };
 
 export const defaultFormTheme = {
-  background: "#ffffff",
-  surface: "#ffffff",
-  inputBackground: "#ffffff",
-  text: "#1b2a4a",
+  background: "#f4f0e8",
+  surface: "#fffdfa",
+  inputBackground: "#f8f4ed",
+  text: "#000000",
   muted: "#6f7787",
-  border: "#d8dde6",
+  border: "#ddd6ca",
   accent: "#852c21",
   buttonText: "#ffffff",
   radius: 8,
@@ -71,6 +72,39 @@ const getSafeWebsiteTheme = (theme = {}) => ({
   ...theme,
 });
 
+export const pageBuilderFontFamilyOptions = [
+  "Inter",
+  "Arial",
+  "Verdana",
+  "Tahoma",
+  "Trebuchet MS",
+  "Georgia",
+  "Times New Roman",
+  "Courier New",
+  "Lobster Two",
+  "EB Garamond",
+  "Cormorant Garamond",
+  "Playfair Display",
+  "Lora",
+  "Montserrat",
+  "Poppins",
+  "Raleway",
+  "Oswald",
+  "Bebas Neue",
+];
+
+export const getThemeFontStack = (fontFamily) => {
+  const selectedFont = String(fontFamily || "Inter").trim() || "Inter";
+  const genericFamily = selectedFont === "Lobster Two"
+    ? "cursive"
+    : ["EB Garamond", "Cormorant Garamond", "Playfair Display", "Lora", "Georgia", "Times New Roman"].includes(selectedFont)
+      ? "serif"
+      : selectedFont === "Courier New"
+        ? "monospace"
+        : "sans-serif";
+  return `${JSON.stringify(selectedFont)}, "IBM Plex Sans Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", ${genericFamily}`;
+};
+
 const getSafeFormTheme = (theme = {}) => ({
   ...defaultFormTheme,
   ...((theme || {}).form || {}),
@@ -82,6 +116,10 @@ export const getWebsiteThemeVars = (theme = {}) => {
     background: resolveThemeColor(safeTheme.background, defaultWebsiteTheme.background),
     softSurface: resolveThemeColor(safeTheme.softSurface, defaultWebsiteTheme.softSurface),
     surface: resolveThemeColor(safeTheme.surface, defaultWebsiteTheme.surface),
+    headerBackground: resolveThemeColor(
+      safeTheme.headerBackground,
+      resolveThemeColor(safeTheme.surface, defaultWebsiteTheme.headerBackground)
+    ),
     text: resolveThemeColor(safeTheme.text, defaultWebsiteTheme.text),
     muted: resolveThemeColor(safeTheme.muted, defaultWebsiteTheme.muted),
     primary: resolveThemeColor(safeTheme.primary, defaultWebsiteTheme.primary),
@@ -100,6 +138,7 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--theme-bg": websiteTheme.background,
     "--theme-bg-soft": websiteTheme.softSurface,
     "--theme-surface": websiteTheme.surface,
+    "--theme-header-background": websiteTheme.headerBackground,
     "--theme-surface-elevated": websiteTheme.softSurface,
     "--theme-surface-2": websiteTheme.softSurface,
     "--theme-surface-3": websiteTheme.softSurface,
@@ -110,6 +149,7 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--theme-text-inverse-rgb": hexToRgb(websiteTheme.buttonText, "255, 255, 255"),
     "--theme-primary": websiteTheme.accent,
     "--theme-primary-hover": websiteTheme.accentDark,
+    "--theme-on-primary": websiteTheme.buttonText,
     "--theme-primary-soft": `rgba(${primaryRgb}, 0.1)`,
     "--theme-primary-rgb": primaryRgb,
     "--theme-border": borderColor,
@@ -122,6 +162,8 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--theme-gradient-hover": websiteTheme.accentDark,
     "--theme-text-gradient": websiteTheme.accent,
     "--theme-shadow-rgb": shadowRgb,
+    "--action-primary": websiteTheme.accent,
+    "--action-primary-hover": websiteTheme.accentDark,
     "--madar-bg": websiteTheme.background,
     "--madar-surface": websiteTheme.surface,
     "--madar-surface-soft": websiteTheme.softSurface,
@@ -138,7 +180,8 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--madar-gradient": websiteTheme.accent,
     "--madar-gradient-hover": websiteTheme.accentDark,
     "--madar-radius": `${safeTheme.radius}px`,
-    fontFamily: safeTheme.fontFamily,
+    "--theme-font-family": getThemeFontStack(safeTheme.fontFamily),
+    fontFamily: getThemeFontStack(safeTheme.fontFamily),
   };
 };
 

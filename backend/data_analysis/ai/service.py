@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
+import re
 
 from data_analysis.ai.code_validator import CodeValidationError, validate_generated_code
 from data_analysis.ai.plan_validator import (
@@ -15,6 +16,7 @@ from data_analysis.ai.predefined_executor import (
     execute_predefined_plan,
 )
 from data_analysis.ai.profile import build_dataframe_profile
+from data_analysis.ai.profile import SENSITIVE_COLUMN_KEYWORDS
 from data_analysis.ai.result_validator import ResultValidationError
 from data_analysis.ai.sandbox import SandboxExecutionError, run_generated_code_locally
 from data_analysis.ai.settings import get_ai_limits_for_plan, is_ai_enabled
@@ -22,6 +24,70 @@ from data_analysis.ai.settings import get_ai_limits_for_plan, is_ai_enabled
 
 class AIAnalysisServiceError(RuntimeError):
     pass
+
+
+STRICT_BLOCKED_REQUEST_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\b(read|open|load|parse|inspect|scan|view|show|print|dump)\b"
+            r".{0,40}\b(file|files|document|documents|csv|excel|xlsx|xls|json|raw upload)\b",
+            re.IGNORECASE,
+        ),
+        "I can analyze approved dataset columns, but I cannot read or expose raw file contents.",
+    ),
+    (
+        re.compile(
+            r"\b(show|print|list|dump|return|give|export|download|copy)\b"
+            r".{0,50}\b(all|every|full|entire|complete|raw)\b"
+            r".{0,50}\b(row|rows|record|records|dataset|dataframe|data|file)\b",
+            re.IGNORECASE,
+        ),
+        "I cannot expose the full dataset or raw rows. Ask for an aggregate statistical summary instead.",
+    ),
+    (
+        re.compile(
+            r"\b(raw data|full data|entire dataset|complete dataset|all rows|every row|"
+            r"all records|every record|data dump|dump the data|export the data|export dataset)\b",
+            re.IGNORECASE,
+        ),
+        "I cannot expose the full dataset or raw rows. Ask for an aggregate statistical summary instead.",
+    ),
+    (
+        re.compile(
+            r"\b(chart|charts|plot|plots|graph|graphs|visual|visualization|image|images|theme|themes)\b",
+            re.IGNORECASE,
+        ),
+        "I only answer statistical calculation questions. I cannot create, read, or explain charts or visual themes.",
+    ),
+    (
+        re.compile(
+            r"\b(ignore|bypass|override|disable)\b.{0,40}\b(policy|policies|rules|safety|guardrail|instructions)\b",
+            re.IGNORECASE,
+        ),
+        "I cannot bypass safety rules or system instructions.",
+    ),
+)
+
+SENSITIVE_REQUEST_TERMS = {
+    str(keyword).strip().lower().replace("_", " ")
+    for keyword in SENSITIVE_COLUMN_KEYWORDS
+    if str(keyword).strip()
+} | {
+    "api key",
+    "access key",
+    "secret key",
+    "private key",
+    "credit card",
+    "debit card",
+    "card number",
+    "identity number",
+    "national id",
+    "full name",
+    "first name",
+    "last name",
+    "phone number",
+    "email address",
+}
 
 
 def run_ai_analysis_on_dataframe(
@@ -33,6 +99,7 @@ def run_ai_analysis_on_dataframe(
     daily_code_generations_used: int | None = None,
     global_daily_messages_used: int | None = None,
     global_daily_code_generations_used: int | None = None,
+    reserve_code_generation: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     if not is_ai_enabled():
         return _error_response(
@@ -48,6 +115,11 @@ def run_ai_analysis_on_dataframe(
 
     if not str(user_message or "").strip():
         return _chat_response("Tell me what you want to analyze.")
+
+    strict_block = _strict_request_block(user_message)
+
+    if strict_block:
+        return strict_block
 
     limits = get_ai_limits_for_plan(user_plan)
 
@@ -83,6 +155,15 @@ def run_ai_analysis_on_dataframe(
         )
 
     try:
+        allowed_columns_error = _validate_allowed_columns_available(
+            df=df,
+            dataset_name=dataset_name,
+            limits=limits,
+        )
+
+        if allowed_columns_error:
+            return allowed_columns_error
+
         full_profile = build_dataframe_profile(
             df=df,
             dataset_name=dataset_name,
@@ -122,6 +203,7 @@ def run_ai_analysis_on_dataframe(
             limits=limits,
             daily_code_generations_used=daily_code_generations_used,
             global_daily_code_generations_used=global_daily_code_generations_used,
+            reserve_code_generation=reserve_code_generation,
         )
 
     except PlanValidationError as exc:
@@ -141,6 +223,75 @@ def run_ai_analysis_on_dataframe(
             code="ai_analysis_failed",
             message="AI analysis failed unexpectedly.",
         )
+
+
+def validate_ai_request_before_provider(
+    *,
+    df: pd.DataFrame,
+    user_message: str,
+    user_plan: str | None = "free",
+    dataset_name: str | None = None,
+) -> dict[str, Any] | None:
+    if not is_ai_enabled():
+        return _error_response(
+            code="ai_disabled",
+            message="AI analysis is currently disabled.",
+        )
+
+    if not isinstance(df, pd.DataFrame):
+        return _error_response(
+            code="invalid_dataframe",
+            message="AI analysis expected a valid dataframe.",
+        )
+
+    if not str(user_message or "").strip():
+        return _chat_response("Tell me what you want to analyze.")
+
+    strict_block = _strict_request_block(user_message)
+
+    if strict_block:
+        return strict_block
+
+    limits = get_ai_limits_for_plan(user_plan)
+
+    if len(df) > limits.max_rows:
+        return _error_response(
+            code="row_limit_exceeded",
+            message=(
+                f"This dataset has {len(df)} rows. "
+                f"Your current plan allows up to {limits.max_rows} rows for AI analysis."
+            ),
+        )
+
+    return _validate_allowed_columns_available(
+        df=df,
+        dataset_name=dataset_name,
+        limits=limits,
+    )
+
+
+def _validate_allowed_columns_available(
+    *,
+    df: pd.DataFrame,
+    dataset_name: str | None,
+    limits: Any,
+) -> dict[str, Any] | None:
+    full_profile = build_dataframe_profile(
+        df=df,
+        dataset_name=dataset_name,
+        max_columns=limits.max_profile_columns,
+        max_sample_rows=3,
+        max_sample_values=5,
+        max_top_values=5,
+    )
+
+    if not _get_non_sensitive_columns(full_profile):
+        return _error_response(
+            code="no_allowed_columns",
+            message="No safe columns are available for AI analysis.",
+        )
+
+    return None
 
 
 def build_compact_profile(full_profile: dict[str, Any]) -> dict[str, Any]:
@@ -175,6 +326,57 @@ def build_compact_profile(full_profile: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _strict_request_block(user_message: str) -> dict[str, Any] | None:
+    message = str(user_message or "").strip()
+
+    if not message:
+        return None
+
+    normalized = _normalize_request_text(message)
+
+    if _asks_to_reveal_sensitive_values(normalized):
+        return _blocked_response(
+            "I cannot reveal sensitive or identifying values. Ask for aggregated, anonymized analysis instead."
+        )
+
+    for pattern, reason in STRICT_BLOCKED_REQUEST_PATTERNS:
+        if pattern.search(message):
+            return _blocked_response(reason)
+
+    return None
+
+
+def _normalize_request_text(value: str) -> str:
+    return re.sub(r"\s+", " ", str(value or "").replace("_", " ").lower()).strip()
+
+
+def _asks_to_reveal_sensitive_values(normalized_message: str) -> bool:
+    reveal_verbs = {
+        "show",
+        "list",
+        "print",
+        "give",
+        "return",
+        "display",
+        "export",
+        "download",
+        "extract",
+        "reveal",
+        "find",
+        "lookup",
+        "search",
+    }
+
+    if not any(re.search(rf"\b{re.escape(verb)}\b", normalized_message) for verb in reveal_verbs):
+        return False
+
+    return any(
+        re.search(rf"\b{re.escape(term)}\b", normalized_message)
+        for term in SENSITIVE_REQUEST_TERMS
+        if len(term) >= 2
+    )
+
+
 def _execute_normalized_plan(
     df: pd.DataFrame,
     normalized_plan: dict[str, Any],
@@ -183,6 +385,7 @@ def _execute_normalized_plan(
     limits: Any,
     daily_code_generations_used: int,
     global_daily_code_generations_used: int,
+    reserve_code_generation: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     intent = normalized_plan.get("intent")
 
@@ -229,6 +432,12 @@ def _execute_normalized_plan(
 
         if code_limit_error:
             return code_limit_error
+
+        if reserve_code_generation is not None and not reserve_code_generation():
+            return _error_response(
+                code="daily_code_generation_limit_reached",
+                message="You reached today’s advanced AI analysis limit. You can still use basic predefined analysis.",
+            )
 
         return _run_generated_code_mode(
             df=df,
@@ -460,7 +669,7 @@ def _success_response(
         "success": True,
         "type": "analysis_result",
         "mode": mode,
-        "result": result,
+        "result": _remove_chart_outputs(result),
         "plan": plan,
     }
 
@@ -468,6 +677,15 @@ def _success_response(
         response["generated_code"] = generated_code
 
     return response
+
+
+def _remove_chart_outputs(result: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        return result
+
+    cleaned = dict(result)
+    cleaned["charts"] = []
+    return cleaned
 
 
 def _chat_response(reply: str) -> dict[str, Any]:

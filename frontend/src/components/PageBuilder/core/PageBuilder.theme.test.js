@@ -1,48 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { defaultFormTheme, getPageBuilderThemeVars } from "./PageBuilder.theme";
 
-describe("getPageBuilderThemeVars form colors", () => {
-  it("keeps form defaults separate from website colors", () => {
-    const vars = getPageBuilderThemeVars({
-      background: "#123456",
-      surface: "#234567",
-      text: "#345678",
-      muted: "#456789",
-      accent: "#567890",
-      buttonText: "#678901",
-      form: {},
-    });
+import { getPageBuilderThemeVars } from "./PageBuilder.theme";
 
-    expect(vars["--theme-bg"]).toBe("#123456");
-    expect(vars["--form-theme-bg"]).toBe(defaultFormTheme.background);
-    expect(vars["--form-theme-surface"]).toBe(defaultFormTheme.surface);
-    expect(vars["--form-theme-input"]).toBe(defaultFormTheme.inputBackground);
-    expect(vars["--form-theme-text"]).toBe(defaultFormTheme.text);
-    expect(vars["--form-theme-accent"]).toBe(defaultFormTheme.accent);
+describe("Page Builder typography theme", () => {
+  it("exposes the selected font as both an inherited style and shared runtime token", () => {
+    const variables = getPageBuilderThemeVars({ fontFamily: "Times New Roman" });
+
+    expect(variables.fontFamily).toContain('"Times New Roman"');
+    expect(variables.fontFamily).toContain("system-ui");
+    expect(variables["--theme-font-family"]).toBe(variables.fontFamily);
   });
 
-  it("uses explicit form colors when they are set", () => {
-    const vars = getPageBuilderThemeVars({
-      background: "#123456",
-      form: {
-        background: "#abcdef",
-        surface: "#fedcba",
-        inputBackground: "#102030",
-        text: "#203040",
-        muted: "#304050",
-        border: "#405060",
-        accent: "#506070",
-        buttonText: "#607080",
-      },
+  it("uses the same Inter fallback when no font is configured", () => {
+    const variables = getPageBuilderThemeVars({});
+
+    expect(variables.fontFamily).toContain('"Inter"');
+    expect(variables.fontFamily).toContain('"IBM Plex Sans Arabic"');
+    expect(variables["--theme-font-family"]).toBe(variables.fontFamily);
+    expect(variables["--theme-text"]).toBe("#000000");
+  });
+
+  it("isolates site action colors from the surrounding application theme", () => {
+    const variables = getPageBuilderThemeVars({
+      accent: "#2f7a58",
+      accentDark: "#245e49",
+      buttonText: "#ffe1e1",
     });
 
-    expect(vars["--form-theme-bg"]).toBe("#abcdef");
-    expect(vars["--form-theme-surface"]).toBe("#fedcba");
-    expect(vars["--form-theme-input"]).toBe("#102030");
-    expect(vars["--form-theme-text"]).toBe("#203040");
-    expect(vars["--form-theme-muted"]).toBe("#304050");
-    expect(vars["--form-theme-border"]).toBe("#405060");
-    expect(vars["--form-theme-accent"]).toBe("#506070");
-    expect(vars["--form-theme-button-text"]).toBe("#607080");
+    expect(variables["--action-primary"]).toBe("#2f7a58");
+    expect(variables["--action-primary-hover"]).toBe("#245e49");
+    expect(variables["--theme-on-primary"]).toBe("#ffe1e1");
+    expect(variables["--theme-text-inverse"]).toBe("#ffe1e1");
+  });
+
+  it("exposes a dedicated header background color with a safe default", () => {
+    expect(getPageBuilderThemeVars({ headerBackground: "#123456" })["--theme-header-background"])
+      .toBe("#123456");
+    expect(getPageBuilderThemeVars({ surface: "#abcdef", headerBackground: "" })["--theme-header-background"])
+      .toBe("#abcdef");
   });
 });
