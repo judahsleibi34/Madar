@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createReservationPalettePlacement,
   findReservationBlockElement,
+  getReservationPaletteItems,
   resolveReservationBlockElement,
   resolveReservationBlockValue,
 } from "./PageBuilder.reservations";
@@ -56,6 +58,44 @@ describe("reservation block source resolution", () => {
     expect(resolveReservationBlockValue(stalePlacement, pages)).toEqual(source.reservation);
   });
 
+  it("creates exact palette entries from configured reservation definitions", () => {
+    expect(getReservationPaletteItems([
+      { element: source },
+      {
+        element: {
+          id: "request-source",
+          type: "reservationBlock",
+          name: "Discovery call",
+          reservation: { bookingMode: "flexible" },
+        },
+      },
+    ])).toEqual([
+      {
+        id: source.id,
+        label: source.reservation.title,
+        mode: "restricted",
+        type: "reservationFixedSlots",
+        helper: "Fixed slots",
+      },
+      {
+        id: "request-source",
+        label: "Discovery call",
+        mode: "flexible",
+        type: "reservationRequest",
+        helper: "Date request",
+      },
+    ]);
+  });
+  it("creates a linked placement for the exact selected saved build", () => {
+    expect(createReservationPalettePlacement([{ element: source }], source.id)).toEqual({
+      type: "reservationFixedSlots",
+      overrides: expect.objectContaining({
+        connectedReservationBlockId: source.id,
+        reservationPlacementType: "restricted",
+        reservation: source.reservation,
+      }),
+    });
+  });
   it("keeps local data when the selected source no longer exists", () => {
     expect(resolveReservationBlockValue(stalePlacement, [])).toEqual(
       stalePlacement.reservation

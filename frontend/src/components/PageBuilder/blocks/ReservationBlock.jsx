@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getReservationContent } from "../../../content/pageBuilder";
 import { createReservationIdempotencyKey } from "../runtime/reservationSubmission";
 import FixedSlotPicker from "./FixedSlotPicker";
+import ReservationFormItems from "./ReservationFormItems";
+import { normalizeReservationFormItems, reservationFormItemNeedsAnswer } from "./reservationForm";
 import "./ReservationBlock.css";
 
 const reservationDefaults = getReservationContent("en");
@@ -34,9 +36,11 @@ export default function ReservationBlock({
   description = reservationDefaults.description,
   services,
   fields,
+  formItems,
   bookingMode = "flexible",
   availableDates = [],
   timeSlots = [],
+  timeSlotsByDate,
   disabled = false,
   submitLabel = reservationDefaults.submitLabel,
   lang = "en",
@@ -46,6 +50,10 @@ export default function ReservationBlock({
   const fieldMeta = content.fieldMeta;
   const serviceOptions = useMemo(() => normalizeServices(services), [services]);
   const isFixedSlots = bookingMode !== "flexible";
+  const normalizedFormItems = useMemo(() => normalizeReservationFormItems(formItems), [formItems]);
+  const hasCustomSubmit = normalizedFormItems.some((item) => item.type === "button");
+  const hasCustomComposition = normalizedFormItems.length > 0;
+  const hasAvailabilityComponent = normalizedFormItems.some((item) => item.type === "availability");
   const enabledFields = useMemo(
     () => Array.isArray(fields)
       ? fields
@@ -56,6 +64,7 @@ export default function ReservationBlock({
   const hasScheduleFields = ["date", "time"].some((key) => enabledFields.includes(key));
   const [values, setValues] = useState(() => initialValues(serviceOptions[0]));
   const [errors, setErrors] = useState({});
+  const [customAnswers, setCustomAnswers] = useState({});
   const [idempotencyKey, setIdempotencyKey] = useState(createReservationIdempotencyKey);
   const [honeypot, setHoneypot] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,6 +86,15 @@ export default function ReservationBlock({
     });
   };
 
+  const updateCustomAnswer = (itemId, value) => {
+    setCustomAnswers((prev) => ({ ...prev, [itemId]: value }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  };
+
   const selectFixedSlot = (date, time) => {
     setValues((prev) => ({ ...prev, date, time }));
     setErrors((prev) => {
@@ -91,15 +109,23 @@ export default function ReservationBlock({
     event.preventDefault();
 
     const nextErrors = {};
-    (isFixedSlots
-      ? ["name", "email", "phone", "date", "time"]
-      : requiredFields.filter((key) => enabledFields.includes(key)))
+    (hasCustomComposition
+      ? (hasAvailabilityComponent ? ["date", "time"] : [])
+      : isFixedSlots
+        ? ["name", "email", "phone", "date", "time"]
+        : requiredFields.filter((key) => enabledFields.includes(key)))
       .filter((key) => key !== "service" || serviceOptions.length > 0)
       .forEach((key) => {
         if (!String(values[key] || "").trim()) {
           nextErrors[key] = content.required;
         }
       });
+
+    normalizedFormItems.forEach((item) => {
+      if (reservationFormItemNeedsAnswer(item, customAnswers[item.id])) {
+        nextErrors[item.id] = content.required;
+      }
+    });
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -111,6 +137,7 @@ export default function ReservationBlock({
         ...values,
         ...(isFixedSlots ? { contact: values.phone } : {}),
         guests: Number(values.guests) || 1,
+        ...(normalizedFormItems.length > 0 ? { customAnswers } : {}),
       }, idempotencyKey, honeypot, Math.min(
         86_400_000,
         Math.max(0, Date.now() - submissionStartedAtRef.current)
@@ -122,6 +149,7 @@ export default function ReservationBlock({
         setIdempotencyKey(createReservationIdempotencyKey());
       } else if (submitted !== false) {
         setValues(initialValues(serviceOptions[0]));
+        setCustomAnswers({});
         setIdempotencyKey(createReservationIdempotencyKey());
         setHoneypot("");
         submissionStartedAtRef.current = Date.now();
@@ -196,7 +224,7 @@ export default function ReservationBlock({
   };
 
   return (
-    <form className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"}`} onSubmit={submitReservation}>
+    <form className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"} ${hasCustomComposition ? "has-custom-composition" : ""}`} onSubmit={submitReservation}>
       <label className="runtime-honeypot" aria-hidden="true">
         Website
         <input
@@ -208,19 +236,22 @@ export default function ReservationBlock({
           onChange={(event) => setHoneypot(event.target.value)}
         />
       </label>
-      <div className="reservation-block-header">
-        <div>
+      {!hasCustomComposition && (
+        <div className="reservation-block-header">
+          <div>
           {isFixedSlots && <span>Book an appointment</span>}
           <h3>{title}</h3>
           <p>{description}</p>
         </div>
 
-      </div>
+        </div>
+      )}
 
-      {isFixedSlots && (
+      {isFixedSlots && !hasCustomComposition && !hasAvailabilityComponent && (
         <FixedSlotPicker
           dates={availableDates}
           times={timeSlots}
+          timesByDate={timeSlotsByDate}
           selectedDate={values.date}
           selectedTime={values.time}
           disabled={submissionDisabled}
@@ -230,7 +261,7 @@ export default function ReservationBlock({
         />
       )}
 
-      {isFixedSlots ? (
+      {!hasCustomComposition && (isFixedSlots ? (
         <div className="reservation-grid fixed-slot-contact-grid">
           <label className={`reservation-field reservation-field-name ${errors.name ? "has-error" : ""}`}>
             Full name *
@@ -302,15 +333,36 @@ export default function ReservationBlock({
             </section>
           )}
         </div>
+      ))}
+
+      {normalizedFormItems.length > 0 && (
+        <ReservationFormItems
+          items={normalizedFormItems}
+          answers={customAnswers}
+          errors={errors}
+          disabled={submissionDisabled}
+          availableDates={availableDates}
+          timeSlots={timeSlots}
+          timeSlotsByDate={timeSlotsByDate}
+          selectedDate={values.date}
+          selectedTime={values.time}
+          slotError={errors.date || errors.time || ""}
+          lang={lang}
+          onSelectSlot={selectFixedSlot}
+          onChange={updateCustomAnswer}
+        />
       )}
 
-      <div className="reservation-footer">
-        <button type="submit" className="reservation-submit" disabled={submissionDisabled}>
-          {submitLabel}
-        </button>
-
-        {disabled && <p className="reservation-helper">{content.disabledHelper}</p>}
-      </div>
+      {!hasCustomComposition && (
+        <div className="reservation-footer">
+          {!hasCustomSubmit && (
+            <button type="submit" className="reservation-submit" disabled={submissionDisabled}>
+              {submitLabel}
+            </button>
+          )}
+          {disabled && <p className="reservation-helper">{content.disabledHelper}</p>}
+        </div>
+      )}
     </form>
   );
 }

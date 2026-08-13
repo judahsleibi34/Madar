@@ -156,13 +156,14 @@ PRODUCTS: dict[str, dict[str, Any]] = {
         2 * GIB,
         _WEBSITE_CAPABILITIES,
         20,
-        "A visual website builder with one standard Madar-hosted address.",
+        "A visual website builder with forms, reservations, and one standard Madar-hosted address.",
         (
             "visual_page_builder",
             "one_published_website",
             "standard_hosted_address",
             "unlimited_forms_submissions",
             "image_uploads_response_management",
+            "reservation_system",
         ),
     ),
     "business": _plan(
@@ -178,6 +179,8 @@ PRODUCTS: dict[str, dict[str, Any]] = {
             "expanded_analytics",
             "data_cleaning",
             "charts_data_exports",
+            "reservation_system",
+            "cv_reranker",
         ),
     ),
     "business_plus": _plan(

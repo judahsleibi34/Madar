@@ -768,3 +768,59 @@ class BuilderBackendHardeningTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ReservationFormPublishValidationTests(unittest.TestCase):
+    def test_accepts_supported_reservation_form_items(self):
+        reservation = {
+            "formItems": [
+                {"id": "intro", "type": "heading", "text": "Tell us more"},
+                {"id": "topics", "type": "checkbox", "label": "Topics", "options": ["Design", "Build"], "required": True},
+                {"id": "submit", "type": "button", "label": "Book now"},
+            ]
+        }
+
+        builder_routes.validate_reservation_form_items(reservation)
+
+    def test_validates_reservation_typography_and_direction(self):
+        builder_routes.validate_reservation_form_items({
+            "formItems": [{
+                "id": "intro",
+                "type": "heading",
+                "text": "احجز موعدك",
+                "direction": "rtl",
+                "textStyle": {
+                    "format": "h2",
+                    "fontFamily": "IBM Plex Sans Arabic",
+                    "fontSize": 28,
+                    "opacity": 0.8,
+                    "fontWeight": "700",
+                    "fontStyle": "normal",
+                    "textDecoration": "none",
+                    "textAlign": "right",
+                    "color": "#123456",
+                },
+            }],
+        })
+
+        invalid_items = [
+            {"id": "direction", "type": "text", "label": "Name", "direction": "sideways"},
+            {"id": "size", "type": "heading", "text": "Huge", "textStyle": {"fontSize": 999}},
+            {"id": "color", "type": "paragraph", "text": "Unsafe", "textStyle": {"color": "url(javascript:alert(1))"}},
+        ]
+        for item in invalid_items:
+            with self.subTest(item=item), self.assertRaises(HTTPException):
+                builder_routes.validate_reservation_form_items({"formItems": [item]})
+    def test_rejects_unsupported_and_duplicate_reservation_controls(self):
+        invalid_forms = [
+            {"formItems": [{"id": "unsafe", "type": "html", "text": "Unsafe"}]},
+            {"formItems": [
+                {"id": "one", "type": "button", "label": "One"},
+                {"id": "two", "type": "button", "label": "Two"},
+            ]},
+            {"formItems": [{"id": "choice", "type": "radio", "label": "Choice", "options": ["Same", "Same"]}]},
+        ]
+
+        for reservation in invalid_forms:
+            with self.subTest(reservation=reservation), self.assertRaises(HTTPException) as raised:
+                builder_routes.validate_reservation_form_items(reservation)
+            self.assertEqual(raised.exception.detail["code"], "publish_validation_failed")

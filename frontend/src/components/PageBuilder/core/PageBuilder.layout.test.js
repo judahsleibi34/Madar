@@ -219,9 +219,13 @@ describe("page builder element layers", () => {
 describe("page builder scaled canvas coordinates", () => {
   it("allows reservation components to resize on both axes", () => {
     expect(getDirectElementMinimumSize({ type: "reservationBlock" })).toEqual({
-      width: 320,
+      width: 280,
       height: 320,
     });
+    expect(getDirectElementMinimumSize({
+      type: "reservationBlock",
+      reservation: { formItems: [{ id: "heading", type: "heading" }] },
+    })).toEqual({ width: 280, height: 48 });
   });
 
   it("preserves a resized form width while expanding it to fit its content", () => {

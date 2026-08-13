@@ -91,15 +91,6 @@ import {
   getArtboardLogicalWidth,
   getEditorCameraStageWidth,
 } from "../core/PageBuilder.artboard";
-import {
-  isSmartResponsiveProject,
-  withAutoResponsiveOverride,
-} from "../core/PageBuilder.responsiveCapabilities";
-import {
-  compareLegacyPageWithSmartShadow,
-  getSmartProjectLayoutDiagnostics,
-  resolvePageResponsiveLayout,
-} from "../core/PageBuilder.responsiveLayout";
 import ButtonColorControls from "./ButtonColorControls";
 import PageBuilderPageInspector from "./PageBuilderPageInspector";
 import {
@@ -349,6 +340,8 @@ import {
 import { getElementHeadingTag, getHeadingLevelFromFormat } from "../core/PageBuilder.heading";
 import {
   resolveReservationBlockValue,
+  createReservationPalettePlacement,
+  getReservationPaletteItems,
 } from "../core/PageBuilder.reservations";
 import {
   createSiteChromeRenderers,
@@ -751,7 +744,6 @@ export default function PageBuilder({
   const [designPanel, setDesignPanelState] = useState(routeDesignPanel || "Pages");
   const [viewport, setViewport] = useState("desktop");
   const [preview, setPreview] = useState(false);
-  const [legacyShadowEnabled, setLegacyShadowEnabled] = useState(false);
   const [editorViewportWidth, setEditorViewportWidth] = useState(0);
   const [manualEditorZoom, setManualEditorZoom] = useState(1);
   const logicalArtboardWidth = getArtboardLogicalWidth(viewport);
@@ -1469,44 +1461,6 @@ export default function PageBuilder({
     () => resolveInspectorPage(project),
     [project]
   );
-  const smartResponsiveEnabled = isSmartResponsiveProject(project);
-  const activeSmartDiagnostics = useMemo(
-    () => {
-      if (!smartResponsiveEnabled || !activePage) return [];
-      const resolved = resolvePageResponsiveLayout({
-        project,
-        page: activePage,
-        viewportMode: viewport,
-        layoutWidth: logicalArtboardWidth,
-      });
-      return (resolved?.diagnostics || []).map((diagnostic) => ({
-        ...diagnostic,
-        pageId: activePage.id,
-        layoutWidth: logicalArtboardWidth,
-        viewportMode: viewport,
-      }));
-    },
-    [activePage, logicalArtboardWidth, project, smartResponsiveEnabled, viewport]
-  );
-  const legacyShadowComparison = useMemo(
-    () => legacyShadowEnabled && !smartResponsiveEnabled
-      ? compareLegacyPageWithSmartShadow({
-          project,
-          page: activePage,
-          viewportMode: viewport,
-          layoutWidth: logicalArtboardWidth,
-        })
-      : null,
-    [
-      activePage,
-      legacyShadowEnabled,
-      logicalArtboardWidth,
-      project,
-      smartResponsiveEnabled,
-      viewport,
-    ]
-  );
-
   const activeForm = useMemo(
     () =>
       safeProjectForms.find((form) => form.id === project.activeFormId) ||
@@ -1754,11 +1708,16 @@ export default function PageBuilder({
     [reservationBlocks]
   );
 
+  const reservationPaletteItems = useMemo(
+    () => getReservationPaletteItems(reservationDefinitions),
+    [reservationDefinitions]
+  );
+
   const reservationFormOptions = useMemo(
     () =>
       reservationDefinitions.map((block, index) => {
         const reservation = block.element.reservation || {};
-        const title = reservation.title || block.element.name || `Reservation ${index + 1}`;
+        const title = block.element.name || reservation.title || `Reservation ${index + 1}`;
         const mode = reservation.bookingMode === "flexible" ? "flexible" : "restricted";
         const modeLabel = mode === "flexible" ? "Date request" : "Fixed slots";
 
@@ -1774,6 +1733,10 @@ export default function PageBuilder({
   const getReservationBlockValue = useCallback(
     (element) => resolveReservationBlockValue(element, project.pages),
     [project.pages]
+  );
+  const getReservationPalettePlacement = useCallback(
+    (definitionId) => createReservationPalettePlacement(reservationDefinitions, definitionId),
+    [reservationDefinitions]
   );
 
   const selectedRole = useMemo(() => {
@@ -2161,7 +2124,7 @@ export default function PageBuilder({
         : null;
       const height = elementType === "formBlock"
         ? estimateFormBlockHeight(connectedForm, viewportName)
-        : directElementHeight(element);
+        : directElementHeight({ ...element, ...resolvedOverrides });
 
       const requestedPosition = {
         ...base,
@@ -2227,10 +2190,13 @@ export default function PageBuilder({
     return nextElement;
   };
 
-  const handlePaletteDragStart = (event, type) => {
+  const handlePaletteDragStart = (event, type, reservationDefinitionId = "") => {
     event.dataTransfer.effectAllowed = "copy";
     event.dataTransfer.setData("application/x-madar-component", type);
     event.dataTransfer.setData("text/plain", type);
+    if (reservationDefinitionId) {
+      event.dataTransfer.setData("application/x-madar-reservation-definition", reservationDefinitionId);
+    }
   };
 
   const getVisibleCanvasInsertPoint = (sectionId = "") => {
@@ -2265,7 +2231,12 @@ export default function PageBuilder({
     const type =
       event.dataTransfer.getData("application/x-madar-component") ||
       event.dataTransfer.getData("text/plain");
-    if (!elementTypes.some((item) => item.id === type)) return;
+    const reservationDefinitionId = event.dataTransfer.getData("application/x-madar-reservation-definition");
+    const reservationPlacement = reservationDefinitionId
+      ? getReservationPalettePlacement(reservationDefinitionId)
+      : null;
+    if (reservationDefinitionId && !reservationPlacement) return;
+    if (!elementTypes.some((item) => item.id === (reservationPlacement?.type || type))) return;
 
     const localPoint = clientPointToCanvasLocal(
       event.currentTarget,
@@ -2273,7 +2244,12 @@ export default function PageBuilder({
       event.clientY,
       { coordinateScale: 1 }
     );
-    addComponentToSection(type, section.id, localPoint);
+    addComponentToSection(
+      reservationPlacement?.type || type,
+      section.id,
+      localPoint,
+      reservationPlacement?.overrides || {}
+    );
   };
 
   const updateSelectedElement = useCallback((updates) => {
@@ -2313,49 +2289,6 @@ export default function PageBuilder({
     );
   }, [selectedElement, updateSections]);
 
-  const applyResponsiveDiagnosticAction = useCallback((diagnostic, action) => {
-    const elementId = diagnostic?.elementIds?.[0];
-    if (!elementId) return;
-    if (action === "move_element") {
-      setSelected({ type: "element", id: elementId });
-      window.requestAnimationFrame(() => {
-        findBuilderDataElement(document, "data-element-id", elementId)?.scrollIntoView?.({
-          block: "center",
-          inline: "center",
-        });
-      });
-      showToast("Element selected. Drag it to resolve the collision.");
-      return;
-    }
-    updateSections((sections) => sections.map((section) => {
-      if (!["direct", "free"].includes(section.mode)) return section;
-      let changed = false;
-      const freeElements = (section.freeElements || []).map((element) => {
-        if (element.id !== elementId) return element;
-        changed = true;
-        if (action === "reset_to_auto") {
-          return withAutoResponsiveOverride(element, diagnostic.viewportMode || viewport);
-        }
-        const collisionPolicy = action === "mark_background" ? "background" : "overlay";
-        return {
-          ...element,
-          responsive: {
-            ...(element.responsive || {}),
-            capabilities: {
-              ...(element.responsive?.capabilities || {}),
-              collisionPolicy,
-            },
-          },
-        };
-      });
-      return changed ? { ...section, freeElements } : section;
-    }));
-    showToast(action === "reset_to_auto"
-      ? "Responsive geometry reset to Auto."
-      : action === "mark_background"
-        ? "Element marked as an intentional background."
-        : "Element marked as an intentional overlay.");
-  }, [showToast, updateSections, viewport]);
 
   const setSelectedImageBehindText = useCallback((behindText) => {
     if (!selectedElement || selectedElement.type !== "image") return;
@@ -2479,56 +2412,7 @@ export default function PageBuilder({
     setSelected({ type: "element", id: elementId });
   };
 
-  const resizeReservationBlockForEditing = (elementId) => {
-    updateProject((prev) => ({
-      ...prev,
-      pages: prev.pages.map((page) => ({
-        ...page,
-        sections: page.sections.map((section) => {
-          const resizeElement = (element) => {
-            if (element.id !== elementId || element.type !== "reservationBlock") return element;
-
-            const nextPosition = {};
-            ["desktop", "tablet", "mobile"].forEach((viewportName) => {
-              const base = element.position?.[viewportName] || createPosition()[viewportName];
-              const canvasWidth = viewports[viewportName] || viewports.desktop;
-              const targetWidth = viewportName === "mobile" ? 360 : 760;
-              const targetHeight = 770;
-
-              nextPosition[viewportName] = {
-                ...base,
-                width: Math.min(Math.max(Number(base.width) || targetWidth, targetWidth), canvasWidth - 24),
-                height: Math.max(Number(base.height) || targetHeight, targetHeight),
-              };
-            });
-
-            return { ...element, position: { ...(element.position || {}), ...nextPosition } };
-          };
-
-          if (section.mode === "direct") {
-            return {
-              ...section,
-              freeElements: (section.freeElements || []).map(resizeElement),
-            };
-          }
-
-          return {
-            ...section,
-            rows: (section.rows || []).map((row) => ({
-              ...row,
-              columns: (row.columns || []).map((column) => ({
-                ...column,
-                elements: (column.elements || []).map(resizeElement),
-              })),
-            })),
-          };
-        }),
-      })),
-    }));
-  };
-
   const openReservationBlockOnPage = (elementId, pageId) => {
-    resizeReservationBlockForEditing(elementId);
     selectReservationBlock(elementId, pageId);
     setActiveTab("design");
     setDesignPanel("Sections");
@@ -3951,19 +3835,7 @@ export default function PageBuilder({
       return false;
     }
 
-    const overlapWarnings = isSmartResponsiveProject(publishedProject)
-      ? []
-      : getProjectOverlapWarnings(publishedProject);
-
-    if (isSmartResponsiveProject(publishedProject)) {
-      const blockingDiagnostics = getSmartProjectLayoutDiagnostics(publishedProject).filter((diagnostic) =>
-        ["unresolved_manual_collision", "manual_out_of_bounds", "collision_iteration_limit"].includes(diagnostic.code)
-      );
-      if (blockingDiagnostics.length > 0) {
-        showToast("Smart responsive layout has unresolved manual collisions or out-of-bounds components. Reset or reposition them before publishing.");
-        return false;
-      }
-    }
+    const overlapWarnings = getProjectOverlapWarnings(publishedProject);
 
     if (!skipOverlapCheck && overlapWarnings.length > 0) {
       setPublishOverlapWarnings(overlapWarnings);
@@ -4235,7 +4107,7 @@ export default function PageBuilder({
       dragState?.previewPositions?.[element.id] ||
       (dragState?.elementId === element.id ? dragState.previewPosition : null);
     if (previewPosition) return previewPosition;
-    return smartResponsiveEnabled ? null : getArtboardElementPosition(element, viewport);
+    return getArtboardElementPosition(element, viewport);
   };
 
 
@@ -5531,7 +5403,6 @@ export default function PageBuilder({
         previewPositions: finalPreview.previewPositions,
         previewSectionHeight: finalPreview.previewSectionHeight,
         viewportName: viewport,
-        smartResponsive: smartResponsiveEnabled,
       }));
       showToast(`Moved ${groupElementIds.length} components together.`);
     } else if (targetFrame && targetSection && sourceLocation && sourceLocation.sectionId !== targetSection.id) {
@@ -5563,7 +5434,6 @@ export default function PageBuilder({
         sourceSectionId: sourceLocation.sectionId,
         targetSectionId: targetSection.id,
         viewportName: viewport,
-        smartResponsive: smartResponsiveEnabled,
       }));
       showToast(`Moved ${selectedElement.name || "component"} to ${targetSection.name || "section"}.`);
     } else if (sourceLocation && finalPreview.previewPosition) {
@@ -5573,13 +5443,12 @@ export default function PageBuilder({
         previewSectionHeight: finalPreview.previewSectionHeight,
         sourceSectionId: sourceLocation.sectionId,
         viewportName: viewport,
-        smartResponsive: smartResponsiveEnabled,
         elementUpdates:
           dragState.interaction === "resize"
             ? selectedElement.type === "heading"
               ? { directWidthMode: "fixed" }
               : selectedElement.type === "reservationBlock"
-                ? { directSizeMode: "fixed" }
+                ? { directSizeMode: "auto" }
                 : null
             : null,
       }));
@@ -6155,7 +6024,33 @@ export default function PageBuilder({
                 {elementGroups.map((group) => (
                   <div className="add-group" key={group}>
                     <span>{group}</span>
-                    {elementTypes
+                    {group === "Bookings" ? (
+                      reservationPaletteItems.length > 0 ? reservationPaletteItems.map((item) => (
+                        <button
+                          type="button"
+                          draggable
+                          className="saved-reservation-palette-item"
+                          key={`reservation_${item.id}`}
+                          onDragStart={(event) => handlePaletteDragStart(event, item.type, item.id)}
+                          onClick={() => {
+                            const targetSectionId = selectedSection?.id || "";
+                            const placement = getReservationPalettePlacement(item.id);
+                            if (!placement) return;
+                            addComponentToSection(
+                              placement.type,
+                              targetSectionId,
+                              getVisibleCanvasInsertPoint(targetSectionId),
+                              placement.overrides
+                            );
+                          }}
+                        >
+                          <strong>{item.label}</strong>
+                          <small>{item.helper} · Drag into a section</small>
+                        </button>
+                      )) : (
+                        <p className="builder-palette-empty">Create a reservation in the Reservations workspace first.</p>
+                      )
+                    ) : elementTypes
                       .filter((item) => item.group === group)
                       .map((item) => (
                         <button
@@ -6216,17 +6111,6 @@ export default function PageBuilder({
           viewportMode={viewport}
           presentationZoom={canvasScale}
           availablePresentationWidth={editorViewportWidth}
-          responsiveLayoutWidth={logicalArtboardWidth}
-          responsiveChangedElementIds={smartResponsiveEnabled && dragState
-            ? dragState.groupElementIds || [dragState.elementId]
-            : []}
-          responsiveTransientRectsBySection={smartResponsiveEnabled && dragState?.parentSectionId
-            ? {
-                [dragState.parentSectionId]: dragState.previewPositions || (
-                  dragState.previewPosition ? { [dragState.elementId]: dragState.previewPosition } : {}
-                ),
-              }
-            : {}}
           renderElement={renderElement}
           renderSiteHeader={renderSiteHeader}
           renderSiteFooter={renderSiteFooter}
@@ -6416,43 +6300,6 @@ export default function PageBuilder({
         </div>
       )}
 
-      {smartResponsiveEnabled && activeSmartDiagnostics.some(
-        (diagnostic) => diagnostic.code === "unresolved_manual_collision"
-      ) && (
-        <div className="inspector-group responsive-layout-control">
-          <h3>Responsive issues</h3>
-          {activeSmartDiagnostics
-          .filter((diagnostic) => diagnostic.code === "unresolved_manual_collision")
-          .map((diagnostic) => (
-            <div
-              className="responsive-collision-diagnostic"
-              key={`${diagnostic.sectionId}:${diagnostic.elementIds.join(":")}:${diagnostic.layoutWidth}`}
-              role="alert"
-            >
-              <strong>Manual collision</strong>
-              <p className="builder-note">
-                {diagnostic.elementIds.join(" and ")} conflict at {diagnostic.layoutWidth}px.
-                Publishing remains blocked until this is resolved.
-              </p>
-              <div className="layer-selection-actions">
-                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "move_element")}>
-                  Move element
-                </button>
-                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "reset_to_auto")}>
-                  Reset to Auto
-                </button>
-                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "mark_intentional_overlay")}>
-                  Mark overlay
-                </button>
-                <button type="button" onClick={() => applyResponsiveDiagnosticAction(diagnostic, "mark_background")}>
-                  Mark background
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {inspectorMode === "page" && activePage && (
         <PageBuilderPageInspector
           page={activePage}
@@ -6555,26 +6402,6 @@ export default function PageBuilder({
       {inspectorMode === "element" && selectedElement && (
         <div className="inspector-group">
           <h3>{selectedElement.type === "reservationBlock" ? "Reservation" : "Element"}</h3>
-          {smartResponsiveEnabled && ["tablet", "mobile"].includes(viewport) && (
-            <div className="responsive-element-override">
-              <p className="builder-note">
-                {selectedElement.responsive?.overrides?.[viewport]?.mode === "manual"
-                  ? `${viewport} geometry is manually overridden.`
-                  : `${viewport} geometry is generated automatically.`}
-              </p>
-              <button
-                type="button"
-                className="danger-lite"
-                onClick={() => {
-                  const resetElement = withAutoResponsiveOverride(selectedElement, viewport);
-                  updateSelectedElement({ responsive: resetElement.responsive });
-                  showToast(`${viewport} layout reset to Auto.`);
-                }}
-              >
-                Reset {viewport} to Auto
-              </button>
-            </div>
-          )}
           {selectedElement.type !== "reservationBlock" && (
             <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
           )}
@@ -7004,16 +6831,12 @@ export default function PageBuilder({
 
           {selectedElement.type === "reservationBlock" && (() => {
             const selectedReservationId = selectedElement.connectedReservationBlockId || selectedElement.id;
-            const compatibleOptions = reservationFormOptions.filter((option) =>
-              !selectedElement.reservationPlacementType ||
-              option.mode === selectedElement.reservationPlacementType ||
-              option.id === selectedReservationId
-            );
+            const compatibleOptions = reservationFormOptions;
 
             return (
               <div className="reservation-form-picker">
                 <label>
-                  Reservation form
+                  Reservation build
                   <select
                     value={selectedReservationId}
                     onChange={(event) => {
@@ -7021,8 +6844,10 @@ export default function PageBuilder({
                         (block) => block.element.id === event.target.value
                       )?.element;
                       if (!source) return;
+                      const option = reservationFormOptions.find((item) => item.id === source.id);
                       updateSelectedElement({
                         connectedReservationBlockId: source.id,
+                        reservationPlacementType: option?.mode || "restricted",
                         reservation: source.reservation,
                       });
                     }}
@@ -7038,7 +6863,7 @@ export default function PageBuilder({
                   </select>
                 </label>
                 {compatibleOptions.length > 1 && (
-                  <p className="builder-note">Choose which reservation form this section should use.</p>
+                  <p className="builder-note">Choose which saved reservation build this element should use.</p>
                 )}
               </div>
             );
@@ -7641,9 +7466,6 @@ export default function PageBuilder({
       project={project}
       updateProject={updateProject}
       setThemeMode={setThemeMode}
-      legacyShadowEnabled={legacyShadowEnabled}
-      legacyShadowComparison={legacyShadowComparison}
-      onToggleLegacyShadow={() => setLegacyShadowEnabled((current) => !current)}
       {...themeTabProps}
     />
   );

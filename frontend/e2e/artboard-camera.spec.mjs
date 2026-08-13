@@ -3,14 +3,14 @@ import { expect, test } from "@playwright/test";
 const widths = [360, 390, 480, 600, 601, 768, 1024, 1025, 1200, 1440, 1920];
 
 const profiles = {
-  360: ["mobile", 360, 1],
+  360: ["mobile", 390, 360 / 390],
   390: ["mobile", 390, 1],
-  480: ["mobile", 480, 1],
-  600: ["mobile", 600, 1],
-  601: ["tablet", 601, 1],
+  480: ["mobile", 390, 1],
+  600: ["mobile", 390, 1],
+  601: ["tablet", 768, 601 / 768],
   768: ["tablet", 768, 1],
-  1024: ["tablet", 1024, 1],
-  1025: ["desktop", 1025, 1],
+  1024: ["tablet", 768, 1],
+  1025: ["desktop", 1200, 1025 / 1200],
   1200: ["desktop", 1200, 1],
   1440: ["desktop", 1200, 1],
   1920: ["desktop", 1200, 1],
@@ -24,7 +24,6 @@ const positions = {
 
 const publishedSchema = {
   theme: {},
-  responsiveLayout: { mode: "smart", engineVersion: 1 },
   siteChrome: { showHeader: false, showFooter: false },
   pages: [{
     id: "page_1",
@@ -48,7 +47,7 @@ const publishedSchema = {
   }],
 };
 
-test("published smart layout uses continuous CSS widths, full bleed, and controlled snapshots", async ({ page }) => {
+test("published layout uses saved artboards, full bleed, and controlled snapshots", async ({ page }) => {
   await page.route("**/api/public/sites/artboard-test**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname.endsWith("/auth/status")) {
@@ -70,8 +69,6 @@ test("published smart layout uses continuous CSS widths, full bleed, and control
 
   await page.setViewportSize({ width: 1200, height: 900 });
   await page.goto("/site/artboard-test/", { waitUntil: "networkidle" });
-  const geometries = new Map();
-
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     const [mode, logicalWidth, zoom] = profiles[width];
@@ -82,7 +79,6 @@ test("published smart layout uses continuous CSS widths, full bleed, and control
     const element = page.locator("[data-builder-element-id='element_1']");
     await expect(camera).toHaveAttribute("data-viewport-mode", mode);
     await expect(camera).toHaveAttribute("data-logical-width", String(logicalWidth));
-    await expect(camera).toHaveAttribute("data-responsive-layout-mode", "smart");
     await expect.poll(async () => Number(await camera.getAttribute("data-presentation-zoom")))
       .toBeCloseTo(zoom, 4);
     await expect.poll(async () => (await bleed.boundingBox())?.width || 0)
@@ -118,28 +114,19 @@ test("published smart layout uses continuous CSS widths, full bleed, and control
     });
 
     expect(geometry.zoom).toBeCloseTo(zoom, 4);
-    expect(geometry.zoom).toBe(1);
-    expect(geometry.artboard.width).toBeCloseTo(logicalWidth, 1);
+    expect(geometry.artboard.width / geometry.zoom).toBeCloseTo(logicalWidth, 1);
     expect(geometry.artboard.x).toBeCloseTo((width - geometry.artboard.width) / 2, 1);
     expect(geometry.section.width).toBeCloseTo(geometry.artboard.width, 1);
     expect(geometry.bleed.width).toBeCloseTo(width, 1);
     for (const key of ["x", "y", "width", "height"]) {
-      expect(geometry.physicalLogicalRect[key]).toBeCloseTo(geometry.resolvedLogicalRect[key], 1);
+      expect(geometry.physicalLogicalRect[key] / geometry.zoom).toBeCloseTo(geometry.resolvedLogicalRect[key], 1);
     }
-    geometries.set(width, geometry.resolvedLogicalRect);
-
     if ([390, 768, 1200].includes(width)) {
       expect(await artboard.screenshot({ animations: "disabled" }))
-        .toMatchSnapshot(`smart-artboard-${width}.png`);
+        .toMatchSnapshot(`legacy-artboard-${width}.png`);
     }
   }
 
-  for (const [beforeWidth, afterWidth] of [[600, 601], [1024, 1025]]) {
-    for (const key of ["x", "y", "width", "height"]) {
-      expect(Math.abs(geometries.get(afterWidth)[key] - geometries.get(beforeWidth)[key]))
-        .toBeLessThan(4);
-    }
-  }
 });
 
 test("editor viewport scrolls an exact camera stage and does not clip boundary overlays", async ({ page }) => {

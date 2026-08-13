@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import PageBuilderSubbar from "./PageBuilderSubbar";
@@ -14,19 +14,14 @@ describe("PageBuilderSubbar", () => {
         setViewport={vi.fn()}
         renderWorkspaceNavigator={() => <nav>Pages</nav>}
         artboardCameraControls={<div role="toolbar" aria-label="Artboard zoom">Zoom</div>}
-        copy={{ preview: "Preview" }}
-        onPreviewClick={vi.fn()}
       />
     );
 
     expect(screen.getByRole("toolbar", { name: "Artboard zoom" })
       .closest(".builder-subbar-actions")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Preview" })).toBeNull();
   });
 
-  it("keeps the existing exit control while preview is active", () => {
-    const onPreviewClick = vi.fn();
-
+  it("keeps only viewport controls in the preview subbar", () => {
     render(
       <PageBuilderSubbar
         preview
@@ -35,13 +30,10 @@ describe("PageBuilderSubbar", () => {
         viewport="desktop"
         setViewport={vi.fn()}
         renderWorkspaceNavigator={() => null}
-        copy={{ exitPreview: "Exit preview" }}
-        onPreviewClick={onPreviewClick}
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Exit preview" }));
-
-    expect(onPreviewClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Exit preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "desktop" })).toBeTruthy();
   });
 });

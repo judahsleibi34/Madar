@@ -24,8 +24,6 @@ import {
   getLiveArtboardViewportMode,
   getLivePresentationZoom,
 } from "../core/PageBuilder.artboard";
-import { isSmartResponsiveProject } from "../core/PageBuilder.responsiveCapabilities";
-import { getSmartLayoutWidth } from "../core/PageBuilder.responsiveLayout";
 import {
   getContentDirection,
   getDefaultFormLanguage,
@@ -474,13 +472,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     ? decodePathSegment(standaloneFormMatch[1])
     : "");
   const [project, setProject] = useState(null);
-  const smartResponsiveEnabled = isSmartResponsiveProject(project);
-  const effectiveRuntimeLogicalWidth = smartResponsiveEnabled
-    ? getSmartLayoutWidth(runtimeAvailableWidth)
-    : runtimeLogicalWidth;
-  const effectiveRuntimePresentationZoom = smartResponsiveEnabled
-    ? 1
-    : runtimePresentationZoom;
+  const effectiveRuntimeLogicalWidth = runtimeLogicalWidth;
+  const effectiveRuntimePresentationZoom = runtimePresentationZoom;
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState("loading");
   const [publicationBoundary, setPublicationBoundary] = useState(null);
@@ -1744,9 +1737,11 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             description={reservation.description}
             services={reservation.services}
             fields={reservation.fields}
+            formItems={reservation.formItems}
             bookingMode={reservation.bookingMode}
             availableDates={reservation.availableDates}
             timeSlots={reservation.timeSlots}
+            timeSlotsByDate={reservation.timeSlotsByDate}
             submitLabel={reservation.submitLabel}
             disabled={Boolean(status.submitting)}
             onSubmit={(values, idempotencyKey, honeypot, submissionElapsedMs) =>
@@ -1930,15 +1925,12 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           viewportMode={runtimeViewport}
           presentationZoom={effectiveRuntimePresentationZoom}
           availablePresentationWidth={runtimeAvailableWidth}
-          responsiveLayoutWidth={effectiveRuntimeLogicalWidth}
           renderElement={renderElement}
           renderSiteHeader={renderCanvasHeader}
           renderSiteFooter={renderCanvasFooter}
           carouselElementTypes={carouselElementTypes}
           filterElement={filterElement}
-          getDirectElementPosition={smartResponsiveEnabled
-            ? undefined
-            : (element) => getRuntimeDirectPosition(element, runtimeViewport)}
+          getDirectElementPosition={(element) => getRuntimeDirectPosition(element, runtimeViewport)}
           canvasStyle={{ "--site-runtime-logical-width": `${effectiveRuntimeLogicalWidth}px` }}
         />
       </main>

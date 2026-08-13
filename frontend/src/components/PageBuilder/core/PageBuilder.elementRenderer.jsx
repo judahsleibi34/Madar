@@ -459,9 +459,11 @@ export const createElementRenderer = ({
             description={reservation.description}
             services={reservation.services}
             fields={reservation.fields}
+            formItems={reservation.formItems}
             bookingMode={reservation.bookingMode}
             availableDates={reservation.availableDates}
             timeSlots={reservation.timeSlots}
+            timeSlotsByDate={reservation.timeSlotsByDate}
             submitLabel={reservation.submitLabel}
             disabled
           />
