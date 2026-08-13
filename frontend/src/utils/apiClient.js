@@ -236,6 +236,10 @@ export const apiFetch = async (input, init = {}) => {
         skipAuthRefresh: true,
       });
     }
+
+    if (refreshResponse.status >= 500) {
+      return refreshResponse.clone();
+    }
   }
 
   if (
@@ -273,6 +277,10 @@ export const apiFetch = async (input, init = {}) => {
           headers: retryHeaders,
           skipAuthRefresh: true,
         });
+      }
+
+      if (refreshResponse.status >= 500) {
+        return refreshResponse.clone();
       }
     }
   }

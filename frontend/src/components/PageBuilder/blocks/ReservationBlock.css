@@ -810,3 +810,260 @@
     grid-column: 1 / -1;
   }
 }
+
+/* User-composed reservation content and questions */
+.reservation-custom-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.reservation-custom-heading {
+  margin: 6px 0 -4px;
+  color: var(--theme-text);
+  font-size: clamp(18px, 2.2vw, 23px);
+  line-height: 1.25;
+}
+
+.reservation-custom-paragraph {
+  margin: -4px 0 0;
+  color: var(--theme-text-muted);
+  line-height: 1.65;
+}
+
+.reservation-custom-field {
+  width: 100%;
+}
+
+.reservation-choice-field {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  background: var(--theme-surface-soft);
+}
+
+.reservation-choice-field legend {
+  padding: 0 5px;
+  color: var(--theme-text);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.reservation-choice-options {
+  display: grid;
+  gap: 10px;
+}
+
+.reservation-choice-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  color: var(--theme-text);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.reservation-block .reservation-choice-options input[type="checkbox"],
+.reservation-block .reservation-choice-options input[type="radio"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--theme-primary);
+  box-shadow: none;
+}
+
+.reservation-choice-field.has-error {
+  border-color: var(--theme-danger);
+}
+
+.reservation-choice-field > strong {
+  display: block;
+  margin-top: 9px;
+  color: var(--theme-danger);
+  font-size: 12px;
+}
+
+.reservation-custom-submit {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.reservation-custom-form + .reservation-footer:has(.reservation-helper:only-child) {
+  margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+  .reservation-custom-submit {
+    width: 100%;
+  }
+}
+/* Saved custom booking typography and bidirectional content. */
+.reservation-custom-text-component {
+  min-width: 0;
+}
+
+.reservation-custom-text-component :is(h1, h2, h3, h4, p, ul, ol) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.reservation-custom-text-component :is(ul, ol) {
+  padding-inline-start: 1.5em;
+}
+
+.reservation-custom-text-component [dir="rtl"]:is(ul, ol) {
+  padding-inline-start: 0;
+  padding-inline-end: 1.5em;
+}
+
+.reservation-custom-form [dir="rtl"] {
+  text-align: right;
+}
+
+.reservation-custom-form button[dir="rtl"] {
+  direction: rtl;
+}
+/* LTR aligns left, RTL aligns right; choice controls remain inline. */
+.reservation-custom-form [dir="ltr"] {
+  text-align: left;
+}
+
+.reservation-custom-form [dir="rtl"] {
+  text-align: right;
+}
+
+.reservation-custom-form .reservation-choice-options label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  width: 100%;
+  text-align: start;
+}
+
+.reservation-custom-form .reservation-choice-options label input:is([type="checkbox"], [type="radio"]) {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.reservation-custom-form .reservation-choice-options {
+  gap: 10px;
+  margin-top: 12px;
+}
+.reservation-custom-availability {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.reservation-custom-availability > h4 {
+  margin: 0;
+  color: var(--theme-text);
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.reservation-custom-availability[dir="rtl"] > h4 {
+  text-align: right;
+}
+/* Custom builder composition follows the same structural order as its canvas:
+   locked booking fields first, followed by user components in saved order. */
+.reservation-block.has-custom-composition.is-fixed-slots {
+  grid-template-areas:
+    "slots"
+    "fields"
+    "custom"
+    "footer";
+}
+
+.reservation-block.has-custom-composition.is-date-request {
+  grid-template-areas:
+    "fields"
+    "custom"
+    "footer";
+}
+
+.reservation-block.has-custom-composition .reservation-custom-form {
+  grid-area: custom;
+  margin-top: 0;
+}
+/* Render custom-built reservations without the legacy card shell. */
+.reservation-block.has-custom-composition,
+.reservation-block.has-custom-composition.is-fixed-slots,
+.reservation-block.has-custom-composition.is-date-request {
+  display: block;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.reservation-block.has-custom-composition .reservation-custom-form {
+  margin: 0;
+}
+/* Custom reservation components own their responsive flow and intrinsic height. */
+.reservation-block.has-custom-composition .reservation-custom-form {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(16px, 4cqw, 24px);
+}
+
+.reservation-block.has-custom-composition :is(
+  .reservation-custom-text-component,
+  .reservation-custom-field,
+  .reservation-choice-field,
+  .reservation-custom-availability,
+  .fixed-slot-picker,
+  .fixed-slot-booking-controls,
+  .fixed-slot-date-control,
+  .fixed-slot-date-control > div,
+  .fixed-slot-times
+) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.reservation-block.has-custom-composition .reservation-custom-availability,
+.reservation-block.has-custom-composition .fixed-slot-booking-controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.reservation-block.has-custom-composition .fixed-slot-date-control select {
+  width: 100%;
+}
+
+@container (max-width: 460px) {
+  .reservation-block.has-custom-composition.is-fixed-slots {
+    padding: 0;
+  }
+
+  .reservation-block.has-custom-composition .reservation-custom-form {
+    gap: 18px;
+  }
+
+  .reservation-block.has-custom-composition .reservation-choice-field {
+    padding: 14px;
+  }
+
+  .reservation-block.has-custom-composition.is-fixed-slots .fixed-slot-times > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 320px) {
+  .reservation-block.has-custom-composition.is-fixed-slots .fixed-slot-times > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

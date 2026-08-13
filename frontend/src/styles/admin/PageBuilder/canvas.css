@@ -93,7 +93,7 @@
   background: var(--theme-bg);
   font-family: var(--theme-font-family, Inter, Arial, sans-serif);
   min-height: calc(100vh - 182px);
-  border-radius: 24px;
+  border-radius: 0;
   border: 1px solid var(--madar-border);
   direction: ltr;
   overflow: hidden;
@@ -2019,6 +2019,38 @@
   overflow: hidden;
 }
 
+/* Flowing content treats the authored height as a minimum. Its natural height
+   is measured and then participates in proportional collision padding. */
+.site-renderer-artboard .direct-element-frame.is-intrinsic-height {
+  height: auto !important;
+  min-height: var(--site-element-logical-height);
+  container-type: inline-size;
+}
+
+.site-renderer-artboard .direct-element-frame.is-intrinsic-height > .direct-element-content,
+.site-renderer-artboard .direct-element-frame.is-intrinsic-height > .direct-element-content > .builder-element {
+  height: auto !important;
+  min-height: 0;
+  overflow: visible;
+}
+
+.site-renderer-artboard .direct-element-frame-list.is-intrinsic-height .builder-element-list {
+  padding: clamp(12px, 4cqw, 42px);
+  gap: clamp(12px, 3.8cqw, 30px);
+  justify-content: flex-start;
+  container-type: inline-size;
+}
+
+.site-renderer-artboard .direct-element-frame-list.is-intrinsic-height .builder-list-title {
+  margin-bottom: clamp(2px, 0.9cqw, 10px);
+  font-size: clamp(24px, 8.5cqw, 58px);
+}
+
+.site-renderer-artboard .direct-element-frame-list.is-intrinsic-height .builder-element-list ul {
+  gap: clamp(7px, 2.8cqw, 24px);
+  font-size: clamp(14px, 5cqw, 34px);
+}
+
 .direct-element-frame-button .direct-element-content {
   display: flex;
   align-items: stretch;
@@ -2088,14 +2120,14 @@
 }
 
 .direct-element-frame-reservationBlock.is-fixed-size .direct-element-content {
-  height: 100%;
+  height: auto;
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
 
 .direct-element-frame-reservationBlock.is-fixed-size .direct-element-content > .builder-element-reservationBlock {
   height: auto;
-  min-height: 100%;
+  min-height: 0;
   overflow: visible;
 }
 

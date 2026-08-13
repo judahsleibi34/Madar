@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { BadgeCheck, CheckCircle2, Clock3, Info } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { getPricingContent } from "../../content";
@@ -8,14 +8,19 @@ import { BILLING_API_ROUTES } from "../../services/apiRoutes";
 import { apiFetch, getApiUrl, readApiError } from "../../utils/apiClient";
 import SubscriptionStatusModal from "./SubscriptionStatusModal";
 
-const formatPrice = (minor, currency) =>
-  new Intl.NumberFormat("en-US", {
+const formatPrice = (minor, currency, locale = "en-US") =>
+  new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency || "USD",
     maximumFractionDigits: 0,
   }).format(Number(minor || 0) / 100);
 
 const formatStorage = (bytes) => `${Math.round(Number(bytes || 0) / 1024 ** 3)} GB`;
+
+const CARD_FEATURE_KEYS = {
+  website: ["reservation_system"],
+  business: ["reservation_system", "cv_reranker"],
+};
 
 export default function BasePlansPage({ lang = "en" }) {
   const activeLang = lang === "ar" ? "ar" : "en";
@@ -54,6 +59,14 @@ export default function BasePlansPage({ lang = "en" }) {
       ["add_on", "token_pack"].includes(product.type)
     ),
     [catalog]
+  );
+  const availableAddons = useMemo(
+    () => addons.filter((addon) => !addon.coming_soon && addon.price_minor != null),
+    [addons]
+  );
+  const upcomingAddons = useMemo(
+    () => addons.filter((addon) => addon.coming_soon || addon.price_minor == null),
+    [addons]
   );
 
   const requestPlan = async (plan) => {
@@ -104,78 +117,114 @@ export default function BasePlansPage({ lang = "en" }) {
           <span className="pricing-eyebrow">{t.eyebrow}</span>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
-          <p role="note"><strong>{t.manualActivation}</strong></p>
         </div>
       </section>
+
 
       {loading && <section className="pricing-base-section" role="status">{t.loading}</section>}
       {!loading && error && <section className="pricing-base-section" role="alert">{error}</section>}
 
       {!loading && !error && (
         <section className="pricing-base-section">
-          <div className="pricing-plan-strip">
+          <div className="pricing-catalog-heading">
+            <div>
+              <span>{t.eyebrow}</span>
+              <h2>{t.plansTitle}</h2>
+            </div>
+          </div>
+
+          <div className="pricing-plan-strip pricing-comparison-grid">
             {plans.map((plan) => {
               const copy = t.plans[plan.id];
+              const recommended = plan.id === "business";
+              const visibleFeatureKeys = [
+                ...new Set([...(plan.public_feature_keys || []), ...(CARD_FEATURE_KEYS[plan.id] || [])]),
+              ];
               return (
-                <article className={`pricing-mini-plan ${plan.id === "business" ? "is-selected" : ""}`} key={plan.id}>
-                  <span>{copy?.name || plan.name}</span>
-                  <strong>{formatPrice(plan.price_minor, plan.currency)}{t.perMonth}</strong>
-                  <small>{copy?.summary || plan.summary}</small>
+                <article className={`pricing-mini-plan pricing-catalog-plan ${recommended ? "is-selected" : ""}`} key={plan.id}>
+                  <header className="pricing-catalog-plan-header">
+                    <div>
+                      <span>{t.planLabel}</span>
+                      {recommended && <em><BadgeCheck size={14} aria-hidden="true" />{t.recommended}</em>}
+                    </div>
+                    <h3>{copy?.name || plan.name}</h3>
+                    <p>{copy?.summary || plan.summary}</p>
+                  </header>
+                  <div className="pricing-catalog-price">
+                    <strong>{formatPrice(plan.price_minor, plan.currency, activeLang === "ar" ? "ar" : "en-US")}</strong>
+                    <span>{t.perMonth}</span>
+                  </div>
+                  <div className="pricing-includes-label">{t.includedTitle}</div>
                   <ul className="pricing-feature-list">
-                    {(plan.public_feature_keys || []).map((featureKey) => (
+                    {visibleFeatureKeys.map((featureKey) => (
                       <li className="included" key={featureKey}>
-                        <CheckCircle2 size={15} aria-hidden="true" /> {t.featureLabels[featureKey] || featureKey}
+                        <CheckCircle2 size={15} aria-hidden="true" />
+                        <span>{t.featureLabels[featureKey] || featureKey}</span>
                       </li>
                     ))}
-                    <li className="included">
-                      <CheckCircle2 size={15} aria-hidden="true" />
-                      {formatStorage(plan.allowances?.storage_bytes)} {t.hostedStorage}
-                    </li>
-                    <li className="included">
-                      <CheckCircle2 size={15} aria-hidden="true" /> {t.oneOperator}
-                    </li>
+                    <li className="included"><CheckCircle2 size={15} aria-hidden="true" /><span>{formatStorage(plan.allowances?.storage_bytes)} {t.hostedStorage}</span></li>
+                    <li className="included"><CheckCircle2 size={15} aria-hidden="true" /><span>{t.oneOperator}</span></li>
                   </ul>
-                  <button
-                    className="pricing-plan-button primary"
-                    type="button"
-                    disabled={submittingId === plan.id}
-                    onClick={() => requestPlan(plan)}
-                  >
-                    {submittingId === plan.id ? t.saving : t.requestPlan}
-                  </button>
+                  <footer>
+                    <button className="pricing-plan-button primary" type="button" disabled={submittingId === plan.id} onClick={() => requestPlan(plan)}>
+                      {submittingId === plan.id ? t.saving : t.requestPlan}
+                    </button>
+                  </footer>
                 </article>
               );
             })}
           </div>
 
-          <section className="pricing-compare" aria-labelledby="pricing-addons-title">
-            <h2 id="pricing-addons-title">{t.addonsTitle}</h2>
-            <div className="pricing-plan-strip">
-              {addons.map((addon) => (
-                <article className="pricing-mini-plan" key={addon.id}>
-                  <span>{t.addons[addon.id]?.name || addon.name}</span>
-                  <strong>
-                    {addon.price_minor == null
-                      ? t.comingSoon
-                      : `${formatPrice(addon.price_minor, addon.currency)}${
-                          addon.billing_interval === "month" ? t.perMonth : ""
-                        }`}
-                  </strong>
-                  <small>{t.addons[addon.id]?.summary || addon.summary}</small>
-                  {addon.coming_soon && <small role="note">{t.comingSoon}</small>}
-                </article>
-              ))}
-            </div>
-          </section>
+          {addons.length > 0 && (
+            <section className="pricing-compare pricing-addons-section" aria-labelledby="pricing-addons-title">
+              <div className="pricing-addons-heading">
+                <div><span>{t.addonsLabel}</span><h2 id="pricing-addons-title">{t.addonsTitle}</h2></div>
+              </div>
+
+              {availableAddons.length > 0 && (
+                <div className="pricing-addon-group">
+                  <div className="pricing-addon-group-heading"><h3>{t.availableAddons}</h3></div>
+                  <div className="pricing-addon-grid">
+                    {availableAddons.map((addon) => (
+                      <article className="pricing-addon-card is-available" key={addon.id}>
+                        <div className="pricing-addon-card-heading">
+                          <span className="pricing-addon-status"><CheckCircle2 size={14} aria-hidden="true" />{t.availableNow}</span>
+                          <h4>{t.addons[addon.id]?.name || addon.name}</h4>
+                        </div>
+                        <div className="pricing-addon-price">
+                          <strong>{formatPrice(addon.price_minor, addon.currency, activeLang === "ar" ? "ar" : "en-US")}</strong>
+                          {addon.billing_interval === "month" && <span>{t.perMonth}</span>}
+                        </div>
+                        <p>{t.addons[addon.id]?.summary || addon.summary}</p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {upcomingAddons.length > 0 && (
+                <div className="pricing-addon-group is-upcoming">
+                  <div className="pricing-addon-group-heading"><h3>{t.upcomingAddons}</h3></div>
+                  <div className="pricing-addon-grid pricing-upcoming-grid">
+                    {upcomingAddons.map((addon) => (
+                      <article className="pricing-addon-card is-upcoming" key={addon.id}>
+                        <Clock3 size={18} aria-hidden="true" />
+                        <div><h4>{t.addons[addon.id]?.name || addon.name}</h4><p>{t.addons[addon.id]?.summary || addon.summary}</p></div>
+                        <span className="pricing-addon-coming-soon">{t.comingSoon}</span>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           <aside className="pricing-storage-callout" role="note">
-            <p>{t.fairUse}</p>
-            <p>{t.addressNote}</p>
-            <p>{t.exclusions}</p>
+            <Info size={20} aria-hidden="true" />
+            <div><strong>{t.goodToKnow}</strong><ul><li>{t.fairUse}</li><li>{t.addressNote}</li><li>{t.exclusions}</li></ul></div>
           </aside>
         </section>
       )}
-
       <SubscriptionStatusModal
         open={modalState.open}
         type={modalState.type}

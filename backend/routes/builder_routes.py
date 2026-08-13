@@ -563,116 +563,6 @@ def _raise_revision_conflict(project_id: str, tenant_id: int | str) -> None:
     )
 
 
-def _validate_smart_responsive_geometry(schema: dict[str, Any]) -> None:
-    responsive_layout = schema.get("responsiveLayout")
-    if not isinstance(responsive_layout, dict) or responsive_layout.get("mode") != "smart":
-        return
-    try:
-        engine_version = int(responsive_layout.get("engineVersion"))
-    except (TypeError, ValueError):
-        engine_version = 0
-    if engine_version != 1:
-        raise HTTPException(
-            status_code=400,
-            detail=error_detail(
-                "publish_validation_failed",
-                "This smart responsive engine version cannot be published.",
-                context={"issue_type": "unsupported_responsive_engine", "engine_version": engine_version},
-            ),
-        )
-
-    anchor_widths = {"desktop": 1200.0, "tablet": 768.0, "mobile": 390.0}
-
-    def finite_rect(value: Any) -> dict[str, float] | None:
-        if not isinstance(value, dict):
-            return None
-        try:
-            rect = {key: float(value.get(key)) for key in ("x", "y", "width", "height")}
-        except (TypeError, ValueError):
-            return None
-        if not all(math.isfinite(item) for item in rect.values()) or rect["width"] <= 0 or rect["height"] <= 0:
-            return None
-        return rect
-
-    for page in schema.get("pages") or []:
-        if not isinstance(page, dict):
-            continue
-        for section in page.get("sections") or []:
-            if not isinstance(section, dict):
-                continue
-            elements = [element for element in section.get("freeElements") or [] if isinstance(element, dict)]
-            for viewport_mode, logical_width in anchor_widths.items():
-                manual_solids: list[dict[str, Any]] = []
-                for element in elements:
-                    capabilities = element.get("responsive", {}).get("capabilities", {})
-                    collision_policy = capabilities.get("collisionPolicy") if isinstance(capabilities, dict) else None
-                    overrides = element.get("responsive", {}).get("overrides", {})
-                    override = overrides.get(viewport_mode) if isinstance(overrides, dict) else None
-                    if not isinstance(override, dict) or override.get("mode") != "manual":
-                        continue
-                    rect = finite_rect(override.get("rect"))
-                    block_id = str(element.get("id") or "")
-                    if rect is None:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=error_detail(
-                                "publish_validation_failed",
-                                "A smart responsive manual override has invalid geometry.",
-                                context={"issue_type": "invalid_manual_responsive_rect", "block_id": block_id, "viewport": viewport_mode},
-                            ),
-                        )
-                    if rect["y"] < 0:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=error_detail(
-                                "publish_validation_failed",
-                                "A smart responsive manual override is outside its artboard.",
-                                context={"issue_type": "manual_responsive_out_of_bounds", "block_id": block_id, "viewport": viewport_mode},
-                            ),
-                        )
-                    if element.get("layer") == "behindText" or collision_policy in {"overlay", "background"}:
-                        continue
-                    if rect["x"] < 0 or rect["x"] + rect["width"] > logical_width:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=error_detail(
-                                "publish_validation_failed",
-                                "A smart responsive manual override is outside its artboard.",
-                                context={"issue_type": "manual_responsive_out_of_bounds", "block_id": block_id, "viewport": viewport_mode},
-                            ),
-                        )
-                    manual_solids.append({"id": block_id, "rect": rect})
-
-                active: list[dict[str, Any]] = []
-                for current in sorted(manual_solids, key=lambda item: (item["rect"]["x"], item["rect"]["y"], item["id"])):
-                    current_rect = current["rect"]
-                    active = [
-                        item for item in active
-                        if item["rect"]["x"] + item["rect"]["width"] > current_rect["x"]
-                    ]
-                    for other in active:
-                        other_rect = other["rect"]
-                        vertical_overlap = (
-                            current_rect["y"] < other_rect["y"] + other_rect["height"]
-                            and current_rect["y"] + current_rect["height"] > other_rect["y"]
-                        )
-                        if vertical_overlap:
-                            raise HTTPException(
-                                status_code=400,
-                                detail=error_detail(
-                                    "publish_validation_failed",
-                                    "Smart responsive manual components overlap.",
-                                    context={
-                                        "issue_type": "unresolved_manual_responsive_collision",
-                                        "page_id": str(page.get("id") or ""),
-                                        "section_id": str(section.get("id") or ""),
-                                        "viewport": viewport_mode,
-                                        "block_ids": sorted([other["id"], current["id"]]),
-                                    },
-                                ),
-                            )
-                    active.append(current)
-
 
 def require_schema_asset_tenant(schema: dict[str, Any], tenant_id: int) -> None:
     try:
@@ -686,6 +576,143 @@ def require_schema_asset_tenant(schema: dict[str, Any], tenant_id: int) -> None:
             ),
         ) from error
 
+
+RESERVATION_FORM_ITEM_TYPES = {"heading", "paragraph", "text", "checkbox", "radio", "button"}
+RESERVATION_FORM_INPUT_TYPES = {"text", "checkbox", "radio"}
+RESERVATION_FORM_DIRECTIONS = {"ltr", "rtl"}
+RESERVATION_TEXT_FORMATS = {"text", "h1", "h2", "h3", "bullets", "numbers"}
+RESERVATION_TEXT_ALIGNMENTS = {"left", "center", "right", "justify"}
+RESERVATION_TEXT_FONT_FAMILIES = {
+    "Inter", "Arial", "Verdana", "Tahoma", "Trebuchet MS", "Georgia",
+    "Times New Roman", "Courier New", "Lobster Two", "EB Garamond",
+    "Cormorant Garamond", "Playfair Display", "Lora", "Montserrat",
+    "Poppins", "Raleway", "Oswald", "Bebas Neue", "IBM Plex Sans Arabic",
+}
+RESERVATION_TEXT_STYLE_KEYS = {
+    "format", "fontFamily", "fontSize", "opacity", "fontWeight", "fontStyle",
+    "textDecoration", "textAlign", "color", "backgroundColor",
+}
+
+
+def validate_reservation_form_items(reservation: dict[str, Any]) -> None:
+    form_items = reservation.get("formItems")
+    if form_items is None:
+        return
+    if not isinstance(form_items, list) or len(form_items) > 40:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail(
+                "publish_validation_failed",
+                "A reservation form must contain no more than 40 components.",
+                context={"issue_type": "invalid_reservation_form_items"},
+            ),
+        )
+
+    seen_ids: set[str] = set()
+    button_count = 0
+    for index, item in enumerate(form_items):
+        item_type = str(item.get("type") or "").strip() if isinstance(item, dict) else ""
+        item_id = str(item.get("id") or "").strip() if isinstance(item, dict) else ""
+        invalid = (
+            not isinstance(item, dict)
+            or item_type not in RESERVATION_FORM_ITEM_TYPES
+            or not item_id
+            or len(item_id) > 120
+            or item_id in seen_ids
+        )
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=error_detail(
+                    "publish_validation_failed",
+                    "A reservation form contains an invalid component.",
+                    context={"issue_type": "invalid_reservation_form_item", "item_index": index},
+                ),
+            )
+        seen_ids.add(item_id)
+
+        direction = item.get("direction")
+        if direction is not None and direction not in RESERVATION_FORM_DIRECTIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=error_detail(
+                    "publish_validation_failed",
+                    "A reservation component has an invalid text direction.",
+                    context={"issue_type": "invalid_reservation_form_direction", "item_id": item_id},
+                ),
+            )
+
+        text_style = item.get("textStyle")
+        if text_style is not None:
+            color_values = (text_style.get("color"), text_style.get("backgroundColor")) if isinstance(text_style, dict) else ()
+            invalid_text_style = (
+                item_type not in {"heading", "paragraph"}
+                or not isinstance(text_style, dict)
+                or not set(text_style).issubset(RESERVATION_TEXT_STYLE_KEYS)
+                or text_style.get("format", "text") not in RESERVATION_TEXT_FORMATS
+                or text_style.get("textAlign", "left") not in RESERVATION_TEXT_ALIGNMENTS
+                or text_style.get("fontFamily", "Inter") not in RESERVATION_TEXT_FONT_FAMILIES
+                or text_style.get("fontWeight", "400") not in {"400", "700"}
+                or text_style.get("fontStyle", "normal") not in {"normal", "italic"}
+                or text_style.get("textDecoration", "none") not in {"none", "underline"}
+                or not isinstance(text_style.get("fontSize", 16), (int, float))
+                or isinstance(text_style.get("fontSize", 16), bool)
+                or not 8 <= text_style.get("fontSize", 16) <= 256
+                or not isinstance(text_style.get("opacity", 1), (int, float))
+                or isinstance(text_style.get("opacity", 1), bool)
+                or not 0 <= text_style.get("opacity", 1) <= 1
+                or any(value is not None and (not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value)) for value in color_values)
+            )
+            if invalid_text_style:
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_detail(
+                        "publish_validation_failed",
+                        "A reservation text component has invalid typography settings.",
+                        context={"issue_type": "invalid_reservation_text_style", "item_id": item_id},
+                    ),
+                )
+
+        text_key = "text" if item_type in {"heading", "paragraph"} else "label"
+        text_value = item.get(text_key)
+        if not isinstance(text_value, str) or not text_value.strip() or len(text_value) > 500:
+            raise HTTPException(
+                status_code=400,
+                detail=error_detail(
+                    "publish_validation_failed",
+                    "Reservation form labels and text must be between 1 and 500 characters.",
+                    context={"issue_type": "invalid_reservation_form_text", "item_id": item_id},
+                ),
+            )
+
+        if item_type in {"checkbox", "radio"}:
+            options = item.get("options")
+            if (
+                not isinstance(options, list)
+                or not 1 <= len(options) <= 20
+                or any(not isinstance(option, str) or not option.strip() or len(option) > 200 for option in options)
+                or len(set(options)) != len(options)
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_detail(
+                        "publish_validation_failed",
+                        "Reservation choices must contain 1 to 20 unique options.",
+                        context={"issue_type": "invalid_reservation_form_options", "item_id": item_id},
+                    ),
+                )
+
+        if item_type == "button":
+            button_count += 1
+            if button_count > 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_detail(
+                        "publish_validation_failed",
+                        "A reservation form can contain only one submit button.",
+                        context={"issue_type": "duplicate_reservation_submit_button"},
+                    ),
+                )
 
 def validate_publish_schema(
     value: Any,
@@ -910,6 +937,8 @@ def validate_publish_schema(
                     "A reservation block has invalid configuration.",
                 ),
             )
+        if element_type == "reservationBlock":
+            validate_reservation_form_items(element["reservation"])
         if element_type in {"button", "imageButton"}:
             raw_action = element.get("action")
             action = raw_action if isinstance(raw_action, dict) else {}
@@ -1004,7 +1033,6 @@ def validate_publish_schema(
             for element in page_elements(page):
                 inspect_element(page, element)
 
-    _validate_smart_responsive_geometry(schema)
     validate_builder_schema_urls(schema, field_name="draft_schema")
     return schema, schema_version
 

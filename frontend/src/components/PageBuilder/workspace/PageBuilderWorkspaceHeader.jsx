@@ -34,6 +34,7 @@ export default function PageBuilderWorkspaceHeader({
         preview={preview}
         demoMode={demoMode}
         copy={builderCopy.topbar}
+        onPreviewClick={handlePreviewClick}
         activeTopbarAction={activeTopbarAction}
         setActiveTopbarAction={setActiveTopbarAction}
         setModal={setModal}
@@ -47,8 +48,6 @@ export default function PageBuilderWorkspaceHeader({
         viewports={viewports}
         viewport={viewport}
         setViewport={setViewport}
-        copy={builderCopy.topbar}
-        onPreviewClick={handlePreviewClick}
         renderWorkspaceNavigator={renderWorkspaceNavigator}
         artboardCameraControls={artboardCameraControls}
       />

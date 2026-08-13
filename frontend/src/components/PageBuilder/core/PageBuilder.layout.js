@@ -1,7 +1,6 @@
 import { viewports } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
 import { clampElementToBounds } from "./PageBuilder.bounds";
-import { withManualResponsiveOverride } from "./PageBuilder.responsiveCapabilities";
 
 export const getSectionElements = (section) => {
   const autoElements = (section.rows || []).flatMap((row) =>
@@ -61,7 +60,9 @@ export const getMetricMinimumHeight = () => 170;
 
 export const getDirectElementMinimumSize = (element) => {
   if (element?.type === "reservationBlock") {
-    return { width: 320, height: 320 };
+    const hasCustomComposition = Array.isArray(element?.reservation?.formItems)
+      && element.reservation.formItems.length > 0;
+    return { width: 280, height: hasCustomComposition ? 48 : 320 };
   }
 
   if (element?.type === "button") {
@@ -123,7 +124,8 @@ export const directElementHeight = (element) => {
     divider: 32,
     thinDivider: 32,
     formBlock: 460,
-    reservationBlock: 770,
+    reservationBlock: Array.isArray(element?.reservation?.formItems)
+      && element.reservation.formItems.length > 0 ? 48 : 560,
     loginBlock: 390,
     registrationBlock: 520,
     carousel: 420,
@@ -274,7 +276,6 @@ export const commitDirectElementInteraction = (sections, {
   targetSectionId = "",
   viewportName = "desktop",
   elementUpdates = null,
-  smartResponsive = false,
 } = {}) => {
   const isCrossSectionMove = Boolean(
     movedElement && targetSectionId && sourceSectionId !== targetSectionId
@@ -306,13 +307,7 @@ export const commitDirectElementInteraction = (sections, {
         },
         freeElements: [
           ...(section.freeElements || []),
-          smartResponsive
-            ? withManualResponsiveOverride(
-                movedElement,
-                viewportName,
-                movedElement.position?.[viewportName] || createPosition()[viewportName]
-              )
-            : movedElement,
+          movedElement,
         ],
       };
     }
@@ -341,9 +336,7 @@ export const commitDirectElementInteraction = (sections, {
                 [viewportName]: previewPosition,
               },
             };
-        return smartResponsive
-          ? withManualResponsiveOverride(updatedElement, viewportName, previewPosition)
-          : updatedElement;
+        return updatedElement;
       }),
     };
   });
@@ -582,7 +575,6 @@ export const commitDirectElementGroupInteraction = (sections, {
   previewPositions = {},
   previewSectionHeight = 0,
   viewportName = "desktop",
-  smartResponsive = false,
 } = {}) => sections.map((section) => {
   if (section.id !== sourceSectionId || !Object.keys(previewPositions).length) return section;
 
@@ -607,9 +599,7 @@ export const commitDirectElementGroupInteraction = (sections, {
               [viewportName]: previewPositions[element.id],
             },
           };
-      return smartResponsive
-        ? withManualResponsiveOverride(updatedElement, viewportName, previewPositions[element.id])
-        : updatedElement;
+      return updatedElement;
     }),
   };
 });

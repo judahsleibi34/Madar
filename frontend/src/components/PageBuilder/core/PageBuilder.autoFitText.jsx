@@ -19,7 +19,6 @@ export default function AutoFitDirectText({ as: Element, fitKey, children, ...pr
       element.style.removeProperty("--builder-fitted-font-size");
       element.style.removeProperty("--builder-text-fit-scale");
 
-      if (frame.closest("[data-responsive-layout-mode='smart']")) return;
 
       if (!element.clientWidth || !element.clientHeight) return;
 

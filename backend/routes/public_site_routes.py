@@ -1061,6 +1061,86 @@ def reservation_block_is_exclusive(block: dict[str, Any]) -> bool:
     return str(reservation.get("bookingMode") or "restricted").strip().lower() != "flexible"
 
 
+def validate_configured_reservation_slot(block: dict[str, Any], payload: dict[str, Any]) -> None:
+    reservation = block.get("reservation")
+    if not isinstance(reservation, dict):
+        return
+    if str(reservation.get("bookingMode") or "restricted").strip().lower() == "flexible":
+        return
+
+    slots_by_date = reservation.get("timeSlotsByDate")
+    if not isinstance(slots_by_date, dict):
+        return
+
+    requested_date = str(payload.get("date") or "").strip()
+    requested_time = str(payload.get("time") or "").strip()
+    configured_times = slots_by_date.get(requested_date)
+    valid_times = {
+        str(value).strip()
+        for value in configured_times
+        if str(value).strip()
+    } if isinstance(configured_times, list) else set()
+
+    if not requested_date or not requested_time or requested_time not in valid_times:
+        raise api_error(
+            400,
+            "reservation_slot_invalid",
+            "Choose an available date and time.",
+        )
+
+def validate_reservation_custom_answers(block: dict[str, Any], payload: dict[str, Any]) -> None:
+    reservation = block.get("reservation")
+    form_items = reservation.get("formItems") if isinstance(reservation, dict) else None
+    answer_items = {
+        str(item.get("id")): item
+        for item in (form_items or [])
+        if isinstance(item, dict) and item.get("type") in {"text", "checkbox", "radio"} and item.get("id")
+    }
+    raw_answers = payload.get("customAnswers")
+
+    if not answer_items:
+        if raw_answers not in (None, {}):
+            raise api_error(400, "reservation_answers_invalid", "This reservation does not accept custom answers.")
+        payload.pop("customAnswers", None)
+        return
+
+    if raw_answers is None:
+        raw_answers = {}
+    if not isinstance(raw_answers, dict):
+        raise api_error(400, "reservation_answers_invalid", "Custom reservation answers must be an object.")
+    if any(str(item_id) not in answer_items for item_id in raw_answers):
+        raise api_error(400, "reservation_answers_invalid", "A custom reservation answer does not match the published form.")
+
+    cleaned_answers: dict[str, Any] = {}
+    for item_id, item in answer_items.items():
+        item_type = item.get("type")
+        answer = raw_answers.get(item_id)
+        options = item.get("options") if isinstance(item.get("options"), list) else []
+
+        if item_type == "checkbox":
+            if answer is None:
+                answer = []
+            if not isinstance(answer, list) or any(not isinstance(value, str) or value not in options for value in answer):
+                raise api_error(400, "reservation_answers_invalid", "A checkbox answer contains an invalid choice.")
+            answer = list(dict.fromkeys(answer))
+            is_empty = len(answer) == 0
+        else:
+            if answer is None:
+                answer = ""
+            if not isinstance(answer, str):
+                raise api_error(400, "reservation_answers_invalid", "A custom reservation answer has an invalid value.")
+            answer = answer.strip()
+            if item_type == "radio" and answer and answer not in options:
+                raise api_error(400, "reservation_answers_invalid", "A radio answer contains an invalid choice.")
+            is_empty = not answer
+
+        if item.get("required") is True and is_empty:
+            raise api_error(400, "reservation_answer_required", f"{str(item.get('label') or 'A reservation question')[:120]} is required.")
+        if not is_empty:
+            cleaned_answers[item_id] = answer
+
+    payload["customAnswers"] = cleaned_answers
+
 def build_reservation_field_snapshot(block: dict, block_id: str | None, block_type: str) -> list[dict[str, Any]]:
     snapshot = {
         "block_id": block_id or block.get("id"),
@@ -2418,6 +2498,9 @@ def submit_public_builder_block_event(
         str(key)[:120]: normalize_event_value(value)
         for key, value in payload.items()
     }
+    if block_type == "reservationBlock":
+        validate_reservation_custom_answers(block, cleaned_payload)
+        validate_configured_reservation_slot(block, cleaned_payload)
     timing = normalize_reservation_timing(cleaned_payload)
 
     if block_type == "reservationBlock":

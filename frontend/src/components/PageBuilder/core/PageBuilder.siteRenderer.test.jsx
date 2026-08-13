@@ -249,110 +249,52 @@ describe("SiteRenderer artboard camera", () => {
     expect(JSON.stringify(dynamicPage)).toBe(originalSchema);
   });
 
-  it("renders smart live geometry at the actual CSS width without whole-page scaling", () => {
-    const smartProject = {
-      theme: {},
-      responsiveLayout: { mode: "smart", engineVersion: 1 },
-    };
-    const originalSchema = JSON.stringify(activePage);
-    const view = render(
-      <SiteRenderer
-        project={smartProject}
-        activePage={activePage}
-        viewportMode="tablet"
-        presentationZoom={1}
-        responsiveLayoutWidth={900}
-        availablePresentationWidth={1440}
-        renderElement={(element) => <span>{element.content}</span>}
-      />
-    );
-    const camera = view.container.querySelector(".site-renderer-camera");
-    const artboard = view.container.querySelector(".site-renderer-artboard");
-    const directFrame = view.container.querySelector(".direct-layout-frame");
-    const bleed = view.container.querySelector(".site-section-bleed-background");
-
-    expect(camera.dataset.responsiveLayoutMode).toBe("smart");
-    expect(camera.dataset.presentationZoom).toBe("1.0000");
-    expect(camera.dataset.logicalWidth).toBe("900");
-    expect(camera.style.width).toBe("900px");
-    expect(artboard.style.width).toBe("900px");
-    expect(directFrame.style.width).toBe("900px");
-    expect(bleed.style.width).toBe("1440px");
-    expect(JSON.stringify(activePage)).toBe(originalSchema);
-  });
-
-  it("measures generic smart content and pushes a downstream element without mutating schema", async () => {
-    const observerCallbacks = [];
+  it("shrinks a custom reservation frame to its measured content height", async () => {
     const animationCallbacks = [];
     vi.stubGlobal("requestAnimationFrame", (callback) => {
       animationCallbacks.push(callback);
       return animationCallbacks.length;
     });
     globalThis.ResizeObserver = class ResizeObserver {
-      constructor(callback) { observerCallbacks.push(callback); }
       observe() {}
       disconnect() {}
     };
-    const smartProject = {
-      theme: {},
-      responsiveLayout: { mode: "smart", engineVersion: 1 },
-    };
-    const smartPage = {
-      id: "smart-dynamic-page",
+    const reservationPage = {
+      id: "reservation_page",
       sections: [{
-        id: "smart-dynamic-section",
+        id: "reservation_section",
         mode: "direct",
-        layout: { width: "full", background: "transparent", minHeight: 200 },
-        freeElements: [
-          {
-            id: "growing-text",
-            type: "text",
-            content: "Growing text",
-            styles: {},
-            position: {
-              desktop: { x: 24, y: 20, width: 320, height: 80 },
-              tablet: { x: 24, y: 20, width: 320, height: 80 },
-              mobile: { x: 24, y: 20, width: 320, height: 80 },
-            },
-          },
-          {
-            id: "future-block",
-            type: "future-component",
-            content: "Future component",
-            styles: {},
-            position: {
-              desktop: { x: 24, y: 120, width: 320, height: 80 },
-              tablet: { x: 24, y: 120, width: 320, height: 80 },
-              mobile: { x: 24, y: 120, width: 320, height: 80 },
-            },
-          },
-        ],
+        layout: { width: "full", minHeight: 300 },
+        freeElements: [{
+          id: "custom_reservation",
+          type: "reservationBlock",
+          directSizeMode: "fixed",
+          reservation: { formItems: [{ id: "heading", type: "heading", text: "Book" }] },
+          styles: {},
+          position: { desktop: { x: 100, y: 80, width: 400, height: 770 } },
+        }],
       }],
     };
-    const originalSchema = JSON.stringify(smartPage);
     const view = render(
       <SiteRenderer
-        project={smartProject}
-        activePage={smartPage}
-        viewportMode="tablet"
+        project={project}
+        activePage={reservationPage}
+        viewportMode="desktop"
         presentationZoom={1}
-        responsiveLayoutWidth={768}
-        renderElement={(element) => <div>{element.content}</div>}
+        renderElement={() => <div>Custom booking content</div>}
       />
     );
-    const content = view.container.querySelector('[data-builder-element-id="growing-text"] > .direct-element-content');
-    Object.defineProperty(content, "scrollHeight", { configurable: true, value: 300 });
-    Object.defineProperty(content, "offsetHeight", { configurable: true, value: 300 });
+    const frame = view.container.querySelector(".direct-element-frame-reservationBlock");
+    const content = frame.querySelector(":scope > .direct-element-content");
+    Object.defineProperty(content, "scrollHeight", { configurable: true, value: 240 });
+    Object.defineProperty(content, "offsetHeight", { configurable: true, value: 240 });
 
     await act(async () => {
-      observerCallbacks.slice().forEach((callback) => callback([]));
       animationCallbacks.splice(0).forEach((callback) => callback());
     });
 
-    const growing = view.container.querySelector('[data-builder-element-id="growing-text"]');
-    const downstream = view.container.querySelector('[data-builder-element-id="future-block"]');
-    expect(growing.style.height).toBe("300px");
-    expect(Number(downstream.dataset.logicalY)).toBeGreaterThanOrEqual(336);
-    expect(JSON.stringify(smartPage)).toBe(originalSchema);
+    expect(frame.style.height).toBe("240px");
+    expect(frame.dataset.logicalHeight).toBe("240");
+    expect(frame.classList.contains("is-fixed-size")).toBe(false);
   });
 });

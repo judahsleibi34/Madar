@@ -226,6 +226,50 @@ describe("apiFetch session refresh", () => {
     expect(fetchCall(1)[0]).toBe("/api/auth/refresh");
   });
 
+  it("returns a transient refresh failure instead of the original 401", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(textResponse("expired", { status: 401 }))
+        .mockResolvedValueOnce(jsonResponse(
+          { detail: { code: "auth_temporarily_unavailable" } },
+          { status: 503, headers: { "Retry-After": "5" } }
+        ))
+    );
+
+    const response = await apiFetch("/api/users/1/profile");
+
+    expect(response.status).toBe(503);
+    expect((await response.json()).detail.code).toBe("auth_temporarily_unavailable");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives concurrent callers independent transient refresh responses", async () => {
+    const fetchMock = vi.fn((url) => {
+      if (url === "/api/auth/refresh") {
+        return Promise.resolve(jsonResponse(
+          { detail: { code: "auth_temporarily_unavailable" } },
+          { status: 503 }
+        ));
+      }
+      return Promise.resolve(textResponse("expired", { status: 401 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const responses = await Promise.all([
+      apiFetch("/api/protected"),
+      apiFetch("/api/protected"),
+    ]);
+    const bodies = await Promise.all(responses.map((response) => response.json()));
+
+    expect(bodies.map((body) => body.detail.code)).toEqual([
+      "auth_temporarily_unavailable",
+      "auth_temporarily_unavailable",
+    ]);
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth/refresh")).toHaveLength(1);
+  });
+
   it("readApiErrorCode extracts stable backend error codes", () => {
     expect(readApiErrorCode({ code: "CONTACT_RECEIVED" })).toBe("CONTACT_RECEIVED");
     expect(readApiErrorCode({ detail: { code: "CONTACT_NAME_REQUIRED" } })).toBe("CONTACT_NAME_REQUIRED");

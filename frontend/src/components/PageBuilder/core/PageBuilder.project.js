@@ -24,7 +24,6 @@ import {
   convertSectionToDirectLayout,
   mergeSectionsIntoPageCanvas,
 } from "./PageBuilder.layout";
-import { RESPONSIVE_LAYOUT_ENGINE_VERSION, RESPONSIVE_LAYOUT_MODES } from "./PageBuilder.responsiveCapabilities";
 
 export const normalizeFormReference = (value) => String(value ?? "").trim();
 export const buildFormConnectionUpdate = (value) => ({
@@ -418,7 +417,7 @@ export const normalizeBuilderProjectShape = (project) => {
     name: "Untitled Site",
     status: "draft",
     publish: { environment: "local" },
-    ...source,
+    ...Object.fromEntries(Object.entries(source).filter(([key]) => key !== "responsiveLayout")),
     pages,
     defaultPageId: routedProject.defaultPageId,
     forms,
@@ -448,16 +447,6 @@ export const normalizeBuilderProjectShape = (project) => {
       ...defaultTheme,
       ...(source.theme || {}),
     },
-    ...(source.responsiveLayout && typeof source.responsiveLayout === "object"
-      ? {
-          responsiveLayout: {
-            mode: source.responsiveLayout.mode === RESPONSIVE_LAYOUT_MODES.smart
-              ? RESPONSIVE_LAYOUT_MODES.smart
-              : RESPONSIVE_LAYOUT_MODES.legacy,
-            engineVersion: Number(source.responsiveLayout.engineVersion) || RESPONSIVE_LAYOUT_ENGINE_VERSION,
-          },
-        }
-      : {}),
   };
 };
 

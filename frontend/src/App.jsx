@@ -123,7 +123,14 @@ export default function App() {
       cache: "no-store",
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if (response.status >= 500) {
+        const error = new Error("Authentication is temporarily unavailable");
+        error.status = response.status;
+        throw error;
+      }
+      return null;
+    }
 
     const data = await response.json();
     syncCsrfTokenFromResponseData(data);

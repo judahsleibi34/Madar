@@ -161,6 +161,7 @@ export const factoryContent = {
           description: "Choose a service, date, and time. We will confirm availability with you.",
           services: ["Consultation", "Service appointment", "Table reservation"],
           fields: ["name", "contact", "service", "date", "time", "guests", "notes"],
+          formItems: [],
           submitLabel: "Request reservation",
         },
       },

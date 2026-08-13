@@ -488,3 +488,71 @@ class BuilderReservationManagementTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ReservationConfiguredSlotValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.block = {
+            "reservation": {
+                "bookingMode": "restricted",
+                "timeSlotsByDate": {
+                    "2026-08-20": ["09:00"],
+                    "2026-08-21": ["16:00"],
+                },
+            }
+        }
+
+    def test_accepts_a_time_configured_for_its_date(self):
+        public_site_routes.validate_configured_reservation_slot(
+            self.block,
+            {"date": "2026-08-20", "time": "09:00"},
+        )
+
+    def test_rejects_a_time_borrowed_from_another_date(self):
+        with self.assertRaises(HTTPException) as raised:
+            public_site_routes.validate_configured_reservation_slot(
+                self.block,
+                {"date": "2026-08-20", "time": "16:00"},
+            )
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertEqual(raised.exception.detail["code"], "reservation_slot_invalid")
+
+    def test_keeps_legacy_global_time_lists_compatible(self):
+        public_site_routes.validate_configured_reservation_slot(
+            {"reservation": {"bookingMode": "restricted", "timeSlots": ["09:00"]}},
+            {"date": "2026-08-20", "time": "09:00"},
+        )
+
+class ReservationCustomAnswerValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.block = {
+            "reservation": {
+                "formItems": [
+                    {"id": "notes", "type": "text", "label": "Notes", "required": True},
+                    {"id": "topics", "type": "checkbox", "label": "Topics", "options": ["Design", "Build"], "required": True},
+                    {"id": "channel", "type": "radio", "label": "Channel", "options": ["Email", "Phone"]},
+                ]
+            }
+        }
+
+    def test_accepts_and_normalizes_published_custom_answers(self):
+        payload = {"customAnswers": {"notes": "  Ready  ", "topics": ["Design", "Design"], "channel": "Email"}}
+
+        public_site_routes.validate_reservation_custom_answers(self.block, payload)
+
+        self.assertEqual(payload["customAnswers"], {
+            "notes": "Ready",
+            "topics": ["Design"],
+            "channel": "Email",
+        })
+
+    def test_rejects_missing_required_unknown_and_invalid_choices(self):
+        payloads = [
+            {"customAnswers": {"notes": "", "topics": ["Design"]}},
+            {"customAnswers": {"notes": "Ready", "topics": ["Unknown"]}},
+            {"customAnswers": {"notes": "Ready", "topics": ["Design"], "extra": "value"}},
+        ]
+
+        for payload in payloads:
+            with self.subTest(payload=payload), self.assertRaises(HTTPException) as raised:
+                public_site_routes.validate_reservation_custom_answers(self.block, payload)
+            self.assertEqual(raised.exception.status_code, 400)

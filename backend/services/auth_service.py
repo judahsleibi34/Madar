@@ -8,6 +8,13 @@ import threading
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, Request, Response
+from supabase_auth.errors import (
+    AuthApiError,
+    AuthInvalidCredentialsError,
+    AuthInvalidJwtError,
+    AuthRetryableError,
+    AuthSessionMissingError,
+)
 
 from database import service_supabase, supabase
 from services.account_lifecycle_service import (
@@ -29,6 +36,24 @@ logger = logging.getLogger(__name__)
 _AUTH_REFRESH_LOCK = threading.Lock()
 _AUTH_REFRESH_REPLAY = {}
 _AUTH_REFRESH_REPLAY_SECONDS = 15
+
+
+class SessionRefreshUnavailable(RuntimeError):
+    """The identity provider could not verify the session temporarily."""
+
+
+def is_definitive_auth_failure(error: Exception) -> bool:
+    if isinstance(error, AuthRetryableError):
+        return False
+    if isinstance(
+        error,
+        (AuthInvalidCredentialsError, AuthInvalidJwtError, AuthSessionMissingError),
+    ):
+        return True
+    if isinstance(error, AuthApiError):
+        status = int(getattr(error, "status", 0) or 0)
+        return 400 <= status < 500 and status not in {408, 429}
+    return False
 
 
 def _get_auth_value(source, key: str):
@@ -370,12 +395,24 @@ def get_authenticated_user_row(
                 refresh_token
             )
 
-    except Exception as e:
+    except Exception as error:
+        if is_definitive_auth_failure(error):
+            logger.warning(
+                "auth.session.invalid",
+                extra={"error_type": type(error).__name__},
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired session",
+            ) from error
+
         logger.warning(
-            "auth.session.invalid",
-            extra={"error_type": type(e).__name__},
+            "auth.session.temporarily_unavailable",
+            extra={"error_type": type(error).__name__},
         )
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
+        raise SessionRefreshUnavailable(
+            "Authentication service is temporarily unavailable"
+        ) from error
 
     if not auth_user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")

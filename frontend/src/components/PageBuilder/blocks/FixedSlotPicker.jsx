@@ -1,3 +1,7 @@
+import { CalendarDays } from "lucide-react";
+import { useEffect } from "react";
+import { normalizeTimeSlotsByDate } from "./reservationAvailability";
+
 const normalizeOptions = (items) => [...new Set(
   (Array.isArray(items) ? items : [])
     .map((item) => String(item || "").trim())
@@ -22,6 +26,7 @@ const formatSlotTime = (timeValue, lang) => {
 export default function FixedSlotPicker({
   dates = [],
   times = [],
+  timesByDate,
   selectedDate = "",
   selectedTime = "",
   disabled = false,
@@ -30,7 +35,10 @@ export default function FixedSlotPicker({
   onSelect,
 }) {
   const fixedDates = normalizeOptions(dates).sort();
-  const fixedTimes = normalizeOptions(times);
+  const normalizedTimesByDate = normalizeTimeSlotsByDate(fixedDates, times, timesByDate);
+  const activeDate = fixedDates.includes(selectedDate) ? selectedDate : fixedDates[0] || "";
+  const activeTimes = normalizedTimesByDate[activeDate] || [];
+  const activeDateValue = parseLocalDate(activeDate);
   const fullDateFormatter = new Intl.DateTimeFormat(lang, {
     weekday: "long",
     day: "numeric",
@@ -43,14 +51,16 @@ export default function FixedSlotPicker({
     onSelect?.(fixedDates[0], "");
   }, [fixedDates, onSelect, selectedDate]);
 
-  const activeDate = fixedDates.includes(selectedDate) ? selectedDate : fixedDates[0] || "";
-  const activeDateValue = parseLocalDate(activeDate);
+  useEffect(() => {
+    if (!selectedDate || !selectedTime || activeTimes.includes(selectedTime)) return;
+    onSelect?.(activeDate, "");
+  }, [activeDate, activeTimes, onSelect, selectedDate, selectedTime]);
 
   return (
     <fieldset className={`fixed-slot-picker ${error ? "has-error" : ""}`}>
       <legend className="sr-only">Choose an appointment date and time</legend>
 
-      {fixedDates.length > 0 && fixedTimes.length > 0 ? (
+      {fixedDates.length > 0 ? (
         <div className="fixed-slot-booking-controls">
           <label className="fixed-slot-date-control">
             <span>Appointment date</span>
@@ -74,25 +84,27 @@ export default function FixedSlotPicker({
 
           <div className="fixed-slot-times">
             <span>Available time slots</span>
-            <div>
-              {fixedTimes.map((timeValue) => {
-                const selected = activeDate === selectedDate && selectedTime === timeValue;
-                const timeLabel = formatSlotTime(timeValue, lang);
-                return (
-                  <button
-                    type="button"
-                    key={`${activeDate}_${timeValue}`}
-                    className={selected ? "is-selected" : ""}
-                    aria-pressed={selected}
-                    aria-label={`${activeDateValue ? fullDateFormatter.format(activeDateValue) : activeDate} at ${timeLabel}`}
-                    disabled={disabled || !activeDate}
-                    onClick={() => onSelect?.(activeDate, timeValue)}
-                  >
-                    {timeLabel}
-                  </button>
-                );
-              })}
-            </div>
+            {activeTimes.length > 0 ? (
+              <div>
+                {activeTimes.map((timeValue) => {
+                  const selected = activeDate === selectedDate && selectedTime === timeValue;
+                  const timeLabel = formatSlotTime(timeValue, lang);
+                  return (
+                    <button
+                      type="button"
+                      key={`${activeDate}_${timeValue}`}
+                      className={selected ? "is-selected" : ""}
+                      aria-pressed={selected}
+                      aria-label={`${activeDateValue ? fullDateFormatter.format(activeDateValue) : activeDate} at ${timeLabel}`}
+                      disabled={disabled || !activeDate}
+                      onClick={() => onSelect?.(activeDate, timeValue)}
+                    >
+                      {timeLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : <div className="fixed-slot-empty">No times are available for this date.</div>}
           </div>
         </div>
       ) : (
@@ -103,5 +115,3 @@ export default function FixedSlotPicker({
     </fieldset>
   );
 }
-import { useEffect } from "react";
-import { CalendarDays } from "lucide-react";

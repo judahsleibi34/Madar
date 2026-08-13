@@ -258,3 +258,40 @@
     overflow: visible;
   }
 }
+
+/* True page centering for the workspace navigation.
+   The camera controls occupy the right track without shifting the middle. */
+.page-builder .builder-subbar-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+}
+
+.page-builder .builder-subbar-inner > .workspace-tabs {
+  grid-column: 2;
+  width: max-content;
+  max-width: calc(100vw - 440px);
+  justify-self: center;
+}
+
+.page-builder .builder-subbar-actions {
+  grid-column: 3;
+  justify-self: end;
+}
+
+@media (max-width: 1100px) {
+  .page-builder .builder-subbar-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .page-builder .builder-subbar-inner > .workspace-tabs {
+    grid-column: 1;
+    width: 100%;
+    max-width: none;
+  }
+
+  .page-builder .builder-subbar-actions {
+    grid-column: 2;
+  }
+}

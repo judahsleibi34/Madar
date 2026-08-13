@@ -7,12 +7,14 @@ from unittest.mock import patch
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
 from fastapi.middleware.cors import CORSMiddleware
+from supabase_auth.errors import AuthInvalidJwtError, AuthRetryableError
 
 from routes import auth_routes
 from services import auth_service, rate_limit_service
 from services.rate_limit_service import InMemoryRateLimitStore, enforce_rate_limit
 from services.auth_service import (
     SESSION_ACTIVITY_COOKIE_NAME,
+    SessionRefreshUnavailable,
     create_session_activity_value,
     delete_auth_cookies,
     is_session_activity_valid,
@@ -411,6 +413,16 @@ class SecurityFoundationTests(unittest.TestCase):
             self.assertTrue(is_session_activity_valid(activity, now=4_600))
             self.assertFalse(is_session_activity_valid(activity, now=4_601))
 
+    def test_auth_error_classifier_preserves_session_for_retryable_provider_errors(self):
+        error = AuthRetryableError("provider timeout", 503)
+
+        self.assertFalse(auth_service.is_definitive_auth_failure(error))
+
+    def test_auth_error_classifier_rejects_invalid_credentials(self):
+        error = AuthInvalidJwtError("invalid token")
+
+        self.assertTrue(auth_service.is_definitive_auth_failure(error))
+
     def test_session_activity_rejects_tampering(self):
         activity = create_session_activity_value(now=1_000)
         timestamp, _ = activity.split(".", 1)
@@ -508,6 +520,76 @@ class SecurityFoundationTests(unittest.TestCase):
         self.assertFalse(
             any(header.startswith("madar_refresh_token=") for header in set_cookie_headers)
         )
+
+    def test_user_status_transient_failure_returns_503_without_clearing_cookies(self):
+        app = FastAPI()
+        app.include_router(auth_routes.router)
+        client = TestClient(app)
+
+        with patch.object(
+            auth_routes,
+            "get_authenticated_user_row",
+            side_effect=SessionRefreshUnavailable("provider timeout"),
+        ):
+            response = client.get(
+                "/auth/user_status",
+                cookies={
+                    "madar_access_token": "access-token",
+                    "madar_refresh_token": "refresh-token",
+                },
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "auth_temporarily_unavailable")
+        self.assertEqual(response.headers.get("Retry-After"), "5")
+        self.assertFalse(response.headers.get_list("set-cookie"))
+
+    def test_refresh_transient_failure_returns_503_without_clearing_cookies(self):
+        app = FastAPI()
+        app.include_router(auth_routes.router)
+        client = TestClient(app)
+
+        with patch.object(
+            auth_routes,
+            "get_authenticated_user_row",
+            side_effect=SessionRefreshUnavailable("provider timeout"),
+        ):
+            response = client.post(
+                "/auth/refresh",
+                cookies={
+                    "madar_access_token": "access-token",
+                    "madar_refresh_token": "refresh-token",
+                },
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "auth_temporarily_unavailable")
+        self.assertEqual(response.headers.get("Retry-After"), "5")
+        self.assertFalse(response.headers.get_list("set-cookie"))
+
+    def test_refresh_definitive_failure_clears_auth_cookies(self):
+        app = FastAPI()
+        app.include_router(auth_routes.router)
+        client = TestClient(app)
+
+        with patch.object(
+            auth_routes,
+            "get_authenticated_user_row",
+            side_effect=HTTPException(status_code=401, detail="Invalid session"),
+        ):
+            response = client.post(
+                "/auth/refresh",
+                cookies={
+                    "madar_access_token": "access-token",
+                    "madar_refresh_token": "refresh-token",
+                },
+            )
+
+        set_cookie_headers = response.headers.get_list("set-cookie")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"]["code"], "auth_session_expired")
+        self.assertTrue(any(header.startswith("madar_access_token=") for header in set_cookie_headers))
+        self.assertTrue(any(header.startswith("madar_refresh_token=") for header in set_cookie_headers))
 
     def build_rate_limit_request(self, host="198.51.100.10", headers=None):
         return SimpleNamespace(

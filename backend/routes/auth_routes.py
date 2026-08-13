@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, UUID4
 
 from database import service_supabase, supabase
@@ -15,6 +16,7 @@ from services.auth_service import (
     auth_user_email_is_verified,
     mark_local_email_verified,
     normalize_user_type,
+    SessionRefreshUnavailable,
 )
 from services.account_lifecycle_service import (
     ACTIVE_ACCOUNT_STATUS,
@@ -24,7 +26,7 @@ from services.account_lifecycle_service import (
     is_platform_account,
     synchronize_verified_account,
 )
-from services.api_errors import api_error
+from services.api_errors import api_error, error_detail
 from services.billing_service import get_billing_summary_for_tenant
 from services.onboarding_service import (
     ensure_subdomain_available,
@@ -1059,9 +1061,16 @@ def user_status(request: Request, response: Response):
         }
 
     except HTTPException as error:
-        # Keep this status probe non-destructive. A delayed/failed background
-        # auth check can otherwise erase newer cookies from a successful refresh
-        # or login response that reached the browser first.
+        if error.status_code >= 500 or error.status_code in {408, 429}:
+            raise api_error(
+                503,
+                "auth_temporarily_unavailable",
+                "Authentication is temporarily unavailable. Please try again.",
+                headers={"Retry-After": "5"},
+            ) from error
+
+        # Keep definitive status failures non-destructive. A delayed background
+        # probe must never erase newer cookies from a successful refresh/login.
         payload = {
             "logged_in": False,
             "user": None,
@@ -1070,12 +1079,17 @@ def user_status(request: Request, response: Response):
             payload["account_state"] = error.detail["code"]
         return payload
 
-    except Exception as e:
-        logger.warning("auth.user_status.failed", extra={"error_type": type(e).__name__})
-        return {
-            "logged_in": False,
-            "user": None,
-        }
+    except Exception as error:
+        logger.warning(
+            "auth.user_status.temporarily_unavailable",
+            extra={"error_type": type(error).__name__},
+        )
+        raise api_error(
+            503,
+            "auth_temporarily_unavailable",
+            "Authentication is temporarily unavailable. Please try again.",
+            headers={"Retry-After": "5"},
+        ) from error
 
 
 @router.post("/refresh")
@@ -1091,19 +1105,41 @@ def refresh_session(request: Request, response: Response):
         }
 
     except HTTPException as error:
-        delete_auth_cookies(response)
-        raise HTTPException(
-            status_code=401,
-            detail="Session expired. Please log in again.",
+        if error.status_code < 500 and error.status_code not in {408, 429}:
+            expired_response = JSONResponse(
+                status_code=401,
+                content={
+                    "detail": error_detail(
+                        "auth_session_expired",
+                        "Session expired. Please log in again.",
+                    )
+                },
+            )
+            delete_auth_cookies(expired_response)
+            return expired_response
+
+        logger.warning(
+            "auth.refresh.temporarily_unavailable",
+            extra={"error_type": type(error).__name__},
+        )
+        raise api_error(
+            503,
+            "auth_temporarily_unavailable",
+            "Authentication is temporarily unavailable. Please try again.",
+            headers={"Retry-After": "5"},
         ) from error
 
     except Exception as error:
-        logger.warning("auth.refresh.failed", extra={"error_type": type(error).__name__})
-        delete_auth_cookies(response)
-        raise HTTPException(
-            status_code=401,
-            detail="Session expired. Please log in again.",
+        logger.warning(
+            "auth.refresh.temporarily_unavailable",
+            extra={"error_type": type(error).__name__},
         )
+        raise api_error(
+            503,
+            "auth_temporarily_unavailable",
+            "Authentication is temporarily unavailable. Please try again.",
+            headers={"Retry-After": "5"},
+        ) from error
 
 
 @router.put("/password/change")

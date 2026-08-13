@@ -1,4 +1,4 @@
-import { Fragment, forwardRef, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, forwardRef, useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { getRowCarouselElements } from "./PageBuilder.elementLayout";
 import {
@@ -7,16 +7,33 @@ import {
   getSectionCanvasHeight,
 } from "./PageBuilder.layout";
 import { getDirectElementFrameStyle } from "./PageBuilder.styles";
+import {
+  RESPONSIVE_ELEMENT_GAP_RATIO,
+  resolveDirectElementCollisionPadding,
+} from "./PageBuilder.collisionPadding";
+import { resolveResponsiveElementSizing } from "./PageBuilder.responsiveSizing";
+import {
+  getUnderTextImageRelationships,
+  projectUnderTextImagePosition,
+} from "./PageBuilder.underTextLayout";
 import { getPageBuilderThemeVars } from "./PageBuilder.theme";
 import {
   getArtboardElementPosition,
   getArtboardLogicalWidth,
   normalizeArtboardViewportMode,
 } from "./PageBuilder.artboard";
-import { getResponsiveCapabilities, isSmartResponsiveProject } from "./PageBuilder.responsiveCapabilities";
-import { resolvePageResponsiveLayout } from "./PageBuilder.responsiveLayout";
 
-const legacyMeasurableElementTypes = new Set(["formBlock", "reservationBlock", "loginBlock", "registrationBlock"]);
+const intrinsicHeightElementTypes = new Set(["heading", "text", "list"]);
+
+const measurableElementTypes = new Set([
+  "heading",
+  "text",
+  "list",
+  "formBlock",
+  "reservationBlock",
+  "loginBlock",
+  "registrationBlock",
+]);
 
 const mergeRefs = (...refs) => (node) => {
   refs.forEach((ref) => {
@@ -38,7 +55,7 @@ function MeasuredDirectElement({
 
   useLayoutEffect(() => {
     if (!shouldMeasure) return undefined;
-    if (element.type === "reservationBlock" && element.directSizeMode === "fixed") return undefined;
+
 
     const frame = frameRef.current;
     const content = frame?.querySelector(":scope > .direct-element-content");
@@ -88,9 +105,6 @@ const SiteRenderer = forwardRef(function SiteRenderer({
   viewportMode = "desktop",
   presentationZoom = 1,
   availablePresentationWidth,
-  responsiveLayoutWidth,
-  responsiveChangedElementIds = [],
-  responsiveTransientRectsBySection = {},
   renderElement,
   renderSiteHeader,
   renderSiteFooter,
@@ -111,59 +125,9 @@ const SiteRenderer = forwardRef(function SiteRenderer({
 }, forwardedRef) {
   const mode = normalizeArtboardViewportMode(viewportMode);
   const referenceLogicalWidth = getArtboardLogicalWidth(mode);
-  const smartResponsive = isSmartResponsiveProject(project);
-  const requestedLayoutWidth = smartResponsive
-    ? Math.max(1, Number(responsiveLayoutWidth) || referenceLogicalWidth)
-    : referenceLogicalWidth;
+  const logicalWidth = referenceLogicalWidth;
   const zoom = Math.min(2, Math.max(0.0001, Number(presentationZoom) || 1));
   const [measuredElementHeights, setMeasuredElementHeights] = useState({});
-  const [lastMeasuredElementIds, setLastMeasuredElementIds] = useState([]);
-  const [fontStateRevision, setFontStateRevision] = useState(0);
-  const [assetStateRevision, setAssetStateRevision] = useState(0);
-  const measurementsBySection = useMemo(() => {
-    const result = {};
-    Object.entries(measuredElementHeights).forEach(([key, height]) => {
-      const [pageId, keyMode, keyWidth, sectionId, elementId] = key.split(":");
-      if (pageId !== String(activePage?.id || "page") || keyMode !== mode || Number(keyWidth) !== requestedLayoutWidth) return;
-      if (!result[sectionId]) result[sectionId] = {};
-      result[sectionId][elementId] = height;
-    });
-    return result;
-  }, [activePage?.id, measuredElementHeights, mode, requestedLayoutWidth]);
-  const resolvedLayout = useMemo(() => resolvePageResponsiveLayout({
-    project,
-    page: activePage,
-    viewportMode: mode,
-    layoutWidth: requestedLayoutWidth,
-    measurements: measurementsBySection,
-    changedElementIds: [...new Set([...lastMeasuredElementIds, ...responsiveChangedElementIds])],
-    transientRectsBySection: responsiveTransientRectsBySection,
-    fontSignature: {
-      theme: project?.theme?.typography || project?.theme?.fonts || "",
-      readinessRevision: fontStateRevision,
-    },
-    assetState: {
-      projectRevision: project?.assetRevision || "",
-      loadRevision: assetStateRevision,
-    },
-  }), [
-    activePage,
-    lastMeasuredElementIds,
-    measurementsBySection,
-    mode,
-    project,
-    requestedLayoutWidth,
-    assetStateRevision,
-    fontStateRevision,
-    responsiveChangedElementIds,
-    responsiveTransientRectsBySection,
-  ]);
-  const logicalWidth = resolvedLayout?.layoutWidth || referenceLogicalWidth;
-  useLayoutEffect(() => {
-    if (!lastMeasuredElementIds.length) return undefined;
-    const frame = window.requestAnimationFrame(() => setLastMeasuredElementIds([]));
-    return () => window.cancelAnimationFrame(frame);
-  }, [lastMeasuredElementIds, resolvedLayout]);
   const physicalAvailableWidth = Math.max(
     logicalWidth * zoom,
     Number(availablePresentationWidth) || 0
@@ -178,9 +142,6 @@ const SiteRenderer = forwardRef(function SiteRenderer({
       Math.abs((current[measurementKey] || 0) - logicalHeight) <= 1
         ? current
         : { ...current, [measurementKey]: logicalHeight }
-    );
-    setLastMeasuredElementIds((current) =>
-      current.length === 1 && current[0] === elementId ? current : [elementId]
     );
     onElementMeasured?.(elementId, logicalHeight, mode, sectionId);
   }, [activePage?.id, logicalWidth, mode, onElementMeasured]);
@@ -199,44 +160,72 @@ const SiteRenderer = forwardRef(function SiteRenderer({
       if (cancelled || animationFrame !== null) return;
       animationFrame = window.requestAnimationFrame(measure);
     };
-    const scheduleAssetMeasurement = () => {
-      if (cancelled) return;
-      setAssetStateRevision((current) => current + 1);
-      schedule();
-    };
-    const scheduleFontMeasurement = () => {
-      if (cancelled) return;
-      setFontStateRevision((current) => current + 1);
-      schedule();
-    };
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     observer?.observe(artboard);
-    artboard.addEventListener("load", scheduleAssetMeasurement, true);
-    document.fonts?.addEventListener?.("loadingdone", scheduleFontMeasurement);
-    document.fonts?.ready?.then(scheduleFontMeasurement);
+    artboard.addEventListener("load", schedule, true);
     schedule();
     return () => {
       cancelled = true;
       if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
       observer?.disconnect();
-      artboard.removeEventListener("load", scheduleAssetMeasurement, true);
-      document.fonts?.removeEventListener?.("loadingdone", scheduleFontMeasurement);
+      artboard.removeEventListener("load", schedule, true);
     };
   }, [activePage?.id, mode, project]);
 
   const sections = activePage?.sections || [];
+  const underTextImageRelationshipsBySection = Object.fromEntries(sections.map((section) => {
+    if (!["direct", "free"].includes(section.mode)) return [section.id, new Set()];
+    const desktopEntries = (section.freeElements || []).filter(filterElement).map((element) => ({
+      element,
+      position: getArtboardElementPosition(element, "desktop"),
+    }));
+    return [section.id, getUnderTextImageRelationships(desktopEntries)];
+  }));
+  const resolvedDirectPositionsBySection = Object.fromEntries(sections.map((section) => {
+    if (!["direct", "free"].includes(section.mode)) return [section.id, {}];
+    const visibleElements = (section.freeElements || []).filter(filterElement);
+    const entries = visibleElements.map((element) => {
+      const underTextRelationship = underTextImageRelationshipsBySection[section.id]?.get(element.id);
+      const isUnderTextImage = Boolean(underTextRelationship);
+      const authoredDesktopPosition = getArtboardElementPosition(element, "desktop");
+      const savedPosition = isUnderTextImage && mode !== "desktop"
+        ? projectUnderTextImagePosition(authoredDesktopPosition, logicalWidth)
+        : getDirectElementPosition?.(element, section, mode)
+          || getArtboardElementPosition(element, mode);
+      const measurementKey = `${activePage?.id || "page"}:${mode}:${logicalWidth}:${section.id}:${element.id}`;
+      const measuredHeight = measuredElementHeights[measurementKey] || 0;
+      const minimumHeight = getDirectElementMinimumSize(element).height;
+      const usesMeasuredReservationHeight = element.type === "reservationBlock"
+        && measuredHeight > 0;
+      return {
+        element,
+        flowRole: isUnderTextImage ? "underText" : "normal",
+        anchorElementId: underTextRelationship?.anchorElementId || null,
+        anchorOffsetY: (underTextRelationship?.offsetY || 0) * (logicalWidth / 1200),
+        position: {
+          ...savedPosition,
+          height: usesMeasuredReservationHeight
+            ? Math.max(minimumHeight, measuredHeight)
+            : Math.max(Number(savedPosition.height) || 0, measuredHeight),
+        },
+      };
+    });
+    const sizedEntries = resolveResponsiveElementSizing(entries, mode, logicalWidth);
+    return [
+      section.id,
+      resolveDirectElementCollisionPadding(sizedEntries, RESPONSIVE_ELEMENT_GAP_RATIO),
+    ];
+  }));
   const resolvedSectionHeights = Object.fromEntries(sections.map((section) => {
-    const smartSection = resolvedLayout?.sections?.[section.id];
-    if (smartSection) return [section.id, smartSection.rect.height];
     const baseHeight = getSectionLogicalHeight?.(section, mode) || getSectionCanvasHeight(section, mode);
     if (!['direct', 'free'].includes(section.mode)) return [section.id, baseHeight];
-    const requiredHeight = (section.freeElements || []).reduce((maximum, element) => {
-      const position = getDirectElementPosition?.(element, section, mode)
-        || resolvedLayout?.sections?.[section.id]?.elementRects?.[element.id]
+    const requiredHeight = (section.freeElements || []).filter(filterElement).reduce((maximum, element) => {
+      const position = resolvedDirectPositionsBySection[section.id]?.[element.id]
         || getArtboardElementPosition(element, mode);
-      const measuredHeight = measuredElementHeights[`${activePage?.id || "page"}:${mode}:${logicalWidth}:${section.id}:${element.id}`] || 0;
-      const height = Math.max(Number(position.height) || 0, measuredHeight);
-      return Math.max(maximum, (Number(position.y) || 0) + height + 48);
+      return Math.max(
+        maximum,
+        (Number(position.y) || 0) + (Number(position.height) || 0) + 48
+      );
     }, baseHeight);
     return [section.id, requiredHeight];
   }));
@@ -265,8 +254,6 @@ const SiteRenderer = forwardRef(function SiteRenderer({
       data-presentation-zoom={zoom.toFixed(4)}
       data-logical-width={logicalWidth}
       data-viewport-mode={mode}
-      data-responsive-layout-mode={smartResponsive ? "smart" : "legacy"}
-      data-responsive-engine-version={resolvedLayout?.engineVersion || ""}
     >
       <div
         ref={mergeRefs(artboardRef, forwardedRef)}
@@ -310,18 +297,15 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                   style={{ width: `${logicalWidth}px`, minHeight: `${logicalHeight}px`, ...(directCanvasProps.style || {}) }}
                 >
                   {(section.freeElements || []).filter(filterElement).map((element) => {
-                    const responsiveCapabilities = getResponsiveCapabilities(element);
-                    const position = getDirectElementPosition?.(element, section, mode)
-                      || resolvedLayout?.sections?.[section.id]?.elementRects?.[element.id]
+                    const effectivePosition = resolvedDirectPositionsBySection[section.id]?.[element.id]
                       || getArtboardElementPosition(element, mode);
-                    const measuredHeight = measuredElementHeights[`${activePage?.id || "page"}:${mode}:${logicalWidth}:${section.id}:${element.id}`] || 0;
-                    const effectivePosition = {
-                      ...position,
-                      height: Math.max(Number(position.height) || 0, measuredHeight),
-                    };
+                    const isUnderTextImage = underTextImageRelationshipsBySection[section.id]?.has(element.id);
+                    const layoutElement = isUnderTextImage && element.layer !== "behindText"
+                      ? { ...element, layer: "behindText" }
+                      : element;
                     const frameStyle = {
                       ...getDirectElementFrameStyle({
-                        element,
+                        element: layoutElement,
                         position: effectivePosition,
                         viewportWidth: logicalWidth,
                         sectionHeight: logicalHeight,
@@ -330,12 +314,11 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                         canvasScale: 1,
                       }),
                       "--site-element-logical-height": `${effectivePosition.height}px`,
-                      "--site-minimum-font-size": `${responsiveCapabilities.minimumFontSize}px`,
                     };
                     const suppliedFrameProps = getDirectFrameProps?.(element, section, frameStyle) || {};
                     const frameProps = {
                       ...suppliedFrameProps,
-                      className: `direct-element-frame direct-element-frame-${element.type} ${element.type === "reservationBlock" && element.directSizeMode === "fixed" ? "is-fixed-size" : ""} ${element.layer === "behindText" ? "is-behind-text" : ""} ${suppliedFrameProps.className || ""}`.trim(),
+                      className: `direct-element-frame direct-element-frame-${element.type} ${intrinsicHeightElementTypes.has(element.type) ? "is-intrinsic-height" : ""} ${isUnderTextImage || element.layer === "behindText" ? "is-behind-text" : ""} ${suppliedFrameProps.className || ""}`.trim(),
                       "data-builder-element-id": element.id,
                       "data-logical-x": effectivePosition.x,
                       "data-logical-y": effectivePosition.y,
@@ -348,9 +331,7 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                           element={element}
                           frameProps={frameProps}
                           frameStyle={{ ...frameStyle, ...(suppliedFrameProps.style || {}) }}
-                          shouldMeasure={smartResponsive
-                            ? responsiveCapabilities.canGrowY
-                            : legacyMeasurableElementTypes.has(element.type)}
+                          shouldMeasure={measurableElementTypes.has(element.type)}
                           onLogicalHeight={(elementId, height) => reportElementHeight(elementId, height, section.id)}
                         >
                           <div className="direct-element-content">
