@@ -56,11 +56,13 @@ import App from "./App.jsx";
 import { getBrandedRuntimePath } from "./utils/hostedAddress";
 import { installMadarPwaMetadata, isMadarPwaHost } from "./pwa/pwaContext";
 import { getMadarServiceWorkerRegistration } from "./pwa/serviceWorker";
+import { initializeInstallPromptCapture } from "./pwa/installPromptStore";
 
 const brandedRuntimePath = getBrandedRuntimePath(window.location);
 const madarPwaHost = isMadarPwaHost(window.location);
 
 if (madarPwaHost) {
+  initializeInstallPromptCapture(window);
   installMadarPwaMetadata(document);
 
   // Avoid development workers controlling Vite's mutable module graph. The

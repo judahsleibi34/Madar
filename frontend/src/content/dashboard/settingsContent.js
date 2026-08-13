@@ -96,7 +96,10 @@ export const settingsContent = {
       installDescription: "Open Madar in its own app window from this device.",
       alreadyInstalled: "Madar is running as an installed app on this device.",
       iosInstallGuidance: "To install Madar, open the Share menu and choose Add to Home Screen.",
-      installUnavailable: "Installation is available when supported by your browser.",
+      browserInstallGuidance: "Install Madar from the install icon in your browser's address bar or menu.",
+      installUnavailable: "This browser doesn't currently support installing Madar as an app.",
+      installing: "Installing...",
+      installError: "Madar could not open the installation prompt. Please try again when your browser offers it.",
       platforms: {
         ios: "iPhone/iPad",
         android: "Android",
@@ -225,7 +228,10 @@ export const settingsContent = {
       installDescription: "افتح مدار في نافذة تطبيق مستقلة على هذا الجهاز.",
       alreadyInstalled: "يعمل مدار كتطبيق مثبت على هذا الجهاز.",
       iosInstallGuidance: "لتثبيت مدار، افتح قائمة المشاركة واختر إضافة إلى الشاشة الرئيسية.",
-      installUnavailable: "يتوفر التثبيت عندما يدعمه متصفحك.",
+      browserInstallGuidance: "ثبّت مدار من أيقونة التثبيت في شريط عنوان المتصفح أو من قائمته.",
+      installUnavailable: "هذا المتصفح لا يدعم حالياً تثبيت مدار كتطبيق.",
+      installing: "جارٍ التثبيت...",
+      installError: "تعذر على مدار فتح مطالبة التثبيت. حاول مرة أخرى عندما يعرضها المتصفح.",
       platforms: {
         ios: "iPhone/iPad",
         android: "Android",
