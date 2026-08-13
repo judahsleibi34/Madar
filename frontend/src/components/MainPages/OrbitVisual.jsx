@@ -219,7 +219,7 @@ function createLabel(text, extraClass = "") {
 }
 
 
-export default function OrbitVisual({ lang = "en" }) {
+export default function OrbitVisual({ lang = "en", onUnavailable }) {
   const containerRef = useRef(null);
   const labelsRef    = useRef(null);
 
@@ -234,10 +234,17 @@ export default function OrbitVisual({ lang = "en" }) {
     let W = container.clientWidth;
     let H = container.clientHeight;
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-    });
+    let renderer;
+
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+      });
+    } catch {
+      onUnavailable?.();
+      return undefined;
+    }
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
@@ -485,7 +492,7 @@ export default function OrbitVisual({ lang = "en" }) {
       planets.forEach((p) => p.lbl.remove());
       renderer.domElement.remove();
     };
-  }, [lang]);
+  }, [lang, onUnavailable]);
 
   return (
     <div

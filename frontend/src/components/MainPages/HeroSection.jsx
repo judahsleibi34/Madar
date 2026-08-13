@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -6,6 +6,23 @@ import GradientText from "../Animations/GradientText";
 import SplitText from "../Animations/SplitText";
 
 const OrbitVisual = lazy(() => import("./OrbitVisual"));
+
+function canCreateWebGL2Context() {
+  try {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("webgl2", {
+      antialias: true,
+      alpha: true,
+    });
+
+    if (!context) return false;
+
+    context.getExtension("WEBGL_lose_context")?.loseContext();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function OrbitVisualPlaceholder() {
   return (
@@ -21,13 +38,24 @@ function OrbitVisualPlaceholder() {
 function LazyOrbitVisual({ lang }) {
   const prefersReducedMotion = useReducedMotion();
   const [shouldLoad, setShouldLoad] = useState(false);
+  const [webGLUnavailable, setWebGLUnavailable] = useState(false);
+  const handleWebGLUnavailable = useCallback(() => {
+    setWebGLUnavailable(true);
+  }, []);
 
   useEffect(() => {
     if (prefersReducedMotion) {
       return undefined;
     }
 
-    const load = () => setShouldLoad(true);
+    const load = () => {
+      if (!canCreateWebGL2Context()) {
+        setWebGLUnavailable(true);
+        return;
+      }
+
+      setShouldLoad(true);
+    };
 
     if ("requestIdleCallback" in window) {
       const id = window.requestIdleCallback(load, { timeout: 1500 });
@@ -38,14 +66,14 @@ function LazyOrbitVisual({ lang }) {
     return () => window.clearTimeout(id);
   }, [prefersReducedMotion]);
 
-  if (prefersReducedMotion || !shouldLoad) {
+  if (prefersReducedMotion || webGLUnavailable || !shouldLoad) {
     return <OrbitVisualPlaceholder />;
   }
 
   return (
     <Suspense fallback={<OrbitVisualPlaceholder />}>
       <div className="hero-visual-ready">
-        <OrbitVisual lang={lang} />
+        <OrbitVisual lang={lang} onUnavailable={handleWebGLUnavailable} />
       </div>
     </Suspense>
   );
