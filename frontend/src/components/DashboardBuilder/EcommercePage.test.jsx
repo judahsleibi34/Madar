@@ -63,7 +63,7 @@ describe("EcommercePage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Add category" }));
     expect(screen.getByLabelText("Parent category")).toBeTruthy();
 
-    rerender(<EcommercePage section="products" />);
+    rerender(<EcommercePage key="products" section="products" />);
     fireEvent.click(await screen.findByRole("button", { name: "Add product" }));
     expect(screen.getByText("Pricing")).toBeTruthy();
     expect(screen.getByText("Inventory")).toBeTruthy();
