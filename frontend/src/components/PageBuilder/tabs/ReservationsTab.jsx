@@ -229,30 +229,6 @@ export default function ReservationsTab({
     });
   };
 
-  const updateReservationListItem = (key, index, value) => {
-    const fallback = key === "timeSlots" ? fallbackReservation.timeSlots : fallbackReservation.services;
-    const current = getEditableList(reservation[key], fallback);
-    updateReservation({
-      [key]: current.map((item, itemIndex) => (itemIndex === index ? value : item)),
-    });
-  };
-
-  const addReservationListItem = (key, value) => {
-    const fallback = key === "timeSlots" ? fallbackReservation.timeSlots : fallbackReservation.services;
-    const current = getEditableList(reservation[key], fallback);
-    updateReservation({ [key]: [...current, value] });
-  };
-
-  const removeReservationListItem = (key, index) => {
-    const fallback = key === "timeSlots" ? fallbackReservation.timeSlots : fallbackReservation.services;
-    const current = getEditableList(reservation[key], fallback);
-    updateReservation({ [key]: current.filter((_, itemIndex) => itemIndex !== index) });
-  };
-
-  const cleanReservationList = (key) => {
-    updateReservation({ [key]: cleanList(reservation[key]) });
-  };
-
   const services = getEditableList(reservation.services, fallbackReservation.services);
   const availableDates = Array.isArray(reservation.availableDates)
     ? cleanList(reservation.availableDates).sort()
@@ -339,13 +315,16 @@ export default function ReservationsTab({
 
   const saveAsNewBuild = () => {
     if (!activeElement) return;
-    const formItems = bookingComponents.map(({ id: _id, ...item }) =>
-      createReservationFormItem(item.type, {
-        ...item,
+    const formItems = bookingComponents.map((item) => {
+      const copiedItem = Object.fromEntries(
+        Object.entries(item).filter(([key]) => key !== "id")
+      );
+      return createReservationFormItem(item.type, {
+        ...copiedItem,
         options: Array.isArray(item.options) ? [...item.options] : item.options,
         textStyle: item.textStyle ? { ...item.textStyle } : item.textStyle,
-      })
-    );
+      });
+    });
     const copiedTimeSlotsByDate = Object.fromEntries(
       Object.entries(timeSlotsByDate).map(([date, slots]) => [date, [...slots]])
     );

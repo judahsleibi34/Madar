@@ -154,64 +154,64 @@ class DataReadingRemoteUrlSecurityTests(unittest.TestCase):
 
         self.assertEqual(df.to_dict("records"), [{"name": "A", "value": 1}])
 
-    def test_remote_enabled_still_blocks_ssrf_and_unsafe_schemes(self):
-        reader = DataReadingNormal("uploads/fake.csv")
-        blocked_urls = [
-            "https://127.0.0.1/file.csv",
-            "https://localhost/file.csv",
-            "https://169.254.169.254/latest/meta-data",
-            "https://10.0.0.1/file.csv",
-            "https://172.16.0.1/file.csv",
-            "https://192.168.1.1/file.csv",
-            "https://[::1]/file.csv",
-            "file:///etc/passwd",
-            "ftp://example.com/file.csv",
-            "gopher://example.com/file.csv",
-            "//evil.com/file.csv",
+    def test_remote_enabled_routes_through_egress_then_parser_without_direct_get(self):
+        egress = Mock(status_code=200)
+        egress.headers = {}
+        egress.iter_content.return_value = [
+            b'{"status":"ok","request_id":"REQUEST_ID",'
+            b'"final_url":"https://example.com/file.csv",'
+            b'"content_type":"text/csv","content_b64":"bmFtZSx2YWx1ZVxuQSwxXG4="}'
         ]
-
-        with patch.dict("os.environ", {"ALLOW_REMOTE_DATASET_URLS": "true"}, clear=False):
-            for url in blocked_urls:
-                with self.subTest(url=url):
-                    with self.assertRaises(ValueError):
-                        reader._validate_public_url(url)
-
-    def test_remote_enabled_requires_https_by_default(self):
-        reader = DataReadingNormal("uploads/fake.csv")
-
-        with patch.dict("os.environ", {"ALLOW_REMOTE_DATASET_URLS": "true"}, clear=False):
-            with self.assertRaisesRegex(ValueError, "must use HTTPS"):
-                reader._validate_public_url("http://example.com/file.csv")
-
-    def test_remote_enabled_redirect_to_private_target_is_blocked(self):
-        redirect_response = Mock()
-        redirect_response.is_redirect = True
-        redirect_response.headers = {"Location": "http://127.0.0.1/private.csv"}
-        redirect_response.close = Mock()
-
-        public_address = [(2, 1, 6, "", ("93.184.216.34", 80))]
-        private_address = [(2, 1, 6, "", ("127.0.0.1", 80))]
-
-        def fake_getaddrinfo(host, port, type=None):
-            if host == "example.com":
-                return public_address
-            if host == "127.0.0.1":
-                return private_address
-            raise AssertionError(f"Unexpected host: {host}")
+        egress.json.side_effect = lambda: __import__("json").loads(egress._content)
+        parser = Mock(status_code=200)
+        parser.headers = {}
+        parser.iter_content.return_value = [b'{"columns":["name","value"],"data":[["A",1]]}']
+        parser.json.side_effect = lambda: __import__("json").loads(parser._content)
 
         with patch.dict(
             "os.environ",
             {
                 "ALLOW_REMOTE_DATASET_URLS": "true",
-                "ALLOW_INSECURE_REMOTE_DATASET_HTTP": "true",
+                "PARSER_ISOLATED_WORKER_ENABLED": "true",
             },
             clear=False,
-        ), patch("data_analysis.io.data_reading.requests.get", return_value=redirect_response), patch(
-            "data_analysis.io.data_reading.socket.getaddrinfo", side_effect=fake_getaddrinfo
-        ):
-            reader = DataReadingNormal("http://example.com/file.csv")
-            with self.assertRaisesRegex(ValueError, "Private or local network"):
-                reader._fetch_public_url("http://example.com/file.csv")
+        ), patch("data_analysis.io.data_reading.uuid4") as request_uuid, patch(
+            "data_analysis.io.data_reading.requests.post",
+            side_effect=[egress, parser],
+        ) as post, patch("data_analysis.io.data_reading.requests.get") as direct_get:
+            request_uuid.return_value.hex = "REQUEST_ID"
+            result = DataReadingNormal(
+                "https://example.com/file.csv", tenant_id="7", user_id="12"
+            ).read()
+
+        self.assertEqual(result.to_dict("records"), [{"name": "A", "value": 1}])
+        self.assertEqual(post.call_count, 2)
+        self.assertIn("remote-ingestion-worker", post.call_args_list[0].args[0])
+        self.assertIn("parser-worker", post.call_args_list[1].args[0])
+        self.assertEqual(post.call_args_list[0].kwargs["json"]["tenant_id"], "7")
+        self.assertEqual(post.call_args_list[0].kwargs["json"]["user_id"], "12")
+        direct_get.assert_not_called()
+
+    def test_remote_worker_unavailable_is_a_controlled_503_without_fallback(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "ALLOW_REMOTE_DATASET_URLS": "true",
+                "PARSER_ISOLATED_WORKER_ENABLED": "true",
+            },
+            clear=False,
+        ), patch(
+            "data_analysis.io.data_reading.requests.post",
+            side_effect=__import__("requests").Timeout("unavailable"),
+        ), patch("data_analysis.io.data_reading.requests.get") as direct_get:
+            with self.assertRaises(HTTPException) as context:
+                DataReadingNormal(
+                    "https://example.com/file.csv", tenant_id="7", user_id="12"
+                ).read()
+
+        self.assertEqual(context.exception.status_code, 503)
+        self.assertEqual(context.exception.headers.get("Retry-After"), "30")
+        direct_get.assert_not_called()
 
 
 class DataReadingExcelSafetyTests(unittest.TestCase):

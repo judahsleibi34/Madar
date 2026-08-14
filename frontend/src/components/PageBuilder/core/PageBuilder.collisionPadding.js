@@ -90,4 +90,3 @@ export const resolveDirectElementCollisionPadding = (
 
   return Object.fromEntries(nodes.map((node) => [node.element.id, { ...node.position }]));
 };
-

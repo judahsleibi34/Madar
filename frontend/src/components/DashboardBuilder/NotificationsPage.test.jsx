@@ -146,13 +146,21 @@ describe("NotificationsPage tenant safety", () => {
 
     fireEvent.click(notificationRow.closest("article"));
     await waitFor(() => expect(markNotificationRead).toHaveBeenCalledWith("a"));
-    expect(screen.getByText("0", { selector: ".notifications-header-count strong" })).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen.getByText("0", { selector: ".notifications-header-count strong" }),
+      ).toBeTruthy(),
+    );
 
     fetchNotifications.mockResolvedValueOnce(response("b", "Another", 2));
     fireEvent.focus(window);
     await screen.findByText("Another");
     fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
     await waitFor(() => expect(markAllNotificationsRead).toHaveBeenCalledOnce());
-    expect(screen.getByText("0", { selector: ".notifications-header-count strong" })).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen.getByText("0", { selector: ".notifications-header-count strong" }),
+      ).toBeTruthy(),
+    );
   });
 });

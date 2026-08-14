@@ -101,6 +101,16 @@ export const createReservationFormItem = (type, overrides = {}) => {
   };
 };
 
+export const moveBookingComponent = (items, sourceId, targetIndex) => {
+  const current = Array.isArray(items) ? [...items] : [];
+  const sourceIndex = current.findIndex((item) => item.id === sourceId);
+  if (sourceIndex < 0) return current;
+  const [moved] = current.splice(sourceIndex, 1);
+  const adjustedIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+  current.splice(Math.max(0, Math.min(adjustedIndex, current.length)), 0, moved);
+  return current;
+};
+
 export const normalizeReservationFormItems = (items) => {
   if (!Array.isArray(items)) return [];
 
