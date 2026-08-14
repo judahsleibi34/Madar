@@ -16,20 +16,34 @@ services:
       CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-true}
       PUBLIC_API_URL: http://127.0.0.1:8002
       FRONTEND_PRIMARY_URL: http://127.0.0.1:3001
+      PARSER_ISOLATED_WORKER_ENABLED: "true"
+      ALLOW_REMOTE_DATASET_URLS: "true"
     depends_on: !override
       redis:
         condition: service_healthy
 
   notification-worker:
+    container_name: madar-dev-notification-worker
     profiles: !override []
     environment:
       APP_ENV: development
 
   calendar-sync-worker:
+    container_name: madar-dev-calendar-sync-worker
     environment:
       APP_ENV: development
       PUBLIC_API_URL: http://127.0.0.1:8002
       FRONTEND_PRIMARY_URL: http://127.0.0.1:3001
+
+  parser-worker:
+    container_name: madar-dev-parser-worker
+    environment:
+      APP_ENV: development
+
+  remote-ingestion-worker:
+    container_name: madar-dev-remote-ingestion-worker
+    environment:
+      APP_ENV: development
 
   frontend:
     container_name: madar-dev-frontend

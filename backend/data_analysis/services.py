@@ -464,10 +464,10 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
         )
 
     try:
-        if file_extension == ".csv":
+        if file_extension == ".csv" and not DataReadingNormal._isolated_parser_enabled():
             response = extract_csv_metadata(file_path, original_filename=filename)
         else:
-            _raise_if_full_dataframe_blocked(file_path, operation="Excel preview")
+            _raise_if_full_dataframe_blocked(file_path, operation="dataset preview")
             reader = DataCleaning(str(file_path), tenant_id=tenant_id, user_id=user_id)
             df = reader.read()
             response = build_dataset_response(
@@ -511,7 +511,11 @@ def process_read(input_path: str, *, tenant_id: str, user_id: str):
     authorized_input_path = authorize_dataset_input_path(input_path, tenant_id=tenant_id, user_id=user_id)
     authorized_path = Path(authorized_input_path)
 
-    if not _is_remote_dataset(authorized_input_path) and authorized_path.suffix.lower() == ".csv":
+    if (
+        not _is_remote_dataset(authorized_input_path)
+        and authorized_path.suffix.lower() == ".csv"
+        and not DataReadingNormal._isolated_parser_enabled()
+    ):
         return extract_csv_metadata(authorized_path, original_filename=Path(input_path).name)
 
     if not _is_remote_dataset(authorized_input_path):

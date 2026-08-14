@@ -319,7 +319,24 @@ def check_remote_ingestion_guard() -> str:
     enabled = _env_bool("ALLOW_REMOTE_DATASET_URLS", False)
     if not enabled:
         return "disabled"
-    return "ok" if _env_bool("REMOTE_INGESTION_EGRESS_ENFORCED", False) else "insecure"
+    health_url = os.getenv("REMOTE_INGESTION_WORKER_HEALTH_URL", "").strip()
+    worker_url = os.getenv("REMOTE_INGESTION_WORKER_URL", "").strip()
+    if not health_url or not worker_url:
+        return "misconfigured"
+    try:
+        response = requests.get(
+            health_url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False
+        )
+        payload = response.json() if response.status_code == 200 else {}
+        return (
+            "ok"
+            if payload.get("status") == "ok"
+            and payload.get("isolation") == "remote_ingestion_worker"
+            and payload.get("policy") == "pinned_https_v1"
+            else "unavailable"
+        )
+    except (requests.RequestException, TypeError, ValueError):
+        return "unavailable"
 
 
 def check_calendar_configuration() -> str:
@@ -384,7 +401,24 @@ def check_calendar_sync_queue() -> str:
 
 
 def check_parser_isolation() -> str:
-    return "in_process" if _app_env() in {"prod", "production"} else "development"
+    if not _env_bool("PARSER_ISOLATED_WORKER_ENABLED", False):
+        return "in_process" if _app_env() in {"prod", "production"} else "development"
+    url = os.getenv("PARSER_WORKER_HEALTH_URL", "").strip()
+    if not url:
+        return "misconfigured"
+    try:
+        response = requests.get(
+            url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False
+        )
+        payload = response.json() if response.status_code == 200 else {}
+        return (
+            "ok"
+            if payload.get("status") == "ok"
+            and payload.get("isolation") == "parser_worker"
+            else "unavailable"
+        )
+    except (requests.RequestException, TypeError, ValueError):
+        return "unavailable"
 
 
 def _is_required_state_ready(component: str, state: str) -> bool:

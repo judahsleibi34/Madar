@@ -20,8 +20,40 @@ class ReadinessServiceTests(unittest.TestCase):
             self.assertEqual(readiness_service.check_ai_execution_guard(), "ok")
 
     def test_remote_ingestion_requires_enforced_egress(self):
-        with patch.dict("os.environ", {"ALLOW_REMOTE_DATASET_URLS": "true", "REMOTE_INGESTION_EGRESS_ENFORCED": "false"}, clear=False):
-            self.assertEqual(readiness_service.check_remote_ingestion_guard(), "insecure")
+        healthy = SimpleNamespace(
+            status_code=200,
+            json=lambda: {
+                "status": "ok",
+                "isolation": "remote_ingestion_worker",
+                "policy": "pinned_https_v1",
+            },
+        )
+        environment = {
+            "ALLOW_REMOTE_DATASET_URLS": "true",
+            "REMOTE_INGESTION_WORKER_URL": "http://remote-ingestion-worker:8093/fetch",
+            "REMOTE_INGESTION_WORKER_HEALTH_URL": "http://remote-ingestion-worker:8093/health",
+            "REMOTE_INGESTION_EGRESS_ENFORCED": "false",
+        }
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=healthy
+        ):
+            self.assertEqual(readiness_service.check_remote_ingestion_guard(), "ok")
+
+    def test_remote_ingestion_cannot_be_declared_secure_without_worker_identity(self):
+        wrong = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"status": "ok", "isolation": "other", "policy": "pinned_https_v1"},
+        )
+        environment = {
+            "ALLOW_REMOTE_DATASET_URLS": "true",
+            "REMOTE_INGESTION_WORKER_URL": "http://remote-ingestion-worker:8093/fetch",
+            "REMOTE_INGESTION_WORKER_HEALTH_URL": "http://remote-ingestion-worker:8093/health",
+            "REMOTE_INGESTION_EGRESS_ENFORCED": "true",
+        }
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=wrong
+        ):
+            self.assertEqual(readiness_service.check_remote_ingestion_guard(), "unavailable")
 
     def test_notification_worker_required_without_health_target_fails_closed(self):
         with patch.dict("os.environ", {
@@ -58,8 +90,31 @@ class ReadinessServiceTests(unittest.TestCase):
                 self.assertEqual(readiness_service.check_backup_freshness(), "stale")
 
     def test_production_parser_stays_gated_until_isolated(self):
-        with patch.dict("os.environ", {"APP_ENV": "production"}, clear=False):
+        with patch.dict("os.environ", {"APP_ENV": "production", "PARSER_ISOLATED_WORKER_ENABLED": "false"}, clear=False):
             self.assertEqual(readiness_service.check_parser_isolation(), "in_process")
+
+    def test_parser_isolation_requires_worker_identity_and_health(self):
+        healthy = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"status": "ok", "isolation": "parser_worker"},
+        )
+        wrong_identity = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"status": "ok", "isolation": "other"},
+        )
+        environment = {
+            "APP_ENV": "production",
+            "PARSER_ISOLATED_WORKER_ENABLED": "true",
+            "PARSER_WORKER_HEALTH_URL": "http://parser-worker:8092/health",
+        }
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=healthy
+        ):
+            self.assertEqual(readiness_service.check_parser_isolation(), "ok")
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=wrong_identity
+        ):
+            self.assertEqual(readiness_service.check_parser_isolation(), "unavailable")
 
     def test_environment_name_must_be_explicit_and_known(self):
         for value, expected in (("production", "ok"), ("development", "ok"), ("test", "ok"), ("unknown", "misconfigured"), ("", "misconfigured")):
