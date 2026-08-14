@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { normalizeTimeSlotsByDate } from "./reservationAvailability";
 
 const normalizeOptions = (items) => [...new Set(
@@ -34,10 +34,16 @@ export default function FixedSlotPicker({
   lang = "en",
   onSelect,
 }) {
-  const fixedDates = normalizeOptions(dates).sort();
-  const normalizedTimesByDate = normalizeTimeSlotsByDate(fixedDates, times, timesByDate);
+  const fixedDates = useMemo(() => normalizeOptions(dates).sort(), [dates]);
+  const normalizedTimesByDate = useMemo(
+    () => normalizeTimeSlotsByDate(fixedDates, times, timesByDate),
+    [fixedDates, times, timesByDate]
+  );
   const activeDate = fixedDates.includes(selectedDate) ? selectedDate : fixedDates[0] || "";
-  const activeTimes = normalizedTimesByDate[activeDate] || [];
+  const activeTimes = useMemo(
+    () => normalizedTimesByDate[activeDate] || [],
+    [activeDate, normalizedTimesByDate]
+  );
   const activeDateValue = parseLocalDate(activeDate);
   const fullDateFormatter = new Intl.DateTimeFormat(lang, {
     weekday: "long",

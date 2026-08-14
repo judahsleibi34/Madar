@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 afterEach(cleanup);
 
-import ReservationBlockBuilder, { moveBookingComponent } from "./ReservationBlockBuilder";
+import { moveBookingComponent } from "../blocks/reservationForm";
+import ReservationBlockBuilder from "./ReservationBlockBuilder";
 
 describe("ReservationBlockBuilder", () => {
   it("moves booking components by their saved ids", () => {

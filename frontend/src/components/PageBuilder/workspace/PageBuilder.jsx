@@ -2324,7 +2324,7 @@ export default function PageBuilder({
     );
 
     showToast(behindText ? "Image placed behind the text." : "Image moved in front of the text.");
-  }, [activePage, selectedElement, updateSections]);
+  }, [activePage, selectedElement, showToast, updateSections]);
 
   const updateElementInlineText = useCallback((elementId, updates) => {
     if (!elementId) return;
@@ -2452,7 +2452,12 @@ export default function PageBuilder({
     });
   };
 
-  const copySelectedElement = ({ announce = true } = {}) => {
+  const findElementLocation = useCallback(
+    (elementId) => findElementLocationInPage(activePage, elementId),
+    [activePage]
+  );
+
+  const copySelectedElement = useCallback(({ announce = true } = {}) => {
     if (!selectedElement) return false;
     elementClipboardRef.current = {
       element: selectedElement,
@@ -2462,9 +2467,9 @@ export default function PageBuilder({
     setHasCopiedElement(true);
     if (announce) showToast("Element copied. Press Ctrl+V or Cmd+V to paste.");
     return true;
-  };
+  }, [activePage, findElementLocation, selectedElement, showToast]);
 
-  const pasteCopiedElement = ({ announce = true } = {}) => {
+  const pasteCopiedElement = useCallback(({ announce = true } = {}) => {
     const clipboard = elementClipboardRef.current;
     if (!clipboard?.element || !activePage) return false;
 
@@ -2523,7 +2528,7 @@ export default function PageBuilder({
     setSelected({ type: "element", id: copy.id });
     if (announce) showToast("Element pasted.");
     return true;
-  };
+  }, [activePage, findElementLocation, selectedElement, showToast, updateSections]);
 
   const duplicateSelectedElement = () => {
     if (!copySelectedElement({ announce: false })) return;
@@ -2558,7 +2563,16 @@ export default function PageBuilder({
 
     document.addEventListener("keydown", handleElementClipboardShortcut, true);
     return () => document.removeEventListener("keydown", handleElementClipboardShortcut, true);
-  }, [activePage, activeTab, elementPendingDelete, modal, preview, selectedElement]);
+  }, [
+    activePage,
+    activeTab,
+    copySelectedElement,
+    elementPendingDelete,
+    modal,
+    pasteCopiedElement,
+    preview,
+    selectedElement,
+  ]);
 
   useEffect(() => {
     if (
@@ -2735,11 +2749,6 @@ export default function PageBuilder({
     );
     if (member) setUserPendingDelete(member);
   };
-
-  const findElementLocation = useCallback(
-    (elementId) => findElementLocationInPage(activePage, elementId),
-    [activePage]
-  );
 
   const {
     addRole,
@@ -5244,7 +5253,7 @@ export default function PageBuilder({
         allowBottomOverflow: true,
       }
     );
-    let previewPositions = { [selectedElement.id]: previewPosition };
+    let previewPositions;
     let smartGuides = [];
 
     if (dragState.interaction === "move" && groupElementIds.length > 1) {

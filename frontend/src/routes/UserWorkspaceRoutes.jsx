@@ -31,7 +31,6 @@ const BuilderProjectChooser = lazy(() =>
 
 function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const projectId = getBuilderProjectIdFromPath(location.pathname);
   if (!projectId) {
     return (
@@ -54,6 +53,7 @@ export default function UserWorkspaceRoutes({
   user,
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const isBuilderLoadingPath =
     location.pathname.startsWith("/page-builder") ||
     location.pathname.startsWith("/builder-responses") ||
