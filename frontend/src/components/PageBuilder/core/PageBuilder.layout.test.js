@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compactDirectSectionAfterElementRemoval,
+  applyEditorialCardSizingToSections,
   constrainResizeToSiblingElements,
   getDirectElementMinimumSize,
   getSectionCanvasHeight,
@@ -11,6 +12,47 @@ import {
   moveElementToFront,
   reconcileMeasuredFormBlockPosition,
 } from "./PageBuilder.layout";
+
+describe("editorial image card sizing", () => {
+  it("applies one frame and image width to every editorial card in the viewport", () => {
+    const sections = [{
+      id: "direct",
+      mode: "direct",
+      freeElements: [
+        {
+          id: "card-a",
+          type: "imageButton",
+          imageButtonVariant: "editorialCard",
+          position: { desktop: { x: 20, y: 30, width: 300, height: 190 } },
+        },
+        {
+          id: "card-b",
+          type: "imageButton",
+          imageButtonVariant: "editorialCard",
+          position: { desktop: { x: 400, y: 30, width: 420, height: 260 } },
+        },
+        {
+          id: "plain-image",
+          type: "image",
+          position: { desktop: { x: 0, y: 0, width: 500, height: 300 } },
+        },
+      ],
+    }];
+
+    const [result] = applyEditorialCardSizingToSections(sections, {
+      viewport: "desktop",
+      width: 360,
+      height: 220,
+      mediaWidth: 195,
+    });
+
+    expect(result.freeElements[0].position.desktop).toEqual({ x: 20, y: 30, width: 360, height: 240 });
+    expect(result.freeElements[1].position.desktop).toEqual({ x: 400, y: 30, width: 360, height: 240 });
+    expect(result.freeElements[0].imageCardMediaWidth).toBe(195);
+    expect(result.freeElements[1].imageCardMediaWidth).toBe(195);
+    expect(result.freeElements[2]).toBe(sections[0].freeElements[2]);
+  });
+});
 
 describe("page builder smart guides", () => {
   it("snaps a moving component to the horizontal canvas center", () => {
@@ -69,6 +111,31 @@ describe("page builder smart guides", () => {
     expect(result.position.x).toBe(205);
     expect(result.guides.filter((guide) => guide.kind === "spacing")).toHaveLength(2);
     expect(result.guides[0].label).toBe("105px");
+  });
+
+  it("matches a moving card to spacing established by another row and column", () => {
+    const result = getSmartGuideSnap({
+      candidate: { x: 309, y: 209, width: 100, height: 60 },
+      siblings: [
+        { x: 0, y: 0, width: 100, height: 60 },
+        { x: 310, y: 0, width: 100, height: 60 },
+        { x: 0, y: 210, width: 100, height: 60 },
+      ],
+      canvasWidth: 800,
+      canvasHeight: 600,
+    });
+
+    expect(result.position).toEqual(expect.objectContaining({ x: 310, y: 210 }));
+    const horizontalSpacing = result.guides.filter(
+      (guide) => guide.kind === "spacing" && guide.dimension === "x"
+    );
+    const verticalSpacing = result.guides.filter(
+      (guide) => guide.kind === "spacing" && guide.dimension === "y"
+    );
+    expect(horizontalSpacing).toHaveLength(2);
+    expect(verticalSpacing).toHaveLength(2);
+    expect(horizontalSpacing.every((guide) => guide.label === "210px")).toBe(true);
+    expect(verticalSpacing.every((guide) => guide.label === "150px")).toBe(true);
   });
 });
 describe("page builder canvas compaction", () => {

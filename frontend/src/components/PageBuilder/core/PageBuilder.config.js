@@ -27,7 +27,7 @@ export const carouselElementTypes = new Set([
   "circularGallery",
 ]);
 
-export const builderAssetMaxBytes = 5 * 1024 * 1024;
+export const builderAssetMaxBytes = 25 * 1024 * 1024;
 
 export const builderAssetMimeTypes = new Set([
   "image/png",

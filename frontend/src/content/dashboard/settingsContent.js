@@ -46,7 +46,7 @@ export const settingsContent = {
     invalidAvatarType: "Please upload a PNG, JPG, or WebP image.",
     invalidLogoType: "Please upload a PNG, JPG, or WebP image.",
     avatarTooLarge: "Profile photo must be 5MB or smaller.",
-    logoTooLarge: "Logo image must be 5MB or smaller.",
+    logoTooLarge: "Logo image must be 25MB or smaller.",
     invalidLogoUrl:
       "Use an HTTPS image URL or managed internal path. Data, SVG, JavaScript, and HTTP URLs are not allowed.",
     sessionExpired: "Your session expired. Please log in again.",
@@ -178,7 +178,7 @@ export const settingsContent = {
     invalidAvatarType: "يرجى رفع صورة بصيغة PNG أو JPG أو WebP.",
     invalidLogoType: "يرجى رفع صورة بصيغة PNG أو JPG أو WebP.",
     avatarTooLarge: "يجب ألا يتجاوز حجم صورة الملف الشخصي 5MB.",
-    logoTooLarge: "يجب ألا يتجاوز حجم الشعار 5MB.",
+    logoTooLarge: "يجب ألا يتجاوز حجم الشعار 25MB.",
     invalidLogoUrl:
       "استخدم رابط صورة HTTPS أو مساراً داخلياً مُداراً. روابط data و SVG و JavaScript و HTTP غير مسموحة.",
     sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",

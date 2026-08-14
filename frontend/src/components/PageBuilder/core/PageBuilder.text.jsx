@@ -170,7 +170,8 @@ export const getTextBlockIndexesForRange = (value, startOffset = 0, endOffset = 
 };
 
 export const renderRichTextBlocks = (element, ranges = []) => {
-  const lines = String(element?.content ?? "").split("\n");
+  const content = String(element?.content ?? "");
+  const lines = content.split("\n");
   const formats = getTextBlockFormats(element);
   const hasMixedBlockFormats = new Set(formats).size > 1;
   let lineStart = 0;
@@ -183,7 +184,12 @@ export const renderRichTextBlocks = (element, ranges = []) => {
       .filter((range) =>
         range.end > lineStart &&
         range.start < lineEnd &&
-        !(hasMixedBlockFormats && range.fontSize && (range.start < lineStart || range.end > lineEnd))
+        !(
+          hasMixedBlockFormats &&
+          range.fontSize &&
+          range.start <= 0 &&
+          range.end >= content.length
+        )
       )
       .map((range) => ({
         ...range,
@@ -300,6 +306,7 @@ export const renderRichText = (value, ranges = []) => {
 
 export const getFloatingToolbarPlacement = ({
   anchorRect,
+  avoidanceRect,
   toolbarRect,
   horizontalBounds,
   viewportHeight,
@@ -323,14 +330,20 @@ export const getFloatingToolbarPlacement = ({
   const maxBottom = Math.max(minTop, (Number(viewportHeight) || 0) - margin);
   const anchorTop = Number(anchorRect?.top) || minTop;
   const anchorBottom = Number(anchorRect?.bottom) || anchorTop;
-  const spaceAbove = anchorTop - minTop;
-  const spaceBelow = maxBottom - anchorBottom;
+  const avoidanceTop = Number.isFinite(Number(avoidanceRect?.top))
+    ? Number(avoidanceRect.top)
+    : anchorTop;
+  const avoidanceBottom = Number.isFinite(Number(avoidanceRect?.bottom))
+    ? Number(avoidanceRect.bottom)
+    : anchorBottom;
+  const spaceAbove = avoidanceTop - minTop;
+  const spaceBelow = maxBottom - avoidanceBottom;
   const placement = spaceAbove >= toolbarHeight + aboveGap || spaceAbove >= spaceBelow
     ? "above"
     : "below";
   const desiredTop = placement === "above"
-    ? anchorTop - aboveGap - toolbarHeight
-    : anchorBottom + gap;
+    ? avoidanceTop - aboveGap - toolbarHeight
+    : avoidanceBottom + gap;
   const top = Math.min(
     Math.max(desiredTop, minTop),
     Math.max(minTop, maxBottom - toolbarHeight)

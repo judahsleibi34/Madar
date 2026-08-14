@@ -804,11 +804,11 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
   const siteHomePath = getPublicPagePath(runtimeBasePath, defaultPage || { isDefault: true });
 
-  const pageLinks = splitLines(site.footerShopLinks || runtimeCopy.runtime.footerShopLinks);
-  const helpLinks = splitLines(site.footerHelpLinks || runtimeCopy.runtime.footerHelpLinks);
+  const pageLinks = splitLines(site.footerShopLinks || "");
+  const helpLinks = splitLines(site.footerHelpLinks || "");
   const socialLinks = getFooterLinkItems(
     site.footerSocialItems,
-    site.footerSocialLinks || runtimeCopy.runtime.footerSocialLinks
+    site.footerSocialLinks || ""
   );
   const paymentLinks = getFooterLinkItems(
     site.footerPaymentItems,

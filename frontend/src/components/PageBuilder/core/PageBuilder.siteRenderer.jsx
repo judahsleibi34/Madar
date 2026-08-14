@@ -9,6 +9,7 @@ import {
 import { getDirectElementFrameStyle } from "./PageBuilder.styles";
 import {
   RESPONSIVE_ELEMENT_GAP_RATIO,
+  resolveMobileReadingOrder,
   resolveDirectElementCollisionPadding,
 } from "./PageBuilder.collisionPadding";
 import { resolveResponsiveElementSizing } from "./PageBuilder.responsiveSizing";
@@ -24,6 +25,7 @@ import {
 } from "./PageBuilder.artboard";
 
 const intrinsicHeightElementTypes = new Set(["heading", "text", "list"]);
+const compactDividerTypes = new Set(["divider", "thinDivider"]);
 
 const measurableElementTypes = new Set([
   "heading",
@@ -188,32 +190,65 @@ const SiteRenderer = forwardRef(function SiteRenderer({
       const underTextRelationship = underTextImageRelationshipsBySection[section.id]?.get(element.id);
       const isUnderTextImage = Boolean(underTextRelationship);
       const authoredDesktopPosition = getArtboardElementPosition(element, "desktop");
-      const savedPosition = isUnderTextImage && mode !== "desktop"
-        ? projectUnderTextImagePosition(authoredDesktopPosition, logicalWidth)
-        : getDirectElementPosition?.(element, section, mode)
-          || getArtboardElementPosition(element, mode);
+      const requestedPosition = getDirectElementPosition?.(element, section, mode)
+        || getArtboardElementPosition(element, mode);
+      const projectedDesktopPosition = projectUnderTextImagePosition(
+        authoredDesktopPosition,
+        logicalWidth
+      );
+      const tabletDriftLimit = logicalWidth * 0.35;
+      const hasBrokenTabletVerticalPlacement = mode === "tablet"
+        && Math.abs(
+          Number(requestedPosition.y || 0) - Number(projectedDesktopPosition.y || 0)
+        ) > tabletDriftLimit;
+      const savedPosition = mode === "tablet" && isUnderTextImage
+        ? projectedDesktopPosition
+        : hasBrokenTabletVerticalPlacement
+          ? { ...requestedPosition, y: projectedDesktopPosition.y }
+          : requestedPosition;
       const measurementKey = `${activePage?.id || "page"}:${mode}:${logicalWidth}:${section.id}:${element.id}`;
       const measuredHeight = measuredElementHeights[measurementKey] || 0;
       const minimumHeight = getDirectElementMinimumSize(element).height;
       const usesMeasuredReservationHeight = element.type === "reservationBlock"
         && measuredHeight > 0;
+      const usesCompactDividerFrame = compactDividerTypes.has(element.type);
+      const usesFixedEditorialCardHeight = element.type === "imageButton"
+        && element.imageButtonVariant === "editorialCard";
       return {
         element,
+        readingOrderPosition: authoredDesktopPosition,
         flowRole: isUnderTextImage ? "underText" : "normal",
-        anchorElementId: underTextRelationship?.anchorElementId || null,
-        anchorOffsetY: (underTextRelationship?.offsetY || 0) * (logicalWidth / 1200),
+        anchorElementId: mode === "desktop"
+          ? underTextRelationship?.anchorElementId || null
+          : null,
+        anchorOffsetY: mode === "desktop"
+          ? (underTextRelationship?.offsetY || 0) * (logicalWidth / 1200)
+          : 0,
         position: {
           ...savedPosition,
-          height: usesMeasuredReservationHeight
+          height: usesFixedEditorialCardHeight
+            ? 240
+            : usesCompactDividerFrame
+            ? minimumHeight
+            : usesMeasuredReservationHeight
             ? Math.max(minimumHeight, measuredHeight)
             : Math.max(Number(savedPosition.height) || 0, measuredHeight),
         },
       };
     });
     const sizedEntries = resolveResponsiveElementSizing(entries, mode, logicalWidth);
+    const orderedEntries = mode === 'mobile'
+      ? resolveMobileReadingOrder(sizedEntries, RESPONSIVE_ELEMENT_GAP_RATIO)
+      : sizedEntries;
+    const resolvedPositions = mode === 'mobile'
+      ? Object.fromEntries(orderedEntries.map((entry) => [
+          entry.element.id,
+          { ...entry.position },
+        ]))
+      : resolveDirectElementCollisionPadding(orderedEntries, RESPONSIVE_ELEMENT_GAP_RATIO);
     return [
       section.id,
-      resolveDirectElementCollisionPadding(sizedEntries, RESPONSIVE_ELEMENT_GAP_RATIO),
+      resolvedPositions,
     ];
   }));
   const resolvedSectionHeights = Object.fromEntries(sections.map((section) => {
@@ -303,6 +338,7 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                     const layoutElement = isUnderTextImage && element.layer !== "behindText"
                       ? { ...element, layer: "behindText" }
                       : element;
+                    const usesIntrinsicHeight = intrinsicHeightElementTypes.has(element.type);
                     const frameStyle = {
                       ...getDirectElementFrameStyle({
                         element: layoutElement,
@@ -318,7 +354,7 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                     const suppliedFrameProps = getDirectFrameProps?.(element, section, frameStyle) || {};
                     const frameProps = {
                       ...suppliedFrameProps,
-                      className: `direct-element-frame direct-element-frame-${element.type} ${intrinsicHeightElementTypes.has(element.type) ? "is-intrinsic-height" : ""} ${isUnderTextImage || element.layer === "behindText" ? "is-behind-text" : ""} ${suppliedFrameProps.className || ""}`.trim(),
+                      className: `direct-element-frame direct-element-frame-${element.type} ${usesIntrinsicHeight ? "is-intrinsic-height" : ""} ${isUnderTextImage || element.layer === "behindText" ? "is-behind-text" : ""} ${suppliedFrameProps.className || ""}`.trim(),
                       "data-builder-element-id": element.id,
                       "data-logical-x": effectivePosition.x,
                       "data-logical-y": effectivePosition.y,
@@ -331,7 +367,7 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                           element={element}
                           frameProps={frameProps}
                           frameStyle={{ ...frameStyle, ...(suppliedFrameProps.style || {}) }}
-                          shouldMeasure={measurableElementTypes.has(element.type)}
+                          shouldMeasure={measurableElementTypes.has(element.type) || usesIntrinsicHeight}
                           onLogicalHeight={(elementId, height) => reportElementHeight(elementId, height, section.id)}
                         >
                           <div className="direct-element-content">

@@ -29,6 +29,28 @@ const TABLET_FLUID_TYPES = new Set([
 
 const TABLET_MEDIA_TYPES = new Set(["image", "imageButton", "video", "embed"]);
 
+const getResponsiveButtonPosition = (node, source, bounds) => {
+  const alignment = node.element?.styles?.alignSelf;
+  const normalizedAlignment = alignment === "left"
+    ? "flex-start"
+    : alignment === "right"
+      ? "flex-end"
+      : alignment;
+
+  if (normalizedAlignment === "stretch") {
+    return { ...source, x: bounds.x, width: bounds.width };
+  }
+
+  const targetWidth = Math.min(bounds.width, source.width);
+  let x = bounds.x + (bounds.width - targetWidth) / 2;
+  if (normalizedAlignment === "flex-start") x = bounds.x;
+  if (normalizedAlignment === "flex-end") {
+    x = bounds.x + bounds.width - targetWidth;
+  }
+
+  return { ...source, x: round(x), width: round(targetWidth) };
+};
+
 const normalizeEntry = (entry) => ({
   ...entry,
   position: {
@@ -66,6 +88,12 @@ export const getTabletContentBounds = (artboardWidth) => {
   return { x: inset, width: Math.max(1, width - inset * 2) };
 };
 
+export const getMobileContentBounds = (artboardWidth) => {
+  const width = Math.max(1, finite(artboardWidth, 390));
+  const inset = Math.ceil(Math.max(20, width * 0.06));
+  return { x: inset, width: Math.max(1, width - inset * 2) };
+};
+
 /**
  * Produces readable tablet widths without mutating saved breakpoint geometry.
  * Authored multi-column rows scale as a group; single flow components fill the
@@ -77,6 +105,66 @@ export const resolveResponsiveElementSizing = (
   artboardWidth = 1200
 ) => {
   const nodes = entries.map(normalizeEntry);
+  if (viewportMode === "mobile") {
+    const width = Math.max(1, finite(artboardWidth, 390));
+    const bounds = getMobileContentBounds(width);
+
+    return nodes.map((node) => {
+      const source = node.position;
+      if (node.flowRole === "underText" || node.element?.layer === "behindText") return node;
+
+      if (
+        node.element?.type === "imageButton" &&
+        node.element.imageButtonVariant === "editorialCard"
+      ) {
+        return {
+          ...node,
+          position: { ...source, x: bounds.x, width: bounds.width, height: 240 },
+        };
+      }
+
+      if (TABLET_MEDIA_TYPES.has(node.element?.type)) {
+        const targetWidth = bounds.width;
+        const scale = targetWidth / source.width;
+        return {
+          ...node,
+          position: {
+            ...source,
+            x: bounds.x,
+            width: targetWidth,
+            height: round(source.height * scale),
+          },
+        };
+      }
+
+      if (TABLET_FLUID_TYPES.has(node.element?.type)) {
+        return {
+          ...node,
+          position: { ...source, x: bounds.x, width: bounds.width },
+        };
+      }
+
+      if (node.element?.type === "button") {
+        return {
+          ...node,
+          position: getResponsiveButtonPosition(node, source, bounds),
+        };
+      }
+
+      const targetWidth = Math.min(bounds.width, source.width);
+      return {
+        ...node,
+        position: {
+          ...source,
+          x: round(Math.min(
+            Math.max(bounds.x, source.x),
+            bounds.x + bounds.width - targetWidth
+          )),
+          width: targetWidth,
+        },
+      };
+    });
+  }
   if (viewportMode !== "tablet") return nodes;
 
   const width = Math.max(1, finite(artboardWidth, 768));
@@ -126,6 +214,14 @@ export const resolveResponsiveElementSizing = (
       return {
         ...node,
         position: { ...source, x: bounds.x, width: bounds.width },
+      };
+    }
+
+
+    if (node.element?.type === "button") {
+      return {
+        ...node,
+        position: getResponsiveButtonPosition(node, source, bounds),
       };
     }
 

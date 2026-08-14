@@ -442,6 +442,68 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
   });
 
+  it("keeps the highlighted heading range while changing its font size", async () => {
+    const headingSchema = {
+      ...schemaA,
+      pages: [{
+        ...schemaA.pages[0],
+        sections: [{
+          ...schemaA.pages[0].sections[0],
+          freeElements: [{
+            id: "block-heading-size",
+            type: "heading",
+            name: "Heading",
+            content: "Natalie\nAbu Allies",
+            textBlockFormats: ["h1", "h1"],
+            styles: { color: "#202735", fontSize: "54px" },
+          }],
+        }],
+      }],
+    };
+    apiMocks.fetchBuilderProject.mockResolvedValueOnce({
+      id: projectId,
+      name: headingSchema.name,
+      slug: headingSchema.slug,
+      status: "draft",
+      draft_revision: 100,
+      draft_schema: headingSchema,
+      published_revision: 0,
+      published_version: 0,
+      published_schema: headingSchema,
+      updated_at: "2026-07-15T10:00:00.000Z",
+    });
+
+    const mounted = render(
+      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+    await screen.findByLabelText("Page name");
+    const frame = mounted.container.querySelector('[data-builder-element-id="block-heading-size"]');
+    fireEvent.pointerDown(frame);
+    const editor = frame.querySelector('[contenteditable="true"]');
+    const firstLine = editor.querySelector('[data-builder-text-block="h1"]');
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(firstLine);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent.mouseUp(editor);
+
+    const sizeInput = (await screen.findByTitle("Text size")).querySelector('input[type="number"]');
+    fireEvent.pointerDown(sizeInput);
+    fireEvent.focus(sizeInput);
+    fireEvent.change(sizeInput, { target: { value: "72" } });
+    fireEvent.pointerUp(sizeInput);
+
+    await waitFor(() => {
+      const sizedText = frame.querySelector('[data-builder-text-block="h1"] span');
+      expect(sizedText.style.fontSize).toContain("72px");
+      expect(frame.querySelectorAll('[data-builder-text-block="h1"]')[1].querySelector("span"))
+        .toBeNull();
+    });
+  });
+
   it.skipIf(!actualCrashSchema)("edits copied mixed-format text from the current saved schema", async () => {
     apiMocks.fetchBuilderProject.mockResolvedValueOnce({
       id: projectId,

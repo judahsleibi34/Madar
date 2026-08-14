@@ -29,6 +29,8 @@ describe("Page Builder typography theme", () => {
 
     expect(variables["--action-primary"]).toBe("#2f7a58");
     expect(variables["--action-primary-hover"]).toBe("#245e49");
+    expect(variables["--theme-icon-background"]).toBe("#2f7a58");
+    expect(variables["--theme-icon-foreground"]).toBe("#ffe1e1");
     expect(variables["--theme-on-primary"]).toBe("#ffe1e1");
     expect(variables["--theme-text-inverse"]).toBe("#ffe1e1");
   });

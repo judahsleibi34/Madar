@@ -138,7 +138,10 @@ export const getDirectElementFrameStyle = ({
   const requestedPosition = {
     ...(position || {}),
     width: Number(position?.width) || 240,
-    height: Number(position?.height) || 80,
+    height:
+      element?.type === "imageButton" && element.imageButtonVariant === "editorialCard"
+        ? 240
+        : Number(position?.height) || 80,
   };
   let clamped = clampElementToBounds(
     requestedPosition,

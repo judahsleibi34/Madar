@@ -7,8 +7,38 @@ import {
   parsePhotoProofingContent,
   serializePhotoProofingContent,
 } from "./PageBuilder.uploadHandlers";
+import { builderAssetMaxBytes } from "./PageBuilder.config";
 
 describe("Page Builder image uploads", () => {
+  it("allows builder images up to 25 MiB", async () => {
+    const uploadBuilderAsset = vi.fn().mockResolvedValue({ url: "/uploads/hash.png" });
+    const showToast = vi.fn();
+    const handlers = createUploadHandlers({
+      selectedElement: { id: "image-1", type: "image", name: "Image" },
+      carouselElementTypes: new Set(),
+      builderAssetMimeTypes: new Set(["image/png"]),
+      builderAssetMaxBytes,
+      uploadBuilderAsset,
+      setAssetUploadBusy: vi.fn(),
+      updateSelectedElement: vi.fn(),
+      showToast,
+      user: { id: "user-1" },
+    });
+
+    expect(builderAssetMaxBytes).toBe(25 * 1024 * 1024);
+
+    await handlers.handleSelectedElementImageUpload({
+      target: { files: [{ name: "boundary.png", type: "image/png", size: builderAssetMaxBytes }], value: "selected" },
+    });
+    expect(uploadBuilderAsset).toHaveBeenCalledTimes(1);
+
+    await handlers.handleSelectedElementImageUpload({
+      target: { files: [{ name: "too-large.png", type: "image/png", size: builderAssetMaxBytes + 1 }], value: "selected" },
+    });
+    expect(uploadBuilderAsset).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith("Image is too large. Use an image up to 25 MB.");
+  });
+
   it("fits every responsive boundary to the uploaded media aspect ratio", () => {
     expect(fitMediaPositionsToAspectRatio({
       desktop: { x: 10, y: 20, width: 600, height: 100 },

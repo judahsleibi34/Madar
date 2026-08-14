@@ -109,6 +109,7 @@ export const reconcileMeasuredFormBlockPosition = ({
 
 export const directElementHeight = (element) => {
   if (element?.type === "metric") return getMetricMinimumHeight(element);
+  if (element?.type === "imageButton" && element.imageButtonVariant === "editorialCard") return 240;
 
   const heights = {
     heading: 112,
@@ -359,6 +360,56 @@ export const getMarqueeSelectionIds = (elements = [], viewportName = "desktop", 
   }).map((element) => element.id);
 };
 
+export const applyEditorialCardSizingToSections = (
+  sections = [],
+  { viewport = "desktop", width, height, mediaWidth } = {}
+) => {
+  const savedMediaWidth = Number(mediaWidth);
+  const normalizedMediaWidth = savedMediaWidth > 65
+    ? Math.max(140, Math.min(280, savedMediaWidth))
+    : 200;
+  const normalizedWidth = Number(width);
+  const normalizedHeight = Number(height);
+  const shouldMatchFrame = normalizedWidth > 0 && normalizedHeight > 0;
+  const updateCard = (element) => {
+    if (element?.type !== "imageButton" || element.imageButtonVariant !== "editorialCard") {
+      return element;
+    }
+    const currentViewportPosition = element.position?.[viewport];
+    return {
+      ...element,
+      imageCardMediaWidth: normalizedMediaWidth,
+      ...(shouldMatchFrame && currentViewportPosition
+        ? {
+            position: {
+              ...element.position,
+              [viewport]: {
+                ...currentViewportPosition,
+                width: normalizedWidth,
+                height: 240,
+              },
+            },
+          }
+        : {}),
+    };
+  };
+
+  return sections.map((section) => ({
+    ...section,
+    ...(section.mode === "direct"
+      ? { freeElements: (section.freeElements || []).map(updateCard) }
+      : {
+          rows: (section.rows || []).map((row) => ({
+            ...row,
+            columns: (row.columns || []).map((column) => ({
+              ...column,
+              elements: (column.elements || []).map(updateCard),
+            })),
+          })),
+        }),
+  }));
+};
+
 export const getSmartGuideSnap = ({
   candidate,
   siblings = [],
@@ -411,6 +462,9 @@ export const getSmartGuideSnap = ({
       : Math.max(position.x + position.width, sibling ? sibling.x + sibling.width : visibleCanvas.x + visibleCanvas.width),
     kind,
   });
+  const rangesOverlap = (firstStart, firstSize, secondStart, secondSize) =>
+    Math.min(firstStart + firstSize, secondStart + secondSize) -
+      Math.max(firstStart, secondStart) > 0;
 
   if (interaction === "move") {
     xOptions.push({
@@ -500,6 +554,155 @@ export const getSmartGuideSnap = ({
         ],
       });
     }
+
+    // Match the gap beside the moving component to an existing sibling pair.
+    // This covers the common two-column/two-row layout where the fourth card
+    // should inherit the spacing already established by the other three.
+    normalizedSiblings.forEach((first, firstIndex) => {
+      normalizedSiblings.slice(firstIndex + 1).forEach((second) => {
+        const orderedHorizontal = first.x <= second.x ? [first, second] : [second, first];
+        const [referenceLeft, referenceRight] = orderedHorizontal;
+        const referenceHorizontalGap = referenceRight.x - (referenceLeft.x + referenceLeft.width);
+        if (
+          referenceHorizontalGap >= 0 &&
+          rangesOverlap(referenceLeft.y, referenceLeft.height, referenceRight.y, referenceRight.height)
+        ) {
+          const referenceYStart = Math.max(referenceLeft.y, referenceRight.y);
+          const referenceYEnd = Math.min(
+            referenceLeft.y + referenceLeft.height,
+            referenceRight.y + referenceRight.height
+          );
+          normalizedSiblings.forEach((neighbor) => {
+            if (!rangesOverlap(position.y, position.height, neighbor.y, neighbor.height)) return;
+            const neighborRight = neighbor.x + neighbor.width;
+            const currentRightGap = position.x - neighborRight;
+            if (currentRightGap >= 0) {
+              const desiredX = neighborRight + referenceHorizontalGap;
+              xOptions.push({
+                delta: desiredX - position.x,
+                priority: 5,
+                guides: [
+                  {
+                    axis: "horizontal",
+                    value: (referenceYStart + referenceYEnd) / 2,
+                    start: referenceLeft.x + referenceLeft.width,
+                    end: referenceRight.x,
+                    kind: "spacing",
+                    label: `${Math.round(referenceHorizontalGap)}px`,
+                  },
+                  {
+                    axis: "horizontal",
+                    value: position.y + position.height / 2,
+                    start: neighborRight,
+                    end: desiredX,
+                    kind: "spacing",
+                    label: `${Math.round(referenceHorizontalGap)}px`,
+                  },
+                ],
+              });
+            }
+
+            const currentLeftGap = neighbor.x - candidateRight;
+            if (currentLeftGap >= 0) {
+              const desiredX = neighbor.x - referenceHorizontalGap - position.width;
+              xOptions.push({
+                delta: desiredX - position.x,
+                priority: 5,
+                guides: [
+                  {
+                    axis: "horizontal",
+                    value: (referenceYStart + referenceYEnd) / 2,
+                    start: referenceLeft.x + referenceLeft.width,
+                    end: referenceRight.x,
+                    kind: "spacing",
+                    label: `${Math.round(referenceHorizontalGap)}px`,
+                  },
+                  {
+                    axis: "horizontal",
+                    value: position.y + position.height / 2,
+                    start: desiredX + position.width,
+                    end: neighbor.x,
+                    kind: "spacing",
+                    label: `${Math.round(referenceHorizontalGap)}px`,
+                  },
+                ],
+              });
+            }
+          });
+        }
+
+        const orderedVertical = first.y <= second.y ? [first, second] : [second, first];
+        const [referenceAbove, referenceBelow] = orderedVertical;
+        const referenceVerticalGap = referenceBelow.y - (referenceAbove.y + referenceAbove.height);
+        if (
+          referenceVerticalGap >= 0 &&
+          rangesOverlap(referenceAbove.x, referenceAbove.width, referenceBelow.x, referenceBelow.width)
+        ) {
+          const referenceXStart = Math.max(referenceAbove.x, referenceBelow.x);
+          const referenceXEnd = Math.min(
+            referenceAbove.x + referenceAbove.width,
+            referenceBelow.x + referenceBelow.width
+          );
+          normalizedSiblings.forEach((neighbor) => {
+            if (!rangesOverlap(position.x, position.width, neighbor.x, neighbor.width)) return;
+            const neighborBottom = neighbor.y + neighbor.height;
+            const currentBottomGap = position.y - neighborBottom;
+            if (currentBottomGap >= 0) {
+              const desiredY = neighborBottom + referenceVerticalGap;
+              yOptions.push({
+                delta: desiredY - position.y,
+                priority: 5,
+                guides: [
+                  {
+                    axis: "vertical",
+                    value: (referenceXStart + referenceXEnd) / 2,
+                    start: referenceAbove.y + referenceAbove.height,
+                    end: referenceBelow.y,
+                    kind: "spacing",
+                    label: `${Math.round(referenceVerticalGap)}px`,
+                  },
+                  {
+                    axis: "vertical",
+                    value: position.x + position.width / 2,
+                    start: neighborBottom,
+                    end: desiredY,
+                    kind: "spacing",
+                    label: `${Math.round(referenceVerticalGap)}px`,
+                  },
+                ],
+              });
+            }
+
+            const currentTopGap = neighbor.y - candidateBottom;
+            if (currentTopGap >= 0) {
+              const desiredY = neighbor.y - referenceVerticalGap - position.height;
+              yOptions.push({
+                delta: desiredY - position.y,
+                priority: 5,
+                guides: [
+                  {
+                    axis: "vertical",
+                    value: (referenceXStart + referenceXEnd) / 2,
+                    start: referenceAbove.y + referenceAbove.height,
+                    end: referenceBelow.y,
+                    kind: "spacing",
+                    label: `${Math.round(referenceVerticalGap)}px`,
+                  },
+                  {
+                    axis: "vertical",
+                    value: position.x + position.width / 2,
+                    start: desiredY + position.height,
+                    end: neighbor.y,
+                    kind: "spacing",
+                    label: `${Math.round(referenceVerticalGap)}px`,
+                  },
+                ],
+              });
+            }
+          });
+        }
+      });
+    });
   }
 
   const xSnap = choose(xOptions);

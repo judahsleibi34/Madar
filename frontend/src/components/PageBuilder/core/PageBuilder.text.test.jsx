@@ -116,6 +116,32 @@ describe("renderRichText", () => {
     expect(container.querySelector("p span")).toBeNull();
   });
 
+  it("applies a selected font size across adjacent heading lines in a mixed-format element", () => {
+    const element = {
+      type: "heading",
+      headingLevel: 1,
+      content: "TIMELESS PHOTOGRAPHY\n\nNatalie\nAbu Allies",
+      textBlockFormats: ["text", "h1", "h1", "h1"],
+    };
+    const selectionStart = element.content.indexOf("Natalie");
+    const { container } = render(
+      <div>{renderRichTextBlocks(element, [{
+        field: "content",
+        start: selectionStart,
+        end: element.content.length,
+        fontSize: "76px",
+      }])}</div>
+    );
+    const headingSpans = container.querySelectorAll("h1 span");
+
+    expect(headingSpans).toHaveLength(2);
+    expect([...headingSpans].map((span) => span.textContent)).toEqual(["Natalie", "Abu Allies"]);
+    expect([...headingSpans].every(
+      (span) => span.style.fontSize === "calc(76px * var(--builder-text-fit-scale, 1))"
+    )).toBe(true);
+    expect(container.querySelector('p[data-builder-text-block="text"] span')).toBeNull();
+  });
+
   it("targets only the lines touched by the selection", () => {
     const content = "First heading\nMiddle text\nLast text";
 
@@ -186,6 +212,18 @@ describe("renderRichText", () => {
     });
 
     expect(placement).toEqual({ left: 500, top: 70, placement: "below" });
+  });
+
+  it("keeps the toolbar outside the full selected element", () => {
+    const placement = getFloatingToolbarPlacement({
+      anchorRect: { left: 90, top: 680, bottom: 704, width: 120 },
+      avoidanceRect: { left: 90, top: 260, bottom: 740, width: 480 },
+      toolbarRect: { width: 700, height: 80 },
+      horizontalBounds: { left: 28, right: 885 },
+      viewportHeight: 900,
+    });
+
+    expect(placement).toEqual({ left: 28, top: 152, placement: "above" });
   });
   it("repairs exact long-form text duplication without changing normal copy", () => {
     const original = "Design pages, collect responses, manage roles, and prepare the backend integration.";

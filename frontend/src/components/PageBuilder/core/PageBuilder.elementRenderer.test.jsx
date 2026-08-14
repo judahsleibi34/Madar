@@ -143,6 +143,46 @@ describe("image button rendering", () => {
     fireEvent.click(button);
     expect(runElementAction).toHaveBeenCalledWith(imageButton);
   });
+
+  it("renders the editorial image card version with copy and action", () => {
+    const renderElement = createElementRenderer({
+      carouselElementTypes: new Set(),
+      selected: { type: "", id: "" },
+      preview: true,
+      getFreeElementStyle: () => ({}),
+      getElementStyle: () => ({}),
+      startDrag: vi.fn(),
+      findElementLocation: vi.fn(),
+      setInsertTarget: vi.fn(),
+      setSelected: vi.fn(),
+      captureCanvasTextSelection: vi.fn(),
+      shouldIgnoreInlineTextBlur: () => false,
+      updateElementInlineText: vi.fn(),
+      runElementAction: vi.fn(),
+      renderConnectedForm: vi.fn(),
+      getReservationBlockValue: vi.fn(),
+    });
+
+    render(renderElement({
+      id: "image-card-1",
+      type: "imageButton",
+      imageButtonVariant: "editorialCard",
+      content: "https://media.example.com/wedding.webp",
+      cardTitle: "Celebrations",
+      cardDescription: "Weddings and family celebrations captured with heart and artistry.",
+      cardActionLabel: "Explore",
+      cardIcon: "Camera",
+      styles: {},
+    }));
+
+    const card = screen.getByRole("button", { name: "Celebrations" });
+    expect(card.className).toContain("is-editorial-card");
+    expect(card.style.getPropertyValue("--image-card-media-width")).toBe("200px");
+    expect(card.querySelector("img")?.getAttribute("src")).toContain("wedding.webp");
+    expect(card.querySelector('[data-builder-icon="Camera"]')).toBeTruthy();
+    expect(screen.getByText("Weddings and family celebrations captured with heart and artistry.")).toBeTruthy();
+    expect(screen.getByText("Explore")).toBeTruthy();
+  });
 });
 
 describe("video rendering", () => {

@@ -104,9 +104,40 @@ describe("SiteRenderer artboard camera", () => {
     const artboard = view.container.querySelector(".site-renderer-artboard");
 
     expect(artboard.style.width).toBe("390px");
-    expect(frame.style.width).toBe("200px");
+    expect(frame.style.width).toBe("342px");
     expect(frame.style.height).toBe("70px");
-    expect(frame.style.transform).toBe("translate3d(20px, 30px, 0)");
+    expect(frame.style.transform).toBe("translate3d(24px, 30px, 0)");
+  });
+
+  it("repairs severely drifted tablet y placement from desktop geometry", () => {
+    const driftedProject = {
+      ...project,
+      pages: [{
+        ...activePage,
+        sections: [{
+          ...activePage.sections[0],
+          freeElements: [{
+            ...activePage.sections[0].freeElements[0],
+            position: {
+              desktop: { x: 100, y: 120, width: 300, height: 70 },
+              tablet: { x: 40, y: 600, width: 300, height: 70 },
+            },
+          }],
+        }],
+      }],
+    };
+    const view = render(
+      <SiteRenderer
+        project={driftedProject}
+        activePage={driftedProject.pages[0]}
+        viewportMode="tablet"
+        presentationZoom={1}
+        renderElement={(element) => <span>{element.content}</span>}
+      />
+    );
+    const frame = view.container.querySelector('[data-builder-element-id="element_1"]');
+
+    expect(frame.style.transform).toBe("translate3d(39px, 76.8px, 0)");
   });
 
   it("bleeds only the section background while content stays on the canonical artboard", () => {

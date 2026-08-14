@@ -117,6 +117,7 @@ export const elementTypes = [
   { id: "text", label: "Text", group: "Content" },
   { id: "button", label: "Button", group: "Content" },
   { id: "imageButton", label: "Image Button", group: "Content" },
+  { id: "imageCardButton", label: "Image Card Button", group: "Content" },
   { id: "image", label: "Image", group: "Content" },
   { id: "video", label: "Video", group: "Media" },
   { id: "document", label: "File Viewer", group: "Media" },
@@ -228,6 +229,7 @@ export const themePresets = {
 };
 
 export const defaultSiteChrome = {
+  logoWidth: 42,
   showHeader: true,
   showFooter: true,
   brand: "Madar",
@@ -245,12 +247,12 @@ export const defaultSiteChrome = {
   footerStoreName: "Madar",
   rights: "All rights reserved.",
   footerShopTitle: "Pages",
-  footerShopLinks: "Home\nSubmit Request\nReports",
+  footerShopLinks: "",
   footerHelpTitle: "Help",
-  footerHelpLinks: "About Us\nPolicies\nContact",
-  footerSocialLinks: "Facebook\nLinkedIn\nX\nInstagram",
+  footerHelpLinks: "",
+  footerSocialLinks: "",
   footerSocialItems: [],
-  footerPaymentMethods: "Visa\nMastercard\nApple Pay\nGoogle Pay",
+  footerPaymentMethods: "",
   footerPaymentItems: [],
   footerLanguageLabel: "AR",
 };

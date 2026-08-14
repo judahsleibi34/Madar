@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import "../../../styles/admin/PageBuilder/index.css";
 import LoadingBar from "../../common/LoadingBar";
+import PageBuilderIconPicker from "../ui/PageBuilderIconPicker";
+import AutoGrowTextarea from "../ui/AutoGrowTextarea";
 import {
   deferEffectStateUpdate,
   normalizeRuntimeAnswerValue,
@@ -90,6 +92,7 @@ import {
   getArtboardElementPosition,
   getArtboardLogicalWidth,
   getEditorCameraStageWidth,
+  getFitPresentationZoom,
 } from "../core/PageBuilder.artboard";
 import ButtonColorControls from "./ButtonColorControls";
 import PageBuilderPageInspector from "./PageBuilderPageInspector";
@@ -206,6 +209,7 @@ import {
   getMarqueeSelectionIds,
   getSmartGuideSnap,
   getPositionCollectionBounds,
+  applyEditorialCardSizingToSections,
   moveElementBehindText,
   moveElementToFront,
 } from "../core/PageBuilder.layout";
@@ -747,7 +751,9 @@ export default function PageBuilder({
   const [editorViewportWidth, setEditorViewportWidth] = useState(0);
   const [manualEditorZoom, setManualEditorZoom] = useState(1);
   const logicalArtboardWidth = getArtboardLogicalWidth(viewport);
-  const canvasScale = manualEditorZoom;
+  const canvasScale = preview
+    ? getFitPresentationZoom(editorViewportWidth || logicalArtboardWidth, logicalArtboardWidth)
+    : manualEditorZoom;
   const cameraStageWidth = getEditorCameraStageWidth(logicalArtboardWidth, canvasScale);
   const [selected, setSelected] = useState(() => ({
     type: "page",
@@ -1708,10 +1714,19 @@ export default function PageBuilder({
     [reservationBlocks]
   );
 
-  const reservationPaletteItems = useMemo(
-    () => getReservationPaletteItems(reservationDefinitions),
-    [reservationDefinitions]
-  );
+  const reservationPaletteItems = useMemo(() => {
+    const savedItems = getReservationPaletteItems(reservationDefinitions);
+    if (savedItems.length > 0) return savedItems;
+
+    return elementTypes
+      .filter((item) => item.group === 'Bookings')
+      .map((item) => ({
+        ...item,
+        type: item.id,
+        helper: 'Start empty and configure it after placement',
+        isStarter: true,
+      }));
+  }, [reservationDefinitions]);
 
   const reservationFormOptions = useMemo(
     () =>
@@ -2048,7 +2063,12 @@ export default function PageBuilder({
       : type === "reservationFixedSlots"
         ? "restricted"
         : "";
-    const elementType = reservationPlacementMode ? "reservationBlock" : type;
+    const isImageCardButton = type === "imageCardButton";
+    const elementType = reservationPlacementMode
+      ? "reservationBlock"
+      : isImageCardButton
+        ? "imageButton"
+        : type;
     const activePageIndex = project.pages.findIndex((page) => page.id === activePage?.id);
     const defaultNextPage = activePageIndex >= 0 ? project.pages[activePageIndex + 1] : null;
     const preferredReservationDefinition = reservationPlacementMode
@@ -2089,7 +2109,35 @@ export default function PageBuilder({
               }),
         }
       : {};
-    const resolvedOverrides = { ...reservationPlacementOverrides, ...overrides };
+    const imageCardButtonOverrides = isImageCardButton
+      ? {
+          name: "Celebrations image card",
+          imageButtonVariant: "editorialCard",
+          imageCardMediaWidth: 200,
+          cardTitle: "Celebrations",
+          cardDescription: "Weddings, graduations, and family celebrations captured with heart and artistry.",
+          cardActionLabel: "Explore",
+          cardIcon: "Sparkles",
+          styles: {
+            ...element.styles,
+            backgroundColor: "var(--theme-surface)",
+            borderRadius: "18px",
+          },
+        }
+      : {};
+    const resolvedOverrides = {
+      ...reservationPlacementOverrides,
+      ...imageCardButtonOverrides,
+      ...overrides,
+      ...((imageCardButtonOverrides.styles || overrides.styles)
+        ? {
+            styles: {
+              ...(imageCardButtonOverrides.styles || {}),
+              ...(overrides.styles || {}),
+            },
+          }
+        : {}),
+    };
     const nextElementConnectedFormId = resolvedOverrides.connectedFormId || element.connectedFormId;
     const existingTarget =
       activePage?.sections.find((section) => section.id === requestedSectionId) ||
@@ -2288,6 +2336,19 @@ export default function PageBuilder({
       })
     );
   }, [selectedElement, updateSections]);
+
+  const applySelectedImageCardSizingToAll = useCallback((mediaWidth, matchFrame = false) => {
+    if (selectedElement?.type !== "imageButton" || selectedElement.imageButtonVariant !== "editorialCard") return;
+    const referencePosition = selectedElement.position?.[viewport];
+    updateSections((sections) => applyEditorialCardSizingToSections(sections, {
+      viewport,
+      mediaWidth,
+      ...(matchFrame && referencePosition
+        ? { width: referencePosition.width, height: 240 }
+        : {}),
+    }));
+    if (matchFrame) showToast("Applied this card size to all image cards on the page.");
+  }, [selectedElement, showToast, updateSections, viewport]);
 
 
   const setSelectedImageBehindText = useCallback((behindText) => {
@@ -4359,9 +4420,18 @@ export default function PageBuilder({
       width: sourceRect.width,
       height: sourceRect.height,
     };
+    const avoidanceRect = {
+      left: targetRect.left,
+      top: targetRect.top,
+      right: targetRect.right,
+      bottom: targetRect.bottom,
+      width: targetRect.width,
+      height: targetRect.height,
+    };
 
     setInlineToolbarPosition({
       anchorRect,
+      avoidanceRect,
       horizontalBounds,
       left: anchorRect.left,
       top: anchorRect.bottom + 10,
@@ -4377,6 +4447,7 @@ export default function PageBuilder({
     const toolbarRect = toolbar.getBoundingClientRect();
     const placement = getFloatingToolbarPlacement({
       anchorRect: inlineToolbarPosition.anchorRect,
+      avoidanceRect: inlineToolbarPosition.avoidanceRect,
       toolbarRect,
       horizontalBounds: inlineToolbarPosition.horizontalBounds,
       viewportHeight: window.innerHeight,
@@ -4394,6 +4465,7 @@ export default function PageBuilder({
     });
   }, [
     inlineToolbarPosition?.anchorRect,
+    inlineToolbarPosition?.avoidanceRect,
     inlineToolbarPosition?.horizontalBounds,
     inlineToolbarPosition?.maxWidth,
   ]);
@@ -4484,32 +4556,38 @@ export default function PageBuilder({
     preserveCanvasTextSelectionHighlight(range);
   }, [preserveCanvasTextSelectionHighlight, selectedElement, textSelection]);
 
-  const getSelectedTextTargetValue = () => {
-    if (!selectedElement || textSelection?.elementId !== selectedElement.id) return "";
+  const getActiveTextSelection = () =>
+    textSelectionRef.current?.elementId === selectedElement?.id
+      ? textSelectionRef.current
+      : textSelection;
 
-    if (textSelection.field === "listTitle") {
+  const getSelectedTextTargetValue = (selection = getActiveTextSelection()) => {
+    if (!selectedElement || selection?.elementId !== selectedElement.id) return "";
+
+    if (selection.field === "listTitle") {
       return selectedElement.listTitle || "";
     }
 
-    if (textSelection.field === "listItem") {
-      return getListItems(selectedElement)[textSelection.itemIndex] || "";
+    if (selection.field === "listItem") {
+      return getListItems(selectedElement)[selection.itemIndex] || "";
     }
 
     return selectedElement.content || "";
   };
 
   const getSelectedTextRange = () => {
-    if (!selectedElement || textSelection?.elementId !== selectedElement.id) return null;
+    const activeSelection = getActiveTextSelection();
+    if (!selectedElement || activeSelection?.elementId !== selectedElement.id) return null;
 
-    const targetText = getSelectedTextTargetValue();
+    const targetText = getSelectedTextTargetValue(activeSelection);
     const targetLength = targetText.length;
     if (!targetLength) return null;
 
-    const start = Number(textSelection.start) || 0;
-    const end = Number(textSelection.end) || 0;
+    const start = Number(activeSelection.start) || 0;
+    const end = Number(activeSelection.end) || 0;
 
-    if (start === end && textSelection.blockIndexes?.length && textSelection.field === "content") {
-      const activeLineIndex = textSelection.blockIndexes[0];
+    if (start === end && activeSelection.blockIndexes?.length && activeSelection.field === "content") {
+      const activeLineIndex = activeSelection.blockIndexes[0];
       const lines = String(targetText).split("\n");
       const lineStart = lines.slice(0, activeLineIndex).reduce((total, line) => total + line.length + 1, 0);
       return {
@@ -4521,8 +4599,8 @@ export default function PageBuilder({
     }
 
     return {
-      field: textSelection.field || "content",
-      itemIndex: textSelection.itemIndex ?? null,
+      field: activeSelection.field || "content",
+      itemIndex: activeSelection.itemIndex ?? null,
       start: start === end ? 0 : Math.max(0, Math.min(start, targetLength)),
       end: start === end ? targetLength : Math.max(0, Math.min(end, targetLength)),
     };
@@ -4534,8 +4612,8 @@ export default function PageBuilder({
     (textSelection.field === "listTitle" || textSelection.field === "listItem");
 
   const hasExplicitSelectedTextRange = () =>
-    textSelection?.elementId === selectedElement?.id &&
-    Number(textSelection.start) !== Number(textSelection.end);
+    getActiveTextSelection()?.elementId === selectedElement?.id &&
+    Number(getActiveTextSelection()?.start) !== Number(getActiveTextSelection()?.end);
   const getSelectedTextRangeStyle = (property) => {
     const selectedRange = getSelectedTextRange();
     if (!selectedElement || !selectedRange) return "";
@@ -5653,6 +5731,10 @@ export default function PageBuilder({
     () => ({ ...defaultSiteChrome, ...(project.siteChrome || {}) }),
     [project.siteChrome]
   );
+  const siteLogoWidth = Math.min(
+    240,
+    Math.max(16, Number(siteChrome.logoWidth) || defaultSiteChrome.logoWidth)
+  );
   const updateSiteChrome = useCallback((updates) => {
     updateProject((prev) => ({
       ...prev,
@@ -6031,16 +6113,20 @@ export default function PageBuilder({
                           draggable
                           className="saved-reservation-palette-item"
                           key={`reservation_${item.id}`}
-                          onDragStart={(event) => handlePaletteDragStart(event, item.type, item.id)}
+                          onDragStart={(event) => handlePaletteDragStart(
+                            event,
+                            item.type,
+                            item.isStarter ? '' : item.id
+                          )}
                           onClick={() => {
                             const targetSectionId = selectedSection?.id || "";
                             const placement = getReservationPalettePlacement(item.id);
-                            if (!placement) return;
+                            if (!placement && !item.isStarter) return;
                             addComponentToSection(
-                              placement.type,
+                              placement?.type || item.type,
                               targetSectionId,
                               getVisibleCanvasInsertPoint(targetSectionId),
-                              placement.overrides
+                              placement?.overrides || {}
                             );
                           }}
                         >
@@ -6692,6 +6778,38 @@ export default function PageBuilder({
             selectedElement.type !== "thinDivider" && (
             <label>Content<textarea value={selectedElement.content} onSelect={(event) => captureTextSelection(event, "content")} onChange={(event) => updateSelectedElement({ content: event.target.value, richTextColors: (selectedElement.richTextColors || []).filter((range) => range.field !== "content") })} /></label>
           )}
+          {selectedElement.type === "imageButton" && selectedElement.imageButtonVariant === "editorialCard" && (
+            <details className="image-card-content-editor">
+              <summary>Image card content</summary>
+              <label>
+                Fixed image width <strong>{Number(selectedElement.imageCardMediaWidth) > 65 ? Math.max(140, Math.min(280, Number(selectedElement.imageCardMediaWidth))) : 200}px</strong>
+                <input
+                  type="range"
+                  min="140"
+                  max="280"
+                  step="5"
+                  value={Number(selectedElement.imageCardMediaWidth) > 65 ? Math.max(140, Math.min(280, Number(selectedElement.imageCardMediaWidth))) : 200}
+                  onChange={(event) => applySelectedImageCardSizingToAll(Number(event.target.value))}
+                />
+              </label>
+              <button
+                type="button"
+                className="image-card-apply-all"
+                onClick={() => applySelectedImageCardSizingToAll(
+                  Number(selectedElement.imageCardMediaWidth) > 65
+                    ? Math.max(140, Math.min(280, Number(selectedElement.imageCardMediaWidth)))
+                    : 200,
+                  true
+                )}
+              >
+                Apply this size to all cards
+              </button>
+              <label>Title<input value={selectedElement.cardTitle || ""} onChange={(event) => updateSelectedElement({ cardTitle: event.target.value })} /></label>
+              <label>Description<AutoGrowTextarea value={selectedElement.cardDescription || ""} onChange={(event) => updateSelectedElement({ cardDescription: event.target.value })} /></label>
+              <label>Action label<input value={selectedElement.cardActionLabel || ""} onChange={(event) => updateSelectedElement({ cardActionLabel: event.target.value })} /></label>
+              <PageBuilderIconPicker value={selectedElement.cardIcon || "Sparkles"} onChange={(cardIcon) => updateSelectedElement({ cardIcon })} />
+            </details>
+          )}
           {selectedElement.type === "metric" && (
             <details open className="metric-editor">
               <summary>Metrics</summary>
@@ -7181,6 +7299,21 @@ export default function PageBuilder({
                     <small>Paste an image URL or upload a PNG, JPG, or WebP from your computer.</small>
                   </div>
                   <label className="span-2">
+                    Logo width
+                    <span className='site-chrome-logo-size-control'>
+                      <input
+                        aria-label='Header logo width'
+                        type='range'
+                        min='16'
+                        max='240'
+                        value={siteLogoWidth}
+                        onChange={(event) => updateSiteChrome({ logoWidth: Number(event.target.value) })}
+                      />
+                      <output>{siteLogoWidth}px</output>
+                    </span>
+                    <small>The logo keeps its proportions and the header grows or shrinks around it.</small>
+                  </label>
+                  <label className='span-2'>
                     Header alignment
                     <select value={siteChrome.headerAlign || "center"} onChange={(event) => updateSiteChrome({ headerAlign: event.target.value })}>
                       <option value="center">Centered navigation</option>

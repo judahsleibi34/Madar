@@ -3,6 +3,7 @@ import AutoFitDirectText from "./PageBuilder.autoFitText";
 import LazyBuilderVideo from "./LazyBuilderVideo";
 import DocumentViewerElement from "./DocumentViewerElement";
 import CountUpText from "../ui/CountUpText";
+import { BuilderIcon } from "../ui/PageBuilderIconPicker";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
 import { resolveDocumentUrl, resolveMediaUrl } from "../../../utils/media";
@@ -225,11 +226,11 @@ export const createElementRenderer = ({
     if (overridden !== undefined) return overridden;
 
     if (element.type === "heading") {
-      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
+      return <AutoFitDirectText preserveFontSize as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "text") {
-      return <AutoFitDirectText as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
+      return <AutoFitDirectText preserveFontSize as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;
     }
 
     if (element.type === "button") {
@@ -260,18 +261,50 @@ export const createElementRenderer = ({
 
     if (element.type === "imageButton") {
       const imageSrc = resolveMediaUrl(element.content);
+      const isEditorialCard = element.imageButtonVariant === "editorialCard";
+      const savedCardMediaWidth = Number(element.imageCardMediaWidth);
+      const cardMediaWidth = savedCardMediaWidth > 65
+        ? Math.max(140, Math.min(280, savedCardMediaWidth))
+        : 200;
       return (
         <button
           key={element.id}
           type="button"
           {...commonProps}
-          aria-label={element.name || "Image button"}
+          className={`${commonProps.className} ${isEditorialCard ? "is-editorial-card" : ""}`.trim()}
+          style={{
+            ...commonProps.style,
+            ...(isEditorialCard
+              ? { "--image-card-media-width": `${cardMediaWidth}px` }
+              : {}),
+          }}
+          aria-label={isEditorialCard ? (element.cardTitle || element.name || "Image card button") : (element.name || "Image button")}
           onClick={(event) => {
             commonProps.onClick(event);
             if (preview) runElementAction(element);
           }}
         >
-          {imageSrc ? (
+          {isEditorialCard ? (
+            <>
+              <span className="image-button-card-media">
+                {imageSrc ? (
+                  <img src={imageSrc} alt="" loading="lazy" decoding="async" />
+                ) : (
+                  <span className="image-button-card-placeholder">Upload image</span>
+                )}
+              </span>
+              <span className="image-button-card-copy">
+                {element.cardIcon !== "none" && (
+                  <span className="image-button-card-icon" aria-hidden="true">
+                    <BuilderIcon name={element.cardIcon || "Sparkles"} />
+                  </span>
+                )}
+                <span className="image-button-card-title">{element.cardTitle || "Celebrations"}</span>
+                <span className="image-button-card-description">{element.cardDescription || "Add a short description for this destination."}</span>
+                <span className="image-button-card-action">{element.cardActionLabel || "Explore"}<span aria-hidden="true">→</span></span>
+              </span>
+            </>
+          ) : imageSrc ? (
             <img src={imageSrc} alt="" loading="lazy" decoding="async" />
           ) : (
             <span>Upload button image</span>
@@ -384,7 +417,22 @@ export const createElementRenderer = ({
     }
 
     if (element.type === "divider" || element.type === "thinDivider") {
-      return <hr key={element.id} {...commonProps} />;
+      const dividerStyle = element.type === 'thinDivider'
+        ? {
+            ...commonProps.style,
+            '--divider-color': element.styles?.color || 'var(--theme-border-strong)',
+          }
+        : commonProps.style;
+
+      return (
+        <div
+          key={element.id}
+          {...commonProps}
+          role='separator'
+          aria-orientation='horizontal'
+          style={dividerStyle}
+        />
+      );
     }
 
     if (element.type === "embed") {

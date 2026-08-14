@@ -124,7 +124,7 @@ export const createUploadHandlers = ({  selectedElement,
     }
 
     if (file.size > builderAssetMaxBytes) {
-      showToast("Image is too large. Use an image under 5 MB.");
+      showToast("Image is too large. Use an image up to 25 MB.");
       return "";
     }
 
@@ -180,7 +180,9 @@ export const createUploadHandlers = ({  selectedElement,
       assetFileName: file.name || getBuilderAssetFileName(assetUrl),
       name: selectedElement.name || file.name || "Image",
       mediaAspectRatio: aspectRatio || selectedElement.mediaAspectRatio || undefined,
-      ...(selectedElement.mode === "direct" && aspectRatio
+      ...(selectedElement.mode === "direct" &&
+        aspectRatio &&
+        selectedElement.imageButtonVariant !== "editorialCard"
         ? { position: fitMediaPositionsToAspectRatio(selectedElement.position, aspectRatio) }
         : {}),
     });

@@ -9,6 +9,31 @@ afterEach(() => {
 });
 
 describe("AutoFitDirectText", () => {
+  it("preserves an explicitly chosen heading size instead of scaling it down", () => {
+    const requestAnimationFrame = vi.fn();
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    render(
+      <div className="direct-element-frame">
+        <AutoFitDirectText
+          preserveFontSize
+          as="h1"
+          className="builder-element-heading"
+          fitKey="manual-heading-size"
+          style={{ fontSize: "75px", "--builder-text-fit-scale": "0.5" }}
+        >
+          Natalie Abu Allies
+        </AutoFitDirectText>
+      </div>
+    );
+
+    const heading = screen.getByRole("heading");
+    expect(heading.style.fontSize).toBe("75px");
+    expect(heading.style.getPropertyValue("--builder-text-fit-scale")).toBe("");
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+  });
+
   it("shrinks direct-layout text until all content fits inside its frame", () => {
     let scheduledFit = null;
     vi.stubGlobal("requestAnimationFrame", (callback) => {
