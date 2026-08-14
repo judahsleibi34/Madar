@@ -79,7 +79,7 @@ export default function PageBuilderPageInspector({
             </button>
           )}
         </div>
-        <p className="builder-note">PNG, JPG, or WebP up to 5 MB. If unset, the site logo is used.</p>
+        <p className="builder-note">PNG, JPG, or WebP up to 25 MB. If unset, the site logo is used.</p>
       </div>
     </>
   );

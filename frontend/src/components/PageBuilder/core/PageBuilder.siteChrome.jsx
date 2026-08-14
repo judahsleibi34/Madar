@@ -46,6 +46,7 @@ export const createSiteChromeRenderers = ({
       ? site.headerBackgroundColor
       : "";
     const logoSrc = resolveMediaUrl(site.logoUrl);
+    const logoWidth = Math.min(240, Math.max(16, Number(site.logoWidth) || defaultSiteChrome.logoWidth));
     const brandLabel = String(site.brand ?? "").trim();
     const headerButtonLabel = String(site.headerButtonLabel ?? "").trim();
     const headerActionPage = headerButtonLabel
@@ -72,7 +73,10 @@ export const createSiteChromeRenderers = ({
     return (
       <header
         className={`built-site-header header-align-${site.headerAlign || "center"} ${selected.type === "siteHeader" ? "is-selected" : ""}`}
-        style={headerBackgroundColor ? { backgroundColor: headerBackgroundColor } : undefined}
+        style={{
+          ...(headerBackgroundColor ? { backgroundColor: headerBackgroundColor } : {}),
+          ['--site-header-logo-width']: `${logoWidth}px`,
+        }}
         onClick={(event) => {
           event.stopPropagation();
           if (!preview) setSelected({ type: "siteHeader", id: "site-header" });
@@ -195,7 +199,18 @@ export const createSiteChromeRenderers = ({
     };
     const visiblePageLinks = pageLinks.filter(isVisibleFooterItem);
     const visibleHelpLinks = helpLinks.filter(isVisibleFooterItem);
-    const visibleQuickLinks = Array.from(new Set([...visiblePageLinks, ...visibleHelpLinks]));
+    const footerDescription = String(site.description ?? "").trim();
+    const footerShopTitle = String(site.footerShopTitle ?? "").trim() || "Pages";
+    const footerHelpTitle = String(site.footerHelpTitle ?? "").trim() || "Help";
+    const hasBrandSection = Boolean(resolveMediaUrl(site.logoUrl) || footerBrand || footerDescription || socialLinks.length);
+    const hasContactDetails = Boolean(contactEmail || contactPhone);
+    const hasContactSection = Boolean(hasContactDetails || paymentMethods.length);
+    const footerSectionCount = [
+      hasBrandSection,
+      visiblePageLinks.length > 0,
+      visibleHelpLinks.length > 0,
+      hasContactSection,
+    ].filter(Boolean).length;
     const navigateFooterLink = (label) => {
       const target = resolveFooterPageLink(label);
 
@@ -213,20 +228,21 @@ export const createSiteChromeRenderers = ({
           }
         }}
       >
-        <div className="ecommerce-footer-grid">
-          <div className="ecommerce-footer-brand">
+        {footerSectionCount > 0 && (
+        <div className="ecommerce-footer-grid" data-section-count={footerSectionCount}>
+          {hasBrandSection && <div className="ecommerce-footer-brand">
             <div className="ecommerce-footer-logo-row">
               {resolveMediaUrl(site.logoUrl) ? (
-                <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={`${footerBrand} logo`} />
+                <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={footerBrand ? `${footerBrand} logo` : "Footer logo"} />
               ) : footerBrand ? (
                 <div className="ecommerce-footer-logo footer-logo-fallback">{footerInitial}</div>
               ) : null}
               {footerBrand && <h3>{footerBrand}</h3>}
             </div>
 
-            <p>{site.description}</p>
+            {footerDescription && <p>{footerDescription}</p>}
 
-            <div className="ecommerce-social-row">
+            {socialLinks.length > 0 && <div className="ecommerce-social-row">
               {socialLinks.map((item) => {
                 const href = getSafeFooterLinkUrl(item.url, item.label);
                 const socialMark = getFooterSocialMark(item.label);
@@ -248,19 +264,26 @@ export const createSiteChromeRenderers = ({
                   <span key={item.label} aria-label={item.label}><span className="ecommerce-social-mark" aria-hidden="true">{socialMark}</span></span>
                 );
               })}
-            </div>
+            </div>}
 
-          </div>
+          </div>}
 
-          <div className="ecommerce-footer-column ecommerce-footer-quick-links">
-            <h4>Quick Links</h4>
+          {visiblePageLinks.length > 0 && <div className="ecommerce-footer-column ecommerce-footer-quick-links">
+            <h4>{footerShopTitle}</h4>
             <div className="ecommerce-footer-links-grid">
-              {visibleQuickLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
+              {visiblePageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
             </div>
-          </div>
+          </div>}
 
-          <div className="ecommerce-footer-contact">
-            <h4>Contact Info</h4>
+          {visibleHelpLinks.length > 0 && <div className="ecommerce-footer-column ecommerce-footer-quick-links">
+            <h4>{footerHelpTitle}</h4>
+            <div className="ecommerce-footer-links-grid">
+              {visibleHelpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
+            </div>
+          </div>}
+
+          {hasContactSection && <div className="ecommerce-footer-contact">
+            <h4>{hasContactDetails ? "Contact Info" : "Payment Methods"}</h4>
             {contactEmail && (
               <a className="ecommerce-contact-row" href={`mailto:${contactEmail}`} onClick={(event) => event.stopPropagation()}>
                 <Mail size={19} aria-hidden="true" />
@@ -294,8 +317,9 @@ export const createSiteChromeRenderers = ({
                 })}
               </div>
             )}
-          </div>
+          </div>}
         </div>
+        )}
 
         <div className="ecommerce-footer-bottom">
           <p>© 2026{footerBrand ? ` ${footerBrand}.` : ""}{footerRights ? ` ${footerRights}` : ""}</p>

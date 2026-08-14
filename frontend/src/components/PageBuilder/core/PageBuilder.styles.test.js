@@ -219,6 +219,24 @@ describe("getBuilderFreeElementStyle", () => {
     expect(style.maxWidth).toBe("1120px");
   });
 
+  it("normalizes every editorial image card to the fixed 240px base height", () => {
+    const style = getDirectElementFrameStyle({
+      element: {
+        id: "legacy-tall-card",
+        type: "imageButton",
+        imageButtonVariant: "editorialCard",
+      },
+      position: { x: 40, y: 80, width: 420, height: 310 },
+      viewportWidth: 1200,
+      sectionHeight: 900,
+      getMetricMinimumHeight: () => 80,
+      getDirectElementMinimumSize: () => ({ width: 220, height: 120 }),
+    });
+
+    expect(style.width).toBe("420px");
+    expect(style.height).toBe("240px");
+  });
+
   it("moves a recovered element inside the canvas without collapsing its width", () => {
     const element = {
       id: "text-1",

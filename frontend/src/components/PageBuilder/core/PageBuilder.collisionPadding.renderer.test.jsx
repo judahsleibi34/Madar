@@ -83,6 +83,57 @@ describe("SiteRenderer collision padding", () => {
     expect(view.container.querySelector('[data-builder-element-id="right"]').dataset.logicalY).toBe("40");
   });
 
+  it("allows only the editorial image button to grow with its content", () => {
+    const page = {
+      id: "image-card-page",
+      sections: [{
+        id: "cards",
+        mode: "direct",
+        layout: { width: "full" },
+        freeElements: [
+          { id: "editorial", type: "imageButton", imageButtonVariant: "editorialCard", styles: {}, position: position(20, 40, 380, 240) },
+          { id: "image-only", type: "imageButton", styles: {}, position: position(20, 320, 380, 180) },
+        ],
+      }],
+    };
+    const view = render(
+      <SiteRenderer
+        project={{ theme: {} }}
+        activePage={page}
+        viewportMode="desktop"
+        renderElement={(element) => <div>{element.id}</div>}
+      />
+    );
+
+    expect(view.container.querySelector('[data-builder-element-id="editorial"]').classList.contains("is-intrinsic-height")).toBe(false);
+    expect(view.container.querySelector('[data-builder-element-id="image-only"]').classList.contains("is-intrinsic-height")).toBe(false);
+  });
+
+  it("repairs an oversized saved divider frame to its compact interaction height", () => {
+    const page = {
+      id: "divider-page",
+      sections: [{
+        id: "divider-section",
+        mode: "direct",
+        layout: { width: "full" },
+        freeElements: [
+          { id: "line", type: "thinDivider", styles: {}, position: position(20, 80, 350, 120) },
+        ],
+      }],
+    };
+    const view = render(
+      <SiteRenderer
+        project={{ theme: {} }}
+        activePage={page}
+        viewportMode="desktop"
+        renderElement={(element) => <div>{element.id}</div>}
+      />
+    );
+
+    expect(view.container.querySelector('[data-builder-element-id="line"]').dataset.logicalHeight)
+      .toBe("24");
+  });
+
   it("uses wrapped text height before padding the next element", async () => {
     const observerCallbacks = [];
     const animationCallbacks = [];

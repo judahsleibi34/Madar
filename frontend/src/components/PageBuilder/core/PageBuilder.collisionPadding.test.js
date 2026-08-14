@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   RESPONSIVE_ELEMENT_GAP_RATIO,
   resolveDirectElementCollisionPadding,
+  resolveMobileReadingOrder,
 } from "./PageBuilder.collisionPadding";
 
 const entry = (id, position, layer, flowRole, type) => ({ element: { id, layer, type }, position, flowRole });
@@ -85,5 +86,55 @@ describe("direct element collision padding", () => {
     expect(result.art.x).toBe(78);
     expect(result.art.y).toBe(155);
     expect(result.card.y).toBe(421);
+  });
+
+  it("lets horizontal separators sit directly below the preceding element", () => {
+    const result = resolveDirectElementCollisionPadding([
+      entry("heading", { x: 20, y: 100, width: 350, height: 100 }, undefined, undefined, "heading"),
+      entry("line", { x: 20, y: 150, width: 350, height: 32 }, undefined, undefined, "thinDivider"),
+    ]);
+
+    expect(result.line.y).toBe(200);
+  });
+
+  it('repairs mobile geometry using desktop heading and reading order', () => {
+    const result = resolveMobileReadingOrder([
+      { ...entry('copy', { x: 20, y: 30, width: 350, height: 180 }, undefined, undefined, 'text'), readingOrderPosition: { x: 70, y: 360, width: 600, height: 180 } },
+      { ...entry('tagline', { x: 20, y: 260, width: 350, height: 60 }, undefined, undefined, 'text'), readingOrderPosition: { x: 70, y: 445, width: 600, height: 60 } },
+      { ...entry('heading', { x: 20, y: 550, width: 350, height: 110 }, undefined, undefined, 'heading'), readingOrderPosition: { x: 70, y: 100, width: 500, height: 110 } },
+      { ...entry('button', { x: 20, y: 700, width: 300, height: 52 }, undefined, undefined, 'button'), readingOrderPosition: { x: 70, y: 560, width: 260, height: 52 } },
+    ]);
+    const headingBottom = 30 + 110 + Math.ceil(110 * RESPONSIVE_ELEMENT_GAP_RATIO);
+    const copyBottom = headingBottom + 180 + Math.ceil(180 * RESPONSIVE_ELEMENT_GAP_RATIO);
+    const taglineBottom = copyBottom + 60 + Math.ceil(60 * RESPONSIVE_ELEMENT_GAP_RATIO);
+
+    expect(result.map((item) => item.position.y)).toEqual([headingBottom, copyBottom, 30, taglineBottom]);
+  });
+
+  it('derives timeless -> artwork -> heading even when legacy storage starts with the image', () => {
+    const result = resolveMobileReadingOrder([
+      { ...entry('portrait', { x: 170, y: 20, width: 200, height: 260 }, 'behindText', undefined, 'image'), readingOrderPosition: { x: 650, y: 40, width: 500, height: 650 } },
+      { ...entry('timeless', { x: 20, y: 410, width: 350, height: 40 }, undefined, undefined, 'text'), readingOrderPosition: { x: 70, y: 100, width: 300, height: 40 } },
+      { ...entry('heading', { x: 20, y: 520, width: 350, height: 180 }, undefined, undefined, 'heading'), readingOrderPosition: { x: 70, y: 190, width: 500, height: 180 } },
+    ]);
+    const gapAfterTimeless = Math.ceil(40 * RESPONSIVE_ELEMENT_GAP_RATIO);
+    const gapAfterPortrait = Math.ceil(260 * RESPONSIVE_ELEMENT_GAP_RATIO);
+
+    expect(result[1].position.y).toBe(20);
+    expect(result[0].position.y).toBe(20 + 40 + gapAfterTimeless);
+    expect(result[2].position.y).toBe(20 + 40 + gapAfterTimeless + 260 + gapAfterPortrait);
+    expect(result[0].element.layer).toBe('behindText');
+  });
+
+  it('applies the indexed phone sequence even when saved mobile y values look ordered', () => {
+    const result = resolveMobileReadingOrder([
+      { ...entry('portrait', { x: 170, y: 500, width: 200, height: 260 }, 'behindText', undefined, 'image'), readingOrderPosition: { x: 650, y: 40, width: 500, height: 650 } },
+      { ...entry('timeless', { x: 20, y: 20, width: 350, height: 40 }, undefined, undefined, 'text'), readingOrderPosition: { x: 70, y: 100, width: 300, height: 40 } },
+      { ...entry('heading', { x: 20, y: 100, width: 350, height: 180 }, undefined, undefined, 'heading'), readingOrderPosition: { x: 70, y: 190, width: 500, height: 180 } },
+    ]);
+
+    expect(result[1].position.y).toBe(20);
+    expect(result[0].position.y).toBeGreaterThan(result[1].position.y);
+    expect(result[2].position.y).toBeGreaterThan(result[0].position.y);
   });
 });

@@ -150,6 +150,8 @@ export const getWebsiteThemeVars = (theme = {}) => {
     "--theme-primary": websiteTheme.accent,
     "--theme-primary-hover": websiteTheme.accentDark,
     "--theme-on-primary": websiteTheme.buttonText,
+    "--theme-icon-background": websiteTheme.accent,
+    "--theme-icon-foreground": websiteTheme.buttonText,
     "--theme-primary-soft": `rgba(${primaryRgb}, 0.1)`,
     "--theme-primary-rgb": primaryRgb,
     "--theme-border": borderColor,

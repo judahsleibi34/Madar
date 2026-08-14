@@ -1,12 +1,18 @@
 import { useLayoutEffect, useRef } from "react";
 
-export default function AutoFitDirectText({ as: Element, fitKey, children, ...props }) {
+export default function AutoFitDirectText({ as: Element, fitKey, preserveFontSize = false, children, ...props }) {
   const elementRef = useRef(null);
 
   useLayoutEffect(() => {
     const element = elementRef.current;
     const frame = element?.closest(".direct-element-frame");
     if (!element || !frame) return undefined;
+
+    if (preserveFontSize) {
+      element.style.removeProperty("--builder-fitted-font-size");
+      element.style.removeProperty("--builder-text-fit-scale");
+      return undefined;
+    }
 
     let animationFrame = null;
     let disposed = false;
@@ -76,7 +82,7 @@ export default function AutoFitDirectText({ as: Element, fitKey, children, ...pr
       window.removeEventListener("resize", scheduleFit);
       document.fonts?.removeEventListener?.("loadingdone", scheduleFit);
     };
-  }, [fitKey]);
+  }, [fitKey, preserveFontSize]);
 
   return <Element ref={elementRef} {...props}>{children}</Element>;
 }

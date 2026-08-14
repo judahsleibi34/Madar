@@ -156,7 +156,7 @@ def schema_contains_element_type(value: Any, element_type: str) -> bool:
             for item in value
         )
     return False
-BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(5 * 1024 * 1024)))
+BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(25 * 1024 * 1024)))
 BUILDER_VIDEO_MAX_BYTES = int(os.getenv("BUILDER_VIDEO_MAX_BYTES", str(250 * 1024 * 1024)))
 BUILDER_DOCUMENT_MAX_BYTES = int(os.getenv("BUILDER_DOCUMENT_MAX_BYTES", str(50 * 1024 * 1024)))
 BUILDER_ASSET_COPY_CHUNK_BYTES = 1024 * 1024
@@ -1614,7 +1614,7 @@ async def upload_builder_asset(
             if asset_kind == "video"
             else "Document file must be 50MB or smaller"
             if asset_kind == "document"
-            else "Image file must be 5MB or smaller"
+            else "Image file must be 25MB or smaller"
         )
         raise HTTPException(status_code=413, detail=detail)
 
@@ -1697,7 +1697,7 @@ async def upload_builder_asset(
             if asset_kind == "video"
             else "Document file must be 50MB or smaller"
             if asset_kind == "document"
-            else "Image file must be 5MB or smaller"
+            else "Image file must be 25MB or smaller"
         )
         raise HTTPException(status_code=413, detail=detail) from error
     except OSError as error:

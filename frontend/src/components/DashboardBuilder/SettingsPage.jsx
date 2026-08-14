@@ -30,7 +30,7 @@ import NotificationPreferencesPanel from "./NotificationPreferencesPanel";
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
-const BUILDER_ASSET_MAX_BYTES = 5 * 1024 * 1024;
+const BUILDER_ASSET_MAX_BYTES = 25 * 1024 * 1024;
 const BUILDER_ASSET_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const BLOCKED_STORED_URL_SCHEMES = new Set(["javascript", "data", "vbscript", "file", "ftp"]);
 const CONTROL_CHARS_PATTERN = new RegExp(

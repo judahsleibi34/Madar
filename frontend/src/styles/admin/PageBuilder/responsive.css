@@ -527,6 +527,7 @@
 :is(.page-builder.preview-mode, .tenant-runtime-page)
 .builder-canvas:is(.viewport-tablet, .viewport-mobile)
 .built-site-brand {
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   justify-self: start;
@@ -546,10 +547,28 @@
 :is(.page-builder.preview-mode, .tenant-runtime-page)
 .builder-canvas:is(.viewport-tablet, .viewport-mobile)
 .built-site-brand :is(img, .logo-fallback) {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: min(var(--site-header-logo-width, 32px), 88px) !important;
+  height: auto !important;
+  max-width: 88px;
+  max-height: 48px;
+  flex: 0 1 auto !important;
   border-radius: 8px;
+}
+
+:is(.page-builder.preview-mode, .tenant-runtime-page)
+.builder-canvas.viewport-mobile
+.built-site-brand {
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+:is(.page-builder.preview-mode, .tenant-runtime-page)
+.builder-canvas.viewport-mobile
+.built-site-brand :is(img, .logo-fallback) {
+  width: min(var(--site-header-logo-width, 32px), 64px) !important;
+  max-width: 64px;
+  max-height: 42px;
 }
 
 :is(.page-builder.preview-mode, .tenant-runtime-page)
