@@ -36,6 +36,18 @@ def register_builder_asset(*, tenant_id: int, uploader_user_id: int | None, stor
     return data[0]
 
 
+def delete_builder_asset_registration(*, asset_id: str, tenant_id: int, client=None) -> None:
+    """Remove a registry row when its upload transaction cannot finish."""
+    (
+        (client or service_supabase)
+        .table("builder_assets")
+        .delete()
+        .eq("id", asset_id)
+        .eq("tenant_id", int(tenant_id))
+        .execute()
+    )
+
+
 def extract_builder_asset_references(schema: Any, *, tenant_id: int) -> dict[str, str]:
     found: dict[str, str] = {}
     def visit(value: Any, path: str) -> None:
