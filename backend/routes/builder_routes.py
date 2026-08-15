@@ -16,6 +16,7 @@ from postgrest.exceptions import APIError
 
 from database import service_supabase
 from services.asset_registry_service import (
+    delete_builder_asset_registration,
     reconcile_project_asset_references,
     register_builder_asset,
     require_builder_asset_tenant_ownership,
@@ -39,6 +40,7 @@ from services.storage_quota_service import (
     StorageSafetyError,
     finish_storage,
     get_tenant_storage_usage,
+    release_storage,
     reserve_storage,
 )
 from services.website_settings_service import require_public_subdomain
@@ -173,6 +175,22 @@ BUILDER_ASSET_EXTENSIONS = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 MANAGED_TENANT_ASSET_PATTERN = re.compile(r"^/uploads/tenant_(\d+)/")
+
+
+def release_builder_asset_reservation(*, reservation_id: str, tenant_id: int) -> bool:
+    """Best-effort release that preserves the route's controlled error response."""
+    try:
+        finish_storage(reservation_id=reservation_id, succeeded=False)
+        return True
+    except Exception as accounting_error:
+        logger.error(
+            "builder.asset_reservation_release_failed",
+            extra={
+                "tenant_id": tenant_id,
+                "error_type": type(accounting_error).__name__,
+            },
+        )
+        return False
 
 
 def validate_managed_asset_ownership(value: Any, tenant_id: int) -> None:
@@ -1684,14 +1702,20 @@ async def upload_builder_asset(
         sha256_hex = digest.hexdigest()
     except BuilderAssetValidationError as error:
         target_path.unlink(missing_ok=True)
-        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        release_builder_asset_reservation(
+            reservation_id=storage_reservation_id,
+            tenant_id=context.tenant_id,
+        )
         raise HTTPException(
             status_code=400,
             detail=f"{asset_kind.title()} file content is invalid",
         ) from error
     except ValueError as error:
         target_path.unlink(missing_ok=True)
-        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        release_builder_asset_reservation(
+            reservation_id=storage_reservation_id,
+            tenant_id=context.tenant_id,
+        )
         detail = (
             "Video file must be 250MB or smaller"
             if asset_kind == "video"
@@ -1702,16 +1726,10 @@ async def upload_builder_asset(
         raise HTTPException(status_code=413, detail=detail) from error
     except OSError as error:
         target_path.unlink(missing_ok=True)
-        try:
-            finish_storage(reservation_id=storage_reservation_id, succeeded=False)
-        except Exception as accounting_error:
-            logger.error(
-                "builder.asset_reservation_release_failed",
-                extra={
-                    "tenant_id": context.tenant_id,
-                    "error_type": type(accounting_error).__name__,
-                },
-            )
+        release_builder_asset_reservation(
+            reservation_id=storage_reservation_id,
+            tenant_id=context.tenant_id,
+        )
         logger.error(
             "builder.asset_write_failed",
             extra={
@@ -1731,16 +1749,10 @@ async def upload_builder_asset(
         # Exception on every Python version. Always remove partial local data
         # and release the reservation before propagating cancellation/failure.
         target_path.unlink(missing_ok=True)
-        try:
-            finish_storage(reservation_id=storage_reservation_id, succeeded=False)
-        except Exception as accounting_error:
-            logger.error(
-                "builder.asset_reservation_release_failed",
-                extra={
-                    "tenant_id": context.tenant_id,
-                    "error_type": type(accounting_error).__name__,
-                },
-            )
+        release_builder_asset_reservation(
+            reservation_id=storage_reservation_id,
+            tenant_id=context.tenant_id,
+        )
         raise
 
     storage_key = f"{tenant_dir}/builder_assets/{filename}"
@@ -1753,7 +1765,10 @@ async def upload_builder_asset(
         )
     except BuilderAssetStorageError as error:
         target_path.unlink(missing_ok=True)
-        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        release_builder_asset_reservation(
+            reservation_id=storage_reservation_id,
+            tenant_id=context.tenant_id,
+        )
         raise HTTPException(
             status_code=503,
             detail=error_detail(
@@ -1779,7 +1794,10 @@ async def upload_builder_asset(
             delete_builder_asset(storage_key=storage_key)
         except Exception:
             logger.warning("builder.asset_durable_rollback_failed", extra={"storage_key": storage_key})
-        finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+        release_builder_asset_reservation(
+            reservation_id=storage_reservation_id,
+            tenant_id=context.tenant_id,
+        )
         logger.error(
             "builder.asset_registry_failed",
             extra={
@@ -1804,6 +1822,38 @@ async def upload_builder_asset(
             delete_builder_asset(storage_key=storage_key)
         except Exception:
             logger.warning("builder.asset_durable_rollback_failed", extra={"storage_key": storage_key})
+        try:
+            delete_builder_asset_registration(
+                asset_id=str(registered_asset.get("id") or ""),
+                tenant_id=context.tenant_id,
+            )
+        except Exception as registry_error:
+            logger.warning(
+                "builder.asset_registry_rollback_failed",
+                extra={
+                    "tenant_id": context.tenant_id,
+                    "error_type": type(registry_error).__name__,
+                },
+            )
+        reservation_released = release_builder_asset_reservation(
+            reservation_id=storage_reservation_id,
+            tenant_id=context.tenant_id,
+        )
+        if not reservation_released:
+            try:
+                release_storage(
+                    tenant_id=context.tenant_id,
+                    category="builder_asset",
+                    storage_key=storage_key,
+                )
+            except Exception as accounting_error:
+                logger.error(
+                    "builder.asset_object_accounting_rollback_failed",
+                    extra={
+                        "tenant_id": context.tenant_id,
+                        "error_type": type(accounting_error).__name__,
+                    },
+                )
         logger.error(
             "builder.asset_accounting_failed",
             extra={"tenant_id": context.tenant_id, "error_type": type(error).__name__},
