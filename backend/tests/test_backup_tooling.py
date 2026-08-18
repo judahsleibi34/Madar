@@ -42,7 +42,11 @@ class BackupToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             result = self.run_script("backup_madar.sh", "--dry-run", env={
                 "MADAR_BACKUP_DIR": root,
-                "MADAR_DATABASE_URL": "postgresql://source.invalid/madar",
+                "PGHOST": "source.invalid",
+                "PGPORT": "5432",
+                "PGUSER": "backup",
+                "PGPASSWORD": "synthetic-test-password",
+                "PGDATABASE": "madar",
                 "MADAR_BACKUP_TIMESTAMP": "20260720T000000Z",
             })
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -64,13 +68,19 @@ class BackupToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             backup = self.fixture(root)
             common = {
-                "MADAR_DATABASE_URL": "postgresql://localhost/source",
-                "MADAR_RESTORE_DATABASE_URL": "postgresql://localhost/source",
+                "MADAR_SOURCE_DATABASE_ID": "source",
+                "MADAR_RESTORE_DATABASE_ID": "source",
+                "MADAR_RESTORE_PGHOST": "localhost",
+                "MADAR_RESTORE_PGPORT": "5432",
+                "MADAR_RESTORE_PGUSER": "restore",
+                "MADAR_RESTORE_PGPASSWORD": "synthetic-test-password",
+                "MADAR_RESTORE_PGDATABASE": "madar_restore_test",
                 "MADAR_RESTORE_CONFIRM_ISOLATED": "YES",
             }
             same = self.run_script("restore_madar.sh", "--dry-run", backup, env=common)
             self.assertIn("must differ", same.stderr)
-            common["MADAR_RESTORE_DATABASE_URL"] = "postgresql://prod.example.com/madar"
+            common["MADAR_RESTORE_DATABASE_ID"] = "other"
+            common["MADAR_RESTORE_PGHOST"] = "prod.example.com"
             unsafe = self.run_script("restore_madar.sh", "--dry-run", backup, env=common)
             self.assertIn("not recognizably isolated", unsafe.stderr)
 
@@ -78,8 +88,13 @@ class BackupToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             backup = self.fixture(root)
             env = {
-                "MADAR_DATABASE_URL": "postgresql://source.invalid/madar",
-                "MADAR_RESTORE_DATABASE_URL": "postgresql://localhost/madar_restore_test",
+                "MADAR_SOURCE_DATABASE_ID": "production",
+                "MADAR_RESTORE_DATABASE_ID": "isolated-test",
+                "MADAR_RESTORE_PGHOST": "localhost",
+                "MADAR_RESTORE_PGPORT": "5432",
+                "MADAR_RESTORE_PGUSER": "restore",
+                "MADAR_RESTORE_PGPASSWORD": "synthetic-test-password",
+                "MADAR_RESTORE_PGDATABASE": "madar_restore_test",
                 "MADAR_RESTORE_CONFIRM_ISOLATED": "YES",
             }
             for name in ("BUILDER_ASSETS", "PRIVATE_UPLOADS", "GENERATED_ARTIFACTS", "AVATARS"):

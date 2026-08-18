@@ -38,6 +38,10 @@ services:
       - .env
     environment:
       APP_ENV: production
+      # Direct PostgreSQL credentials are operator-only. An explicit empty
+      # override makes the key unusable even when the shared env_file contains
+      # it for backup or catalog-verification tooling.
+      SUPABASE_DB_URL: ""
       FRONTEND_URLS: ${FRONTEND_URLS:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-none}
@@ -173,6 +177,7 @@ services:
       - .env
     environment:
       APP_ENV: production
+      SUPABASE_DB_URL: ""
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       NOTIFICATION_WORKER_ENABLED: "true"
@@ -212,6 +217,7 @@ services:
       - .env
     environment:
       APP_ENV: production
+      SUPABASE_DB_URL: ""
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}

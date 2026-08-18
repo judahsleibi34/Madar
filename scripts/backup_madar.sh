@@ -12,7 +12,11 @@ DRY_RUN=0
 [[ $# -le $DRY_RUN ]] || die "usage: $0 [--dry-run]"
 
 : "${MADAR_BACKUP_DIR:?MADAR_BACKUP_DIR is required}"
-: "${MADAR_DATABASE_URL:?MADAR_DATABASE_URL is required}"
+: "${PGHOST:?PGHOST is required}"
+: "${PGPORT:?PGPORT is required}"
+: "${PGUSER:?PGUSER is required}"
+: "${PGPASSWORD:?PGPASSWORD is required}"
+: "${PGDATABASE:?PGDATABASE is required}"
 [[ "$MADAR_BACKUP_DIR" = /* ]] || die "MADAR_BACKUP_DIR must be an absolute path"
 [[ "$MADAR_BACKUP_DIR" != "/" ]] || die "MADAR_BACKUP_DIR must not be /"
 
@@ -30,7 +34,7 @@ paths=(
 
 if (( DRY_RUN )); then
   printf 'backup_path=%s\n' "$backup_path"
-  printf 'pg_dump --format=custom --no-owner --no-acl --file=%s/database.dump <MADAR_DATABASE_URL>\n' "$backup_path"
+  printf 'pg_dump --format=custom --no-owner --no-acl --file=%s/database.dump <libpq environment>\n' "$backup_path"
   for entry in "${paths[@]}"; do
     printf 'copy %s -> %s/files/%s\n' "${entry#*:}" "$backup_path" "${entry%%:*}"
   done
@@ -43,7 +47,7 @@ require sha256sum
 require cp
 mkdir -p "$backup_path/files"
 log "backup.start destination=$backup_path"
-pg_dump --dbname="$MADAR_DATABASE_URL" --format=custom --no-owner --no-acl \
+pg_dump --format=custom --no-owner --no-acl \
   --file="$backup_path/database.dump"
 
 for entry in "${paths[@]}"; do
