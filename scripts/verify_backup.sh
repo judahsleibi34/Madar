@@ -11,7 +11,11 @@ required=(backup.env database.dump SHA256SUMS files/builder-assets files/private
 for member in "${required[@]}"; do
   [[ -e "$backup_path/$member" ]] || die "missing backup member: $member"
 done
-grep -qx 'MADAR_BACKUP_FORMAT=1' "$backup_path/backup.env" || die "unsupported backup format"
+format="$(sed -n 's/^MADAR_BACKUP_FORMAT=//p' "$backup_path/backup.env")"
+[[ "$format" == "1" || "$format" == "2" ]] || die "unsupported backup format"
+if [[ "$format" == "2" ]]; then
+  [[ -f "$backup_path/BACKUP_COMPLETE" ]] || die "missing backup member: BACKUP_COMPLETE"
+fi
 (
   cd "$backup_path"
   sha256sum --check --strict SHA256SUMS >/dev/null

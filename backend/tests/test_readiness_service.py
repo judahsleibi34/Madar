@@ -121,13 +121,15 @@ class ReadinessServiceTests(unittest.TestCase):
             with self.subTest(value=value), patch.dict(os.environ, {"APP_ENV": value}, clear=False):
                 self.assertEqual(readiness_service.check_environment(), expected)
 
-    def test_calendar_schema_checks_tables_and_single_use_state_function(self):
+    def test_schema_readiness_uses_one_authoritative_contract_probe(self):
+        observed = []
+
         def response_for(url, **_kwargs):
-            if url.endswith("/rest/v1/"):
-                return SimpleNamespace(status_code=200, json=lambda: {"paths": {
-                    f"/rpc/{name}": {} for name in readiness_service.CALENDAR_SCHEMA_FUNCTIONS
-                }})
-            return SimpleNamespace(status_code=200)
+            observed.append(url)
+            return SimpleNamespace(
+                status_code=200,
+                json=lambda: [{"schema_version": readiness_service.EXPECTED_SCHEMA_VERSION}],
+            )
 
         with patch.dict(os.environ, {
             "CALENDAR_FEATURE_ENABLED": "true",
@@ -135,18 +137,61 @@ class ReadinessServiceTests(unittest.TestCase):
             "SUPABASE_SERVICE_KEY": "test-service-key",
         }, clear=False), patch.object(readiness_service.requests, "get", side_effect=response_for):
             self.assertEqual(readiness_service.check_schema(), "ok")
+        self.assertEqual(len(observed), 1)
+        self.assertIn("application_schema_state", observed[0])
+        self.assertNotIn("calendar", observed[0])
 
-        def missing_function(url, **_kwargs):
-            if url.endswith("/rest/v1/"):
-                return SimpleNamespace(status_code=200, json=lambda: {"paths": {}})
-            return SimpleNamespace(status_code=200)
-
+    def test_schema_readiness_fails_closed_on_old_or_missing_contract(self):
         with patch.dict(os.environ, {
-            "CALENDAR_FEATURE_ENABLED": "true",
             "SUPABASE_URL": "https://supabase.example",
             "SUPABASE_SERVICE_KEY": "test-service-key",
-        }, clear=False), patch.object(readiness_service.requests, "get", side_effect=missing_function):
+        }, clear=False), patch.object(
+            readiness_service.requests,
+            "get",
+            return_value=SimpleNamespace(
+                status_code=200,
+                json=lambda: [{"schema_version": readiness_service.EXPECTED_SCHEMA_VERSION - 1}],
+            ),
+        ):
             self.assertEqual(readiness_service.check_schema(), "missing")
+
+        with patch.dict(os.environ, {
+            "SUPABASE_URL": "https://supabase.example",
+            "SUPABASE_SERVICE_KEY": "test-service-key",
+        }, clear=False), patch.object(
+            readiness_service.requests,
+            "get",
+            return_value=SimpleNamespace(status_code=404, json=lambda: {}),
+        ):
+            self.assertEqual(readiness_service.check_schema(), "missing")
+
+    def test_schema_contract_migration_is_mirrored_and_service_role_only(self):
+        root = next(
+            parent
+            for parent in Path(__file__).resolve().parents
+            if (parent / "database/migrations").is_dir()
+        )
+        name = "081_create_application_schema_state.sql"
+        database_sql = (root / "database/migrations" / name).read_text(encoding="utf-8")
+        supabase_sql = (root / "supabase/migrations" / name).read_text(encoding="utf-8")
+        self.assertEqual(database_sql, supabase_sql)
+        normalized = " ".join(database_sql.lower().split())
+        self.assertIn("values ('core', 81, now())", normalized)
+        self.assertIn(
+            "revoke all on public.application_schema_state from public, anon, authenticated",
+            normalized,
+        )
+        self.assertIn(
+            "revoke all on public.application_schema_state from service_role",
+            normalized,
+        )
+        self.assertIn(
+            "grant select on public.application_schema_state to service_role",
+            normalized,
+        )
+        self.assertNotIn("grant insert", normalized)
+        self.assertNotIn("grant update", normalized)
+        self.assertNotIn("grant delete", normalized)
 
     def test_calendar_sync_configuration_fails_closed_when_required(self):
         with patch.dict(os.environ, {"CALENDAR_FEATURE_ENABLED": "false"}, clear=False):
