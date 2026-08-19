@@ -33,6 +33,47 @@ class BackupToolingTests(unittest.TestCase):
         (backup / "SHA256SUMS").write_text("".join(lines), encoding="utf-8")
         return backup
 
+    def backup_environment(self, root, timestamp="20260720T000000Z"):
+        root = Path(root)
+        source_root = root / "source"
+        environment = {
+            "MADAR_BACKUP_DIR": str(root / "backups"),
+            "PGHOST": "source.invalid",
+            "PGPORT": "5432",
+            "PGUSER": "backup",
+            "PGPASSWORD": "synthetic-test-password",
+            "PGDATABASE": "madar",
+            "MADAR_BACKUP_TIMESTAMP": timestamp,
+        }
+        for key, name in (
+            ("MADAR_BUILDER_ASSETS_DIR", "builder-assets"),
+            ("MADAR_PRIVATE_UPLOADS_DIR", "private-uploads"),
+            ("MADAR_GENERATED_ARTIFACTS_DIR", "generated-artifacts"),
+            ("MADAR_AVATARS_DIR", "avatars"),
+        ):
+            source = source_root / name
+            source.mkdir(parents=True)
+            (source / "fixture.txt").write_text(name, encoding="utf-8")
+            environment[key] = str(source)
+        return environment
+
+    def fake_pg_dump(self, root, *, succeeds=True):
+        fake_bin = Path(root) / "fake-bin"
+        fake_bin.mkdir()
+        executable = fake_bin / "pg_dump"
+        if succeeds:
+            executable.write_text(
+                "#!/bin/sh\n"
+                "for arg in \"$@\"; do\n"
+                "  case \"$arg\" in --file=*) printf fixture > \"${arg#*=}\";; esac\n"
+                "done\n",
+                encoding="utf-8",
+            )
+        else:
+            executable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        executable.chmod(0o700)
+        return f"{fake_bin}:{os.environ.get('PATH', '')}"
+
     def test_backup_requires_environment(self):
         result = self.run_script("backup_madar.sh", "--dry-run")
         self.assertNotEqual(result.returncode, 0)
@@ -52,6 +93,31 @@ class BackupToolingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("pg_dump --format=custom", result.stdout)
         self.assertNotIn("source.invalid", result.stdout)
+
+    def test_backup_is_published_only_after_verified_completion(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = self.backup_environment(root)
+            env["PATH"] = self.fake_pg_dump(root)
+            result = self.run_script("backup_madar.sh", env=env)
+            published = Path(root) / "backups" / "madar-20260720T000000Z"
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((published / "BACKUP_COMPLETE").is_file())
+            self.assertIn("MADAR_BACKUP_FORMAT=2", (published / "backup.env").read_text())
+            self.assertFalse(list((Path(root) / "backups").glob(".*.incomplete.*")))
+            verified = self.run_script("verify_backup.sh", published)
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+
+    def test_failed_backup_never_occupies_final_recovery_path(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = self.backup_environment(root)
+            env["PATH"] = self.fake_pg_dump(root, succeeds=False)
+            result = self.run_script("backup_madar.sh", env=env)
+            backup_root = Path(root) / "backups"
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((backup_root / "madar-20260720T000000Z").exists())
+            self.assertEqual(len(list(backup_root.glob(".*.incomplete.*"))), 1)
 
     def test_verifier_rejects_missing_member_and_checksum_mismatch(self):
         with tempfile.TemporaryDirectory() as root:

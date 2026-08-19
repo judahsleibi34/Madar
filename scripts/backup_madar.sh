@@ -22,8 +22,11 @@ DRY_RUN=0
 
 timestamp="${MADAR_BACKUP_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 [[ "$timestamp" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || die "invalid MADAR_BACKUP_TIMESTAMP"
-backup_path="${MADAR_BACKUP_DIR%/}/madar-${timestamp}"
+backup_name="madar-${timestamp}"
+backup_path="${MADAR_BACKUP_DIR%/}/${backup_name}"
+work_path="${MADAR_BACKUP_DIR%/}/.${backup_name}.incomplete.$$"
 [[ ! -e "$backup_path" ]] || die "backup destination already exists: $backup_path"
+[[ ! -e "$work_path" ]] || die "backup staging destination already exists: $work_path"
 
 paths=(
   "builder-assets:${MADAR_BUILDER_ASSETS_DIR:-/app/builder-assets}"
@@ -45,28 +48,32 @@ fi
 require pg_dump
 require sha256sum
 require cp
-mkdir -p "$backup_path/files"
+mkdir -p "$MADAR_BACKUP_DIR"
+mkdir -p "$work_path/files"
 log "backup.start destination=$backup_path"
 pg_dump --format=custom --no-owner --no-acl \
-  --file="$backup_path/database.dump"
+  --file="$work_path/database.dump"
 
 for entry in "${paths[@]}"; do
   name="${entry%%:*}"
   source_path="${entry#*:}"
   [[ -d "$source_path" ]] || die "required backup source is not a directory: $name"
-  mkdir -p "$backup_path/files/$name"
-  cp -a "$source_path/". "$backup_path/files/$name/"
+  mkdir -p "$work_path/files/$name"
+  cp -a "$source_path/". "$work_path/files/$name/"
 done
 
-cat >"$backup_path/backup.env" <<EOF
-MADAR_BACKUP_FORMAT=1
+cat >"$work_path/backup.env" <<EOF
+MADAR_BACKUP_FORMAT=2
 MADAR_BACKUP_CREATED_AT=${timestamp}
 MADAR_BACKUP_CONTENTS=database,builder-assets,private-uploads,generated-artifacts,avatars
 EOF
+printf 'completed_at=%s\n' "$timestamp" >"$work_path/BACKUP_COMPLETE"
 (
-  cd "$backup_path"
+  cd "$work_path"
   find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum >SHA256SUMS
+  sha256sum --check --strict SHA256SUMS >/dev/null
 )
+mv -T "$work_path" "$backup_path"
 log "backup.complete destination=$backup_path"
 if [[ -n "${MADAR_BACKUP_FRESHNESS_MARKER:-}" ]]; then
   [[ "$MADAR_BACKUP_FRESHNESS_MARKER" = /* ]] || die "MADAR_BACKUP_FRESHNESS_MARKER must be an absolute path"
