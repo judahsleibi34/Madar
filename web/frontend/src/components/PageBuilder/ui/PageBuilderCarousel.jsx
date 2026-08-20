@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
@@ -24,15 +24,15 @@ export default function PageBuilderCarousel({
   const safeAutoScrollMs = Math.max(1000, Number(autoScrollMs) || 4000);
   const visibleProducts = getVisibleProducts(products, startIndex, 5);
 
-  const move = (direction) => {
+  const move = useCallback((direction) => {
     setStartIndex((current) => (current + direction + products.length) % products.length);
-  };
+  }, [products.length]);
 
   useEffect(() => {
     if (!autoScroll || products.length <= 1) return undefined;
     const interval = window.setInterval(() => move(1), safeAutoScrollMs);
     return () => window.clearInterval(interval);
-  }, [autoScroll, products.length, safeAutoScrollMs]);
+  }, [autoScroll, products.length, safeAutoScrollMs, move]);
 
   return (
     <section className="page-builder-carousel workspace-card-carousel" aria-label={name}>

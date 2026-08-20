@@ -227,7 +227,7 @@ The main architectural risk is inherited from public project selection: forms an
 
 ## 18. Assets and Uploads
 
-Uploads require builder write access, are tenant-directory scoped, rate limited, limited to 5 MB PNG/JPEG/WebP, validate declared type and magic bytes, reject SVG/path traversal, generate UUID filenames, and record audit events. URL validators accept only managed upload paths or safe remote URLs.
+Uploads require builder write access, are tenant-directory scoped, rate limited, limited to 25 MiB PNG/JPEG/WebP, validate declared type and magic bytes, reject SVG/path traversal, generate UUID filenames, and record audit events. URL validators accept only managed upload paths or safe remote URLs.
 
 There is no durable asset registry or project association. Assets are not reference-counted, archived, or cleaned when projects change, so orphaned public files accumulate. The upload API does not send/validate the builder client-contract header used for other builder mutations. Settings duplicates upload validation/client code rather than sharing the builder API end-to-end.
 

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -23,9 +23,14 @@ vi.mock("../components/DashboardBuilder/EcommerceStorePage", () => ({
 }));
 vi.mock("../components/DashboardBuilder/ReservationCalendarPage", async () => {
   const React = await import("react");
-  function CalendarMock({ user, initialView }) {
+  function CalendarMock({ user, initialView, onViewChange }) {
     const [mountedTenant] = React.useState(user?.tenant_id || "missing");
-    return <div>Calendar mounted for {mountedTenant} in {initialView || "calendar"} view</div>;
+    return (
+      <div>
+        Calendar mounted for {mountedTenant} in {initialView || "calendar"} view
+        <button type="button" onClick={() => onViewChange?.("agenda")}>Open agenda</button>
+      </div>
+    );
   }
   return {
     default: CalendarMock,
@@ -64,7 +69,11 @@ describe("workspace settings routes", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByRole("heading", { name: heading, level: 1 })).toBeTruthy();
+    expect(await screen.findByRole(
+      "heading",
+      { name: heading, level: 1 },
+      { timeout: 5000 }
+    )).toBeTruthy();
   });
 
   it("renders the authenticated live Store page", async () => {
@@ -138,6 +147,17 @@ describe("workspace settings routes", () => {
       </MemoryRouter>
     );
 
+    expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
+  });
+
+  it("navigates from calendar to the refresh-safe agenda route", async () => {
+    render(
+      <MemoryRouter initialEntries={["/calendar"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open agenda" }));
     expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
   });
 });

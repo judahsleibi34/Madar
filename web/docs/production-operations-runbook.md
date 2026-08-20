@@ -67,7 +67,21 @@ Review counts and database/storage health before scheduling the corresponding `-
 
 ## Parsing, generated execution, and remote ingestion
 
-Generated code is disabled by default and requires `AI_ISOLATED_WORKER_ENABLED=true`; the subprocess worker has resource and protocol controls. Spreadsheet/CSV/JSON parsing remains bounded but in the web process. `PARSER_ISOLATED_WORKER_ENABLED` is therefore not a deployable completion flag until a real worker service exists, and production readiness must remain degraded for this gap. Remote URL ingestion stays disabled unless an egress layer pins validated DNS resolution, revalidates redirects, blocks private/reserved ranges, and sets `REMOTE_INGESTION_EGRESS_ENFORCED=true`. Do not override either guard to make readiness green.
+Generated code is disabled by default and requires `AI_ISOLATED_WORKER_ENABLED=true`; the subprocess worker has resource and protocol controls. Local CSV/XLS/XLSX full-dataframe parsing uses the `parser-worker` service when `PARSER_ISOLATED_WORKER_ENABLED=true`. The worker is non-root, resource limited, read-only, capability dropped, and connected only to an internal backend network with read-only private-upload storage. Readiness calls its health endpoint and verifies the explicit parser-worker identity; setting the flag without a live worker remains degraded.
+
+Remote URL ingestion is disabled by default. When enabled, the backend has no
+direct-fetch fallback and requires the `remote-ingestion-worker`. That non-root,
+read-only, capability-dropped worker has no application secrets, database/Redis
+network, host mounts, or public port. It validates all DNS answers, rejects
+non-public and mixed answers, pins the TCP connection to the selected validated
+address while preserving TLS SNI/certificate hostname verification, manually
+revalidates at most five redirects, permits only HTTPS port 443, rejects content
+encoding, and streams at most 10 MiB under a hard process deadline. It returns
+bounded bytes to the backend, which forwards them to the separate no-network
+parser worker. Readiness verifies the live worker identity and pinned-HTTPS
+policy; no assertion-only environment flag can make the gate green. Keep both
+worker services in the normal Compose deployment so restart and reboot policies
+remain effective.
 
 The generated worker forces OpenBLAS, OpenMP, MKL, NumExpr, VecLib, and BLIS
 to one thread before numerical imports. It keeps a sanitized structured protocol,

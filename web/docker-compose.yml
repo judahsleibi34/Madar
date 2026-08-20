@@ -38,6 +38,10 @@ services:
       - .env
     environment:
       APP_ENV: production
+      # Direct PostgreSQL credentials are operator-only. An explicit empty
+      # override makes the key unusable even when the shared env_file contains
+      # it for backup or catalog-verification tooling.
+      SUPABASE_DB_URL: ""
       FRONTEND_URLS: ${FRONTEND_URLS:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-none}
@@ -107,9 +111,25 @@ services:
       MICROSOFT_CALENDAR_CLIENT_SECRET: ${MICROSOFT_CALENDAR_CLIENT_SECRET:-}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       FRONTEND_PRIMARY_URL: ${FRONTEND_PRIMARY_URL:-}
+      ALLOW_REMOTE_DATASET_URLS: ${ALLOW_REMOTE_DATASET_URLS:-false}
+      REMOTE_INGESTION_WORKER_URL: ${REMOTE_INGESTION_WORKER_URL:-http://remote-ingestion-worker:8093/fetch}
+      REMOTE_INGESTION_WORKER_HEALTH_URL: ${REMOTE_INGESTION_WORKER_HEALTH_URL:-http://remote-ingestion-worker:8093/health}
+      REMOTE_INGESTION_BACKEND_TIMEOUT_SECONDS: ${REMOTE_INGESTION_BACKEND_TIMEOUT_SECONDS:-45}
+      PARSER_ISOLATED_WORKER_ENABLED: ${PARSER_ISOLATED_WORKER_ENABLED:-true}
+      PARSER_WORKER_URL: ${PARSER_WORKER_URL:-http://parser-worker:8092/parse}
+      PARSER_WORKER_HEALTH_URL: ${PARSER_WORKER_HEALTH_URL:-http://parser-worker:8092/health}
+      PARSER_WORKER_TIMEOUT_SECONDS: ${PARSER_WORKER_TIMEOUT_SECONDS:-60}
     depends_on:
       redis:
         condition: service_healthy
+      parser-worker:
+        condition: service_healthy
+      remote-ingestion-worker:
+        condition: service_healthy
+    networks:
+      - default
+      - parser_internal
+      - remote_ingestion_internal
     ports:
       - "127.0.0.1:8001:8000"
     volumes:
@@ -157,6 +177,7 @@ services:
       - .env
     environment:
       APP_ENV: production
+      SUPABASE_DB_URL: ""
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       NOTIFICATION_WORKER_ENABLED: "true"
@@ -196,6 +217,7 @@ services:
       - .env
     environment:
       APP_ENV: production
+      SUPABASE_DB_URL: ""
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
@@ -225,6 +247,82 @@ services:
       start_period: 10s
     cpus: 1.00
     mem_limit: 512m
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  parser-worker:
+    build:
+      context: ./backend
+    container_name: madar-parser-worker
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "65534:65534"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,uid=65534,gid=65534
+    environment:
+      APP_ENV: production
+      DATA_UPLOAD_DIR: /app/private_uploads
+      MADAR_UPLOAD_WORKSPACE_DIR: /tmp/madar_parser
+      PARSER_WORKER_PROCESS: "true"
+      PARSER_WORKER_HEALTH_HOST: 0.0.0.0
+      PARSER_WORKER_PORT: 8092
+      PARSER_JOB_TIMEOUT_SECONDS: ${PARSER_JOB_TIMEOUT_SECONDS:-55}
+      ALLOW_REMOTE_DATASET_URLS: "false"
+      STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
+    command: ["python", "-m", "workers.parser_worker"]
+    volumes:
+      - ./backend/private_uploads:/app/private_uploads:ro
+    networks:
+      - parser_internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    cpus: 0.75
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  remote-ingestion-worker:
+    build:
+      context: ./backend
+    container_name: madar-remote-ingestion-worker
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "65534:65534"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,uid=65534,gid=65534
+    environment:
+      APP_ENV: production
+      REMOTE_INGESTION_WORKER_HOST: 0.0.0.0
+      REMOTE_INGESTION_WORKER_PORT: 8093
+      REMOTE_INGESTION_DEADLINE_SECONDS: ${REMOTE_INGESTION_DEADLINE_SECONDS:-35}
+      REMOTE_INGESTION_HARD_TIMEOUT_SECONDS: ${REMOTE_INGESTION_HARD_TIMEOUT_SECONDS:-40}
+      STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
+    command: ["python", "-m", "workers.remote_ingestion_worker"]
+    networks:
+      - remote_ingestion_internal
+      - remote_ingestion_egress
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8093/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    cpus: 0.50
+    mem_limit: 256m
     logging:
       driver: json-file
       options: {max-size: "20m", max-file: "5"}
@@ -264,3 +362,10 @@ services:
     logging:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}
+
+networks:
+  parser_internal:
+    internal: true
+  remote_ingestion_internal:
+    internal: true
+  remote_ingestion_egress: {}

@@ -85,6 +85,10 @@ backend/.env.ai.local
 
 # Private uploaded user data
 backend/private_uploads/
+backend/private_generated_charts/
+
+# One-time local environment input
+env13-8
 
 # Temporary Codex build validation output
 frontend/.codex-build-check/

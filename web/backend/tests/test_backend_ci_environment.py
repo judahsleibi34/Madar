@@ -72,6 +72,27 @@ class BackendCiEnvironmentTests(unittest.TestCase):
         self.assertIn("APP_ENV: development", development)
         self.assertNotIn("PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost", production)
 
+    def test_runtime_services_explicitly_drop_direct_postgres_credentials(self):
+        production = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        backend_section = production.split("\n  backend:", 1)[1].split(
+            "\n  notification-worker:", 1
+        )[0]
+        notification_section = production.split(
+            "\n  notification-worker:", 1
+        )[1].split("\n  calendar-sync-worker:", 1)[0]
+        calendar_section = production.split("\n  calendar-sync-worker:", 1)[1].split(
+            "\n  parser-worker:", 1
+        )[0]
+
+        for name, section in (
+            ("backend", backend_section),
+            ("notification", notification_section),
+            ("calendar", calendar_section),
+        ):
+            with self.subTest(service=name):
+                self.assertIn('SUPABASE_DB_URL: ""', section)
+                self.assertNotIn("SUPABASE_DB_URL: ${", section)
+
     def test_backend_ci_uses_safe_complete_hermetic_environment(self):
         command = _named_run_command(WORKFLOW, "Run backend tests")
         tokens = shlex.split(command)

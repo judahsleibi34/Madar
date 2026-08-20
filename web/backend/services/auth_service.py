@@ -24,7 +24,7 @@ from services.account_lifecycle_service import (
     synchronize_verified_account,
 )
 from services.identity_service import canonical_auth_email, normalize_email
-from services.api_errors import api_error
+from services.api_errors import api_error, error_detail
 from services.request_security import (
     create_csrf_token,
     delete_csrf_cookie,
@@ -38,8 +38,18 @@ _AUTH_REFRESH_REPLAY = {}
 _AUTH_REFRESH_REPLAY_SECONDS = 15
 
 
-class SessionRefreshUnavailable(RuntimeError):
+class SessionRefreshUnavailable(HTTPException):
     """The identity provider could not verify the session temporarily."""
+
+    def __init__(self, _message: str = "Authentication service is temporarily unavailable"):
+        super().__init__(
+            status_code=503,
+            detail=error_detail(
+                "auth_temporarily_unavailable",
+                "Authentication is temporarily unavailable. Please try again.",
+            ),
+            headers={"Retry-After": "5"},
+        )
 
 
 def is_definitive_auth_failure(error: Exception) -> bool:

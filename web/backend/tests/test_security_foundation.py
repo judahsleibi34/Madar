@@ -423,6 +423,13 @@ class SecurityFoundationTests(unittest.TestCase):
 
         self.assertTrue(auth_service.is_definitive_auth_failure(error))
 
+    def test_transient_auth_failure_maps_to_503_for_all_protected_routes(self):
+        error = SessionRefreshUnavailable("provider timeout")
+
+        self.assertEqual(error.status_code, 503)
+        self.assertEqual(error.detail["code"], "auth_temporarily_unavailable")
+        self.assertEqual(error.headers["Retry-After"], "5")
+
     def test_session_activity_rejects_tampering(self):
         activity = create_session_activity_value(now=1_000)
         timestamp, _ = activity.split(".", 1)

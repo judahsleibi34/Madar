@@ -20,8 +20,40 @@ class ReadinessServiceTests(unittest.TestCase):
             self.assertEqual(readiness_service.check_ai_execution_guard(), "ok")
 
     def test_remote_ingestion_requires_enforced_egress(self):
-        with patch.dict("os.environ", {"ALLOW_REMOTE_DATASET_URLS": "true", "REMOTE_INGESTION_EGRESS_ENFORCED": "false"}, clear=False):
-            self.assertEqual(readiness_service.check_remote_ingestion_guard(), "insecure")
+        healthy = SimpleNamespace(
+            status_code=200,
+            json=lambda: {
+                "status": "ok",
+                "isolation": "remote_ingestion_worker",
+                "policy": "pinned_https_v1",
+            },
+        )
+        environment = {
+            "ALLOW_REMOTE_DATASET_URLS": "true",
+            "REMOTE_INGESTION_WORKER_URL": "http://remote-ingestion-worker:8093/fetch",
+            "REMOTE_INGESTION_WORKER_HEALTH_URL": "http://remote-ingestion-worker:8093/health",
+            "REMOTE_INGESTION_EGRESS_ENFORCED": "false",
+        }
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=healthy
+        ):
+            self.assertEqual(readiness_service.check_remote_ingestion_guard(), "ok")
+
+    def test_remote_ingestion_cannot_be_declared_secure_without_worker_identity(self):
+        wrong = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"status": "ok", "isolation": "other", "policy": "pinned_https_v1"},
+        )
+        environment = {
+            "ALLOW_REMOTE_DATASET_URLS": "true",
+            "REMOTE_INGESTION_WORKER_URL": "http://remote-ingestion-worker:8093/fetch",
+            "REMOTE_INGESTION_WORKER_HEALTH_URL": "http://remote-ingestion-worker:8093/health",
+            "REMOTE_INGESTION_EGRESS_ENFORCED": "true",
+        }
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=wrong
+        ):
+            self.assertEqual(readiness_service.check_remote_ingestion_guard(), "unavailable")
 
     def test_notification_worker_required_without_health_target_fails_closed(self):
         with patch.dict("os.environ", {
@@ -58,21 +90,46 @@ class ReadinessServiceTests(unittest.TestCase):
                 self.assertEqual(readiness_service.check_backup_freshness(), "stale")
 
     def test_production_parser_stays_gated_until_isolated(self):
-        with patch.dict("os.environ", {"APP_ENV": "production"}, clear=False):
+        with patch.dict("os.environ", {"APP_ENV": "production", "PARSER_ISOLATED_WORKER_ENABLED": "false"}, clear=False):
             self.assertEqual(readiness_service.check_parser_isolation(), "in_process")
+
+    def test_parser_isolation_requires_worker_identity_and_health(self):
+        healthy = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"status": "ok", "isolation": "parser_worker"},
+        )
+        wrong_identity = SimpleNamespace(
+            status_code=200,
+            json=lambda: {"status": "ok", "isolation": "other"},
+        )
+        environment = {
+            "APP_ENV": "production",
+            "PARSER_ISOLATED_WORKER_ENABLED": "true",
+            "PARSER_WORKER_HEALTH_URL": "http://parser-worker:8092/health",
+        }
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=healthy
+        ):
+            self.assertEqual(readiness_service.check_parser_isolation(), "ok")
+        with patch.dict("os.environ", environment, clear=False), patch.object(
+            readiness_service.requests, "get", return_value=wrong_identity
+        ):
+            self.assertEqual(readiness_service.check_parser_isolation(), "unavailable")
 
     def test_environment_name_must_be_explicit_and_known(self):
         for value, expected in (("production", "ok"), ("development", "ok"), ("test", "ok"), ("unknown", "misconfigured"), ("", "misconfigured")):
             with self.subTest(value=value), patch.dict(os.environ, {"APP_ENV": value}, clear=False):
                 self.assertEqual(readiness_service.check_environment(), expected)
 
-    def test_calendar_schema_checks_tables_and_single_use_state_function(self):
+    def test_schema_readiness_uses_one_authoritative_contract_probe(self):
+        observed = []
+
         def response_for(url, **_kwargs):
-            if url.endswith("/rest/v1/"):
-                return SimpleNamespace(status_code=200, json=lambda: {"paths": {
-                    f"/rpc/{name}": {} for name in readiness_service.CALENDAR_SCHEMA_FUNCTIONS
-                }})
-            return SimpleNamespace(status_code=200)
+            observed.append(url)
+            return SimpleNamespace(
+                status_code=200,
+                json=lambda: [{"schema_version": readiness_service.EXPECTED_SCHEMA_VERSION}],
+            )
 
         with patch.dict(os.environ, {
             "CALENDAR_FEATURE_ENABLED": "true",
@@ -80,18 +137,61 @@ class ReadinessServiceTests(unittest.TestCase):
             "SUPABASE_SERVICE_KEY": "test-service-key",
         }, clear=False), patch.object(readiness_service.requests, "get", side_effect=response_for):
             self.assertEqual(readiness_service.check_schema(), "ok")
+        self.assertEqual(len(observed), 1)
+        self.assertIn("application_schema_state", observed[0])
+        self.assertNotIn("calendar", observed[0])
 
-        def missing_function(url, **_kwargs):
-            if url.endswith("/rest/v1/"):
-                return SimpleNamespace(status_code=200, json=lambda: {"paths": {}})
-            return SimpleNamespace(status_code=200)
-
+    def test_schema_readiness_fails_closed_on_old_or_missing_contract(self):
         with patch.dict(os.environ, {
-            "CALENDAR_FEATURE_ENABLED": "true",
             "SUPABASE_URL": "https://supabase.example",
             "SUPABASE_SERVICE_KEY": "test-service-key",
-        }, clear=False), patch.object(readiness_service.requests, "get", side_effect=missing_function):
+        }, clear=False), patch.object(
+            readiness_service.requests,
+            "get",
+            return_value=SimpleNamespace(
+                status_code=200,
+                json=lambda: [{"schema_version": readiness_service.EXPECTED_SCHEMA_VERSION - 1}],
+            ),
+        ):
             self.assertEqual(readiness_service.check_schema(), "missing")
+
+        with patch.dict(os.environ, {
+            "SUPABASE_URL": "https://supabase.example",
+            "SUPABASE_SERVICE_KEY": "test-service-key",
+        }, clear=False), patch.object(
+            readiness_service.requests,
+            "get",
+            return_value=SimpleNamespace(status_code=404, json=lambda: {}),
+        ):
+            self.assertEqual(readiness_service.check_schema(), "missing")
+
+    def test_schema_contract_migration_is_mirrored_and_service_role_only(self):
+        root = next(
+            parent
+            for parent in Path(__file__).resolve().parents
+            if (parent / "database/migrations").is_dir()
+        )
+        name = "081_create_application_schema_state.sql"
+        database_sql = (root / "database/migrations" / name).read_text(encoding="utf-8")
+        supabase_sql = (root / "supabase/migrations" / name).read_text(encoding="utf-8")
+        self.assertEqual(database_sql, supabase_sql)
+        normalized = " ".join(database_sql.lower().split())
+        self.assertIn("values ('core', 81, now())", normalized)
+        self.assertIn(
+            "revoke all on public.application_schema_state from public, anon, authenticated",
+            normalized,
+        )
+        self.assertIn(
+            "revoke all on public.application_schema_state from service_role",
+            normalized,
+        )
+        self.assertIn(
+            "grant select on public.application_schema_state to service_role",
+            normalized,
+        )
+        self.assertNotIn("grant insert", normalized)
+        self.assertNotIn("grant update", normalized)
+        self.assertNotIn("grant delete", normalized)
 
     def test_calendar_sync_configuration_fails_closed_when_required(self):
         with patch.dict(os.environ, {"CALENDAR_FEATURE_ENABLED": "false"}, clear=False):

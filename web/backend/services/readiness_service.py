@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import tempfile
 import time
-from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 from shutil import disk_usage
 from threading import Lock
@@ -31,53 +31,7 @@ except ImportError:  # pragma: no cover - installed in the runtime image
 
 READINESS_TIMEOUT_SECONDS = float(os.getenv("READINESS_TIMEOUT_SECONDS", "2"))
 READINESS_CACHE_SECONDS = float(os.getenv("READINESS_CACHE_SECONDS", "5"))
-REQUIRED_SCHEMA_SELECTS = {
-    "users": "id,account_kind,account_status,email_verified,pending_email",
-    "tenant_memberships": "id,tenant_id,auth_id,status",
-    "builder_projects": "id,draft_revision,published_revision,schema_version",
-    "builder_reservations": "id,idempotency_key_hash,request_hash,exclusive_slot",
-    "features": "id,payment_status,billing_state_changed_at",
-    "email_verification_attempts": "id,email_hash,status",
-    "pending_account_onboarding": "id,auth_id,status,expires_at",
-    "password_reset_requests": "id,nonce_hash,status,processing_started_at",
-    "billing_webhook_events": "id,provider_event_id,tenant_id,provider_occurred_at,status",
-    "notification_outbox": "id,channel,status,deduplication_key",
-    "builder_form_submissions": "id,idempotency_key_hash,request_hash",
-    "builder_assets": "id,tenant_id,status,size_bytes,retention_until",
-    "builder_asset_references": "asset_id,project_id,reference_path",
-    "storage_accounts": "tenant_id,scope_key,used_bytes,reserved_bytes,quota_bytes",
-    "storage_reservations": "id,status,bytes,expires_at",
-    "storage_objects": "id,tenant_id,category,size_bytes,status",
-    "tenant_site_project_roles": "id,tenant_id,project_id,role_key,capabilities,deleted_at",
-    "tenant_site_project_role_assignments": "membership_id,project_id,role_id",
-}
-CALENDAR_SCHEMA_SELECTS = {
-    "calendars": "id,tenant_id,owner_user_id,visibility",
-    "calendar_memberships": "calendar_id,tenant_id,user_id,role",
-    "calendar_events": "id,tenant_id,calendar_id,project_id,version",
-    "calendar_event_attendees": "id,event_id,tenant_id",
-    "calendar_event_reminders": "id,event_id,tenant_id,delivery_status",
-    "calendar_event_changes": "id,event_id,tenant_id,changed_by",
-    "calendar_tasks": "id,tenant_id,calendar_id,project_id,owner_user_id,recurrence_rule,sync_connection_id,sync_event_id,sync_status",
-    "calendar_task_dependencies": "task_id,depends_on_task_id,tenant_id",
-    "calendar_task_reminders": "id,task_id,tenant_id,delivery_status",
-    "calendar_sync_connections": "id,tenant_id,user_id,local_calendar_id,provider,status,provider_calendar_id,inbound_sync_enabled,inbound_sync_status,last_inbound_success_at",
-    "calendar_sync_conflicts": "id,tenant_id,connection_id,event_id,status",
-    "calendar_invitation_reviews": "id,tenant_id,event_id,disposition",
-    "calendar_oauth_states": "nonce_hash,connection_id,tenant_id,user_id,calendar_id,consumed_at",
-    "calendar_task_sync_jobs": "id,tenant_id,task_id,connection_id,operation,status,attempts,next_attempt_at,leased_at",
-    "calendar_connection_sync_jobs": "id,tenant_id,connection_id,operation,status,attempts,next_attempt_at,leased_at",
-}
-CALENDAR_SCHEMA_FUNCTIONS = (
-    "consume_calendar_oauth_state",
-    "enqueue_calendar_task_sync_job",
-    "claim_calendar_task_sync_jobs",
-    "finish_calendar_task_sync_job",
-    "complete_calendar_task_sync_delete",
-    "enqueue_calendar_connection_sync_job",
-    "claim_calendar_connection_sync_jobs",
-    "finish_calendar_connection_sync_job",
-)
+EXPECTED_SCHEMA_VERSION = 81
 
 _cache_lock = Lock()
 _cached_at = 0.0
@@ -152,41 +106,32 @@ def check_schema() -> str:
     if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_SERVICE_KEY"):
         return "misconfigured"
     try:
-        def check_table(item: tuple[str, str]) -> bool:
-            table, columns = item
-            response = requests.get(
-                _supabase_url(f"/rest/v1/{table}?select={columns}&limit=0"),
-                headers={**_supabase_headers(), "Range": "0-0"},
-                timeout=READINESS_TIMEOUT_SECONDS,
-                allow_redirects=False,
-            )
-            return 200 <= response.status_code < 300
-
-        required_selects = dict(REQUIRED_SCHEMA_SELECTS)
-        if _env_bool("CALENDAR_FEATURE_ENABLED", False):
-            required_selects.update(CALENDAR_SCHEMA_SELECTS)
-        schema_items = tuple(required_selects.items())
-        with ThreadPoolExecutor(max_workers=min(4, len(schema_items))) as executor:
-            table_states = tuple(executor.map(check_table, schema_items))
-        if not all(table_states):
+        response = requests.get(
+            _supabase_url(
+                "/rest/v1/application_schema_state"
+                "?select=schema_version&contract_key=eq.core&limit=1"
+            ),
+            headers=_supabase_headers(),
+            timeout=READINESS_TIMEOUT_SECONDS,
+            allow_redirects=False,
+        )
+        if response.status_code in {400, 404}:
             return "missing"
-        if _env_bool("CALENDAR_FEATURE_ENABLED", False):
-            response = requests.get(
-                _supabase_url("/rest/v1/"),
-                headers=_supabase_headers(),
-                timeout=READINESS_TIMEOUT_SECONDS,
-                allow_redirects=False,
-            )
-            if not 200 <= response.status_code < 300:
-                return "unavailable"
-            try:
-                paths = (response.json() or {}).get("paths") or {}
-            except (ValueError, TypeError):
-                return "unavailable"
-            if not all(f"/rpc/{name}" in paths for name in CALENDAR_SCHEMA_FUNCTIONS):
-                return "missing"
-        return "ok"
-    except requests.RequestException:
+        if not 200 <= response.status_code < 300:
+            return "unavailable"
+        rows = response.json()
+        if (
+            not isinstance(rows, list)
+            or len(rows) != 1
+            or not isinstance(rows[0], dict)
+        ):
+            return "missing"
+        return (
+            "ok"
+            if rows[0].get("schema_version") == EXPECTED_SCHEMA_VERSION
+            else "missing"
+        )
+    except (requests.RequestException, TypeError, ValueError):
         return "unavailable"
 
 
@@ -319,7 +264,24 @@ def check_remote_ingestion_guard() -> str:
     enabled = _env_bool("ALLOW_REMOTE_DATASET_URLS", False)
     if not enabled:
         return "disabled"
-    return "ok" if _env_bool("REMOTE_INGESTION_EGRESS_ENFORCED", False) else "insecure"
+    health_url = os.getenv("REMOTE_INGESTION_WORKER_HEALTH_URL", "").strip()
+    worker_url = os.getenv("REMOTE_INGESTION_WORKER_URL", "").strip()
+    if not health_url or not worker_url:
+        return "misconfigured"
+    try:
+        response = requests.get(
+            health_url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False
+        )
+        payload = response.json() if response.status_code == 200 else {}
+        return (
+            "ok"
+            if payload.get("status") == "ok"
+            and payload.get("isolation") == "remote_ingestion_worker"
+            and payload.get("policy") == "pinned_https_v1"
+            else "unavailable"
+        )
+    except (requests.RequestException, TypeError, ValueError):
+        return "unavailable"
 
 
 def check_calendar_configuration() -> str:
@@ -384,7 +346,24 @@ def check_calendar_sync_queue() -> str:
 
 
 def check_parser_isolation() -> str:
-    return "in_process" if _app_env() in {"prod", "production"} else "development"
+    if not _env_bool("PARSER_ISOLATED_WORKER_ENABLED", False):
+        return "in_process" if _app_env() in {"prod", "production"} else "development"
+    url = os.getenv("PARSER_WORKER_HEALTH_URL", "").strip()
+    if not url:
+        return "misconfigured"
+    try:
+        response = requests.get(
+            url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False
+        )
+        payload = response.json() if response.status_code == 200 else {}
+        return (
+            "ok"
+            if payload.get("status") == "ok"
+            and payload.get("isolation") == "parser_worker"
+            else "unavailable"
+        )
+    except (requests.RequestException, TypeError, ValueError):
+        return "unavailable"
 
 
 def _is_required_state_ready(component: str, state: str) -> bool:

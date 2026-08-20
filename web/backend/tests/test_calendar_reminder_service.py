@@ -59,6 +59,67 @@ class RpcClient:
 
 
 class CalendarReminderServiceTests(unittest.TestCase):
+    def test_malformed_legacy_rows_are_failed_without_aborting_valid_reminders(self):
+        client = Client()
+        client.tables["calendar_event_reminders"] = [
+            {
+                "id": "event-bad",
+                "event_id": "event-bad",
+                "tenant_id": 7,
+                "scheduled_for": None,
+                "delivery_status": "scheduled",
+            },
+            {
+                "id": "event-good",
+                "event_id": "event-good",
+                "tenant_id": 7,
+                "channel": "in_app",
+                "minutes_before": 10,
+                "scheduled_for": "2026-07-22T08:50:00+00:00",
+                "delivery_status": "scheduled",
+            },
+        ]
+        client.tables["calendar_events"] = [
+            {
+                "id": "event-good",
+                "tenant_id": 7,
+                "created_by": 12,
+                "status": "confirmed",
+                "title": "Good event",
+                "starts_at": "2026-07-22T09:00:00+00:00",
+                "deleted_at": None,
+            }
+        ]
+        client.tables["calendar_task_reminders"][0]["tenant_id"] = None
+        payloads = []
+        with patch.object(
+            calendar_reminder_service,
+            "enqueue_notification",
+            side_effect=lambda **kwargs: payloads.append(kwargs["payload"]) or {"id": "outbox"},
+        ):
+            queued = calendar_reminder_service.enqueue_due_calendar_reminders(client=client)
+
+        self.assertEqual(queued, 2)
+        self.assertEqual(
+            client.tables["calendar_event_reminders"][0]["failure_code"],
+            "reminder_schema_invalid",
+        )
+        self.assertEqual(
+            client.tables["calendar_task_reminders"][0]["failure_code"],
+            "reminder_schema_invalid",
+        )
+        self.assertEqual(
+            client.tables["calendar_event_reminders"][1]["delivery_status"],
+            "queued",
+        )
+        self.assertEqual(
+            client.tables["calendar_task_reminders"][1]["delivery_status"],
+            "queued",
+        )
+        self.assertEqual(
+            {payload["source_id"] for payload in payloads}, {"event-good", "task-good"}
+        )
+
     def test_task_state_controls_future_reminders_without_silencing_overdue_active_work(self):
         client = Client()
         client.tables["calendar_task_reminders"] = [

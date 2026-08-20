@@ -1,9 +1,9 @@
 import math
-import ipaddress
+import base64
+import json
 import os
 import re
 import shutil
-import socket
 import struct
 import tempfile
 import time
@@ -13,11 +13,13 @@ from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
 from typing import Iterator
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urlparse
+from uuid import uuid4
 
 import openpyxl
 import pandas as pd
 import requests
+from fastapi import HTTPException
 
 from services.upload_config import (
     get_data_upload_dir,
@@ -28,6 +30,27 @@ from services.upload_config import (
 
 class RemoteDatasetUrlsDisabledError(ValueError):
     pass
+
+
+class RemoteIngestionUnavailableError(HTTPException):
+    def __init__(self, message: str = "Remote ingestion is temporarily unavailable") -> None:
+        super().__init__(
+            status_code=503,
+            detail={"code": "remote_ingestion_unavailable", "message": message},
+            headers={"Retry-After": "30"},
+        )
+
+
+class ParserWorkerUnavailableError(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=503,
+            detail={
+                "code": "parser_worker_unavailable",
+                "message": "Dataset parsing is temporarily unavailable",
+            },
+            headers={"Retry-After": "30"},
+        )
 
 
 class DataReadingNormal:
@@ -92,22 +115,218 @@ class DataReadingNormal:
                     self._cached_df = cached.copy(deep=True)
                     return cached.copy(deep=True)
 
-            if self._is_google_sheets_url(self.input_path):
-                df = self._read_google_sheet(self.input_path)
+            if self._is_url(self.input_path) and not self._isolated_parser_enabled():
+                raise RemoteIngestionUnavailableError(
+                    "Remote ingestion requires the isolated worker topology"
+                )
 
-            elif self._is_url(self.input_path):
-                df = self._read_from_url_or_api(self.input_path)
+            if self._isolated_parser_enabled() and not self._is_parser_worker_process():
+                df = self._read_via_isolated_worker()
+                self._cached_df = df.copy(deep=True)
+                if cache_key:
+                    self._set_shared_cache(cache_key, df)
+                return df.copy(deep=True)
 
-            else:
-                df = self._read_local_file(self.input_path)
+            if self._is_url(self.input_path):
+                raise RemoteIngestionUnavailableError(
+                    "Remote ingestion requires the isolated worker topology"
+                )
+            df = self._read_local_file(self.input_path)
 
             self._cached_df = df.copy(deep=True)
             if cache_key:
                 self._set_shared_cache(cache_key, df)
             return df.copy(deep=True)
 
+        except (
+            RemoteDatasetUrlsDisabledError,
+            RemoteIngestionUnavailableError,
+            ParserWorkerUnavailableError,
+        ):
+            raise
         except Exception as error:
             raise RuntimeError("Failed to read data") from error
+
+    def _read_via_isolated_worker(self) -> pd.DataFrame:
+        if self._is_url(self.input_path):
+            parser_payload = self._fetch_remote_parser_payload(self.input_path)
+        else:
+            safe_path = self._resolve_uploaded_file(self.input_path)
+            parser_payload = {
+                "input_path": str(safe_path),
+                "tenant_id": str(self.tenant_id) if self.tenant_id is not None else None,
+                "user_id": str(self.user_id) if self.user_id is not None else None,
+            }
+        worker_url = os.getenv(
+            "PARSER_WORKER_URL", "http://parser-worker:8092/parse"
+        ).strip()
+        timeout_seconds = max(
+            1.0, min(float(os.getenv("PARSER_WORKER_TIMEOUT_SECONDS", "60")), 300.0)
+        )
+        max_result_bytes = max(
+            1024,
+            min(
+                int(os.getenv("PARSER_WORKER_MAX_RESULT_BYTES", str(16 * 1024 * 1024))),
+                64 * 1024 * 1024,
+            ),
+        )
+        try:
+            response = requests.post(
+                worker_url,
+                json=parser_payload,
+                timeout=(2.0, timeout_seconds),
+                stream=True,
+                allow_redirects=False,
+            )
+        except requests.RequestException as error:
+            raise ParserWorkerUnavailableError() from error
+        if response.status_code >= 500:
+            response.close()
+            raise ParserWorkerUnavailableError()
+        if response.status_code != 200:
+            response.close()
+            raise ValueError("The isolated parser could not process this dataset")
+        self._buffer_worker_response(response, max_result_bytes=max_result_bytes)
+        try:
+            payload = response.json()
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError("The isolated parser returned an invalid result") from error
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("columns"), list)
+            or not isinstance(payload.get("data"), list)
+        ):
+            raise ValueError("The isolated parser returned an invalid result")
+        columns = payload["columns"]
+        data = payload["data"]
+        if len(columns) > self.MAX_COLUMNS or len(data) > self.MAX_ROWS:
+            raise ValueError("The isolated parser result exceeds dataset limits")
+        if any(not isinstance(row, list) or len(row) != len(columns) for row in data):
+            raise ValueError("The isolated parser returned an invalid result")
+        return self._normalize_dataframe(pd.DataFrame(data, columns=columns))
+
+    def _fetch_remote_parser_payload(self, url: str) -> dict:
+        if not self._isolated_parser_enabled():
+            raise RemoteIngestionUnavailableError(
+                "Remote ingestion requires the isolated parser worker"
+            )
+        egress_url = os.getenv(
+            "REMOTE_INGESTION_WORKER_URL", "http://remote-ingestion-worker:8093/fetch"
+        ).strip()
+        timeout_seconds = max(
+            1.0,
+            min(float(os.getenv("REMOTE_INGESTION_BACKEND_TIMEOUT_SECONDS", "45")), 65.0),
+        )
+        max_result_bytes = max(
+            1024,
+            min(
+                int(os.getenv("REMOTE_INGESTION_MAX_RESULT_BYTES", str(14 * 1024 * 1024 + 65536))),
+                20 * 1024 * 1024,
+            ),
+        )
+        requested_url = self._google_sheet_to_csv_url(url) if self._is_google_sheets_url(url) else url
+        request_id = uuid4().hex
+        try:
+            response = requests.post(
+                egress_url,
+                json={
+                    "url": requested_url,
+                    "tenant_id": str(self.tenant_id) if self.tenant_id is not None else None,
+                    "user_id": str(self.user_id) if self.user_id is not None else None,
+                    "request_id": request_id,
+                },
+                timeout=(2.0, timeout_seconds),
+                stream=True,
+                allow_redirects=False,
+            )
+        except requests.RequestException as error:
+            raise RemoteIngestionUnavailableError(
+                "Remote ingestion worker is unavailable"
+            ) from error
+        if response.status_code >= 500:
+            response.close()
+            raise RemoteIngestionUnavailableError(
+                "Remote ingestion worker is unavailable"
+            )
+        if response.status_code != 200:
+            response.close()
+            raise ValueError("The remote dataset could not be fetched safely")
+        self._buffer_worker_response(response, max_result_bytes=max_result_bytes)
+        try:
+            payload = response.json()
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise RemoteIngestionUnavailableError(
+                "Remote ingestion worker returned an invalid result"
+            ) from error
+        if (
+            not isinstance(payload, dict)
+            or payload.get("status") != "ok"
+            or payload.get("request_id") != request_id
+            or not isinstance(payload.get("final_url"), str)
+            or not isinstance(payload.get("content_type"), str)
+            or not isinstance(payload.get("content_b64"), str)
+        ):
+            raise RemoteIngestionUnavailableError(
+                "Remote ingestion worker returned an invalid result"
+            )
+        try:
+            content_size = len(base64.b64decode(payload["content_b64"], validate=True))
+        except (ValueError, TypeError) as error:
+            raise RemoteIngestionUnavailableError(
+                "Remote ingestion worker returned an invalid result"
+            ) from error
+        if content_size > self.MAX_REMOTE_BYTES:
+            raise RemoteIngestionUnavailableError(
+                "Remote ingestion worker returned an oversized result"
+            )
+        return {
+            "content_b64": payload["content_b64"],
+            "source_url": payload["final_url"],
+            "content_type": payload["content_type"],
+            "tenant_id": str(self.tenant_id) if self.tenant_id is not None else None,
+            "user_id": str(self.user_id) if self.user_id is not None else None,
+        }
+
+    @staticmethod
+    def _buffer_worker_response(response: requests.Response, *, max_result_bytes: int) -> None:
+        content_length = response.headers.get("Content-Length")
+        if content_length:
+            try:
+                if int(content_length) > max_result_bytes:
+                    raise ValueError("The isolated parser result is too large")
+            except (TypeError, ValueError) as error:
+                response.close()
+                raise ValueError("The isolated parser result is too large") from error
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > max_result_bytes:
+                response.close()
+                raise ValueError("The isolated parser result is too large")
+            chunks.append(chunk)
+        response._content = b"".join(chunks)
+        response._content_consumed = True
+
+    @staticmethod
+    def _isolated_parser_enabled() -> bool:
+        return (os.getenv("PARSER_ISOLATED_WORKER_ENABLED") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+    @staticmethod
+    def _is_parser_worker_process() -> bool:
+        return (os.getenv("PARSER_WORKER_PROCESS") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     def clear_cache(self) -> None:
         self._cached_df = None
@@ -168,52 +387,6 @@ class DataReadingNormal:
             "Supported formats are .csv, .xls, and .xlsx"
         )
 
-    def _read_from_url_or_api(self, url: str) -> pd.DataFrame:
-        extension = self._get_extension(url)
-
-        response = self._fetch_public_url(url)
-        response.raise_for_status()
-
-        content_type = response.headers.get("Content-Type", "").lower()
-
-        if extension == ".csv" or "csv" in content_type:
-            return self._read_csv_bytes(response.content)
-
-        if extension in [".xls", ".xlsx"] or self._is_excel_content_type(content_type):
-            return self._read_excel_bytes(response.content, extension=extension)
-
-        if "application/json" in content_type or url.lower().endswith(".json"):
-            data = response.json()
-            df = self._json_to_dataframe(data)
-            return self._normalize_dataframe(df)
-
-        raise ValueError(
-            "Could not detect data format from URL/API. "
-            "Expected CSV, Excel, JSON, or Google Sheets."
-        )
-
-    def _read_google_sheet(self, url: str) -> pd.DataFrame:
-        csv_url = self._google_sheet_to_csv_url(url)
-
-        response = self._fetch_public_url(csv_url)
-
-        if not response.ok:
-            raise ValueError(
-                "Google Sheet could not be read. Make sure it is shared with "
-                "'Anyone with the link' or published to the web."
-            )
-
-        content_type = response.headers.get("Content-Type", "").lower()
-        content_start = response.content.lstrip()[:20].lower()
-
-        if "html" in content_type or content_start.startswith(b"<"):
-            raise ValueError(
-                "Google returned a page instead of spreadsheet data. Share the "
-                "sheet publicly or publish it to the web, then try again."
-            )
-
-        return self._read_csv_bytes(response.content)
-
     def _read_excel_bytes(self, content: bytes, *, extension: str = "") -> pd.DataFrame:
         self._validate_excel_file_size(len(content))
 
@@ -245,8 +418,8 @@ class DataReadingNormal:
 
     @contextmanager
     def _isolated_parser_workspace(self, source_path: Path) -> Iterator[Path]:
-        # TODO: move parsing into a no-network, resource-limited worker/container.
-        # This workspace provides application-level file isolation until then.
+        # The production parser worker uses this per-job workspace inside its
+        # no-network, resource-limited container.
         base_dir = Path(self.PARSER_WORKSPACE_BASE).resolve()
         base_dir.mkdir(parents=True, exist_ok=True)
         workspace = Path(
@@ -624,74 +797,8 @@ class DataReadingNormal:
         except ValueError as error:
             raise ValueError("Invalid upload storage scope") from error
 
-    def _fetch_public_url(self, url: str) -> requests.Response:
-        self._assert_remote_dataset_urls_enabled()
-        headers = {"User-Agent": "Mozilla/5.0"}
-        current_url = url
-
-        for _ in range(5):
-            self._validate_public_url(current_url)
-            response = requests.get(
-                current_url,
-                timeout=30,
-                headers=headers,
-                allow_redirects=False,
-                stream=True,
-            )
-
-            if response.is_redirect:
-                response.close()
-                location = response.headers.get("Location")
-                if not location:
-                    raise ValueError("URL redirected without a location")
-                current_url = urljoin(current_url, location)
-                continue
-
-            self._buffer_limited_response(response)
-            return response
-
-        raise ValueError("URL redirected too many times")
-
-    def _buffer_limited_response(self, response: requests.Response) -> None:
-        content_length = response.headers.get("Content-Length")
-
-        if content_length:
-            try:
-                if int(content_length) > self.MAX_REMOTE_BYTES:
-                    response.close()
-                    raise ValueError("Remote data file is too large")
-            except ValueError:
-                response.close()
-                raise ValueError("Remote data file is too large")
-
-        chunks = []
-        total = 0
-
-        for chunk in response.iter_content(chunk_size=1024 * 1024):
-            if not chunk:
-                continue
-
-            total += len(chunk)
-
-            if total > self.MAX_REMOTE_BYTES:
-                response.close()
-                raise ValueError("Remote data file is too large")
-
-            chunks.append(chunk)
-
-        response._content = b"".join(chunks)
-        response._content_consumed = True
-
     def _remote_dataset_urls_enabled(self) -> bool:
         return (os.getenv("ALLOW_REMOTE_DATASET_URLS") or "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-
-    def _insecure_remote_dataset_http_enabled(self) -> bool:
-        return (os.getenv("ALLOW_INSECURE_REMOTE_DATASET_HTTP") or "").strip().lower() in {
             "1",
             "true",
             "yes",
@@ -701,28 +808,3 @@ class DataReadingNormal:
     def _assert_remote_dataset_urls_enabled(self) -> None:
         if not self._remote_dataset_urls_enabled():
             raise RemoteDatasetUrlsDisabledError(self.REMOTE_DATASET_URLS_DISABLED_MESSAGE)
-
-    def _validate_public_url(self, url: str) -> None:
-        parsed = urlparse(url)
-        if parsed.scheme not in ["http", "https"] or not parsed.hostname:
-            raise ValueError("Only public HTTP or HTTPS URLs are supported")
-
-        if parsed.scheme == "http" and not self._insecure_remote_dataset_http_enabled():
-            raise ValueError("Remote dataset URLs must use HTTPS")
-
-        try:
-            addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
-        except socket.gaierror as error:
-            raise ValueError("Could not resolve data URL host") from error
-
-        for address in addresses:
-            ip = ipaddress.ip_address(address[4][0])
-            if (
-                ip.is_private
-                or ip.is_loopback
-                or ip.is_link_local
-                or ip.is_multicast
-                or ip.is_reserved
-                or ip.is_unspecified
-            ):
-                raise ValueError("Private or local network URLs are not allowed")

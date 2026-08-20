@@ -23,6 +23,41 @@ def _datetime(value: Any) -> datetime:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def _validate_due_reminder(
+    reminder: dict[str, Any], *, table: str, client
+) -> bool:
+    """Reject malformed legacy rows without aborting the whole due batch."""
+    missing_fields = [
+        field for field in ("id", "tenant_id", "scheduled_for") if reminder.get(field) in (None, "")
+    ]
+    try:
+        if not missing_fields:
+            int(reminder["tenant_id"])
+    except (TypeError, ValueError, OverflowError):
+        missing_fields.append("tenant_id_invalid")
+
+    if not missing_fields:
+        return True
+
+    reminder_id = reminder.get("id")
+    if reminder_id not in (None, ""):
+        client.table(table).update(
+            {
+                "delivery_status": "failed",
+                "failure_code": "reminder_schema_invalid",
+            }
+        ).eq("id", reminder_id).eq("delivery_status", "scheduled").execute()
+    logger.warning(
+        "calendar_reminder.schema_invalid",
+        extra={
+            "reminder_source": "task" if table == "calendar_task_reminders" else "event",
+            "missing_fields": sorted(set(missing_fields)),
+            "error_code": "reminder_schema_invalid",
+        },
+    )
+    return False
+
+
 def next_task_reminder_time(payload: dict[str, Any]) -> str | None:
     rule_text = str(payload.get("task_recurrence_rule") or "").strip()
     if not rule_text:
@@ -102,6 +137,10 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
     )
     queued = 0
     for reminder in due:
+        if not _validate_due_reminder(
+            reminder, table="calendar_event_reminders", client=database_client
+        ):
+            continue
         event_rows = _rows(
             database_client.table("calendar_events")
             .select("*")
@@ -140,9 +179,19 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
                 extra={"tenant_id": reminder.get("tenant_id"), "user_id": user_id, "error_code": "owner_inactive"},
             )
             continue
-        occurrence_start = _datetime(reminder.get("scheduled_for")) + timedelta(
-            minutes=int(reminder.get("minutes_before") or 0)
-        )
+        try:
+            occurrence_start = _datetime(reminder.get("scheduled_for")) + timedelta(
+                minutes=int(reminder.get("minutes_before") or 0)
+            )
+        except (TypeError, ValueError, OverflowError):
+            database_client.table("calendar_event_reminders").update(
+                {"delivery_status": "failed", "failure_code": "reminder_time_invalid"}
+            ).eq("id", reminder.get("id")).execute()
+            logger.warning(
+                "calendar_event_reminder.invalid",
+                extra={"error_code": "reminder_time_invalid"},
+            )
+            continue
         payload = {
             "event_type": "calendar_reminder",
             "source_type": "calendar_event",
@@ -184,6 +233,10 @@ def enqueue_due_calendar_reminders(*, limit: int = 100, client=None) -> int:
         .execute()
     )
     for reminder in task_due:
+        if not _validate_due_reminder(
+            reminder, table="calendar_task_reminders", client=database_client
+        ):
+            continue
         task_rows = _rows(
             database_client.table("calendar_tasks")
             .select("*")

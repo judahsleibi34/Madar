@@ -16,10 +16,11 @@ import {
   Underline,
   Undo2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   createReservationFormItem,
   getReservationTextStyle,
+  moveBookingComponent,
   normalizeReservationTextStyle,
   reservationFormItemLabels,
 } from "../blocks/reservationForm";
@@ -29,16 +30,6 @@ import { normalizeTimeSlotsByDate } from "../blocks/reservationAvailability";
 const BOOKING_COMPONENT_MIME = "application/x-madar-booking-component";
 const toolboxTypes = ["heading", "paragraph", "availability", "text", "checkbox", "radio", "button"];
 const textComponentTypes = new Set(["heading", "paragraph"]);
-
-export const moveBookingComponent = (items, sourceId, targetIndex) => {
-  const current = Array.isArray(items) ? [...items] : [];
-  const sourceIndex = current.findIndex((item) => item.id === sourceId);
-  if (sourceIndex < 0) return current;
-  const [moved] = current.splice(sourceIndex, 1);
-  const adjustedIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
-  current.splice(Math.max(0, Math.min(adjustedIndex, current.length)), 0, moved);
-  return current;
-};
 
 const writeDragPayload = (event, payload) => {
   event.dataTransfer.effectAllowed = "move";
@@ -238,16 +229,14 @@ export default function ReservationBlockBuilder({ items, onChange, availableDate
   const [selectedId, setSelectedId] = useState(components[0]?.id || "");
   const [activeDropIndex, setActiveDropIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const historyRef = useRef(new Map());
-  const futureRef = useRef(new Map());
-  const selected = components.find((item) => item.id === selectedId) || null;
+  const [historyById, setHistoryById] = useState(() => new Map());
+  const [futureById, setFutureById] = useState(() => new Map());
+  const effectiveSelectedId = components.some((item) => item.id === selectedId)
+    ? selectedId
+    : components[0]?.id || "";
+  const selected = components.find((item) => item.id === effectiveSelectedId) || null;
   const hasButton = components.some((item) => item.type === "button");
   const hasAvailability = components.some((item) => item.type === "availability");
-
-  useEffect(() => {
-    if (!selectedId && components.length > 0) setSelectedId(components[0].id);
-    else if (selectedId && components.length > 0 && !components.some((item) => item.id === selectedId)) setSelectedId(components[0].id);
-  }, [components, selectedId]);
 
   const addComponent = (type, targetIndex = components.length) => {
     if ((type === "button" && hasButton) || (type === "availability" && hasAvailability)) return;
@@ -273,29 +262,32 @@ export default function ReservationBlockBuilder({ items, onChange, availableDate
   };
 
   const updateSelected = (updates, recordHistory = true) => {
-    const current = components.find((item) => item.id === selectedId);
+    const current = components.find((item) => item.id === effectiveSelectedId);
     if (!current) return;
     if (recordHistory) {
-      const history = historyRef.current.get(selectedId) || [];
-      historyRef.current.set(selectedId, [...history.slice(-49), current]);
-      futureRef.current.set(selectedId, []);
+      const history = historyById.get(effectiveSelectedId) || [];
+      setHistoryById(new Map(historyById).set(effectiveSelectedId, [...history.slice(-49), current]));
+      setFutureById(new Map(futureById).set(effectiveSelectedId, []));
     }
-    onChange(components.map((item) => item.id === selectedId ? { ...item, ...updates } : item));
+    onChange(components.map((item) => item.id === effectiveSelectedId ? { ...item, ...updates } : item));
   };
 
-  const restoreSelected = (sourceRef, targetRef) => {
-    const source = sourceRef.current.get(selectedId) || [];
-    const current = components.find((item) => item.id === selectedId);
+  const restoreSelected = (sourceMap, setSourceMap, targetMap, setTargetMap) => {
+    const source = sourceMap.get(effectiveSelectedId) || [];
+    const current = components.find((item) => item.id === effectiveSelectedId);
     if (!current || source.length === 0) return;
     const previous = source[source.length - 1];
-    sourceRef.current.set(selectedId, source.slice(0, -1));
-    targetRef.current.set(selectedId, [...(targetRef.current.get(selectedId) || []), current]);
-    onChange(components.map((item) => item.id === selectedId ? previous : item));
+    setSourceMap(new Map(sourceMap).set(effectiveSelectedId, source.slice(0, -1)));
+    setTargetMap(new Map(targetMap).set(
+      effectiveSelectedId,
+      [...(targetMap.get(effectiveSelectedId) || []), current]
+    ));
+    onChange(components.map((item) => item.id === effectiveSelectedId ? previous : item));
   };
 
   const deleteSelected = () => {
-    const index = components.findIndex((item) => item.id === selectedId);
-    const next = components.filter((item) => item.id !== selectedId);
+    const index = components.findIndex((item) => item.id === effectiveSelectedId);
+    const next = components.filter((item) => item.id !== effectiveSelectedId);
     onChange(next);
     setSelectedId(next[Math.min(index, next.length - 1)]?.id || "");
   };
@@ -321,7 +313,7 @@ export default function ReservationBlockBuilder({ items, onChange, availableDate
           {components.map((item, index) => (
             <div className="booking-canvas-component-slot" key={item.id}>
               <div className={`booking-component-dropzone ${isDragging ? "is-visible" : ""} ${activeDropIndex === index ? "is-active" : ""}`} onDragEnter={(event) => { event.preventDefault(); setActiveDropIndex(index); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropAt(event, index)} />
-              <article className={`booking-canvas-component is-${item.type} ${selectedId === item.id ? "is-selected" : ""}`} draggable tabIndex={0} aria-label={`${reservationFormItemLabels[item.type]} component`}
+              <article className={`booking-canvas-component is-${item.type} ${effectiveSelectedId === item.id ? "is-selected" : ""}`} draggable tabIndex={0} aria-label={`${reservationFormItemLabels[item.type]} component`}
                 onDragStart={(event) => { writeDragPayload(event, { kind: "component", id: item.id }); setIsDragging(true); }} onDragEnd={() => { setIsDragging(false); setActiveDropIndex(null); }} onClick={() => setSelectedId(item.id)} onFocus={() => setSelectedId(item.id)}>
                 <div className="booking-canvas-component-preview" dir={item.direction === "rtl" ? "rtl" : "ltr"}><BookingComponentPreview item={item} availableDates={availableDates} timeSlots={timeSlots} timeSlotsByDate={timeSlotsByDate} /></div>
               </article>
@@ -334,8 +326,10 @@ export default function ReservationBlockBuilder({ items, onChange, availableDate
 
       {selected ? (
         <BookingComponentInspector item={selected} onUpdate={updateSelected} onDelete={deleteSelected}
-          onUndo={() => restoreSelected(historyRef, futureRef)} onRedo={() => restoreSelected(futureRef, historyRef)}
-          canUndo={(historyRef.current.get(selectedId) || []).length > 0} canRedo={(futureRef.current.get(selectedId) || []).length > 0} />
+          onUndo={() => restoreSelected(historyById, setHistoryById, futureById, setFutureById)}
+          onRedo={() => restoreSelected(futureById, setFutureById, historyById, setHistoryById)}
+          canUndo={(historyById.get(effectiveSelectedId) || []).length > 0}
+          canRedo={(futureById.get(effectiveSelectedId) || []).length > 0} />
       ) : <aside className="booking-component-inspector is-empty"><strong>No component selected</strong><p>Drag a component onto the canvas, then select it to edit its content.</p></aside>}
     </div>
   );

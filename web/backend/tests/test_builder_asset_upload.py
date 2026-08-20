@@ -95,7 +95,7 @@ class BuilderAssetUploadTests(unittest.TestCase):
         self.upload_dir = Path(self.temp_dir.name).resolve()
         self.patches = [
             patch.object(builder_routes, "BUILDER_ASSET_UPLOAD_DIR", self.upload_dir),
-            patch.object(builder_routes, "BUILDER_ASSET_MAX_BYTES", 5 * 1024 * 1024),
+            patch.object(builder_routes, "BUILDER_ASSET_MAX_BYTES", 25 * 1024 * 1024),
             patch.object(
                 builder_routes,
                 "require_builder_write_access",
@@ -111,8 +111,10 @@ class BuilderAssetUploadTests(unittest.TestCase):
                 "register_builder_asset",
                 return_value={"id": "asset-registry-1"},
             ),
+            patch.object(builder_routes, "delete_builder_asset_registration", return_value=None),
             patch.object(builder_routes, "reserve_storage", return_value="reservation-1"),
             patch.object(builder_routes, "finish_storage", return_value="object-1"),
+            patch.object(builder_routes, "release_storage", return_value=True),
             patch.object(builder_routes, "store_builder_asset", return_value=None),
             patch.object(builder_routes, "delete_builder_asset", return_value=None),
             patch.object(builder_routes, "require_entitlement", return_value={}),
@@ -169,6 +171,18 @@ class BuilderAssetUploadTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "Write access required")
+
+    def test_tenant_without_image_upload_entitlement_is_rejected_before_storage(self):
+        with patch.object(
+            builder_routes,
+            "require_entitlement",
+            side_effect=HTTPException(status_code=403, detail="Image uploads are unavailable"),
+        ), patch.object(builder_routes, "reserve_storage") as reserve_storage:
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Image uploads are unavailable")
+        reserve_storage.assert_not_called()
 
     def test_empty_file_is_rejected(self):
         response = self.post_asset(b"", "empty.png", "image/png")
@@ -306,12 +320,79 @@ class BuilderAssetUploadTests(unittest.TestCase):
             builder_routes,
             "store_builder_asset",
             side_effect=builder_routes.BuilderAssetStorageError("unavailable"),
-        ):
+        ), patch.object(builder_routes, "finish_storage") as finish_storage:
             response = self.post_asset(PNG_BYTES)
 
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["detail"]["code"], "asset_storage_unavailable")
         self.assertEqual(list(self.upload_dir.rglob("*.png")), [])
+        finish_storage.assert_called_once_with(
+            reservation_id="reservation-1",
+            succeeded=False,
+        )
+
+    def test_registry_failure_rolls_back_local_durable_and_reserved_storage(self):
+        with patch.object(
+            builder_routes,
+            "register_builder_asset",
+            side_effect=RuntimeError("registry unavailable"),
+        ), patch.object(builder_routes, "delete_builder_asset") as delete_builder_asset, patch.object(
+            builder_routes,
+            "finish_storage",
+        ) as finish_storage:
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(list(self.upload_dir.rglob("*.png")), [])
+        delete_builder_asset.assert_called_once()
+        finish_storage.assert_called_once_with(
+            reservation_id="reservation-1",
+            succeeded=False,
+        )
+
+    def test_accounting_failure_rolls_back_registry_storage_and_reservation(self):
+        with patch.object(
+            builder_routes,
+            "finish_storage",
+            side_effect=[RuntimeError("commit unavailable"), None],
+        ) as finish_storage, patch.object(
+            builder_routes,
+            "delete_builder_asset",
+        ) as delete_builder_asset, patch.object(
+            builder_routes,
+            "delete_builder_asset_registration",
+        ) as delete_registration:
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(list(self.upload_dir.rglob("*.png")), [])
+        delete_builder_asset.assert_called_once()
+        delete_registration.assert_called_once_with(
+            asset_id="asset-registry-1",
+            tenant_id=1,
+        )
+        self.assertEqual(finish_storage.call_count, 2)
+        self.assertEqual(
+            finish_storage.call_args_list[1].kwargs,
+            {"reservation_id": "reservation-1", "succeeded": False},
+        )
+
+    def test_uncertain_accounting_commit_releases_any_committed_storage_object(self):
+        with patch.object(
+            builder_routes,
+            "finish_storage",
+            side_effect=[RuntimeError("commit response lost"), RuntimeError("state conflict")],
+        ), patch.object(builder_routes, "release_storage") as release_storage:
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 503)
+        release_storage.assert_called_once()
+        self.assertEqual(release_storage.call_args.kwargs["tenant_id"], 1)
+        self.assertEqual(release_storage.call_args.kwargs["category"], "builder_asset")
+        self.assertRegex(
+            release_storage.call_args.kwargs["storage_key"],
+            r"^tenant_1/builder_assets/[a-f0-9]{32}\.png$",
+        )
 
     def test_unwritable_storage_returns_controlled_cors_error(self):
         with patch.object(Path, "open", side_effect=PermissionError("denied")):
@@ -377,6 +458,46 @@ class BuilderAssetUploadTests(unittest.TestCase):
             response = self.post_asset(PNG_BYTES, "asset.png", "image/png")
 
         self.assertEqual(response.status_code, 413)
+
+    def test_image_upload_25_mib_boundaries(self):
+        limit = 25 * 1024 * 1024
+
+        for size_bytes, expected_status in (
+            (limit - 1, 200),
+            (limit, 200),
+            (limit + 1, 413),
+        ):
+            content = b"\x89PNG\r\n\x1a\n" + bytes(size_bytes - 8)
+            with self.subTest(size_bytes=size_bytes), patch.object(
+                builder_routes,
+                "reserve_storage",
+                return_value="reservation-1",
+            ) as reserve_storage:
+                response = self.post_asset(content, "asset.png", "image/png")
+
+            self.assertEqual(response.status_code, expected_status)
+            if expected_status == 200:
+                self.assertEqual(
+                    reserve_storage.call_args.kwargs["size_bytes"],
+                    size_bytes,
+                )
+            else:
+                reserve_storage.assert_not_called()
+
+    def test_validation_failure_removes_partial_file_and_releases_reservation(self):
+        with patch.object(
+            builder_routes,
+            "validate_builder_asset_file",
+            side_effect=builder_routes.BuilderAssetValidationError("invalid"),
+        ), patch.object(builder_routes, "finish_storage") as finish_storage:
+            response = self.post_asset(PNG_BYTES)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(list(self.upload_dir.rglob("*.png")), [])
+        finish_storage.assert_called_once_with(
+            reservation_id="reservation-1",
+            succeeded=False,
+        )
 
     def test_quota_rejection_writes_no_file(self):
         with patch.object(

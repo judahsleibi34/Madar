@@ -182,7 +182,7 @@ Published form -> public rate limit + honeypot + timing check
 Avatar -> authenticated owner -> <=5 MB + magic bytes -> random file
   -> public avatars/users/:auth_id/* -> public read
 
-Builder image -> active tenant writer -> <=5 MB + magic bytes
+Builder image -> active tenant writer -> <=25 MiB + magic bytes
   -> local uploads/tenant_:tenant_id/builder_assets/:random -> constrained public route
 
 Dataset -> authenticated matching user/tenant -> bounded multipart upload

@@ -161,9 +161,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
   const [catalog, setCatalog] = useState(EMPTY_CATALOG);
   const [site, setSite] = useState(null);
   const [productDetail, setProductDetail] = useState(null);
-  const [searchDraft, setSearchDraft] = useState(urlFilters.get("search") || "");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [requestStatus, setRequestStatus] = useState({
+    key: "",
+    loading: true,
+    error: "",
+  });
   const cartKey = `madar-store-cart:${subdomain}`;
   const [cart, setCart] = useState(() => readCart(cartKey));
 
@@ -176,17 +178,31 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
     locale,
   };
 
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
+  const requestKey = JSON.stringify([
+    subdomain,
+    productSlug,
+    filters.search,
+    filters.category,
+    filters.tag,
+    filters.sort,
+    filters.page,
+    locale,
+  ]);
+  const loading = requestStatus.key !== requestKey || requestStatus.loading;
+  const error = requestStatus.key === requestKey ? requestStatus.error : "";
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError("");
     const request = productSlug
       ? fetchPublicEcommerceProduct(subdomain, productSlug, locale)
-      : fetchPublicEcommerceCatalog(subdomain, filters);
+      : fetchPublicEcommerceCatalog(subdomain, {
+          search: filters.search,
+          category: filters.category,
+          tag: filters.tag,
+          sort: filters.sort,
+          page: filters.page,
+          locale,
+        });
     request
       .then((result) => {
         if (cancelled) return;
@@ -197,12 +213,16 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
           setCatalog(result?.catalog || EMPTY_CATALOG);
           setProductDetail(null);
         }
+        setRequestStatus({ key: requestKey, loading: false, error: "" });
       })
       .catch((requestError) => {
-        if (!cancelled) setError(requestError?.message || "Could not load the live store");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setRequestStatus({
+            key: requestKey,
+            loading: false,
+            error: requestError?.message || "Could not load the live store",
+          });
+        }
       });
     return () => {
       cancelled = true;
@@ -216,6 +236,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
     filters.tag,
     filters.sort,
     filters.page,
+    requestKey,
   ]);
 
   const setFilter = (key, value, resetPage = true) => {
@@ -294,12 +315,14 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
                 className="live-store-search"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  setFilter("search", searchDraft);
+                  const value = new FormData(event.currentTarget).get("search");
+                  setFilter("search", typeof value === "string" ? value : "");
                 }}
               >
                 <input
-                  value={searchDraft}
-                  onChange={(event) => setSearchDraft(event.target.value)}
+                  key={filters.search}
+                  name="search"
+                  defaultValue={filters.search}
                   placeholder="Search for products…"
                   aria-label="Search products"
                 />

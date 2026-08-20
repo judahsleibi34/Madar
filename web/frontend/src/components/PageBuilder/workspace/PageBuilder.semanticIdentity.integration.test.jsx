@@ -21,8 +21,8 @@ vi.mock("../services/PageBuilder.api", async (importOriginal) => ({
 
 const projectId = "project-semantic-identity";
 const user = { id: "user-1", tenant_id: "tenant-1" };
-const actualCrashSchema = process.env.MADAR_ACTUAL_BUILDER_SCHEMA
-  ? JSON.parse(process.env.MADAR_ACTUAL_BUILDER_SCHEMA)
+const actualCrashSchema = globalThis.process?.env?.MADAR_ACTUAL_BUILDER_SCHEMA
+  ? JSON.parse(globalThis.process.env.MADAR_ACTUAL_BUILDER_SCHEMA)
   : null;
 
 const schemaA = {

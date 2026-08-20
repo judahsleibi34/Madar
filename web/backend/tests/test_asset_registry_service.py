@@ -72,6 +72,24 @@ class AssetRegistryTests(unittest.TestCase):
         self.assertEqual(row["original_filename"], "logo.png")
         self.assertNotIn("..", row["storage_key"])
 
+    def test_failed_upload_registration_rollback_is_tenant_scoped(self):
+        client = Client()
+        client.data["builder_assets"] = [
+            {"id": "asset-1", "tenant_id": 7},
+            {"id": "asset-1", "tenant_id": 8},
+        ]
+
+        asset_registry_service.delete_builder_asset_registration(
+            asset_id="asset-1",
+            tenant_id=7,
+            client=client,
+        )
+
+        self.assertEqual(
+            client.data["builder_assets"],
+            [{"id": "asset-1", "tenant_id": 8}],
+        )
+
     def test_reference_extraction_is_tenant_scoped(self):
         schema = {"logo": "/uploads/tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png", "other": "/uploads/tenant_8/builder_assets/abcdefabcdefabcdefabcdefabcdefab.webp"}
         refs = asset_registry_service.extract_builder_asset_references(schema, tenant_id=7)

@@ -164,7 +164,11 @@ Data-analysis and remote dataset controls:
 - `CSV_DUPLICATE_TRACK_ROWS`
 - `MAX_EXCEL_UPLOAD_BYTES`
 - `ALLOW_REMOTE_DATASET_URLS`
-- `ALLOW_INSECURE_REMOTE_DATASET_HTTP`
+- `REMOTE_INGESTION_WORKER_URL`
+- `REMOTE_INGESTION_WORKER_HEALTH_URL`
+- `REMOTE_INGESTION_BACKEND_TIMEOUT_SECONDS`
+- `REMOTE_INGESTION_DEADLINE_SECONDS`
+- `REMOTE_INGESTION_HARD_TIMEOUT_SECONDS`
 - `DATAFRAME_CACHE_MAX_ITEMS`
 - `DATAFRAME_URL_CACHE_SECONDS`
 - `MAX_REMOTE_DATA_BYTES`
@@ -177,6 +181,20 @@ Data-analysis and remote dataset controls:
 - `MAX_EXCEL_ROWS`
 - `MAX_EXCEL_COLUMNS`
 - `MAX_EXCEL_CELL_CHARS`
+- `PARSER_ISOLATED_WORKER_ENABLED`
+- `PARSER_WORKER_URL`
+- `PARSER_WORKER_HEALTH_URL`
+- `PARSER_WORKER_TIMEOUT_SECONDS`
+- `PARSER_JOB_TIMEOUT_SECONDS`
+
+Remote ingestion is HTTPS/443-only and has no backend direct-fetch fallback.
+When enabled, the backend sends a bounded GET-only request contract to the
+isolated `remote-ingestion-worker`; that worker validates every DNS answer,
+connects to the selected numeric address while retaining TLS SNI and hostname
+verification, manually revalidates redirects, rejects content encoding, and
+streams at most 10 MiB. The fetched bytes are parsed by the separate no-network
+parser worker. An enabled feature without the correctly identified live egress
+worker fails readiness.
 
 Upload storage is intentionally split by trust level:
 
@@ -194,6 +212,11 @@ metadata extraction instead of full in-memory DataFrames. Defaults are
 `CSV_DUPLICATE_TRACK_ROWS=100000` row signatures. Excel files above
 `MAX_EXCEL_UPLOAD_BYTES=52428800` are
 rejected with guidance to convert to CSV because Excel parsing is not chunked.
+When `PARSER_ISOLATED_WORKER_ENABLED=true`, bounded full-dataframe parsing is
+delegated to the internal `parser-worker` service. The worker has read-only
+access to private uploads, no outbound network, and container CPU, memory, PID,
+capability, and filesystem restrictions. Readiness verifies the worker identity
+and health endpoint; the flag alone is not sufficient.
 
 AI provider usage is enforced at `POST /users/{user_id}/analysis/ai` in
 `backend/data_analysis/routes/analysis_routes.py` before provider calls are
