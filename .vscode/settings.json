@@ -1,0 +1,17 @@
+{
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python.defaultInterpreterPath": "${workspaceFolder}\\web\\backend\\madar_back\\Scripts\\python.exe",
+  "terminal.integrated.profiles.windows": {
+    "Madar Backend PowerShell": {
+      "source": "PowerShell",
+      "args": [
+        "-NoExit",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "& '${workspaceFolder}\\web\\backend\\madar_back\\Scripts\\Activate.ps1'"
+      ]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "Madar Backend PowerShell"
+}
