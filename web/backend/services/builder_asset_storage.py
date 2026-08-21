@@ -125,6 +125,22 @@ def create_builder_asset_signed_url(
         raise BuilderAssetStorageError("builder_asset_signed_url_failed") from error
 
 
+def download_builder_asset(*, storage_key: str, client=None) -> bytes:
+    database_client = client or service_supabase
+    ensure_builder_asset_bucket(client=database_client)
+    try:
+        content = database_client.storage.from_(BUILDER_ASSET_BUCKET).download(storage_key)
+        if not isinstance(content, bytes) or not content:
+            raise ValueError("builder_asset_download_empty")
+        return content
+    except Exception as error:
+        logger.error(
+            "builder.asset_download_failed",
+            extra={"storage_key": storage_key, "error_type": type(error).__name__},
+        )
+        raise BuilderAssetStorageError("builder_asset_download_failed") from error
+
+
 def delete_builder_asset(*, storage_key: str, client=None) -> None:
     database_client = client or service_supabase
     ensure_builder_asset_bucket(client=database_client)

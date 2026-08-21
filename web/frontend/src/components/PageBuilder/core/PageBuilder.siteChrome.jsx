@@ -2,7 +2,7 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
-import { resolveMediaUrl } from "../../../utils/media";
+import { getResponsiveMediaProps } from "../../../utils/media";
 import { defaultSiteChrome } from "./PageBuilder.constants";
 import { splitLines } from "./PageBuilder.text";
 import {
@@ -45,7 +45,12 @@ export const createSiteChromeRenderers = ({
     const headerBackgroundColor = /^#[0-9a-f]{6}$/i.test(String(site.headerBackgroundColor || ""))
       ? site.headerBackgroundColor
       : "";
-    const logoSrc = resolveMediaUrl(site.logoUrl);
+    const logoProps = getResponsiveMediaProps(site.logoUrl, {
+      widths: [320, 480],
+      fallbackWidth: 480,
+      sizes: "240px",
+    });
+    const logoSrc = logoProps.src;
     const logoWidth = Math.min(240, Math.max(16, Number(site.logoWidth) || defaultSiteChrome.logoWidth));
     const brandLabel = String(site.brand ?? "").trim();
     const headerButtonLabel = String(site.headerButtonLabel ?? "").trim();
@@ -92,7 +97,7 @@ export const createSiteChromeRenderers = ({
               if (homePage) selectPage(homePage.id);
             }}
           >
-            {logoSrc ? <img src={logoSrc} alt={`${brandLabel || "Website"} logo`} /> : brandLabel ? <span className="logo-fallback">{brandLabel.slice(0, 1).toUpperCase()}</span> : null}
+            {logoSrc ? <img {...logoProps} alt={`${brandLabel || "Website"} logo`} /> : brandLabel ? <span className="logo-fallback">{brandLabel.slice(0, 1).toUpperCase()}</span> : null}
             {brandLabel && <span>{brandLabel}</span>}
           </button>
 
@@ -202,7 +207,12 @@ export const createSiteChromeRenderers = ({
     const footerDescription = String(site.description ?? "").trim();
     const footerShopTitle = String(site.footerShopTitle ?? "").trim() || "Pages";
     const footerHelpTitle = String(site.footerHelpTitle ?? "").trim() || "Help";
-    const hasBrandSection = Boolean(resolveMediaUrl(site.logoUrl) || footerBrand || footerDescription || socialLinks.length);
+    const footerLogoProps = getResponsiveMediaProps(site.logoUrl, {
+      widths: [320, 480],
+      fallbackWidth: 480,
+      sizes: "160px",
+    });
+    const hasBrandSection = Boolean(footerLogoProps.src || footerBrand || footerDescription || socialLinks.length);
     const hasContactDetails = Boolean(contactEmail || contactPhone);
     const hasContactSection = Boolean(hasContactDetails || paymentMethods.length);
     const footerSectionCount = [
@@ -232,8 +242,8 @@ export const createSiteChromeRenderers = ({
         <div className="ecommerce-footer-grid" data-section-count={footerSectionCount}>
           {hasBrandSection && <div className="ecommerce-footer-brand">
             <div className="ecommerce-footer-logo-row">
-              {resolveMediaUrl(site.logoUrl) ? (
-                <img className="ecommerce-footer-logo" src={resolveMediaUrl(site.logoUrl)} alt={footerBrand ? `${footerBrand} logo` : "Footer logo"} />
+              {footerLogoProps.src ? (
+                <img className="ecommerce-footer-logo" {...footerLogoProps} alt={footerBrand ? `${footerBrand} logo` : "Footer logo"} />
               ) : footerBrand ? (
                 <div className="ecommerce-footer-logo footer-logo-fallback">{footerInitial}</div>
               ) : null}

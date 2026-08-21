@@ -3893,7 +3893,6 @@ export default function PageBuilder({
       const messages = {
         invalid_button_page_target: "Choose a valid destination page for this button before publishing.",
         invalid_button_url: "Enter a valid HTTPS URL for this button before publishing.",
-        empty_button_message: "Enter a message for this button before publishing.",
       };
       showToast(messages[issue.issue_type] || "Review this button action before publishing.");
       return false;

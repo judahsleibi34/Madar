@@ -24,6 +24,7 @@ const labels = {
   "sidebar.tags": "Tags",
   "sidebar.categories": "Categories",
   "sidebar.products": "Products",
+  "sidebar.storeTheme": "Store theme",
   "sidebar.cvRerank": "CV Rerank",
   "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
@@ -139,6 +140,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Tags" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Categories" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Products" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "Store theme" })).toBeTruthy();
     expect(within(document.getElementById("dashboard-sidebar-ecommerce")).queryByRole("button", { name: "CV Rerank" })).toBeNull();
     expect(screen.getByRole("button", { name: "Store" })).toBeTruthy();
   });
@@ -228,6 +230,17 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(
       screen.getByRole("button", { name: "Collapse sidebar" }),
     ).toBeTruthy();
+  });
+
+  it("keeps Agenda compact and marks Calendar as active", () => {
+    renderSidebar("/agenda");
+
+    const sidebar = screen.getByLabelText("Dashboard sidebar");
+    const calendar = screen.getByRole("button", { name: "Calendar" });
+
+    expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
+    expect(calendar.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeTruthy();
   });
 
   it("expands the workspace sidebar when a navigation icon is pressed", () => {

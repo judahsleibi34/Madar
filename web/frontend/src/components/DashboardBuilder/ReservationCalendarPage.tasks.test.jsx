@@ -7,6 +7,7 @@ import {
   createCalendarTask,
   deleteCalendarTask,
   fetchCalendarWorkspace,
+  listBuilderReservations,
   syncCalendarTask,
   updateCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
@@ -28,6 +29,7 @@ vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
   fetchCalendarWorkspace: vi.fn(),
   getCalendarExportUrl: vi.fn(() => "#"),
   importCalendarIcs: vi.fn(),
+  listBuilderReservations: vi.fn(),
   removeCalendarConnection: vi.fn(),
   resolveCalendarInvitation: vi.fn(),
   syncCalendarConnection: vi.fn(),
@@ -110,6 +112,7 @@ afterEach(() => {
 
 beforeEach(() => {
   fetchCalendarWorkspace.mockResolvedValue(workspace);
+  listBuilderReservations.mockResolvedValue({ reservations: [], pagination: { has_more: false } });
   createCalendarTask.mockResolvedValue({});
   deleteCalendarTask.mockResolvedValue({});
   syncCalendarTask.mockResolvedValue({});
@@ -118,6 +121,17 @@ beforeEach(() => {
 });
 
 describe("calendar task UI", () => {
+  it("opens the structured Reservations view beside Agenda", async () => {
+    render(<ReservationCalendarPage user={operator} />);
+    await screen.findByText("Open tasks");
+
+    fireEvent.click(screen.getByRole("button", { name: "reservations" }));
+
+    expect(await screen.findByRole("heading", { name: "Reservations" })).toBeTruthy();
+    expect(screen.getByLabelText("Search reservations")).toBeTruthy();
+    expect(listBuilderReservations).toHaveBeenCalledWith({ limit: 100, offset: 0 });
+  });
+
   it("renders a fresh cache without a redundant network request", async () => {
     readCalendarWorkspaceCacheEntry.mockReturnValueOnce({
       freshness: "fresh",
@@ -218,7 +232,19 @@ describe("calendar task UI", () => {
     expect(screen.getByRole("dialog", { name: "What would you like to add?" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
-    expect(screen.getByLabelText("Scheduled start").value).toMatch(/T00:00$/);
+    expect(screen.getByLabelText("Start date").value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(screen.getByLabelText("Start time").value).toBe("00:00");
+
+    const endTimeToggle = screen.getByLabelText("Add an end date and time");
+    expect(endTimeToggle.checked).toBe(false);
+    expect(screen.queryByLabelText("End date")).toBeNull();
+
+    fireEvent.click(endTimeToggle);
+    expect(screen.getByLabelText("End date")).toBeTruthy();
+    expect(screen.getByLabelText("End time")).toBeTruthy();
+
+    fireEvent.click(endTimeToggle);
+    expect(screen.queryByLabelText("End date")).toBeNull();
   });
 
   it("renders scheduled tasks in week, day, month, and agenda while keeping unscheduled work separate", async () => {
@@ -263,6 +289,7 @@ describe("calendar task UI", () => {
     fireEvent.click(dateButton);
     fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
     expect(screen.getByRole("heading", { name: "Add a task" })).toBeTruthy();
+    expect(screen.getByLabelText("Add an end date and time").checked).toBe(false);
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Task from date" } });
     fireEvent.click(screen.getByRole("button", { name: "Save task" }));
 
@@ -272,6 +299,7 @@ describe("calendar task UI", () => {
       title: "Task from date",
     });
     expect(createCalendarTask.mock.calls[0][0].scheduled_start).toBeTruthy();
+    expect(createCalendarTask.mock.calls[0][0].scheduled_end).toBeNull();
   });
 
   it("sends an explicit schedule or explicit nulls from quick add and counts both as open", async () => {
@@ -293,7 +321,7 @@ describe("calendar task UI", () => {
     const scheduledPayload = createCalendarTask.mock.calls[0][0];
     expect(scheduledPayload.calendar_id).toBe("calendar-fixture");
     expect(scheduledPayload.scheduled_start).toMatch(/^2026-07-23T/);
-    expect(scheduledPayload.scheduled_end).not.toBeNull();
+    expect(scheduledPayload.scheduled_end).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Task title"), {
       target: { value: "New unscheduled task" },
@@ -397,32 +425,18 @@ describe("calendar task UI", () => {
     await waitFor(() => expect(updateCalendarTask).toHaveBeenCalledTimes(1));
   });
 
-  it("offers explicit Google sync and confirmed task deletion without exposing identifiers", async () => {
+  it("keeps advanced fields out of the editor and confirms task deletion", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    fetchCalendarWorkspace.mockResolvedValue({
-      ...workspace,
-      connections: [{
-        id: "private-connection-id",
-        provider: "google",
-        account_label: "Operator Google Calendar",
-        direction: "two_way",
-        status: "connected",
-      }],
-    });
     render(<ReservationCalendarPage user={operator} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Scheduled fixture task/ }));
     expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Calendar sync"), {
-      target: { value: "private-connection-id" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save task" }));
-    await waitFor(() =>
-      expect(syncCalendarTask).toHaveBeenCalledWith(
-        "scheduled-task",
-        "private-connection-id"
-      )
-    );
+    expect(screen.queryByText("More options")).toBeNull();
+    expect(screen.queryByLabelText("Time needed (minutes)")).toBeNull();
+    expect(screen.queryByLabelText("Add to calendar")).toBeNull();
+    expect(screen.queryByLabelText("Finish by")).toBeNull();
+    expect(screen.queryByLabelText(/Notes/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     fireEvent.click(screen.getByRole("button", { name: /TasksScheduled and unscheduled work/ }));
     fireEvent.click(await screen.findByRole("button", { name: /Unscheduled fixture task/ }));
@@ -434,12 +448,18 @@ describe("calendar task UI", () => {
         "local_only"
       )
     );
-    expect(screen.queryByText("private-connection-id")).toBeNull();
   });
 
-  it("reports provider enqueue failure separately from a successful local save", async () => {
+  it("preserves existing provider sync while reporting enqueue failure separately", async () => {
     fetchCalendarWorkspace.mockResolvedValue({
       ...workspace,
+      tasks: workspace.tasks.map((task) => task.id === "scheduled-task"
+        ? {
+            ...task,
+            sync_connection_id: "private-connection-id",
+            is_synchronized: false,
+          }
+        : task),
       connections: [{
         id: "private-connection-id",
         provider: "google",
@@ -452,12 +472,11 @@ describe("calendar task UI", () => {
     render(<ReservationCalendarPage user={operator} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Scheduled fixture task/ }));
-    fireEvent.change(screen.getByLabelText("Calendar sync"), {
-      target: { value: "private-connection-id" },
-    });
+    expect(screen.queryByText("private-connection-id")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save task" }));
 
     expect(await screen.findByText(/Task saved, but Google synchronization could not be queued/)).toBeTruthy();
+    expect(syncCalendarTask).toHaveBeenCalledWith("scheduled-task", "private-connection-id");
     expect(screen.queryByRole("button", { name: "Save task" })).toBeNull();
     expect(screen.getByRole("button", { name: /Scheduled fixture task/ })).toBeTruthy();
   });

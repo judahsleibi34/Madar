@@ -810,6 +810,9 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
             {"type": "goToPage", "pageId": "home"},
             {"type": "openUrl", "url": "https://example.com/path"},
             {"type": "showMessage", "message": "Safe plain text"},
+            {"type": "showMessage", "message": "  "},
+            {"type": "goToPage", "pageId": ""},
+            {"type": "openUrl", "url": ""},
         ]
         for action in valid_actions:
             validated, _ = builder_routes.validate_publish_schema(schema_for(action))
@@ -826,7 +829,6 @@ class BuilderRevisionSafetyTests(unittest.TestCase):
         invalid_actions = [
             ({"type": "goToPage", "pageId": "missing"}, "invalid_button_page_target"),
             ({"type": "openUrl", "url": "javascript:alert(1)"}, "invalid_button_url"),
-            ({"type": "showMessage", "message": "  "}, "empty_button_message"),
         ]
         for action, issue_type in invalid_actions:
             with self.assertRaises(HTTPException) as rejected:

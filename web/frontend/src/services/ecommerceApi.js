@@ -5,10 +5,14 @@ import {
   readApiResponse,
 } from "../utils/apiClient";
 import {
-  clearEcommerceCatalogCache,
   getOrCreateEcommerceCatalogRequest,
+  getOrCreateEcommerceThemeRequest,
   readEcommerceCatalogCache,
+  readEcommerceThemeCache,
+  removeFromEcommerceCatalogCache,
+  updateEcommerceCatalogCache,
   writeEcommerceCatalogCache,
+  writeEcommerceThemeCache,
 } from "../components/DashboardBuilder/utils/ecommerceCatalogCache";
 
 async function request(path, options = {}) {
@@ -45,15 +49,119 @@ export const saveEcommerceItem = async (section, itemId, payload, { scope } = {}
     method: itemId ? "PUT" : "POST",
     body: JSON.stringify(payload),
   });
-  clearEcommerceCatalogCache(scope);
+  const singular = section === "categories" ? "category" : section === "products" ? "product" : "tag";
+  updateEcommerceCatalogCache(scope, section, result?.[singular]);
   return result;
 };
 
 export const deleteEcommerceItem = async (section, itemId, { scope } = {}) => {
   const result = await request(`/ecommerce/${section}/${itemId}`, { method: "DELETE" });
-  clearEcommerceCatalogCache(scope);
+  removeFromEcommerceCatalogCache(scope, section, itemId);
   return result;
 };
+
+export const fetchEcommerceTheme = ({ scope, force = false } = {}) => {
+  if (!force) {
+    const cached = readEcommerceThemeCache(scope);
+    if (cached) return Promise.resolve({ theme: cached });
+  }
+  return getOrCreateEcommerceThemeRequest(scope, async () => {
+    const result = await request("/ecommerce/theme");
+    writeEcommerceThemeCache(scope, result?.theme);
+    return result;
+  });
+};
+
+export const saveEcommerceTheme = async (theme, { scope } = {}) => {
+  const result = await request("/ecommerce/theme", {
+    method: "PUT",
+    body: JSON.stringify(theme),
+  });
+  writeEcommerceThemeCache(scope, result?.theme || theme);
+  return result;
+};
+export const uploadEcommerceProductImage = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiFetch(getApiUrl("/builder/assets/upload"), {
+    method: "POST",
+    body: formData,
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok) {
+    throw new Error(readApiError(data, "Could not upload this product image"));
+  }
+  return data?.asset_url || data?.url || "";
+};
+
+
+const PUBLIC_STORE_FRESH_MS = 60_000;
+const PUBLIC_STORE_STALE_MS = 5 * 60_000;
+const PUBLIC_STORE_MAX_ENTRIES = 80;
+const publicStoreResponseCache = new Map();
+const publicStoreRequests = new Map();
+
+const rememberPublicStoreResponse = (url, data) => {
+  publicStoreResponseCache.delete(url);
+  publicStoreResponseCache.set(url, { data, storedAt: Date.now() });
+  while (publicStoreResponseCache.size > PUBLIC_STORE_MAX_ENTRIES) {
+    publicStoreResponseCache.delete(publicStoreResponseCache.keys().next().value);
+  }
+  return data;
+};
+
+const loadPublicStoreResponse = (url) => {
+  const pending = publicStoreRequests.get(url);
+  if (pending) return pending;
+  const requestPromise = apiFetch(url, { method: "GET" })
+    .then(async (response) => {
+      const data = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "Could not load the live store"));
+      }
+      return rememberPublicStoreResponse(url, data);
+    })
+    .finally(() => publicStoreRequests.delete(url));
+  publicStoreRequests.set(url, requestPromise);
+  return requestPromise;
+};
+
+const fetchPublicStoreResponse = (path) => {
+  const url = getApiUrl(path);
+  const cached = publicStoreResponseCache.get(url);
+  if (cached) {
+    const age = Date.now() - cached.storedAt;
+    if (age <= PUBLIC_STORE_FRESH_MS) return Promise.resolve(cached.data);
+    if (age <= PUBLIC_STORE_STALE_MS) {
+      loadPublicStoreResponse(url).catch(() => {});
+      return Promise.resolve(cached.data);
+    }
+    publicStoreResponseCache.delete(url);
+  }
+  return loadPublicStoreResponse(url);
+};
+
+export const clearPublicEcommerceCache = () => {
+  publicStoreResponseCache.clear();
+  publicStoreRequests.clear();
+};
+
+const publicStoreProfilePath = (subdomain) =>
+  `/public/sites/${encodeURIComponent(subdomain)}/store-profile`;
+
+const rememberEmbeddedStoreProfile = (subdomain, data) => {
+  if (data?.site) {
+    rememberPublicStoreResponse(getApiUrl(publicStoreProfilePath(subdomain)), {
+      success: true,
+      site: data.site,
+    });
+  }
+  return data;
+};
+
+export const fetchPublicEcommerceProfile = (subdomain) =>
+  fetchPublicStoreResponse(publicStoreProfilePath(subdomain));
 
 export const fetchPublicEcommerceCatalog = async (subdomain, filters = {}) => {
   const params = new URLSearchParams();
@@ -63,27 +171,15 @@ export const fetchPublicEcommerceCatalog = async (subdomain, filters = {}) => {
     }
   });
   const query = params.toString();
-  const response = await apiFetch(
-    getApiUrl(`/public/sites/${encodeURIComponent(subdomain)}/catalog${query ? `?${query}` : ""}`),
-    { method: "GET" }
+  const data = await fetchPublicStoreResponse(
+    `/public/sites/${encodeURIComponent(subdomain)}/catalog${query ? `?${query}` : ""}`
   );
-  const data = await readApiResponse(response);
-  if (!response.ok) {
-    throw new Error(readApiError(data, "Could not load the live store"));
-  }
-  return data;
+  return rememberEmbeddedStoreProfile(subdomain, data);
 };
 
 export const fetchPublicEcommerceProduct = async (subdomain, slug, locale = "en") => {
-  const response = await apiFetch(
-    getApiUrl(
-      `/public/sites/${encodeURIComponent(subdomain)}/catalog/products/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`
-    ),
-    { method: "GET" }
+  const data = await fetchPublicStoreResponse(
+    `/public/sites/${encodeURIComponent(subdomain)}/catalog/products/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`
   );
-  const data = await readApiResponse(response);
-  if (!response.ok) {
-    throw new Error(readApiError(data, "Could not load this product"));
-  }
-  return data;
+  return rememberEmbeddedStoreProfile(subdomain, data);
 };

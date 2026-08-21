@@ -31,19 +31,16 @@ export const getButtonActionIssue = ({ element, pages = [], getStoredUrlError })
   if (!["button", "imageButton"].includes(element?.type)) return null;
   const action = normalizeElementAction(element.action);
 
-  if (action.type === "goToPage" && !pages.some((page) => String(page?.id || "") === action.pageId)) {
+  if (action.type === "goToPage" && action.pageId && !pages.some((page) => String(page?.id || "") === action.pageId)) {
     return { issue_type: "invalid_button_page_target", action_type: action.type };
   }
-  if (action.type === "openUrl") {
+  if (action.type === "openUrl" && action.url) {
     const error = getStoredUrlError?.(action.url, {
       fieldName: "Button action URL",
       allowRelative: false,
       allowEmpty: false,
     });
     if (error) return { issue_type: "invalid_button_url", action_type: action.type, message: error };
-  }
-  if (action.type === "showMessage" && !action.message.trim()) {
-    return { issue_type: "empty_button_message", action_type: action.type };
   }
   return null;
 };
@@ -66,10 +63,12 @@ export const runPublicElementAction = ({
 
   if (action.type === "goToPage") {
     const page = pages.find((item) => String(item?.id || "") === action.pageId);
-    goToPage?.(page);
-    return { handled: true, type: action.type };
+    if (page) {
+      goToPage?.(page);
+      return { handled: true, type: action.type };
+    }
   }
-  if (action.type === "openUrl") {
+  if (action.type === "openUrl" && action.url) {
     openExternal?.(action.url, action.openInNewTab !== false);
     return { handled: true, type: action.type };
   }

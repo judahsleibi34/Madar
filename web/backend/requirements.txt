@@ -23,6 +23,7 @@ mdurl==0.1.2
 mmh3==5.2.1
 multidict==6.7.1
 packaging==26.2
+pillow==12.3.0
 postgrest==2.30.0
 propcache==0.5.2
 pycparser==3.0

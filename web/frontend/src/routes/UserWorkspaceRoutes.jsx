@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-
 import RouteSuspense from "../components/common/RouteSuspense";
 import { getBuilderProjectIdFromPath } from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
 import { appShellContent } from "../content";
+import { DASHBOARD_ROUTES } from "../config/routes";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
 const ChangePasswordPage = lazy(() => import("../components/DashboardBuilder/ChangePasswordPage"));
@@ -13,6 +14,7 @@ const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"
 const NotificationsPage = lazy(() => import("../components/DashboardBuilder/NotificationsPage"));
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
 const EcommercePage = lazy(() => import("../components/DashboardBuilder/EcommercePage"));
+const EcommerceThemePage = lazy(() => import("../components/DashboardBuilder/EcommerceThemePage"));
 const EcommerceStorePage = lazy(() => import("../components/DashboardBuilder/EcommerceStorePage"));
 const CvRerankPage = lazy(() => import("../components/DashboardBuilder/CvRerankPage"));
 const ReservationCalendarPage = lazy(() =>
@@ -186,20 +188,20 @@ export default function UserWorkspaceRoutes({
             user={user}
             initialView={location.state?.calendarView || ""}
             onViewChange={(nextView) => {
-              if (nextView === "agenda") navigate("/agenda");
+              if (nextView === "agenda") navigate(DASHBOARD_ROUTES.agenda);
             }}
           />
         )}
       />
       <Route
-        path="/agenda/*"
+        path={`${DASHBOARD_ROUTES.agenda}/*`}
         element={renderShell(
           <ReservationCalendarPage
             key={`agenda:${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`}
             user={user}
             initialView="agenda"
             onViewChange={(nextView) => {
-              if (nextView !== "agenda") navigate("/calendar", { state: { calendarView: nextView } });
+              if (nextView !== "agenda") navigate(DASHBOARD_ROUTES.calendar, { state: { calendarView: nextView } });
             }}
           />
         )}
@@ -220,6 +222,10 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/ecommerce/products/*"
         element={renderShell(<EcommercePage key="products" section="products" user={user} />)}
+      />
+      <Route
+        path="/ecommerce/theme/*"
+        element={renderShell(<EcommerceThemePage user={user} />)}
       />
       <Route
         path="/ecommerce/cv-rerank/*"

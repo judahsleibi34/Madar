@@ -32,6 +32,7 @@ export default function FixedSlotPicker({
   disabled = false,
   error = "",
   lang = "en",
+  direction = "ltr",
   onSelect,
 }) {
   const fixedDates = useMemo(() => normalizeOptions(dates).sort(), [dates]);
@@ -63,7 +64,7 @@ export default function FixedSlotPicker({
   }, [activeDate, activeTimes, onSelect, selectedDate, selectedTime]);
 
   return (
-    <fieldset className={`fixed-slot-picker ${error ? "has-error" : ""}`}>
+    <fieldset className={`fixed-slot-picker ${error ? "has-error" : ""}`} dir={direction === "rtl" ? "rtl" : "ltr"}>
       <legend className="sr-only">Choose an appointment date and time</legend>
 
       {fixedDates.length > 0 ? (

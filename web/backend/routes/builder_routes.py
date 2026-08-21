@@ -595,8 +595,8 @@ def require_schema_asset_tenant(schema: dict[str, Any], tenant_id: int) -> None:
         ) from error
 
 
-RESERVATION_FORM_ITEM_TYPES = {"heading", "paragraph", "text", "checkbox", "radio", "button"}
-RESERVATION_FORM_INPUT_TYPES = {"text", "checkbox", "radio"}
+RESERVATION_FORM_ITEM_TYPES = {"heading", "paragraph", "text", "email", "phone", "checkbox", "radio", "button"}
+RESERVATION_FORM_INPUT_TYPES = {"text", "email", "phone", "checkbox", "radio"}
 RESERVATION_FORM_DIRECTIONS = {"ltr", "rtl"}
 RESERVATION_TEXT_FORMATS = {"text", "h1", "h2", "h3", "bullets", "numbers"}
 RESERVATION_TEXT_ALIGNMENTS = {"left", "center", "right", "justify"}
@@ -990,7 +990,7 @@ def validate_publish_schema(
                     or action.get("page_id")
                     or ""
                 ).strip()
-                if target_page_id not in {
+                if target_page_id and target_page_id not in {
                     str(item.get("id") or "")
                     for item in schema.get("pages") or []
                     if isinstance(item, dict)
@@ -1006,34 +1006,26 @@ def validate_publish_schema(
                 action = {**action, "type": action_type, "pageId": target_page_id}
             elif action_type == "openUrl":
                 action_url = str(action.get("url") or action.get("href") or "").strip()
-                try:
-                    validate_public_url(
-                        action_url,
-                        field_name="Button action URL",
-                        allow_empty=False,
-                        allow_relative=False,
-                    )
-                except HTTPException:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=error_detail(
-                            "publish_validation_failed",
-                            "A button must use a valid HTTPS URL.",
-                            context={**action_context, "issue_type": "invalid_button_url"},
-                        ),
-                    ) from None
+                if action_url:
+                    try:
+                        validate_public_url(
+                            action_url,
+                            field_name="Button action URL",
+                            allow_empty=False,
+                            allow_relative=False,
+                        )
+                    except HTTPException:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=error_detail(
+                                "publish_validation_failed",
+                                "A button must use a valid HTTPS URL.",
+                                context={**action_context, "issue_type": "invalid_button_url"},
+                            ),
+                        ) from None
                 action = {**action, "type": action_type, "url": action_url}
             elif action_type == "showMessage":
                 message = str(action.get("message") or "")
-                if not message.strip():
-                    raise HTTPException(
-                        status_code=400,
-                        detail=error_detail(
-                            "publish_validation_failed",
-                            "A message button must contain a message.",
-                            context={**action_context, "issue_type": "empty_button_message"},
-                        ),
-                    )
                 action = {**action, "type": action_type, "message": message}
             elif action_type is None:
                 raise HTTPException(

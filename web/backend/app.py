@@ -2,6 +2,7 @@ import os
 import re
 import logging
 import time
+from io import BytesIO
 
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from data_analysis.routes.analysis_routes import router as analysis_router
 from data_analysis.routes.cleaning_routes import router as cleaning_router
@@ -43,6 +45,7 @@ from services.auth_service import get_authenticated_user_row, require_regular_us
 from services.builder_asset_storage import (
     BuilderAssetStorageError,
     create_builder_asset_signed_url,
+    download_builder_asset,
 )
 from services.request_body_limits import RequestBodyLimitMiddleware
 from services.observability_service import (
@@ -99,6 +102,30 @@ PUBLIC_UPLOAD_MEDIA_TYPES = {
     ".doc": "application/msword",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
+RESPONSIVE_IMAGE_WIDTHS = {320, 480, 768, 1024, 1440, 1920, 2560}
+
+
+def render_responsive_builder_image(source: bytes, media_type: str, width: int) -> tuple[bytes, str]:
+    try:
+        with Image.open(BytesIO(source)) as opened:
+            if getattr(opened, "is_animated", False):
+                return source, media_type
+            image = ImageOps.exif_transpose(opened)
+            original_width = image.width
+            if image.width > width:
+                target_height = max(1, round(image.height * width / image.width))
+                image = image.resize((width, target_height), Image.Resampling.LANCZOS)
+            has_alpha = "A" in image.getbands() or "transparency" in image.info
+            image = image.convert("RGBA" if has_alpha else "RGB")
+            output = BytesIO()
+            image.save(output, format="WEBP", quality=90, method=4, exact=has_alpha)
+            optimized = output.getvalue()
+            if original_width <= width and len(optimized) >= len(source):
+                return source, media_type
+            return optimized, "image/webp"
+    except (OSError, UnidentifiedImageError, Image.DecompressionBombError):
+        return source, media_type
+
 
 FRONTEND_URLS = os.getenv(
     "FRONTEND_URLS",
@@ -191,7 +218,7 @@ def madar_status():
 
 
 @app.get("/uploads/tenant_{tenant_id}/builder_assets/{filename}")
-def get_public_builder_asset(tenant_id: int, filename: str):
+def get_public_builder_asset(tenant_id: int, filename: str, w: int | None = None):
     if tenant_id <= 0:
         raise HTTPException(status_code=404, detail="Asset was not found.")
 
@@ -217,6 +244,7 @@ def get_public_builder_asset(tenant_id: int, filename: str):
 
     response_headers = {
         "Cache-Control": "public, max-age=31536000, immutable",
+        "CDN-Cache-Control": "public, max-age=31536000, immutable",
         "Content-Disposition": "inline",
         # Media byte ranges describe the stored representation. Prevent the
         # global GZip middleware from changing its length after FileResponse
@@ -224,6 +252,18 @@ def get_public_builder_asset(tenant_id: int, filename: str):
         "Content-Encoding": "identity",
     }
     media_type = PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()]
+
+    if w is not None:
+        if w not in RESPONSIVE_IMAGE_WIDTHS or not media_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Unsupported image width.")
+        try:
+            source = asset_path.read_bytes() if asset_path.is_file() else download_builder_asset(
+                storage_key=f"tenant_{tenant_id}/builder_assets/{safe_filename}"
+            )
+        except (OSError, BuilderAssetStorageError) as error:
+            raise HTTPException(status_code=404, detail="Asset was not found.") from error
+        content, response_media_type = render_responsive_builder_image(source, media_type, w)
+        return Response(content=content, media_type=response_media_type, headers=response_headers)
 
     if asset_path.is_file():
         return FileResponse(

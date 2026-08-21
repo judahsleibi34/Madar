@@ -3,7 +3,7 @@ import { getReservationContent } from "../../../content/pageBuilder";
 import { createReservationIdempotencyKey } from "../runtime/reservationSubmission";
 import FixedSlotPicker from "./FixedSlotPicker";
 import ReservationFormItems from "./ReservationFormItems";
-import { normalizeReservationFormItems, reservationFormItemNeedsAnswer } from "./reservationForm";
+import { getReservationAnswerError, normalizeReservationFormItems, reservationFormItemNeedsAnswer } from "./reservationForm";
 import "./ReservationBlock.css";
 
 const reservationDefaults = getReservationContent("en");
@@ -124,7 +124,10 @@ export default function ReservationBlock({
     normalizedFormItems.forEach((item) => {
       if (reservationFormItemNeedsAnswer(item, customAnswers[item.id])) {
         nextErrors[item.id] = content.required;
+        return;
       }
+      const validationError = getReservationAnswerError(item, customAnswers[item.id]);
+      if (validationError) nextErrors[item.id] = validationError;
     });
 
     setErrors(nextErrors);
@@ -224,7 +227,7 @@ export default function ReservationBlock({
   };
 
   return (
-    <form className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"} ${hasCustomComposition ? "has-custom-composition" : ""}`} onSubmit={submitReservation}>
+    <form className={`reservation-block ${isFixedSlots ? "is-fixed-slots" : "is-date-request"} ${hasCustomComposition ? "has-custom-composition" : ""}`} noValidate onSubmit={submitReservation}>
       <label className="runtime-honeypot" aria-hidden="true">
         Website
         <input

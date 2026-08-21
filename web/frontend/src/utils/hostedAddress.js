@@ -44,6 +44,11 @@ export const getBrandedRuntimePath = (locationLike) => {
   const subdomain = getBrandedMadarSubdomain(locationLike?.hostname);
   if (!subdomain) return "";
   const pathname = String(locationLike?.pathname || "/");
-  if (pathname.startsWith("/site/") || pathname.startsWith("/api/")) return "";
+  if (
+    pathname === "/shop" ||
+    pathname.startsWith("/shop/") ||
+    pathname.startsWith("/site/") ||
+    pathname.startsWith("/api/")
+  ) return "";
   return `/site/${encodeURIComponent(subdomain)}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
 };

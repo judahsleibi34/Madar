@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from classes import WebsiteSettingsUpdate
 from services.audit_service import record_audit_event
+from services.ecommerce_cache_service import invalidate_ecommerce_cache
 from services.tenant_service import require_active_tenant_member
 from services.url_validation import validate_public_url
 from services.website_settings_service import get_settings_for_tenant, ensure_settings_for_tenant, save_settings_for_tenant
@@ -199,6 +200,7 @@ def update_website_settings(
             user_id=authenticated_user_id,
             update_payload=update_payload,
         )
+        invalidate_ecommerce_cache(tenant_id)
 
         audit_metadata = {
             "changed_fields": sorted(update_payload.keys()),

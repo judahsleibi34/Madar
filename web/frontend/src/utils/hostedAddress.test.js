@@ -13,6 +13,10 @@ describe("hosted address routing", () => {
       pathname: "/",
     })).toBe("/site/shop-name/");
     expect(getBrandedRuntimePath({
+      hostname: "shop-name.madarportal.com",
+      pathname: "/shop/products",
+    })).toBe("");
+    expect(getBrandedRuntimePath({
       hostname: "madarportal.com",
       pathname: "/site/shop-name/",
     })).toBe(

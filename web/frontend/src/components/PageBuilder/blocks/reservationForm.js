@@ -3,6 +3,8 @@ const FORM_ITEM_TYPES = new Set([
   "paragraph",
   "availability",
   "text",
+  "email",
+  "phone",
   "checkbox",
   "radio",
   "button",
@@ -87,6 +89,8 @@ export const createReservationFormItem = (type, overrides = {}) => {
     paragraph: { text: "Add helpful instructions for your visitors.", textStyle: { format: "text", fontSize: 16 } },
     availability: { label: "Choose an available slot" },
     text: { label: "Your question", placeholder: "Type your answer", required: false },
+    email: { label: "Email address", placeholder: "you@example.com", required: true },
+    phone: { label: "Phone number", placeholder: "+970 59 000 0000", required: true },
     checkbox: { label: "Choose all that apply", options: ["Option 1", "Option 2"], required: false },
     radio: { label: "Choose one option", options: ["Option 1", "Option 2"], required: false },
     button: { label: "Request reservation" },
@@ -143,7 +147,7 @@ export const normalizeReservationFormItems = (items) => {
       normalized.label = cleanText(item.label, item.type === "button" ? "Request reservation" : item.type === "availability" ? "Choose an available slot" : "Question");
     }
 
-    if (item.type === "text") {
+    if (["text", "email", "phone"].includes(item.type)) {
       normalized.placeholder = cleanText(item.placeholder);
       normalized.required = Boolean(item.required);
     }
@@ -158,6 +162,43 @@ export const normalizeReservationFormItems = (items) => {
   });
 };
 
+const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+const ISRAEL_PHONE_PATTERN = /^(?:\+972(?:5\d{8}|7\d{8}|[23489]\d{7})|0(?:5\d{8}|7\d{8}|[23489]\d{7}))$/;
+const PALESTINE_PHONE_PATTERN = /^(?:\+970(?:5[69]\d{7}|[28]\d{7})|0(?:5[69]\d{7}|[28]\d{7}))$/;
+
+export const normalizeReservationPhone = (value) => {
+  const compact = String(value || "").trim().replace(/[\s().-]/g, "");
+  return compact.startsWith("00") ? `+${compact.slice(2)}` : compact;
+};
+
+export const isValidReservationEmail = (value) => {
+  const email = String(value || "").trim();
+  const [local = ""] = email.split("@");
+  return email.length <= 254
+    && local.length > 0
+    && local.length <= 64
+    && !local.startsWith(".")
+    && !local.endsWith(".")
+    && !local.includes("..")
+    && EMAIL_PATTERN.test(email);
+};
+
+export const isValidRegionalPhone = (value) => {
+  const phone = normalizeReservationPhone(value);
+  return ISRAEL_PHONE_PATTERN.test(phone) || PALESTINE_PHONE_PATTERN.test(phone);
+};
+
+export const getReservationAnswerError = (item, answer) => {
+  const value = String(answer || "").trim();
+  if (!value) return item?.required ? "This field is required." : "";
+  if (item?.type === "email" && !isValidReservationEmail(value)) {
+    return "Enter a valid email address, for example name@example.com.";
+  }
+  if (item?.type === "phone" && !isValidRegionalPhone(value)) {
+    return "Enter a valid Palestinian (+970) or Israeli (+972) phone number.";
+  }
+  return "";
+};
 export const reservationFormItemNeedsAnswer = (item, answer) => {
   if (!item?.required) return false;
   if (item.type === "checkbox") return !Array.isArray(answer) || answer.length === 0;
@@ -169,6 +210,8 @@ export const reservationFormItemLabels = {
   paragraph: "Text",
   availability: "Available slots",
   text: "Text field",
+  email: "Email",
+  phone: "Phone number",
   checkbox: "Checkboxes",
   radio: "Radio choices",
   button: "Submit button",

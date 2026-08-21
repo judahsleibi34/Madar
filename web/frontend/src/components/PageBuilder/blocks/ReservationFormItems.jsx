@@ -52,21 +52,25 @@ export default function ReservationFormItems({
         if (item.type === "availability") return (
           <section className="reservation-custom-availability" dir={direction} key={item.id}>
             <h4>{item.label}</h4>
-            <FixedSlotPicker dates={availableDates} times={timeSlots} timesByDate={timeSlotsByDate} selectedDate={selectedDate} selectedTime={selectedTime} disabled={disabled} error={slotError} lang={lang} onSelect={onSelectSlot} />
+            <FixedSlotPicker dates={availableDates} times={timeSlots} timesByDate={timeSlotsByDate} selectedDate={selectedDate} selectedTime={selectedTime} disabled={disabled} error={slotError} lang={lang} direction={direction} onSelect={onSelectSlot} />
           </section>
         );
-        if (item.type === "text") {
+        if (["text", "email", "phone"].includes(item.type)) {
           return (
             <label dir={direction} className={`reservation-field reservation-custom-field ${errors[item.id] ? "has-error" : ""}`} key={item.id}>
               {item.label}{item.required ? " *" : ""}
               <input
-                type="text"
+                type={item.type === "text" ? "text" : item.type}
                 dir={direction}
+                inputMode={item.type === "phone" ? "tel" : undefined}
+                autoComplete={item.type === "email" ? "email" : item.type === "phone" ? "tel" : undefined}
+                required={Boolean(item.required)}
                 value={answers[item.id] || ""}
                 placeholder={item.placeholder || ""}
                 disabled={disabled}
                 onChange={(event) => onChange(item.id, event.target.value)}
               />
+              {item.type === "phone" && !errors[item.id] && <small>Palestinian (+970) or Israeli (+972) numbers only.</small>}
               {errors[item.id] && <strong>{errors[item.id]}</strong>}
             </label>
           );
@@ -94,6 +98,7 @@ export default function ReservationFormItems({
                   </label>
                 ))}
               </div>
+
               {errors[item.id] && <strong>{errors[item.id]}</strong>}
             </fieldset>
           );

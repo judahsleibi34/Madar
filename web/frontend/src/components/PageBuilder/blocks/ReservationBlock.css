@@ -142,6 +142,12 @@
   box-shadow: none;
 }
 
+.reservation-custom-field > small {
+  color: var(--form-theme-muted, var(--theme-text-muted));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
 .reservation-block input::placeholder,
 .reservation-block textarea::placeholder {
   color: rgba(109, 116, 132, 0.78);
@@ -453,13 +459,35 @@
 }
 
 .fixed-slot-picker {
-  grid-area: slots;
+  inline-size: 100%;
+  max-inline-size: 100%;
   min-width: 0;
   display: grid;
   gap: 6px;
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* Only the legacy picker participates in the reservation block's named grid.
+   A picker nested in a custom availability component must remain in normal flow. */
+.reservation-block > .fixed-slot-picker {
+  grid-area: slots;
+}
+
+/* Keep the fieldset name available to assistive technology without letting
+   the browser's native legend layout consume space in the booking form. */
+.fixed-slot-picker > legend.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 .fixed-slot-picker legend {
@@ -727,10 +755,21 @@
 .fixed-slot-date-control svg {
   position: absolute;
   top: 50%;
-  right: 14px;
+  inset-inline-end: 14px;
   color: var(--form-theme-muted, var(--theme-text-soft));
   pointer-events: none;
   transform: translateY(-50%);
+}
+
+.fixed-slot-picker[dir] :is(.fixed-slot-date-control, .fixed-slot-times),
+.fixed-slot-picker[dir] :is(.fixed-slot-date-control > span, .fixed-slot-times > span) {
+  direction: inherit;
+  text-align: start;
+}
+
+.fixed-slot-picker[dir] select {
+  direction: inherit;
+  text-align: start;
 }
 
 .reservation-block.is-fixed-slots .fixed-slot-times {
@@ -879,6 +918,11 @@
   box-shadow: none;
 }
 
+.reservation-choice-options label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .reservation-choice-field.has-error {
   border-color: var(--theme-danger);
 }
@@ -959,19 +1003,26 @@
 }
 .reservation-custom-availability {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .reservation-custom-availability > h4 {
+  display: block;
+  width: 100%;
+  max-width: none;
   margin: 0;
   color: var(--theme-text);
   font-size: 16px;
   font-weight: 850;
-}
-
-.reservation-custom-availability[dir="rtl"] > h4 {
-  text-align: right;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  text-align: start;
 }
 /* Custom builder composition follows the same structural order as its canvas:
    locked booking fields first, followed by user components in saved order. */
@@ -1040,6 +1091,13 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.reservation-block.has-custom-composition .reservation-custom-availability > *,
+.reservation-block.has-custom-composition .fixed-slot-booking-controls > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .reservation-block.has-custom-composition .fixed-slot-date-control select {
   width: 100%;
 }
@@ -1055,6 +1113,10 @@
 
   .reservation-block.has-custom-composition .reservation-choice-field {
     padding: 14px;
+  }
+
+  .reservation-block.has-custom-composition .reservation-custom-submit {
+    width: 100%;
   }
 
   .reservation-block.has-custom-composition.is-fixed-slots .fixed-slot-times > div {

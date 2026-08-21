@@ -44,6 +44,7 @@ import {
   updateCalendarTask,
 } from "../PageBuilder/services/PageBuilder.api";
 import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
+import CalendarReservationsTable from "./CalendarReservationsTable";
 import {
   clearCalendarWorkspaceCache,
   createCalendarWorkspaceCacheKey,
@@ -68,7 +69,7 @@ import {
 import { isAndroidDevice } from "../../pwa/pwaContext";
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
-const VIEWS = ["day", "week", "month", "agenda"];
+const VIEWS = ["day", "week", "month", "agenda", "reservations"];
 const PHONE_AGENDA_QUERY = "(max-width: 680px)";
 const pad = (value) => String(value).padStart(2, "0");
 
@@ -252,7 +253,6 @@ function blankTaskEditor(calendarId, focusDate, useSelectedTime = false) {
   const start = new Date(focusDate);
   if (useSelectedTime) start.setMinutes(0, 0, 0);
   else start.setHours(9, 0, 0, 0);
-  const end = new Date(start.getTime() + 60 * 60 * 1000);
   return taskEditorValue({
     id: "",
     calendar_id: calendarId,
@@ -261,7 +261,7 @@ function blankTaskEditor(calendarId, focusDate, useSelectedTime = false) {
     status: "todo",
     priority: "normal",
     scheduled_start: start.toISOString(),
-    scheduled_end: end.toISOString(),
+    scheduled_end: null,
     due_at: null,
     reminder_minutes_before: 10,
     recurrence_rule: null,
@@ -329,68 +329,107 @@ function EventEditor({ value, calendars, saving, conflict, onChange, onClose, on
   );
 }
 
-function TaskEditor({ value: initialValue, connections, saving, error, notice, onClose, onSave, onArchive, onDelete }) {
+function TaskDateTimeFields({ label, value, onChange }) {
+  const dateValue = value?.slice(0, 10) || "";
+  const timeValue = value?.slice(11, 16) || "";
+  const updateDate = (nextDate) => onChange(nextDate ? `${nextDate}T${timeValue || "09:00"}` : "");
+  const updateTime = (nextTime) => onChange(dateValue && nextTime ? `${dateValue}T${nextTime}` : value);
+
+  return (
+    <fieldset className="calendar-task-date-time-field">
+      <legend>{label}</legend>
+      <div>
+        <label>Date<input type="date" aria-label={`${label} date`} value={dateValue} onChange={(event) => updateDate(event.target.value)} /></label>
+        <label>Time<input type="time" aria-label={`${label} time`} value={timeValue} disabled={!dateValue} onChange={(event) => updateTime(event.target.value)} /></label>
+      </div>
+    </fieldset>
+  );
+}
+
+function TaskEditor({ value: initialValue, saving, error, notice, onClose, onSave, onArchive, onDelete }) {
   const [value, setValue] = useState(initialValue);
+  const [includeEndTime, setIncludeEndTime] = useState(() => Boolean(initialValue.scheduled_end));
   const onChange = (field, nextValue) => {
     setValue((current) => ({ ...current, [field]: nextValue }));
   };
-  const writableGoogleConnections = connections.filter(
-    (connection) =>
-      connection.provider === "google"
-      && connection.direction === "two_way"
-      && ["connected", "degraded"].includes(connection.status)
-  );
-  const hasReadOnlyGoogle = connections.some(
-    (connection) =>
-      connection.provider === "google"
-      && connection.direction === "read"
-      && ["connected", "degraded"].includes(connection.status)
-  );
   return (
     <div className="calendar-modal-backdrop" role="presentation">
-      <form className="calendar-modal calendar-task-editor" onSubmit={(event) => onSave(event, value)}>
+      <form
+        className="calendar-modal calendar-task-editor"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="calendar-task-editor-title"
+        onSubmit={(event) => onSave(event, value)}
+      >
         <header>
-          <div><span>{value.id ? "Edit task" : "New task"}</span><h2>{value.id ? value.title || "Untitled task" : "Add a task"}</h2></div>
-          <button type="button" onClick={onClose} aria-label="Close"><X size={19} /></button>
+          <div>
+            <span>{value.id ? "Edit task" : "New task"}</span>
+            <h2 id="calendar-task-editor-title">{value.id ? value.title || "Untitled task" : "Add a task"}</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close task editor"><X size={19} /></button>
         </header>
         {error && <div className="calendar-conflict-warning"><AlertTriangle size={18} /><div><strong>{error.startsWith("Task saved,") ? "Google sync was not queued" : "Task could not be saved"}</strong><span>{error}</span></div></div>}
         {notice && <div className="calendar-task-save-notice" role="status">{notice}</div>}
-        <label>Title<input autoFocus required value={value.title} onChange={(event) => onChange("title", event.target.value)} /></label>
-        <div className="calendar-form-grid">
-          <label>Status<select value={value.status} onChange={(event) => onChange("status", event.target.value)}><option value="todo">Todo</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></label>
+
+        <label className="calendar-task-title-field">
+          Title
+          <input autoFocus required value={value.title} onChange={(event) => onChange("title", event.target.value)} placeholder="For example, call the supplier" />
+        </label>
+
+        <div className="calendar-form-grid calendar-task-basics">
+          <label>Progress<select value={value.status} onChange={(event) => onChange("status", event.target.value)}><option value="todo">Not started</option><option value="in_progress">In progress</option><option value="blocked">Waiting on something</option><option value="done">Completed</option><option value="cancelled">Cancelled</option></select></label>
           <label>Priority<select value={value.priority} onChange={(event) => onChange("priority", event.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label>
-          <label>Scheduled start<input type="datetime-local" value={value.scheduled_start} onChange={(event) => onChange("scheduled_start", event.target.value)} /></label>
-          <label>Scheduled end<input type="datetime-local" value={value.scheduled_end} onChange={(event) => onChange("scheduled_end", event.target.value)} /></label>
-          <label>Due date<input type="datetime-local" value={value.due_at} onChange={(event) => onChange("due_at", event.target.value)} /></label>
-          <label>Estimate (minutes)<input type="number" min="1" max="525600" value={value.estimate_minutes} onChange={(event) => onChange("estimate_minutes", event.target.value)} /></label>
-          <label>Remind me before<select value={value.reminder_minutes_before} onChange={(event) => onChange("reminder_minutes_before", event.target.value)}><option value="">No reminder</option><option value="0">At start time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
-          <label>Repeat<select value={value.repeat} onChange={(event) => onChange("repeat", event.target.value)}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
-          <label>Calendar sync<select value={value.sync_connection_id} onChange={(event) => onChange("sync_connection_id", event.target.value)}><option value="">Madar only</option>{writableGoogleConnections.map((connection) => <option key={connection.id} value={connection.id}>Sync to {connection.account_label || "Google Calendar"}</option>)}</select></label>
         </div>
-        {(value.scheduled_start || value.scheduled_end) && (
-          <div className="calendar-task-schedule-tools">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); }}
-            >
-              Remove date and time
-            </button>
+
+        <section className="calendar-task-section">
+          <div className="calendar-task-section-heading"><strong>Schedule</strong><small>Optional</small></div>
+          <p>Leave these empty if you do not need to schedule the task yet.</p>
+          <div className={`calendar-form-grid calendar-task-date-grid${includeEndTime ? " has-end" : ""}`}>
+            <TaskDateTimeFields label="Start" value={value.scheduled_start} onChange={(nextValue) => onChange("scheduled_start", nextValue)} />
+            {includeEndTime && <TaskDateTimeFields label="End" value={value.scheduled_end} onChange={(nextValue) => onChange("scheduled_end", nextValue)} />}
           </div>
-        )}
-        {hasReadOnlyGoogle && writableGoogleConnections.length === 0 && <p className="calendar-task-sync-help">Your Google connection is read only. Enable write access from Sync health to send scheduled tasks to Google Calendar.</p>}
-        {value.sync_status && value.sync_status !== "not_synced" && <p className={`calendar-task-sync-status is-${value.sync_status}`}>Google sync: {value.sync_status.replaceAll("_", " ")}</p>}
-        <label>Notes<textarea rows="3" value={value.description} onChange={(event) => onChange("description", event.target.value)} /></label>
-        <footer className="calendar-task-editor-footer">
-          <div className="calendar-task-record-actions">
-            {value.id && <button type="button" className="is-archive" disabled={saving} onClick={onArchive}><Archive size={16} /> Archive</button>}
-            {value.id && <button type="button" className="is-danger" disabled={saving} onClick={onDelete}><Trash2 size={16} /> Delete</button>}
+          <label className="calendar-checkbox calendar-task-end-toggle">
+            <input
+              type="checkbox"
+              checked={includeEndTime}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setIncludeEndTime(checked);
+                if (!checked) {
+                  onChange("scheduled_end", "");
+                } else if (!value.scheduled_end && value.scheduled_start) {
+                  const suggestedEnd = new Date(new Date(value.scheduled_start).getTime() + 60 * 60 * 1000);
+                  if (!Number.isNaN(suggestedEnd.getTime())) onChange("scheduled_end", localInputValue(suggestedEnd));
+                }
+              }}
+            />
+            <span>Add an end date and time</span>
+          </label>
+          <div className="calendar-form-grid">
+            <label>Reminder<select value={value.reminder_minutes_before} onChange={(event) => onChange("reminder_minutes_before", event.target.value)}><option value="">No reminder</option><option value="0">At the start time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
+            <label>Repeats<select value={value.repeat} onChange={(event) => onChange("repeat", event.target.value)}><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekly">Every week</option><option value="monthly">Every month</option></select></label>
           </div>
-          <div className="calendar-task-submit-actions">
-            <button type="button" disabled={saving} onClick={onClose}>Cancel</button>
+          {(value.scheduled_start || value.scheduled_end) && (
+            <div className="calendar-task-schedule-tools">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => { onChange("scheduled_start", ""); onChange("scheduled_end", ""); setIncludeEndTime(false); }}
+              >
+                Clear scheduled time
+              </button>
+            </div>
+          )}
+        </section>
+
+
+        <div className="calendar-modal-actions calendar-task-editor-actions">
+          {value.id && <button type="button" className="is-archive" disabled={saving} onClick={onArchive}><Archive size={16} /> Archive</button>}
+          {value.id && <button type="button" className="is-danger" disabled={saving} onClick={onDelete}><Trash2 size={16} /> Delete</button>}
+          <span />
+          <button type="button" disabled={saving} onClick={onClose}>Cancel</button>
           <button type="submit" className="is-primary" disabled={saving}>{saving ? "Saving…" : "Save task"}</button>
-          </div>
-        </footer>
+        </div>
       </form>
     </div>
   );
@@ -811,9 +850,6 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
       if (scheduledStart && Number.isNaN(scheduledStart.getTime())) {
         throw new Error("Choose a valid task date and time.");
       }
-      const scheduledEnd = scheduledStart
-        ? new Date(scheduledStart.getTime() + 60 * 60 * 1000)
-        : null;
       await createCalendarTask({
         calendar_id: defaultCalendar.id,
         title: taskTitle.trim(),
@@ -822,7 +858,7 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
         priority: "normal",
         due_at: null,
         scheduled_start: scheduledStart?.toISOString() || null,
-        scheduled_end: scheduledEnd?.toISOString() || null,
+        scheduled_end: null,
         reminder_minutes_before: scheduledStart ? 10 : null,
         recurrence_rule: null,
         milestone: false,
@@ -853,8 +889,7 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
       let scheduledEnd = editedTask.scheduled_end ? new Date(editedTask.scheduled_end) : null;
       if (!scheduledStart && scheduledEnd) throw new Error("Choose a scheduled start time first.");
       if (editedTask.repeat !== "none" && !scheduledStart) throw new Error("Choose a scheduled start time for a repeating task.");
-      if (scheduledStart && !scheduledEnd) scheduledEnd = new Date(scheduledStart.getTime() + Number(editedTask.estimate_minutes || 60) * 60000);
-      if (scheduledStart && scheduledEnd <= scheduledStart) throw new Error("Scheduled end must be after the start.");
+      if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) throw new Error("Scheduled end must be after the start.");
       const taskPayload = {
         title: editedTask.title.trim(),
         description: editedTask.description || "",
@@ -1127,12 +1162,14 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
       </section>
 
       <div className="calendar-control-bar">
-        <button type="button" onClick={() => setFocusDate(new Date())}>Today</button>
-        <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous"><ChevronLeft size={18} /></button>
-        <button type="button" onClick={() => movePeriod(1)} aria-label="Next"><ChevronRight size={18} /></button>
-        <strong>{formatRange(rangeStart, rangeEnd)}</strong>
+        {view === "reservations" ? <strong className="calendar-reservations-control-title">All reservation records</strong> : <>
+          <button type="button" onClick={() => setFocusDate(new Date())}>Today</button>
+          <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous"><ChevronLeft size={18} /></button>
+          <button type="button" onClick={() => movePeriod(1)} aria-label="Next"><ChevronRight size={18} /></button>
+          <strong>{formatRange(rangeStart, rangeEnd)}</strong>
+        </>}
         <span className="calendar-control-spacer" />
-        <div className="reservation-calendar-view-switch">{(isPhoneAgenda ? ["month", "agenda"] : VIEWS).map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => selectView(item)} onPointerEnter={item === "agenda" ? warmAgendaCache : undefined} onFocus={item === "agenda" ? warmAgendaCache : undefined}>{isPhoneAgenda && item === "month" ? "calendar" : item}</button>)}</div>
+        <div className="reservation-calendar-view-switch">{(isPhoneAgenda ? ["month", "agenda", "reservations"] : VIEWS).map((item) => <button type="button" className={view === item ? "is-active" : ""} key={item} onClick={() => selectView(item)} onPointerEnter={item === "agenda" ? warmAgendaCache : undefined} onFocus={item === "agenda" ? warmAgendaCache : undefined}>{isPhoneAgenda && item === "month" ? "calendar" : item}</button>)}</div>
       </div>
 
       {error && <div className="calendar-workspace-notice"><AlertTriangle size={17} />{error}<button type="button" onClick={() => setError("")}><X size={15} /></button></div>}
@@ -1182,11 +1219,12 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
             })}
             {unscheduledAgendaTasks.length === 0 && agendaItems.length === 0 && <div className="reservation-calendar-empty"><CalendarDays size={30} /><strong>No events or tasks in this range</strong></div>}
           </div>}
+          {view === "reservations" && <CalendarReservationsTable />}
         </main>
       </div>
 
       {editor && <EventEditor value={editor} calendars={workspace.calendars || []} saving={saving} conflict={conflict} onChange={(field, value) => setEditor((current) => ({ ...current, [field]: value }))} onClose={() => setEditor(null)} onSave={saveEvent} onDelete={removeEvent} />}
-      {taskEditor && <TaskEditor value={taskEditor} connections={workspace.connections || []} saving={saving} error={taskEditorError} notice={taskEditorNotice} onClose={() => setTaskEditor(null)} onSave={saveTask} onArchive={() => requestTaskArchive(taskEditor)} onDelete={() => requestTaskDelete(taskEditor)} />}
+      {taskEditor && <TaskEditor value={taskEditor} saving={saving} error={taskEditorError} notice={taskEditorNotice} onClose={() => setTaskEditor(null)} onSave={saveTask} onArchive={() => requestTaskArchive(taskEditor)} onDelete={() => requestTaskDelete(taskEditor)} />}
       {taskConfirmation && (
         <div className={`calendar-task-confirmation is-${taskConfirmation.action}`}>
           <PageDeleteConfirmModal

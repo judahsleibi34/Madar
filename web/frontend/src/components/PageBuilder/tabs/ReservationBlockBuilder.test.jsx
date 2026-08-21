@@ -97,4 +97,17 @@ describe("ReservationBlockBuilder", () => {
       textStyle: expect.objectContaining({ textAlign: "right" }),
     }));
   });
+  it("offers dedicated draggable Email and Phone components", () => {
+    const onChange = vi.fn();
+    render(<ReservationBlockBuilder items={[]} onChange={onChange} />);
+
+    expect(screen.getByRole("button", { name: /^Email/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Phone number/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Email/ }));
+    expect(onChange.mock.calls.at(-1)[0][0]).toEqual(expect.objectContaining({
+      type: "email",
+      label: "Email address",
+      required: true,
+    }));
+  });
 });

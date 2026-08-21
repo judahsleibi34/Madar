@@ -13,6 +13,7 @@ import {
   FolderTree,
   FileSearch,
   Package,
+  Palette,
   ShoppingBag,
   Tag,
   ShieldCheck,
@@ -155,6 +156,7 @@ export default function DashboardSidebar({
     DASHBOARD_ROUTES.builderResponses,
     DASHBOARD_ROUTES.builderData,
     DASHBOARD_ROUTES.calendar,
+    DASHBOARD_ROUTES.agenda,
     DASHBOARD_ROUTES.archive,
   ].some(
     (path) =>
@@ -168,6 +170,7 @@ export default function DashboardSidebar({
     DASHBOARD_ROUTES.ecommerceTags,
     DASHBOARD_ROUTES.ecommerceCategories,
     DASHBOARD_ROUTES.ecommerceProducts,
+    DASHBOARD_ROUTES.ecommerceTheme,
     DASHBOARD_ROUTES.ecommerceStore,
   ].some(
     (path) =>
@@ -285,6 +288,11 @@ export default function DashboardSidebar({
       icon: Package,
     },
     {
+      label: t("sidebar.storeTheme", { defaultValue: "Store theme" }),
+      path: DASHBOARD_ROUTES.ecommerceTheme,
+      icon: Palette,
+    },
+    {
       label: t("sidebar.store", { defaultValue: "Store" }),
       path: DASHBOARD_ROUTES.ecommerceStore,
       icon: ShoppingBag,
@@ -395,6 +403,15 @@ export default function DashboardSidebar({
   const isActive = (path) => {
     if (path === PUBLIC_ROUTES.home) {
       return location.pathname === PUBLIC_ROUTES.home;
+    }
+
+    if (path === DASHBOARD_ROUTES.calendar) {
+      return (
+        location.pathname === DASHBOARD_ROUTES.calendar ||
+        location.pathname.startsWith(`${DASHBOARD_ROUTES.calendar}/`) ||
+        location.pathname === DASHBOARD_ROUTES.agenda ||
+        location.pathname.startsWith(`${DASHBOARD_ROUTES.agenda}/`)
+      );
     }
 
     return location.pathname === path || location.pathname.startsWith(`${path}/`);

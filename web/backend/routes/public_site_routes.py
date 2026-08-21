@@ -35,6 +35,8 @@ from services.account_lifecycle_service import synchronize_verified_account
 from services.ecommerce_cache_service import (
     ecommerce_cache_key,
     get_or_create_ecommerce_cache,
+    read_ecommerce_cache,
+    write_ecommerce_cache,
 )
 from services.site_permission_service import (
     assign_project_role,
@@ -675,20 +677,46 @@ def get_bound_published_form(settings: dict, form_id: str):
     return project, form, published_schema
 
 
-def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> dict:
-    schema = project.get("published_schema") if isinstance(project, dict) else {}
-    chrome = schema.get("siteChrome") if isinstance(schema, dict) else {}
-    chrome = chrome if isinstance(chrome, dict) else {}
+DEFAULT_PUBLIC_STORE_THEME = {
+    "accent": "#2463eb",
+    "background": "#ffffff",
+    "surface": "#f7f8fa",
+    "text": "#151821",
+    "muted": "#697181",
+}
+
+def build_public_store_profile(settings: dict, subdomain: str) -> dict:
+    """Build storefront identity without reading any page-builder project."""
     return {
         "subdomain": subdomain,
-        "brand": chrome.get("brand") or chrome.get("brandName"),
-        "footer_store_name": chrome.get("footerStoreName"),
-        "logo_url": chrome.get("logoUrl"),
-        "contact_email": chrome.get("contactEmail"),
-        "phone": chrome.get("phone"),
-        "description": chrome.get("description"),
+        "brand": settings.get("footer_store_name") or settings.get("brand"),
+        "footer_store_name": settings.get("footer_store_name"),
+        "logo_url": settings.get("logo_url"),
+        "loading_image_url": settings.get("loading_image_url"),
+        "contact_email": settings.get("contact_email"),
+        "phone": settings.get("phone"),
+        "description": settings.get("description"),
+        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **(settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {})},
     }
 
+def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> dict:
+    schema = project.get("published_schema") if isinstance(project, dict) else None
+    has_published_snapshot = isinstance(schema, dict)
+    chrome = schema.get("siteChrome") if has_published_snapshot else {}
+    chrome = chrome if isinstance(chrome, dict) else {}
+    fallback = settings if not has_published_snapshot else {}
+    fallback_name = fallback.get("footer_store_name") or fallback.get("brand")
+    return {
+        "subdomain": subdomain,
+        "brand": chrome.get("brand") or chrome.get("brandName") or fallback_name,
+        "footer_store_name": chrome.get("footerStoreName") or fallback.get("footer_store_name"),
+        "logo_url": chrome.get("logoUrl") or fallback.get("logo_url"),
+        "loading_image_url": chrome.get("loadingImageUrl") or chrome.get("loading_image_url") or fallback.get("loading_image_url"),
+        "contact_email": chrome.get("contactEmail") or fallback.get("contact_email"),
+        "phone": chrome.get("phone") or fallback.get("phone"),
+        "description": chrome.get("description") or fallback.get("description"),
+        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **(settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {})},
+    }
 
 def build_public_form(form: dict) -> dict:
     public_form = dict(form)
@@ -1088,13 +1116,50 @@ def validate_configured_reservation_slot(block: dict[str, Any], payload: dict[st
             "Choose an available date and time.",
         )
 
+RESERVATION_EMAIL_PATTERN = re.compile(
+    r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$",
+    re.IGNORECASE,
+)
+ISRAEL_RESERVATION_PHONE_PATTERN = re.compile(
+    r"^(?:\+972(?:5\d{8}|7\d{8}|[23489]\d{7})|0(?:5\d{8}|7\d{8}|[23489]\d{7}))$"
+)
+PALESTINE_RESERVATION_PHONE_PATTERN = re.compile(
+    r"^(?:\+970(?:5[69]\d{7}|[28]\d{7})|0(?:5[69]\d{7}|[28]\d{7}))$"
+)
+
+
+def is_valid_reservation_email(value: str) -> bool:
+    email = value.strip()
+    local = email.partition("@")[0]
+    return (
+        0 < len(email) <= 254
+        and 0 < len(local) <= 64
+        and not local.startswith(".")
+        and not local.endswith(".")
+        and ".." not in local
+        and RESERVATION_EMAIL_PATTERN.fullmatch(email) is not None
+    )
+
+
+def normalize_reservation_phone(value: str) -> str:
+    phone = re.sub(r"[\s().-]", "", value.strip())
+    return f"+{phone[2:]}" if phone.startswith("00") else phone
+
+
+def is_valid_reservation_phone(value: str) -> bool:
+    phone = normalize_reservation_phone(value)
+    return (
+        ISRAEL_RESERVATION_PHONE_PATTERN.fullmatch(phone) is not None
+        or PALESTINE_RESERVATION_PHONE_PATTERN.fullmatch(phone) is not None
+    )
+
 def validate_reservation_custom_answers(block: dict[str, Any], payload: dict[str, Any]) -> None:
     reservation = block.get("reservation")
     form_items = reservation.get("formItems") if isinstance(reservation, dict) else None
     answer_items = {
         str(item.get("id")): item
         for item in (form_items or [])
-        if isinstance(item, dict) and item.get("type") in {"text", "checkbox", "radio"} and item.get("id")
+        if isinstance(item, dict) and item.get("type") in {"text", "email", "phone", "checkbox", "radio"} and item.get("id")
     }
     raw_answers = payload.get("customAnswers")
 
@@ -1130,6 +1195,12 @@ def validate_reservation_custom_answers(block: dict[str, Any], payload: dict[str
             if not isinstance(answer, str):
                 raise api_error(400, "reservation_answers_invalid", "A custom reservation answer has an invalid value.")
             answer = answer.strip()
+            if item_type == "email" and answer and not is_valid_reservation_email(answer):
+                raise api_error(400, "reservation_email_invalid", "Enter a valid email address.")
+            if item_type == "phone" and answer:
+                if not is_valid_reservation_phone(answer):
+                    raise api_error(400, "reservation_phone_invalid", "Enter a valid Palestinian (+970) or Israeli (+972) phone number.")
+                answer = normalize_reservation_phone(answer)
             if item_type == "radio" and answer and answer not in options:
                 raise api_error(400, "reservation_answers_invalid", "A radio answer contains an invalid choice.")
             is_empty = not answer
@@ -1406,6 +1477,24 @@ def resolve_tenant_id(settings: dict):
     return tenant_id
 
 
+def resolve_public_store_settings(site_identifier: str, *, request: Request) -> dict:
+    """Reuse public store identity/profile lookups without sharing data across tenants."""
+    branded = _request_uses_branded_address(request, site_identifier)
+    cache_key = ecommerce_cache_key(
+        0,
+        "public-store-settings-v1",
+        site_identifier=site_identifier,
+        branded=branded,
+    )
+    cached = read_ecommerce_cache(cache_key)
+    if isinstance(cached, dict):
+        return cached
+    settings = resolve_website_settings(site_identifier, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    write_ecommerce_cache(cache_key, tenant_id, settings, ttl_seconds=30)
+    return settings
+
+
 def _localized_catalog_text(translations: Any, locale: str) -> dict[str, str]:
     values = translations if isinstance(translations, dict) else {}
     requested = str(locale or "en").strip()
@@ -1541,6 +1630,16 @@ def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], l
     return category_rows, tag_rows, product_rows, link_rows
 
 
+def _cached_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    cache_key = ecommerce_cache_key(tenant_id, "public-catalog-source-v1")
+    cached, _cache_hit = get_or_create_ecommerce_cache(
+        cache_key,
+        tenant_id,
+        lambda: _read_public_catalog_rows(tenant_id),
+    )
+    return cached
+
+
 def _filter_catalog_taxonomy(
     products: list[dict[str, Any]],
     *,
@@ -1620,9 +1719,7 @@ def _catalog_payload(
     page: int = 1,
     limit: int = 12,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, product_rows, link_rows = _read_public_catalog_rows(
-        tenant_id
-    )
+    category_rows, tag_rows, product_rows, link_rows = _cached_public_catalog_rows(tenant_id)
     tags_by_product: dict[str, list[str]] = {}
     for link in link_rows:
         tags_by_product.setdefault(
@@ -1672,9 +1769,7 @@ def _catalog_product_payload(
     product_slug: str,
     locale: str,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, product_rows, link_rows = _read_public_catalog_rows(
-        tenant_id
-    )
+    category_rows, tag_rows, product_rows, link_rows = _cached_public_catalog_rows(tenant_id)
     row = next(
         (
             item for item in product_rows
@@ -2019,6 +2114,30 @@ def logout_tenant_visitor(subdomain: str, response: Response):
     delete_auth_cookies(response)
     return {"logged_in": False, "message": "Logged out"}
 
+@router.get("/sites/{subdomain}/store-profile")
+def get_public_store_profile(subdomain: str, request: Request, response: Response):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "store_profile_lookup", clean_subdomain)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
+    site_profile = build_public_store_profile(settings, clean_subdomain)
+    canonical = json.dumps(site_profile, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    metadata = {
+        "etag": f'"store-profile-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
+    }
+    apply_public_cache_headers(response, metadata)
+    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
+    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    if request_etag_matches(request, metadata):
+        return Response(
+            status_code=304,
+            headers={
+                "ETag": metadata["etag"],
+                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
+                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+            },
+        )
+    return {"success": True, "site": site_profile}
+
 @router.get("/sites/{subdomain}/catalog")
 def get_public_catalog(
     subdomain: str,
@@ -2034,8 +2153,7 @@ def get_public_catalog(
 ):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "catalog_lookup", clean_subdomain)
-    settings = resolve_website_settings(clean_subdomain, request=request)
-    project = get_bound_published_project(settings)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
     locale_value = str(locale or "en")[:16]
     search_value = str(search or "")[:200]
@@ -2078,8 +2196,9 @@ def get_public_catalog(
             ) from error
         raise
 
+    site_profile = build_public_store_profile(settings, clean_subdomain)
     canonical = json.dumps(
-        payload,
+        {"site": site_profile, "catalog": payload},
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -2088,20 +2207,22 @@ def get_public_catalog(
         "etag": f'"catalog-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
+    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=0, must-revalidate",
+                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
+                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
     return {
         "success": True,
-        "site": build_public_site_profile(settings, clean_subdomain, project),
+        "site": site_profile,
         "catalog": payload,
     }
 
@@ -2123,8 +2244,7 @@ def get_public_catalog_product(
         "catalog_product_lookup",
         f"{clean_subdomain}:{clean_slug}",
     )
-    settings = resolve_website_settings(clean_subdomain, request=request)
-    project = get_bound_published_project(settings)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
     locale_value = str(locale or "en")[:16]
     cache_key = ecommerce_cache_key(
@@ -2142,25 +2262,28 @@ def get_public_catalog_product(
             locale=locale_value,
         ),
     )
-    canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    site_profile = build_public_store_profile(settings, clean_subdomain)
+    canonical = json.dumps({"site": site_profile, **result}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     metadata = {
         "etag": f'"product-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
+    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=0, must-revalidate",
+                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
+                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
     return {
         "success": True,
-        "site": build_public_site_profile(settings, clean_subdomain, project),
+        "site": site_profile,
         **result,
     }
 
@@ -2173,13 +2296,10 @@ def get_public_site_bootstrap(subdomain: str, request: Request):
     require_public_runtime_entitlement(settings, "website_publish")
     if not str(settings.get("published_project_id") or "").strip():
         raise HTTPException(status_code=404, detail="Published site not found")
+    project = get_bound_published_project(settings, require_pages=False)
     return {
         "success": True,
-        "site": {
-            "subdomain": clean_subdomain,
-            "brand": str(settings.get("brand") or "").strip(),
-            "logo_url": str(settings.get("logo_url") or "").strip(),
-        },
+        "site": build_public_site_profile(settings, clean_subdomain, project),
     }
 
 
