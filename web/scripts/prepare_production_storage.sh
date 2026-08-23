@@ -14,7 +14,10 @@ if (( EUID != 0 )); then
 fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-REPOSITORY_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
+# The web sources moved below web/, but the production data directories must
+# remain at the repository root so existing bind mounts keep the same host
+# paths across the monorepo transition.
+REPOSITORY_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly STORAGE_UID=65534
 readonly STORAGE_GID=65534
 readonly STORAGE_MODE=0755

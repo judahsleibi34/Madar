@@ -1,4 +1,9 @@
-# Madar SaaS
+# Madar web application
+
+This document applies to the web application root (`web/`). Git commands belong
+at the repository root; unless a command shows an absolute path, run the Docker,
+backend, frontend, migration, and script commands below from `web/`. The sibling
+`mobile/` application is built separately and is not part of this Compose stack.
 
 Madar is a multi-tenant SaaS website builder and tenant workspace platform built with a FastAPI backend, a React/Vite frontend, and Supabase for authentication and data storage.
 
@@ -243,7 +248,7 @@ docker compose up
 The compose file currently maps:
 
 - backend: `127.0.0.1:8001 -> 8000`
-- frontend: `127.0.0.1:3000 -> 80`
+- frontend: `127.0.0.1:3000 -> 8080`
 
 Redis is included as a compose service for rate limiting.
 

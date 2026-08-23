@@ -1,56 +1,30 @@
-# Welcome to your Expo app 👋
+# Madar mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This directory is an independent Expo SDK 57 / React Native 0.86 application
+using TypeScript and Expo Router. It is not included in the production web
+Docker Compose deployment.
 
-## Get started
+The current application is an early navigation/UI prototype with splash,
+landing, and placeholder login routes under `src/app/`. It does not yet contain
+API integration, authentication, token storage, local persistence, push
+notifications, or production deep-link handling. Do not treat the placeholder
+login screen or an EAS build as a production-ready authenticated client.
 
-1. Install dependencies
+## Local checks
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Use Node.js 22.13 or newer, then run:
 
 ```bash
-npm run reset-project
+npm ci
+npm run typecheck
+npm run lint
+npm run build:web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Native release validation still requires reviewed EAS/Android/iOS builds and
+device testing. Configure API endpoints and public Expo environment variables
+deliberately when that functionality is implemented; never place secrets in
+`EXPO_PUBLIC_*` values or commit local environment/signing files.
 
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Follow the versioned Expo SDK 57 documentation referenced in `AGENTS.md` when
+changing framework configuration or dependencies.

@@ -36,10 +36,16 @@ jobs:
             --env XDG_CACHE_HOME=/tmp/madar-ci/cache/xdg \
             --env PYGWALKER_TELEMETRY_ENABLED=false \
             --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
-            --tmpfs /tmp:rw,nosuid,nodev,size=1g,mode=1777 \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777 \
             --volume "$PWD/web/scripts:/scripts:ro" \
             --volume "$PWD/web/database:/app/database:ro" \
             --volume "$PWD/web/supabase:/app/supabase:ro" \
+            --volume "$PWD/web/scripts:/test-repository/scripts:ro" \
+            --volume "$PWD/web/deployment:/test-repository/deployment:ro" \
+            --volume "$PWD/web/database:/workspace/database:ro" \
+            --volume "$PWD/web/supabase:/workspace/supabase:ro" \
+            --volume "$PWD/web/database:/database:ro" \
+            --volume "$PWD/web/supabase:/supabase:ro" \
             --volume "$PWD/.github/workflows/backend-check.yml:/test-repository/.github/workflows/backend-check.yml:ro" \
             --volume "$PWD/web/backend/Dockerfile:/test-repository/backend/Dockerfile:ro" \
             --volume "$PWD/web/frontend/Dockerfile:/test-repository/frontend/Dockerfile:ro" \

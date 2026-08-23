@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import {
   Animated,
   Easing,
@@ -19,16 +19,16 @@ const COLORS = {
 export default function SplashScreen() {
   const { width, height } = useWindowDimensions();
 
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.88)).current;
+  const [logoOpacity] = useState(() => new Animated.Value(0));
+  const [logoScale] = useState(() => new Animated.Value(0.88));
 
-  const textOpacity = useRef(new Animated.Value(0)).current;
-  const textY = useRef(new Animated.Value(18)).current;
+  const [textOpacity] = useState(() => new Animated.Value(0));
+  const [textY] = useState(() => new Animated.Value(18));
 
-  const screenOpacity = useRef(new Animated.Value(1)).current;
+  const [screenOpacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    Animated.sequence([
+    const animation = Animated.sequence([
       Animated.parallel([
         Animated.timing(logoOpacity, {
           toValue: 1,
@@ -67,12 +67,16 @@ export default function SplashScreen() {
         duration: 600,
         useNativeDriver: true,
       }),
-    ]).start(({ finished }) => {
+    ]);
+
+    animation.start(({ finished }) => {
       if (finished) {
         router.replace("/landing");
       }
     });
-  }, []);
+
+    return () => animation.stop();
+  }, [logoOpacity, logoScale, screenOpacity, textOpacity, textY]);
 
   return (
     <View

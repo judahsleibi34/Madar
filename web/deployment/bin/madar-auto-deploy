@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly REPO_ROOT="/home/madar/saas/Madar"
+readonly DEPLOY_SCRIPT="/home/madar/docker_auto.sh"
+readonly LOG_PREFIX="[madar-auto-deploy]"
+
+echo "$LOG_PREFIX Checking origin/main"
+git -C "$REPO_ROOT" fetch --quiet origin main
+
+LOCAL_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+REMOTE_COMMIT="$(git -C "$REPO_ROOT" rev-parse origin/main)"
+
+if [[ "$LOCAL_COMMIT" == "$REMOTE_COMMIT" ]]; then
+    echo "$LOG_PREFIX No update. Current commit: ${LOCAL_COMMIT:0:7}"
+    exit 0
+fi
+
+echo "$LOG_PREFIX New main commit detected"
+echo "$LOG_PREFIX Current: $LOCAL_COMMIT"
+echo "$LOG_PREFIX Remote:  $REMOTE_COMMIT"
+exec "$DEPLOY_SCRIPT"
