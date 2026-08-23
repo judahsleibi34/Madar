@@ -147,7 +147,10 @@ class BackendCiEnvironmentTests(unittest.TestCase):
         self.assertNotIn("chmod", tokens)
         self.assertNotIn("777", tokens)
         tmpfs_index = tokens.index("--tmpfs")
-        self.assertEqual(tokens[tmpfs_index + 1], "/tmp:rw,nosuid,nodev,size=1g,mode=1777")
+        self.assertEqual(
+            tokens[tmpfs_index + 1],
+            "/tmp:rw,exec,nosuid,nodev,size=1g,mode=1777",
+        )
 
     def test_application_import_uses_writable_ci_storage_as_non_root(self):
         command = _named_run_command(WORKFLOW, "Run backend tests")

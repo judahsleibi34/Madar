@@ -34,6 +34,7 @@ class ProductionStoragePreparationTests(unittest.TestCase):
         self.assertEqual(configured, expected)
         self.assertIn("if (( $# != 0 ))", self.script)
         self.assertNotIn("STORAGE_PATHS:-", self.script)
+        self.assertIn('"$SCRIPT_DIR/../.."', self.script)
 
     def test_creation_ownership_mode_and_preservation_are_explicit(self):
         self.assertIn("install -d", self.script)
@@ -46,7 +47,7 @@ class ProductionStoragePreparationTests(unittest.TestCase):
 
     def test_root_preparation_precedes_compose_deployment(self):
         self.assertIn("ExecStartPre=+", self.drop_in)
-        self.assertIn("/scripts/prepare_production_storage.sh", self.drop_in)
+        self.assertIn("/web/scripts/prepare_production_storage.sh", self.drop_in)
         self.assertNotIn("docker compose", self.script)
 
     def test_backend_image_remains_non_root(self):

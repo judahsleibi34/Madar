@@ -123,6 +123,8 @@ class FakeSupabase:
                     "user_id": 2,
                     "subdomain": "tenant-site",
                     "published_project_id": "project-1",
+                    "brand": " Tenant Brand ",
+                    "logo_url": " https://cdn.example.test/logo.png ",
                 }
             ],
             "builder_projects": [
@@ -444,6 +446,42 @@ if __name__ == "__main__":
     unittest.main()
 
 class PublicSiteContractTests(unittest.TestCase):
+    def test_public_site_bootstrap_returns_only_public_loading_profile(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["website_settings"][0]["private_note"] = "do not expose"
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit") as rate_limit:
+            response = client.get("/public/sites/tenant-site/bootstrap")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "success": True,
+                "site": {
+                    "subdomain": "tenant-site",
+                    "brand": "Tenant Brand",
+                    "logo_url": "https://cdn.example.test/logo.png",
+                },
+            },
+        )
+        rate_limit.assert_called_once()
+        self.assertNotIn("private_note", response.text)
+
+    def test_public_site_bootstrap_rejects_unpublished_site(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["website_settings"][0]["published_project_id"] = None
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site/bootstrap")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")
+
     def test_public_site_preserves_published_page_routing_metadata_only(self):
         fake_supabase = FakeSupabase()
         published_schema = {

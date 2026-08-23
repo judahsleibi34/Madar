@@ -1,4 +1,4 @@
-﻿import { Image, StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 
 type MadarLogoProps = {
   width?: number;

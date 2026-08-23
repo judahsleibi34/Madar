@@ -7,6 +7,7 @@ import {
   fetchBuilderProject,
   fetchProtectedSitePage,
   fetchPublicSite,
+  fetchPublicSiteBootstrap,
   getTenantVisitorStatus,
   loginTenantVisitor,
 } from "../services/PageBuilder.api";
@@ -16,6 +17,7 @@ vi.mock("../services/PageBuilder.api", async () => ({
   fetchBuilderProject: vi.fn(),
   fetchProtectedSitePage: vi.fn(),
   fetchPublicSite: vi.fn(),
+  fetchPublicSiteBootstrap: vi.fn(),
   getTenantVisitorStatus: vi.fn(),
   loginTenantVisitor: vi.fn(),
 }));
@@ -74,6 +76,9 @@ const renderPublic = ({
   teamSections = [],
 } = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
+  fetchPublicSiteBootstrap.mockResolvedValue({
+    site: { subdomain: "tenant-site", brand: "Route Test", logo_url: "" },
+  });
   fetchPublicSite.mockResolvedValue({
     site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
     project: {

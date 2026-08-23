@@ -215,7 +215,10 @@ class ParserIsolationTests(unittest.TestCase):
         self.assertIn('cap_drop: ["ALL"]', worker)
         self.assertIn('security_opt: ["no-new-privileges:true"]', worker)
         self.assertIn("pids_limit: 64", worker)
-        self.assertIn("./backend/private_uploads:/app/private_uploads:ro", worker)
+        self.assertIn(
+            "${MADAR_STORAGE_ROOT:-../backend}/private_uploads:/app/private_uploads:ro",
+            worker,
+        )
         self.assertIn("- parser_internal", worker)
         self.assertNotIn("env_file:", worker)
         networks = compose.split("\nnetworks:\n", 1)[1]
