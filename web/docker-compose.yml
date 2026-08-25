@@ -419,6 +419,7 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-}
+        MADAR_REQUIRE_PRODUCTION_API_URL: ${MADAR_REQUIRE_PRODUCTION_API_URL:-true}
         MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
         MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
     container_name: madar-${MADAR_SLOT:-active}-frontend

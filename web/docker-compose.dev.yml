@@ -50,6 +50,7 @@ services:
     build:
       args:
         VITE_API_URL: http://127.0.0.1:8002
+        MADAR_REQUIRE_PRODUCTION_API_URL: "false"
     ports: !override
       - "127.0.0.1:3001:8080"
     environment:
