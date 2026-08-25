@@ -62,7 +62,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._reply(200, {
                 "id": subject,
                 "email": claims.get("email", f"{subject}@staging.invalid"),
+                "aud": "authenticated",
                 "role": "authenticated",
+                "created_at": "2026-01-01T00:00:00Z",
+                "email_confirmed_at": "2026-01-01T00:00:00Z",
+                "confirmed_at": "2026-01-01T00:00:00Z",
                 "app_metadata": {"provider": "email", "providers": ["email"]},
                 "user_metadata": {},
                 "aal": claims.get("aal", "aal1"),
