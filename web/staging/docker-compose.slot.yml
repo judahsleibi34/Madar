@@ -55,6 +55,18 @@ services:
       MADAR_HSTS: ""
 
 networks:
+  default:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-default
+  parser_internal:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-parser-internal
+  remote_ingestion_egress:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-remote-egress
+  remote_ingestion_internal:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-remote-internal
   stage_control:
     external: true
     name: madar-stage-control_default

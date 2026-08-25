@@ -12,13 +12,16 @@ failure behavior remains covered by fake-adapter tests.
 Lifecycle:
 
 1. Create a private runtime root and generated environment/JWT fixtures.
-2. Start `docker-compose.control.yml`; prepare a fresh schema 81 with
+2. Run `prepare_networks.py`. It creates/attests labeled, slot-specific
+   networks with explicit `10.251.0.0/21` child ranges so staging does not
+   depend on Docker's finite implicit address pools.
+3. Start `docker-compose.control.yml`; prepare a fresh schema 81 with
    `prepare_database.sh 81`.
-3. Build immutable SHA images and start slots through `madar-release-deploy`
+4. Build immutable SHA images and start slots through `madar-release-deploy`
    with `docker-compose.slot.yml` as the override.
-4. Generate and verify a format-3 backup, then use `madar-migrate` for 82/83.
-5. Start the schema-83-only deletion-worker profile explicitly.
-6. Switch only the local staging proxy. Production ports and routing are never
+5. Generate and verify a format-3 backup, then use `madar-migrate` for 82/83.
+6. Start the schema-83-only deletion-worker profile explicitly.
+7. Switch only the local staging proxy. Production ports and routing are never
    modified.
 
 The control database uses tmpfs. Loss on teardown is intentional.
