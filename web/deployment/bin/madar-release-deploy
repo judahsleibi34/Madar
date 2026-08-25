@@ -217,10 +217,12 @@ class DockerGitOperations:
         )
 
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
+        services = ["backend", "notification-worker", "calendar-sync-worker"]
+        if self.schema_version() >= 83:
+            services.append("data-deletion-worker")
         self._compose(
             sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
-            "--wait", "--wait-timeout", "180", "backend", "notification-worker",
-            "calendar-sync-worker", "data-deletion-worker", workers_active=True,
+            "--wait", "--wait-timeout", "180", *services, workers_active=True,
         )
 
     @staticmethod
@@ -454,6 +456,40 @@ def adopt_prepared_release(
     return adopted
 
 
+def refresh_active_workers(
+    *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
+) -> dict:
+    state_file = state_root / "state.json"
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RuntimeError("release_state_missing_or_invalid") from error
+    known_good = state.get("known_good_release") or {}
+    if known_good.get("sha") != sha or known_good.get("slot") != slot:
+        raise RuntimeError("active_release_identity_mismatch")
+    schema = operations.schema_version()
+    if schema < 83:
+        raise RuntimeError("data_deletion_worker_schema_not_ready")
+    operations.verify_source(sha)
+    operations.validate_candidate(sha, slot)
+    operations.activate_workers(sha, slot, known_good["images"])
+    operations.validate_candidate(sha, slot)
+    stable_identity = operations._json("http://127.0.0.1:8001/health/version")
+    stable_readiness = operations._json("http://127.0.0.1:8001/health/ready")
+    if stable_identity.get("release_sha") != sha or not stable_readiness.get("ready"):
+        raise RuntimeError("stable_proxy_post_migration_validation_failed")
+    known_good["schema"] = schema
+    event = {
+        "release_sha": sha, "candidate_slot": slot, "traffic_target": slot,
+        "schema": {"observed": schema}, "status": "known_good",
+        "phase": "post_migration_workers_refreshed",
+        "completed_at": utc_now().isoformat(),
+    }
+    state.setdefault("history", []).append(event)
+    atomic_json(state_file, state)
+    return event
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("sha", help="Full candidate Git SHA")
@@ -462,6 +498,7 @@ def main() -> int:
     mode.add_argument("--prepare-only", action="store_true", help="Validate an initial inactive candidate without workers or traffic")
     mode.add_argument("--activate-prepared", action="store_true", help="Activate workers for a previously prepared candidate")
     mode.add_argument("--adopt-prepared", action="store_true", help="Adopt a promoted initial candidate as immutable known-good")
+    mode.add_argument("--refresh-active-workers", action="store_true", help="Refresh the active release after reaching schema 83")
     parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
     repo = Path(os.getenv("MADAR_PRODUCTION_REPO", "/home/madar/saas/Madar")).resolve()
@@ -489,6 +526,14 @@ def main() -> int:
             result = adopt_prepared_release(
                 sha=args.sha.lower(), slot=args.slot, state_root=state_root,
                 compatibility=compatibility, operations=operations,
+            )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.refresh_active_workers:
+        with deployment_lock(state_root):
+            result = refresh_active_workers(
+                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                operations=operations,
             )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0

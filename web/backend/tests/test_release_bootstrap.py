@@ -138,6 +138,33 @@ class ReleaseBootstrapTests(unittest.TestCase):
         self.assertEqual(active["CALENDAR_FEATURE_ENABLED"], "true")
         self.assertEqual(active["CALENDAR_SYNC_WORKER_ENABLED"], "true")
 
+    def test_post_migration_refresh_requires_exact_known_good_and_schema_83(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            operations = FakeOperations()
+            state = {
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": SHA, "slot": "green", "schema": 81,
+                    "images": {"backend": "b", "frontend": "f", "worker": "b"},
+                },
+                "history": [],
+            }
+            (root_path / "state.json").write_text(json.dumps(state))
+            operations.schema_version = lambda: 81
+            with self.assertRaisesRegex(RuntimeError, "schema_not_ready"):
+                release_cli.refresh_active_workers(
+                    sha=SHA, slot="green", state_root=root_path, operations=operations,
+                )
+            operations.schema_version = lambda: 83
+            result = release_cli.refresh_active_workers(
+                sha=SHA, slot="green", state_root=root_path, operations=operations,
+            )
+            persisted = json.loads((root_path / "state.json").read_text())
+        self.assertEqual(result["phase"], "post_migration_workers_refreshed")
+        self.assertEqual(persisted["known_good_release"]["schema"], 83)
+        self.assertIn(("activate_workers", SHA, "green"), operations.calls)
+
 
 if __name__ == "__main__":
     unittest.main()
