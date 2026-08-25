@@ -192,7 +192,13 @@ class DockerGitOperations:
                 raise RuntimeError(f"storage_unavailable:{relative}")
 
     def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None:
-        self._compose(sha, slot, images, "up", "-d", "--no-build", "--wait", "--wait-timeout", "180")
+        # Queue consumers must not run in the inactive slot. Parser/remote
+        # workers are slot-local and cannot see the active slot's Redis queue.
+        self._compose(
+            sha, slot, images, "up", "-d", "--no-build", "--wait",
+            "--wait-timeout", "180", "redis", "parser-worker",
+            "remote-ingestion-worker", "backend", "frontend",
+        )
 
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
         self._compose(
@@ -273,12 +279,14 @@ class DockerGitOperations:
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
+        environment = dict(os.environ)
+        environment["MADAR_SLOT"] = slot
         subprocess.run([
             "docker", "compose", "--project-name", f"madar-{slot}",
             "--project-directory", str(self.release_root / "web"),
             "--env-file", str(self.env_file), *files,
             "--profile", "workers", "--profile", "deletion-worker", "down", "--remove-orphans",
-        ], check=False)
+        ], check=False, env=environment)
 
 
 def main() -> int:
