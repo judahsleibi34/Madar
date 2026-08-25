@@ -117,7 +117,7 @@ class ReadinessServiceTests(unittest.TestCase):
             self.assertEqual(readiness_service.check_parser_isolation(), "unavailable")
 
     def test_environment_name_must_be_explicit_and_known(self):
-        for value, expected in (("production", "ok"), ("development", "ok"), ("test", "ok"), ("unknown", "misconfigured"), ("", "misconfigured")):
+        for value, expected in (("production", "ok"), ("staging", "ok"), ("development", "ok"), ("test", "ok"), ("unknown", "misconfigured"), ("", "misconfigured")):
             with self.subTest(value=value), patch.dict(os.environ, {"APP_ENV": value}, clear=False):
                 self.assertEqual(readiness_service.check_environment(), expected)
 

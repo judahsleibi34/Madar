@@ -58,7 +58,7 @@ def _app_env() -> str:
 
 def check_environment() -> str:
     value = os.getenv("APP_ENV", "").strip().lower()
-    return "ok" if value in {"development", "test", "prod", "production"} else "misconfigured"
+    return "ok" if value in {"development", "test", "staging", "prod", "production"} else "misconfigured"
 
 
 def _supabase_headers() -> dict[str, str]:
