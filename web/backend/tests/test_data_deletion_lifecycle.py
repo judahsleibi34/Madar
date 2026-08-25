@@ -133,9 +133,17 @@ class DeletionLifecycleTests(unittest.TestCase):
     def test_tenant_deletion_unbinds_public_state_and_removes_platform_users(self):
         client, request = workflow("tenant")
         client.tables["website_settings"] = [{"id": 1, "tenant_id": 7}]
-        # The tenant cascade is represented by this fake explicitly.
+        # Model both the tenant-owned cascades and PostgreSQL's restrictive
+        # users.tenant_id FK so the service's ordering is exercised faithfully.
         original_delete = Query.execute
         def cascade(query):
+            if query.name == "tenants" and query.operation == "delete":
+                tenant_ids = {
+                    row["tenant_id"] for row in client.tables["tenants"]
+                    if query.matches(row)
+                }
+                if any(row.get("tenant_id") in tenant_ids for row in client.tables["users"]):
+                    raise RuntimeError("users_tenant_id_fkey")
             response = original_delete(query)
             if query.name == "tenants" and query.operation == "delete":
                 client.tables["website_settings"] = []

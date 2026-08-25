@@ -418,9 +418,13 @@ def _step_delete_application_data(request: dict[str, Any], *, client, **_kwargs)
     subjects = _subjects(request["id"], client=client)
     if request["request_type"] == "tenant":
         tenant_id = int(request["target_tenant_id_snapshot"])
-        client.table("tenants").delete().eq("tenant_id", tenant_id).execute()
+        # Platform users retain a restrictive FK to tenants. Delete the
+        # captured user subjects first; their auth-provider identities remain
+        # available in the durable subject snapshots for the later, deliberately
+        # irreversible provider phase. Each delete is replay-safe.
         for subject in subjects:
             client.table("users").delete().eq("id", subject["user_id_snapshot"]).execute()
+        client.table("tenants").delete().eq("tenant_id", tenant_id).execute()
         return {"tenant_deleted": True, "platform_users_deleted": len(subjects)}
     client.table("users").delete().eq("id", request["target_user_id_snapshot"]).execute()
     return {"user_deleted": True}
