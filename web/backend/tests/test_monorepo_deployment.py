@@ -91,6 +91,16 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx", self.auto_service)
         self.assertIn('driver not in {"nginx", "docker-nginx"}', self.switch)
         self.assertIn("network_mode: host", self.proxy_compose)
+        self.assertIn("MADAR_PROXY_CONFIG_ROOT:-/var/lib/madar/proxy", self.proxy_compose)
+        self.assertNotIn("MADAR_ACTIVE_UPSTREAMS_FILE:-", self.proxy_compose)
+        self.assertIn(
+            "MADAR_ACTIVE_UPSTREAMS_FILE=/var/lib/madar/proxy/active-upstreams.conf",
+            self.auto_service,
+        )
+        self.assertIn("stable_route_identity_not_observed", self.switch)
+        self.assertIn("MADAR_STABLE_BACKEND_URL", self.switch)
+        self.assertIn("_atomic_bytes(target, previous)", self.switch)
+        self.assertIn("_reload(driver, container)", self.switch)
         self.assertIn("listen 127.0.0.1:8001", self.proxy_config)
         self.assertIn("listen 127.0.0.1:3000", self.proxy_config)
         self.assertIn('cap_drop: ["ALL"]', self.proxy_compose)

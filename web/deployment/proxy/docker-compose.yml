@@ -13,7 +13,10 @@ services:
     network_mode: host
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ${MADAR_ACTIVE_UPSTREAMS_FILE:-/var/lib/madar/releases/active-upstreams.conf}:/etc/nginx/madar/active-upstreams.conf:ro
+      # Mount the directory, not the file. The switcher publishes a new inode
+      # with os.replace(); a single-file bind mount would keep nginx pinned to
+      # the old inode even after a successful config reload.
+      - ${MADAR_PROXY_CONFIG_ROOT:-/var/lib/madar/proxy}:/etc/nginx/madar:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101
       - /var/cache/nginx:rw,noexec,nosuid,size=32m,uid=101,gid=101
