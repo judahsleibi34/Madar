@@ -291,7 +291,9 @@ services:
     security_opt: ["no-new-privileges:true"]
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m
-    profiles: ["workers"]
+    # Schema 083 is required. This deliberately separate profile prevents a
+    # generic worker deployment from starting the deletion consumer early.
+    profiles: ["deletion-worker"]
     env_file:
       - ${MADAR_ENV_FILE:-../.env}
     environment:

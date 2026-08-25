@@ -113,18 +113,28 @@ class DockerGitOperations:
             "MADAR_FRONTEND_BIND_PORT": ports["frontend"],
             "MADAR_REDIS_BIND_PORT": ports["redis"],
             "SCHEMA_COMPATIBLE_MIN": "81",
-            "SCHEMA_COMPATIBLE_MAX": "82",
+            "SCHEMA_COMPATIBLE_MAX": "83",
         })
+        storage_root = os.getenv("MADAR_STORAGE_ROOT", "").strip()
+        if storage_root:
+            env["MADAR_STORAGE_ROOT"] = str(Path(storage_root).resolve())
         return env
 
     def _compose(self, sha: str, slot: str, images: dict[str, str], *args: str) -> None:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
         web = self.release_root / "web"
+        files = ["-f", str(web / "docker-compose.yml")]
+        override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
+        if override:
+            files.extend(["-f", str(Path(override).resolve())])
+        profiles = ["--profile", "workers"]
+        if self.schema_version() >= 83:
+            profiles.extend(["--profile", "deletion-worker"])
         self.run([
             "docker", "compose", "--project-name", f"madar-{slot}",
             "--project-directory", str(web), "--env-file", str(self.env_file),
-            "-f", str(web / "docker-compose.yml"), "--profile", "workers", *args,
+            *files, *profiles, *args,
         ], cwd=web, env=self._environment(sha, slot, images))
 
     def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None:
@@ -175,11 +185,15 @@ class DockerGitOperations:
             return
         # Only the isolated inactive Compose project is removed. Images and the
         # retained active target are deliberately untouched.
+        files = ["-f", str(self.release_root / "web/docker-compose.yml")]
+        override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
+        if override:
+            files.extend(["-f", str(Path(override).resolve())])
         subprocess.run([
             "docker", "compose", "--project-name", f"madar-{slot}",
             "--project-directory", str(self.release_root / "web"),
-            "--env-file", str(self.env_file), "-f", str(self.release_root / "web/docker-compose.yml"),
-            "--profile", "workers", "down", "--remove-orphans",
+            "--env-file", str(self.env_file), *files,
+            "--profile", "workers", "--profile", "deletion-worker", "down", "--remove-orphans",
         ], check=False)
 
 

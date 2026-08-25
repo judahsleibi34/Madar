@@ -6,7 +6,9 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import json
 import tempfile
+from datetime import datetime, timezone
 import urllib.request
 from pathlib import Path
 
@@ -22,6 +24,34 @@ def main() -> int:
         with urllib.request.urlopen(url, timeout=5) as response:
             if response.status != 200:
                 raise RuntimeError(f"candidate target is not ready: {slot}")
+    driver = os.getenv("MADAR_TRAFFIC_SWITCH_DRIVER", "nginx").strip().lower()
+    if driver == "file-proxy":
+        target = Path(os.getenv("MADAR_ACTIVE_TARGET_FILE", "")).resolve()
+        if not str(target) or str(target) == "/":
+            raise RuntimeError("MADAR_ACTIVE_TARGET_FILE is required for file-proxy")
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        payload = {
+            "slot": slot,
+            "backend_port": backend,
+            "frontend_port": frontend,
+            "switched_at": datetime.now(timezone.utc).isoformat(),
+        }
+        descriptor, temporary = tempfile.mkstemp(prefix=".active-target.", dir=target.parent)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, target)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print(f"Madar traffic target: {slot}")
+        return 0
+    if driver != "nginx":
+        raise RuntimeError("unsupported traffic switch driver")
     target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/releases/active-upstreams.conf"))
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     content = (

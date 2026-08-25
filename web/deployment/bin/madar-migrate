@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""Run the reviewed Madar migration manifest with backup and DB locks."""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import replace
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import psycopg
+
+SCRIPT = Path(__file__).resolve()
+WEB_ROOT = SCRIPT.parents[2]
+REPOSITORY_ROOT = WEB_ROOT.parent
+sys.path.insert(0, str(WEB_ROOT))
+
+from deployment.lib.migration_executor import LockedMigrationExecutor, MigrationManifest  # noqa: E402
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--manifest", type=Path, default=WEB_ROOT / "deployment/releases/migrations-082-083.json")
+    parser.add_argument("--backup", type=Path, required=True)
+    parser.add_argument("--state-file", type=Path, required=True)
+    parser.add_argument("--database-url", default=os.getenv("MADAR_MIGRATION_DATABASE_URL", ""))
+    parser.add_argument("--verify-script", type=Path, default=WEB_ROOT / "scripts/verify_backup.sh")
+    args = parser.parse_args()
+    if not args.database_url:
+        raise SystemExit("MADAR_MIGRATION_DATABASE_URL or --database-url is required")
+    manifest = MigrationManifest.load(args.manifest.resolve(), REPOSITORY_ROOT.resolve())
+    actual_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=REPOSITORY_ROOT,
+        check=True, text=True, stdout=subprocess.PIPE,
+    ).stdout.strip()
+    expected_sha = os.getenv("MADAR_EXPECTED_RELEASE_SHA", actual_sha).strip().lower()
+    if actual_sha != expected_sha:
+        raise SystemExit("migration release identity does not match expected SHA")
+    if manifest.release_sha in {"CURRENT", "STAGING"}:
+        manifest = replace(manifest, release_sha=actual_sha)
+    elif manifest.release_sha != actual_sha:
+        raise SystemExit("migration manifest does not match checked-out release")
+
+    def verify(path: Path) -> None:
+        subprocess.run([str(args.verify_script.resolve()), str(path.resolve())], check=True)
+
+    executor = LockedMigrationExecutor(
+        connection_factory=lambda: psycopg.connect(args.database_url),
+        manifest=manifest,
+        state_file=args.state_file.resolve(),
+        backup_dir=args.backup.resolve(),
+        backup_verifier=verify,
+    )
+    result = executor.run()
+    print(f"Madar migration completed: schema {result['observed_schema']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
