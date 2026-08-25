@@ -246,7 +246,17 @@ class DockerGitOperations:
         slot = str(release.get("slot") or "")
         if slot not in SLOT_PORTS:
             raise RuntimeError("worker_release_slot_invalid")
-        self.run(["docker", "start", *self._worker_names(slot)])
+        existing: list[str] = []
+        for name in self._worker_names(slot):
+            inspected = subprocess.run(
+                ["docker", "inspect", name], check=False,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            if inspected.returncode == 0:
+                existing.append(name)
+        if not existing:
+            raise RuntimeError("retained_worker_containers_missing")
+        self.run(["docker", "start", *existing])
 
     def _json(self, url: str) -> dict:
         with urllib.request.urlopen(url, timeout=5) as response:
