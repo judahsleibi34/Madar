@@ -1,4 +1,7 @@
 import logging
+import hashlib
+import os
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
@@ -11,6 +14,7 @@ from services.api_errors import api_error
 from services.identity_service import canonical_auth_email, normalize_email
 from services.rate_limit_service import enforce_avatar_upload_rate_limit
 from services.url_validation import validate_public_url
+from services.storage_quota_service import finish_storage, release_storage, reserve_storage
 from routes.user_routes import (
     AVATAR_BUCKET,
     AVATAR_EXTENSIONS,
@@ -201,22 +205,29 @@ async def upload_admin_avatar(
         extension = AVATAR_EXTENSIONS[content_type]
         filename = f"{uuid4().hex}{extension}"
         storage_path = f"users/{auth_id}/{filename}"
-
-        upload_avatar_to_storage(
-            storage_path=storage_path,
-            content=content,
-            content_type=content_type,
+        tenant_id = int(admin_user.get("tenant_id"))
+        reservation_id = reserve_storage(
+            tenant_id=tenant_id,
+            user_id=int(admin_user.get("id")),
+            category="avatar",
+            size_bytes=len(content),
+            storage_root=Path(os.getenv("AVATAR_UPLOAD_DIR", "avatar_uploads")),
         )
+        try:
+            upload_avatar_to_storage(storage_path=storage_path, content=content, content_type=content_type)
+        except Exception:
+            finish_storage(reservation_id=reservation_id, succeeded=False)
+            raise
 
         avatar_url = get_storage_public_url(AVATAR_BUCKET, storage_path)
 
         try:
-            update_response = (
-                service_supabase.table("users")
-                .update({"avatar": avatar_url})
-                .eq("auth_id", auth_id)
-                .execute()
-            )
+            update_query = service_supabase.table("users").update({"avatar": avatar_url}).eq("auth_id", auth_id)
+            old_avatar = str(admin_user.get("avatar") or "")
+            update_query = update_query.eq("avatar", old_avatar) if old_avatar else update_query.is_("avatar", "null")
+            update_response = update_query.execute()
+            if not getattr(update_response, "data", None):
+                raise RuntimeError("avatar_replacement_conflict")
 
         except Exception as db_error:
             logger.warning(
@@ -238,10 +249,26 @@ async def upload_admin_avatar(
                     },
                 )
 
-            raise HTTPException(
-                status_code=500,
-                detail="Could not save profile photo",
+            finish_storage(reservation_id=reservation_id, succeeded=False)
+            status_code = 409 if str(db_error) == "avatar_replacement_conflict" else 500
+            raise HTTPException(status_code=status_code, detail="Profile photo changed; retry the upload" if status_code == 409 else "Could not save profile photo")
+
+        try:
+            finish_storage(
+                reservation_id=reservation_id,
+                succeeded=True,
+                storage_key=storage_path,
+                sha256_hex=hashlib.sha256(content).hexdigest(),
             )
+        except Exception as accounting_error:
+            service_supabase.table("users").update({"avatar": admin_user.get("avatar")}).eq("auth_id", auth_id).eq("avatar", avatar_url).execute()
+            service_supabase.storage.from_(AVATAR_BUCKET).remove([storage_path])
+            try:
+                finish_storage(reservation_id=reservation_id, succeeded=False)
+            except Exception:
+                pass
+            logger.error("admin.avatar.accounting_finalize_failed", extra={"admin_user_id": admin_user.get("id"), "error_type": type(accounting_error).__name__})
+            raise HTTPException(status_code=503, detail="Profile photo storage accounting is unavailable")
 
         updated_user = (
             update_response.data[0]
@@ -252,10 +279,12 @@ async def upload_admin_avatar(
             }
         )
 
-        delete_old_avatar_if_storage_url(
+        deleted_storage_key = delete_old_avatar_if_storage_url(
             old_avatar=str(admin_user.get("avatar") or ""),
             auth_id=auth_id,
         )
+        if deleted_storage_key:
+            release_storage(tenant_id=tenant_id, category="avatar", storage_key=deleted_storage_key)
 
         record_security_event(
             request=request,

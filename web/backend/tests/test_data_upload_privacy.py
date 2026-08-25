@@ -13,6 +13,18 @@ from data_analysis.routes import data_routes
 from routes import builder_routes
 from services.tenant_service import TenantContext
 from services.upload_config import validate_private_uploads_not_publicly_mounted
+from tests.entitlement_test_support import installed_business_fixture
+
+
+_entitlement_fixture = installed_business_fixture(1, 2)
+
+
+def setUpModule():
+    _entitlement_fixture.__enter__()
+
+
+def tearDownModule():
+    _entitlement_fixture.__exit__(None, None, None)
 
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16

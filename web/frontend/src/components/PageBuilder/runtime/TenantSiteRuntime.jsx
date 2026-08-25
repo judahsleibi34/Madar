@@ -13,6 +13,8 @@ import {
   registerTenantVisitor,
   submitPublicBuilderEvent,
   submitPublicFormSubmission,
+  startPublicQuizAttempt,
+  finalizePublicQuizAttempt,
 } from "../services/PageBuilder.api";
 import { createFormIdempotencyKey } from "./formSubmission";
 import { getFormSections } from "../core/PageBuilder.factories";
@@ -484,6 +486,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
+  const [quizAttempts, setQuizAttempts] = useState({});
   const [authPanelModes, setAuthPanelModes] = useState({});
   const [publicActionMessage, setPublicActionMessage] = useState("");
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
@@ -1219,26 +1222,34 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     formIdempotencyKeysRef.current[instanceKey] = idempotencyKey;
 
     try {
-      await submitPublicFormSubmission(cleanSubdomain, form.id, {
-        answers,
-        form_element_id: formElementId,
-        honeypot: formHoneypots[instanceKey] || "",
-        submission_elapsed_ms: Math.min(
-          86_400_000,
-          Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
-        ),
-      }, { idempotencyKey });
+      const activeAttempt = quizAttempts[instanceKey];
+      const response = form.mode === "quiz"
+        ? await finalizePublicQuizAttempt(cleanSubdomain, form.id, activeAttempt?.id, answers)
+        : await submitPublicFormSubmission(cleanSubdomain, form.id, {
+            answers,
+            form_element_id: formElementId,
+            honeypot: formHoneypots[instanceKey] || "",
+            submission_elapsed_ms: Math.min(
+              86_400_000,
+              Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
+            ),
+          }, { idempotencyKey });
 
       delete formIdempotencyKeysRef.current[instanceKey];
       setFormAnswers((prev) => ({ ...prev, [instanceKey]: {} }));
       setFormHoneypots((prev) => ({ ...prev, [instanceKey]: "" }));
       setFormPages((prev) => ({ ...prev, [instanceKey]: 0 }));
+      if (form.mode === "quiz") {
+        setQuizAttempts((prev) => ({ ...prev, [instanceKey]: null }));
+      }
       setFormStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           submitting: false,
           error: "",
-          success: getLocalizedValue(form, "successMessage", formLang) || formCopy.runtime.successMessage,
+          success: response?.result?.score !== undefined && response?.result?.score !== null
+            ? `Score: ${response.result.score}%`
+            : getLocalizedValue(form, "successMessage", formLang) || formCopy.runtime.successMessage,
         },
       }));
     } catch (error) {
@@ -1252,6 +1263,25 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           success: "",
           error: getSubmissionErrorMessage(error, formCopy),
         },
+      }));
+    }
+  };
+
+  const startRuntimeQuiz = async (form, instanceKey) => {
+    const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
+    const formCopy = getTenantRuntimeContent(formLang);
+    setFormStatus((prev) => ({ ...prev, [instanceKey]: { submitting: true, success: "", error: "" } }));
+    try {
+      const response = await startPublicQuizAttempt(cleanSubdomain, form.id, {
+        honeypot: formHoneypots[instanceKey] || "",
+        submission_elapsed_ms: Math.min(86_400_000, Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)),
+      });
+      setQuizAttempts((prev) => ({ ...prev, [instanceKey]: response?.attempt || null }));
+      setFormStatus((prev) => ({ ...prev, [instanceKey]: { submitting: false, success: "", error: "" } }));
+    } catch (error) {
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: { submitting: false, success: "", error: getSubmissionErrorMessage(error, formCopy) },
       }));
     }
   };
@@ -1523,6 +1553,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const instanceKey = `${formElementId || "form"}_${form.id}`;
     const status = formStatus[instanceKey] || {};
     const isSubmitting = Boolean(status.submitting);
+    const isQuiz = form.mode === "quiz";
+    const quizAttempt = quizAttempts[instanceKey];
     const languageMode = normalizeLanguageMode(form.languageMode || form.localeMode || form.defaultLanguage || "en");
     const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
     const formCopy = getTenantRuntimeContent(formLang);
@@ -1575,6 +1607,22 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       </div>
       );
     };
+
+    if (isQuiz && !quizAttempt) {
+      return (
+        <div className="runtime-form" dir={formDir}>
+          <div className="quiz-start-panel">
+            <strong>Ready to start?</strong>
+            <p>Timing and scoring are enforced by the server. Focus detection is browser advisory.</p>
+            {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
+            {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}
+            <button type="button" className="runtime-submit" disabled={isSubmitting} onClick={() => startRuntimeQuiz(form, instanceKey)}>
+              {isSubmitting ? formCopy.runtime.submitting : "Start quiz"}
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <form

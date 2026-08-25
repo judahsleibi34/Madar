@@ -902,7 +902,11 @@ def login(user: LogIn, response: Response, request: Request):
                             "error_type": type(mfa_lookup_error).__name__,
                         },
                     )
-                    verified_factors = []
+                    raise api_error(
+                        503,
+                        "mfa_provider_unavailable",
+                        "Multi-factor authentication could not be verified. Try again shortly.",
+                    ) from mfa_lookup_error
 
                 if verified_factors:
                     set_pending_mfa_cookie(
@@ -918,7 +922,31 @@ def login(user: LogIn, response: Response, request: Request):
                         "factors": verified_factors,
                     }
 
-                mfa_enrollment_recommended = True
+                # A password-only provider session must never become an ordinary
+                # admin application session.  Keep the tokens solely in the
+                # encrypted, short-lived pending cookie used by the deliberately
+                # restricted MFA login/enrollment endpoints.
+                set_pending_mfa_cookie(
+                    response,
+                    access_token=auth_response.session.access_token,
+                    refresh_token=auth_response.session.refresh_token,
+                    auth_id=auth_user_id,
+                    user_id=local_user.get("id"),
+                    tenant_id=local_user.get("tenant_id"),
+                )
+                record_security_event(
+                    request=request,
+                    tenant_id=local_user.get("tenant_id"),
+                    actor_user_id=local_user.get("id"),
+                    action="auth.mfa_enrollment_required",
+                    target_type="user",
+                    target_id=local_user.get("id"),
+                    metadata={"login_method": "credentials"},
+                )
+                return {
+                    "mfa_enrollment_required": True,
+                    "restricted_session": "mfa_enrollment_only",
+                }
 
         csrf_token = set_auth_cookies(
             response,
