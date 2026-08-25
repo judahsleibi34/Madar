@@ -47,7 +47,7 @@ services:
     environment:
       SUPABASE_URL: http://host.docker.internal:15430
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
-      CALENDAR_SYNC_WORKER_ENABLED: "false"
+      CALENDAR_SYNC_WORKER_ENABLED: "true"
 
   frontend:
     environment:
