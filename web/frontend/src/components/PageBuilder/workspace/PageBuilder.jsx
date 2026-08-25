@@ -7834,6 +7834,10 @@ export default function PageBuilder({
           onUseServer={() => adoptServerProject(conflictServerCandidate)}
         />
 
+        {/* Render helpers only capture refs inside event handlers; no ref value
+            participates in render output. The compiler cannot prove that
+            across the legacy helper boundary. */}
+        {/* eslint-disable-next-line react-hooks/refs */}
         {renderActiveTab()}
       </div>
 

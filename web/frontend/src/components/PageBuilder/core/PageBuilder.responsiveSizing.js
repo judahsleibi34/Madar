@@ -108,10 +108,28 @@ export const resolveResponsiveElementSizing = (
   if (viewportMode === "mobile") {
     const width = Math.max(1, finite(artboardWidth, 390));
     const bounds = getMobileContentBounds(width);
+    const horizontalScale = bounds.width / width;
+    const rowMemberIds = new Set();
+    nodes.forEach((node, index) => {
+      if (nodes.some((other, otherIndex) => otherIndex !== index && sharesAuthoredRow(node, other))) {
+        rowMemberIds.add(node.element.id);
+      }
+    });
 
     return nodes.map((node) => {
       const source = node.position;
       if (node.flowRole === "underText" || node.element?.layer === "behindText") return node;
+
+      if (rowMemberIds.has(node.element.id)) {
+        return {
+          ...node,
+          position: {
+            ...source,
+            x: round(bounds.x + source.x * horizontalScale),
+            width: round(Math.min(bounds.width, source.width * horizontalScale)),
+          },
+        };
+      }
 
       if (
         node.element?.type === "imageButton" &&
