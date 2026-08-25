@@ -64,6 +64,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("candidate_image_identity_changed", self.release_deploy)
         self.assertIn("self._digest(tag)", self.release_deploy)
         self.assertIn("docker-compose.release.yml", self.release_deploy)
+        self.assertIn("MADAR_CANDIDATE_READY_ATTEMPTS", self.release_deploy)
+        self.assertIn("candidate_deep_validation_failed:", self.release_deploy)
 
     def test_release_slots_use_non_overlapping_explicit_ipam(self):
         self.assertIn('"blue": {', self.release_deploy)

@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 from contextlib import contextmanager
@@ -286,13 +287,40 @@ class DockerGitOperations:
 
     def validate_candidate(self, sha: str, slot: str) -> None:
         ports = SLOT_PORTS[slot]
-        readiness = self._json(f"http://127.0.0.1:{ports['backend']}/health/ready")
-        identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
-        if not readiness.get("ready") or identity.get("release_sha") != sha:
-            raise RuntimeError("candidate_deep_validation_failed")
-        with urllib.request.urlopen(f"http://127.0.0.1:{ports['frontend']}/", timeout=5) as response:
-            if response.status != 200:
-                raise RuntimeError("candidate_frontend_unavailable")
+        attempts = max(1, min(int(os.getenv("MADAR_CANDIDATE_READY_ATTEMPTS", "12")), 60))
+        delay = max(1, min(int(os.getenv("MADAR_CANDIDATE_READY_RETRY_SECONDS", "5")), 30))
+        last_failure = "candidate_unavailable"
+        for attempt in range(1, attempts + 1):
+            try:
+                readiness = self._json(f"http://127.0.0.1:{ports['backend']}/health/ready")
+                identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
+                if not readiness.get("ready"):
+                    components = readiness.get("components") or {}
+                    degraded = sorted(name for name, state in components.items() if state not in {"ok", "disabled", "configured", "not_required", "development"})
+                    last_failure = "readiness:" + ",".join(degraded[:12])
+                elif identity.get("release_sha") != sha:
+                    last_failure = "release_identity_mismatch"
+                else:
+                    with urllib.request.urlopen(f"http://127.0.0.1:{ports['frontend']}/", timeout=5) as response:
+                        if response.status == 200:
+                            return
+                    last_failure = "frontend_unavailable"
+            except urllib.error.HTTPError as error:
+                last_failure = f"http_{error.code}"
+                if error.code == 503:
+                    try:
+                        payload = json.loads(error.read())
+                        components = payload.get("components") or {}
+                        degraded = sorted(name for name, state in components.items() if state not in {"ok", "disabled", "configured", "not_required", "development"})
+                        if degraded:
+                            last_failure = "readiness:" + ",".join(degraded[:12])
+                    except (TypeError, ValueError):
+                        pass
+            except (OSError, ValueError):
+                last_failure = "candidate_unavailable"
+            if attempt < attempts:
+                time.sleep(delay)
+        raise RuntimeError(f"candidate_deep_validation_failed:{last_failure}")
 
     def validate_rollback_target(self, release: dict, schema: int) -> dict[str, int]:
         slot = str(release.get("slot") or "")
