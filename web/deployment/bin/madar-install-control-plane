@@ -22,6 +22,7 @@ deployment_root="$(cd -- "$script_dir/.." && pwd)"
 install_root=/usr/local/lib/madar/web/deployment
 
 declare -a tracked_files=(
+  docker-compose.release.yml
   bin/madar-auto-deploy
   bin/madar-production-deploy
   bin/madar-release-deploy

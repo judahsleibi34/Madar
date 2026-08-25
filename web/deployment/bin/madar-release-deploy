@@ -32,6 +32,21 @@ SLOT_PORTS = {
     "green": {"backend": "8201", "frontend": "3200", "redis": "6382"},
 }
 
+SLOT_SUBNETS = {
+    "blue": {
+        "default": "10.252.0.0/24",
+        "parser": "10.252.1.0/24",
+        "remote_internal": "10.252.2.0/24",
+        "remote_egress": "10.252.3.0/24",
+    },
+    "green": {
+        "default": "10.252.4.0/24",
+        "parser": "10.252.5.0/24",
+        "remote_internal": "10.252.6.0/24",
+        "remote_egress": "10.252.7.0/24",
+    },
+}
+
 
 class DockerGitOperations:
     def __init__(self, repo: Path, state_root: Path, env_file: Path):
@@ -135,6 +150,7 @@ class DockerGitOperations:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
         ports = SLOT_PORTS[slot]
+        subnets = SLOT_SUBNETS[slot]
         env = dict(os.environ)
         env.update({
             "MADAR_ENV_FILE": str(self.env_file),
@@ -146,6 +162,10 @@ class DockerGitOperations:
             "MADAR_BACKEND_BIND_PORT": ports["backend"],
             "MADAR_FRONTEND_BIND_PORT": ports["frontend"],
             "MADAR_REDIS_BIND_PORT": ports["redis"],
+            "MADAR_DEFAULT_SUBNET": subnets["default"],
+            "MADAR_PARSER_SUBNET": subnets["parser"],
+            "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
+            "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
             "SCHEMA_COMPATIBLE_MIN": "81",
             "SCHEMA_COMPATIBLE_MAX": "83",
             "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
@@ -181,6 +201,8 @@ class DockerGitOperations:
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
+        else:
+            files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         profiles = ["--profile", "workers"]
         if self.schema_version() >= 83:
             profiles.extend(["--profile", "deletion-worker"])
@@ -318,8 +340,17 @@ class DockerGitOperations:
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
+        else:
+            files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         environment = dict(os.environ)
-        environment["MADAR_SLOT"] = slot
+        subnets = SLOT_SUBNETS[slot]
+        environment.update({
+            "MADAR_SLOT": slot,
+            "MADAR_DEFAULT_SUBNET": subnets["default"],
+            "MADAR_PARSER_SUBNET": subnets["parser"],
+            "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
+            "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
+        })
         subprocess.run([
             "docker", "compose", "--project-name", f"madar-{slot}",
             "--project-directory", str(self.release_root / "web"),

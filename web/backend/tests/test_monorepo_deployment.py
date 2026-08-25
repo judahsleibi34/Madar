@@ -16,6 +16,7 @@ ENVIRONMENT_LIBRARY = WEB_ROOT / "deployment" / "lib" / "environment_file.py"
 SWITCH = WEB_ROOT / "deployment" / "bin" / "madar-switch-traffic"
 PROXY_COMPOSE = WEB_ROOT / "deployment" / "proxy" / "docker-compose.yml"
 PROXY_CONFIG = WEB_ROOT / "deployment" / "proxy" / "nginx.conf"
+RELEASE_COMPOSE = WEB_ROOT / "deployment" / "docker-compose.release.yml"
 AUTO_SERVICE = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.service"
 AUTO_TIMER = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.timer"
 BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
@@ -35,6 +36,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.switch = SWITCH.read_text(encoding="utf-8")
         self.proxy_compose = PROXY_COMPOSE.read_text(encoding="utf-8")
         self.proxy_config = PROXY_CONFIG.read_text(encoding="utf-8")
+        self.release_compose = RELEASE_COMPOSE.read_text(encoding="utf-8")
         self.auto_service = AUTO_SERVICE.read_text(encoding="utf-8")
         self.auto_timer = AUTO_TIMER.read_text(encoding="utf-8")
         self.backend_dockerfile = BACKEND_DOCKERFILE.read_text(encoding="utf-8")
@@ -61,6 +63,20 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-../.env}"), 4)
         self.assertIn("candidate_image_identity_changed", self.release_deploy)
         self.assertIn("self._digest(tag)", self.release_deploy)
+        self.assertIn("docker-compose.release.yml", self.release_deploy)
+
+    def test_release_slots_use_non_overlapping_explicit_ipam(self):
+        self.assertIn('"blue": {', self.release_deploy)
+        self.assertIn('"green": {', self.release_deploy)
+        for variable in (
+            "MADAR_DEFAULT_SUBNET",
+            "MADAR_PARSER_SUBNET",
+            "MADAR_REMOTE_INTERNAL_SUBNET",
+            "MADAR_REMOTE_EGRESS_SUBNET",
+        ):
+            self.assertIn(variable, self.release_deploy)
+            self.assertIn(variable, self.release_compose)
+        self.assertIn("internal: true", self.release_compose)
 
     def test_rollback_switches_to_retained_target_without_rebuild_or_git_reset(self):
         combined = self.deploy + self.release_deploy + self.release_library
