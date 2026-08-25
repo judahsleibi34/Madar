@@ -103,9 +103,10 @@ class RuntimeConfiguration:
 
 def validate_runtime_configuration() -> RuntimeConfiguration:
     environment = os.getenv("APP_ENV", "development").strip().lower()
-    if environment not in {"development", "test", "prod", "production"}:
+    if environment not in {"development", "test", "staging", "prod", "production"}:
         raise RuntimeError("configuration value is invalid: APP_ENV")
     production = environment in {"prod", "production"}
+    production_like = production or environment == "staging"
     release_sha = os.getenv("MADAR_RELEASE_SHA", "development").strip()
     try:
         schema_min = int(os.getenv("SCHEMA_COMPATIBLE_MIN", "81"))
@@ -115,7 +116,7 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
     if schema_min <= 0 or schema_max < schema_min:
         raise RuntimeError("schema compatibility configuration is invalid")
     email_enabled = env_bool("EMAIL_CHANNEL_ENABLED", False)
-    if production:
+    if production_like:
         required = ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY", "CSRF_SECRET", "FRONTEND_URLS", "REDIS_URL")
         missing = [name for name in required if not os.getenv(name, "").strip()]
         if missing:
@@ -138,7 +139,17 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
         origins = os.getenv("CSRF_TRUSTED_ORIGINS", "").strip() or os.getenv("FRONTEND_URLS", "")
         for origin in (value.strip() for value in origins.split(",") if value.strip()):
             parsed = urlsplit(origin)
-            if "*" in origin or parsed.scheme != "https" or not parsed.hostname or parsed.path not in {"", "/"}:
+            staging_loopback = (
+                environment == "staging"
+                and parsed.scheme == "http"
+                and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+            )
+            if (
+                "*" in origin
+                or (parsed.scheme != "https" and not staging_loopback)
+                or not parsed.hostname
+                or parsed.path not in {"", "/"}
+            ):
                 raise RuntimeError("production trusted origin configuration is unsafe")
         if not os.getenv("REDIS_URL", "").startswith(("redis://", "rediss://")):
             raise RuntimeError("production Redis URL is invalid")

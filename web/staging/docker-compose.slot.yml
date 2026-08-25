@@ -8,6 +8,7 @@ services:
     user: "65534:1000"
     networks: [default, parser_internal, remote_ingestion_internal, stage_control]
     environment:
+      APP_ENV: staging
       SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_ANON_KEY: ${STAGING_ANON_JWT}
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
