@@ -148,7 +148,10 @@ class DockerGitOperations:
         storage_root = Path(os.getenv("MADAR_STORAGE_ROOT", str(self.repo / "backend")))
         for relative in ("uploads", "avatar_uploads", "private_uploads", "private_generated_charts"):
             path = storage_root / relative
-            if not path.is_dir() or not os.access(path, os.R_OK | os.W_OK | os.X_OK):
+            # The deploy operator may intentionally have read/traverse only;
+            # the runtime UID/GID owns write access. Candidate readiness performs
+            # the authoritative write probe from inside the container.
+            if not path.is_dir() or not os.access(path, os.R_OK | os.X_OK):
                 raise RuntimeError(f"storage_unavailable:{relative}")
 
     def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None:
