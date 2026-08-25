@@ -6,8 +6,8 @@
     "target": 83,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
-    "rollback_compatible_max": 82
+    "rollback_compatible_max": 83
   },
   "migration_policy": "manual-locked-backup-first-forward-repair",
-  "notes": "Compatibility bridge: deploy and validate this image on schema 81/82 before applying additive migration 083. Deletion remains unavailable until schema 083. The currently retained old image is not schema-83-ready, so do not apply 083 until the bridge is known-good; after migration use forward repair, not rollback to the pre-bridge image."
+  "notes": "Compatibility bridge: deploy and validate this image on schema 81/82 before applying additive migrations through 083. Deletion remains unavailable until schema 083. Promotion attests the retained running target's own /health/version schema range before candidate start; never infer rollback safety from the candidate manifest."
 }

@@ -35,6 +35,11 @@ class FakeOperations:
     def preflight(self, sha, slot, images, schema): self._call("preflight", sha, slot, schema)
     def start_candidate(self, sha, slot, images): self._call("start_candidate", sha, slot)
     def validate_candidate(self, sha, slot): self._call("validate_candidate", sha, slot)
+    def validate_rollback_target(self, release, schema):
+        self._call("validate_rollback_target", release["sha"], release["slot"], schema)
+        if self.fail_at == "rollback_schema":
+            raise RuntimeError("known_good_rollback_schema_incompatible")
+        return {"compatible_min": 81, "compatible_max": 83}
     def switch_traffic(self, slot): self._call("switch_traffic", slot)
     def observe(self, sha, slot): self._call("observe", sha, slot)
     def stop_candidate(self, slot): self._call("stop_candidate", slot)
@@ -55,6 +60,7 @@ class ReleaseDeployerTests(unittest.TestCase):
         self.assertEqual(result["status"], "known_good")
         self.assertEqual(state["known_good_release"]["sha"], SHA)
         self.assertEqual(state["active_slot"], "green")
+        self.assertEqual(state["known_good_release"]["schema_compatible_max"], 82)
 
     def test_every_pre_switch_failure_leaves_active_target_untouched(self):
         for phase in ("verify_source", "build", "schema_version", "preflight", "start_candidate", "validate_candidate"):
@@ -108,6 +114,15 @@ class ReleaseDeployerTests(unittest.TestCase):
             self.assertEqual(second.calls, [])
             result = self.deployer(root, second).deploy(SHA, manual_retry=True)
             self.assertEqual(result["status"], "known_good")
+
+    def test_retained_target_is_attested_against_observed_schema_before_start(self):
+        with tempfile.TemporaryDirectory() as root:
+            first = self.deployer(root, FakeOperations())
+            first.deploy(SHA)
+            operations = FakeOperations(fail_at="rollback_schema", schema=82)
+            with self.assertRaisesRegex(RuntimeError, "known_good_rollback_schema_incompatible"):
+                self.deployer(root, operations).deploy("b" * 40)
+            self.assertFalse(any(call[0] == "start_candidate" for call in operations.calls))
 
     def test_interrupted_release_is_rolled_back_and_archived_before_next_attempt(self):
         class InterruptingOperations(FakeOperations):

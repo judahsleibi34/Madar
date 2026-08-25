@@ -200,6 +200,20 @@ class DockerGitOperations:
             if response.status != 200:
                 raise RuntimeError("candidate_frontend_unavailable")
 
+    def validate_rollback_target(self, release: dict, schema: int) -> dict[str, int]:
+        slot = str(release.get("slot") or "")
+        expected_sha = str(release.get("sha") or "")
+        if slot not in SLOT_PORTS or len(expected_sha) != 40:
+            raise RuntimeError("known_good_release_identity_invalid")
+        identity = self._json(f"http://127.0.0.1:{SLOT_PORTS[slot]['backend']}/health/version")
+        minimum = int(identity.get("schema_compatible_min", -1))
+        maximum = int(identity.get("schema_compatible_max", -1))
+        if identity.get("release_sha") != expected_sha:
+            raise RuntimeError("known_good_release_identity_mismatch")
+        if not minimum <= schema <= maximum:
+            raise RuntimeError("known_good_rollback_schema_incompatible")
+        return {"compatible_min": minimum, "compatible_max": maximum}
+
     def switch_traffic(self, slot: str) -> None:
         command = os.getenv("MADAR_TRAFFIC_SWITCH_COMMAND", "").strip()
         if not command:

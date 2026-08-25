@@ -73,6 +73,7 @@ class Operations(Protocol):
     def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None: ...
     def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None: ...
     def validate_candidate(self, sha: str, slot: str) -> None: ...
+    def validate_rollback_target(self, release: dict[str, Any], schema: int) -> dict[str, int]: ...
     def switch_traffic(self, slot: str) -> None: ...
     def observe(self, sha: str, slot: str) -> None: ...
     def stop_candidate(self, slot: str) -> None: ...
@@ -181,10 +182,16 @@ class ReleaseDeployer:
                 }
                 if not self.compatibility.schema_min <= schema <= self.compatibility.schema_max:
                     raise RuntimeError("candidate_schema_incompatible")
-                if state.get("known_good_release") and not (
-                    self.compatibility.rollback_schema_min <= schema <= self.compatibility.rollback_schema_max
-                ):
-                    raise RuntimeError("known_good_rollback_schema_incompatible")
+                known_good = state.get("known_good_release")
+                if known_good:
+                    # A candidate manifest cannot prove what the retained old
+                    # process supports. Attest the running rollback target
+                    # itself immediately before touching the inactive slot.
+                    attested = self.operations.validate_rollback_target(known_good, schema)
+                    known_good["schema_compatible_min"] = int(attested["compatible_min"])
+                    known_good["schema_compatible_max"] = int(attested["compatible_max"])
+                    known_good["schema_attested_at"] = utc_now().isoformat()
+                    self._checkpoint(state, release)
                 release["phase"] = "preflight"
                 self._checkpoint(state, release)
                 self.operations.preflight(sha, candidate_slot, images, schema)
@@ -206,6 +213,8 @@ class ReleaseDeployer:
                 state["active_slot"] = candidate_slot
                 state["known_good_release"] = {
                     "sha": sha, "slot": candidate_slot, "images": images, "schema": schema,
+                    "schema_compatible_min": self.compatibility.schema_min,
+                    "schema_compatible_max": self.compatibility.schema_max,
                 }
                 state.setdefault("failed_releases", {}).pop(sha, None)
                 state.pop("in_progress_release", None)
