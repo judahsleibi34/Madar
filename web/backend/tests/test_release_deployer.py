@@ -109,6 +109,26 @@ class ReleaseDeployerTests(unittest.TestCase):
             result = self.deployer(root, second).deploy(SHA, manual_retry=True)
             self.assertEqual(result["status"], "known_good")
 
+    def test_interrupted_release_is_rolled_back_and_archived_before_next_attempt(self):
+        class InterruptingOperations(FakeOperations):
+            def observe(self, sha, slot):
+                self._call("observe", sha, slot)
+                raise KeyboardInterrupt()
+
+        with tempfile.TemporaryDirectory() as root:
+            interrupted = InterruptingOperations()
+            with self.assertRaises(KeyboardInterrupt):
+                self.deployer(root, interrupted).deploy(SHA)
+            persisted = json.loads((Path(root) / "state.json").read_text())
+            self.assertEqual(persisted["in_progress_release"]["phase"], "observation")
+            resumed = FakeOperations()
+            result = self.deployer(root, resumed).deploy("b" * 40)
+            state = json.loads((Path(root) / "state.json").read_text())
+        self.assertEqual(result["status"], "known_good")
+        self.assertIn(("switch_traffic", "blue"), resumed.calls)
+        self.assertIn(("stop_candidate", "green"), resumed.calls)
+        self.assertTrue(any(row.get("status") == "interrupted_recovered" for row in state["history"]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -63,12 +63,40 @@ class DockerGitOperations:
             raise RuntimeError("docker_image_digest_unavailable")
         return f"{tag}@{image_id}"
 
+    def _existing_artifact(self, tag: str, sha: str) -> tuple[str, str] | None:
+        try:
+            raw = self.run(
+                ["docker", "image", "inspect", "--format", "{{json .Config.Labels}}", tag],
+                capture=True,
+            )
+            labels = json.loads(raw) if raw else {}
+        except (subprocess.CalledProcessError, ValueError):
+            return None
+        if not isinstance(labels, dict) or labels.get("com.madar.release.sha") != sha:
+            return None
+        built_at = str(labels.get("com.madar.release.built_at") or "").strip()
+        if not built_at:
+            return None
+        return self._digest(tag), built_at
+
     def build(self, sha: str, slot: str) -> dict[str, str]:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
         build_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         backend_tag = f"madar-backend:{sha}"
         frontend_tag = f"madar-frontend:{sha}"
+        existing_backend = self._existing_artifact(backend_tag, sha)
+        existing_frontend = self._existing_artifact(frontend_tag, sha)
+        if existing_backend and existing_frontend:
+            if existing_backend[1] != existing_frontend[1]:
+                raise RuntimeError("release_artifact_timestamp_mismatch")
+            return {
+                "backend": existing_backend[0],
+                "frontend": existing_frontend[0],
+                "worker": existing_backend[0],
+                "build_timestamp": existing_backend[1],
+                "artifact_reused": True,
+            }
         labels = ["--label", f"com.madar.release.sha={sha}", "--label", f"com.madar.release.built_at={build_timestamp}"]
         self.run([
             "docker", "build", *labels, "--build-arg", f"MADAR_RELEASE_SHA={sha}",
@@ -85,6 +113,7 @@ class DockerGitOperations:
             "frontend": self._digest(frontend_tag),
             "worker": self._digest(backend_tag),
             "build_timestamp": build_timestamp,
+            "artifact_reused": False,
         }
 
     def schema_version(self) -> int:

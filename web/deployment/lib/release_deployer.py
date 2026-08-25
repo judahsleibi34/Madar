@@ -100,6 +100,34 @@ class ReleaseDeployer:
         state["history"] = history
         atomic_json(self.state_file, state)
 
+    def _checkpoint(self, state: dict[str, Any], release: dict[str, Any]) -> None:
+        state["in_progress_release"] = dict(release)
+        atomic_json(self.state_file, state)
+
+    def _recover_interrupted(self, state: dict[str, Any]) -> None:
+        interrupted = state.get("in_progress_release")
+        if not isinstance(interrupted, dict):
+            return
+        sha = str(interrupted.get("release_sha") or "")
+        slot = str(interrupted.get("candidate_slot") or "")
+        previous = str(interrupted.get("previous_traffic_target") or "")
+        if len(sha) != 40 or slot not in {"blue", "green"} or previous not in {"blue", "green"}:
+            raise RuntimeError("interrupted_release_state_invalid")
+        # Preparing the old release source gives the operations layer the
+        # immutable Compose definition needed to remove only that candidate.
+        self.operations.verify_source(sha)
+        if interrupted.get("rollback_required"):
+            self.operations.switch_traffic(previous)
+        self.operations.stop_candidate(slot)
+        interrupted.update(
+            status="interrupted_recovered",
+            phase="recovered",
+            completed_at=utc_now().isoformat(),
+            failure_code="previous_process_interrupted",
+        )
+        state.pop("in_progress_release", None)
+        self._record(state, interrupted)
+
     def deploy(self, sha: str, *, manual_retry: bool = False) -> dict[str, Any]:
         if len(sha) != 40 or any(char not in "0123456789abcdef" for char in sha.lower()):
             raise ValueError("candidate must be a full lowercase Git SHA")
@@ -109,6 +137,8 @@ class ReleaseDeployer:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
                 raise RuntimeError("deployment_already_running") from error
+            state = self._state()
+            self._recover_interrupted(state)
             state = self._state()
             failure = (state.get("failed_releases") or {}).get(sha)
             if failure and not manual_retry:
@@ -130,14 +160,17 @@ class ReleaseDeployer:
                 "images": {},
             }
             switched = False
+            self._checkpoint(state, release)
             try:
                 self.operations.verify_source(sha)
                 release["phase"] = "immutable_build"
+                self._checkpoint(state, release)
                 images = self.operations.build(sha, candidate_slot)
                 required_images = ("backend", "frontend", "worker")
                 if any("@sha256:" not in str(images.get(name) or "") for name in required_images):
                     raise RuntimeError("immutable_image_digest_missing")
                 release["images"] = images
+                self._checkpoint(state, release)
                 schema = self.operations.schema_version()
                 release["schema"] = {
                     "observed": schema,
@@ -153,15 +186,21 @@ class ReleaseDeployer:
                 ):
                     raise RuntimeError("known_good_rollback_schema_incompatible")
                 release["phase"] = "preflight"
+                self._checkpoint(state, release)
                 self.operations.preflight(sha, candidate_slot, images, schema)
                 release["phase"] = "candidate_start"
+                self._checkpoint(state, release)
                 self.operations.start_candidate(sha, candidate_slot, images)
                 release["phase"] = "deep_validation"
+                self._checkpoint(state, release)
                 self.operations.validate_candidate(sha, candidate_slot)
                 release["phase"] = "traffic_switch"
+                release["rollback_required"] = True
+                self._checkpoint(state, release)
                 self.operations.switch_traffic(candidate_slot)
                 switched = True
                 release["phase"] = "observation"
+                self._checkpoint(state, release)
                 self.operations.observe(sha, candidate_slot)
                 release.update(status="known_good", phase="complete", completed_at=utc_now().isoformat(), traffic_target=candidate_slot)
                 state["active_slot"] = candidate_slot
@@ -169,6 +208,7 @@ class ReleaseDeployer:
                     "sha": sha, "slot": candidate_slot, "images": images, "schema": schema,
                 }
                 state.setdefault("failed_releases", {}).pop(sha, None)
+                state.pop("in_progress_release", None)
                 self._record(state, release)
                 return release
             except Exception as error:
@@ -187,5 +227,6 @@ class ReleaseDeployer:
                     "failed_at": release["completed_at"], "retry_after": retry_after.isoformat(),
                     "reason": release["failure_code"],
                 }
+                state.pop("in_progress_release", None)
                 self._record(state, release)
                 raise
