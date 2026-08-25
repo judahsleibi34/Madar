@@ -1,0 +1,117 @@
+import importlib.machinery
+import importlib.util
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+
+WEB_ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolve().parents[2])
+SCRIPT = WEB_ROOT / "deployment" / "bin" / "madar-release-deploy"
+loader = importlib.machinery.SourceFileLoader("madar_release_deploy_cli", str(SCRIPT))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+release_cli = importlib.util.module_from_spec(spec)
+loader.exec_module(release_cli)
+
+
+SHA = "c" * 40
+
+
+class FakeResponse:
+    status = 200
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+
+class FakeOperations:
+    def __init__(self):
+        self.calls = []
+
+    def verify_source(self, sha): self.calls.append(("verify_source", sha))
+    def build(self, sha, slot):
+        self.calls.append(("build", sha, slot))
+        return {
+            "backend": "backend@sha256:1", "frontend": "frontend@sha256:2",
+            "worker": "backend@sha256:1", "build_timestamp": "2026-08-25T00:00:00Z",
+        }
+    def schema_version(self):
+        self.calls.append(("schema_version",))
+        return 83
+    def preflight(self, sha, slot, images, schema): self.calls.append(("preflight", sha, slot, schema))
+    def start_candidate(self, sha, slot, images): self.calls.append(("start_candidate", sha, slot))
+    def validate_candidate(self, sha, slot): self.calls.append(("validate_candidate", sha, slot))
+    def stop_candidate(self, slot): self.calls.append(("stop_candidate", slot))
+    def activate_workers(self, sha, slot, images): self.calls.append(("activate_workers", sha, slot))
+    def deactivate_workers(self, release): self.calls.append(("deactivate_workers", release["slot"]))
+    def _json(self, url):
+        if url.endswith("/health/version"):
+            return {"release_sha": SHA}
+        return {"ready": True}
+
+
+class ReleaseBootstrapTests(unittest.TestCase):
+    def compatibility(self):
+        return release_cli.Compatibility(81, 83, 83, "expand-only", 81, 83)
+
+    def test_prepare_keeps_workers_and_traffic_inactive(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = FakeOperations()
+            record = release_cli.prepare_release(
+                sha=SHA, slot="green", state_root=Path(root),
+                compatibility=self.compatibility(), operations=operations,
+            )
+            persisted = json.loads((Path(root) / "prepared-release.json").read_text())
+        self.assertEqual(record["status"], "candidate_validated_workers_inactive")
+        self.assertEqual(persisted["release_sha"], SHA)
+        self.assertFalse(any(call[0] == "activate_workers" for call in operations.calls))
+
+    def test_activate_requires_exact_prepared_identity(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = FakeOperations()
+            release_cli.prepare_release(
+                sha=SHA, slot="green", state_root=Path(root),
+                compatibility=self.compatibility(), operations=operations,
+            )
+            with self.assertRaisesRegex(RuntimeError, "identity_mismatch"):
+                release_cli.activate_prepared_release(
+                    sha="d" * 40, slot="green", state_root=Path(root), operations=operations,
+                )
+            result = release_cli.activate_prepared_release(
+                sha=SHA, slot="green", state_root=Path(root), operations=operations,
+            )
+        self.assertEqual(result["status"], "candidate_workers_active")
+
+    def test_adoption_requires_workers_and_stable_proxy_identity(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = FakeOperations()
+            release_cli.prepare_release(
+                sha=SHA, slot="green", state_root=Path(root),
+                compatibility=self.compatibility(), operations=operations,
+            )
+            with self.assertRaisesRegex(RuntimeError, "workers_not_active"):
+                release_cli.adopt_prepared_release(
+                    sha=SHA, slot="green", state_root=Path(root),
+                    compatibility=self.compatibility(), operations=operations,
+                )
+            release_cli.activate_prepared_release(
+                sha=SHA, slot="green", state_root=Path(root), operations=operations,
+            )
+            with patch.object(release_cli.urllib.request, "urlopen", return_value=FakeResponse()):
+                result = release_cli.adopt_prepared_release(
+                    sha=SHA, slot="green", state_root=Path(root),
+                    compatibility=self.compatibility(), operations=operations,
+                )
+            state = json.loads((Path(root) / "state.json").read_text())
+        self.assertEqual(result["phase"], "bootstrap_adopted")
+        self.assertEqual(state["known_good_release"]["sha"], SHA)
+        self.assertFalse((Path(root) / "prepared-release.json").exists())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -90,7 +90,9 @@ class MonorepoDeploymentTests(unittest.TestCase):
     def test_docker_proxy_is_hardened_and_preserves_forwarded_request_context(self):
         self.assertIn("MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx", self.auto_service)
         self.assertIn('driver not in {"nginx", "docker-nginx"}', self.switch)
-        self.assertIn("host.docker.internal", self.switch)
+        self.assertIn("network_mode: host", self.proxy_compose)
+        self.assertIn("listen 127.0.0.1:8001", self.proxy_config)
+        self.assertIn("listen 127.0.0.1:3000", self.proxy_config)
         self.assertIn('cap_drop: ["ALL"]', self.proxy_compose)
         self.assertIn("read_only: true", self.proxy_compose)
         self.assertIn("proxy_request_buffering off", self.proxy_config)

@@ -22,4 +22,3 @@ Environment=MADAR_PROXY_CONTAINER=madar-release-proxy
 ExecStart=/usr/local/sbin/madar-auto-deploy
 TimeoutStartSec=45min
 NoNewPrivileges=true
-
