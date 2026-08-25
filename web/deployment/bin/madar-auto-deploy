@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 readonly REPO_ROOT="/home/madar/saas/Madar"
-readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-/usr/local/lib/madar/madar-production-deploy}"
+readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-/usr/local/lib/madar/web/deployment/bin/madar-production-deploy}"
 readonly STATE_ROOT="${MADAR_DEPLOY_STATE_ROOT:-/var/lib/madar/releases}"
 
 git -C "$REPO_ROOT" fetch --quiet origin main

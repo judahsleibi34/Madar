@@ -20,6 +20,7 @@ AUTO_SERVICE = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.service"
 AUTO_TIMER = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.timer"
 BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
 FRONTEND_DOCKERFILE = WEB_ROOT / "frontend" / "Dockerfile"
+INSTALLER = WEB_ROOT / "deployment" / "bin" / "madar-install-control-plane"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
@@ -37,6 +38,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.auto_timer = AUTO_TIMER.read_text(encoding="utf-8")
         self.backend_dockerfile = BACKEND_DOCKERFILE.read_text(encoding="utf-8")
         self.frontend_dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
+        self.installer = INSTALLER.read_text(encoding="utf-8")
 
     def test_wrapper_delegates_a_clean_full_sha_to_immutable_deployer(self):
         self.assertIn('readonly REPO_ROOT="/home/madar/saas/Madar"', self.deploy)
@@ -44,6 +46,10 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("status --porcelain --untracked-files=normal", self.deploy)
         self.assertIn('"$RELEASE_DEPLOY" "$TARGET_SHA"', self.deploy)
         self.assertIn('merge --ff-only "$TARGET_SHA"', self.deploy)
+        self.assertIn(
+            "/usr/local/lib/madar/web/deployment/bin/madar-release-deploy",
+            self.deploy,
+        )
 
     def test_release_deployer_uses_explicit_compose_and_environment_roots(self):
         self.assertIn('"MADAR_ENV_FILE": str(self.env_file)', self.release_deploy)
@@ -75,6 +81,10 @@ class MonorepoDeploymentTests(unittest.TestCase):
     def test_wrapper_keeps_git_operations_at_repository_root(self):
         self.assertIn('git -C "$REPO_ROOT" fetch', self.wrapper)
         self.assertIn('exec "$DEPLOY_SCRIPT"', self.wrapper)
+        self.assertIn(
+            "/usr/local/lib/madar/web/deployment/bin/madar-production-deploy",
+            self.wrapper,
+        )
 
     def test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state(self):
         self.assertIn("failed_releases", self.wrapper)
@@ -124,6 +134,13 @@ class MonorepoDeploymentTests(unittest.TestCase):
         for dockerfile in (self.backend_dockerfile, self.frontend_dockerfile):
             self.assertIn("org.opencontainers.image.revision=$MADAR_RELEASE_SHA", dockerfile)
             self.assertIn("org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP", dockerfile)
+
+    def test_control_plane_installer_preserves_layout_and_does_not_start_timer(self):
+        self.assertIn("/usr/local/lib/madar/web/deployment", self.installer)
+        self.assertIn("cp -a --", self.installer)
+        self.assertIn("systemctl daemon-reload", self.installer)
+        self.assertNotIn("systemctl start madar-auto-deploy.timer", self.installer)
+        self.assertNotIn("systemctl enable", self.installer)
 
 
 if __name__ == "__main__":

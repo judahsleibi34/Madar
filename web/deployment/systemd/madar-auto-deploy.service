@@ -13,9 +13,9 @@ Environment=MADAR_PRODUCTION_REPO=/home/madar/saas/Madar
 Environment=MADAR_ENV_FILE=/home/madar/saas/Madar/.env
 Environment=MADAR_DEPLOY_STATE_ROOT=/var/lib/madar/releases
 Environment=MADAR_STORAGE_ROOT=/home/madar/saas/Madar/backend
-Environment=MADAR_RELEASE_DEPLOY_BIN=/usr/local/lib/madar/madar-release-deploy
-Environment=MADAR_PRODUCTION_DEPLOY_BIN=/usr/local/lib/madar/madar-production-deploy
-Environment=MADAR_TRAFFIC_SWITCH_COMMAND=/usr/local/lib/madar/madar-switch-traffic
+Environment=MADAR_RELEASE_DEPLOY_BIN=/usr/local/lib/madar/web/deployment/bin/madar-release-deploy
+Environment=MADAR_PRODUCTION_DEPLOY_BIN=/usr/local/lib/madar/web/deployment/bin/madar-production-deploy
+Environment=MADAR_TRAFFIC_SWITCH_COMMAND=/usr/local/lib/madar/web/deployment/bin/madar-switch-traffic
 Environment=MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx
 Environment=MADAR_ACTIVE_UPSTREAMS_FILE=/var/lib/madar/proxy/active-upstreams.conf
 Environment=MADAR_PROXY_CONTAINER=madar-release-proxy

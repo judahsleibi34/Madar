@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 readonly REPO_ROOT="/home/madar/saas/Madar"
-readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-/usr/local/lib/madar/madar-release-deploy}"
+readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-/usr/local/lib/madar/web/deployment/bin/madar-release-deploy}"
 
 if [[ ! -x "$RELEASE_DEPLOY" ]]; then
     echo "[madar-production] ERROR: immutable release deployer is not installed." >&2
