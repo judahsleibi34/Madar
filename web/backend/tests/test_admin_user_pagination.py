@@ -134,13 +134,12 @@ class AdminUserPaginationTests(unittest.TestCase):
     def test_successful_user_delete_records_audit(self):
         client = build_client()
         admin_user = {"id": 1, "user_type": "admin"}
-        deleted_user = {
+        scheduled_user = {
             "id": 4,
             "tenant_id": 7,
-            "email": "user@example.com",
-            "user_type": "user",
-            "auth_id": "auth-secret",
             "tenant_deleted": False,
+            "deletion_pending": True,
+            "deletion_request_id": "request-4",
         }
 
         with patch.object(
@@ -150,26 +149,25 @@ class AdminUserPaginationTests(unittest.TestCase):
         ), patch.object(
             admin_user_routes,
             "delete_user_account",
-            return_value=deleted_user,
+            return_value=scheduled_user,
         ) as delete_user_account, patch.object(admin_user_routes, "record_audit_event") as record_audit:
             response = client.delete("/admin/users/4")
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
         delete_user_account.assert_called_once_with(user_id=4, requesting_user_id=1)
         record_audit.assert_called_once()
         audit_kwargs = record_audit.call_args.kwargs
         self.assertEqual(audit_kwargs["tenant_id"], 7)
         self.assertEqual(audit_kwargs["actor_user_id"], 1)
-        self.assertEqual(audit_kwargs["action"], "admin.user_deleted")
+        self.assertEqual(audit_kwargs["action"], "admin.user_deletion_requested")
         self.assertEqual(audit_kwargs["target_type"], "user")
         self.assertEqual(audit_kwargs["target_id"], 4)
         self.assertEqual(
             audit_kwargs["metadata"],
             {
                 "deleted_user_id": 4,
+                "deletion_request_id": "request-4",
                 "source": "admin",
-                "deleted_user_email_hash": "b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514",
-                "deleted_user_type": "user",
             },
         )
         self.assertNotIn("auth-secret", str(audit_kwargs["metadata"]))

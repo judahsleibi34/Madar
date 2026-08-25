@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from database import service_supabase
 from services.notification_outbox_service import get_queue_metrics
+from services.data_deletion_service import get_deletion_metrics
 from services.upload_config import get_data_upload_dir, get_private_charts_dir, get_public_uploads_dir
 
 CORRELATION_ID = contextvars.ContextVar("madar_correlation_id", default="")
@@ -63,6 +64,10 @@ def operational_snapshot() -> dict[str, int]:
         result.update({f"notification_{key}": int(value) for key, value in get_queue_metrics().items()})
     except Exception:
         result["notification_metrics_available"] = 0
+    try:
+        result.update(get_deletion_metrics())
+    except Exception:
+        result["deletion_metrics_available"] = 0
     try:
         expired_assets = (
             service_supabase.table("builder_assets")

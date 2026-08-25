@@ -48,7 +48,7 @@ services:
       MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
       MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
       SCHEMA_COMPATIBLE_MIN: ${SCHEMA_COMPATIBLE_MIN:-81}
-      SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:-82}
+      SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:-83}
       # Direct PostgreSQL credentials are operator-only. An explicit empty
       # override makes the key unusable even when the shared env_file contains
       # it for backup or catalog-verification tooling.
@@ -109,6 +109,9 @@ services:
       NOTIFICATION_QUEUE_MAX_DEPTH: ${NOTIFICATION_QUEUE_MAX_DEPTH:-1000}
       NOTIFICATION_QUEUE_MAX_AGE_SECONDS: ${NOTIFICATION_QUEUE_MAX_AGE_SECONDS:-900}
       NOTIFICATION_QUEUE_MAX_DEAD: ${NOTIFICATION_QUEUE_MAX_DEAD:-0}
+      DATA_DELETION_WORKER_REQUIRED: ${DATA_DELETION_WORKER_REQUIRED:-false}
+      DATA_DELETION_WORKER_ENABLED: ${DATA_DELETION_WORKER_ENABLED:-false}
+      DATA_DELETION_WORKER_HEALTH_URL: ${DATA_DELETION_WORKER_HEALTH_URL:-}
       MPLCONFIGDIR: /tmp/matplotlib
       XDG_CACHE_HOME: /tmp/.cache
       CALENDAR_FEATURE_ENABLED: ${CALENDAR_FEATURE_ENABLED:-false}
@@ -272,6 +275,56 @@ services:
       start_period: 10s
     cpus: 1.00
     mem_limit: 512m
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  data-deletion-worker:
+    image: ${MADAR_BACKEND_IMAGE:-madar-backend:development}
+    build:
+      context: ./backend
+    container_name: madar-${MADAR_SLOT:-active}-data-deletion-worker
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    profiles: ["workers"]
+    env_file:
+      - ${MADAR_ENV_FILE:-../.env}
+    environment:
+      APP_ENV: production
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+      MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
+      SUPABASE_DB_URL: ""
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      CALENDAR_CREDENTIALS_SECRET: ${CALENDAR_CREDENTIALS_SECRET:-}
+      DATA_DELETION_WORKER_ENABLED: "true"
+      DATA_DELETION_WORKER_BATCH_SIZE: ${DATA_DELETION_WORKER_BATCH_SIZE:-5}
+      DATA_DELETION_WORKER_POLL_SECONDS: ${DATA_DELETION_WORKER_POLL_SECONDS:-10}
+      DATA_DELETION_WORKER_HEALTH_HOST: 0.0.0.0
+      DATA_DELETION_WORKER_HEALTH_PORT: 8094
+      MADAR_ALERT_HOOK: /scripts/madar_alert_hook.sh
+      STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
+    command: ["python", "-m", "workers.data_deletion_worker"]
+    volumes:
+      - ${MADAR_STORAGE_ROOT:-../backend}/private_uploads:/app/private_uploads
+      - ${MADAR_STORAGE_ROOT:-../backend}/private_generated_charts:/app/private_generated_charts
+      - ./scripts:/scripts:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8094/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    cpus: 0.50
+    mem_limit: 256m
     logging:
       driver: json-file
       options: {max-size: "20m", max-file: "5"}

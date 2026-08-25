@@ -26,6 +26,7 @@ from routes.admin_profile_routes import router as admin_profile_router
 from routes.admin_user_routes import router as admin_user_router
 from routes.auth_routes import router as auth_router
 from routes.billing_routes import router as billing_router
+from routes.data_deletion_routes import router as data_deletion_router
 from routes.calendar_routes import router as calendar_router
 from routes.ecommerce_routes import router as ecommerce_router
 from routes.builder_routes import router as builder_router
@@ -301,6 +302,7 @@ app.include_router(installation_router)
 app.include_router(notification_router)
 app.include_router(server_status_router)
 app.include_router(billing_router)
+app.include_router(data_deletion_router)
 app.include_router(calendar_router)
 app.include_router(ecommerce_router)
 app.include_router(admin_account_access_router)

@@ -46,6 +46,7 @@ from services.entitlement_service import (
     require_branded_subdomain,
     require_public_runtime_entitlement,
 )
+from services.tenant_lifecycle_service import tenant_is_active
 from services.hosted_address_service import (
     HOSTED_ADDRESS_PATTERN,
     normalize_hosted_address,
@@ -1420,6 +1421,9 @@ def resolve_website_settings(site_identifier: str, *, request: Request):
         missing_detail="Published site not found",
         ambiguous_code="publication_hostname_ambiguous",
     )
+    tenant_id = settings.get("tenant_id")
+    if tenant_id is None or not tenant_is_active(tenant_id):
+        raise HTTPException(status_code=404, detail="Published site not found")
     if branded:
         require_branded_subdomain(settings, allow_legacy_routing=True)
     return settings

@@ -37,7 +37,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn('"docker", "compose", "--project-name", f"madar-{slot}"', self.release_deploy)
         self.assertIn('"--project-directory", str(web)', self.release_deploy)
         self.assertIn('"--env-file", str(self.env_file)', self.release_deploy)
-        self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-../.env}"), 3)
+        self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-../.env}"), 4)
         self.assertIn("candidate_image_identity_changed", self.release_deploy)
         self.assertIn("self._digest(tag)", self.release_deploy)
 

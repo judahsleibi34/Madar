@@ -290,6 +290,44 @@ def disconnect_connection(connection: dict[str, Any], *, http_client=None, clien
     return revoked
 
 
+def disconnect_connection_for_deletion(
+    connection: dict[str, Any], *, http_client=None, client=None
+) -> str:
+    """Revoke where supported, then irreversibly remove local credentials.
+
+    Google revocation failures remain retryable and preserve encrypted material
+    so a later saga attempt can retry. Microsoft does not expose a compatible
+    token-revocation operation in Madar today; local credentials are removed and
+    the retained limitation is reported as ``local_credentials_removed``.
+    """
+    database_client = client or service_supabase
+    provider = str(connection.get("provider") or "")
+    encrypted = connection.get("encrypted_credentials")
+    outcome = "local_credentials_removed"
+    if provider == "google" and encrypted:
+        credentials = decrypt_credentials(encrypted)
+        token = credentials.get("refresh_token") or credentials.get("access_token")
+        if token:
+            provider_client = http_client or httpx.Client(timeout=10)
+            response = provider_client.post(
+                "https://oauth2.googleapis.com/revoke", data={"token": token}
+            )
+            if response.status_code not in {200, 204, 400}:
+                raise CalendarSyncError(
+                    "oauth_revocation_failed",
+                    "The provider grant could not be revoked yet.",
+                )
+            outcome = "provider_revoked"
+    database_client.table("calendar_sync_connections").update({
+        "status": "disconnected",
+        "encrypted_credentials": None,
+        "cursor_data": {},
+        "last_error_code": None,
+        "inbound_sync_enabled": False,
+    }).eq("id", connection["id"]).eq("tenant_id", connection["tenant_id"]).execute()
+    return outcome
+
+
 def delete_provider_event(
     connection: dict[str, Any],
     event: dict[str, Any],

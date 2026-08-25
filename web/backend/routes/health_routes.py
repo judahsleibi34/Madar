@@ -22,7 +22,7 @@ def version():
         "release_sha": os.getenv("MADAR_RELEASE_SHA", "development"),
         "build_timestamp": os.getenv("MADAR_BUILD_TIMESTAMP", "unknown"),
         "schema_compatible_min": int(os.getenv("SCHEMA_COMPATIBLE_MIN", "81")),
-        "schema_compatible_max": int(os.getenv("SCHEMA_COMPATIBLE_MAX", "82")),
+        "schema_compatible_max": int(os.getenv("SCHEMA_COMPATIBLE_MAX", "83")),
     }
 
 

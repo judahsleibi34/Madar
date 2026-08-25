@@ -33,7 +33,7 @@ except ImportError:  # pragma: no cover - installed in the runtime image
 READINESS_TIMEOUT_SECONDS = float(os.getenv("READINESS_TIMEOUT_SECONDS", "2"))
 READINESS_CACHE_SECONDS = float(os.getenv("READINESS_CACHE_SECONDS", "5"))
 DEFAULT_SCHEMA_COMPATIBLE_MIN = 81
-DEFAULT_SCHEMA_COMPATIBLE_MAX = 82
+DEFAULT_SCHEMA_COMPATIBLE_MAX = 83
 
 _cache_lock = Lock()
 _cached_at = 0.0
@@ -199,6 +199,21 @@ def check_notification_worker() -> str:
     if not _env_bool("NOTIFICATION_WORKER_ENABLED", False):
         return "misconfigured"
     url = os.getenv("NOTIFICATION_WORKER_HEALTH_URL", "").strip()
+    if not url:
+        return "misconfigured"
+    try:
+        response = requests.get(url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False)
+        return "ok" if response.status_code == 200 else "unavailable"
+    except requests.RequestException:
+        return "unavailable"
+
+
+def check_data_deletion_worker() -> str:
+    if not _env_bool("DATA_DELETION_WORKER_REQUIRED", False):
+        return "disabled"
+    if not _env_bool("DATA_DELETION_WORKER_ENABLED", False):
+        return "misconfigured"
+    url = os.getenv("DATA_DELETION_WORKER_HEALTH_URL", "").strip()
     if not url:
         return "misconfigured"
     try:
@@ -395,7 +410,7 @@ def _is_required_state_ready(component: str, state: str) -> bool:
         return True
     if component == "admin_mfa_policy" and state == "not_required":
         return True
-    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "notification_email", "notification_push", "backup_freshness", "calendar_configuration", "calendar_sync_worker", "calendar_sync_queue"} and state == "disabled":
+    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "notification_email", "notification_push", "backup_freshness", "calendar_configuration", "calendar_sync_worker", "calendar_sync_queue", "data_deletion_worker"} and state == "disabled":
         return True
     if component in {"notification_email", "notification_push"} and state == "configured":
         return True
@@ -420,6 +435,7 @@ def compute_readiness() -> dict:
         "calendar_sync_queue": check_calendar_sync_queue,
         "parser_isolation": check_parser_isolation,
         "notification_worker": check_notification_worker,
+        "data_deletion_worker": check_data_deletion_worker,
         "notification_queue": check_notification_queue,
         "notification_email": check_notification_email,
         "notification_push": check_notification_push,

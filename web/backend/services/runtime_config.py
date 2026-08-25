@@ -34,6 +34,9 @@ CONFIG_CLASSIFICATION: dict[str, ConfigClass] = {
     "SCHEMA_COMPATIBLE_MAX": "required",
     "BACKUP_FRESHNESS_REQUIRED": "production-only",
     "BACKUP_FRESHNESS_MARKER": "production-only",
+    "DATA_DELETION_WORKER_ENABLED": "production-only",
+    "DATA_DELETION_WORKER_REQUIRED": "production-only",
+    "DATA_DELETION_WORKER_HEALTH_URL": "production-only",
     "FRONTEND_URL": "deprecated",
 }
 
@@ -65,7 +68,7 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
     release_sha = os.getenv("MADAR_RELEASE_SHA", "development").strip()
     try:
         schema_min = int(os.getenv("SCHEMA_COMPATIBLE_MIN", "81"))
-        schema_max = int(os.getenv("SCHEMA_COMPATIBLE_MAX", "82"))
+        schema_max = int(os.getenv("SCHEMA_COMPATIBLE_MAX", "83"))
     except ValueError as error:
         raise RuntimeError("schema compatibility configuration is invalid") from error
     if schema_min <= 0 or schema_max < schema_min:
