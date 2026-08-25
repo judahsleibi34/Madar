@@ -1,0 +1,34 @@
+name: madar-release-proxy
+
+services:
+  proxy:
+    image: nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+    container_name: madar-release-proxy
+    restart: unless-stopped
+    user: "101:101"
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:8001:8001"
+      - "127.0.0.1:3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${MADAR_ACTIVE_UPSTREAMS_FILE:-/var/lib/madar/releases/active-upstreams.conf}:/etc/nginx/madar/active-upstreams.conf:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m,uid=101,gid=101
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8001/health/live && wget -q -O /dev/null http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 10s
+    cpus: 0.50
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

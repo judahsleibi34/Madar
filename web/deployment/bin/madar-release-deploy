@@ -8,6 +8,7 @@ executed. It never applies or reverses a database migration.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -16,12 +17,14 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+from contextlib import contextmanager
 
 SCRIPT = Path(__file__).resolve()
 WEB_ROOT = SCRIPT.parents[2]
 sys.path.insert(0, str(WEB_ROOT))
 
-from deployment.lib.release_deployer import Compatibility, ReleaseDeployer  # noqa: E402
+from deployment.lib.release_deployer import Compatibility, ReleaseDeployer, atomic_json, utc_now  # noqa: E402
+from deployment.lib.environment_file import load_environment_file  # noqa: E402
 
 
 SLOT_PORTS = {
@@ -300,16 +303,182 @@ class DockerGitOperations:
         ], check=False, env=environment)
 
 
+def prepared_release_path(state_root: Path) -> Path:
+    return state_root / "prepared-release.json"
+
+
+@contextmanager
+def deployment_lock(state_root: Path):
+    state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (state_root / "deploy.lock").open("a+", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError("deployment_already_running") from error
+        yield
+
+
+def prepare_release(
+    *, sha: str, slot: str, state_root: Path, compatibility: Compatibility,
+    operations: DockerGitOperations,
+) -> dict:
+    if slot not in SLOT_PORTS:
+        raise RuntimeError("candidate_slot_invalid")
+    with deployment_lock(state_root):
+        operations.verify_source(sha)
+        images = operations.build(sha, slot)
+        if any("@sha256:" not in str(images.get(name) or "") for name in ("backend", "frontend", "worker")):
+            raise RuntimeError("immutable_image_digest_missing")
+        schema = operations.schema_version()
+        if not compatibility.schema_min <= schema <= compatibility.schema_max:
+            raise RuntimeError("candidate_schema_incompatible")
+        record = {
+            "release_sha": sha,
+            "candidate_slot": slot,
+            "images": images,
+            "schema": schema,
+            "status": "preparing",
+            "prepared_at": utc_now().isoformat(),
+        }
+        try:
+            operations.preflight(sha, slot, images, schema)
+            operations.start_candidate(sha, slot, images)
+            operations.validate_candidate(sha, slot)
+        except Exception:
+            operations.stop_candidate(slot)
+            raise
+        record["status"] = "candidate_validated_workers_inactive"
+        atomic_json(prepared_release_path(state_root), record)
+        return record
+
+
+def load_prepared_release(state_root: Path, sha: str, slot: str) -> dict:
+    try:
+        record = json.loads(prepared_release_path(state_root).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RuntimeError("prepared_release_missing_or_invalid") from error
+    if record.get("release_sha") != sha or record.get("candidate_slot") != slot:
+        raise RuntimeError("prepared_release_identity_mismatch")
+    if record.get("status") not in {
+        "candidate_validated_workers_inactive", "candidate_workers_active",
+    }:
+        raise RuntimeError("prepared_release_state_invalid")
+    return record
+
+
+def activate_prepared_release(
+    *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
+) -> dict:
+    record = load_prepared_release(state_root, sha, slot)
+    operations.verify_source(sha)
+    operations.validate_candidate(sha, slot)
+    try:
+        operations.activate_workers(sha, slot, record["images"])
+        operations.validate_candidate(sha, slot)
+    except Exception:
+        operations.deactivate_workers({"sha": sha, "slot": slot, "images": record["images"]})
+        raise
+    record["status"] = "candidate_workers_active"
+    record["workers_activated_at"] = utc_now().isoformat()
+    atomic_json(prepared_release_path(state_root), record)
+    return record
+
+
+def adopt_prepared_release(
+    *, sha: str, slot: str, state_root: Path, compatibility: Compatibility,
+    operations: DockerGitOperations,
+) -> dict:
+    record = load_prepared_release(state_root, sha, slot)
+    if record.get("status") != "candidate_workers_active":
+        raise RuntimeError("prepared_release_workers_not_active")
+    state_file = state_root / "state.json"
+    try:
+        existing = json.loads(state_file.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        existing = {}
+    except ValueError as error:
+        raise RuntimeError("release_state_invalid") from error
+    if existing.get("known_good_release") or existing.get("in_progress_release"):
+        raise RuntimeError("immutable_release_state_already_initialized")
+    operations.verify_source(sha)
+    operations.validate_candidate(sha, slot)
+    schema = operations.schema_version()
+    if not compatibility.schema_min <= schema <= compatibility.schema_max:
+        raise RuntimeError("candidate_schema_incompatible")
+    stable_identity = operations._json("http://127.0.0.1:8001/health/version")
+    stable_readiness = operations._json("http://127.0.0.1:8001/health/ready")
+    if stable_identity.get("release_sha") != sha or not stable_readiness.get("ready"):
+        raise RuntimeError("stable_proxy_release_validation_failed")
+    with urllib.request.urlopen("http://127.0.0.1:3000/", timeout=5) as response:
+        if response.status != 200:
+            raise RuntimeError("stable_proxy_frontend_validation_failed")
+    known_good = {
+        "sha": sha,
+        "slot": slot,
+        "images": record["images"],
+        "schema": schema,
+        "schema_compatible_min": compatibility.schema_min,
+        "schema_compatible_max": compatibility.schema_max,
+    }
+    adopted = {
+        "release_sha": sha,
+        "candidate_slot": slot,
+        "traffic_target": slot,
+        "images": record["images"],
+        "schema": {"observed": schema},
+        "status": "known_good",
+        "phase": "bootstrap_adopted",
+        "completed_at": utc_now().isoformat(),
+    }
+    state = {
+        "active_slot": slot,
+        "known_good_release": known_good,
+        "failed_releases": existing.get("failed_releases") or {},
+        "history": [adopted],
+    }
+    atomic_json(state_file, state)
+    prepared_release_path(state_root).unlink()
+    return adopted
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("sha", help="Full candidate Git SHA")
     parser.add_argument("--manual-retry", action="store_true", help="Explicitly clear same-SHA suppression for this run")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--prepare-only", action="store_true", help="Validate an initial inactive candidate without workers or traffic")
+    mode.add_argument("--activate-prepared", action="store_true", help="Activate workers for a previously prepared candidate")
+    mode.add_argument("--adopt-prepared", action="store_true", help="Adopt a promoted initial candidate as immutable known-good")
+    parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
     repo = Path(os.getenv("MADAR_PRODUCTION_REPO", "/home/madar/saas/Madar")).resolve()
     state_root = Path(os.getenv("MADAR_DEPLOY_STATE_ROOT", "/var/lib/madar/releases")).resolve()
     env_file = Path(os.getenv("MADAR_ENV_FILE", str(repo / ".env"))).resolve()
+    load_environment_file(env_file)
     compatibility = Compatibility.load(WEB_ROOT / "deployment/releases/release.json")
     operations = DockerGitOperations(repo, state_root, env_file)
+    if args.prepare_only:
+        result = prepare_release(
+            sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+            compatibility=compatibility, operations=operations,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.activate_prepared:
+        with deployment_lock(state_root):
+            result = activate_prepared_release(
+                sha=args.sha.lower(), slot=args.slot, state_root=state_root, operations=operations,
+            )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.adopt_prepared:
+        with deployment_lock(state_root):
+            result = adopt_prepared_release(
+                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                compatibility=compatibility, operations=operations,
+            )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     deployer = ReleaseDeployer(state_root=state_root, compatibility=compatibility, operations=operations)
     result = deployer.deploy(args.sha.lower(), manual_retry=args.manual_retry)
     print(json.dumps(result, indent=2, sort_keys=True))

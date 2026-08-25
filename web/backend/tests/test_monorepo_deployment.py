@@ -12,6 +12,12 @@ WRAPPER = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy"
 COMPOSE = WEB_ROOT / "docker-compose.yml"
 RELEASE_DEPLOY = WEB_ROOT / "deployment" / "bin" / "madar-release-deploy"
 RELEASE_LIBRARY = WEB_ROOT / "deployment" / "lib" / "release_deployer.py"
+ENVIRONMENT_LIBRARY = WEB_ROOT / "deployment" / "lib" / "environment_file.py"
+SWITCH = WEB_ROOT / "deployment" / "bin" / "madar-switch-traffic"
+PROXY_COMPOSE = WEB_ROOT / "deployment" / "proxy" / "docker-compose.yml"
+PROXY_CONFIG = WEB_ROOT / "deployment" / "proxy" / "nginx.conf"
+AUTO_SERVICE = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.service"
+AUTO_TIMER = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.timer"
 BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
 FRONTEND_DOCKERFILE = WEB_ROOT / "frontend" / "Dockerfile"
 
@@ -23,6 +29,12 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.compose = COMPOSE.read_text(encoding="utf-8")
         self.release_deploy = RELEASE_DEPLOY.read_text(encoding="utf-8")
         self.release_library = RELEASE_LIBRARY.read_text(encoding="utf-8")
+        self.environment_library = ENVIRONMENT_LIBRARY.read_text(encoding="utf-8")
+        self.switch = SWITCH.read_text(encoding="utf-8")
+        self.proxy_compose = PROXY_COMPOSE.read_text(encoding="utf-8")
+        self.proxy_config = PROXY_CONFIG.read_text(encoding="utf-8")
+        self.auto_service = AUTO_SERVICE.read_text(encoding="utf-8")
+        self.auto_timer = AUTO_TIMER.read_text(encoding="utf-8")
         self.backend_dockerfile = BACKEND_DOCKERFILE.read_text(encoding="utf-8")
         self.frontend_dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
 
@@ -30,7 +42,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn('readonly REPO_ROOT="/home/madar/saas/Madar"', self.deploy)
         self.assertIn('git -C "$REPO_ROOT"', self.deploy)
         self.assertIn("status --porcelain --untracked-files=normal", self.deploy)
-        self.assertIn('exec "$RELEASE_DEPLOY" "$TARGET_SHA"', self.deploy)
+        self.assertIn('"$RELEASE_DEPLOY" "$TARGET_SHA"', self.deploy)
+        self.assertIn('merge --ff-only "$TARGET_SHA"', self.deploy)
 
     def test_release_deployer_uses_explicit_compose_and_environment_roots(self):
         self.assertIn('"MADAR_ENV_FILE": str(self.env_file)', self.release_deploy)
@@ -62,6 +75,38 @@ class MonorepoDeploymentTests(unittest.TestCase):
     def test_wrapper_keeps_git_operations_at_repository_root(self):
         self.assertIn('git -C "$REPO_ROOT" fetch', self.wrapper)
         self.assertIn('exec "$DEPLOY_SCRIPT"', self.wrapper)
+
+    def test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state(self):
+        self.assertIn("failed_releases", self.wrapper)
+        self.assertIn("remains suppressed", self.wrapper)
+        self.assertIn("release state is not initialized", self.wrapper)
+        self.assertIn('merge-base --is-ancestor "$KNOWN_GOOD" "$TARGET_SHA"', self.wrapper)
+
+    def test_timer_waits_after_completion_instead_of_retrying_immediately(self):
+        self.assertIn("OnUnitInactiveSec=2min", self.auto_timer)
+        self.assertNotIn("OnUnitActiveSec", self.auto_timer)
+        self.assertNotIn("ExecStartPre", self.auto_service)
+
+    def test_docker_proxy_is_hardened_and_preserves_forwarded_request_context(self):
+        self.assertIn("MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx", self.auto_service)
+        self.assertIn('driver not in {"nginx", "docker-nginx"}', self.switch)
+        self.assertIn("host.docker.internal", self.switch)
+        self.assertIn('cap_drop: ["ALL"]', self.proxy_compose)
+        self.assertIn("read_only: true", self.proxy_compose)
+        self.assertIn("proxy_request_buffering off", self.proxy_config)
+        self.assertIn("X-Forwarded-Proto $madar_forwarded_proto", self.proxy_config)
+        self.assertIn("X-Forwarded-For $proxy_add_x_forwarded_for", self.proxy_config)
+
+    def test_host_deployer_loads_secret_file_without_logging_values(self):
+        self.assertIn("load_environment_file(env_file)", self.release_deploy)
+        self.assertIn("permissions_too_broad", self.environment_library)
+        self.assertNotIn("print(", self.environment_library)
+
+    def test_initial_promotion_requires_prepared_candidate_before_state_adoption(self):
+        self.assertIn("candidate_validated_workers_inactive", self.release_deploy)
+        self.assertIn("prepared_release_workers_not_active", self.release_deploy)
+        self.assertIn("stable_proxy_release_validation_failed", self.release_deploy)
+        self.assertIn("immutable_release_state_already_initialized", self.release_deploy)
 
     def test_images_expose_release_sha_and_build_timestamp_as_oci_labels(self):
         for dockerfile in (self.backend_dockerfile, self.frontend_dockerfile):

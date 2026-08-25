@@ -50,13 +50,14 @@ def main() -> int:
                 os.unlink(temporary)
         print(f"Madar traffic target: {slot}")
         return 0
-    if driver != "nginx":
+    if driver not in {"nginx", "docker-nginx"}:
         raise RuntimeError("unsupported traffic switch driver")
     target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/releases/active-upstreams.conf"))
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    upstream_host = "host.docker.internal" if driver == "docker-nginx" else "127.0.0.1"
     content = (
-        f"upstream madar_backend_active {{ server 127.0.0.1:{backend}; }}\n"
-        f"upstream madar_frontend_active {{ server 127.0.0.1:{frontend}; }}\n"
+        f"upstream madar_backend_active {{ server {upstream_host}:{backend}; }}\n"
+        f"upstream madar_frontend_active {{ server {upstream_host}:{frontend}; }}\n"
     )
     descriptor, temporary = tempfile.mkstemp(prefix=".active-upstreams.", dir=target.parent)
     previous = target.read_bytes() if target.exists() else None
@@ -67,11 +68,29 @@ def main() -> int:
             os.fsync(handle.fileno())
         os.chmod(temporary, 0o644)
         os.replace(temporary, target)
-        subprocess.run(["nginx", "-t"], check=True)
-        subprocess.run(["systemctl", "reload", "nginx"], check=True)
+        if driver == "nginx":
+            subprocess.run(["nginx", "-t"], check=True)
+            subprocess.run(["systemctl", "reload", "nginx"], check=True)
+        elif driver == "docker-nginx":
+            container = os.getenv("MADAR_PROXY_CONTAINER", "madar-release-proxy").strip()
+            running = subprocess.run(
+                ["docker", "inspect", "--format", "{{.State.Running}}", container],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            )
+            if running.returncode != 0 or running.stdout.strip() != "true":
+                if os.getenv("MADAR_TRAFFIC_SWITCH_ALLOW_STOPPED_PROXY", "false").lower() == "true":
+                    print(f"Madar traffic target prepared: {slot}")
+                    return 0
+                raise RuntimeError("release_proxy_not_running")
+            subprocess.run(["docker", "exec", container, "nginx", "-t"], check=True)
+            subprocess.run(["docker", "exec", container, "nginx", "-s", "reload"], check=True)
+        else:
+            raise RuntimeError("unsupported traffic switch driver")
     except Exception:
         if previous is not None:
             target.write_bytes(previous)
+        elif target.exists():
+            target.unlink()
         raise
     finally:
         if os.path.exists(temporary):

@@ -15,4 +15,6 @@ fi
 
 git -C "$REPO_ROOT" fetch origin main
 readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
-exec "$RELEASE_DEPLOY" "$TARGET_SHA" "$@"
+"$RELEASE_DEPLOY" "$TARGET_SHA" "$@"
+git -C "$REPO_ROOT" merge --ff-only "$TARGET_SHA"
+echo "[madar-production] Production checkout advanced after successful promotion: ${TARGET_SHA:0:12}"
