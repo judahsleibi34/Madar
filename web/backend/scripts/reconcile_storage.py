@@ -3,8 +3,11 @@ import argparse
 import fcntl
 import json
 import os
+import sys
 from pathlib import Path
 from datetime import datetime, timezone
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from database import service_supabase
 from services.storage_quota_service import finish_storage

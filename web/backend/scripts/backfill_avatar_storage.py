@@ -11,9 +11,12 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from database import service_supabase
 from services.storage_quota_service import finish_storage, reserve_storage

@@ -53,6 +53,16 @@ SENSITIVE_TABLES = (
     "tenant_site_project_roles",
     "tenant_site_project_role_assignments",
     "features",
+    "tenant_subscriptions",
+    "tenant_addons",
+    "billing_addon_requests",
+    "legacy_billing_migration_reviews",
+    "hosted_address_migration_reviews",
+    "commercial_usage_monthly",
+    "ai_token_model_multipliers",
+    "ai_token_allocations",
+    "ai_token_reservations",
+    "ai_token_ledger",
     "user_security_settings",
     "audit_logs",
     "admin_account_access_requests",
@@ -83,6 +93,12 @@ SENSITIVE_TABLES = (
     "calendar_oauth_states",
     "calendar_task_sync_jobs",
     "calendar_connection_sync_jobs",
+    "public_quiz_attempts",
+    "tenant_entitlement_decisions",
+    "data_deletion_requests",
+    "data_deletion_steps",
+    "data_deletion_subjects",
+    "data_deletion_resources",
 )
 
 SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
@@ -120,6 +136,11 @@ SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
     "enqueue_calendar_connection_sync_job",
     "claim_calendar_connection_sync_jobs",
     "finish_calendar_connection_sync_job",
+    "start_public_quiz_attempt",
+    "finalize_public_quiz_attempt",
+    "apply_tenant_entitlement_mapping_batch",
+    "create_data_deletion_request",
+    "claim_data_deletion_requests",
 )
 
 PROTECTED_FUNCTIONS = (
@@ -169,6 +190,11 @@ PROTECTED_FUNCTIONS = (
     "enqueue_calendar_connection_sync_job",
     "claim_calendar_connection_sync_jobs",
     "finish_calendar_connection_sync_job",
+    "start_public_quiz_attempt",
+    "finalize_public_quiz_attempt",
+    "apply_tenant_entitlement_mapping_batch",
+    "create_data_deletion_request",
+    "claim_data_deletion_requests",
 )
 
 TABLE_CRUD_GRANTS = {"SELECT", "INSERT", "UPDATE", "DELETE"}
