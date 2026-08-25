@@ -21,6 +21,7 @@ AUTO_TIMER = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.timer"
 BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
 FRONTEND_DOCKERFILE = WEB_ROOT / "frontend" / "Dockerfile"
 INSTALLER = WEB_ROOT / "deployment" / "bin" / "madar-install-control-plane"
+LEGACY_ENTRYPOINT = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy-legacy-entrypoint"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
@@ -39,6 +40,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.backend_dockerfile = BACKEND_DOCKERFILE.read_text(encoding="utf-8")
         self.frontend_dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
         self.installer = INSTALLER.read_text(encoding="utf-8")
+        self.legacy_entrypoint = LEGACY_ENTRYPOINT.read_text(encoding="utf-8")
 
     def test_wrapper_delegates_a_clean_full_sha_to_immutable_deployer(self):
         self.assertIn('readonly REPO_ROOT="/home/madar/saas/Madar"', self.deploy)
@@ -141,6 +143,14 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("systemctl daemon-reload", self.installer)
         self.assertNotIn("systemctl start madar-auto-deploy.timer", self.installer)
         self.assertNotIn("systemctl enable", self.installer)
+
+    def test_legacy_entrypoint_delegates_only_to_immutable_controller(self):
+        self.assertIn("madar-production-deploy", self.legacy_entrypoint)
+        self.assertIn("madar-release-deploy", self.legacy_entrypoint)
+        self.assertIn("MADAR_DEPLOY_STATE_ROOT", self.legacy_entrypoint)
+        self.assertIn('exec "$CONTROL_ROOT/bin/madar-auto-deploy"', self.legacy_entrypoint)
+        self.assertNotIn("docker compose", self.legacy_entrypoint)
+        self.assertNotIn("reset --hard", self.legacy_entrypoint)
 
 
 if __name__ == "__main__":

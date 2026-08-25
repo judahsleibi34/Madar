@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Safe compatibility entrypoint for the currently root-owned systemd wrapper.
+# It replaces /home/madar/docker_auto.sh until the tracked system units can be
+# installed by an authenticated root operator.
+set -Eeuo pipefail
+
+readonly CONTROL_ROOT=/home/madar/.local/lib/madar/web/deployment
+export MADAR_PRODUCTION_DEPLOY_BIN="$CONTROL_ROOT/bin/madar-production-deploy"
+export MADAR_RELEASE_DEPLOY_BIN="$CONTROL_ROOT/bin/madar-release-deploy"
+export MADAR_TRAFFIC_SWITCH_COMMAND="$CONTROL_ROOT/bin/madar-switch-traffic"
+export MADAR_DEPLOY_STATE_ROOT=/home/madar/.local/state/madar/releases
+export MADAR_ACTIVE_UPSTREAMS_FILE=/home/madar/.local/state/madar/proxy/active-upstreams.conf
+export MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx
+export MADAR_PROXY_CONTAINER=madar-release-proxy
+export MADAR_ENV_FILE=/home/madar/saas/Madar/.env
+export MADAR_STORAGE_ROOT=/home/madar/saas/Madar/backend
+
+exec "$CONTROL_ROOT/bin/madar-auto-deploy"
