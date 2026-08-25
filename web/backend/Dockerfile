@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY requirements.txt constraints.txt ./
 
-RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt \
+RUN python -m pip install --no-cache-dir pip==26.2.1 \
+    && pip install --no-cache-dir -r requirements.txt -c constraints.txt \
     && python -m pip check
 
 # Release metadata changes for every immutable build. Declare it only after
