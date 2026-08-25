@@ -24,4 +24,12 @@ Lifecycle:
 7. Switch only the local staging proxy. Production ports and routing are never
    modified.
 
+After preparation, deploy a committed candidate with the wrapper so host-side
+gateway, storage, and file-proxy settings cannot drift between drills:
+
+```bash
+web/staging/deploy.sh "$(git rev-parse HEAD)"
+web/staging/deploy.sh "$(git rev-parse HEAD)" --manual-retry
+```
+
 The control database uses tmpfs. Loss on teardown is intentional.
