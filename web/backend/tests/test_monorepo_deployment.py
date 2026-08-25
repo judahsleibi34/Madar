@@ -70,6 +70,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("com.madar.frontend.api_origin", self.release_deploy)
         self.assertIn("candidate_frontend_api_origin_mismatch", self.release_deploy)
         self.assertIn("self._validate_frontend_api_origin(frontend_base", self.release_deploy)
+        self.assertIn('"--no-build", "--force-recreate", "--wait"', self.release_deploy)
         self.assertIn("MADAR_REQUIRE_PRODUCTION_API_URL", self.frontend_dockerfile)
         self.assertIn("MADAR_CANDIDATE_READY_ATTEMPTS", self.release_deploy)
         self.assertIn("candidate_deep_validation_failed:", self.release_deploy)

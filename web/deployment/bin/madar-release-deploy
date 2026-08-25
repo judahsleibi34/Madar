@@ -277,7 +277,11 @@ class DockerGitOperations:
         # Queue consumers must not run in the inactive slot. Parser/remote
         # workers are slot-local and cannot see the active slot's Redis queue.
         self._compose(
-            sha, slot, images, "up", "-d", "--no-build", "--wait",
+            # The inactive slot may have been created by an older Compose
+            # topology. Recreate every candidate service so Docker cannot try
+            # to restart a retained container that still references a removed
+            # legacy project network.
+            sha, slot, images, "up", "-d", "--no-build", "--force-recreate", "--wait",
             "--wait-timeout", "180", "redis", "parser-worker",
             "remote-ingestion-worker", "backend", "frontend",
         )
