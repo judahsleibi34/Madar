@@ -152,6 +152,19 @@ class DockerGitOperations:
             "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
             "DATA_DELETION_WORKER_REQUIRED": "true" if workers_active and self.schema_version() >= 83 else "false",
         })
+        # The inactive candidate deliberately has no queue consumers. Its
+        # backend must validate core dependencies without interpreting the
+        # active release's worker feature flags from the shared env file as a
+        # missing-candidate-worker outage. These flags are restored explicitly
+        # when the candidate workers are activated for cutover.
+        env["NOTIFICATION_WORKER_ENABLED"] = "true" if workers_active else "false"
+        env["DATA_DELETION_WORKER_ENABLED"] = (
+            "true" if workers_active and self.schema_version() >= 83 else "false"
+        )
+        env["CALENDAR_SYNC_WORKER_ENABLED"] = "true" if workers_active else "false"
+        if not workers_active:
+            env["CALENDAR_FEATURE_ENABLED"] = "false"
+            env["CALENDAR_SYNC_REQUIRED"] = "false"
         storage_root = os.getenv("MADAR_STORAGE_ROOT", "").strip()
         if storage_root:
             env["MADAR_STORAGE_ROOT"] = str(Path(storage_root).resolve())

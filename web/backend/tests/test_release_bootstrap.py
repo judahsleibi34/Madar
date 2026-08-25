@@ -112,6 +112,32 @@ class ReleaseBootstrapTests(unittest.TestCase):
         self.assertEqual(state["known_good_release"]["sha"], SHA)
         self.assertFalse((Path(root) / "prepared-release.json").exists())
 
+    def test_inactive_candidate_masks_active_worker_requirements_until_cutover(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations.release_root = Path("/tmp/release")
+        operations.env_file = Path("/tmp/release.env")
+        operations.schema_version = lambda: 83
+        images = {
+            "backend": "backend@sha256:1", "frontend": "frontend@sha256:2",
+            "worker": "backend@sha256:1", "build_timestamp": "2026-08-25T00:00:00Z",
+        }
+        with patch.dict(os.environ, {
+            "NOTIFICATION_WORKER_ENABLED": "true",
+            "DATA_DELETION_WORKER_ENABLED": "true",
+            "CALENDAR_FEATURE_ENABLED": "true",
+            "CALENDAR_SYNC_WORKER_ENABLED": "true",
+        }, clear=True):
+            inactive = operations._environment(SHA, "green", images, workers_active=False)
+            active = operations._environment(SHA, "green", images, workers_active=True)
+        self.assertEqual(inactive["NOTIFICATION_WORKER_ENABLED"], "false")
+        self.assertEqual(inactive["DATA_DELETION_WORKER_ENABLED"], "false")
+        self.assertEqual(inactive["CALENDAR_FEATURE_ENABLED"], "false")
+        self.assertEqual(inactive["CALENDAR_SYNC_WORKER_ENABLED"], "false")
+        self.assertEqual(active["NOTIFICATION_WORKER_ENABLED"], "true")
+        self.assertEqual(active["DATA_DELETION_WORKER_ENABLED"], "true")
+        self.assertEqual(active["CALENDAR_FEATURE_ENABLED"], "true")
+        self.assertEqual(active["CALENDAR_SYNC_WORKER_ENABLED"], "true")
+
 
 if __name__ == "__main__":
     unittest.main()
