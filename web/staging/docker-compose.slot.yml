@@ -11,6 +11,7 @@ services:
       SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_ANON_KEY: ${STAGING_ANON_JWT}
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
       FRONTEND_URLS: http://127.0.0.1:13000
       CSRF_TRUSTED_ORIGINS: http://127.0.0.1:13000
       COOKIE_SECURE: "true"
@@ -33,6 +34,7 @@ services:
     environment:
       SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
       EMAIL_CHANNEL_ENABLED: "false"
       NOTIFICATION_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
 
@@ -42,6 +44,7 @@ services:
     environment:
       SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
       DATA_DELETION_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
 
   calendar-sync-worker:
@@ -49,6 +52,7 @@ services:
     environment:
       SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
       CALENDAR_SYNC_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
 
   frontend:
