@@ -83,6 +83,25 @@ def auth_user(*, verified=True, email="owner@example.com"):
 
 
 class AccountLifecycleServiceTests(unittest.TestCase):
+    def test_deletion_pending_account_cannot_be_reactivated_by_provider_sync(self):
+        user = {
+            "id": 9,
+            "auth_id": "auth-9",
+            "tenant_id": 7,
+            "email": "closed@example.test",
+            "account_status": "deletion_pending",
+            "email_verified": True,
+        }
+        auth_user = SimpleNamespace(
+            id="auth-9",
+            email="closed@example.test",
+            email_confirmed_at="2026-08-25T00:00:00Z",
+        )
+        with self.assertRaises(HTTPException) as raised:
+            account_lifecycle_service.synchronize_verified_account(auth_user, user)
+        self.assertEqual(raised.exception.status_code, 403)
+        self.assertEqual(raised.exception.detail["code"], "account_deletion_pending")
+
     def test_pending_verified_account_is_provisioned_through_transactional_rpc(self):
         local = {
             "id": 3,

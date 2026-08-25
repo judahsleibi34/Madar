@@ -2,21 +2,24 @@
 set -Eeuo pipefail
 
 readonly REPO_ROOT="/home/madar/saas/Madar"
-readonly DEPLOY_SCRIPT="/home/madar/docker_auto.sh"
-readonly LOG_PREFIX="[madar-auto-deploy]"
+readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-/usr/local/lib/madar/madar-production-deploy}"
+readonly STATE_ROOT="${MADAR_DEPLOY_STATE_ROOT:-/var/lib/madar/releases}"
 
-echo "$LOG_PREFIX Checking origin/main"
 git -C "$REPO_ROOT" fetch --quiet origin main
+readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
+readonly KNOWN_GOOD="$(python3 - "$STATE_ROOT/state.json" <<'PY'
+import json,sys
+try:
+    print((json.load(open(sys.argv[1], encoding='utf-8')).get('known_good_release') or {}).get('sha',''))
+except (OSError, ValueError):
+    print('')
+PY
+)"
 
-LOCAL_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-REMOTE_COMMIT="$(git -C "$REPO_ROOT" rev-parse origin/main)"
-
-if [[ "$LOCAL_COMMIT" == "$REMOTE_COMMIT" ]]; then
-    echo "$LOG_PREFIX No update. Current commit: ${LOCAL_COMMIT:0:7}"
+if [[ "$TARGET_SHA" == "$KNOWN_GOOD" ]]; then
+    echo "[madar-auto-deploy] No update. Known-good release: ${TARGET_SHA:0:12}"
     exit 0
 fi
 
-echo "$LOG_PREFIX New main commit detected"
-echo "$LOG_PREFIX Current: $LOCAL_COMMIT"
-echo "$LOG_PREFIX Remote:  $REMOTE_COMMIT"
+# The release deployer owns locking, bad-SHA suppression and bounded retry.
 exec "$DEPLOY_SCRIPT"

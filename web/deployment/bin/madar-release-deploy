@@ -1,0 +1,320 @@
+#!/usr/bin/env python3
+"""Installable CLI for the immutable Madar release state machine.
+
+This tracked copy is development-only until the controlled promotion runbook is
+executed. It never applies or reverses a database migration.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+SCRIPT = Path(__file__).resolve()
+WEB_ROOT = SCRIPT.parents[2]
+sys.path.insert(0, str(WEB_ROOT))
+
+from deployment.lib.release_deployer import Compatibility, ReleaseDeployer  # noqa: E402
+
+
+SLOT_PORTS = {
+    "blue": {"backend": "8101", "frontend": "3100", "redis": "6381"},
+    "green": {"backend": "8201", "frontend": "3200", "redis": "6382"},
+}
+
+
+class DockerGitOperations:
+    def __init__(self, repo: Path, state_root: Path, env_file: Path):
+        self.repo = repo
+        self.state_root = state_root
+        self.env_file = env_file
+        self.release_root: Path | None = None
+
+    def run(self, command: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None, capture: bool = False) -> str:
+        completed = subprocess.run(
+            command, cwd=cwd, env=env, check=True, text=True,
+            stdout=subprocess.PIPE if capture else None,
+        )
+        return completed.stdout.strip() if capture else ""
+
+    def verify_source(self, sha: str) -> None:
+        if self.run(["git", "status", "--porcelain", "--untracked-files=normal"], cwd=self.repo, capture=True):
+            raise RuntimeError("production_worktree_dirty")
+        self.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=self.repo)
+        release_root = self.state_root / "releases" / sha
+        if not release_root.exists():
+            release_root.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self.run(["git", "worktree", "add", "--detach", str(release_root), sha], cwd=self.repo)
+        actual = self.run(["git", "rev-parse", "HEAD"], cwd=release_root, capture=True)
+        if actual != sha:
+            raise RuntimeError("release_worktree_identity_mismatch")
+        self.release_root = release_root
+
+    def _digest(self, tag: str) -> str:
+        image_id = self.run(["docker", "image", "inspect", "--format", "{{.Id}}", tag], capture=True)
+        if not image_id.startswith("sha256:"):
+            raise RuntimeError("docker_image_digest_unavailable")
+        return f"{tag}@{image_id}"
+
+    def _existing_artifact(self, tag: str, sha: str) -> tuple[str, str] | None:
+        try:
+            raw = self.run(
+                ["docker", "image", "inspect", "--format", "{{json .Config.Labels}}", tag],
+                capture=True,
+            )
+            labels = json.loads(raw) if raw else {}
+        except (subprocess.CalledProcessError, ValueError):
+            return None
+        if not isinstance(labels, dict) or labels.get("com.madar.release.sha") != sha:
+            return None
+        built_at = str(labels.get("com.madar.release.built_at") or "").strip()
+        if not built_at:
+            return None
+        return self._digest(tag), built_at
+
+    def build(self, sha: str, slot: str) -> dict[str, str]:
+        if self.release_root is None:
+            raise RuntimeError("release_source_not_prepared")
+        build_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        backend_tag = f"madar-backend:{sha}"
+        frontend_tag = f"madar-frontend:{sha}"
+        existing_backend = self._existing_artifact(backend_tag, sha)
+        existing_frontend = self._existing_artifact(frontend_tag, sha)
+        if existing_backend and existing_frontend:
+            if existing_backend[1] != existing_frontend[1]:
+                raise RuntimeError("release_artifact_timestamp_mismatch")
+            return {
+                "backend": existing_backend[0],
+                "frontend": existing_frontend[0],
+                "worker": existing_backend[0],
+                "build_timestamp": existing_backend[1],
+                "artifact_reused": True,
+            }
+        labels = ["--label", f"com.madar.release.sha={sha}", "--label", f"com.madar.release.built_at={build_timestamp}"]
+        self.run([
+            "docker", "build", *labels, "--build-arg", f"MADAR_RELEASE_SHA={sha}",
+            "--build-arg", f"MADAR_BUILD_TIMESTAMP={build_timestamp}", "-t", backend_tag,
+            str(self.release_root / "web/backend"),
+        ])
+        self.run([
+            "docker", "build", *labels, "--build-arg", f"MADAR_RELEASE_SHA={sha}",
+            "--build-arg", f"MADAR_BUILD_TIMESTAMP={build_timestamp}", "-t", frontend_tag,
+            str(self.release_root / "web/frontend"),
+        ])
+        return {
+            "backend": self._digest(backend_tag),
+            "frontend": self._digest(frontend_tag),
+            "worker": self._digest(backend_tag),
+            "build_timestamp": build_timestamp,
+            "artifact_reused": False,
+        }
+
+    def schema_version(self) -> int:
+        url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/application_schema_state?select=schema_version&contract_key=eq.core&limit=1"
+        key = os.environ["SUPABASE_SERVICE_KEY"]
+        request = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
+        with urllib.request.urlopen(request, timeout=5) as response:
+            rows = json.loads(response.read())
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise RuntimeError("schema_state_missing")
+        return int(rows[0]["schema_version"])
+
+    def _environment(
+        self, sha: str, slot: str, images: dict[str, str], *, workers_active: bool = False,
+    ) -> dict[str, str]:
+        if self.release_root is None:
+            raise RuntimeError("release_source_not_prepared")
+        ports = SLOT_PORTS[slot]
+        env = dict(os.environ)
+        env.update({
+            "MADAR_ENV_FILE": str(self.env_file),
+            "MADAR_SLOT": slot,
+            "MADAR_RELEASE_SHA": sha,
+            "MADAR_BUILD_TIMESTAMP": images["build_timestamp"],
+            "MADAR_BACKEND_IMAGE": images["backend"].split("@", 1)[0],
+            "MADAR_FRONTEND_IMAGE": images["frontend"].split("@", 1)[0],
+            "MADAR_BACKEND_BIND_PORT": ports["backend"],
+            "MADAR_FRONTEND_BIND_PORT": ports["frontend"],
+            "MADAR_REDIS_BIND_PORT": ports["redis"],
+            "SCHEMA_COMPATIBLE_MIN": "81",
+            "SCHEMA_COMPATIBLE_MAX": "83",
+            "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
+            "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
+            "DATA_DELETION_WORKER_REQUIRED": "true" if workers_active and self.schema_version() >= 83 else "false",
+        })
+        storage_root = os.getenv("MADAR_STORAGE_ROOT", "").strip()
+        if storage_root:
+            env["MADAR_STORAGE_ROOT"] = str(Path(storage_root).resolve())
+        return env
+
+    def _compose(
+        self, sha: str, slot: str, images: dict[str, str], *args: str,
+        workers_active: bool = False,
+    ) -> None:
+        if self.release_root is None:
+            raise RuntimeError("release_source_not_prepared")
+        web = self.release_root / "web"
+        files = ["-f", str(web / "docker-compose.yml")]
+        override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
+        if override:
+            files.extend(["-f", str(Path(override).resolve())])
+        profiles = ["--profile", "workers"]
+        if self.schema_version() >= 83:
+            profiles.extend(["--profile", "deletion-worker"])
+        self.run([
+            "docker", "compose", "--project-name", f"madar-{slot}",
+            "--project-directory", str(web), "--env-file", str(self.env_file),
+            *files, *profiles, *args,
+        ], cwd=web, env=self._environment(sha, slot, images, workers_active=workers_active))
+
+    def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None:
+        for component in ("backend", "frontend", "worker"):
+            recorded = str(images[component])
+            tag, separator, expected_id = recorded.partition("@")
+            if separator != "@" or self._digest(tag) != f"{tag}@{expected_id}":
+                raise RuntimeError(f"candidate_image_identity_changed:{component}")
+        self._compose(sha, slot, images, "config", "--quiet")
+        self.run([sys.executable, str(self.release_root / "web/scripts/check_migrations.py")])
+        storage_root = Path(os.getenv("MADAR_STORAGE_ROOT", str(self.repo / "backend")))
+        for relative in ("uploads", "avatar_uploads", "private_uploads", "private_generated_charts"):
+            path = storage_root / relative
+            # The deploy operator may intentionally have read/traverse only;
+            # the runtime UID/GID owns write access. Candidate readiness performs
+            # the authoritative write probe from inside the container.
+            if not path.is_dir() or not os.access(path, os.R_OK | os.X_OK):
+                raise RuntimeError(f"storage_unavailable:{relative}")
+
+    def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None:
+        # Queue consumers must not run in the inactive slot. Parser/remote
+        # workers are slot-local and cannot see the active slot's Redis queue.
+        self._compose(
+            sha, slot, images, "up", "-d", "--no-build", "--wait",
+            "--wait-timeout", "180", "redis", "parser-worker",
+            "remote-ingestion-worker", "backend", "frontend",
+        )
+
+    def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
+        self._compose(
+            sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
+            "--wait", "--wait-timeout", "180", "backend", "notification-worker",
+            "calendar-sync-worker", "data-deletion-worker", workers_active=True,
+        )
+
+    @staticmethod
+    def _worker_names(slot: str) -> list[str]:
+        return [
+            f"madar-{slot}-notification-worker",
+            f"madar-{slot}-calendar-sync-worker",
+            f"madar-{slot}-data-deletion-worker",
+        ]
+
+    def deactivate_workers(self, release: dict) -> None:
+        slot = str(release.get("slot") or "")
+        if slot not in SLOT_PORTS:
+            raise RuntimeError("worker_release_slot_invalid")
+        subprocess.run(
+            ["docker", "stop", *self._worker_names(slot)], check=False,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+
+    def restore_workers(self, release: dict) -> None:
+        slot = str(release.get("slot") or "")
+        if slot not in SLOT_PORTS:
+            raise RuntimeError("worker_release_slot_invalid")
+        self.run(["docker", "start", *self._worker_names(slot)])
+
+    def _json(self, url: str) -> dict:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            return json.loads(response.read())
+
+    def validate_candidate(self, sha: str, slot: str) -> None:
+        ports = SLOT_PORTS[slot]
+        readiness = self._json(f"http://127.0.0.1:{ports['backend']}/health/ready")
+        identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
+        if not readiness.get("ready") or identity.get("release_sha") != sha:
+            raise RuntimeError("candidate_deep_validation_failed")
+        with urllib.request.urlopen(f"http://127.0.0.1:{ports['frontend']}/", timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError("candidate_frontend_unavailable")
+
+    def validate_rollback_target(self, release: dict, schema: int) -> dict[str, int]:
+        slot = str(release.get("slot") or "")
+        expected_sha = str(release.get("sha") or "")
+        if slot not in SLOT_PORTS or len(expected_sha) != 40:
+            raise RuntimeError("known_good_release_identity_invalid")
+        identity = self._json(f"http://127.0.0.1:{SLOT_PORTS[slot]['backend']}/health/version")
+        minimum = int(identity.get("schema_compatible_min", -1))
+        maximum = int(identity.get("schema_compatible_max", -1))
+        if identity.get("release_sha") != expected_sha:
+            raise RuntimeError("known_good_release_identity_mismatch")
+        if not minimum <= schema <= maximum:
+            raise RuntimeError("known_good_rollback_schema_incompatible")
+        return {"compatible_min": minimum, "compatible_max": maximum}
+
+    def switch_traffic(self, slot: str) -> None:
+        command = os.getenv("MADAR_TRAFFIC_SWITCH_COMMAND", "").strip()
+        if not command:
+            raise RuntimeError("traffic_switch_command_not_configured")
+        attempts = max(1, min(int(os.getenv("MADAR_TRAFFIC_SWITCH_ATTEMPTS", "12")), 60))
+        delay = max(1, min(int(os.getenv("MADAR_TRAFFIC_SWITCH_RETRY_SECONDS", "5")), 30))
+        last_error: subprocess.CalledProcessError | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                self.run([command, slot])
+                return
+            except subprocess.CalledProcessError as error:
+                last_error = error
+                if attempt < attempts:
+                    time.sleep(delay)
+        raise RuntimeError(f"traffic_switch_failed_after_{attempts}_attempts") from last_error
+
+    def observe(self, sha: str, slot: str) -> None:
+        deadline = time.monotonic() + max(10, int(os.getenv("MADAR_RELEASE_OBSERVE_SECONDS", "60")))
+        while time.monotonic() < deadline:
+            self.validate_candidate(sha, slot)
+            time.sleep(5)
+
+    def stop_candidate(self, slot: str) -> None:
+        if self.release_root is None:
+            return
+        # Only the isolated inactive Compose project is removed. Images and the
+        # retained active target are deliberately untouched.
+        files = ["-f", str(self.release_root / "web/docker-compose.yml")]
+        override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
+        if override:
+            files.extend(["-f", str(Path(override).resolve())])
+        environment = dict(os.environ)
+        environment["MADAR_SLOT"] = slot
+        subprocess.run([
+            "docker", "compose", "--project-name", f"madar-{slot}",
+            "--project-directory", str(self.release_root / "web"),
+            "--env-file", str(self.env_file), *files,
+            "--profile", "workers", "--profile", "deletion-worker", "down", "--remove-orphans",
+        ], check=False, env=environment)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("sha", help="Full candidate Git SHA")
+    parser.add_argument("--manual-retry", action="store_true", help="Explicitly clear same-SHA suppression for this run")
+    args = parser.parse_args()
+    repo = Path(os.getenv("MADAR_PRODUCTION_REPO", "/home/madar/saas/Madar")).resolve()
+    state_root = Path(os.getenv("MADAR_DEPLOY_STATE_ROOT", "/var/lib/madar/releases")).resolve()
+    env_file = Path(os.getenv("MADAR_ENV_FILE", str(repo / ".env"))).resolve()
+    compatibility = Compatibility.load(WEB_ROOT / "deployment/releases/release.json")
+    operations = DockerGitOperations(repo, state_root, env_file)
+    deployer = ReleaseDeployer(state_root=state_root, compatibility=compatibility, operations=operations)
+    result = deployer.deploy(args.sha.lower(), manual_retry=args.manual_retry)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

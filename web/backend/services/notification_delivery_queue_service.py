@@ -145,3 +145,37 @@ def get_delivery_metrics(*, client=None) -> dict[str, int]:
         f"deliveries_{status}": sum(row.get("status") == status for row in rows)
         for status in ("pending", "processing", "sent", "dead")
     }
+
+
+def get_delivery_channel_metrics(*, client=None) -> dict[str, Any]:
+    rows = _rows(
+        (client or service_supabase).table("notification_deliveries")
+        .select("channel,status,created_at,sent_at,last_error_code")
+        .in_("status", ["pending", "processing", "sent", "dead"])
+        .limit(5000)
+        .execute()
+    )
+    now = _now()
+    result: dict[str, Any] = {}
+    for channel in ("internal", "email", "web_push"):
+        selected = [row for row in rows if row.get("channel") == channel]
+        pending = [row for row in selected if row.get("status") in {"pending", "processing"}]
+        dates = []
+        for row in pending:
+            try:
+                value = datetime.fromisoformat(str(row.get("created_at") or "").replace("Z", "+00:00"))
+                dates.append(value if value.tzinfo else value.replace(tzinfo=timezone.utc))
+            except ValueError:
+                continue
+        sent_dates = sorted(str(row.get("sent_at")) for row in selected if row.get("sent_at"))
+        errors = [str(row.get("last_error_code")) for row in selected if row.get("last_error_code")]
+        result[channel] = {
+            "pending": sum(row.get("status") == "pending" for row in selected),
+            "processing": sum(row.get("status") == "processing" for row in selected),
+            "sent": sum(row.get("status") == "sent" for row in selected),
+            "dead": sum(row.get("status") == "dead" for row in selected),
+            "oldest_queued_age_seconds": max(0, int((now - min(dates)).total_seconds())) if dates else 0,
+            "last_success_at": sent_dates[-1] if sent_dates else None,
+            "last_error_code": errors[-1] if errors else None,
+        }
+    return result

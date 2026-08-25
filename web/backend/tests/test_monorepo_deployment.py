@@ -10,6 +10,10 @@ WEB_ROOT = Path(
 DEPLOY = WEB_ROOT / "deployment" / "bin" / "madar-production-deploy"
 WRAPPER = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy"
 COMPOSE = WEB_ROOT / "docker-compose.yml"
+RELEASE_DEPLOY = WEB_ROOT / "deployment" / "bin" / "madar-release-deploy"
+RELEASE_LIBRARY = WEB_ROOT / "deployment" / "lib" / "release_deployer.py"
+BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
+FRONTEND_DOCKERFILE = WEB_ROOT / "frontend" / "Dockerfile"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
@@ -17,28 +21,34 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.deploy = DEPLOY.read_text(encoding="utf-8")
         self.wrapper = WRAPPER.read_text(encoding="utf-8")
         self.compose = COMPOSE.read_text(encoding="utf-8")
+        self.release_deploy = RELEASE_DEPLOY.read_text(encoding="utf-8")
+        self.release_library = RELEASE_LIBRARY.read_text(encoding="utf-8")
+        self.backend_dockerfile = BACKEND_DOCKERFILE.read_text(encoding="utf-8")
+        self.frontend_dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
 
-    def test_git_and_compose_roots_are_distinct_and_explicit(self):
+    def test_wrapper_delegates_a_clean_full_sha_to_immutable_deployer(self):
         self.assertIn('readonly REPO_ROOT="/home/madar/saas/Madar"', self.deploy)
-        self.assertIn('COMPOSE_ROOT="$REPO_ROOT/web"', self.deploy)
-        self.assertIn('--project-directory "$COMPOSE_ROOT"', self.deploy)
-        self.assertIn('-f "$COMPOSE_FILE"', self.deploy)
-        self.assertIn('--project-name "$COMPOSE_PROJECT"', self.deploy)
         self.assertIn('git -C "$REPO_ROOT"', self.deploy)
+        self.assertIn("status --porcelain --untracked-files=normal", self.deploy)
+        self.assertIn('exec "$RELEASE_DEPLOY" "$TARGET_SHA"', self.deploy)
 
-    def test_env_file_is_absolute_and_shared_with_service_env_files(self):
-        self.assertIn('readonly ENV_FILE="${MADAR_ENV_FILE:-$REPO_ROOT/.env}"', self.deploy)
-        self.assertIn('export MADAR_ENV_FILE="$ENV_FILE"', self.deploy)
-        self.assertIn('export MADAR_STORAGE_ROOT="$STORAGE_ROOT"', self.deploy)
-        self.assertIn('--env-file "$ENV_FILE"', self.deploy)
-        self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-../.env}"), 3)
+    def test_release_deployer_uses_explicit_compose_and_environment_roots(self):
+        self.assertIn('"MADAR_ENV_FILE": str(self.env_file)', self.release_deploy)
+        self.assertIn('"docker", "compose", "--project-name", f"madar-{slot}"', self.release_deploy)
+        self.assertIn('"--project-directory", str(web)', self.release_deploy)
+        self.assertIn('"--env-file", str(self.env_file)', self.release_deploy)
+        self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-../.env}"), 4)
+        self.assertIn("candidate_image_identity_changed", self.release_deploy)
+        self.assertIn("self._digest(tag)", self.release_deploy)
 
-    def test_legacy_layout_remains_available_for_rollback(self):
-        self.assertIn('elif [[ -f "$REPO_ROOT/docker-compose.yml" ]]', self.deploy)
-        self.assertIn('git -C "$REPO_ROOT" reset --hard "$previous_commit"', self.deploy)
-        self.assertIn('compose up -d --remove-orphans --wait --wait-timeout 120', self.deploy)
-        self.assertIn('/health/ready', self.deploy)
-        self.assertIn('merge-base --is-ancestor', self.deploy)
+    def test_rollback_switches_to_retained_target_without_rebuild_or_git_reset(self):
+        combined = self.deploy + self.release_deploy + self.release_library
+        self.assertNotIn("reset --hard", combined)
+        self.assertIn("traffic_switch_to_retained_known_good", self.release_library)
+        self.assertIn("previous_traffic_target", self.release_library)
+        self.assertIn("@sha256:", self.release_library)
+        self.assertIn("known_bad_release_suppressed", self.release_library)
+        self.assertIn("/health/ready", self.release_deploy)
 
     def test_persistent_bind_mounts_keep_their_pre_move_host_paths(self):
         for path in (
@@ -52,6 +62,11 @@ class MonorepoDeploymentTests(unittest.TestCase):
     def test_wrapper_keeps_git_operations_at_repository_root(self):
         self.assertIn('git -C "$REPO_ROOT" fetch', self.wrapper)
         self.assertIn('exec "$DEPLOY_SCRIPT"', self.wrapper)
+
+    def test_images_expose_release_sha_and_build_timestamp_as_oci_labels(self):
+        for dockerfile in (self.backend_dockerfile, self.frontend_dockerfile):
+            self.assertIn("org.opencontainers.image.revision=$MADAR_RELEASE_SHA", dockerfile)
+            self.assertIn("org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP", dockerfile)
 
 
 if __name__ == "__main__":

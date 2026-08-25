@@ -379,7 +379,7 @@ def password_reset(payload: PasswordReset, request: Request):
         local_user = get_local_user_by_auth_id(str(user.user.id))
         if not local_user:
             raise api_error(401, "password_reset_invalid", "Password reset link is invalid.")
-        if effective_account_status(local_user) in {"disabled", "expired_pending"}:
+        if effective_account_status(local_user) in {"disabled", "expired_pending", "deletion_pending"}:
             raise api_error(403, "account_unavailable", "This account is not available.")
 
         claimed_request_id = None

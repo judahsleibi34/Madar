@@ -22,6 +22,7 @@ PENDING_ACCOUNT_STATUS = "pending_verification"
 ACTIVE_ACCOUNT_STATUS = "active"
 DISABLED_ACCOUNT_STATUS = "disabled"
 EXPIRED_PENDING_ACCOUNT_STATUS = "expired_pending"
+DELETION_PENDING_ACCOUNT_STATUS = "deletion_pending"
 PLATFORM_ACCOUNT_KIND = "platform"
 SITE_VISITOR_ACCOUNT_KIND = "site_visitor"
 
@@ -101,6 +102,12 @@ def synchronize_verified_account(auth_user, user_data: dict) -> tuple[dict, bool
     status = effective_account_status(user_data)
     if status == DISABLED_ACCOUNT_STATUS:
         raise api_error(403, "account_disabled", "This account is disabled.")
+    if status == DELETION_PENDING_ACCOUNT_STATUS:
+        raise api_error(
+            403,
+            "account_deletion_pending",
+            "This account is closed while deletion is being completed.",
+        )
     if status == EXPIRED_PENDING_ACCOUNT_STATUS:
         raise api_error(
             410,

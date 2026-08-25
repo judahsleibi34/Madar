@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from services.asset_registry_service import cleanup_expired_builder_assets
 from services.upload_config import get_public_uploads_dir
 

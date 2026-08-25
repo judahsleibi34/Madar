@@ -96,3 +96,17 @@ class EntitlementTestState:
             side_effect=self.lookup,
         ):
             yield self
+
+
+def installed_business_fixture(*tenant_ids, extra_capabilities=()):
+    """Build an explicit canonical plan fixture for legacy route tests.
+
+    Tests opt in here instead of relying on an application-side fallback, so
+    unconfigured tenants continue to fail closed in every environment.
+    """
+    state = EntitlementTestState()
+    for tenant_id in tenant_ids:
+        state.activate_plan(tenant_id, "business_plus")
+        for capability in extra_capabilities:
+            state.allow_capability(tenant_id, capability)
+    return state.installed()

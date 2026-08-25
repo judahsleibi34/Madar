@@ -94,8 +94,13 @@ def parse_dataset(payload: dict[str, Any]) -> dict[str, Any]:
     return bounded
 
 
-def _parse_child(payload: dict[str, Any], result_path: str, parse_target) -> None:
+def _parse_child(payload: dict[str, Any], result_path: str, parse_target, ready_pipe) -> None:
     try:
+        # Process/interpreter startup is bounded separately by the parent. The
+        # job timeout starts only after the isolated child is actually ready to
+        # execute untrusted parser work.
+        ready_pipe.send_bytes(b"ready")
+        ready_pipe.close()
         result = parse_target(payload)
         envelope = {"ok": True, "result": result}
     except Exception as error:
@@ -118,6 +123,7 @@ def parse_dataset_with_timeout(
     bounded_timeout = max(1.0, min(configured_timeout, 295.0))
     result_path = ""
     process = None
+    parent_ready = None
     try:
         with tempfile.NamedTemporaryFile(
             prefix="madar-parser-result-", suffix=".json", delete=False
@@ -126,12 +132,25 @@ def parse_dataset_with_timeout(
         # The HTTP server is multi-threaded, so use spawn rather than forking a
         # live interpreter with library locks held by another request thread.
         context = multiprocessing.get_context("spawn")
+        parent_ready, child_ready = context.Pipe(duplex=False)
         process = context.Process(
             target=_parse_child,
-            args=(payload, result_path, target),
+            args=(payload, result_path, target, child_ready),
             daemon=True,
         )
         process.start()
+        child_ready.close()
+        startup_timeout = max(
+            1.0,
+            min(float(os.getenv("PARSER_CHILD_STARTUP_TIMEOUT_SECONDS", "10")), 30.0),
+        )
+        if not parent_ready.poll(startup_timeout):
+            process.terminate()
+            process.join(2)
+            raise TimeoutError("parser_child_start_timeout")
+        parent_ready.recv_bytes()
+        parent_ready.close()
+        parent_ready = None
         process.join(bounded_timeout)
         if process.is_alive():
             process.terminate()
@@ -156,6 +175,8 @@ def parse_dataset_with_timeout(
         if process is not None and process.is_alive():
             process.kill()
             process.join(2)
+        if parent_ready is not None:
+            parent_ready.close()
         if result_path:
             Path(result_path).unlink(missing_ok=True)
 

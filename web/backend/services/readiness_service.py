@@ -18,6 +18,7 @@ from services.upload_config import (
 )
 from services.storage_quota_service import DEFAULT_DISK_FREE_FLOOR_BYTES
 from services.notification_outbox_service import get_queue_metrics
+from services.notification_delivery_queue_service import get_delivery_channel_metrics
 from services.calendar_task_sync_queue_service import get_task_sync_queue_metrics
 from services.calendar_connection_sync_queue_service import (
     get_connection_sync_queue_metrics,
@@ -31,7 +32,8 @@ except ImportError:  # pragma: no cover - installed in the runtime image
 
 READINESS_TIMEOUT_SECONDS = float(os.getenv("READINESS_TIMEOUT_SECONDS", "2"))
 READINESS_CACHE_SECONDS = float(os.getenv("READINESS_CACHE_SECONDS", "5"))
-EXPECTED_SCHEMA_VERSION = 81
+DEFAULT_SCHEMA_COMPATIBLE_MIN = 81
+DEFAULT_SCHEMA_COMPATIBLE_MAX = 83
 
 _cache_lock = Lock()
 _cached_at = 0.0
@@ -56,7 +58,7 @@ def _app_env() -> str:
 
 def check_environment() -> str:
     value = os.getenv("APP_ENV", "").strip().lower()
-    return "ok" if value in {"development", "test", "prod", "production"} else "misconfigured"
+    return "ok" if value in {"development", "test", "staging", "prod", "production"} else "misconfigured"
 
 
 def _supabase_headers() -> dict[str, str]:
@@ -126,11 +128,12 @@ def check_schema() -> str:
             or not isinstance(rows[0], dict)
         ):
             return "missing"
-        return (
-            "ok"
-            if rows[0].get("schema_version") == EXPECTED_SCHEMA_VERSION
-            else "missing"
-        )
+        version = int(rows[0].get("schema_version") or 0)
+        minimum = int(os.getenv("SCHEMA_COMPATIBLE_MIN", str(DEFAULT_SCHEMA_COMPATIBLE_MIN)))
+        maximum = int(os.getenv("SCHEMA_COMPATIBLE_MAX", str(DEFAULT_SCHEMA_COMPATIBLE_MAX)))
+        if minimum <= 0 or maximum < minimum:
+            return "misconfigured"
+        return "ok" if minimum <= version <= maximum else "incompatible"
     except (requests.RequestException, TypeError, ValueError):
         return "unavailable"
 
@@ -205,6 +208,21 @@ def check_notification_worker() -> str:
         return "unavailable"
 
 
+def check_data_deletion_worker() -> str:
+    if not _env_bool("DATA_DELETION_WORKER_REQUIRED", False):
+        return "disabled"
+    if not _env_bool("DATA_DELETION_WORKER_ENABLED", False):
+        return "misconfigured"
+    url = os.getenv("DATA_DELETION_WORKER_HEALTH_URL", "").strip()
+    if not url:
+        return "misconfigured"
+    try:
+        response = requests.get(url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False)
+        return "ok" if response.status_code == 200 else "unavailable"
+    except requests.RequestException:
+        return "unavailable"
+
+
 def check_notification_queue() -> str:
     if not _env_bool("NOTIFICATION_WORKER_REQUIRED", False):
         return "disabled"
@@ -224,6 +242,27 @@ def check_notification_queue() -> str:
         return "ok"
     except Exception:
         return "unavailable"
+
+
+def check_notification_email() -> str:
+    if not _env_bool("EMAIL_CHANNEL_ENABLED", False):
+        return "disabled"
+    required = ("SMTP_HOST", "SMTP_FROM_EMAIL")
+    if not all(os.getenv(name, "").strip() for name in required):
+        return "unavailable"
+    try:
+        metrics = get_delivery_channel_metrics().get("email", {})
+        maximum_dead = int(os.getenv("NOTIFICATION_EMAIL_MAX_DEAD", "0"))
+        return "degraded" if int(metrics.get("dead") or 0) > maximum_dead else "configured"
+    except Exception:
+        return "unavailable"
+
+
+def check_notification_push() -> str:
+    enabled = _env_bool("WEB_PUSH_ENABLED", False)
+    if not enabled:
+        return "disabled"
+    return "configured" if os.getenv("VAPID_PRIVATE_KEY", "").strip() else "unavailable"
 
 
 def check_backup_freshness() -> str:
@@ -371,7 +410,9 @@ def _is_required_state_ready(component: str, state: str) -> bool:
         return True
     if component == "admin_mfa_policy" and state == "not_required":
         return True
-    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "backup_freshness", "calendar_configuration", "calendar_sync_worker", "calendar_sync_queue"} and state == "disabled":
+    if component in {"ai_execution_guard", "remote_ingestion_guard", "notification_worker", "notification_queue", "notification_email", "notification_push", "backup_freshness", "calendar_configuration", "calendar_sync_worker", "calendar_sync_queue", "data_deletion_worker"} and state == "disabled":
+        return True
+    if component in {"notification_email", "notification_push"} and state == "configured":
         return True
     if component == "parser_isolation" and state == "development":
         return True
@@ -394,7 +435,10 @@ def compute_readiness() -> dict:
         "calendar_sync_queue": check_calendar_sync_queue,
         "parser_isolation": check_parser_isolation,
         "notification_worker": check_notification_worker,
+        "data_deletion_worker": check_data_deletion_worker,
         "notification_queue": check_notification_queue,
+        "notification_email": check_notification_email,
+        "notification_push": check_notification_push,
         "backup_freshness": check_backup_freshness,
     }
     def safe_check(check) -> str:

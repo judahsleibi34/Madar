@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from database import service_supabase, supabase
 from services.auth_service import (
@@ -46,12 +46,21 @@ from services.entitlement_service import (
     require_branded_subdomain,
     require_public_runtime_entitlement,
 )
+from services.tenant_lifecycle_service import tenant_is_active
 from services.hosted_address_service import (
     HOSTED_ADDRESS_PATTERN,
     normalize_hosted_address,
 )
 from services.notification_action_service import build_notification_action
 from services.calendar_workspace_cache_service import invalidate_calendar_workspace_cache
+from services.public_quiz_service import (
+    build_attempt_payload,
+    grade as grade_public_quiz,
+    is_quiz as is_public_quiz,
+    public_form as serialize_public_form,
+    redact_public_value,
+    validate_submission_order,
+)
 
 router = APIRouter(prefix="/public", tags=["Public Sites"])
 logger = logging.getLogger(__name__)
@@ -88,6 +97,26 @@ class PublicFormSubmissionCreate(BaseModel):
     def validate_answers(cls, value):
         if value is None:
             return {}
+        if not isinstance(value, dict):
+            raise ValueError("answers must be a JSON object")
+        return value
+
+
+class PublicQuizAttemptCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    honeypot: Optional[str] = Field(default=None, max_length=200)
+    submission_elapsed_ms: Optional[int] = Field(default=None, ge=0, le=86_400_000)
+
+
+class PublicQuizFinalizeCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answers: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("answers")
+    @classmethod
+    def validate_answers(cls, value):
         if not isinstance(value, dict):
             raise ValueError("answers must be a JSON object")
         return value
@@ -524,7 +553,11 @@ def build_authorized_public_schema(
     *,
     authorized_page_ids: set[str] | None = None,
 ) -> dict:
-    source = copy.deepcopy(schema if isinstance(schema, dict) else {})
+    # Redact the entire publication before selecting visible resources.  Forms
+    # are the expected location for grading material, but treating arbitrary
+    # publication JSON as public prevents a future/custom component from
+    # accidentally carrying an answer key in a page or settings object.
+    source = redact_public_value(schema if isinstance(schema, dict) else {})
     pages = [page for page in source.get("pages", []) if isinstance(page, dict)]
     auth_destination_ids = collect_auth_destination_page_ids(pages)
     allowed_ids = authorized_page_ids or set()
@@ -557,8 +590,7 @@ def build_authorized_public_schema(
         for form in source.get("forms", [])
         if isinstance(form, dict) and str(form.get("id") or "") in referenced_form_ids
     ]
-    for form in source["forms"]:
-        form.pop("responses", None)
+    source["forms"] = [serialize_public_form(form) for form in source["forms"]]
 
     for key in PUBLIC_RUNTIME_PRIVATE_KEYS:
         source.pop(key, None)
@@ -691,10 +723,7 @@ def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> 
 
 
 def build_public_form(form: dict) -> dict:
-    public_form = dict(form)
-    public_form.pop("responses", None)
-    public_form.pop("submissions", None)
-    return public_form
+    return serialize_public_form(form)
 
 
 def iter_section_elements(section: dict):
@@ -1392,6 +1421,9 @@ def resolve_website_settings(site_identifier: str, *, request: Request):
         missing_detail="Published site not found",
         ambiguous_code="publication_hostname_ambiguous",
     )
+    tenant_id = settings.get("tenant_id")
+    if tenant_id is None or not tenant_is_active(tenant_id):
+        raise HTTPException(status_code=404, detail="Published site not found")
     if branded:
         require_branded_subdomain(settings, allow_legacy_routing=True)
     return settings
@@ -2171,15 +2203,17 @@ def get_public_site_bootstrap(subdomain: str, request: Request):
     enforce_public_rate_limit(request, "site_bootstrap_lookup", clean_subdomain)
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "website_publish")
-    if not str(settings.get("published_project_id") or "").strip():
-        raise HTTPException(status_code=404, detail="Published site not found")
+    project = get_bound_published_project(settings)
+    profile = build_public_site_profile(settings, clean_subdomain, project)
     return {
         "success": True,
-        "site": {
-            "subdomain": clean_subdomain,
-            "brand": str(settings.get("brand") or "").strip(),
-            "logo_url": str(settings.get("logo_url") or "").strip(),
-        },
+        "site": profile,
+        "publication": build_publication_metadata(
+            project,
+            build_authorized_public_schema(project.get("published_schema") or {}),
+            settings=settings,
+            site_identifier=clean_subdomain,
+        ),
     }
 
 
@@ -2329,6 +2363,204 @@ def get_public_form(subdomain: str, form_id: str, request: Request, response: Re
     }
 
 
+def _quiz_subject_hash(request: Request, subdomain: str, form_id: str) -> str:
+    return hash_public_identifier(
+        ":".join((
+            "quiz-subject-v1",
+            subdomain,
+            form_id,
+            get_client_ip(request),
+            str(request.headers.get("user-agent") or "")[:300],
+        ))
+    )
+
+
+def _rpc_object(response: Any) -> dict[str, Any]:
+    data = getattr(response, "data", None)
+    if isinstance(data, list):
+        data = data[0] if data else None
+    if not isinstance(data, dict):
+        raise api_error(503, "dependency_unavailable", "The quiz service is unavailable.")
+    return data
+
+
+@router.post("/sites/{subdomain}/forms/{form_id}/attempts")
+def start_public_quiz_attempt(
+    subdomain: str,
+    form_id: str,
+    payload: PublicQuizAttemptCreate,
+    request: Request,
+    response: Response,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_form_id = str(form_id or "").strip()
+    enforce_public_form_submission_rate_limit(request, "quiz_start", f"{clean_subdomain}:{clean_form_id}")
+    reject_suspicious_public_submission(
+        honeypot=payload.honeypot,
+        submission_elapsed_ms=payload.submission_elapsed_ms,
+        route_name="quiz_start",
+    )
+    settings = resolve_website_settings(clean_subdomain, request=request)
+    require_public_runtime_entitlement(settings, "public_form_links")
+    tenant_id = resolve_tenant_id(settings)
+    project, form, _ = get_bound_published_form(settings, clean_form_id)
+    if not is_public_quiz(form):
+        raise api_error(409, "quiz_mode_required", "This published form is not a quiz.")
+    authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="submit_protected_form",
+        resource_type="form",
+        resource_id=clean_form_id,
+    )
+    attempt = build_attempt_payload(
+        tenant_id=tenant_id,
+        project=project,
+        form=form,
+        subject_hash=_quiz_subject_hash(request, clean_subdomain, clean_form_id),
+    )
+    quiz_settings = form.get("quiz") if isinstance(form.get("quiz"), dict) else {}
+    max_attempts = 1
+    if quiz_settings.get("allowRetakes"):
+        max_retakes = max(0, min(int(quiz_settings.get("maxRetakes") or 0), 99))
+        max_attempts = 100 if max_retakes == 0 else 1 + max_retakes
+    try:
+        created = _rpc_object(service_supabase.rpc(
+            "start_public_quiz_attempt",
+            {"p_attempt": attempt, "p_max_attempts": max_attempts},
+        ).execute())
+    except HTTPException:
+        raise
+    except Exception as error:
+        raw = str(error).lower()
+        if "quiz_attempt_limit_reached" in raw:
+            raise api_error(409, "quiz_attempt_limit_reached", "No quiz attempts remain.") from error
+        logger.warning("public.quiz_start_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
+        raise api_error(503, "dependency_unavailable", "The quiz could not be started.") from error
+    return {
+        "success": True,
+        "attempt": {
+            "id": created.get("id"),
+            "state": created.get("state"),
+            "started_at": created.get("started_at"),
+            "deadline_at": created.get("deadline_at"),
+            "publication_version": created.get("publication_version"),
+            "question_order": created.get("question_order") or [],
+            "form": build_public_form(form),
+        },
+    }
+
+
+@router.post("/sites/{subdomain}/forms/{form_id}/attempts/{attempt_id}/finalize")
+def finalize_public_quiz_attempt(
+    subdomain: str,
+    form_id: str,
+    attempt_id: str,
+    payload: PublicQuizFinalizeCreate,
+    request: Request,
+    response: Response,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_form_id = str(form_id or "").strip()
+    clean_attempt_id = str(attempt_id or "").strip()
+    enforce_public_form_submission_rate_limit(request, "quiz_finalize", f"{clean_subdomain}:{clean_form_id}")
+    validate_public_answer_payload_limits(payload.answers)
+    settings = resolve_website_settings(clean_subdomain, request=request)
+    require_public_runtime_entitlement(settings, "public_form_links")
+    tenant_id = resolve_tenant_id(settings)
+    project, form, _ = get_bound_published_form(settings, clean_form_id)
+    if not is_public_quiz(form):
+        raise api_error(409, "quiz_mode_required", "This published form is not a quiz.")
+    authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="submit_protected_form",
+        resource_type="form",
+        resource_id=clean_form_id,
+    )
+    try:
+        rows = getattr(
+            service_supabase.table("public_quiz_attempts")
+            .select("*")
+            .eq("id", clean_attempt_id)
+            .eq("tenant_id", tenant_id)
+            .eq("project_id", project.get("id"))
+            .eq("form_id", clean_form_id)
+            .limit(2)
+            .execute(),
+            "data",
+            None,
+        ) or []
+    except Exception as error:
+        raise api_error(503, "dependency_unavailable", "The quiz could not be finalized.") from error
+    if len(rows) != 1:
+        raise HTTPException(status_code=404, detail="Quiz attempt not found")
+    attempt = rows[0]
+    if not hmac.compare_digest(
+        str(attempt.get("subject_hash") or ""),
+        _quiz_subject_hash(request, clean_subdomain, clean_form_id),
+    ):
+        raise HTTPException(status_code=404, detail="Quiz attempt not found")
+    validate_submission_order(attempt, payload.answers)
+    private_form = attempt.get("private_form_snapshot")
+    if not isinstance(private_form, dict):
+        raise api_error(409, "quiz_attempt_invalid", "The quiz attempt cannot be graded.")
+    cleaned_answers = validate_form_answers(private_form, payload.answers)
+    result = grade_public_quiz(private_form, cleaned_answers)
+    submission = {
+        "tenant_id": tenant_id,
+        "project_id": project.get("id"),
+        "form_id": clean_form_id,
+        "form_title": private_form.get("title"),
+        "form_version": attempt.get("publication_version"),
+        "status": "new",
+        "answers": cleaned_answers,
+        "quiz_result": result,
+        "field_snapshot": copy.deepcopy(get_form_fields(private_form)),
+        "submitter_ip": get_client_ip(request),
+        "user_agent": str(request.headers.get("user-agent") or "")[:1000],
+    }
+    try:
+        finalized = _rpc_object(service_supabase.rpc(
+            "finalize_public_quiz_attempt",
+            {
+                "p_attempt_id": clean_attempt_id,
+                "p_tenant_id": tenant_id,
+                "p_project_id": project.get("id"),
+                "p_form_id": clean_form_id,
+                "p_publication_version": int(attempt.get("publication_version") or 0),
+                "p_answers": cleaned_answers,
+                "p_result": result,
+                "p_submission": submission,
+                "p_request_hash": canonical_request_hash({
+                    "attempt_id": clean_attempt_id,
+                    "answers": cleaned_answers,
+                }),
+            },
+        ).execute())
+    except HTTPException:
+        raise
+    except Exception as error:
+        raw = str(error).lower()
+        code = "quiz_attempt_expired" if "quiz_attempt_expired" in raw else "quiz_attempt_conflict"
+        status = 410 if code == "quiz_attempt_expired" else 409
+        raise api_error(status, code, "The quiz attempt can no longer be finalized.") from error
+    if finalized.get("error") == "quiz_attempt_expired":
+        raise api_error(410, "quiz_attempt_expired", "The quiz attempt can no longer be finalized.")
+    final_result = finalized.get("result") or result
+    show_results = bool((private_form.get("quiz") or {}).get("showResults", True))
+    return {
+        "success": True,
+        "duplicate": bool(finalized.get("duplicate")),
+        "attempt": {"id": clean_attempt_id, "state": "completed"},
+        "result": final_result if show_results else None,
+    }
+
+
 @router.post("/sites/{subdomain}/forms/{form_id}/submissions")
 def submit_public_builder_form(
     subdomain: str,
@@ -2359,6 +2591,12 @@ def submit_public_builder_form(
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_bound_published_form(settings, clean_form_id)
+    if is_public_quiz(form):
+        raise api_error(
+            409,
+            "quiz_attempt_required",
+            "Start and finalize a server-authoritative quiz attempt.",
+        )
     identity = authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,

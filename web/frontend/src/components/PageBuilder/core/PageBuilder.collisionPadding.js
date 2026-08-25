@@ -97,11 +97,24 @@ export const resolveMobileReadingOrder = (
   const paddingRatio = Math.max(0, finite(gapRatio, RESPONSIVE_ELEMENT_GAP_RATIO));
   let nextY = Math.min(...readingOrder.map((node) => node.position.y));
   const repairedYById = new Map();
-
-  readingOrder.forEach((node) => {
-    repairedYById.set(node.element.id, nextY);
-    nextY += node.position.height + Math.ceil(node.position.height * paddingRatio);
-  });
+  let index = 0;
+  while (index < readingOrder.length) {
+    const first = readingOrder[index];
+    const row = [first];
+    let candidateIndex = index + 1;
+    while (candidateIndex < readingOrder.length) {
+      const candidate = readingOrder[candidateIndex];
+      const sharesAuthoredRow = Math.abs(candidate.position.y - first.position.y) <= 1;
+      const overlapsRow = row.some((member) => horizontalRangesOverlap(member.position, candidate.position));
+      if (!sharesAuthoredRow || overlapsRow) break;
+      row.push(candidate);
+      candidateIndex += 1;
+    }
+    row.forEach((node) => repairedYById.set(node.element.id, nextY));
+    const rowHeight = Math.max(...row.map((node) => node.position.height));
+    nextY += rowHeight + Math.ceil(rowHeight * paddingRatio);
+    index = candidateIndex;
+  }
 
   return nodes.map((node) => {
     const repairedY = repairedYById.get(node.element.id);

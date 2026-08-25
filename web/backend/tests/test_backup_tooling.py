@@ -57,7 +57,7 @@ class BackupToolingTests(unittest.TestCase):
             environment[key] = str(source)
         return environment
 
-    def fake_pg_dump(self, root, *, succeeds=True):
+    def fake_postgres_tools(self, root, *, succeeds=True):
         fake_bin = Path(root) / "fake-bin"
         fake_bin.mkdir()
         executable = fake_bin / "pg_dump"
@@ -72,6 +72,16 @@ class BackupToolingTests(unittest.TestCase):
         else:
             executable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
         executable.chmod(0o700)
+        pg_restore = fake_bin / "pg_restore"
+        pg_restore.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        pg_restore.chmod(0o700)
+        psql = fake_bin / "psql"
+        psql.write_text(
+            "#!/bin/sh\n"
+            "case \"$*\" in *server_version*) printf '17.6\\n';; *) printf '82\\n';; esac\n",
+            encoding="utf-8",
+        )
+        psql.chmod(0o700)
         return f"{fake_bin}:{os.environ.get('PATH', '')}"
 
     def test_backup_requires_environment(self):
@@ -97,27 +107,28 @@ class BackupToolingTests(unittest.TestCase):
     def test_backup_is_published_only_after_verified_completion(self):
         with tempfile.TemporaryDirectory() as root:
             env = self.backup_environment(root)
-            env["PATH"] = self.fake_pg_dump(root)
+            env["PATH"] = self.fake_postgres_tools(root)
             result = self.run_script("backup_madar.sh", env=env)
             published = Path(root) / "backups" / "madar-20260720T000000Z"
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((published / "BACKUP_COMPLETE").is_file())
-            self.assertIn("MADAR_BACKUP_FORMAT=2", (published / "backup.env").read_text())
+            self.assertIn("MADAR_BACKUP_FORMAT=3", (published / "backup.env").read_text())
+            self.assertTrue((published / "manifest.json").is_file())
             self.assertFalse(list((Path(root) / "backups").glob(".*.incomplete.*")))
-            verified = self.run_script("verify_backup.sh", published)
+            verified = self.run_script("verify_backup.sh", published, env={"PATH": env["PATH"]})
             self.assertEqual(verified.returncode, 0, verified.stderr)
 
     def test_failed_backup_never_occupies_final_recovery_path(self):
         with tempfile.TemporaryDirectory() as root:
             env = self.backup_environment(root)
-            env["PATH"] = self.fake_pg_dump(root, succeeds=False)
+            env["PATH"] = self.fake_postgres_tools(root, succeeds=False)
             result = self.run_script("backup_madar.sh", env=env)
             backup_root = Path(root) / "backups"
 
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((backup_root / "madar-20260720T000000Z").exists())
-            self.assertEqual(len(list(backup_root.glob(".*.incomplete.*"))), 1)
+            self.assertEqual(len(list(backup_root.glob(".*.incomplete.*"))), 0)
 
     def test_verifier_rejects_missing_member_and_checksum_mismatch(self):
         with tempfile.TemporaryDirectory() as root:
@@ -162,12 +173,59 @@ class BackupToolingTests(unittest.TestCase):
                 "MADAR_RESTORE_PGPASSWORD": "synthetic-test-password",
                 "MADAR_RESTORE_PGDATABASE": "madar_restore_test",
                 "MADAR_RESTORE_CONFIRM_ISOLATED": "YES",
+                "PATH": self.fake_postgres_tools(root),
             }
             for name in ("BUILDER_ASSETS", "PRIVATE_UPLOADS", "GENERATED_ARTIFACTS", "AVATARS"):
                 env[f"MADAR_RESTORE_{name}_DIR"] = str(Path(root) / name.lower())
             result = self.run_script("restore_madar.sh", "--dry-run", backup, env=env)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("pg_restore", result.stdout)
+
+    def test_offhost_replication_refuses_an_unmounted_local_directory(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            backup = root / "madar-20260720T000000Z"
+            mount = root / "drive"
+            recipients = root / "recipients.txt"
+            backup.mkdir()
+            mount.mkdir()
+            recipients.write_text("age1synthetic-public-recipient\n", encoding="utf-8")
+            result = self.run_script("replicate_backup_offhost.sh", backup, env={
+                "MADAR_OFFHOST_MOUNT": str(mount),
+                "MADAR_OFFHOST_VOLUME_ID": "expected-drive",
+                "MADAR_BACKUP_AGE_RECIPIENTS_FILE": str(recipients),
+            })
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("not a mounted filesystem", result.stderr)
+            self.assertFalse((mount / "madar-encrypted").exists())
+
+    def test_offhost_replication_requires_exact_volume_identity_before_writing(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            backup = root / "madar-20260720T000000Z"
+            mount = root / "drive"
+            recipients = root / "recipients.txt"
+            fake_bin = root / "fake-bin"
+            backup.mkdir()
+            mount.mkdir()
+            fake_bin.mkdir()
+            recipients.write_text("age1synthetic-public-recipient\n", encoding="utf-8")
+            (mount / ".madar-backup-volume").write_text("wrong-drive\n", encoding="utf-8")
+            mountpoint = fake_bin / "mountpoint"
+            mountpoint.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            mountpoint.chmod(0o700)
+            findmnt = fake_bin / "findmnt"
+            findmnt.write_text(f"#!/bin/sh\nprintf '%s\\n' '{mount}'\n", encoding="utf-8")
+            findmnt.chmod(0o700)
+            result = self.run_script("replicate_backup_offhost.sh", backup, env={
+                "PATH": f"{fake_bin}:{os.environ.get('PATH', '')}",
+                "MADAR_OFFHOST_MOUNT": str(mount),
+                "MADAR_OFFHOST_VOLUME_ID": "expected-drive",
+                "MADAR_BACKUP_AGE_RECIPIENTS_FILE": str(recipients),
+            })
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("identity does not match", result.stderr)
+            self.assertFalse((mount / "madar-encrypted").exists())
 
 
 if __name__ == "__main__":

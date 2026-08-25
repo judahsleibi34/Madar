@@ -8,7 +8,7 @@ from typing import Any
 
 from database import service_supabase
 from services.upload_config import assert_path_within_root
-from services.storage_quota_service import release_storage
+from services.storage_quota_service import release_storage, sha256_file
 
 ASSET_URL_PATTERN = re.compile(r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp|mp4|webm|pdf|doc|docx))$")
 
@@ -109,14 +109,27 @@ def reconcile_project_asset_references(*, project_id: str, tenant_id: int, schem
 def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_run: bool = True, client=None) -> dict[str, int]:
     database_client = client or service_supabase
     response = database_client.table("builder_assets").select("id,tenant_id,storage_key,sha256").eq("status", "unreferenced").lte("retention_until", _now().isoformat()).limit(max(1, min(int(limit), 500))).execute()
-    eligible = deleted = skipped = 0
+    eligible = deleted = skipped = missing_files = hash_mismatches = referenced = 0
     for row in getattr(response, "data", None) or []:
         eligible += 1
         refs = database_client.table("builder_asset_references").select("asset_id").eq("asset_id", row["id"]).limit(1).execute()
-        if getattr(refs, "data", None): skipped += 1; continue
+        if getattr(refs, "data", None):
+            skipped += 1; referenced += 1; continue
         path = assert_path_within_root(storage_root / row["storage_key"], storage_root)
-        if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() != row["sha256"]: skipped += 1; continue
+        if path.exists() and not path.is_file():
+            skipped += 1; continue
+        if path.is_file() and sha256_file(path) != row["sha256"]:
+            skipped += 1; hash_mismatches += 1; continue
+        if not path.exists():
+            missing_files += 1
         if not dry_run:
+            # Recheck immediately before the irreversible file operation. The
+            # publication path creates a reference before marking an asset
+            # active, so a concurrent publish makes this item ineligible.
+            current = database_client.table("builder_assets").select("status,reference_count").eq("id", row["id"]).eq("tenant_id", int(row["tenant_id"])).limit(1).execute()
+            current_rows = getattr(current, "data", None) or []
+            if len(current_rows) != 1 or current_rows[0].get("status") != "unreferenced" or int(current_rows[0].get("reference_count") or 0) != 0:
+                skipped += 1; referenced += 1; continue
             if path.is_file(): path.unlink()
             release_storage(
                 tenant_id=int(row["tenant_id"]),
@@ -126,4 +139,8 @@ def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_
             )
             database_client.table("builder_assets").update({"status": "soft_deleted", "deleted_at": _now().isoformat(), "reference_count": 0}).eq("id", row["id"]).execute()
             deleted += 1
-    return {"eligible": eligible, "deleted": deleted, "skipped": skipped}
+    return {
+        "eligible": eligible, "deleted": deleted, "skipped": skipped,
+        "referenced": referenced, "missing_files": missing_files,
+        "hash_mismatches": hash_mismatches,
+    }

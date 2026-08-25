@@ -309,97 +309,38 @@ def update_user_type(*, user_id: int, user_type: str) -> dict[str, Any]:
 
 
 def delete_user_account(*, user_id: int, requesting_user_id: int | None = None) -> dict[str, Any]:
-    if requesting_user_id is not None and int(user_id) == int(requesting_user_id):
+    """Compatibility entry point: schedule the durable workflow, never delete inline."""
+    if requesting_user_id is None:
+        raise HTTPException(status_code=400, detail="A requesting administrator is required.")
+    if int(user_id) == int(requesting_user_id):
         raise HTTPException(status_code=400, detail="Admins cannot delete their own account.")
-
     try:
-        user_result = (
-            service_supabase
-            .table("users")
-            .select("id, auth_id, tenant_id, email, first_name, last_name, account_status, user_type")
+        response = (
+            service_supabase.table("users")
+            .select("id,tenant_id,account_status,user_type")
             .eq("id", user_id)
             .limit(1)
             .execute()
         )
-
     except Exception as error:
-        logger.warning("admin.user_delete.fetch_failed", extra={"target_user_id": user_id, "error_type": type(error).__name__})
-        raise HTTPException(status_code=500, detail="Could not load user for deletion.")
-
-    if not user_result.data:
+        logger.warning(
+            "admin.user_deletion_preflight_failed",
+            extra={"target_user_id": user_id, "error_type": type(error).__name__},
+        )
+        raise HTTPException(status_code=500, detail="Could not verify user deletion safety.") from error
+    if not response.data:
         raise HTTPException(status_code=404, detail="User was not found.")
-
-    target_user = user_result.data[0]
+    target_user = response.data[0]
     _assert_not_last_system_admin(target_user)
-    auth_id = str(target_user.get("auth_id") or "").strip()
-    tenant_id = target_user.get("tenant_id")
-    tenant_should_be_deleted = False
+    from services.data_deletion_service import request_user_deletion
 
-    if tenant_id is not None:
-        try:
-            remaining_members = (
-                service_supabase
-                .table("tenant_memberships")
-                .select("id")
-                .eq("tenant_id", tenant_id)
-                .neq("user_id", user_id)
-                .limit(1)
-                .execute()
-            )
-            tenant_should_be_deleted = not bool(remaining_members.data)
-
-        except Exception as error:
-            logger.warning("admin.user_delete.membership_check_failed", extra={"target_user_id": user_id, "tenant_id": tenant_id, "error_type": type(error).__name__})
-            raise HTTPException(status_code=500, detail="Could not verify tenant membership.")
-
-    try:
-        if auth_id:
-            service_supabase.auth.admin.delete_user(auth_id)
-        else:
-            (
-                service_supabase
-                .table("users")
-                .delete()
-                .eq("id", user_id)
-                .execute()
-            )
-
-        if tenant_should_be_deleted and tenant_id is not None:
-            (
-                service_supabase
-                .table("tenants")
-                .delete()
-                .eq("tenant_id", tenant_id)
-                .execute()
-            )
-
-    except Exception as error:
-        if "last_system_admin_required" in str(error).lower():
-            raise HTTPException(
-                status_code=409,
-                detail=error_detail(
-                    "last_system_admin_required",
-                    "At least one active system administrator is required.",
-                ),
-            )
-        logger.warning("admin.user_delete.failed", extra={"target_user_id": user_id, "tenant_id": tenant_id, "error_type": type(error).__name__})
-        raise HTTPException(status_code=500, detail="Could not delete user.")
-
-    logger.info(
-        "admin.user_deleted",
-        extra={
-            "target_user_id": target_user.get("id"),
-            "tenant_id": tenant_id,
-            "tenant_deleted": tenant_should_be_deleted,
-            "requesting_user_id": requesting_user_id,
-        },
+    request = request_user_deletion(
+        target_user_id=int(user_id), requested_by_user_id=int(requesting_user_id)
     )
-
     return {
-        "id": target_user.get("id"),
-        "auth_id": auth_id,
-        "tenant_id": tenant_id,
-        "email": target_user.get("email"),
-        "user_type": target_user.get("user_type") or "user",
-        "tenant_deleted": tenant_should_be_deleted,
+        "id": int(user_id),
+        "tenant_id": target_user.get("tenant_id"),
+        "tenant_deleted": False,
+        "deletion_pending": True,
+        "deletion_request_id": request.get("request_id"),
     }

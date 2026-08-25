@@ -656,6 +656,30 @@ export const submitPublicFormSubmission = async (
   return parseJsonResponse(response);
 };
 
+export const startPublicQuizAttempt = async (subdomain, formId, payload = {}) => {
+  const response = await apiFetch(
+    getApiUrl(`/public/sites/${subdomain}/forms/${formId}/attempts`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  return parseJsonResponse(response);
+};
+
+export const finalizePublicQuizAttempt = async (subdomain, formId, attemptId, answers) => {
+  const response = await apiFetch(
+    getApiUrl(`/public/sites/${subdomain}/forms/${formId}/attempts/${attemptId}/finalize`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
+    }
+  );
+  return parseJsonResponse(response);
+};
+
 export const submitPublicBuilderEvent = async (
   subdomain,
   payload,

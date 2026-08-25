@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule Madar backup verification
+
+[Timer]
+OnCalendar=*-*-* 08,20:00:00 UTC
+Persistent=true
+Unit=madar-backup-verify.service
+
+[Install]
+WantedBy=timers.target

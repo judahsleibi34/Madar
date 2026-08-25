@@ -288,6 +288,8 @@ def mfa_enroll_verify(payload: MfaEnrollVerifyRequest, request: Request, respons
                 "code": payload.code.strip(),
             }
         )
+        if get_authenticator_assurance_level().get("current_level") != "aal2":
+            raise ValueError("MFA enrollment did not produce aal2")
 
     except Exception as error:
         logger.warning(
@@ -364,14 +366,29 @@ def mfa_remove_factor(factor_id: str, request: Request, response: Response):
     aal = get_authenticator_assurance_level()
     current_level = aal.get("current_level")
 
-    if current_level and current_level != "aal2":
+    if current_level != "aal2":
         raise HTTPException(
             status_code=403,
             detail="MFA verification required before removing this factor",
         )
 
     try:
+        factors = factor_list_from_response(supabase.auth.mfa.list_factors())
+        matching = [item for item in factors if str(item.get("id") or "") == clean_factor_id]
+        if len(matching) != 1:
+            raise HTTPException(status_code=404, detail="MFA factor not found")
+        verified = [item for item in factors if str(item.get("status") or "verified") == "verified"]
+        if (
+            normalize_user_type(user_data.get("user_type")) == "admin"
+            and len(verified) <= 1
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="The last verified administrator factor cannot be removed",
+            )
         supabase.auth.mfa.unenroll({"factor_id": clean_factor_id})
+    except HTTPException:
+        raise
     except Exception as error:
         logger.warning(
             "auth.mfa.factor_remove_failed",
@@ -445,6 +462,97 @@ def mfa_login_challenge(
     return {"challenge_id": challenge_id}
 
 
+@router.post("/login/enroll")
+def mfa_login_enroll(
+    payload: MfaEnrollRequest,
+    request: Request,
+    response: Response,
+):
+    """Begin enrollment using only a restricted pending-admin session."""
+    pending_payload = require_pending_mfa_payload(request, response)
+    try:
+        mfa_client = create_pending_mfa_client(pending_payload)
+        enroll_payload = {"factor_type": "totp"}
+        friendly_name = str(payload.friendly_name or "").strip()
+        if friendly_name:
+            enroll_payload["friendly_name"] = friendly_name
+        enrolled = mfa_client.auth.mfa.enroll(enroll_payload)
+        factor, totp = totp_payload_from_enroll_response(enrolled)
+        if not factor.get("id"):
+            raise ValueError("Missing MFA factor id")
+    except Exception as error:
+        logger.warning("auth.mfa.restricted_enroll_failed", extra={
+            "user_id": pending_payload.get("user_id"), "error_type": type(error).__name__,
+        })
+        raise HTTPException(status_code=400, detail="Could not start MFA enrollment") from error
+    record_mfa_event(
+        request=request,
+        tenant_id=pending_payload.get("tenant_id"),
+        actor_user_id=pending_payload.get("user_id"),
+        action=MFA_ENROLL_STARTED,
+        target_user_id=pending_payload.get("user_id"),
+        factor_id=factor.get("id"),
+        metadata={"factor_type": "totp", "restricted_session": True},
+    )
+    return {"factor": factor, "totp": totp, "restricted_session": True}
+
+
+@router.post("/login/enroll/verify")
+def mfa_login_enroll_verify(
+    payload: MfaEnrollVerifyRequest,
+    request: Request,
+    response: Response,
+):
+    """Verify first factor and issue normal cookies only after exact AAL2."""
+    pending_payload = require_pending_mfa_payload(request, response)
+    factor_id = payload.factor_id.strip()
+    try:
+        mfa_client = create_pending_mfa_client(pending_payload)
+        challenge = mfa_client.auth.mfa.challenge({"factor_id": factor_id})
+        challenge_id = challenge_id_from_response(challenge)
+        if not challenge_id:
+            raise ValueError("Missing MFA challenge id")
+        verified = mfa_client.auth.mfa.verify({
+            "factor_id": factor_id,
+            "challenge_id": challenge_id,
+            "code": payload.code.strip(),
+        })
+        get_aal = getattr(mfa_client.auth.mfa, "get_authenticator_assurance_level", None)
+        if not get_aal or login_aal_payload_from_response(get_aal()).get("current_level") != "aal2":
+            raise ValueError("MFA enrollment did not produce aal2")
+        session = get_session_from_verify_response(verified)
+        if not session:
+            session_response = mfa_client.auth.get_session()
+            session = getattr(session_response, "session", None) or session_response
+        access_token = read_value(session, "access_token")
+        refresh_token = read_value(session, "refresh_token")
+        local_user = get_local_user_for_pending_mfa(pending_payload)
+        if not local_user or not access_token or not refresh_token:
+            raise ValueError("MFA enrollment session is incomplete")
+        csrf_token = set_auth_cookies(response, access_token, refresh_token)
+        clear_pending_mfa_cookie(response)
+        mark_aal2_verified(
+            user_id=local_user.get("id"),
+            auth_id=str(local_user.get("auth_id") or pending_payload.get("auth_id") or ""),
+            verified_at=current_utc_iso(),
+        )
+    except Exception as error:
+        logger.warning("auth.mfa.restricted_enroll_verify_failed", extra={
+            "user_id": pending_payload.get("user_id"), "error_type": type(error).__name__,
+        })
+        raise HTTPException(status_code=400, detail="Could not verify MFA enrollment") from error
+    record_mfa_event(
+        request=request,
+        tenant_id=local_user.get("tenant_id"),
+        actor_user_id=local_user.get("id"),
+        action=MFA_ENROLL_VERIFIED,
+        target_user_id=local_user.get("id"),
+        factor_id=factor_id,
+        metadata={"factor_type": "totp", "restricted_session": True},
+    )
+    return {"message": "User is logged in", "user": build_user_payload(local_user), "csrf_token": csrf_token}
+
+
 @router.post("/login/verify")
 def mfa_login_verify(
     payload: MfaLoginVerifyRequest,
@@ -475,8 +583,10 @@ def mfa_login_verify(
 
         if get_aal:
             aal = login_aal_payload_from_response(get_aal())
-            if aal.get("current_level") and aal.get("current_level") != "aal2":
+            if aal.get("current_level") != "aal2":
                 raise ValueError("MFA verification did not produce aal2")
+        else:
+            raise ValueError("MFA assurance lookup is unavailable")
 
         session = get_session_from_verify_response(verify_response)
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Query, Request, Response, status
 
 from classes import AdminUserTypeUpdateRequest
 from services.audit_service import hash_audit_identifier, record_audit_event
@@ -81,7 +81,7 @@ def change_user_type(
     }
 
 
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", status_code=status.HTTP_202_ACCEPTED)
 def delete_user(
     user_id: int,
     request: Request,
@@ -91,27 +91,20 @@ def delete_user(
 
     deleted_user = delete_user_account(
         user_id=user_id,
-        requesting_user_id=admin_user.get("id"),
+        requesting_user_id=int(admin_user.get("id")),
     )
 
     metadata = {
-        "deleted_user_id": deleted_user.get("id") or user_id,
+        "deleted_user_id": user_id,
+        "deletion_request_id": deleted_user.get("deletion_request_id"),
         "source": "admin",
     }
-
-    if deleted_user.get("email") is not None:
-        metadata["deleted_user_email_hash"] = hash_audit_identifier(
-            deleted_user.get("email")
-        )
-
-    if deleted_user.get("user_type") is not None:
-        metadata["deleted_user_type"] = deleted_user.get("user_type")
 
     record_audit_event(
         request=request,
         tenant_id=deleted_user.get("tenant_id"),
         actor_user_id=admin_user.get("id"),
-        action="admin.user_deleted",
+        action="admin.user_deletion_requested",
         target_type="user",
         target_id=user_id,
         metadata=metadata,
@@ -120,4 +113,8 @@ def delete_user(
     return {
         "success": True,
         "deleted_user": deleted_user,
+        "deletion_request": {
+            "request_id": deleted_user.get("deletion_request_id"),
+            "state": "pending",
+        },
     }
