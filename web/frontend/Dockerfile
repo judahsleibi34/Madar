@@ -2,13 +2,15 @@ FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb
 
 WORKDIR /app
 
-ARG VITE_API_URL
-ARG MADAR_RELEASE_SHA=development
-ARG MADAR_BUILD_TIMESTAMP=unknown
-
 COPY package*.json ./
 
 RUN npm ci
+
+# Build-time application metadata changes per release; keep it below npm ci
+# so immutable SHA labels do not invalidate the dependency layer.
+ARG VITE_API_URL
+ARG MADAR_RELEASE_SHA=development
+ARG MADAR_BUILD_TIMESTAMP=unknown
 
 ENV VITE_API_URL=$VITE_API_URL \
     VITE_MADAR_RELEASE_SHA=$MADAR_RELEASE_SHA \

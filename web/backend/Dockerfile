@@ -2,13 +2,15 @@ FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd
 
 WORKDIR /app
 
-ARG MADAR_RELEASE_SHA=development
-ARG MADAR_BUILD_TIMESTAMP=unknown
-
 COPY requirements.txt constraints.txt ./
 
 RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt \
     && python -m pip check
+
+# Release metadata changes for every immutable build. Declare it only after
+# the expensive dependency layer so a new SHA cannot invalidate locked deps.
+ARG MADAR_RELEASE_SHA=development
+ARG MADAR_BUILD_TIMESTAMP=unknown
 
 COPY . .
 
