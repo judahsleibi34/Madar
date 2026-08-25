@@ -88,6 +88,22 @@ class ReleaseDeployerTests(unittest.TestCase):
         self.assertFalse(any(call[0] == "restore_workers" for call in operations.calls))
         self.assertEqual(sum(call[0] == "build" for call in operations.calls), 1)
 
+    def test_rollback_switch_failure_is_durable_and_preserves_candidate(self):
+        class RollbackFailureOperations(FakeOperations):
+            def switch_traffic(self, slot):
+                self.calls.append(("switch_traffic", slot))
+                if len([call for call in self.calls if call[0] == "switch_traffic"]) == 2:
+                    raise RuntimeError("injected_rollback_switch_failure")
+
+        with tempfile.TemporaryDirectory() as root:
+            operations = RollbackFailureOperations(fail_at="observe")
+            with self.assertRaisesRegex(RuntimeError, "automatic_rollback_failed_manual_intervention"):
+                self.deployer(root, operations).deploy(SHA)
+            state = json.loads((Path(root) / "state.json").read_text())
+        self.assertEqual(state["in_progress_release"]["phase"], "rollback_failed")
+        self.assertEqual(state["rollback_failure"]["required_target"], "blue")
+        self.assertFalse(any(call[0] == "stop_candidate" for call in operations.calls))
+
     def test_worker_cutover_failure_restores_retained_workers_before_traffic_switch(self):
         with tempfile.TemporaryDirectory() as root:
             self.deployer(root, FakeOperations()).deploy(SHA)

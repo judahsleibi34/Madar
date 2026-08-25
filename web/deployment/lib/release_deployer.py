@@ -135,6 +135,7 @@ class ReleaseDeployer:
             failure_code="previous_process_interrupted",
         )
         state.pop("in_progress_release", None)
+        state.pop("rollback_failure", None)
         self._record(state, interrupted)
 
     def deploy(self, sha: str, *, manual_retry: bool = False) -> dict[str, Any]:
@@ -257,7 +258,26 @@ class ReleaseDeployer:
                     })
                     if known_good:
                         self.operations.restore_workers(known_good)
-                    self.operations.switch_traffic(previous_slot)
+                    try:
+                        self.operations.switch_traffic(previous_slot)
+                    except Exception as rollback_error:
+                        release.update(
+                            status="rollback_failed_manual_intervention",
+                            phase="rollback_failed",
+                            rollback="traffic_switch_failed_retained_artifacts_preserved",
+                            rollback_failure_reason=type(rollback_error).__name__,
+                            rollback_failure_code=str(rollback_error)[:200],
+                        )
+                        state["in_progress_release"] = dict(release)
+                        state["rollback_failure"] = {
+                            "release_sha": sha,
+                            "candidate_slot": candidate_slot,
+                            "required_target": previous_slot,
+                            "recorded_at": utc_now().isoformat(),
+                            "failure_code": release["rollback_failure_code"],
+                        }
+                        atomic_json(self.state_file, state)
+                        raise RuntimeError("automatic_rollback_failed_manual_intervention") from rollback_error
                 else:
                     release["rollback"] = "not_required_active_target_untouched"
                     if workers_cut_over:
