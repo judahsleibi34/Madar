@@ -40,6 +40,9 @@ class FakeOperations:
         if self.fail_at == "rollback_schema":
             raise RuntimeError("known_good_rollback_schema_incompatible")
         return {"compatible_min": 81, "compatible_max": 83}
+    def activate_workers(self, sha, slot, images): self._call("activate_workers", sha, slot)
+    def deactivate_workers(self, release): self._call("deactivate_workers", release["slot"])
+    def restore_workers(self, release): self._call("restore_workers", release["slot"])
     def switch_traffic(self, slot): self._call("switch_traffic", slot)
     def observe(self, sha, slot): self._call("observe", sha, slot)
     def stop_candidate(self, slot): self._call("stop_candidate", slot)
@@ -81,7 +84,19 @@ class ReleaseDeployerTests(unittest.TestCase):
             [call for call in operations.calls if call[0] == "switch_traffic"],
             [("switch_traffic", "green"), ("switch_traffic", "blue")],
         )
+        self.assertIn(("deactivate_workers", "green"), operations.calls)
+        self.assertFalse(any(call[0] == "restore_workers" for call in operations.calls))
         self.assertEqual(sum(call[0] == "build" for call in operations.calls), 1)
+
+    def test_worker_cutover_failure_restores_retained_workers_before_traffic_switch(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.deployer(root, FakeOperations()).deploy(SHA)
+            operations = FakeOperations(fail_at="activate_workers")
+            with self.assertRaisesRegex(RuntimeError, "injected_activate_workers_failure"):
+                self.deployer(root, operations).deploy("b" * 40)
+        self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
+        self.assertIn(("deactivate_workers", "green"), operations.calls)
+        self.assertIn(("restore_workers", "green"), operations.calls)
 
     def test_db_redis_worker_storage_and_frontend_faults_are_preflight_or_validation_failures(self):
         # The operations layer maps these dependency injections into one of the

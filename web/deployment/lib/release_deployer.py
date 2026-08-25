@@ -74,6 +74,9 @@ class Operations(Protocol):
     def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None: ...
     def validate_candidate(self, sha: str, slot: str) -> None: ...
     def validate_rollback_target(self, release: dict[str, Any], schema: int) -> dict[str, int]: ...
+    def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None: ...
+    def deactivate_workers(self, release: dict[str, Any]) -> None: ...
+    def restore_workers(self, release: dict[str, Any]) -> None: ...
     def switch_traffic(self, slot: str) -> None: ...
     def observe(self, sha: str, slot: str) -> None: ...
     def stop_candidate(self, slot: str) -> None: ...
@@ -119,6 +122,11 @@ class ReleaseDeployer:
         self.operations.verify_source(sha)
         if interrupted.get("rollback_required"):
             self.operations.switch_traffic(previous)
+        if interrupted.get("workers_cut_over"):
+            self.operations.deactivate_workers({"sha": sha, "slot": slot, "images": interrupted.get("images") or {}})
+            known_good = interrupted.get("previous_known_good_release")
+            if isinstance(known_good, dict):
+                self.operations.restore_workers(known_good)
         self.operations.stop_candidate(slot)
         interrupted.update(
             status="interrupted_recovered",
@@ -161,6 +169,7 @@ class ReleaseDeployer:
                 "images": {},
             }
             switched = False
+            workers_cut_over = False
             self._checkpoint(state, release)
             try:
                 self.operations.verify_source(sha)
@@ -201,6 +210,22 @@ class ReleaseDeployer:
                 release["phase"] = "deep_validation"
                 self._checkpoint(state, release)
                 self.operations.validate_candidate(sha, candidate_slot)
+                release["phase"] = "worker_cutover"
+                self._checkpoint(state, release)
+                candidate_identity = {"sha": sha, "slot": candidate_slot, "images": images}
+                if known_good:
+                    self.operations.deactivate_workers(known_good)
+                try:
+                    self.operations.activate_workers(sha, candidate_slot, images)
+                    self.operations.validate_candidate(sha, candidate_slot)
+                    workers_cut_over = True
+                    release["workers_cut_over"] = True
+                    self._checkpoint(state, release)
+                except Exception:
+                    self.operations.deactivate_workers(candidate_identity)
+                    if known_good:
+                        self.operations.restore_workers(known_good)
+                    raise
                 release["phase"] = "traffic_switch"
                 release["rollback_required"] = True
                 self._checkpoint(state, release)
@@ -227,9 +252,20 @@ class ReleaseDeployer:
                 )
                 if switched:
                     release["rollback"] = "traffic_switch_to_retained_known_good"
+                    self.operations.deactivate_workers({
+                        "sha": sha, "slot": candidate_slot, "images": release.get("images") or {},
+                    })
+                    if known_good:
+                        self.operations.restore_workers(known_good)
                     self.operations.switch_traffic(previous_slot)
                 else:
                     release["rollback"] = "not_required_active_target_untouched"
+                    if workers_cut_over:
+                        self.operations.deactivate_workers({
+                            "sha": sha, "slot": candidate_slot, "images": release.get("images") or {},
+                        })
+                        if known_good:
+                            self.operations.restore_workers(known_good)
                 self.operations.stop_candidate(candidate_slot)
                 retry_after = utc_now() + timedelta(minutes=self.retry_minutes)
                 state.setdefault("failed_releases", {})[sha] = {
