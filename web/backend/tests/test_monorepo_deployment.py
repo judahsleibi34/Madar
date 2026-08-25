@@ -12,6 +12,8 @@ WRAPPER = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy"
 COMPOSE = WEB_ROOT / "docker-compose.yml"
 RELEASE_DEPLOY = WEB_ROOT / "deployment" / "bin" / "madar-release-deploy"
 RELEASE_LIBRARY = WEB_ROOT / "deployment" / "lib" / "release_deployer.py"
+BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
+FRONTEND_DOCKERFILE = WEB_ROOT / "frontend" / "Dockerfile"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
@@ -21,6 +23,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.compose = COMPOSE.read_text(encoding="utf-8")
         self.release_deploy = RELEASE_DEPLOY.read_text(encoding="utf-8")
         self.release_library = RELEASE_LIBRARY.read_text(encoding="utf-8")
+        self.backend_dockerfile = BACKEND_DOCKERFILE.read_text(encoding="utf-8")
+        self.frontend_dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
 
     def test_wrapper_delegates_a_clean_full_sha_to_immutable_deployer(self):
         self.assertIn('readonly REPO_ROOT="/home/madar/saas/Madar"', self.deploy)
@@ -58,6 +62,11 @@ class MonorepoDeploymentTests(unittest.TestCase):
     def test_wrapper_keeps_git_operations_at_repository_root(self):
         self.assertIn('git -C "$REPO_ROOT" fetch', self.wrapper)
         self.assertIn('exec "$DEPLOY_SCRIPT"', self.wrapper)
+
+    def test_images_expose_release_sha_and_build_timestamp_as_oci_labels(self):
+        for dockerfile in (self.backend_dockerfile, self.frontend_dockerfile):
+            self.assertIn("org.opencontainers.image.revision=$MADAR_RELEASE_SHA", dockerfile)
+            self.assertIn("org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP", dockerfile)
 
 
 if __name__ == "__main__":

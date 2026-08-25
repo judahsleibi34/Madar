@@ -4,8 +4,6 @@ WORKDIR /app
 
 ARG MADAR_RELEASE_SHA=development
 ARG MADAR_BUILD_TIMESTAMP=unknown
-ENV MADAR_RELEASE_SHA=$MADAR_RELEASE_SHA \
-    MADAR_BUILD_TIMESTAMP=$MADAR_BUILD_TIMESTAMP
 
 COPY requirements.txt constraints.txt ./
 
@@ -18,6 +16,11 @@ COPY . .
 RUN mkdir -p /test-repository/backend /test-repository/frontend \
     && python scripts/verify_installed_constraints.py \
     && ln -s . backend
+
+LABEL org.opencontainers.image.revision=$MADAR_RELEASE_SHA \
+      org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP
+ENV MADAR_RELEASE_SHA=$MADAR_RELEASE_SHA \
+    MADAR_BUILD_TIMESTAMP=$MADAR_BUILD_TIMESTAMP
 
 USER 65534:65534
 
