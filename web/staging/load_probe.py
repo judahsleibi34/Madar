@@ -29,6 +29,12 @@ def request(url: str, timeout: float) -> tuple[int, float, int]:
     except urllib.error.HTTPError as error:
         content = error.read()
         status = error.code
+    except (urllib.error.URLError, TimeoutError, OSError):
+        # Transport failures are measurements, not harness crashes. Status 0
+        # is deliberately outside the HTTP status space and is included in
+        # the error count and status histogram below.
+        content = b""
+        status = 0
     return status, (time.perf_counter() - started) * 1000, len(content)
 
 
@@ -60,6 +66,7 @@ def main() -> int:
         "p95_ms": round(percentile(latencies, 0.95), 2),
         "p99_ms": round(percentile(latencies, 0.99), 2),
         "response_bytes": sorted({row[2] for row in rows}),
+        "transport_errors": sum(row[0] == 0 for row in rows),
         "status_counts": dict(sorted(collections.Counter(row[0] for row in rows).items())),
     }
     print(json.dumps(result, sort_keys=True))
