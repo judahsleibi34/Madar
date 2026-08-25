@@ -79,6 +79,10 @@ def main() -> int:
     status, _headers, _payload = call(f"/builder/projects/{TENANT_B_PROJECT}", owner_a)
     assert status == 404
     status, _headers, _payload = call(
+        f"/builder/projects/{TENANT_B_PROJECT}", owner_a, method="DELETE",
+    )
+    assert status == 403
+    status, _headers, _payload = call(
         f"/builder/projects/{TENANT_B_PROJECT}", owner_a, method="DELETE", csrf=csrf_a,
     )
     assert status == 404
@@ -103,9 +107,11 @@ def main() -> int:
 
     status, headers, _payload = call("/definitely-missing", owner_a, origin="https://evil.invalid")
     assert status == 404 and "access-control-allow-origin" not in headers
+    status, headers, _payload = call("/definitely-missing", owner_a)
+    assert status == 404 and headers.get("access-control-allow-origin") == ALLOWED_ORIGIN
 
     print(json.dumps({
-        "status": "pass", "checks": 12, "tenant_a": 9101, "tenant_b": 9102,
+        "status": "pass", "checks": 14, "tenant_a": 9101, "tenant_b": 9102,
         "external_network_attempts": 0,
     }, sort_keys=True))
     return 0
