@@ -46,13 +46,23 @@ if (( DRY_RUN )); then
 fi
 
 require pg_dump
+require pg_restore
+require psql
 require sha256sum
 require cp
+require python3
 mkdir -p "$MADAR_BACKUP_DIR"
 mkdir -p "$work_path/files"
+cleanup_incomplete() {
+  if [[ -d "$work_path" ]]; then
+    rm -rf --one-file-system "$work_path"
+  fi
+}
+trap cleanup_incomplete EXIT
 log "backup.start destination=$backup_path"
 pg_dump --format=custom --no-owner --no-acl \
   --file="$work_path/database.dump"
+pg_restore --list "$work_path/database.dump" >/dev/null
 
 for entry in "${paths[@]}"; do
   name="${entry%%:*}"
@@ -62,10 +72,49 @@ for entry in "${paths[@]}"; do
   cp -a "$source_path/". "$work_path/files/$name/"
 done
 
+database_version="$(psql --no-psqlrc --tuples-only --no-align --command='show server_version')"
+schema_version="$(psql --no-psqlrc --tuples-only --no-align --command="select schema_version from public.application_schema_state where contract_key='core'")"
+release_sha="${MADAR_RELEASE_SHA:-unknown}"
+build_timestamp="${MADAR_BUILD_TIMESTAMP:-unknown}"
 cat >"$work_path/backup.env" <<EOF
-MADAR_BACKUP_FORMAT=2
+MADAR_BACKUP_FORMAT=3
 MADAR_BACKUP_CREATED_AT=${timestamp}
 MADAR_BACKUP_CONTENTS=database,builder-assets,private-uploads,generated-artifacts,avatars
+EOF
+python3 - "$work_path/manifest.json" "$backup_name" "$timestamp" "$release_sha" "$build_timestamp" "$database_version" "$schema_version" <<'PY'
+import json,sys
+manifest = {
+  "backup_id": sys.argv[2],
+  "created_at": sys.argv[3],
+  "status": "complete",
+  "format_version": 3,
+  "script_version": "2026-08-25.1",
+  "release": {"git_sha": sys.argv[4], "build_timestamp": sys.argv[5]},
+  "database": {"server_version": sys.argv[6], "schema_version": sys.argv[7], "dump": "database.dump", "format": "postgres_custom"},
+  "file_sets": ["builder-assets", "private-uploads", "generated-artifacts", "avatars"],
+  "configuration": {"values_included": False, "required_inventory": "CONFIGURATION-INVENTORY.txt"},
+  "checksums": "SHA256SUMS"
+}
+with open(sys.argv[1], "x", encoding="utf-8") as handle:
+    json.dump(manifest, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
+cat >"$work_path/MANIFEST.txt" <<EOF
+Madar backup: ${backup_name}
+Created: ${timestamp}
+Release SHA: ${release_sha}
+Build timestamp: ${build_timestamp}
+PostgreSQL: ${database_version}
+Schema contract: ${schema_version}
+Status: complete
+EOF
+cat >"$work_path/CONFIGURATION-INVENTORY.txt" <<'EOF'
+Secret values are intentionally excluded. Restore requires separately escrowed:
+- Madar environment file and encryption/token secrets
+- Supabase project/database/auth/storage configuration and credentials
+- Cloudflare tunnel credentials and sanitized ingress mapping
+- SMTP/VAPID/OAuth credentials for enabled channels
+- systemd unit installation and immutable release state/manifest
 EOF
 printf 'completed_at=%s\n' "$timestamp" >"$work_path/BACKUP_COMPLETE"
 (
@@ -74,6 +123,7 @@ printf 'completed_at=%s\n' "$timestamp" >"$work_path/BACKUP_COMPLETE"
   sha256sum --check --strict SHA256SUMS >/dev/null
 )
 mv -T "$work_path" "$backup_path"
+trap - EXIT
 log "backup.complete destination=$backup_path"
 if [[ -n "${MADAR_BACKUP_FRESHNESS_MARKER:-}" ]]; then
   [[ "$MADAR_BACKUP_FRESHNESS_MARKER" = /* ]] || die "MADAR_BACKUP_FRESHNESS_MARKER must be an absolute path"

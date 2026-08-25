@@ -1,0 +1,13 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 81,
+    "compatible_max": 82,
+    "target": 82,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 81,
+    "rollback_compatible_max": 82
+  },
+  "migration_policy": "manual-locked-backup-first-forward-repair",
+  "notes": "Migration 082 is additive. Promote compatibility code against schema 81 before applying 082. Never reverse 082 automatically."
+}

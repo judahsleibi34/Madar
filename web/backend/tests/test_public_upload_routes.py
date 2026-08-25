@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -9,6 +10,24 @@ import app as app_module
 
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+
+
+class AssetVisibilityQuery:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def select(self, *_args): return self
+    def eq(self, *_args): return self
+    def limit(self, *_args): return self
+    def execute(self): return SimpleNamespace(data=self.rows)
+
+
+class AssetVisibilityStore:
+    def __init__(self, tables):
+        self.tables = tables
+
+    def table(self, name):
+        return AssetVisibilityQuery(self.tables.get(name, []))
 
 
 class PublicUploadRouteTests(unittest.TestCase):
@@ -21,9 +40,17 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.asset_path.write_bytes(PNG_BYTES)
         self.patch = patch.object(app_module, "PUBLIC_UPLOADS_DIR", self.public_dir)
         self.patch.start()
+        # These transport/range tests model an already-published asset. Draft
+        # privacy and publication-reference authorization are covered by the
+        # dedicated asset-visibility tests.
+        self.visibility_patch = patch.object(
+            app_module, "_asset_visibility", return_value=(True, False)
+        )
+        self.visibility_patch.start()
         self.client = TestClient(app_module.app)
 
     def tearDown(self):
+        self.visibility_patch.stop()
         self.patch.stop()
         self.temp_dir.cleanup()
 
@@ -131,6 +158,57 @@ class PublicUploadRouteTests(unittest.TestCase):
                 "/uploads/tenant_2/builder_assets/0123456789abcdef0123456789abcdef.png"
             )
         self.assertEqual(response.status_code, 404)
+
+    def test_published_reference_is_public_but_unreferenced_draft_is_not(self):
+        storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
+        published = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "status": "active"}],
+            "builder_asset_references": [{"project_id": "project-1"}],
+            "builder_projects": [{
+                "id": "project-1", "status": "published",
+                "published_schema": {"pages": [{"image": f"/uploads/{storage_key}"}]},
+            }],
+        })
+        draft = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "status": "unreferenced"}],
+            "builder_asset_references": [],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", published):
+                public_response = self.client.get(f"/uploads/{storage_key}")
+            with patch.object(app_module, "service_supabase", draft), patch.object(
+                app_module, "get_authenticated_user_row", side_effect=Exception("anonymous")
+            ):
+                draft_response = self.client.get(f"/uploads/{storage_key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(public_response.status_code, 200)
+        self.assertEqual(draft_response.status_code, 404)
+
+    def test_unreferenced_asset_preview_requires_same_tenant_and_is_private(self):
+        storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
+        draft = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "status": "unreferenced"}],
+            "builder_asset_references": [],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", draft), patch.object(
+                app_module, "get_authenticated_user_row",
+                return_value=(object(), {"tenant_id": 1}),
+            ):
+                own = self.client.get(f"/uploads/{storage_key}")
+            with patch.object(app_module, "service_supabase", draft), patch.object(
+                app_module, "get_authenticated_user_row",
+                return_value=(object(), {"tenant_id": 2}),
+            ):
+                foreign = self.client.get(f"/uploads/{storage_key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(own.headers["cache-control"], "private, no-store")
+        self.assertEqual(foreign.status_code, 404)
 
 
 if __name__ == "__main__":

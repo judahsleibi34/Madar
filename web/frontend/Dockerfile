@@ -3,7 +3,11 @@ FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb
 WORKDIR /app
 
 ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+ARG MADAR_RELEASE_SHA=development
+ARG MADAR_BUILD_TIMESTAMP=unknown
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_MADAR_RELEASE_SHA=$MADAR_RELEASE_SHA \
+    VITE_MADAR_BUILD_TIMESTAMP=$MADAR_BUILD_TIMESTAMP
 
 COPY package*.json ./
 
@@ -14,6 +18,9 @@ COPY . .
 RUN npm run build
 
 FROM nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+
+ARG MADAR_RELEASE_SHA=development
+ARG MADAR_BUILD_TIMESTAMP=unknown
 
 RUN rm -f /etc/nginx/conf.d/default.conf \
     && mkdir -p /etc/nginx/templates/includes /etc/nginx/conf.d/includes /var/cache/nginx \

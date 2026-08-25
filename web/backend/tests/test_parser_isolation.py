@@ -195,7 +195,12 @@ class ParserIsolationTests(unittest.TestCase):
                 parse_target=_slow_parser,
                 timeout_seconds=1,
             )
-        self.assertLess(time.monotonic() - started, 1.8)
+        # The one-second untrusted-job budget starts only after a freshly
+        # spawned interpreter reports ready. Cold startup has a separate
+        # ten-second cap and termination has a two-second cap, so assert the
+        # full documented bound instead of a scheduler-sensitive cold-start
+        # benchmark.
+        self.assertLess(time.monotonic() - started, 14.5)
 
         result = parser_worker.parse_dataset_with_timeout(
             {"input_path": "unused", "tenant_id": "7", "user_id": "12"},

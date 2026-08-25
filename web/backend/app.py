@@ -8,6 +8,7 @@ from pathlib import Path
 # Load the repository environment before importing routes or services whose
 # module-level configuration depends on it (notably Redis rate limiting).
 import database as _database_config  # noqa: F401
+from database import service_supabase
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,7 +45,9 @@ from services.builder_asset_storage import (
     BuilderAssetStorageError,
     create_builder_asset_signed_url,
 )
+from services.asset_registry_service import extract_builder_asset_references
 from services.request_body_limits import RequestBodyLimitMiddleware
+from services.runtime_config import validate_runtime_configuration
 from services.observability_service import (
     CORRELATION_ID,
     configure_structured_logging,
@@ -69,6 +72,7 @@ from services.upload_config import (
 )
 
 configure_structured_logging()
+RUNTIME_CONFIGURATION = validate_runtime_configuration()
 logger = logging.getLogger(__name__)
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -190,8 +194,36 @@ def madar_status():
     return {"message": "All working"}
 
 
+def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
+    rows = getattr(
+        service_supabase.table("builder_assets").select("id,status").eq("tenant_id", tenant_id).eq("storage_key", storage_key).limit(2).execute(),
+        "data", None,
+    ) or []
+    if len(rows) != 1 or rows[0].get("status") not in {"active", "unreferenced"}:
+        return False, False
+    asset_id = rows[0]["id"]
+    references = getattr(
+        service_supabase.table("builder_asset_references").select("project_id").eq("asset_id", asset_id).limit(100).execute(),
+        "data", None,
+    ) or []
+    for reference in references:
+        projects = getattr(
+            service_supabase.table("builder_projects").select("id,published_schema,status").eq("id", reference.get("project_id")).eq("tenant_id", tenant_id).eq("status", "published").limit(1).execute(),
+            "data", None,
+        ) or []
+        if projects and storage_key in extract_builder_asset_references(projects[0].get("published_schema") or {}, tenant_id=tenant_id):
+            return True, False
+    try:
+        _, user = get_authenticated_user_row(request, response, allow_admin_account_access=False)
+        if int(user.get("tenant_id")) == tenant_id:
+            return True, True
+    except Exception:
+        pass
+    return False, False
+
+
 @app.get("/uploads/tenant_{tenant_id}/builder_assets/{filename}")
-def get_public_builder_asset(tenant_id: int, filename: str):
+def get_public_builder_asset(tenant_id: int, filename: str, request: Request, response: Response):
     if tenant_id <= 0:
         raise HTTPException(status_code=404, detail="Asset was not found.")
 
@@ -224,6 +256,22 @@ def get_public_builder_asset(tenant_id: int, filename: str):
         "Content-Encoding": "identity",
     }
     media_type = PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()]
+    storage_key = f"tenant_{tenant_id}/builder_assets/{safe_filename}"
+    try:
+        visible, private_preview = _asset_visibility(
+            tenant_id=tenant_id, storage_key=storage_key, request=request, response=response,
+        )
+    except Exception as error:
+        logger.warning("builder.asset_visibility_lookup_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
+        raise HTTPException(status_code=503, detail="Asset visibility is temporarily unavailable") from error
+    if not visible:
+        raise HTTPException(status_code=404, detail="Asset was not found.")
+    if private_preview:
+        response_headers = {
+            **response_headers,
+            "Cache-Control": "private, no-store",
+            "CDN-Cache-Control": "no-store",
+        }
 
     if asset_path.is_file():
         return FileResponse(
@@ -232,7 +280,6 @@ def get_public_builder_asset(tenant_id: int, filename: str):
             headers=response_headers,
         )
 
-    storage_key = f"tenant_{tenant_id}/builder_assets/{safe_filename}"
     try:
         signed_url = create_builder_asset_signed_url(storage_key=storage_key, expires_in=60)
     except BuilderAssetStorageError as error:

@@ -245,9 +245,16 @@ def _deliver_internal(row: dict[str, Any]) -> None:
 
 
 def _smtp_settings() -> tuple[str, int, str, str, str, bool]:
+    enabled = os.getenv("EMAIL_CHANNEL_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        raise DeliveryError(
+            "email_channel_disabled",
+            retryable=False,
+            terminal_outcome="revoked",
+        )
     host = os.getenv("SMTP_HOST", "").strip()
     if not host:
-        raise DeliveryError("smtp_not_configured")
+        raise DeliveryError("smtp_not_configured", retryable=False)
     try:
         port = int(os.getenv("SMTP_PORT", "587"))
     except ValueError as error:

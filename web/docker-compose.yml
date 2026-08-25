@@ -3,13 +3,14 @@ name: madar
 services:
   redis:
     image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
-    container_name: madar-redis
+    container_name: madar-${MADAR_SLOT:-active}-redis
     restart: unless-stopped
     user: "999:1000"
     init: true
     read_only: true
     cap_drop: ["ALL"]
     security_opt: ["no-new-privileges:true"]
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "noeviction"]
     tmpfs:
       - /data:rw,noexec,nosuid,uid=999,gid=1000,size=64m
     healthcheck:
@@ -23,12 +24,16 @@ services:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${MADAR_REDIS_BIND_PORT:-6379}:6379"
 
   backend:
+    image: ${MADAR_BACKEND_IMAGE:-madar-backend:development}
     build:
       context: ./backend
-    container_name: madar-backend
+      args:
+        MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+        MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
+    container_name: madar-${MADAR_SLOT:-active}-backend
     restart: unless-stopped
     init: true
     read_only: true
@@ -40,6 +45,10 @@ services:
       - ${MADAR_ENV_FILE:-../.env}
     environment:
       APP_ENV: production
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+      MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
+      SCHEMA_COMPATIBLE_MIN: ${SCHEMA_COMPATIBLE_MIN:-81}
+      SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:-82}
       # Direct PostgreSQL credentials are operator-only. An explicit empty
       # override makes the key unusable even when the shared env_file contains
       # it for backup or catalog-verification tooling.
@@ -133,7 +142,7 @@ services:
       - parser_internal
       - remote_ingestion_internal
     ports:
-      - "127.0.0.1:8001:8000"
+      - "127.0.0.1:${MADAR_BACKEND_BIND_PORT:-8001}:8000"
     volumes:
       - ${MADAR_STORAGE_ROOT:-../backend}/avatar_uploads:/app/avatar_uploads
       - type: bind
@@ -151,6 +160,7 @@ services:
       - ./frontend/security_headers.conf.template:/test-repository/frontend/security_headers.conf.template:ro
       - ./docker-compose.yml:/test-repository/docker-compose.yml:ro
       - ./docker-compose.dev.yml:/test-repository/docker-compose.dev.yml:ro
+      - ./deployment:/test-repository/deployment:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
       interval: 15s
@@ -164,9 +174,10 @@ services:
       options: {max-size: "20m", max-file: "5"}
 
   notification-worker:
+    image: ${MADAR_BACKEND_IMAGE:-madar-backend:development}
     build:
       context: ./backend
-    container_name: madar-notification-worker
+    container_name: madar-${MADAR_SLOT:-active}-notification-worker
     restart: unless-stopped
     init: true
     read_only: true
@@ -179,6 +190,15 @@ services:
       - ${MADAR_ENV_FILE:-../.env}
     environment:
       APP_ENV: production
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+      MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
+      EMAIL_CHANNEL_ENABLED: ${EMAIL_CHANNEL_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SUPABASE_DB_URL: ""
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
@@ -205,9 +225,10 @@ services:
       options: {max-size: "20m", max-file: "5"}
 
   calendar-sync-worker:
+    image: ${MADAR_BACKEND_IMAGE:-madar-backend:development}
     build:
       context: ./backend
-    container_name: madar-calendar-sync-worker
+    container_name: madar-${MADAR_SLOT:-active}-calendar-sync-worker
     restart: unless-stopped
     init: true
     read_only: true
@@ -219,6 +240,8 @@ services:
       - ${MADAR_ENV_FILE:-../.env}
     environment:
       APP_ENV: production
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+      MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
       SUPABASE_DB_URL: ""
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
@@ -254,9 +277,10 @@ services:
       options: {max-size: "20m", max-file: "5"}
 
   parser-worker:
+    image: ${MADAR_BACKEND_IMAGE:-madar-backend:development}
     build:
       context: ./backend
-    container_name: madar-parser-worker
+    container_name: madar-${MADAR_SLOT:-active}-parser-worker
     restart: unless-stopped
     init: true
     read_only: true
@@ -268,6 +292,8 @@ services:
       - /tmp:rw,noexec,nosuid,size=256m,uid=65534,gid=65534
     environment:
       APP_ENV: production
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+      MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
       DATA_UPLOAD_DIR: /app/private_uploads
       MADAR_UPLOAD_WORKSPACE_DIR: /tmp/madar_parser
       PARSER_WORKER_PROCESS: "true"
@@ -294,9 +320,10 @@ services:
       options: {max-size: "20m", max-file: "5"}
 
   remote-ingestion-worker:
+    image: ${MADAR_BACKEND_IMAGE:-madar-backend:development}
     build:
       context: ./backend
-    container_name: madar-remote-ingestion-worker
+    container_name: madar-${MADAR_SLOT:-active}-remote-ingestion-worker
     restart: unless-stopped
     init: true
     read_only: true
@@ -308,6 +335,8 @@ services:
       - /tmp:rw,noexec,nosuid,size=32m,uid=65534,gid=65534
     environment:
       APP_ENV: production
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+      MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
       REMOTE_INGESTION_WORKER_HOST: 0.0.0.0
       REMOTE_INGESTION_WORKER_PORT: 8093
       REMOTE_INGESTION_DEADLINE_SECONDS: ${REMOTE_INGESTION_DEADLINE_SECONDS:-35}
@@ -330,11 +359,14 @@ services:
       options: {max-size: "20m", max-file: "5"}
 
   frontend:
+    image: ${MADAR_FRONTEND_IMAGE:-madar-frontend:development}
     build:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-}
-    container_name: madar-frontend
+        MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
+        MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
+    container_name: madar-${MADAR_SLOT:-active}-frontend
     restart: unless-stopped
     init: true
     read_only: true
@@ -346,10 +378,11 @@ services:
       - /etc/nginx/conf.d:rw,noexec,nosuid,uid=101,gid=101,size=1m
     environment:
       APP_ENV: production
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
       MADAR_CSP_CONNECT_SRC: ${MADAR_CSP_CONNECT_SRC:-https://api.madarportal.com}
       MADAR_HSTS: ${MADAR_HSTS:-}
     ports:
-      - "127.0.0.1:3000:8080"
+      - "127.0.0.1:${MADAR_FRONTEND_BIND_PORT:-3000}:8080"
     depends_on:
       backend:
         condition: service_healthy

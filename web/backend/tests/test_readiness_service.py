@@ -128,7 +128,7 @@ class ReadinessServiceTests(unittest.TestCase):
             observed.append(url)
             return SimpleNamespace(
                 status_code=200,
-                json=lambda: [{"schema_version": readiness_service.EXPECTED_SCHEMA_VERSION}],
+                json=lambda: [{"schema_version": readiness_service.DEFAULT_SCHEMA_COMPATIBLE_MAX}],
             )
 
         with patch.dict(os.environ, {
@@ -150,10 +150,10 @@ class ReadinessServiceTests(unittest.TestCase):
             "get",
             return_value=SimpleNamespace(
                 status_code=200,
-                json=lambda: [{"schema_version": readiness_service.EXPECTED_SCHEMA_VERSION - 1}],
+                json=lambda: [{"schema_version": readiness_service.DEFAULT_SCHEMA_COMPATIBLE_MIN - 1}],
             ),
         ):
-            self.assertEqual(readiness_service.check_schema(), "missing")
+            self.assertEqual(readiness_service.check_schema(), "incompatible")
 
         with patch.dict(os.environ, {
             "SUPABASE_URL": "https://supabase.example",
