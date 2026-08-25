@@ -17,6 +17,6 @@ The new controller builds immutable SHA-tagged artifacts, validates an inactive 
 Two issues prevent a fully green operational handoff today:
 
 1. The provider credential exposed during investigation has not yet been rotated. Its value is not repeated in this report.
-2. Root authentication is required to install the tracked systemd units. The root unit remains legacy, so `madar-auto-deploy.timer` remains intentionally inactive. The legacy executable chain is bridged to the safe controller, but the old privileged storage-preparation drop-in and timer semantics must not be enabled.
+2. Root authentication is required to install the tracked systemd units. The root unit remains legacy. `madar-auto-deploy.timer` is inactive but still enabled at boot; it must remain stopped and must be disabled or replaced before any reboot. The legacy executable chain is bridged to the safe controller, but the old privileged storage-preparation drop-in and timer semantics must not run.
 
 Accordingly, the current release is healthy and the promotion was successful, but unattended deployment remains disabled and full production security readiness is **NO-GO until credential rotation**.

@@ -8,7 +8,7 @@
 
 Manual controlled immutable promotion: **GO**.
 
-Unattended automatic promotion: **NO-GO until the tracked root systemd units are installed and the safe no-op is verified**. The timer is intentionally inactive.
+Unattended automatic promotion: **NO-GO until the tracked root systemd units are installed and the safe no-op is verified**. The timer is inactive but remains enabled at boot, so the host must not be rebooted before the root operator disables/replaces the legacy unit.
 
 ## Security readiness
 

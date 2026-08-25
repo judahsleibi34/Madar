@@ -3,7 +3,7 @@
 ## Immediate operator actions
 
 1. **Rotate the exposed provider credential.** The credential has not been revoked or rotated. Do not repeat it in tickets, logs, or commands. Follow the previously supplied provider-specific rotation order, update every confirmed consumer atomically, restart/recreate Madar services in a controlled slot promotion, verify auth/database behavior, then revoke the old credential.
-2. **Install the root control-plane units.** Until a root operator applies the tracked installer and validates a no-op, keep `madar-auto-deploy.timer` inactive.
+2. **Install the root control-plane units.** The timer is currently inactive but enabled at boot. Until a root operator applies the tracked installer and validates a no-op, keep it stopped and avoid rebooting; disabling the legacy unit or replacing it with the tested unit is required.
 
 ## Operational hardening
 
