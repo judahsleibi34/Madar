@@ -172,6 +172,7 @@ class DockerGitOperations:
             "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
             "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
             "DATA_DELETION_WORKER_REQUIRED": "true" if workers_active and self.schema_version() >= 83 else "false",
+            "DATA_DELETION_WORKER_HEALTH_URL": "http://data-deletion-worker:8094/health",
         })
         # The inactive candidate deliberately has no queue consumers. Its
         # backend must validate core dependencies without interpreting the

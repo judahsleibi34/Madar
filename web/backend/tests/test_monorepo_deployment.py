@@ -66,6 +66,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("docker-compose.release.yml", self.release_deploy)
         self.assertIn("MADAR_CANDIDATE_READY_ATTEMPTS", self.release_deploy)
         self.assertIn("candidate_deep_validation_failed:", self.release_deploy)
+        self.assertIn('"DATA_DELETION_WORKER_HEALTH_URL": "http://data-deletion-worker:8094/health"', self.release_deploy)
+        self.assertIn("DATA_DELETION_WORKER_HEALTH_URL: ${DATA_DELETION_WORKER_HEALTH_URL:-http://data-deletion-worker:8094/health}", self.compose)
 
     def test_release_slots_use_non_overlapping_explicit_ipam(self):
         self.assertIn('"blue": {', self.release_deploy)
