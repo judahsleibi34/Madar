@@ -6,9 +6,9 @@ services:
 
   backend:
     user: "65534:1000"
-    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [default, parser_internal, remote_ingestion_internal, stage_control]
     environment:
-      SUPABASE_URL: http://host.docker.internal:15430
+      SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_ANON_KEY: ${STAGING_ANON_JWT}
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
       FRONTEND_URLS: http://127.0.0.1:13000
@@ -29,23 +29,23 @@ services:
       STORAGE_DISK_FREE_FLOOR_BYTES: 104857600
 
   notification-worker:
-    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [default, stage_control]
     environment:
-      SUPABASE_URL: http://host.docker.internal:15430
+      SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
       EMAIL_CHANNEL_ENABLED: "false"
 
   data-deletion-worker:
     user: "65534:1000"
-    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [default, stage_control]
     environment:
-      SUPABASE_URL: http://host.docker.internal:15430
+      SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
 
   calendar-sync-worker:
-    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [default, stage_control]
     environment:
-      SUPABASE_URL: http://host.docker.internal:15430
+      SUPABASE_URL: http://madar-stage-gateway:5430
       SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
       CALENDAR_SYNC_WORKER_ENABLED: "true"
 
@@ -53,3 +53,8 @@ services:
     environment:
       MADAR_CSP_CONNECT_SRC: http://127.0.0.1:18001
       MADAR_HSTS: ""
+
+networks:
+  stage_control:
+    external: true
+    name: madar-stage-control_default
