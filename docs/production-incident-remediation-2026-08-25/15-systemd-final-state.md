@@ -9,6 +9,12 @@ Root-owned installed files remain unchanged:
 - `/etc/systemd/system/madar-auto-deploy.timer`
 - `/usr/local/sbin/madar-auto-deploy`
 
+The user-scoped controller at
+`/home/madar/.local/lib/madar/web/deployment/bin/madar-release-deploy` was
+updated for the controlled correction. Its previous executable was retained as
+`madar-release-deploy.pre-login-origin`. This does not change the root systemd
+unit or enable the timer.
+
 The installed root service still includes the legacy privileged recursive storage-preparation drop-in, and the timer still uses `OnUnitActiveSec=2min`. Root installation was blocked because `sudo` requires interactive authentication.
 
 The root wrapper resolves through the now-safe `/home/madar/docker_auto.sh` compatibility bridge, but this is not sufficient justification to enable the legacy unit.

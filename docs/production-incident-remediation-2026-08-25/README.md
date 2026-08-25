@@ -22,5 +22,6 @@ This directory is the source of truth for the 2026-08-25 failed-deployment incid
 - [Tests](17-test-results.md)
 - [Remaining risks](18-remaining-risks.md)
 - [Final readiness](19-final-production-readiness.md)
+- [Login API-origin regression](20-login-api-origin-regression.md)
 
 No secret values are recorded in these reports.

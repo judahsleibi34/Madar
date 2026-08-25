@@ -14,3 +14,18 @@ Validation:
 - frontend unit, lint, and production build gates pass.
 
 No UI layout, style, branding, or visual design changed. Browser-extension/injected jsDelivr requests are not Madar dependencies and were not accommodated by weakening policy.
+
+## Cloudflare edge evidence
+
+After the corrective promotion, the origin HTML remained 3,860 bytes with zero
+executable inline scripts and no Cloudflare Insights source. The Chrome-like
+public edge response was 5,157 bytes and contained one Cloudflare-marked inline
+block plus a `static.cloudflareinsights.com` script reference. These elements
+appear only after Cloudflare serves the response. Madar's CSP correctly remains
+`script-src 'self'` and blocks them.
+
+No third-party script origin was whitelisted. If Browser Insights/Web Analytics
+is not operationally required, the preferred resolution is for an authorized
+Cloudflare operator to disable that injection. If it is required, its exact
+minimal CSP changes require separate operator approval; this remediation does
+not weaken CSP merely to silence the console.

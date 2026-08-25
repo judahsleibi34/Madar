@@ -18,3 +18,20 @@ All times are UTC on 2026-08-25.
 - The explicit health URL and bounded candidate-readiness diagnostics were added.
 - At `16:24:19`, traffic switched to blue. The observation period completed at `16:25:22`; blue was recorded known-good and the failed-SHA record was cleared.
 - The production checkout was fast-forwarded to the exact running application SHA without container recreation.
+- A live Chrome login test then showed `POST
+  https://madarportal.com/api/auth/login` returning frontend HTML with HTTP 405.
+- Source-to-bundle tracing proved that the immutable builder omitted
+  `VITE_API_URL`, causing Vite to compile its relative `/api` fallback.
+- The build, image metadata, candidate validation, non-JSON response handling,
+  and regression tests were corrected in `ea2ae575...`.
+- The first inactive green preparation failed before traffic or worker cutover
+  because a retained Redis container referenced a removed legacy network. Blue
+  remained healthy; mandatory inactive-service recreation was added in
+  `4faf63a6...`.
+- Green `4faf63a6...` passed bundle, readiness, version, CORS, and controlled
+  invalid-login checks. Traffic switched at `19:18:36`; the 60-second
+  observation completed at `19:19:39`.
+- Live public validation confirmed the canonical API origin, JSON backend login
+  response, all required workers healthy, and edge-only Cloudflare script
+  injection. Production checkout was fast-forwarded to `4faf63a6...` without
+  rebuilding or restarting the running release.

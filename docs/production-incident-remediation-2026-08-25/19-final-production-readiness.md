@@ -2,11 +2,15 @@
 
 ## Current service
 
-**PRODUCTION HEALTHY. PROMOTION SUCCESSFUL.** The active release is immutable, externally reachable, schema compatible, and fully ready with required workers.
+**PRODUCTION HEALTHY. CORRECTIVE PROMOTION SUCCESSFUL.** The active release
+`4faf63a6...` is immutable, externally reachable, schema compatible, fully
+ready with required workers, and contains the corrected canonical API origin.
+The login request path now reaches `https://api.madarportal.com/auth/login`;
+credential-free validation proves correct JSON/CORS behavior.
 
 ## Deployment readiness
 
-Manual controlled immutable promotion: **GO**.
+Manual controlled immutable promotion and critical login-path gate: **GO**.
 
 Unattended automatic promotion: **NO-GO until the tracked root systemd units are installed and the safe no-op is verified**. The timer is inactive but remains enabled at boot, so the host must not be rebooted before the root operator disables/replaces the legacy unit.
 
