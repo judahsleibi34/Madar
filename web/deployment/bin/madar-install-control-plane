@@ -53,14 +53,38 @@ fi
 install -d -m 0700 "$backup_root"
 for current in \
   /usr/local/sbin/madar-auto-deploy \
+  /home/madar/docker_auto.sh \
   /etc/systemd/system/madar-auto-deploy.service \
   /etc/systemd/system/madar-auto-deploy.timer \
+  /etc/systemd/system/madar-auto-deploy.service.d \
   /etc/systemd/system/madar-release-proxy.service; do
   if [[ -e "$current" || -L "$current" ]]; then
     cp -a -- "$current" "$backup_root/$(basename "$current")"
   fi
 done
+(
+  cd -- "$backup_root"
+  find . -mindepth 1 -type f ! -name SHA256SUMS -print0 \
+    | sort -z \
+    | xargs -0 --no-run-if-empty sha256sum > SHA256SUMS
+)
+chmod 0600 "$backup_root/SHA256SUMS"
 
+systemctl is-active --quiet madar-auto-deploy.timer && {
+  echo "refusing installation while madar-auto-deploy.timer is active" >&2
+  exit 1
+}
+systemctl is-enabled --quiet madar-auto-deploy.timer && {
+  echo "refusing installation while madar-auto-deploy.timer is enabled" >&2
+  exit 1
+}
+
+# The controller is immutable/root-owned, but the non-root deployment service
+# must be able to traverse its installation tree.
+install -d -o root -g madar -m 0750 \
+  /usr/local/lib/madar \
+  /usr/local/lib/madar/web \
+  "$install_root"
 for relative in "${tracked_files[@]}"; do
   source_path="$deployment_root/$relative"
   [[ -f "$source_path" ]] || { echo "missing tracked control-plane file: $relative" >&2; exit 1; }
@@ -68,6 +92,8 @@ for relative in "${tracked_files[@]}"; do
   [[ "$relative" == bin/* ]] && mode=0755
   install -D -o root -g root -m "$mode" "$source_path" "$install_root/$relative"
 done
+find /usr/local/lib/madar -type d -exec chown root:madar {} +
+find /usr/local/lib/madar -type d -exec chmod 0750 {} +
 install -o root -g root -m 0755 \
   "$deployment_root/bin/madar-auto-deploy" /usr/local/sbin/madar-auto-deploy
 for unit in "${units[@]}"; do
@@ -75,7 +101,12 @@ for unit in "${units[@]}"; do
     "$deployment_root/systemd/$unit" "/etc/systemd/system/$unit"
 done
 
-install -d -o madar -g madar -m 0700 /var/lib/madar/releases
-install -d -o madar -g madar -m 0755 /var/lib/madar/proxy
+# The old privileged storage-preparation drop-in and direct in-place deployer
+# were preserved above. Remove their live authority before daemon-reload.
+rm -rf -- /etc/systemd/system/madar-auto-deploy.service.d
+rm -f -- /home/madar/docker_auto.sh
+
+install -d -o madar -g madar -m 0700 /home/madar/.local/state/madar/releases
+install -d -o madar -g madar -m 0755 /home/madar/.local/state/madar/proxy
 systemctl daemon-reload
 echo "immutable Madar control plane installed; auto-deploy timer remains stopped"

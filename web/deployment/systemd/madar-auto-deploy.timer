@@ -2,7 +2,7 @@
 Description=Check Madar main for an eligible immutable release
 
 [Timer]
-OnBootSec=5min
+OnActiveSec=2min
 OnUnitInactiveSec=2min
 RandomizedDelaySec=20s
 AccuracySec=10s

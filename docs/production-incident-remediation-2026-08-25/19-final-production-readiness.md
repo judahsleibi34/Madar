@@ -2,21 +2,35 @@
 
 ## Current service
 
-**PRODUCTION HEALTHY. CORRECTIVE PROMOTION SUCCESSFUL.** The active release
-`4faf63a6...` is immutable, externally reachable, schema compatible, fully
-ready with required workers, and contains the corrected canonical API origin.
-The login request path now reaches `https://api.madarportal.com/auth/login`;
-credential-free validation proves correct JSON/CORS behavior.
+**PRODUCTION HEALTHY.** The active immutable application release is
+`67aff17f4a521a01f87bd8ad76a570acaf07df9b` in green. Production checkout
+`2f8ecf99bfdfaca2d9fff479be9efcddada66969` is application-equivalent: its only
+delta from the active release is three incident-report files. Schema is 83.
+
+External frontend, API live/readiness, JSON login validation, approved and
+rejected CORS origins, strict CSP, and unknown-public-site no-fallback behavior
+passed after timer enablement.
 
 ## Deployment readiness
 
-Manual controlled immutable promotion and critical login-path gate: **GO**.
+Unattended immutable promotion: **GO**.
 
-Unattended automatic promotion: **NO-GO until the tracked root systemd units are installed and the safe no-op is verified**. The timer is inactive but remains enabled at boot, so the host must not be rebooted before the root operator disables/replaces the legacy unit.
+The root systemd path now invokes only the immutable blue/green controller.
+The manual service test and three real timer cycles exited successfully without
+changing container IDs, worker IDs, release state, prepared rollback state,
+proxy upstream, schema, or traffic target. Deployment locking and failed-SHA
+suppression are covered by the focused 39-test controller suite.
+
+A later controlled reboot drill is recommended but is not required to keep the
+current timer enabled: Docker restart policies, service ordering, persistent
+state paths, and the sole enabled Madar timer were verified statically.
 
 ## Security readiness
 
-**NO-GO until the previously exposed provider credential is rotated.** The application/configuration fixes do not reduce the risk of an already exposed credential.
+Madar is using the replacement Supabase server credential in both active and
+rollback slots. Provider-side revocation of the superseded exposed individual
+key remains an operator security action. CSP remains strict (`script-src
+'self'`).
 
 ## Deferred product/DR readiness
 
@@ -24,4 +38,5 @@ Unattended automatic promotion: **NO-GO until the tracked root systemd units are
 - Full DR remains blocked on physical media and a replacement-host restore drill.
 - Payment gateway is future work.
 
-The current release may continue serving while the immediate operator actions are completed, but these conditions must not be represented as a fully unconditional production GO.
+These external/product prerequisites do not negate the technical GO for the
+installed unattended immutable deployment control plane.
