@@ -9,6 +9,7 @@ Type=oneshot
 User=madar
 Group=madar
 UMask=0077
+WorkingDirectory=/home/madar/saas/Madar
 Environment=MADAR_PRODUCTION_REPO=/home/madar/saas/Madar
 Environment=MADAR_ENV_FILE=/home/madar/saas/Madar/.env
 Environment=MADAR_DEPLOY_STATE_ROOT=/home/madar/.local/state/madar/releases

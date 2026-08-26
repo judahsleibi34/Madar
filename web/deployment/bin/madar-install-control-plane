@@ -79,6 +79,12 @@ systemctl is-enabled --quiet madar-auto-deploy.timer && {
   exit 1
 }
 
+# The controller is immutable/root-owned, but the non-root deployment service
+# must be able to traverse its installation tree.
+install -d -o root -g madar -m 0750 \
+  /usr/local/lib/madar \
+  /usr/local/lib/madar/web \
+  "$install_root"
 for relative in "${tracked_files[@]}"; do
   source_path="$deployment_root/$relative"
   [[ -f "$source_path" ]] || { echo "missing tracked control-plane file: $relative" >&2; exit 1; }
@@ -86,6 +92,8 @@ for relative in "${tracked_files[@]}"; do
   [[ "$relative" == bin/* ]] && mode=0755
   install -D -o root -g root -m "$mode" "$source_path" "$install_root/$relative"
 done
+find /usr/local/lib/madar -type d -exec chown root:madar {} +
+find /usr/local/lib/madar -type d -exec chmod 0750 {} +
 install -o root -g root -m 0755 \
   "$deployment_root/bin/madar-auto-deploy" /usr/local/sbin/madar-auto-deploy
 for unit in "${units[@]}"; do

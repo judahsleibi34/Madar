@@ -148,6 +148,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
 
     def test_docker_proxy_is_hardened_and_preserves_forwarded_request_context(self):
         self.assertIn("MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx", self.auto_service)
+        self.assertIn("WorkingDirectory=/home/madar/saas/Madar", self.auto_service)
         self.assertIn('driver not in {"nginx", "docker-nginx"}', self.switch)
         self.assertIn("network_mode: host", self.proxy_compose)
         self.assertIn("MADAR_PROXY_CONFIG_ROOT:-/var/lib/madar/proxy", self.proxy_compose)
@@ -198,6 +199,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("/etc/systemd/system/madar-auto-deploy.service.d", self.installer)
         self.assertIn("SHA256SUMS", self.installer)
         self.assertIn("sha256sum", self.installer)
+        self.assertIn("chown root:madar", self.installer)
+        self.assertIn("chmod 0750", self.installer)
         self.assertIn("refusing installation while madar-auto-deploy.timer is enabled", self.installer)
         self.assertIn("rm -rf -- /etc/systemd/system/madar-auto-deploy.service.d", self.installer)
         self.assertIn("rm -f -- /home/madar/docker_auto.sh", self.installer)
