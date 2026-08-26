@@ -107,6 +107,7 @@ class FakeQuery:
         self.not_null_columns = set()
         self.insert_payload = None
         self.update_payload = None
+        self.delete_requested = False
         self.limit_count = None
         self.order_column = None
         self.order_desc = False
@@ -155,6 +156,10 @@ class FakeQuery:
         self.update_payload = payload
         return self
 
+    def delete(self):
+        self.delete_requested = True
+        return self
+
     def execute(self):
         if self.insert_payload is not None:
             row = {
@@ -185,6 +190,12 @@ class FakeQuery:
                     row.update(self.update_payload)
                     updated_rows.append(row)
             return FakeResponse(updated_rows)
+
+        if self.delete_requested:
+            table_rows = self.supabase.tables.get(self.table_name, [])
+            deleted = [row for row in table_rows if row in rows]
+            self.supabase.tables[self.table_name] = [row for row in table_rows if row not in rows]
+            return FakeResponse(deleted)
 
         if self.order_column:
             rows = sorted(
@@ -245,6 +256,7 @@ class FakeSupabase:
                     "created_at": "2026-06-03T14:00:00+00:00",
                 }
             ],
+            "builder_form_drafts": [],
         }
 
     def table(self, table_name):
@@ -450,6 +462,46 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"]["message"], "Required field is missing")
+
+    def test_invalid_email_is_rejected_with_safe_field_context(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada", "field_email": "not-an-email"}},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            {
+                "message": "Invalid field value",
+                "field_id": "field_email",
+                "field_label": "Email",
+                "field_type": "email",
+                "reason": "email",
+            },
+        )
+
+    def test_server_type_validation_covers_scale_choices_and_whitespace(self):
+        fields = [
+            {"id": "name", "label": "Name", "type": "shortText", "required": True},
+            {"id": "scale", "label": "Score", "type": "linearScale", "scaleMin": 1, "scaleMax": 5},
+            {"id": "choices", "label": "Choices", "type": "checkboxes"},
+        ]
+        form = {"sections": [{"fields": fields}]}
+
+        for answers, field_id in [
+            ({"name": "   "}, "name"),
+            ({"name": "Ada", "scale": 6}, "scale"),
+            ({"name": "Ada", "choices": "One"}, "choices"),
+        ]:
+            with self.subTest(field_id=field_id), self.assertRaises(HTTPException) as raised:
+                public_site_routes.validate_form_answers(form, answers)
+            self.assertEqual(raised.exception.detail["field_id"], field_id)
 
     def test_public_submission_honeypot_is_rejected_without_insert(self):
         fake_supabase = FakeSupabase()
@@ -1525,6 +1577,83 @@ class BuilderFormSubmissionTests(unittest.TestCase):
 
 
 class PublicSiteTenantResolutionTests(unittest.TestCase):
+    def test_authenticated_submission_answers_can_be_edited(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "record_audit_event") as record_audit:
+            response = client.patch(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"answers": {"field_name": "Edited"}},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["record"]["answers"], {"field_name": "Edited"})
+        self.assertEqual(fake_supabase.tables["builder_form_submissions"][0]["answers"], {"field_name": "Edited"})
+        self.assertEqual(record_audit.call_args.kwargs["action"], "builder.form_submission_updated")
+
+    def test_authenticated_submission_can_be_deleted(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "record_audit_event"):
+            response = client.delete(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["deleted_id"], SUBMISSION_ID)
+        self.assertEqual(fake_supabase.tables["builder_form_submissions"], [])
+
+    def test_authenticated_draft_can_be_edited_and_deleted(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_form_drafts"] = [{
+            "id": SUBMISSION_ID, "tenant_id": 1, "project_id": PROJECT_ID,
+            "form_id": FORM_ID, "form_title": "Contact form", "form_version": 4,
+            "answers": {"field_name": "Partial"}, "field_snapshot": [],
+            "page_index": 0, "language": "en",
+            "created_at": "2026-06-03T14:00:00+00:00",
+            "updated_at": "2026-06-03T14:00:00+00:00",
+        }]
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "record_audit_event"):
+            update_response = client.patch(
+                f"/builder/projects/{PROJECT_ID}/form-drafts/{SUBMISSION_ID}",
+                json={"answers": {"field_name": "Edited partial"}},
+            )
+            delete_response = client.delete(
+                f"/builder/projects/{PROJECT_ID}/form-drafts/{SUBMISSION_ID}"
+            )
+
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["record"]["answers"], {"field_name": "Edited partial"})
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(fake_supabase.tables["builder_form_drafts"], [])
+
+    def test_record_mutations_require_authentication(self):
+        fake_supabase = FakeSupabase()
+        client = build_builder_client(fake_supabase)
+
+        with patch.object(builder_routes, "service_supabase", fake_supabase):
+            update_response = client.patch(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}",
+                json={"answers": {"field_name": "Blocked"}},
+            )
+            delete_response = client.delete(
+                f"/builder/projects/{PROJECT_ID}/form-submissions/{SUBMISSION_ID}"
+            )
+
+        self.assertEqual(update_response.status_code, 401)
+        self.assertEqual(delete_response.status_code, 401)
+        self.assertEqual(fake_supabase.tables["builder_form_submissions"][0]["answers"], {"field_name": "Existing"})
+
     def test_public_resolve_tenant_id_prefers_website_settings_tenant_id(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["website_settings"] = [

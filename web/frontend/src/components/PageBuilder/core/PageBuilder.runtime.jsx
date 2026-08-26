@@ -438,23 +438,35 @@ export const createRuntimeFormRenderers = ({
                 {isPagedForm ? `Page ${currentPageIndex + 1} of ${formSections.length}` : ""}
               </span>
 
-              {isPagedForm && currentPageIndex < formSections.length - 1 ? (
-                <button
-                  type="button"
-                  onClick={(event) => changeFormPage(event, form.id, currentPageIndex + 1, formSections.length)}
-                >
-                  Next
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="runtime-submit"
-                  disabled={!allowInteraction}
-                  onClick={() => submitRuntimeForm(form)}
-                >
-                  Submit
-                </button>
-              )}
+              <div className="runtime-form-actions">
+                {form.resumeLaterEnabled !== false && (
+                  <button
+                    type="button"
+                    className="runtime-resume-later"
+                    disabled
+                    title="Available to visitors on the published form"
+                  >
+                    Resume later
+                  </button>
+                )}
+                {isPagedForm && currentPageIndex < formSections.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={(event) => changeFormPage(event, form.id, currentPageIndex + 1, formSections.length)}
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="runtime-submit"
+                    disabled={!allowInteraction}
+                    onClick={() => submitRuntimeForm(form)}
+                  >
+                    Submit
+                  </button>
+                )}
+              </div>
             </div>
           </>
         )}

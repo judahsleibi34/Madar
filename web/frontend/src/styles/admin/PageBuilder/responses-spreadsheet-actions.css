@@ -1,0 +1,50 @@
+.page-builder .responses-browser-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.page-builder .responses-browser-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--theme-surface-2);
+  color: var(--theme-text);
+  font-size: 12px;
+  font-weight: 950;
+}
+.page-builder .responses-spreadsheet-button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.32);
+  border-radius: var(--app-radius-control, 10px);
+  background: var(--theme-primary-soft);
+  color: var(--madar-red);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.page-builder .responses-spreadsheet-button:hover:not(:disabled) {
+  border-color: var(--madar-red);
+  background: var(--madar-red);
+  color: var(--theme-text-inverse);
+}
+
+.page-builder .responses-spreadsheet-button:focus-visible {
+  outline: none;
+  box-shadow: var(--app-focus-ring);
+}
+
+.page-builder .responses-spreadsheet-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

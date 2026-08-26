@@ -13,6 +13,8 @@ import { cleanBuilderProject } from "../core/PageBuilder.project";
 import { getQuizSettings } from "../core/PageBuilder.quiz";
 import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import { fetchBuilderProject } from "../services/PageBuilder.api";
+import RuntimeFormToast from "../runtime/RuntimeFormToast";
+import { getRuntimeFormErrors } from "../runtime/formValidation";
 import "../../../styles/admin/PageBuilder/index.css";
 
 const deferEffectStateUpdate = (callback) => {
@@ -29,9 +31,6 @@ const getFieldOptions = (field = {}, lang = "en") =>
   getLocalizedOptions(field, lang).filter((option) =>
     String(option || "").trim()
   );
-
-const isEmptyAnswer = (value) =>
-  Array.isArray(value) ? value.length === 0 : String(value ?? "").trim() === "";
 
 const getAnswerValue = (answer) =>
   answer && typeof answer === "object" && !Array.isArray(answer) && "value" in answer
@@ -73,6 +72,7 @@ export default function BuilderFormPreviewPage() {
   const [submitted, setSubmitted] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizDeactivated, setQuizDeactivated] = useState(false);
+  const [formToast, setFormToast] = useState(null);
   const quizCompleteRef = useRef(false);
   const formShellRef = useRef(null);
   const currentSection = sections[Math.min(pageIndex, Math.max(sections.length - 1, 0))];
@@ -149,12 +149,11 @@ export default function BuilderFormPreviewPage() {
   };
 
   const validateFields = (fields = []) => {
-    const nextErrors = {};
-    fields.forEach((field) => {
-      if (field.required && isEmptyAnswer(answers[field.id])) {
-        nextErrors[field.id] = "This question is required.";
-      }
-    });
+    const values = fields.reduce((current, field) => ({
+      ...current,
+      [field.id]: answers[field.id] !== undefined ? answers[field.id] : field.defaultValue,
+    }), {});
+    const nextErrors = getRuntimeFormErrors(fields, values);
     setErrors((current) => ({ ...current, ...nextErrors }));
     return Object.keys(nextErrors).length === 0;
   };
@@ -177,12 +176,16 @@ export default function BuilderFormPreviewPage() {
     const allFields = sections.flatMap((section) => section.fields || []);
     if (!validateFields(allFields)) {
       const firstInvalidSectionIndex = sections.findIndex((section) =>
-        (section.fields || []).some((field) => field.required && isEmptyAnswer(answers[field.id]))
+        (section.fields || []).some((field) => getRuntimeFormErrors([field], {
+          [field.id]: answers[field.id] !== undefined ? answers[field.id] : field.defaultValue,
+        })[field.id])
       );
       if (firstInvalidSectionIndex >= 0) {
         setPageIndex(firstInvalidSectionIndex);
       }
-      setFormError("Please answer the required questions before submitting.");
+      const message = "Please answer the required questions before submitting.";
+      setFormError(message);
+      setFormToast({ id: Date.now(), title: "Please check the form", message });
       return;
     }
     setFormError("");
@@ -295,8 +298,8 @@ export default function BuilderFormPreviewPage() {
     }
 
     return (
-      <div className="builder-form-preview-question" key={field.id}>
-        <label>
+      <div className={`builder-form-preview-question ${errors[field.id] ? "has-error" : ""}`} key={field.id}>
+        <label aria-invalid={errors[field.id] ? "true" : undefined}>
           <span>
             {label}
             {field.required && <span className="form-required-marker" aria-hidden="true"> *</span>}
@@ -322,6 +325,10 @@ export default function BuilderFormPreviewPage() {
 
   return (
     <main className="builder-form-preview-page" dir={formDirection} style={getPageBuilderThemeVars(project?.theme)}>
+      <RuntimeFormToast
+        toast={formToast}
+        onDismiss={() => setFormToast(null)}
+      />
       <header className="builder-form-preview-topbar">
         <button type="button" onClick={() => navigate(`/page-builder/projects/${projectId}/forms`)}>
           <ArrowLeft size={16} aria-hidden="true" />
@@ -330,7 +337,7 @@ export default function BuilderFormPreviewPage() {
         <strong>Form preview</strong>
       </header>
 
-      <form ref={formShellRef} className="builder-form-preview-shell" onSubmit={submitForm}>
+      <form ref={formShellRef} className="builder-form-preview-shell" noValidate onSubmit={submitForm}>
         {languageMode === "bilingual" && (
           <div className="builder-form-preview-header">
             <div className="runtime-language-switch" role="group" aria-label="Form language">
@@ -390,11 +397,23 @@ export default function BuilderFormPreviewPage() {
                 </button>
               )}
               {isPagedForm && <span className="runtime-form-page-count">Page {pageIndex + 1} of {sections.length}</span>}
-              {isPagedForm && pageIndex < sections.length - 1 ? (
-                <button type="button" onClick={goNext}>Next</button>
-              ) : (
-                <button type="submit">Submit</button>
-              )}
+              <div className="builder-form-preview-action-group">
+                {!isQuiz && form.resumeLaterEnabled !== false && (
+                  <button
+                    type="button"
+                    className="runtime-resume-later"
+                    disabled
+                    title="Available to visitors on the published form"
+                  >
+                    Resume later
+                  </button>
+                )}
+                {isPagedForm && pageIndex < sections.length - 1 ? (
+                  <button type="button" onClick={goNext}>Next</button>
+                ) : (
+                  <button type="submit">Submit</button>
+                )}
+              </div>
             </footer>
           </>
         )}

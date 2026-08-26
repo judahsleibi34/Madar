@@ -7622,6 +7622,7 @@ export default function PageBuilder({
       selectForm={selectForm}
       setActiveTab={setActiveTab}
       getFormFields={getFormFields}
+      updateActiveForm={updateActiveForm}
       formatSavedValue={formatSavedValue}
       showToast={showToast}
     />

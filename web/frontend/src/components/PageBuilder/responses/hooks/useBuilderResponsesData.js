@@ -1,5 +1,8 @@
 ﻿import { useEffect, useState } from "react";
 import {
+  deleteBuilderFormRecord,
+  updateBuilderFormRecord,
+  fetchBuilderFormDraftsPage,
   fetchBuilderFormSubmissionsPage,
   updateBuilderFormSubmissionStatus,
 } from "../../services/PageBuilder.api";
@@ -37,6 +40,7 @@ export function useBuilderResponsesData({
   showToast,
   user,
   t,
+  responseView = "completed",
 }) {
   const selectedForm = activeForm || project.forms?.[0];
   const selectedFormId = selectedForm?.id || "";
@@ -50,6 +54,7 @@ export function useBuilderResponsesData({
         userScope,
         projectId: builderProjectId,
         formId: selectedFormId,
+        view: responseView,
         limit: RESPONSE_PAGE_SIZE,
         offset: 0,
       })
@@ -69,6 +74,7 @@ export function useBuilderResponsesData({
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedResponseId, setSelectedResponseId] = useState("");
   const [statusUpdatingById, setStatusUpdatingById] = useState({});
+  const [recordMutatingById, setRecordMutatingById] = useState({});
   const [refreshKey, setRefreshKey] = useState(0);
   const selectedPage = responsePageByForm[selectedFormId] || 0;
   const selectedOffset = selectedPage * RESPONSE_PAGE_SIZE;
@@ -78,6 +84,7 @@ export function useBuilderResponsesData({
           userScope,
           projectId: builderProjectId,
           formId: selectedFormId,
+          view: responseView,
           limit: RESPONSE_PAGE_SIZE,
           offset: selectedOffset,
         })
@@ -122,12 +129,15 @@ export function useBuilderResponsesData({
     }
 
     getOrCreateResponsesRequest(selectedCacheKey, () =>
-      fetchBuilderFormSubmissionsPage(builderProjectId, {
-        form_id: selectedFormId,
-        limit: RESPONSE_PAGE_SIZE,
-        offset: selectedOffset,
-        user_id: user?.id,
-      })
+      (responseView === "incomplete" ? fetchBuilderFormDraftsPage : fetchBuilderFormSubmissionsPage)(
+        builderProjectId,
+        {
+          form_id: selectedFormId,
+          limit: RESPONSE_PAGE_SIZE,
+          offset: selectedOffset,
+          user_id: user?.id,
+        }
+      )
     )
       .then(({ submissions, pagination }) => {
         if (cancelled) return;
@@ -168,6 +178,7 @@ export function useBuilderResponsesData({
     selectedCacheKey,
     selectedFormId,
     selectedOffset,
+    responseView,
     t,
     user?.id,
   ]);
@@ -249,7 +260,7 @@ export function useBuilderResponsesData({
       setSearchQuery("");
       setSelectedStatuses([]);
     });
-  }, [selectedFormId]);
+  }, [responseView, selectedFormId]);
 
   useEffect(() => {
     if (!selectedResponseId && displayedResponses[0]?.id) {
@@ -344,6 +355,91 @@ export function useBuilderResponsesData({
     }
   };
 
+  const updateResponseRecord = async (recordId, answers) => {
+    if (!builderProjectId || !selectedFormId || !recordId) return false;
+    setRecordMutatingById((current) => ({ ...current, [recordId]: "updating" }));
+
+    try {
+      const updatedRecord = await updateBuilderFormRecord(
+        builderProjectId,
+        recordId,
+        answers,
+        { incomplete: responseView === "incomplete" }
+      );
+      const normalizedRecord = normalizeBackendResponse(updatedRecord);
+
+      setBackendResponsesByForm((current) => {
+        const nextResponses = (current[selectedFormId] || []).map((record) =>
+          record.id === recordId ? normalizedRecord : record
+        );
+        if (selectedPagination) {
+          writeResponsesCache(selectedCacheKey, nextResponses, selectedPagination);
+        }
+        return { ...current, [selectedFormId]: nextResponses };
+      });
+      showToast?.(t.recordUpdated);
+      return true;
+    } catch (error) {
+      showToast?.(error?.message || t.recordUpdateFailed);
+      return false;
+    } finally {
+      setRecordMutatingById((current) => ({ ...current, [recordId]: "" }));
+    }
+  };
+
+  const deleteResponseRecord = async (recordId) => {
+    if (!builderProjectId || !selectedFormId || !recordId) return false;
+    setRecordMutatingById((current) => ({ ...current, [recordId]: "deleting" }));
+
+    try {
+      await deleteBuilderFormRecord(
+        builderProjectId,
+        recordId,
+        { incomplete: responseView === "incomplete" }
+      );
+
+      const remainingCount = responses.filter(
+        (record) => record.id !== recordId
+      ).length;
+      const nextPagination = selectedPagination
+        ? {
+            ...selectedPagination,
+            count: Math.max(0, Number(selectedPagination.count || 0) - 1),
+          }
+        : selectedPagination;
+
+      setBackendResponsesByForm((current) => {
+        const nextResponses = (current[selectedFormId] || []).filter(
+          (record) => record.id !== recordId
+        );
+        if (nextPagination) {
+          writeResponsesCache(selectedCacheKey, nextResponses, nextPagination);
+        }
+        return { ...current, [selectedFormId]: nextResponses };
+      });
+      if (nextPagination) {
+        setBackendPaginationByForm((current) => ({
+          ...current,
+          [selectedFormId]: nextPagination,
+        }));
+      }
+      setSelectedResponseId("");
+      if (remainingCount === 0 && selectedPage > 0) {
+        setResponsePageByForm((current) => ({
+          ...current,
+          [selectedFormId]: selectedPage - 1,
+        }));
+      }
+      showToast?.(t.recordDeleted);
+      return true;
+    } catch (error) {
+      showToast?.(error?.message || t.recordDeleteFailed);
+      return false;
+    } finally {
+      setRecordMutatingById((current) => ({ ...current, [recordId]: "" }));
+    }
+  };
+
   const clearFilters = () => {
     resetFilteredView();
     setSearchQuery("");
@@ -391,5 +487,8 @@ export function useBuilderResponsesData({
     hasFilters: Boolean(searchQuery || selectedFieldIds.length > 0 || selectedStatuses.length > 0),
     statusUpdatingById,
     updateSubmissionStatus,
+    recordMutatingById,
+    updateResponseRecord,
+    deleteResponseRecord,
   };
 }

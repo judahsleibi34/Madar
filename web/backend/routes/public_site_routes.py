@@ -31,6 +31,7 @@ from services.rate_limit_service import (
     get_client_ip,
 )
 from services.api_errors import api_error
+from services.form_draft_service import build_form_draft_token, parse_form_draft_token
 from services.account_lifecycle_service import synchronize_verified_account
 from services.ecommerce_cache_service import (
     ecommerce_cache_key,
@@ -91,6 +92,19 @@ class PublicFormSubmissionCreate(BaseModel):
     honeypot: Optional[str] = Field(default=None, max_length=200)
     submission_elapsed_ms: Optional[int] = Field(default=None, ge=0, le=86_400_000)
     idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=200)
+    resume_token: Optional[str] = Field(default=None, max_length=300)
+
+
+class PublicFormDraftUpsert(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answers: dict[str, Any] = Field(default_factory=dict)
+    form_element_id: Optional[str] = Field(default=None, max_length=200)
+    page_index: int = Field(default=0, ge=0, le=1000)
+    language: str = Field(default="en", min_length=1, max_length=12)
+    resume_token: Optional[str] = Field(default=None, max_length=300)
+    honeypot: Optional[str] = Field(default=None, max_length=200)
+    submission_elapsed_ms: Optional[int] = Field(default=None, ge=0, le=86_400_000)
 
     @field_validator("answers")
     @classmethod
@@ -1312,6 +1326,87 @@ def insert_builder_reservation(
     return saved_reservation, False
 
 
+def _form_answer_rejection_reason(field: dict[str, Any], value: Any) -> str | None:
+    field_type = str(field.get("type") or "shortText").strip()
+    if value is None:
+        return None
+
+    if field_type in {"shortText", "paragraph"}:
+        return None if isinstance(value, str) else "text"
+
+    if field_type == "email":
+        text = str(value).strip() if isinstance(value, str) else ""
+        return None if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", text) else "email"
+
+    if field_type in {"url", "website"}:
+        text = str(value).strip() if isinstance(value, str) else ""
+        parsed = urlparse(text)
+        return None if parsed.scheme in {"http", "https"} and bool(parsed.netloc) else "website"
+
+    if field_type == "phone":
+        text = str(value).strip() if isinstance(value, str) else ""
+        digits = re.sub(r"\D", "", text)
+        valid = bool(re.fullmatch(r"[+()\d\s.\-]+", text)) and 7 <= len(digits) <= 15
+        return None if valid else "phone"
+
+    if field_type in {"number", "money"}:
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            return "amount" if field_type == "money" else "number"
+        try:
+            number = float(str(value).replace(",", ""))
+        except (TypeError, ValueError):
+            return "amount" if field_type == "money" else "number"
+        return None if number not in {float("inf"), float("-inf")} and number == number else (
+            "amount" if field_type == "money" else "number"
+        )
+
+    if field_type == "date":
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+            return None
+        except (TypeError, ValueError):
+            return "date"
+
+    if field_type == "time":
+        return None if isinstance(value, str) and re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value) else "time"
+
+    if field_type in {"dropdown", "status", "yesNo", "radio"}:
+        return None if isinstance(value, (str, int, float, bool)) else "choice"
+
+    if field_type == "checkboxes":
+        valid = isinstance(value, list) and all(
+            item is None or isinstance(item, (str, int, float, bool))
+            for item in value
+        )
+        return None if valid else "choices"
+
+    if field_type in {"linearScale", "rating"}:
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            return "scale"
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return "scale"
+        minimum = 1 if field_type == "rating" else int(field.get("scaleMin") or 1)
+        maximum = int(field.get("maxRating") or 5) if field_type == "rating" else int(field.get("scaleMax") or 5)
+        return None if number.is_integer() and minimum <= number <= maximum else "scale"
+
+    if field_type == "file":
+        valid = (
+            isinstance(value, dict)
+            and bool(str(value.get("name") or "").strip())
+            and isinstance(value.get("size"), (int, float))
+            and not isinstance(value.get("size"), bool)
+            and value.get("size") >= 0
+        )
+        if not valid:
+            return "file"
+        max_size_mb = float(field.get("maxFileSizeMb") or 0)
+        return "file_size" if max_size_mb > 0 and value["size"] > max_size_mb * 1024 * 1024 else None
+
+    return None
+
+
 def validate_form_answers(form: dict, answers: dict[str, Any]) -> dict[str, Any]:
     fields = get_form_fields(form)
     field_ids = {str(field.get("id") or "") for field in fields if field.get("id")}
@@ -1337,7 +1432,7 @@ def validate_form_answers(form: dict, answers: dict[str, Any]) -> dict[str, Any]
 
         if field.get("required") and (
             value is None
-            or value == ""
+            or (isinstance(value, str) and not value.strip())
             or (isinstance(value, list) and len(value) == 0)
         ):
             raise HTTPException(
@@ -1350,9 +1445,55 @@ def validate_form_answers(form: dict, answers: dict[str, Any]) -> dict[str, Any]
             )
 
         if field_id in answers:
+            rejection_reason = _form_answer_rejection_reason(field, value)
+            if rejection_reason:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "message": "Invalid field value",
+                        "field_id": field_id,
+                        "field_label": field.get("label") or field_id,
+                        "field_type": field.get("type") or "shortText",
+                        "reason": rejection_reason,
+                    },
+                )
             cleaned_answers[field_id] = normalize_answer_value(value)
 
     return cleaned_answers
+
+
+def validate_form_draft_answers(form: dict, answers: dict[str, Any]) -> dict[str, Any]:
+    fields = get_form_fields(form)
+    field_ids = {str(field.get("id") or "") for field in fields if field.get("id")}
+    unknown_fields = sorted(set(answers.keys()) - field_ids)
+    if unknown_fields:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Submission contains unknown fields", "fields": unknown_fields},
+        )
+    return {
+        field_id: normalize_answer_value(value)
+        for field_id, value in answers.items()
+    }
+
+
+def format_public_form_draft(row: dict) -> dict[str, Any]:
+    return {
+        "id": row.get("id"),
+        "formId": row.get("form_id"),
+        "answers": row.get("answers") or {},
+        "pageIndex": max(0, int(row.get("page_index") or 0)),
+        "language": row.get("language") or "en",
+        "savedAt": row.get("updated_at") or row.get("created_at"),
+        "resumeToken": build_form_draft_token(str(row.get("id"))),
+    }
+
+
+def require_form_draft_token(value: str | None) -> str:
+    draft_id = parse_form_draft_token(value or "")
+    if not draft_id:
+        raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
+    return draft_id
 
 
 def format_submission(row: dict):
@@ -2561,6 +2702,128 @@ def finalize_public_quiz_attempt(
     }
 
 
+@router.get("/sites/{subdomain}/forms/{form_id}/drafts/{resume_token}")
+def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: str, request: Request, response: Response):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_form_id = (form_id or "").strip()
+    draft_id = require_form_draft_token(resume_token)
+    enforce_public_form_submission_rate_limit(request, "draft_read", f"{clean_subdomain}:{clean_form_id}")
+    settings = resolve_website_settings(clean_subdomain, request=request)
+    require_public_runtime_entitlement(settings, "public_form_links")
+    tenant_id = resolve_tenant_id(settings)
+    project, _form, _ = get_bound_published_form(settings, clean_form_id)
+    authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="submit_protected_form",
+        resource_type="form",
+        resource_id=clean_form_id,
+    )
+    draft_response = (
+        service_supabase.table("builder_form_drafts")
+        .select("*")
+        .eq("id", draft_id)
+        .eq("tenant_id", tenant_id)
+        .eq("project_id", project.get("id"))
+        .eq("form_id", clean_form_id)
+        .limit(1)
+        .execute()
+    )
+    saved = first_row(draft_response)
+    if not saved:
+        raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
+    return {"success": True, "draft": format_public_form_draft(saved)}
+
+
+@router.post("/sites/{subdomain}/forms/{form_id}/drafts")
+def save_public_builder_form_draft(
+    subdomain: str,
+    form_id: str,
+    draft: PublicFormDraftUpsert,
+    request: Request,
+    response: Response,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_form_id = (form_id or "").strip()
+    if not clean_form_id:
+        raise HTTPException(status_code=404, detail="Form not found")
+    enforce_public_form_submission_rate_limit(request, "draft_save", f"{clean_subdomain}:{clean_form_id}")
+    reject_suspicious_public_submission(
+        honeypot=draft.honeypot,
+        submission_elapsed_ms=draft.submission_elapsed_ms,
+        route_name="form_draft",
+    )
+    settings = resolve_website_settings(clean_subdomain, request=request)
+    require_public_runtime_entitlement(settings, "public_form_links")
+    tenant_id = resolve_tenant_id(settings)
+    project, form, _ = get_bound_published_form(settings, clean_form_id)
+    identity = authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="submit_protected_form",
+        resource_type="form",
+        resource_id=clean_form_id,
+    )
+    answers = draft.answers or {}
+    validate_public_answer_payload_limits(answers)
+    cleaned_answers = validate_form_draft_answers(form, answers)
+    identity_user, identity_membership = identity or ({}, {})
+    payload = {
+        "tenant_id": tenant_id,
+        "project_id": project.get("id"),
+        "form_id": clean_form_id,
+        "form_title": form.get("title"),
+        "form_version": project.get("published_version"),
+        "answers": cleaned_answers,
+        "field_snapshot": copy.deepcopy(get_form_fields(form)),
+        "form_element_id": draft.form_element_id,
+        "page_index": draft.page_index,
+        "language": draft.language,
+        "site_user_id": identity_user.get("id"),
+        "site_membership_id": identity_membership.get("id"),
+        "submitter_ip": get_client_ip(request),
+        "user_agent": request.headers.get("user-agent", "")[:1000],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        if draft.resume_token:
+            draft_id = require_form_draft_token(draft.resume_token)
+            existing_response = (
+                service_supabase.table("builder_form_drafts")
+                .select("*")
+                .eq("id", draft_id)
+                .eq("tenant_id", tenant_id)
+                .eq("project_id", project.get("id"))
+                .eq("form_id", clean_form_id)
+                .limit(1)
+                .execute()
+            )
+            if not first_row(existing_response):
+                raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
+            saved_response = (
+                service_supabase.table("builder_form_drafts")
+                .update(payload)
+                .eq("id", draft_id)
+                .eq("tenant_id", tenant_id)
+                .execute()
+            )
+        else:
+            saved_response = service_supabase.table("builder_form_drafts").insert(payload).execute()
+        saved = first_row(saved_response)
+        if not saved:
+            raise RuntimeError("form_draft_empty_result")
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.warning("public.form_draft_save_failed", extra={"error_type": type(error).__name__})
+        raise api_error(503, "dependency_unavailable", "Your progress could not be saved right now.") from error
+    return {"success": True, "draft": format_public_form_draft(saved)}
+
+
 @router.post("/sites/{subdomain}/forms/{form_id}/submissions")
 def submit_public_builder_form(
     subdomain: str,
@@ -2572,6 +2835,9 @@ def submit_public_builder_form(
     clean_subdomain = normalize_subdomain(subdomain)
     clean_form_id = (form_id or "").strip()
     idempotency_key = normalize_idempotency_key(submission, request)
+    resume_draft_id = (
+        require_form_draft_token(submission.resume_token) if submission.resume_token else None
+    )
 
     if not clean_form_id:
         raise HTTPException(status_code=404, detail="Form not found")
@@ -2685,6 +2951,22 @@ def submit_public_builder_form(
 
     if not duplicate:
         increment_operational_usage(tenant_id, "form_submissions")
+    if resume_draft_id:
+        try:
+            (
+                service_supabase.table("builder_form_drafts")
+                .delete()
+                .eq("id", resume_draft_id)
+                .eq("tenant_id", tenant_id)
+                .eq("project_id", project.get("id"))
+                .eq("form_id", clean_form_id)
+                .execute()
+            )
+        except Exception as error:
+            logger.warning(
+                "public.form_draft_cleanup_failed",
+                extra={"draft_id": resume_draft_id, "error_type": type(error).__name__},
+            )
 
     return format_submission(saved_submission)
 

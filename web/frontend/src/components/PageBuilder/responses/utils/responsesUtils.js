@@ -4,6 +4,9 @@ export const normalizeBackendResponse = (submission) => ({
   status: submission?.status || "New",
   answers: submission?.answers && typeof submission.answers === "object" ? submission.answers : {},
   quiz: submission?.quiz || submission?.quiz_result || null,
+  resumeToken: submission?.resumeToken || "",
+  pageIndex: Math.max(0, Number(submission?.pageIndex) || 0),
+  language: submission?.language || "en",
   backendSubmission: true,
 });
 

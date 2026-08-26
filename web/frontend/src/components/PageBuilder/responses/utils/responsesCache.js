@@ -44,6 +44,7 @@ export function createResponsesCacheKey({
   userScope,
   projectId,
   formId,
+  view = "completed",
   limit,
   offset,
 }) {
@@ -52,6 +53,7 @@ export function createResponsesCacheKey({
     userScope || "authenticated",
     projectId || "project",
     formId || "form",
+    view,
     Number(limit) || 0,
     Number(offset) || 0,
   ]
