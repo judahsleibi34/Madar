@@ -42,15 +42,14 @@ export const syncCsrfTokenFromResponseData = (data) => {
 export const readApiResponse = async (response) => {
   const contentType = response.headers.get("Content-Type") || "";
 
-  if (contentType.includes("application/json")) {
+  if (contentType.includes("application/json") || contentType.includes("+json")) {
     const data = await response.json().catch(() => null);
     syncCsrfTokenFromResponseData(data);
     return data;
   }
 
-  const text = await response.text();
   return {
-    detail: text || response.statusText || "The server returned an unreadable response.",
+    detail: "The server returned an unexpected response.",
   };
 };
 

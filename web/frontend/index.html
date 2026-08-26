@@ -8,27 +8,10 @@
     <!-- Manifest and iOS installation metadata are attached by the app
          bootstrap only on Madar application hosts. Branded customer-site
          subdomains intentionally do not advertise the Madar PWA. -->
-    <script>
-      (() => {
-        try {
-          const mode = localStorage.getItem("madar-theme-mode") === "dark" ? "dark" : "light";
-          const root = document.documentElement;
-          root.dataset.theme = mode;
-          root.classList.add(mode === "dark" ? "theme-dark" : "theme-light");
-          root.style.colorScheme = mode;
-        } catch {
-          document.documentElement.dataset.theme = "light";
-          document.documentElement.classList.add("theme-light");
-          document.documentElement.style.colorScheme = "light";
-        }
-      })();
-    </script>
+    <script src="/theme-bootstrap.js"></script>
     <title>Madar</title>
   </head>
   <body>
-    <script>
-      document.body.classList.add(document.documentElement.dataset.theme === "dark" ? "theme-dark" : "theme-light");
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

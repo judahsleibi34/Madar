@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run theme:audit && vite build",
+    "build": "npm run api-origin:audit && npm run theme:audit && vite build && npm run bundle-origin:audit",
+    "api-origin:audit": "node scripts/check-api-origin.mjs",
+    "bundle-origin:audit": "node scripts/check-production-bundle.mjs",
     "theme:audit": "node scripts/check-theme-contract.mjs",
     "edge:audit": "node scripts/check-security-headers.mjs",
     "lint": "eslint .",

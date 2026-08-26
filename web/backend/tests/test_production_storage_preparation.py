@@ -52,6 +52,11 @@ class ProductionStoragePreparationTests(unittest.TestCase):
 
     def test_backend_image_remains_non_root(self):
         dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("chmod -R a+rX /app", dockerfile)
+        self.assertLess(
+            dockerfile.index("chmod -R a+rX /app"),
+            dockerfile.index("USER 65534:65534"),
+        )
         self.assertRegex(dockerfile, r"(?m)^USER 65534:65534$")
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         backend_section = compose.split("\n  backend:\n", 1)[1].split("\n  notification-worker:\n", 1)[0]

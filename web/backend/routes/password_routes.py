@@ -6,10 +6,8 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
-from supabase import create_client
-
 from classes import PasswordReset
-from database import service_supabase, supabase
+from database import create_supabase_client, service_supabase, supabase
 from services.rate_limit_service import enforce_password_rate_limit
 from services.audit_service import record_security_event
 from services.frontend_url import resolve_frontend_url_for_request
@@ -262,7 +260,7 @@ def finish_password_reset_request(request_id: str, *, succeeded: bool) -> None:
         raise RuntimeError("password_reset_finish_conflict")
 
 
-admin_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+admin_supabase = create_supabase_client(SUPABASE_SERVICE_KEY)
 
 
 @router.post("/forgot-password")

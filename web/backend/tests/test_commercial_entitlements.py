@@ -254,6 +254,34 @@ class EntitlementMatrixTests(unittest.TestCase):
         self.assertEqual(state["allowances"], {})
         self.assertTrue(state["review_required"])
 
+    def test_enforcement_enabled_preserves_inactive_tenant_402(self):
+        with patch.dict(environ, {
+            "COMMERCIAL_ENTITLEMENTS_ENFORCED": "true",
+            "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true",
+        }), patch.object(
+            entitlement_service,
+            "_canonical_records",
+            return_value=([{"tenant_id": 7, "plan_id": "business_plus", "state": "canceled"}], []),
+        ), patch.object(entitlement_service, "_legacy_features", return_value=[]):
+            with self.assertRaises(HTTPException) as context:
+                entitlement_service.require_entitlement(7, "website_publish")
+        self.assertEqual(context.exception.status_code, 402)
+
+    def test_enforcement_disabled_entitles_unmapped_and_canceled_tenants(self):
+        for records in (([], []), ([{
+            "tenant_id": 7, "plan_id": "business_plus", "state": "canceled"
+        }], [])):
+            with self.subTest(records=records), patch.dict(environ, {
+                "COMMERCIAL_ENTITLEMENTS_ENFORCED": "false",
+                "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true",
+            }), patch.object(
+                entitlement_service, "_canonical_records", side_effect=AssertionError("lookup must be bypassed")
+            ):
+                state = entitlement_service.require_entitlement(7, "website_publish")
+                self.assertEqual(state["source"], "operator_configuration_override")
+                self.assertIn("reservations", state["capabilities"])
+                self.assertGreater(entitlement_service.get_storage_quota_bytes(7), 0)
+
     def test_duplicate_entitled_subscription_is_rejected(self):
         rows = [
             {"id": 1, "tenant_id": 7, "plan_id": "forms", "state": "active"},

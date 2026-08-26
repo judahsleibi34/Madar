@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlsplit
 
+from services.supabase_api_key import (
+    is_opaque_supabase_api_key,
+    is_supabase_secret_api_key,
+)
+
 
 ConfigClass = Literal["required", "optional", "development-only", "production-only", "secret", "deprecated", "unknown"]
 
@@ -178,6 +183,12 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
         if missing:
             # Key names are safe; values are never included.
             raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+        service_key = os.getenv("SUPABASE_SERVICE_KEY", "").strip()
+        if (
+            is_opaque_supabase_api_key(service_key)
+            and not is_supabase_secret_api_key(service_key)
+        ):
+            raise RuntimeError("production server credential type is invalid: SUPABASE_SERVICE_KEY")
         if len(os.getenv("CSRF_SECRET", "")) < 32:
             raise RuntimeError("production secret is too short: CSRF_SECRET")
         if not env_bool("COOKIE_SECURE", True):

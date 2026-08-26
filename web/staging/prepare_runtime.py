@@ -43,6 +43,7 @@ def main() -> int:
         "SUPABASE_SERVICE_KEY": service,
         "CSRF_SECRET": secrets.token_urlsafe(48),
         "FRONTEND_URLS": "http://127.0.0.1:13000",
+        "VITE_API_URL": "http://127.0.0.1:18001",
         "CSRF_TRUSTED_ORIGINS": "http://127.0.0.1:13000",
         "COOKIE_SECURE": "true",
         "COOKIE_SAMESITE": "lax",
