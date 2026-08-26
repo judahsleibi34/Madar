@@ -50,6 +50,14 @@ SLOT_SUBNETS = {
 }
 
 
+def supabase_server_headers(key: str) -> dict[str, str]:
+    """Keep opaque Supabase API keys out of the JWT Authorization header."""
+    headers = {"apikey": key}
+    if not key.startswith("sb_secret_"):
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
+
+
 class ScriptSourceParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -180,7 +188,7 @@ class DockerGitOperations:
     def schema_version(self) -> int:
         url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/application_schema_state?select=schema_version&contract_key=eq.core&limit=1"
         key = os.environ["SUPABASE_SERVICE_KEY"]
-        request = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
+        request = urllib.request.Request(url, headers=supabase_server_headers(key))
         with urllib.request.urlopen(request, timeout=5) as response:
             rows = json.loads(response.read())
         if not isinstance(rows, list) or len(rows) != 1:

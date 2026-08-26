@@ -39,6 +39,35 @@ class RuntimeConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "SMTP"):
                 validate_runtime_configuration()
 
+    def test_production_accepts_secret_api_key_and_rejects_publishable_key(self):
+        environment = {
+            "APP_ENV": "production", "SUPABASE_URL": "https://example.invalid",
+            "SUPABASE_ANON_KEY": "anon", "CSRF_SECRET": "x" * 40,
+            "FRONTEND_URLS": "https://app.example",
+            "REDIS_URL": "redis://redis:6379/0", "COOKIE_SECURE": "true",
+            "RATE_LIMIT_ENABLED": "true", "RATE_LIMIT_FAIL_OPEN": "false",
+            "ADMIN_MFA_LOGIN_ENFORCEMENT": "true", "MADAR_RELEASE_SHA": "a" * 40,
+        }
+        with patch.dict(
+            os.environ,
+            {
+                **environment,
+                "SUPABASE_SERVICE_KEY": "sb_secret_synthetic_fixture_not_a_credential",
+            },
+            clear=True,
+        ):
+            self.assertEqual(validate_runtime_configuration().environment, "production")
+        with patch.dict(
+            os.environ,
+            {
+                **environment,
+                "SUPABASE_SERVICE_KEY": "sb_publishable_synthetic_fixture_not_a_credential",
+            },
+            clear=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "credential type"):
+                validate_runtime_configuration()
+
     def test_observed_inventory_marks_unclassified_keys_unknown_without_values(self):
         with patch.dict(os.environ, {"UNCLASSIFIED_FIXTURE": "private-value"}, clear=True):
             inventory = redacted_configuration_inventory({"UNCLASSIFIED_FIXTURE"})

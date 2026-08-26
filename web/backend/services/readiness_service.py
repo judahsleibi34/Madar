@@ -23,6 +23,7 @@ from services.calendar_task_sync_queue_service import get_task_sync_queue_metric
 from services.calendar_connection_sync_queue_service import (
     get_connection_sync_queue_metrics,
 )
+from services.supabase_api_key import supabase_api_headers
 
 try:
     import redis
@@ -63,10 +64,7 @@ def check_environment() -> str:
 
 def _supabase_headers() -> dict[str, str]:
     service_key = os.getenv("SUPABASE_SERVICE_KEY", "").strip()
-    return {
-        "apikey": service_key,
-        "Authorization": f"Bearer {service_key}",
-    }
+    return supabase_api_headers(service_key)
 
 
 def _supabase_url(path: str) -> str:

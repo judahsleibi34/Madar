@@ -9,9 +9,7 @@ from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Request, Response
-from supabase import create_client
-
-from database import SUPABASE_ANON_KEY, SUPABASE_URL
+from database import SUPABASE_ANON_KEY, create_supabase_client
 from services.auth_service import COOKIE_SAMESITE, COOKIE_SECURE
 from services.request_security import get_csrf_secret
 
@@ -126,7 +124,7 @@ def read_pending_mfa_cookie(request: Request) -> dict[str, Any] | None:
 
 
 def create_pending_mfa_client(pending_payload: dict[str, Any]):
-    client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    client = create_supabase_client(SUPABASE_ANON_KEY)
     client.auth.set_session(pending_payload["access_token"], pending_payload["refresh_token"])
     return client
 

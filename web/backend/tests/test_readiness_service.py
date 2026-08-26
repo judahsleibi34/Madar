@@ -13,6 +13,27 @@ class ReadinessServiceTests(unittest.TestCase):
     def tearDown(self):
         readiness_service.clear_readiness_cache()
 
+    def test_supabase_readiness_uses_apikey_only_for_opaque_server_secret(self):
+        with patch.dict(
+            os.environ,
+            {"SUPABASE_SERVICE_KEY": "sb_secret_synthetic_fixture_not_a_credential"},
+            clear=False,
+        ):
+            headers = readiness_service._supabase_headers()
+        self.assertEqual({name.lower() for name in headers}, {"apikey"})
+
+    def test_supabase_readiness_retains_legacy_service_role_bearer(self):
+        with patch.dict(
+            os.environ,
+            {"SUPABASE_SERVICE_KEY": "synthetic-legacy-service-role-jwt"},
+            clear=False,
+        ):
+            headers = readiness_service._supabase_headers()
+        self.assertEqual(
+            {name.lower() for name in headers},
+            {"apikey", "authorization"},
+        )
+
     def test_generated_execution_requires_isolated_worker(self):
         with patch.dict("os.environ", {"AI_ALLOW_LOCAL_EXEC": "true", "AI_ISOLATED_WORKER_ENABLED": "false"}, clear=False):
             self.assertEqual(readiness_service.check_ai_execution_guard(), "insecure")

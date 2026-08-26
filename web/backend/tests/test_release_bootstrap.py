@@ -59,6 +59,21 @@ class ReleaseBootstrapTests(unittest.TestCase):
     def compatibility(self):
         return release_cli.Compatibility(81, 83, 83, "expand-only", 81, 83)
 
+    def test_schema_probe_uses_apikey_only_for_opaque_server_secret(self):
+        headers = release_cli.supabase_server_headers(
+            "sb_secret_synthetic_fixture_not_a_credential"
+        )
+        self.assertEqual({name.lower() for name in headers}, {"apikey"})
+
+    def test_schema_probe_retains_legacy_service_role_bearer(self):
+        headers = release_cli.supabase_server_headers(
+            "synthetic-legacy-service-role-jwt"
+        )
+        self.assertEqual(
+            {name.lower() for name in headers},
+            {"apikey", "authorization"},
+        )
+
     def test_prepare_keeps_workers_and_traffic_inactive(self):
         with tempfile.TemporaryDirectory() as root:
             operations = FakeOperations()
