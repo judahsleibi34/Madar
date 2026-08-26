@@ -124,6 +124,23 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("release state is not initialized", self.wrapper)
         self.assertIn('merge-base --is-ancestor "$KNOWN_GOOD" "$TARGET_SHA"', self.wrapper)
 
+    def test_auto_deploy_skips_only_deterministic_runtime_equivalent_commits(self):
+        self.assertIn("RUNTIME_PATHS", self.wrapper)
+        for path in (
+            "web/backend",
+            "web/frontend",
+            "web/database",
+            "web/supabase",
+            "web/scripts",
+            "web/docker-compose.yml",
+            "web/deployment",
+        ):
+            self.assertIn(path, self.wrapper)
+        self.assertIn('diff --quiet "$KNOWN_GOOD" "$TARGET_SHA"', self.wrapper)
+        self.assertIn('merge --ff-only "$TARGET_SHA"', self.wrapper)
+        self.assertIn("Application-equivalent main advanced", self.wrapper)
+        self.assertIn("production checkout contains local changes", self.wrapper)
+
     def test_timer_waits_after_completion_instead_of_retrying_immediately(self):
         self.assertIn("OnUnitInactiveSec=2min", self.auto_timer)
         self.assertNotIn("OnUnitActiveSec", self.auto_timer)
@@ -136,7 +153,11 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("MADAR_PROXY_CONFIG_ROOT:-/var/lib/madar/proxy", self.proxy_compose)
         self.assertNotIn("MADAR_ACTIVE_UPSTREAMS_FILE:-", self.proxy_compose)
         self.assertIn(
-            "MADAR_ACTIVE_UPSTREAMS_FILE=/var/lib/madar/proxy/active-upstreams.conf",
+            "MADAR_ACTIVE_UPSTREAMS_FILE=/home/madar/.local/state/madar/proxy/active-upstreams.conf",
+            self.auto_service,
+        )
+        self.assertIn(
+            "MADAR_DEPLOY_STATE_ROOT=/home/madar/.local/state/madar/releases",
             self.auto_service,
         )
         self.assertIn("stable_route_identity_not_observed", self.switch)
@@ -173,6 +194,11 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("systemctl daemon-reload", self.installer)
         self.assertNotIn("systemctl start madar-auto-deploy.timer", self.installer)
         self.assertNotIn("systemctl enable", self.installer)
+        self.assertIn("/home/madar/docker_auto.sh", self.installer)
+        self.assertIn("/etc/systemd/system/madar-auto-deploy.service.d", self.installer)
+        self.assertIn("refusing installation while madar-auto-deploy.timer is enabled", self.installer)
+        self.assertIn("rm -rf -- /etc/systemd/system/madar-auto-deploy.service.d", self.installer)
+        self.assertIn("rm -f -- /home/madar/docker_auto.sh", self.installer)
 
     def test_legacy_entrypoint_delegates_only_to_immutable_controller(self):
         self.assertIn("madar-production-deploy", self.legacy_entrypoint)
