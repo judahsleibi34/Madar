@@ -6,6 +6,7 @@ import os
 from services.observability_service import metrics_access_allowed, prometheus_metrics
 from services.notification_delivery_queue_service import get_delivery_channel_metrics
 from services.readiness_service import get_readiness
+from services.entitlement_service import commercial_entitlements_enforced
 
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -29,6 +30,7 @@ def version():
 @router.get("/ready")
 def ready():
     readiness = get_readiness()
+    readiness["commercial_entitlements_enforced"] = commercial_entitlements_enforced()
     if readiness["ready"]:
         return readiness
 
@@ -60,5 +62,9 @@ def diagnostics(request: Request):
     return {
         "release": version(),
         "readiness": get_readiness(use_cache=False),
+        "temporary_commercial_policy_override": {
+            "active": not commercial_entitlements_enforced(),
+            "commercial_entitlements_enforced": commercial_entitlements_enforced(),
+        },
         "notification_channels": get_delivery_channel_metrics(),
     }

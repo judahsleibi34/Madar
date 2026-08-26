@@ -17,7 +17,7 @@ from fastapi import HTTPException
 
 from database import service_supabase
 from services.api_errors import error_detail
-from services.commercial_catalog import CAPABILITIES, get_product
+from services.commercial_catalog import CAPABILITIES, GIB, get_product
 
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,22 @@ LEGACY_BUILDER_MAP = {
     "data": "forms",
     "website": "website",
     "reservation": "business_plus",
+}
+
+# TODO(payment-gateway): TEMPORARY operational override only. Production sets
+# COMMERCIAL_ENTITLEMENTS_ENFORCED=false until payment gateway integration and
+# commercial tenant assignments are ready. Set it back to true to restore the
+# canonical subscription/add-on policy; no data migration is required.
+TEMPORARY_OVERRIDE_ALLOWANCES = {
+    "storage_bytes": 10 * GIB,
+    "included_workspace_operators": 10_000,
+    "workspace_seats": 0,
+    "published_websites": 1,
+    "active_builder_projects": None,
+    "forms": None,
+    "form_submissions": None,
+    "reservation_requests": None,
+    "standard_tokens": 1_500_000,
 }
 
 
@@ -171,6 +187,42 @@ def _env_enabled(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def commercial_entitlements_enforced() -> bool:
+    """Return the reversible operator-controlled commercial policy state."""
+    return _env_enabled("COMMERCIAL_ENTITLEMENTS_ENFORCED", True)
+
+
+def _temporary_operator_override_state(tenant_id: int | str) -> dict[str, Any]:
+    capabilities = set(CAPABILITIES)
+    operational, availability = _operational_capabilities(capabilities)
+    return {
+        "tenant_id": int(tenant_id),
+        "source": "operator_configuration_override",
+        "plan_id": "temporary_all_capabilities",
+        "subscription": None,
+        "subscriptions": [],
+        # Preserve the existing AI metering integration while the tenant's
+        # canonical commercial records are intentionally ignored.
+        "active_addons": [
+            {"addon_id": "ai_analytics_plus", "state": ACTIVE_STATE, "quantity": 1}
+        ],
+        "capabilities": sorted(capabilities),
+        "operational_capabilities": sorted(operational),
+        "capability_availability": availability,
+        "allowances": dict(TEMPORARY_OVERRIDE_ALLOWANCES),
+        "legacy_features": [],
+        "review_required": False,
+        "commercial_entitlements_enforced": False,
+    }
+
+
+if not commercial_entitlements_enforced():
+    # This runs once per backend process, never once per request.
+    logger.warning(
+        "commercial entitlement enforcement disabled by operator configuration"
+    )
+
+
 def _operational_capabilities(capabilities: set[str]) -> tuple[set[str], dict[str, str]]:
     operational = set(capabilities)
     availability: dict[str, str] = {}
@@ -207,6 +259,9 @@ def _unentitled_state(
 
 
 def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
+    if not commercial_entitlements_enforced():
+        return _temporary_operator_override_state(tenant_id)
+
     # The repository's offline suite intentionally uses dummy Supabase URLs.
     # Tests that exercise canonical lookup behavior opt in explicitly.
     if _offline_test_compatibility():

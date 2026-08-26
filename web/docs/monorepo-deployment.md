@@ -29,6 +29,15 @@ and calendar worker service-level `env_file` declarations load that exact file.
 The file remains outside Git and must stay mode `0600` or otherwise readable
 only by the deployment identity.
 
+## Temporary commercial-entitlement override
+
+`COMMERCIAL_ENTITLEMENTS_ENFORCED=false` is a temporary production setting
+until the payment gateway and commercial tenant assignments are ready. It
+grants authenticated tenants the implemented commercial capability set without
+changing authentication, tenant isolation, permissions, MFA/AAL2, or canonical
+billing data. Set the value back to `true` and deploy normally to restore the
+canonical subscription/add-on policy; no database change is required.
+
 The four writable application mounts intentionally remain under
 `REPO_ROOT/backend/`, matching the paths used before the monorepo move. Code and
 read-only migration/script mounts resolve under `WEB_ROOT`. Redis uses tmpfs and

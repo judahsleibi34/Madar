@@ -42,6 +42,7 @@ class HealthRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIs(response.json()["ready"], True)
+        self.assertIn("commercial_entitlements_enforced", response.json())
 
     def test_ready_returns_degraded_when_config_missing(self):
         client = build_client()
