@@ -12,7 +12,7 @@ import {
 describe("Madar PWA launch context", () => {
   beforeEach(() => {
     document.head
-      .querySelectorAll('link[rel="manifest"], link[rel="apple-touch-icon"], meta[name^="apple-mobile-web-app"], meta[name="theme-color"]')
+      .querySelectorAll('link[rel="manifest"], link[rel="apple-touch-icon"], meta[name^="apple-mobile-web-app"], meta[name="mobile-web-app-capable"], meta[name="theme-color"]')
       .forEach((element) => element.remove());
   });
 
@@ -76,5 +76,6 @@ describe("Madar PWA launch context", () => {
     expect(document.querySelector('meta[name="apple-mobile-web-app-capable"]').content).toBe(
       "yes"
     );
+    expect(document.querySelector('meta[name="mobile-web-app-capable"]').content).toBe("yes");
   });
 });

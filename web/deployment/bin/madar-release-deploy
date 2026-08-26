@@ -8,26 +8,68 @@ executed. It never applies or reverses a database migration.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
+from html.parser import HTMLParser
 from pathlib import Path
+from contextlib import contextmanager
 
 SCRIPT = Path(__file__).resolve()
 WEB_ROOT = SCRIPT.parents[2]
 sys.path.insert(0, str(WEB_ROOT))
 
-from deployment.lib.release_deployer import Compatibility, ReleaseDeployer  # noqa: E402
+from deployment.lib.release_deployer import Compatibility, ReleaseDeployer, atomic_json, utc_now  # noqa: E402
+from deployment.lib.environment_file import load_environment_file  # noqa: E402
 
 
 SLOT_PORTS = {
     "blue": {"backend": "8101", "frontend": "3100", "redis": "6381"},
     "green": {"backend": "8201", "frontend": "3200", "redis": "6382"},
 }
+
+SLOT_SUBNETS = {
+    "blue": {
+        "default": "10.252.0.0/24",
+        "parser": "10.252.1.0/24",
+        "remote_internal": "10.252.2.0/24",
+        "remote_egress": "10.252.3.0/24",
+    },
+    "green": {
+        "default": "10.252.4.0/24",
+        "parser": "10.252.5.0/24",
+        "remote_internal": "10.252.6.0/24",
+        "remote_egress": "10.252.7.0/24",
+    },
+}
+
+
+def supabase_server_headers(key: str) -> dict[str, str]:
+    """Keep opaque Supabase API keys out of the JWT Authorization header."""
+    headers = {"apikey": key}
+    if not key.startswith("sb_secret_"):
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
+
+
+class ScriptSourceParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.sources: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "script":
+            return
+        attributes = dict(attrs)
+        source = str(attributes.get("src") or "").strip()
+        if source:
+            self.sources.append(source)
 
 
 class DockerGitOperations:
@@ -63,7 +105,9 @@ class DockerGitOperations:
             raise RuntimeError("docker_image_digest_unavailable")
         return f"{tag}@{image_id}"
 
-    def _existing_artifact(self, tag: str, sha: str) -> tuple[str, str] | None:
+    def _existing_artifact(
+        self, tag: str, sha: str, *, expected_labels: dict[str, str] | None = None,
+    ) -> tuple[str, str] | None:
         try:
             raw = self.run(
                 ["docker", "image", "inspect", "--format", "{{json .Config.Labels}}", tag],
@@ -73,6 +117,8 @@ class DockerGitOperations:
         except (subprocess.CalledProcessError, ValueError):
             return None
         if not isinstance(labels, dict) or labels.get("com.madar.release.sha") != sha:
+            return None
+        if expected_labels and any(labels.get(name) != value for name, value in expected_labels.items()):
             return None
         built_at = str(labels.get("com.madar.release.built_at") or "").strip()
         if not built_at:
@@ -84,9 +130,18 @@ class DockerGitOperations:
             raise RuntimeError("release_source_not_prepared")
         build_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         backend_tag = f"madar-backend:{sha}"
-        frontend_tag = f"madar-frontend:{sha}"
+        staging = bool(os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip())
+        frontend_target = "staging" if staging else "production"
+        frontend_api_url = os.getenv("VITE_API_URL", "").strip().rstrip("/")
+        expected_api_url = "http://127.0.0.1:18001" if staging else "https://api.madarportal.com"
+        if frontend_api_url != expected_api_url:
+            raise RuntimeError("frontend_api_origin_missing_or_invalid")
+        frontend_tag = f"madar-frontend:{sha}-{frontend_target}"
         existing_backend = self._existing_artifact(backend_tag, sha)
-        existing_frontend = self._existing_artifact(frontend_tag, sha)
+        existing_frontend = self._existing_artifact(
+            frontend_tag, sha,
+            expected_labels={"com.madar.frontend.api_origin": frontend_api_url},
+        )
         if existing_backend and existing_frontend:
             if existing_backend[1] != existing_frontend[1]:
                 raise RuntimeError("release_artifact_timestamp_mismatch")
@@ -103,8 +158,14 @@ class DockerGitOperations:
             "--build-arg", f"MADAR_BUILD_TIMESTAMP={build_timestamp}", "-t", backend_tag,
             str(self.release_root / "web/backend"),
         ])
+        frontend_labels = [
+            *labels, "--label", f"com.madar.frontend.api_origin={frontend_api_url}",
+        ]
         self.run([
-            "docker", "build", *labels, "--build-arg", f"MADAR_RELEASE_SHA={sha}",
+            "docker", "build", *frontend_labels,
+            "--build-arg", f"VITE_API_URL={frontend_api_url}",
+            "--build-arg", f"MADAR_REQUIRE_PRODUCTION_API_URL={'false' if staging else 'true'}",
+            "--build-arg", f"MADAR_RELEASE_SHA={sha}",
             "--build-arg", f"MADAR_BUILD_TIMESTAMP={build_timestamp}", "-t", frontend_tag,
             str(self.release_root / "web/frontend"),
         ])
@@ -116,10 +177,18 @@ class DockerGitOperations:
             "artifact_reused": False,
         }
 
+    @staticmethod
+    def _expected_frontend_api_url() -> str:
+        return (
+            "http://127.0.0.1:18001"
+            if os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
+            else "https://api.madarportal.com"
+        )
+
     def schema_version(self) -> int:
         url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/application_schema_state?select=schema_version&contract_key=eq.core&limit=1"
         key = os.environ["SUPABASE_SERVICE_KEY"]
-        request = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
+        request = urllib.request.Request(url, headers=supabase_server_headers(key))
         with urllib.request.urlopen(request, timeout=5) as response:
             rows = json.loads(response.read())
         if not isinstance(rows, list) or len(rows) != 1:
@@ -132,6 +201,7 @@ class DockerGitOperations:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
         ports = SLOT_PORTS[slot]
+        subnets = SLOT_SUBNETS[slot]
         env = dict(os.environ)
         env.update({
             "MADAR_ENV_FILE": str(self.env_file),
@@ -143,12 +213,30 @@ class DockerGitOperations:
             "MADAR_BACKEND_BIND_PORT": ports["backend"],
             "MADAR_FRONTEND_BIND_PORT": ports["frontend"],
             "MADAR_REDIS_BIND_PORT": ports["redis"],
+            "MADAR_DEFAULT_SUBNET": subnets["default"],
+            "MADAR_PARSER_SUBNET": subnets["parser"],
+            "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
+            "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
             "SCHEMA_COMPATIBLE_MIN": "81",
             "SCHEMA_COMPATIBLE_MAX": "83",
             "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
             "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
             "DATA_DELETION_WORKER_REQUIRED": "true" if workers_active and self.schema_version() >= 83 else "false",
+            "DATA_DELETION_WORKER_HEALTH_URL": "http://data-deletion-worker:8094/health",
         })
+        # The inactive candidate deliberately has no queue consumers. Its
+        # backend must validate core dependencies without interpreting the
+        # active release's worker feature flags from the shared env file as a
+        # missing-candidate-worker outage. These flags are restored explicitly
+        # when the candidate workers are activated for cutover.
+        env["NOTIFICATION_WORKER_ENABLED"] = "true" if workers_active else "false"
+        env["DATA_DELETION_WORKER_ENABLED"] = (
+            "true" if workers_active and self.schema_version() >= 83 else "false"
+        )
+        env["CALENDAR_SYNC_WORKER_ENABLED"] = "true" if workers_active else "false"
+        if not workers_active:
+            env["CALENDAR_FEATURE_ENABLED"] = "false"
+            env["CALENDAR_SYNC_REQUIRED"] = "false"
         storage_root = os.getenv("MADAR_STORAGE_ROOT", "").strip()
         if storage_root:
             env["MADAR_STORAGE_ROOT"] = str(Path(storage_root).resolve())
@@ -165,6 +253,8 @@ class DockerGitOperations:
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
+        else:
+            files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         profiles = ["--profile", "workers"]
         if self.schema_version() >= 83:
             profiles.extend(["--profile", "deletion-worker"])
@@ -195,16 +285,22 @@ class DockerGitOperations:
         # Queue consumers must not run in the inactive slot. Parser/remote
         # workers are slot-local and cannot see the active slot's Redis queue.
         self._compose(
-            sha, slot, images, "up", "-d", "--no-build", "--wait",
+            # The inactive slot may have been created by an older Compose
+            # topology. Recreate every candidate service so Docker cannot try
+            # to restart a retained container that still references a removed
+            # legacy project network.
+            sha, slot, images, "up", "-d", "--no-build", "--force-recreate", "--wait",
             "--wait-timeout", "180", "redis", "parser-worker",
             "remote-ingestion-worker", "backend", "frontend",
         )
 
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
+        services = ["backend", "notification-worker", "calendar-sync-worker"]
+        if self.schema_version() >= 83:
+            services.append("data-deletion-worker")
         self._compose(
             sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
-            "--wait", "--wait-timeout", "180", "backend", "notification-worker",
-            "calendar-sync-worker", "data-deletion-worker", workers_active=True,
+            "--wait", "--wait-timeout", "180", *services, workers_active=True,
         )
 
     @staticmethod
@@ -228,21 +324,75 @@ class DockerGitOperations:
         slot = str(release.get("slot") or "")
         if slot not in SLOT_PORTS:
             raise RuntimeError("worker_release_slot_invalid")
-        self.run(["docker", "start", *self._worker_names(slot)])
+        existing: list[str] = []
+        for name in self._worker_names(slot):
+            inspected = subprocess.run(
+                ["docker", "inspect", name], check=False,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            if inspected.returncode == 0:
+                existing.append(name)
+        if not existing:
+            raise RuntimeError("retained_worker_containers_missing")
+        self.run(["docker", "start", *existing])
 
     def _json(self, url: str) -> dict:
         with urllib.request.urlopen(url, timeout=5) as response:
             return json.loads(response.read())
 
+    def _validate_frontend_api_origin(self, frontend_base: str, html: bytes) -> None:
+        parser = ScriptSourceParser()
+        parser.feed(html.decode("utf-8", errors="strict"))
+        expected = self._expected_frontend_api_url().encode("utf-8")
+        for source in parser.sources:
+            # Candidate validation only follows Vite assets on the already
+            # loopback-bound candidate frontend. It never follows an arbitrary
+            # URL supplied by HTML.
+            if not source.startswith("/assets/") or not source.endswith(".js"):
+                continue
+            with urllib.request.urlopen(f"{frontend_base}{source}", timeout=5) as response:
+                if expected in response.read(16 * 1024 * 1024):
+                    return
+        raise RuntimeError("candidate_frontend_api_origin_mismatch")
+
     def validate_candidate(self, sha: str, slot: str) -> None:
         ports = SLOT_PORTS[slot]
-        readiness = self._json(f"http://127.0.0.1:{ports['backend']}/health/ready")
-        identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
-        if not readiness.get("ready") or identity.get("release_sha") != sha:
-            raise RuntimeError("candidate_deep_validation_failed")
-        with urllib.request.urlopen(f"http://127.0.0.1:{ports['frontend']}/", timeout=5) as response:
-            if response.status != 200:
-                raise RuntimeError("candidate_frontend_unavailable")
+        attempts = max(1, min(int(os.getenv("MADAR_CANDIDATE_READY_ATTEMPTS", "12")), 60))
+        delay = max(1, min(int(os.getenv("MADAR_CANDIDATE_READY_RETRY_SECONDS", "5")), 30))
+        last_failure = "candidate_unavailable"
+        for attempt in range(1, attempts + 1):
+            try:
+                readiness = self._json(f"http://127.0.0.1:{ports['backend']}/health/ready")
+                identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
+                if not readiness.get("ready"):
+                    components = readiness.get("components") or {}
+                    degraded = sorted(name for name, state in components.items() if state not in {"ok", "disabled", "configured", "not_required", "development"})
+                    last_failure = "readiness:" + ",".join(degraded[:12])
+                elif identity.get("release_sha") != sha:
+                    last_failure = "release_identity_mismatch"
+                else:
+                    frontend_base = f"http://127.0.0.1:{ports['frontend']}"
+                    with urllib.request.urlopen(f"{frontend_base}/", timeout=5) as response:
+                        if response.status == 200:
+                            self._validate_frontend_api_origin(frontend_base, response.read())
+                            return
+                    last_failure = "frontend_unavailable"
+            except urllib.error.HTTPError as error:
+                last_failure = f"http_{error.code}"
+                if error.code == 503:
+                    try:
+                        payload = json.loads(error.read())
+                        components = payload.get("components") or {}
+                        degraded = sorted(name for name, state in components.items() if state not in {"ok", "disabled", "configured", "not_required", "development"})
+                        if degraded:
+                            last_failure = "readiness:" + ",".join(degraded[:12])
+                    except (TypeError, ValueError):
+                        pass
+            except (OSError, ValueError):
+                last_failure = "candidate_unavailable"
+            if attempt < attempts:
+                time.sleep(delay)
+        raise RuntimeError(f"candidate_deep_validation_failed:{last_failure}")
 
     def validate_rollback_target(self, release: dict, schema: int) -> dict[str, int]:
         slot = str(release.get("slot") or "")
@@ -290,8 +440,17 @@ class DockerGitOperations:
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
+        else:
+            files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         environment = dict(os.environ)
-        environment["MADAR_SLOT"] = slot
+        subnets = SLOT_SUBNETS[slot]
+        environment.update({
+            "MADAR_SLOT": slot,
+            "MADAR_DEFAULT_SUBNET": subnets["default"],
+            "MADAR_PARSER_SUBNET": subnets["parser"],
+            "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
+            "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
+        })
         subprocess.run([
             "docker", "compose", "--project-name", f"madar-{slot}",
             "--project-directory", str(self.release_root / "web"),
@@ -300,16 +459,225 @@ class DockerGitOperations:
         ], check=False, env=environment)
 
 
+def prepared_release_path(state_root: Path) -> Path:
+    return state_root / "prepared-release.json"
+
+
+@contextmanager
+def deployment_lock(state_root: Path):
+    state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (state_root / "deploy.lock").open("a+", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError("deployment_already_running") from error
+        yield
+
+
+def prepare_release(
+    *, sha: str, slot: str, state_root: Path, compatibility: Compatibility,
+    operations: DockerGitOperations,
+) -> dict:
+    if slot not in SLOT_PORTS:
+        raise RuntimeError("candidate_slot_invalid")
+    with deployment_lock(state_root):
+        operations.verify_source(sha)
+        images = operations.build(sha, slot)
+        if any("@sha256:" not in str(images.get(name) or "") for name in ("backend", "frontend", "worker")):
+            raise RuntimeError("immutable_image_digest_missing")
+        schema = operations.schema_version()
+        if not compatibility.schema_min <= schema <= compatibility.schema_max:
+            raise RuntimeError("candidate_schema_incompatible")
+        record = {
+            "release_sha": sha,
+            "candidate_slot": slot,
+            "images": images,
+            "schema": schema,
+            "status": "preparing",
+            "prepared_at": utc_now().isoformat(),
+        }
+        try:
+            operations.preflight(sha, slot, images, schema)
+            operations.start_candidate(sha, slot, images)
+            operations.validate_candidate(sha, slot)
+        except Exception:
+            operations.stop_candidate(slot)
+            raise
+        record["status"] = "candidate_validated_workers_inactive"
+        atomic_json(prepared_release_path(state_root), record)
+        return record
+
+
+def load_prepared_release(state_root: Path, sha: str, slot: str) -> dict:
+    try:
+        record = json.loads(prepared_release_path(state_root).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RuntimeError("prepared_release_missing_or_invalid") from error
+    if record.get("release_sha") != sha or record.get("candidate_slot") != slot:
+        raise RuntimeError("prepared_release_identity_mismatch")
+    if record.get("status") not in {
+        "candidate_validated_workers_inactive", "candidate_workers_active",
+    }:
+        raise RuntimeError("prepared_release_state_invalid")
+    return record
+
+
+def activate_prepared_release(
+    *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
+) -> dict:
+    record = load_prepared_release(state_root, sha, slot)
+    operations.verify_source(sha)
+    operations.validate_candidate(sha, slot)
+    try:
+        operations.activate_workers(sha, slot, record["images"])
+        operations.validate_candidate(sha, slot)
+    except Exception:
+        operations.deactivate_workers({"sha": sha, "slot": slot, "images": record["images"]})
+        raise
+    record["status"] = "candidate_workers_active"
+    record["workers_activated_at"] = utc_now().isoformat()
+    atomic_json(prepared_release_path(state_root), record)
+    return record
+
+
+def adopt_prepared_release(
+    *, sha: str, slot: str, state_root: Path, compatibility: Compatibility,
+    operations: DockerGitOperations,
+) -> dict:
+    record = load_prepared_release(state_root, sha, slot)
+    if record.get("status") != "candidate_workers_active":
+        raise RuntimeError("prepared_release_workers_not_active")
+    state_file = state_root / "state.json"
+    try:
+        existing = json.loads(state_file.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        existing = {}
+    except ValueError as error:
+        raise RuntimeError("release_state_invalid") from error
+    if existing.get("known_good_release") or existing.get("in_progress_release"):
+        raise RuntimeError("immutable_release_state_already_initialized")
+    operations.verify_source(sha)
+    operations.validate_candidate(sha, slot)
+    schema = operations.schema_version()
+    if not compatibility.schema_min <= schema <= compatibility.schema_max:
+        raise RuntimeError("candidate_schema_incompatible")
+    stable_identity = operations._json("http://127.0.0.1:8001/health/version")
+    stable_readiness = operations._json("http://127.0.0.1:8001/health/ready")
+    if stable_identity.get("release_sha") != sha or not stable_readiness.get("ready"):
+        raise RuntimeError("stable_proxy_release_validation_failed")
+    with urllib.request.urlopen("http://127.0.0.1:3000/", timeout=5) as response:
+        if response.status != 200:
+            raise RuntimeError("stable_proxy_frontend_validation_failed")
+    known_good = {
+        "sha": sha,
+        "slot": slot,
+        "images": record["images"],
+        "schema": schema,
+        "schema_compatible_min": compatibility.schema_min,
+        "schema_compatible_max": compatibility.schema_max,
+    }
+    adopted = {
+        "release_sha": sha,
+        "candidate_slot": slot,
+        "traffic_target": slot,
+        "images": record["images"],
+        "schema": {"observed": schema},
+        "status": "known_good",
+        "phase": "bootstrap_adopted",
+        "completed_at": utc_now().isoformat(),
+    }
+    state = {
+        "active_slot": slot,
+        "known_good_release": known_good,
+        "failed_releases": existing.get("failed_releases") or {},
+        "history": [adopted],
+    }
+    atomic_json(state_file, state)
+    prepared_release_path(state_root).unlink()
+    return adopted
+
+
+def refresh_active_workers(
+    *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
+) -> dict:
+    state_file = state_root / "state.json"
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RuntimeError("release_state_missing_or_invalid") from error
+    known_good = state.get("known_good_release") or {}
+    if known_good.get("sha") != sha or known_good.get("slot") != slot:
+        raise RuntimeError("active_release_identity_mismatch")
+    schema = operations.schema_version()
+    if schema < 83:
+        raise RuntimeError("data_deletion_worker_schema_not_ready")
+    operations.verify_source(sha)
+    operations.validate_candidate(sha, slot)
+    operations.activate_workers(sha, slot, known_good["images"])
+    operations.validate_candidate(sha, slot)
+    stable_identity = operations._json("http://127.0.0.1:8001/health/version")
+    stable_readiness = operations._json("http://127.0.0.1:8001/health/ready")
+    if stable_identity.get("release_sha") != sha or not stable_readiness.get("ready"):
+        raise RuntimeError("stable_proxy_post_migration_validation_failed")
+    known_good["schema"] = schema
+    event = {
+        "release_sha": sha, "candidate_slot": slot, "traffic_target": slot,
+        "schema": {"observed": schema}, "status": "known_good",
+        "phase": "post_migration_workers_refreshed",
+        "completed_at": utc_now().isoformat(),
+    }
+    state.setdefault("history", []).append(event)
+    atomic_json(state_file, state)
+    return event
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("sha", help="Full candidate Git SHA")
     parser.add_argument("--manual-retry", action="store_true", help="Explicitly clear same-SHA suppression for this run")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--prepare-only", action="store_true", help="Validate an initial inactive candidate without workers or traffic")
+    mode.add_argument("--activate-prepared", action="store_true", help="Activate workers for a previously prepared candidate")
+    mode.add_argument("--adopt-prepared", action="store_true", help="Adopt a promoted initial candidate as immutable known-good")
+    mode.add_argument("--refresh-active-workers", action="store_true", help="Refresh the active release after reaching schema 83")
+    parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
     repo = Path(os.getenv("MADAR_PRODUCTION_REPO", "/home/madar/saas/Madar")).resolve()
     state_root = Path(os.getenv("MADAR_DEPLOY_STATE_ROOT", "/var/lib/madar/releases")).resolve()
     env_file = Path(os.getenv("MADAR_ENV_FILE", str(repo / ".env"))).resolve()
+    load_environment_file(env_file)
     compatibility = Compatibility.load(WEB_ROOT / "deployment/releases/release.json")
     operations = DockerGitOperations(repo, state_root, env_file)
+    if args.prepare_only:
+        result = prepare_release(
+            sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+            compatibility=compatibility, operations=operations,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.activate_prepared:
+        with deployment_lock(state_root):
+            result = activate_prepared_release(
+                sha=args.sha.lower(), slot=args.slot, state_root=state_root, operations=operations,
+            )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.adopt_prepared:
+        with deployment_lock(state_root):
+            result = adopt_prepared_release(
+                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                compatibility=compatibility, operations=operations,
+            )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.refresh_active_workers:
+        with deployment_lock(state_root):
+            result = refresh_active_workers(
+                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                operations=operations,
+            )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     deployer = ReleaseDeployer(state_root=state_root, compatibility=compatibility, operations=operations)
     result = deployer.deploy(args.sha.lower(), manual_retry=args.manual_retry)
     print(json.dumps(result, indent=2, sort_keys=True))

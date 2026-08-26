@@ -1,0 +1,19 @@
+[Unit]
+Description=Madar stable blue/green release proxy
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+User=madar
+Group=madar
+Environment=MADAR_PROXY_CONFIG_ROOT=/var/lib/madar/proxy
+WorkingDirectory=/usr/local/lib/madar/web/deployment/proxy
+ExecStart=/usr/bin/docker compose --project-name madar-release-proxy --file /usr/local/lib/madar/web/deployment/proxy/docker-compose.yml up -d --no-build --wait --wait-timeout 90
+ExecStop=/usr/bin/docker compose --project-name madar-release-proxy --file /usr/local/lib/madar/web/deployment/proxy/docker-compose.yml stop
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+umask 077
+
+apply=0
+backup_root=""
+while (($#)); do
+  case "$1" in
+    --apply) apply=1 ;;
+    --backup-dir) shift; backup_root="${1:-}" ;;
+    *) echo "usage: $0 [--apply] --backup-dir ABSOLUTE_PATH" >&2; exit 2 ;;
+  esac
+  shift
+done
+[[ "$backup_root" = /* && "$backup_root" != / ]] || {
+  echo "backup directory must be an explicit absolute path" >&2; exit 2;
+}
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+deployment_root="$(cd -- "$script_dir/.." && pwd)"
+install_root=/usr/local/lib/madar/web/deployment
+
+declare -a tracked_files=(
+  docker-compose.release.yml
+  bin/madar-auto-deploy
+  bin/madar-production-deploy
+  bin/madar-release-deploy
+  bin/madar-switch-traffic
+  lib/__init__.py
+  lib/environment_file.py
+  lib/migration_executor.py
+  lib/release_deployer.py
+  releases/release.json
+  releases/migrations-082-083.json
+  proxy/docker-compose.yml
+  proxy/nginx.conf
+)
+declare -a units=(
+  madar-auto-deploy.service
+  madar-auto-deploy.timer
+  madar-release-proxy.service
+)
+
+if (( ! apply )); then
+  printf 'would install immutable Madar control plane under %s\n' "$install_root"
+  printf 'would preserve replaced operational files under %s\n' "$backup_root"
+  printf 'would leave madar-auto-deploy.timer stopped\n'
+  exit 0
+fi
+[[ $EUID -eq 0 ]] || { echo "--apply requires root" >&2; exit 1; }
+
+install -d -m 0700 "$backup_root"
+for current in \
+  /usr/local/sbin/madar-auto-deploy \
+  /etc/systemd/system/madar-auto-deploy.service \
+  /etc/systemd/system/madar-auto-deploy.timer \
+  /etc/systemd/system/madar-release-proxy.service; do
+  if [[ -e "$current" || -L "$current" ]]; then
+    cp -a -- "$current" "$backup_root/$(basename "$current")"
+  fi
+done
+
+for relative in "${tracked_files[@]}"; do
+  source_path="$deployment_root/$relative"
+  [[ -f "$source_path" ]] || { echo "missing tracked control-plane file: $relative" >&2; exit 1; }
+  mode=0644
+  [[ "$relative" == bin/* ]] && mode=0755
+  install -D -o root -g root -m "$mode" "$source_path" "$install_root/$relative"
+done
+install -o root -g root -m 0755 \
+  "$deployment_root/bin/madar-auto-deploy" /usr/local/sbin/madar-auto-deploy
+for unit in "${units[@]}"; do
+  install -o root -g root -m 0644 \
+    "$deployment_root/systemd/$unit" "/etc/systemd/system/$unit"
+done
+
+install -d -o madar -g madar -m 0700 /var/lib/madar/releases
+install -d -o madar -g madar -m 0755 /var/lib/madar/proxy
+systemctl daemon-reload
+echo "immutable Madar control plane installed; auto-deploy timer remains stopped"

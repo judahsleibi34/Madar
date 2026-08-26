@@ -9,10 +9,12 @@ RUN npm ci
 # Build-time application metadata changes per release; keep it below npm ci
 # so immutable SHA labels do not invalidate the dependency layer.
 ARG VITE_API_URL
+ARG MADAR_REQUIRE_PRODUCTION_API_URL=false
 ARG MADAR_RELEASE_SHA=development
 ARG MADAR_BUILD_TIMESTAMP=unknown
 
 ENV VITE_API_URL=$VITE_API_URL \
+    MADAR_REQUIRE_PRODUCTION_API_URL=$MADAR_REQUIRE_PRODUCTION_API_URL \
     VITE_MADAR_RELEASE_SHA=$MADAR_RELEASE_SHA \
     VITE_MADAR_BUILD_TIMESTAMP=$MADAR_BUILD_TIMESTAMP
 

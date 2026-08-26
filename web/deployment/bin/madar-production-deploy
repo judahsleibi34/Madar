@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 readonly REPO_ROOT="/home/madar/saas/Madar"
-readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-/usr/local/lib/madar/madar-release-deploy}"
+readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-/usr/local/lib/madar/web/deployment/bin/madar-release-deploy}"
 
 if [[ ! -x "$RELEASE_DEPLOY" ]]; then
     echo "[madar-production] ERROR: immutable release deployer is not installed." >&2
@@ -15,4 +15,6 @@ fi
 
 git -C "$REPO_ROOT" fetch origin main
 readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
-exec "$RELEASE_DEPLOY" "$TARGET_SHA" "$@"
+"$RELEASE_DEPLOY" "$TARGET_SHA" "$@"
+git -C "$REPO_ROOT" merge --ff-only "$TARGET_SHA"
+echo "[madar-production] Production checkout advanced after successful promotion: ${TARGET_SHA:0:12}"

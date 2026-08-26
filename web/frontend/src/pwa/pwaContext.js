@@ -65,6 +65,12 @@ export function installMadarPwaMetadata(documentLike = globalThis.document) {
     meta.content = "yes";
     return meta;
   });
+  ensureHeadElement(documentLike, 'meta[name="mobile-web-app-capable"]', () => {
+    const meta = documentLike.createElement("meta");
+    meta.name = "mobile-web-app-capable";
+    meta.content = "yes";
+    return meta;
+  });
   ensureHeadElement(documentLike, 'meta[name="apple-mobile-web-app-status-bar-style"]', () => {
     const meta = documentLike.createElement("meta");
     meta.name = "apple-mobile-web-app-status-bar-style";

@@ -12,8 +12,17 @@ WRAPPER = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy"
 COMPOSE = WEB_ROOT / "docker-compose.yml"
 RELEASE_DEPLOY = WEB_ROOT / "deployment" / "bin" / "madar-release-deploy"
 RELEASE_LIBRARY = WEB_ROOT / "deployment" / "lib" / "release_deployer.py"
+ENVIRONMENT_LIBRARY = WEB_ROOT / "deployment" / "lib" / "environment_file.py"
+SWITCH = WEB_ROOT / "deployment" / "bin" / "madar-switch-traffic"
+PROXY_COMPOSE = WEB_ROOT / "deployment" / "proxy" / "docker-compose.yml"
+PROXY_CONFIG = WEB_ROOT / "deployment" / "proxy" / "nginx.conf"
+RELEASE_COMPOSE = WEB_ROOT / "deployment" / "docker-compose.release.yml"
+AUTO_SERVICE = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.service"
+AUTO_TIMER = WEB_ROOT / "deployment" / "systemd" / "madar-auto-deploy.timer"
 BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
 FRONTEND_DOCKERFILE = WEB_ROOT / "frontend" / "Dockerfile"
+INSTALLER = WEB_ROOT / "deployment" / "bin" / "madar-install-control-plane"
+LEGACY_ENTRYPOINT = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy-legacy-entrypoint"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
@@ -23,14 +32,28 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.compose = COMPOSE.read_text(encoding="utf-8")
         self.release_deploy = RELEASE_DEPLOY.read_text(encoding="utf-8")
         self.release_library = RELEASE_LIBRARY.read_text(encoding="utf-8")
+        self.environment_library = ENVIRONMENT_LIBRARY.read_text(encoding="utf-8")
+        self.switch = SWITCH.read_text(encoding="utf-8")
+        self.proxy_compose = PROXY_COMPOSE.read_text(encoding="utf-8")
+        self.proxy_config = PROXY_CONFIG.read_text(encoding="utf-8")
+        self.release_compose = RELEASE_COMPOSE.read_text(encoding="utf-8")
+        self.auto_service = AUTO_SERVICE.read_text(encoding="utf-8")
+        self.auto_timer = AUTO_TIMER.read_text(encoding="utf-8")
         self.backend_dockerfile = BACKEND_DOCKERFILE.read_text(encoding="utf-8")
         self.frontend_dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
+        self.installer = INSTALLER.read_text(encoding="utf-8")
+        self.legacy_entrypoint = LEGACY_ENTRYPOINT.read_text(encoding="utf-8")
 
     def test_wrapper_delegates_a_clean_full_sha_to_immutable_deployer(self):
         self.assertIn('readonly REPO_ROOT="/home/madar/saas/Madar"', self.deploy)
         self.assertIn('git -C "$REPO_ROOT"', self.deploy)
         self.assertIn("status --porcelain --untracked-files=normal", self.deploy)
-        self.assertIn('exec "$RELEASE_DEPLOY" "$TARGET_SHA"', self.deploy)
+        self.assertIn('"$RELEASE_DEPLOY" "$TARGET_SHA"', self.deploy)
+        self.assertIn('merge --ff-only "$TARGET_SHA"', self.deploy)
+        self.assertIn(
+            "/usr/local/lib/madar/web/deployment/bin/madar-release-deploy",
+            self.deploy,
+        )
 
     def test_release_deployer_uses_explicit_compose_and_environment_roots(self):
         self.assertIn('"MADAR_ENV_FILE": str(self.env_file)', self.release_deploy)
@@ -40,6 +63,32 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-../.env}"), 4)
         self.assertIn("candidate_image_identity_changed", self.release_deploy)
         self.assertIn("self._digest(tag)", self.release_deploy)
+        self.assertIn("docker-compose.release.yml", self.release_deploy)
+        self.assertIn('f"VITE_API_URL={frontend_api_url}"', self.release_deploy)
+        self.assertIn("frontend_api_origin_missing_or_invalid", self.release_deploy)
+        self.assertIn('f"madar-frontend:{sha}-{frontend_target}"', self.release_deploy)
+        self.assertIn("com.madar.frontend.api_origin", self.release_deploy)
+        self.assertIn("candidate_frontend_api_origin_mismatch", self.release_deploy)
+        self.assertIn("self._validate_frontend_api_origin(frontend_base", self.release_deploy)
+        self.assertIn('"--no-build", "--force-recreate", "--wait"', self.release_deploy)
+        self.assertIn("MADAR_REQUIRE_PRODUCTION_API_URL", self.frontend_dockerfile)
+        self.assertIn("MADAR_CANDIDATE_READY_ATTEMPTS", self.release_deploy)
+        self.assertIn("candidate_deep_validation_failed:", self.release_deploy)
+        self.assertIn('"DATA_DELETION_WORKER_HEALTH_URL": "http://data-deletion-worker:8094/health"', self.release_deploy)
+        self.assertIn("DATA_DELETION_WORKER_HEALTH_URL: ${DATA_DELETION_WORKER_HEALTH_URL:-http://data-deletion-worker:8094/health}", self.compose)
+
+    def test_release_slots_use_non_overlapping_explicit_ipam(self):
+        self.assertIn('"blue": {', self.release_deploy)
+        self.assertIn('"green": {', self.release_deploy)
+        for variable in (
+            "MADAR_DEFAULT_SUBNET",
+            "MADAR_PARSER_SUBNET",
+            "MADAR_REMOTE_INTERNAL_SUBNET",
+            "MADAR_REMOTE_EGRESS_SUBNET",
+        ):
+            self.assertIn(variable, self.release_deploy)
+            self.assertIn(variable, self.release_compose)
+        self.assertIn("internal: true", self.release_compose)
 
     def test_rollback_switches_to_retained_target_without_rebuild_or_git_reset(self):
         combined = self.deploy + self.release_deploy + self.release_library
@@ -49,6 +98,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("@sha256:", self.release_library)
         self.assertIn("known_bad_release_suppressed", self.release_library)
         self.assertIn("/health/ready", self.release_deploy)
+        self.assertIn("retained_worker_containers_missing", self.release_deploy)
+        self.assertIn('["docker", "inspect", name]', self.release_deploy)
 
     def test_persistent_bind_mounts_keep_their_pre_move_host_paths(self):
         for path in (
@@ -62,11 +113,74 @@ class MonorepoDeploymentTests(unittest.TestCase):
     def test_wrapper_keeps_git_operations_at_repository_root(self):
         self.assertIn('git -C "$REPO_ROOT" fetch', self.wrapper)
         self.assertIn('exec "$DEPLOY_SCRIPT"', self.wrapper)
+        self.assertIn(
+            "/usr/local/lib/madar/web/deployment/bin/madar-production-deploy",
+            self.wrapper,
+        )
+
+    def test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state(self):
+        self.assertIn("failed_releases", self.wrapper)
+        self.assertIn("remains suppressed", self.wrapper)
+        self.assertIn("release state is not initialized", self.wrapper)
+        self.assertIn('merge-base --is-ancestor "$KNOWN_GOOD" "$TARGET_SHA"', self.wrapper)
+
+    def test_timer_waits_after_completion_instead_of_retrying_immediately(self):
+        self.assertIn("OnUnitInactiveSec=2min", self.auto_timer)
+        self.assertNotIn("OnUnitActiveSec", self.auto_timer)
+        self.assertNotIn("ExecStartPre", self.auto_service)
+
+    def test_docker_proxy_is_hardened_and_preserves_forwarded_request_context(self):
+        self.assertIn("MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx", self.auto_service)
+        self.assertIn('driver not in {"nginx", "docker-nginx"}', self.switch)
+        self.assertIn("network_mode: host", self.proxy_compose)
+        self.assertIn("MADAR_PROXY_CONFIG_ROOT:-/var/lib/madar/proxy", self.proxy_compose)
+        self.assertNotIn("MADAR_ACTIVE_UPSTREAMS_FILE:-", self.proxy_compose)
+        self.assertIn(
+            "MADAR_ACTIVE_UPSTREAMS_FILE=/var/lib/madar/proxy/active-upstreams.conf",
+            self.auto_service,
+        )
+        self.assertIn("stable_route_identity_not_observed", self.switch)
+        self.assertIn("MADAR_STABLE_BACKEND_URL", self.switch)
+        self.assertIn("_atomic_bytes(target, previous)", self.switch)
+        self.assertIn("_reload(driver, container)", self.switch)
+        self.assertIn("listen 127.0.0.1:8001", self.proxy_config)
+        self.assertIn("listen 127.0.0.1:3000", self.proxy_config)
+        self.assertIn('cap_drop: ["ALL"]', self.proxy_compose)
+        self.assertIn("read_only: true", self.proxy_compose)
+        self.assertIn("proxy_request_buffering off", self.proxy_config)
+        self.assertIn("X-Forwarded-Proto $madar_forwarded_proto", self.proxy_config)
+        self.assertIn("X-Forwarded-For $proxy_add_x_forwarded_for", self.proxy_config)
+
+    def test_host_deployer_loads_secret_file_without_logging_values(self):
+        self.assertIn("load_environment_file(env_file)", self.release_deploy)
+        self.assertIn("permissions_too_broad", self.environment_library)
+        self.assertNotIn("print(", self.environment_library)
+
+    def test_initial_promotion_requires_prepared_candidate_before_state_adoption(self):
+        self.assertIn("candidate_validated_workers_inactive", self.release_deploy)
+        self.assertIn("prepared_release_workers_not_active", self.release_deploy)
+        self.assertIn("stable_proxy_release_validation_failed", self.release_deploy)
+        self.assertIn("immutable_release_state_already_initialized", self.release_deploy)
 
     def test_images_expose_release_sha_and_build_timestamp_as_oci_labels(self):
         for dockerfile in (self.backend_dockerfile, self.frontend_dockerfile):
             self.assertIn("org.opencontainers.image.revision=$MADAR_RELEASE_SHA", dockerfile)
             self.assertIn("org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP", dockerfile)
+
+    def test_control_plane_installer_preserves_layout_and_does_not_start_timer(self):
+        self.assertIn("/usr/local/lib/madar/web/deployment", self.installer)
+        self.assertIn("cp -a --", self.installer)
+        self.assertIn("systemctl daemon-reload", self.installer)
+        self.assertNotIn("systemctl start madar-auto-deploy.timer", self.installer)
+        self.assertNotIn("systemctl enable", self.installer)
+
+    def test_legacy_entrypoint_delegates_only_to_immutable_controller(self):
+        self.assertIn("madar-production-deploy", self.legacy_entrypoint)
+        self.assertIn("madar-release-deploy", self.legacy_entrypoint)
+        self.assertIn("MADAR_DEPLOY_STATE_ROOT", self.legacy_entrypoint)
+        self.assertIn('exec "$CONTROL_ROOT/bin/madar-auto-deploy"', self.legacy_entrypoint)
+        self.assertNotIn("docker compose", self.legacy_entrypoint)
+        self.assertNotIn("reset --hard", self.legacy_entrypoint)
 
 
 if __name__ == "__main__":
