@@ -25,5 +25,6 @@ This directory is the source of truth for the 2026-08-25 failed-deployment incid
 - [Login API-origin regression](20-login-api-origin-regression.md)
 - [Supabase Secret API Key compatibility](21-supabase-secret-key-compatibility.md)
 - [Supabase compatibility production promotion](22-supabase-compatibility-production-promotion.md)
+- [Supabase Secret API key rotation cutover](23-supabase-secret-rotation-cutover.md)
 
 No secret values are recorded in these reports.
