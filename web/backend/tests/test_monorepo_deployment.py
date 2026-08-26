@@ -196,6 +196,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertNotIn("systemctl enable", self.installer)
         self.assertIn("/home/madar/docker_auto.sh", self.installer)
         self.assertIn("/etc/systemd/system/madar-auto-deploy.service.d", self.installer)
+        self.assertIn("SHA256SUMS", self.installer)
+        self.assertIn("sha256sum", self.installer)
         self.assertIn("refusing installation while madar-auto-deploy.timer is enabled", self.installer)
         self.assertIn("rm -rf -- /etc/systemd/system/madar-auto-deploy.service.d", self.installer)
         self.assertIn("rm -f -- /home/madar/docker_auto.sh", self.installer)

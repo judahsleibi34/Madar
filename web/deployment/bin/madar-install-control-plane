@@ -62,6 +62,13 @@ for current in \
     cp -a -- "$current" "$backup_root/$(basename "$current")"
   fi
 done
+(
+  cd -- "$backup_root"
+  find . -mindepth 1 -type f ! -name SHA256SUMS -print0 \
+    | sort -z \
+    | xargs -0 --no-run-if-empty sha256sum > SHA256SUMS
+)
+chmod 0600 "$backup_root/SHA256SUMS"
 
 systemctl is-active --quiet madar-auto-deploy.timer && {
   echo "refusing installation while madar-auto-deploy.timer is active" >&2
