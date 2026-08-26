@@ -142,6 +142,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("production checkout contains local changes", self.wrapper)
 
     def test_timer_waits_after_completion_instead_of_retrying_immediately(self):
+        self.assertIn("OnActiveSec=2min", self.auto_timer)
         self.assertIn("OnUnitInactiveSec=2min", self.auto_timer)
         self.assertNotIn("OnUnitActiveSec", self.auto_timer)
         self.assertNotIn("ExecStartPre", self.auto_service)
