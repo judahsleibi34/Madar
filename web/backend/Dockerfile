@@ -15,8 +15,11 @@ ARG MADAR_BUILD_TIMESTAMP=unknown
 
 COPY . .
 
-# Keep repo-root style script paths working in the backend container.
+# Keep repo-root style script paths working in the backend container. Release
+# worktrees are created under systemd UMask=0077, so normalize only immutable
+# image-layer application files for the non-root runtime user.
 RUN mkdir -p /test-repository/backend /test-repository/frontend \
+    && chmod -R a+rX /app \
     && python scripts/verify_installed_constraints.py \
     && ln -s . backend
 
