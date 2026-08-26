@@ -5,8 +5,9 @@ Madar production is healthy after a successful immutable blue/green promotion.
 - Previous production SHA: `0eaa9edd297d2fd6618d50ae5dfc4b08c94ba1df`.
 - Failed merged SHA: `eb22f736d1a3342b24413e6b4fa2884d4c62eb1c`.
 - First promoted SHA: `ab6844683d89f652e10edc0bc7fefd22791db75f`.
-- Current active application SHA: `4faf63a67cbcfe884d3cbeeaa2f39ae9f0a37467`.
-- Active slot: `green`; retained compatible rollback slot: `blue` at `ab684468...`.
+- Current active application SHA: `67aff17f4a521a01f87bd8ad76a570acaf07df9b`.
+- Active slot: `green`; prepared compatible rollback slot: `blue` at the same
+  schema-83-compatible application SHA.
 - Database: PostgreSQL 17, schema 83 after verified migrations 82 and 83.
 - External frontend and API version checks pass.
 - Readiness reports database, Redis, auth, storage, schema, MFA policy, workers, and queues healthy. Email, push, AI local execution, and remote ingestion are truthfully disabled.
@@ -30,9 +31,17 @@ live bundle now contains `https://api.madarportal.com`; login resolves to
 with exact-origin CORS and a controlled empty login POST returns JSON 422. The
 old `/api/auth/login` string is absent from the live bundle.
 
-Two issues prevent a fully green operational handoff today:
+## Credential and control-plane completion
 
-1. The provider credential exposed during investigation has not yet been rotated. Its value is not repeated in this report.
-2. Root authentication is required to install the tracked systemd units. The root unit remains legacy. `madar-auto-deploy.timer` is inactive but still enabled at boot; it must remain stopped and must be disabled or replaced before any reboot. The legacy executable chain is bridged to the safe controller, but the old privileged storage-preparation drop-in and timer semantics must not run.
+The replacement Supabase server credential is active in production and the
+prepared rollback slot; the exposed old individual key is no longer used by
+Madar. Provider-side revocation of that superseded key remains an explicit
+operator action.
 
-Accordingly, the current release is healthy and the corrective promotion was successful, but unattended deployment remains disabled and full production security readiness is **NO-GO until credential rotation**.
+On 2026-08-26 the root-owned legacy auto-deploy systemd path was replaced by
+the reviewed immutable controller. One manual no-op and three real timer no-ops
+completed without changing application/worker/proxy container IDs, release
+state, rollback preparation, schema, or traffic. The timer is enabled and
+active. Unattended immutable deployment is technically **GO**; the remaining
+commercial mapping, physical-media DR, and future payment work remain separate
+authorized prerequisites/deferrals.
