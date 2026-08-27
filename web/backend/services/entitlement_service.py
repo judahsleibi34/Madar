@@ -170,11 +170,9 @@ def _plan_entitlements(plan_id: str | None) -> tuple[set[str], dict[str, int | N
 
 
 def _ai_provider_configured() -> bool:
-    provider = os.getenv("AI_PROVIDER", "gemini").strip().lower()
+    provider = os.getenv("AI_PROVIDER", "").strip().lower()
     if not _env_enabled("AI_FEATURE_ENABLED", False):
         return False
-    if provider == "gemini":
-        return bool(os.getenv("GEMINI_API_KEY", "").strip())
     if provider == "openai":
         return bool(os.getenv("OPENAI_API_KEY", "").strip())
     return False

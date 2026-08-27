@@ -64,7 +64,6 @@ python-bidi==0.6.11
 pygwalker==0.5.0.1
 python-multipart==0.0.32
 redis==5.0.8
-google-genai==2.11.0
 openai==2.45.0
 pywebpush==2.3.0
 numpy==2.5.1

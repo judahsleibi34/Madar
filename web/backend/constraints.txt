@@ -37,7 +37,6 @@ fonttools==4.63.0
 frozenlist==1.8.0
 fsspec==2026.4.0
 google-auth==2.56.0
-google-genai==2.11.0
 greenlet==3.5.3
 gw_dsl_parser==0.1.49.1
 h11==0.16.0
