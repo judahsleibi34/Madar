@@ -175,26 +175,26 @@ grant execute on function public.resolve_notification_outbox_v2(
 
 do $$
 declare
-  current_schema integer;
+  v_schema_version public.application_schema_state.schema_version%TYPE;
 begin
   select schema_version
-  into current_schema
+  into v_schema_version
   from public.application_schema_state
   where contract_key = 'core'
   for update;
 
-  if current_schema is null then
+  if v_schema_version is null then
     raise exception using
       errcode = 'P0001',
       message = 'migration_085_schema_state_missing';
   end if;
 
-  if current_schema <> 84 then
+  if v_schema_version <> 84 then
     raise exception using
       errcode = 'P0001',
       message = format(
         'migration_085_expected_schema_84_got_%s',
-        current_schema
+        v_schema_version
       );
   end if;
 

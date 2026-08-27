@@ -147,11 +147,13 @@ class LockedMigrationExecutor:
         atomic_json(self.state_file, state)
         connection = self.connection_factory()
         connection.autocommit = True
+        lock_acquired = False
         try:
             with connection.cursor() as cursor:
                 cursor.execute("select pg_try_advisory_lock(%s)", (self.LOCK_KEY,))
                 if not bool(cursor.fetchone()[0]):
                     raise RuntimeError("migration_lock_held")
+                lock_acquired = True
                 state["phase"] = "schema_validation"
                 current = self._schema(cursor)
                 state["observed_schema"] = current
@@ -196,16 +198,47 @@ class LockedMigrationExecutor:
                 atomic_json(self.state_file, state)
                 return state
         except Exception as error:
+            rollback_error = None
+
+            try:
+                connection.rollback()
+            except Exception as failure:
+                rollback_error = failure
+
             state.update(
                 status="failed",
                 failure_code=str(error)[:160],
                 failed_at=utc_now(),
             )
+
+            if rollback_error is not None:
+                state["rollback_failure_code"] = str(
+                    rollback_error
+                )[:160]
+
             atomic_json(self.state_file, state)
             raise
+
         finally:
             try:
-                with connection.cursor() as cursor:
-                    cursor.execute("select pg_advisory_unlock(%s)", (self.LOCK_KEY,))
+                if lock_acquired:
+                    # A failed explicit migration transaction may leave the
+                    # connection in an aborted state. Clear it before issuing
+                    # any cleanup SQL. The session lock is released by close()
+                    # regardless, so cleanup errors must never mask the
+                    # original migration exception.
+                    try:
+                        connection.rollback()
+                    except Exception:
+                        pass
+
+                    try:
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                "select pg_advisory_unlock(%s)",
+                                (self.LOCK_KEY,),
+                            )
+                    except Exception:
+                        pass
             finally:
                 connection.close()

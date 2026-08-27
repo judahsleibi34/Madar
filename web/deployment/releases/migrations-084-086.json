@@ -4,7 +4,7 @@
     {
       "number": 84,
       "path": "web/database/migrations/084_create_builder_form_drafts.sql",
-      "sha256": "388489f3fe39b8b9ae0108e594c2fedde72801bb979a7cedb6bfacaa82cd042c",
+      "sha256": "68280f6143cc7053222c9b681e53ced086e54f403bc0231ae338540db1df46f1",
       "from_schema": 83,
       "to_schema": 84,
       "compatibility": "expand-only"
@@ -12,7 +12,7 @@
     {
       "number": 85,
       "path": "web/database/migrations/085_filter_disabled_notification_channels.sql",
-      "sha256": "9e979ca57078efa1c6f05923727b6ddda388bd2e48a2eeca7fe8809b72050ee9",
+      "sha256": "5f97c6a9fb5d077ff0843846535b9ba25a932b2618c39cce25509773e504dc4b",
       "from_schema": 84,
       "to_schema": 85,
       "compatibility": "expand-only"
@@ -20,7 +20,7 @@
     {
       "number": 86,
       "path": "web/database/migrations/086_retire_legacy_gemini_provider.sql",
-      "sha256": "19a60be3ab230101005999a9e2c5fb3cc63192a58fa8de1db9344ceacde575ab",
+      "sha256": "5a5f9ec6dc315f99cbc38b3fec4d29faaab1582ddffbf3b8eec0b82fca872110",
       "from_schema": 85,
       "to_schema": 86,
       "compatibility": "expand-only"
