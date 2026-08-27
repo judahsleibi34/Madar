@@ -6,7 +6,7 @@ import CountUpText from "../ui/CountUpText";
 import { BuilderIcon } from "../ui/PageBuilderIconPicker";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
-import { resolveDocumentUrl, resolveMediaUrl } from "../../../utils/media";
+import { getResponsiveMediaProps, resolveDocumentUrl, resolveMediaUrl } from "../../../utils/media";
 import {
   collapseAccidentalTextDuplication,
   getEditableTextBlockFormats,
@@ -260,7 +260,12 @@ export const createElementRenderer = ({
     }
 
     if (element.type === "imageButton") {
-      const imageSrc = resolveMediaUrl(element.content);
+      const imageProps = getResponsiveMediaProps(element.content, {
+        sizes: element.imageButtonVariant === "editorialCard"
+          ? "(max-width: 720px) 100vw, 280px"
+          : "100vw",
+      });
+      const imageSrc = imageProps.src;
       const isEditorialCard = element.imageButtonVariant === "editorialCard";
       const savedCardMediaWidth = Number(element.imageCardMediaWidth);
       const cardMediaWidth = savedCardMediaWidth > 65
@@ -288,7 +293,7 @@ export const createElementRenderer = ({
             <>
               <span className="image-button-card-media">
                 {imageSrc ? (
-                  <img src={imageSrc} alt="" loading="lazy" decoding="async" />
+                  <img {...imageProps} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <span className="image-button-card-placeholder">Upload image</span>
                 )}
@@ -305,7 +310,7 @@ export const createElementRenderer = ({
               </span>
             </>
           ) : imageSrc ? (
-            <img src={imageSrc} alt="" loading="lazy" decoding="async" />
+            <img {...imageProps} alt="" loading="lazy" decoding="async" />
           ) : (
             <span>Upload button image</span>
           )}
@@ -314,12 +319,12 @@ export const createElementRenderer = ({
     }
 
     if (element.type === "image") {
-      const imageSrc = resolveMediaUrl(element.content);
-      return imageSrc ? (
+      const imageProps = getResponsiveMediaProps(element.content);
+      return imageProps.src ? (
         <img
           key={element.id}
           {...commonProps}
-          src={imageSrc}
+          {...imageProps}
           alt={element.name}
           loading="lazy"
           decoding="async"

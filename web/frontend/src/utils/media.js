@@ -4,6 +4,8 @@ const BLOCKED_MEDIA_SCHEMES = new Set(["javascript", "data", "vbscript", "file",
 const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/i;
 const MANAGED_UPLOAD_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm)$/;
+const MANAGED_IMAGE_ASSET_PATTERN =
+  /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:png|jpg|jpeg|webp)$/;
 const RELATIVE_MEDIA_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp|mp4|webm)(?:[?#].*)?$/i;
 const MANAGED_DOCUMENT_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:pdf|doc|docx)$/;
@@ -77,6 +79,32 @@ export const resolveMediaUrl = (value) => resolveSupportedAssetUrl(value, {
   relativePattern: RELATIVE_MEDIA_FILE_PATTERN,
   managedPattern: MANAGED_UPLOAD_ASSET_PATTERN,
 });
+
+export const RESPONSIVE_MEDIA_WIDTHS = [320, 480, 768, 1024, 1440, 1920, 2560];
+
+export const getResponsiveMediaProps = (
+  value,
+  { widths = RESPONSIVE_MEDIA_WIDTHS, fallbackWidth = 1440, sizes = "100vw" } = {}
+) => {
+  const src = resolveMediaUrl(value);
+  const source = String(value || "").trim();
+  if (!src || !MANAGED_IMAGE_ASSET_PATTERN.test(source)) return { src };
+
+  const candidates = [...new Set(widths)]
+    .map(Number)
+    .filter((width) => RESPONSIVE_MEDIA_WIDTHS.includes(width))
+    .sort((left, right) => left - right);
+  const appendWidth = (width) => `${src}${src.includes("?") ? "&" : "?"}w=${width}`;
+  const safeFallback = RESPONSIVE_MEDIA_WIDTHS.includes(Number(fallbackWidth))
+    ? Number(fallbackWidth)
+    : 1440;
+
+  return {
+    src: appendWidth(safeFallback),
+    srcSet: candidates.map((width) => `${appendWidth(width)} ${width}w`).join(", "),
+    sizes,
+  };
+};
 
 export const resolveDocumentUrl = (value) => resolveSupportedAssetUrl(value, {
   relativePattern: RELATIVE_DOCUMENT_FILE_PATTERN,

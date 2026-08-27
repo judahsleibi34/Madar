@@ -135,6 +135,20 @@ describe("ReservationBlock fixed slots", () => {
     expect(screen.getByRole("button", { name: /August 20, 2026 at 10:30 AM/i })).toBeTruthy();
     expect(container.querySelectorAll(".fixed-slot-picker")).toHaveLength(1);
   });
+
+  it("applies the saved direction to every part of the availability component", () => {
+    const { container } = render(
+      <ReservationBlock
+        bookingMode="restricted"
+        availableDates={["2026-08-20"]}
+        timeSlots={["10:30"]}
+        formItems={[{ id: "slots", type: "availability", label: "Choose your session", direction: "rtl" }]}
+      />
+    );
+
+    expect(container.querySelector(".reservation-custom-availability").getAttribute("dir")).toBe("rtl");
+    expect(container.querySelector(".fixed-slot-picker").getAttribute("dir")).toBe("rtl");
+  });
   it("keeps free date and time inputs for visitor date requests", () => {
     const { container } = render(<ReservationBlock bookingMode="flexible" />);
 
@@ -233,5 +247,37 @@ describe("ReservationBlock custom form", () => {
     expect(heading.style.fontSize).toBe("28px");
     expect(heading.style.textAlign).toBe("right");
     expect(heading.style.color).toBe("rgb(18, 52, 86)");
+  });
+  it("validates dedicated email and regional phone components before submitting", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(false);
+    render(
+      <ReservationBlock
+        bookingMode="flexible"
+        fields={[]}
+        formItems={[
+          { id: "email", type: "email", label: "Email address", required: true },
+          { id: "phone", type: "phone", label: "Phone number", required: true },
+          { id: "send", type: "button", label: "Book now" },
+        ]}
+        onSubmit={onSubmit}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/Email address/), { target: { value: "invalid" } });
+    fireEvent.change(screen.getByLabelText(/Phone number/), { target: { value: "+971 50 123 4567" } });
+    fireEvent.click(screen.getByRole("button", { name: "Book now" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText(/valid email address/)).toBeTruthy();
+    expect(screen.getByText(/Palestinian \(\+970\).*Israeli \(\+972\)/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/Email address/), { target: { value: "person@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Phone number/), { target: { value: "+970 59 123 4567" } });
+    fireEvent.click(screen.getByRole("button", { name: "Book now" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].customAnswers).toEqual({
+      email: "person@example.com",
+      phone: "+970 59 123 4567",
+    });
   });
 });

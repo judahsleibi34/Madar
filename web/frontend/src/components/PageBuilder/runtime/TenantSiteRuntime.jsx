@@ -49,7 +49,7 @@ import "../../../styles/admin/PageBuilder/index.css";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
 import { resolveReservationBlockValue } from "../core/PageBuilder.reservations";
-import { resolveMediaUrl } from "../../../utils/media";
+import { getResponsiveMediaProps, resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
 import { getReservationErrorMessage } from "./reservationSubmission";
 import {
@@ -840,6 +840,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             publicSiteProfile.brand ||
             defaultSiteChrome.footerStoreName,
           logoUrl: publicSiteProfile.logo_url || "",
+          loadingImageUrl: publicSiteProfile.loading_image_url || "",
           contactEmail:
             publicSiteProfile.contact_email || defaultSiteChrome.contactEmail,
           phone: publicSiteProfile.phone || defaultSiteChrome.phone,
@@ -2118,11 +2119,15 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           }
         : readCachedTenantBrand(getTenantBrandStorage(), publicationBoundary);
     const loadingBrand = resolvedBrand?.brand || getTenantBrandFallback(cleanSubdomain);
-    const loadingLogo = resolveMediaUrl(getTenantLoadingLogoUrl({
+    const loadingLogoProps = getResponsiveMediaProps(getTenantLoadingLogoUrl({
       settingsLogoUrl: publicSiteProfile?.logo_url,
       logoUrl: resolvedBrand?.logoUrl,
       loadingImageUrl: resolvedBrand?.loadingImageUrl,
-    }));
+    }), {
+      widths: [320, 480, 768, 1024, 1440],
+      fallbackWidth: 1024,
+      sizes: "(max-width: 720px) 70vw, 650px",
+    });
     const loadingInitial = loadingBrand.trim().slice(0, 1).toUpperCase() || "M";
 
     return (
@@ -2130,9 +2135,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         <div className="tenant-brand-loader" role="status" aria-live="polite">
           <div className="tenant-brand-loader-mark" aria-hidden="true">
             <span>{loadingInitial}</span>
-            {loadingLogo && (
+            {loadingLogoProps.src && (
               <img
-                src={loadingLogo}
+                {...loadingLogoProps}
                 alt=""
                 decoding="async"
                 fetchPriority="high"

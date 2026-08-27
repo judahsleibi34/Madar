@@ -1,7 +1,8 @@
-export const ECOMMERCE_CATALOG_CACHE_VERSION = 1;
+export const ECOMMERCE_CATALOG_CACHE_VERSION = 3;
 
 const STORAGE_KEY = `madar-ecommerce-catalog-cache-v${ECOMMERCE_CATALOG_CACHE_VERSION}`;
 const MAX_AGE_MS = 3 * 60 * 1000;
+const STALE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_ENTRIES = 8;
 const memoryCache = new Map();
 const inFlightRequests = new Map();
@@ -36,31 +37,55 @@ function isCatalog(value) {
   );
 }
 
-function isUsable(entry) {
+function isTheme(value) {
   return Boolean(
-    isCatalog(entry?.catalog) &&
-      Number.isFinite(Number(entry.cachedAt)) &&
-      Date.now() - Number(entry.cachedAt) <= MAX_AGE_MS,
+    value &&
+      ["accent", "background", "surface", "text", "muted"].every(
+        (key) => typeof value[key] === "string",
+      ),
   );
 }
 
-export function readEcommerceCatalogCache(scope) {
-  const key = cacheKey(scope);
-  const memoryEntry = memoryCache.get(key);
-  if (isUsable(memoryEntry)) return memoryEntry.catalog;
-  if (memoryEntry) memoryCache.delete(key);
+function cacheAge(entry) {
+  return Date.now() - Number(entry?.cachedAt);
+}
 
-  const entries = readStoredEntries();
-  const storedEntry = entries[key];
-  if (!isUsable(storedEntry)) {
-    if (storedEntry) {
-      delete entries[key];
-      writeStoredEntries(entries);
+function isRetained(entry) {
+  return Boolean(
+    isCatalog(entry?.catalog) &&
+      Number.isFinite(Number(entry.cachedAt)) &&
+      cacheAge(entry) <= STALE_MAX_AGE_MS,
+  );
+}
+
+export function readEcommerceCatalogCacheSnapshot(scope) {
+  const key = cacheKey(scope);
+  let entry = memoryCache.get(key);
+
+  if (!isRetained(entry)) {
+    if (entry) memoryCache.delete(key);
+    const entries = readStoredEntries();
+    entry = entries[key];
+    if (!isRetained(entry)) {
+      if (entry) {
+        delete entries[key];
+        writeStoredEntries(entries);
+      }
+      return null;
     }
-    return null;
+    memoryCache.set(key, entry);
   }
-  memoryCache.set(key, storedEntry);
-  return storedEntry.catalog;
+
+  return {
+    catalog: entry.catalog,
+    cachedAt: Number(entry.cachedAt),
+    isStale: cacheAge(entry) > MAX_AGE_MS,
+  };
+}
+
+export function readEcommerceCatalogCache(scope) {
+  const snapshot = readEcommerceCatalogCacheSnapshot(scope);
+  return snapshot && !snapshot.isStale ? snapshot.catalog : null;
 }
 
 export function writeEcommerceCatalogCache(scope, catalog) {
@@ -81,6 +106,25 @@ export function writeEcommerceCatalogCache(scope, catalog) {
   writeStoredEntries(entries);
 }
 
+
+export function updateEcommerceCatalogCache(scope, section, item) {
+  const snapshot = readEcommerceCatalogCacheSnapshot(scope);
+  if (!snapshot || !Array.isArray(snapshot.catalog?.[section]) || !item?.id) return;
+  const currentItems = snapshot.catalog[section];
+  const nextItems = currentItems.some((candidate) => candidate.id === item.id)
+    ? currentItems.map((candidate) => candidate.id === item.id ? item : candidate)
+    : [item, ...currentItems];
+  writeEcommerceCatalogCache(scope, { ...snapshot.catalog, [section]: nextItems });
+}
+
+export function removeFromEcommerceCatalogCache(scope, section, itemId) {
+  const snapshot = readEcommerceCatalogCacheSnapshot(scope);
+  if (!snapshot || !Array.isArray(snapshot.catalog?.[section])) return;
+  writeEcommerceCatalogCache(scope, {
+    ...snapshot.catalog,
+    [section]: snapshot.catalog[section].filter((candidate) => candidate.id !== itemId),
+  });
+}
 export function clearEcommerceCatalogCache(scope) {
   const key = cacheKey(scope);
   memoryCache.delete(key);
@@ -101,6 +145,53 @@ export function getOrCreateEcommerceCatalogRequest(scope, loader) {
     .finally(() => {
       if (inFlightRequests.get(key) === request) inFlightRequests.delete(key);
     });
+  inFlightRequests.set(key, request);
+  return request;
+}
+export function readEcommerceThemeCacheSnapshot(scope) {
+  const key = `theme:${encodeURIComponent(String(scope || "authenticated"))}`;
+  let entry = memoryCache.get(key);
+  if (!entry) {
+    entry = readStoredEntries()[key];
+    if (entry) memoryCache.set(key, entry);
+  }
+  if (!isTheme(entry?.theme) || !Number.isFinite(Number(entry.cachedAt)) || cacheAge(entry) > STALE_MAX_AGE_MS) return null;
+  return { theme: entry.theme, cachedAt: Number(entry.cachedAt), isStale: cacheAge(entry) > MAX_AGE_MS };
+}
+
+export function readEcommerceThemeCache(scope) {
+  const snapshot = readEcommerceThemeCacheSnapshot(scope);
+  return snapshot && !snapshot.isStale ? snapshot.theme : null;
+}
+
+export function writeEcommerceThemeCache(scope, theme) {
+  if (!isTheme(theme)) return;
+  const key = `theme:${encodeURIComponent(String(scope || "authenticated"))}`;
+  const entry = { theme, cachedAt: Date.now() };
+  memoryCache.set(key, entry);
+  const entries = readStoredEntries();
+  entries[key] = entry;
+  writeStoredEntries(entries);
+}
+
+export function clearEcommerceThemeCache(scope) {
+  const key = `theme:${encodeURIComponent(String(scope || "authenticated"))}`;
+  memoryCache.delete(key);
+  inFlightRequests.delete(key);
+  const entries = readStoredEntries();
+  if (entries[key]) {
+    delete entries[key];
+    writeStoredEntries(entries);
+  }
+}
+
+export function getOrCreateEcommerceThemeRequest(scope, loader) {
+  const key = `theme:${encodeURIComponent(String(scope || "authenticated"))}`;
+  const activeRequest = inFlightRequests.get(key);
+  if (activeRequest) return activeRequest;
+  const request = Promise.resolve().then(loader).finally(() => {
+    if (inFlightRequests.get(key) === request) inFlightRequests.delete(key);
+  });
   inFlightRequests.set(key, request);
   return request;
 }

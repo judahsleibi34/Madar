@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { resolveMediaUrl } from "../../../utils/media";
+import { getResponsiveMediaProps } from "../../../utils/media";
 import {
   getHighQualityCarouselImageUrl,
   parseCarouselSlides,
@@ -43,13 +43,19 @@ export default function PageBuilderCarousel({
 
         <div className="product-carousel-grid">
           {visibleProducts.map((product) => {
-            const imageUrl = getHighQualityCarouselImageUrl(resolveMediaUrl(product.image));
+            const responsiveImageProps = getResponsiveMediaProps(product.image, {
+              sizes: "(max-width: 720px) 86vw, 20vw",
+            });
+            const imageProps = responsiveImageProps.srcSet
+              ? responsiveImageProps
+              : { src: getHighQualityCarouselImageUrl(responsiveImageProps.src) };
+            const imageUrl = imageProps.src;
             return (
             <article className="product-carousel-card" key={`${product.sourceIndex}_${product.title}`}>
               <div className="product-carousel-image">
                 {imageUrl ? (
                   <img
-                    src={imageUrl}
+                    {...imageProps}
                     alt={product.title || "Featured product"}
                     decoding="async"
                   />

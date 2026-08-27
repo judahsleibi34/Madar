@@ -1,10 +1,12 @@
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from PIL import Image
 
 import app as app_module
 
@@ -62,6 +64,42 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["content-type"], "image/png")
         self.assertEqual(response.content, PNG_BYTES)
+
+    def test_managed_image_serves_cached_high_quality_responsive_webp(self):
+        image = Image.new("RGB", (1600, 900), color=(35, 90, 140))
+        image.save(self.asset_path, format="PNG")
+
+        response = self.client.get(
+            "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png?w=480"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "image/webp")
+        self.assertEqual(
+            response.headers["cache-control"],
+            "public, max-age=31536000, immutable",
+        )
+        self.assertEqual(
+            response.headers["cdn-cache-control"],
+            "public, max-age=31536000, immutable",
+        )
+        with Image.open(BytesIO(response.content)) as delivered:
+            self.assertEqual(delivered.size, (480, 270))
+
+    def test_responsive_image_can_be_rendered_from_durable_storage(self):
+        source = BytesIO()
+        Image.new("RGB", (1200, 600), color=(80, 40, 120)).save(source, format="PNG")
+        self.asset_path.unlink()
+        with patch.object(app_module, "download_builder_asset", return_value=source.getvalue()) as download:
+            response = self.client.get(
+                "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png?w=320"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "image/webp")
+        download.assert_called_once_with(
+            storage_key="tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
+        )
 
     def test_managed_builder_asset_falls_back_to_durable_storage(self):
         self.asset_path.unlink()

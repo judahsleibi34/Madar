@@ -921,6 +921,10 @@
   box-sizing: border-box;
 }
 
+.page-builder .reservation-editor-card {
+  min-width: 0;
+  container: reservation-editor / inline-size;
+}
 .page-builder .reservation-block-list {
   align-content: start;
 }
@@ -1363,20 +1367,20 @@
 
 .page-builder .booking-component-dropzone {
   position: relative;
-  height: 10px;
+  height: 18px;
   transition: height 0.14s ease;
 }
 
 .page-builder .booking-component-dropzone.is-last {
-  height: 12px;
-}
-
-.page-builder .booking-component-dropzone.is-visible {
   height: 18px;
 }
 
+.page-builder .booking-component-dropzone.is-visible {
+  height: 22px;
+}
+
 .page-builder .booking-component-dropzone.is-active {
-  height: 26px;
+  height: 30px;
 }
 
 .page-builder .booking-component-dropzone.is-active::after {
@@ -1392,9 +1396,10 @@
 .page-builder .booking-canvas-component {
   position: relative;
   min-width: 0;
-  padding: 2px;
-  border: 2px solid transparent;
-  border-radius: 12px;
+  padding: 0;
+  border: 1px solid var(--pb-border);
+  border-left: 5px solid transparent;
+  border-radius: 8px;
   background: var(--pb-surface-raised);
   outline: none;
   cursor: grab;
@@ -1407,8 +1412,9 @@
 
 .page-builder .booking-canvas-component.is-selected,
 .page-builder .booking-canvas-component:focus-visible {
-  border-color: var(--theme-info, var(--pb-accent));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-info, var(--pb-accent)) 28%, transparent);
+  border-color: var(--pb-border);
+  border-left-color: var(--pb-accent);
+  box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.1);
 }
 
 .page-builder .booking-canvas-component:active {
@@ -1449,6 +1455,11 @@
   font-weight: 600;
 }
 
+.page-builder .booking-canvas-component-preview label > small {
+  color: var(--pb-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
 .page-builder .booking-canvas-component-preview input:not([type="checkbox"]):not([type="radio"]) {
   width: 100%;
   min-height: 38px;
@@ -1484,9 +1495,13 @@
 
 .page-builder .booking-component-inspector {
   position: sticky;
-  top: 92px;
+  top: 0;
+  align-self: start;
   display: grid;
   gap: 14px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  scrollbar-width: thin;
   padding: 15px;
 }
 
@@ -1586,6 +1601,8 @@
 
   .page-builder .booking-component-inspector {
     position: static;
+    max-height: none;
+    overflow: visible;
   }
 }
 
@@ -1995,6 +2012,81 @@
 
 .page-builder .booking-availability-preview > small {
   color: var(--pb-muted);
+}
+/* Respond to the editor's real available width, not only the browser width. */
+@container reservation-editor (max-width: 900px) {
+  .page-builder .booking-element-builder {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-builder .booking-component-inspector {
+    position: static;
+    top: auto;
+    max-height: none;
+    overflow: visible;
+    padding-top: 18px;
+    border-top: 1px solid var(--pb-border) !important;
+  }
+}
+
+@container reservation-editor (max-width: 700px) {
+  .page-builder .reservation-block-builder-heading,
+  .page-builder .booking-component-toolbox-heading,
+  .page-builder .booking-element-stage-heading {
+    display: grid;
+  }
+
+  .page-builder .booking-component-toolbox-list.section-component-palette {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-builder .booking-element-canvas {
+    min-height: 320px;
+    padding: 14px;
+  }
+}
+
+@container reservation-editor (max-width: 460px) {
+  .page-builder .booking-component-toolbox-list.section-component-palette,
+  .page-builder .booking-text-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-builder .booking-text-toolbar select,
+  .page-builder .booking-text-toolbar > label:not(.booking-toolbar-color) {
+    grid-column: 1;
+  }
+
+  .page-builder .booking-element-canvas {
+    padding: 10px;
+  }
+
+  .page-builder .booking-canvas-component-preview {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .page-builder .reservation-editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-builder .reservation-block-list {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-builder .reservation-editor-actions,
+  .page-builder .reservation-editor-actions button {
+    width: 100%;
+  }
+
+  .page-builder .reservation-editor-actions button {
+    justify-content: center;
+  }
 }
 /* Date-specific reservation scheduling */
 .page-builder .reservation-date-card {

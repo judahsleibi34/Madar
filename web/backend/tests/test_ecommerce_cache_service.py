@@ -78,8 +78,7 @@ def test_public_catalog_route_reuses_warm_tenant_cache():
             "resolve_website_settings",
             return_value={"tenant_id": 7, "published_project_id": "project-1"},
         ),
-        patch.object(public_site_routes, "get_bound_published_project", return_value={}),
-        patch.object(public_site_routes, "build_public_site_profile", return_value={"subdomain": "demo"}),
+        patch.object(public_site_routes, "build_public_store_profile", return_value={"subdomain": "demo"}),
         patch.object(public_site_routes, "_catalog_payload", return_value=payload) as build_payload,
     ):
         first_response = Response()
@@ -99,3 +98,54 @@ def test_public_catalog_route_reuses_warm_tenant_cache():
     assert build_payload.call_count == 1
     assert first_response.headers["X-Ecommerce-Cache"] == "MISS"
     assert second_response.headers["X-Ecommerce-Cache"] == "HIT"
+
+def test_cache_rejects_a_key_when_the_expected_tenant_does_not_match():
+    key = ecommerce_cache_key(1, "authenticated-catalog")
+    write_ecommerce_cache(key, 1, {"tenant": 1})
+
+    assert read_ecommerce_cache(key, tenant_id=2) is None
+    created, hit = get_or_create_ecommerce_cache(
+        key,
+        2,
+        lambda: {"tenant": 2},
+    )
+    assert hit is False
+    assert created == {"tenant": 2}
+    assert read_ecommerce_cache(key, tenant_id=2) == {"tenant": 2}
+
+def test_public_store_settings_lookup_is_reused_and_tenant_scoped():
+    request = Request({
+        "type": "http",
+        "method": "GET",
+        "path": "/public/sites/demo/store-profile",
+        "headers": [],
+        "query_string": b"",
+        "client": ("127.0.0.1", 1),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    })
+    settings = {"tenant_id": 7, "standard_path_slug": "demo", "brand": "Demo"}
+    with patch.object(
+        public_site_routes,
+        "resolve_website_settings",
+        return_value=settings,
+    ) as lookup:
+        first = public_site_routes.resolve_public_store_settings("demo", request=request)
+        second = public_site_routes.resolve_public_store_settings("demo", request=request)
+
+    assert first == second == settings
+    assert lookup.call_count == 1
+    assert invalidate_ecommerce_cache(7) == 1
+
+
+def test_public_catalog_source_rows_are_reused_across_filter_payloads():
+    source_rows = ([], [], [], [])
+    with patch.object(
+        public_site_routes,
+        "_read_public_catalog_rows",
+        return_value=source_rows,
+    ) as read_rows:
+        public_site_routes._catalog_payload(tenant_id=9, locale="en", search="first")
+        public_site_routes._catalog_payload(tenant_id=9, locale="en", search="second")
+
+    assert read_rows.call_count == 1

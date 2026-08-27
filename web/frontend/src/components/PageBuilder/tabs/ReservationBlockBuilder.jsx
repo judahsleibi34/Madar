@@ -28,7 +28,7 @@ import { pageBuilderFontFamilyOptions } from "../core/PageBuilder.theme";
 import { normalizeTimeSlotsByDate } from "../blocks/reservationAvailability";
 
 const BOOKING_COMPONENT_MIME = "application/x-madar-booking-component";
-const toolboxTypes = ["heading", "paragraph", "availability", "text", "checkbox", "radio", "button"];
+const toolboxTypes = ["heading", "paragraph", "availability", "text", "email", "phone", "checkbox", "radio", "button"];
 const textComponentTypes = new Set(["heading", "paragraph"]);
 
 const writeDragPayload = (event, payload) => {
@@ -75,8 +75,8 @@ function BookingComponentPreview({ item, availableDates, timeSlots, timeSlotsByD
       </div>
     );
   }
-  if (item.type === "text") {
-    return <label>{item.label}{item.required ? " *" : ""}<input disabled placeholder={item.placeholder || ""} /></label>;
+  if (["text", "email", "phone"].includes(item.type)) {
+    return <label>{item.label}{item.required ? " *" : ""}<input type={item.type === "text" ? "text" : item.type} disabled placeholder={item.placeholder || ""} />{item.type === "phone" && <small>Accepts +970 and +972 numbers</small>}</label>;
   }
   if (item.type === "checkbox" || item.type === "radio") {
     return (
@@ -189,7 +189,7 @@ function BookingComponentInspector({ item, onUpdate, onDelete, onUndo, onRedo, c
         </label>
       )}
 
-      {item.type === "text" && (
+      {["text", "email", "phone"].includes(item.type) && (
         <label>Placeholder<input value={item.placeholder || ""} onChange={(event) => onUpdate({ placeholder: event.target.value })} /></label>
       )}
 
@@ -206,7 +206,7 @@ function BookingComponentInspector({ item, onUpdate, onDelete, onUndo, onRedo, c
         </div>
       )}
 
-      {["text", "checkbox", "radio"].includes(item.type) && (
+      {["text", "email", "phone", "checkbox", "radio"].includes(item.type) && (
         <label className="booking-component-required"><input type="checkbox" checked={Boolean(item.required)} onChange={(event) => onUpdate({ required: event.target.checked })} />Required answer</label>
       )}
 

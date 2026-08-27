@@ -58,6 +58,35 @@ describe("published button actions", () => {
     expect(showUnavailable).toHaveBeenCalledWith("This button action is unavailable.");
   });
 
+  it("allows buttons with no destination to publish as no-action buttons", () => {
+    const goToPage = vi.fn();
+    const openExternal = vi.fn();
+    const showUnavailable = vi.fn();
+
+    for (const action of [
+      { type: "goToPage", pageId: "" },
+      { type: "openUrl", url: "" },
+    ]) {
+      expect(getButtonActionIssue({
+        element: { type: "button", action },
+        pages,
+        getStoredUrlError,
+      })).toBeNull();
+      const result = runPublicElementAction({
+        element: { type: "button", action },
+        pages,
+        goToPage,
+        getStoredUrlError,
+        openExternal,
+        showUnavailable,
+      });
+      expect(result).toMatchObject({ handled: false, issue: { issue_type: "missing_button_action" } });
+    }
+
+    expect(goToPage).not.toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
   it("opens an HTTPS URL with the saved new-tab policy", () => {
     const openExternal = vi.fn();
     runPublicElementAction({
@@ -94,11 +123,11 @@ describe("published button actions", () => {
     expect(goToPage).not.toHaveBeenCalled();
   });
 
-  it("rejects an empty message", () => {
+  it("allows an empty message when publishing", () => {
     expect(getButtonActionIssue({
       element: { type: "button", action: { type: "showMessage", message: "  " } },
       pages,
       getStoredUrlError,
-    })?.issue_type).toBe("empty_button_message");
+    })).toBeNull();
   });
 });

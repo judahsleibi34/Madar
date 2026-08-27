@@ -7,9 +7,15 @@ from services import builder_asset_storage
 
 
 class Bucket:
-    def __init__(self, signed_url):
+    def __init__(self, signed_url, content=b"stored asset"):
         self.signed_url = signed_url
+        self.content = content
         self.calls = []
+        self.download_calls = []
+
+    def download(self, storage_key):
+        self.download_calls.append(storage_key)
+        return self.content
 
     def create_signed_url(self, storage_key, expires_in):
         self.calls.append((storage_key, expires_in))
@@ -37,6 +43,15 @@ class BuilderAssetStorageTests(unittest.TestCase):
             )
         self.assertEqual(result, bucket.signed_url)
         self.assertEqual(bucket.calls, [("tenant_7/builder_assets/asset.mp4", 60)])
+
+    def test_downloads_exact_builder_asset_bytes(self):
+        bucket = Bucket("https://project.supabase.co/unused", content=b"image bytes")
+        result = builder_asset_storage.download_builder_asset(
+            storage_key="tenant_7/builder_assets/asset.png",
+            client=self.client(bucket),
+        )
+        self.assertEqual(result, b"image bytes")
+        self.assertEqual(bucket.download_calls, ["tenant_7/builder_assets/asset.png"])
 
     def test_rejects_signed_url_on_another_origin(self):
         bucket = Bucket("https://evil.example/internal?token=test")

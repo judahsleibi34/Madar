@@ -787,6 +787,8 @@ class ReservationFormPublishValidationTests(unittest.TestCase):
             "formItems": [
                 {"id": "intro", "type": "heading", "text": "Tell us more"},
                 {"id": "topics", "type": "checkbox", "label": "Topics", "options": ["Design", "Build"], "required": True},
+                {"id": "email", "type": "email", "label": "Email", "required": True},
+                {"id": "phone", "type": "phone", "label": "Phone", "required": True},
                 {"id": "submit", "type": "button", "label": "Book now"},
             ]
         }

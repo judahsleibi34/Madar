@@ -3,6 +3,7 @@ import {
   Boxes,
   CheckCircle2,
   FolderTree,
+  ImagePlus,
   LoaderCircle,
   Package,
   Pencil,
@@ -14,11 +15,16 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import AuthToast from "../AuthPages/AuthToast";
+
 import {
   deleteEcommerceItem,
   fetchEcommerceCatalog,
   saveEcommerceItem,
+  uploadEcommerceProductImage,
 } from "../../services/ecommerceApi";
+import { resolveMediaUrl } from "../../utils/media";
+import { readEcommerceCatalogCacheSnapshot } from "./utils/ecommerceCatalogCache";
 
 const SECTION_CONFIG = {
   tags: {
@@ -37,7 +43,7 @@ const SECTION_CONFIG = {
     icon: Package,
     title: "Products",
     singular: "product",
-    description: "Manage complete product records, translated content, pricing, inventory, and SEO.",
+    description: "Manage product details, pricing, inventory, and images in one place.",
   },
 };
 
@@ -47,30 +53,29 @@ const blankTranslations = () => ({
 });
 
 function blankForm(section) {
-  const shared = { slug: "", status: section === "products" ? "draft" : "active", translations: blankTranslations() };
+  const shared = { slug: "", status: "", translations: blankTranslations() };
   if (section === "tags") return shared;
-  if (section === "categories") return { ...shared, parent_id: "", sort_order: 0 };
+  if (section === "categories") return { ...shared, parent_id: "", sort_order: "" };
   return {
     ...shared,
     sku: "",
     barcode: "",
     category_id: "",
     tag_ids: [],
-    product_type: "physical",
+    product_type: "",
     brand: "",
-    price: "0.00",
-    compare_at_price: "",
-    cost_price: "",
-    currency: "USD",
-    track_inventory: true,
-    inventory_quantity: 0,
-    low_stock_threshold: 5,
+    price: "",
+    discount_price: "",
+    currency: "",
+    track_inventory: false,
+    inventory_quantity: "",
+    low_stock_threshold: "",
     allow_backorder: false,
-    images: "",
+    images: [],
     weight: "",
-    weight_unit: "kg",
-    requires_shipping: true,
-    taxable: true,
+    weight_unit: "",
+    requires_shipping: false,
+    taxable: false,
     seo_title: "",
     seo_description: "",
   };
@@ -87,8 +92,11 @@ function itemToForm(section, item) {
     },
   };
   if (section === "products") {
-    shared.images = Array.isArray(item.images) ? item.images.join("\n") : "";
+    shared.images = Array.isArray(item.images) ? item.images.slice(0, 4) : [];
     shared.tag_ids = Array.isArray(item.tag_ids) ? item.tag_ids : [];
+    const hasDiscount = item.compare_at_price !== null && item.compare_at_price !== undefined && item.compare_at_price !== "";
+    shared.price = hasDiscount ? item.compare_at_price : (item.price ?? "");
+    shared.discount_price = hasDiscount ? (item.price ?? "") : "";
   }
   return shared;
 }
@@ -116,6 +124,7 @@ function payloadFromForm(section, form) {
   if (section === "categories") {
     return { ...shared, parent_id: form.parent_id || null, sort_order: Number(form.sort_order || 0) };
   }
+  const discountedPrice = form.discount_price === "" ? null : Number(form.discount_price);
   return {
     ...shared,
     sku: form.sku.trim(),
@@ -124,15 +133,15 @@ function payloadFromForm(section, form) {
     tag_ids: form.tag_ids,
     product_type: form.product_type,
     brand: form.brand.trim(),
-    price: Number(form.price || 0),
-    compare_at_price: form.compare_at_price === "" ? null : Number(form.compare_at_price),
-    cost_price: form.cost_price === "" ? null : Number(form.cost_price),
+    price: discountedPrice ?? Number(form.price || 0),
+    compare_at_price: discountedPrice === null ? null : Number(form.price || 0),
+    cost_price: form.cost_price == null || form.cost_price === "" ? null : Number(form.cost_price),
     currency: form.currency.trim().toUpperCase(),
     track_inventory: form.track_inventory,
     inventory_quantity: Number(form.inventory_quantity || 0),
     low_stock_threshold: Number(form.low_stock_threshold || 0),
     allow_backorder: form.allow_backorder,
-    images: form.images.split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
+    images: Array.isArray(form.images) ? form.images.slice(0, 4) : [],
     weight: form.weight === "" ? null : Number(form.weight),
     weight_unit: form.weight_unit,
     requires_shipping: form.requires_shipping,
@@ -195,13 +204,13 @@ function CommonFields({ form, setForm }) {
     <div className="ecommerce-field-grid">
       <label>
         Slug
-        <input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} placeholder="generated-from-name" />
+        <input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required />
       </label>
       <label>
         Status
-        <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+        <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} required><option value="" disabled>Choose status</option>
           <option value="draft">Draft</option>
-          <option value="active">Active</option>
+          <option value="active">Active</option><option value="inactive">Inactive</option>
           <option value="archived">Archived</option>
         </select>
       </label>
@@ -217,17 +226,79 @@ function ProductFields({ form, setForm, catalog }) {
     selectedTagIds.includes(tagId) ? selectedTagIds.filter((id) => id !== tagId) : [...selectedTagIds, tagId],
   );
 
+  const [imageUploadBusy, setImageUploadBusy] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState("");
+  const [imageDragActive, setImageDragActive] = useState(false);
+  const productImages = Array.isArray(form.images) ? form.images : [];
+
+  const addProductImages = async (fileList) => {
+    const files = Array.from(fileList || []);
+    setImageUploadError("");
+    if (!files.length) return;
+    if (files.length > 4 - productImages.length) {
+      setImageUploadError(`You can add ${4 - productImages.length} more image${4 - productImages.length === 1 ? "" : "s"}.`);
+      return;
+    }
+    if (files.some((file) => !["image/png", "image/jpeg", "image/webp"].includes(file.type))) {
+      setImageUploadError("Choose PNG, JPG, or WebP images only.");
+      return;
+    }
+    setImageUploadBusy(true);
+    try {
+      for (const file of files) {
+        const imageUrl = await uploadEcommerceProductImage(file);
+        if (!imageUrl) throw new Error("The image upload did not return a usable image.");
+        setForm((current) => ({
+          ...current,
+          images: [...(Array.isArray(current.images) ? current.images : []), imageUrl].slice(0, 4),
+        }));
+      }
+    } catch (uploadError) {
+      setImageUploadError(uploadError.message || "Could not upload this image.");
+    } finally {
+      setImageUploadBusy(false);
+    }
+  };
+
+  const uploadProductImages = (event) => {
+    const input = event.currentTarget;
+    const files = input.files;
+    input.value = "";
+    void addProductImages(files);
+  };
+
+  const dropProductImages = (event) => {
+    event.preventDefault();
+    setImageDragActive(false);
+    if (!imageUploadBusy && productImages.length < 4) void addProductImages(event.dataTransfer.files);
+  };
+  const removeProductImage = (imageUrl) => {
+    setForm((current) => ({
+      ...current,
+      images: (Array.isArray(current.images) ? current.images : []).filter((value) => value !== imageUrl),
+    }));
+    setImageUploadError("");
+  };
+
   return (
     <>
       <fieldset className="ecommerce-form-section">
         <legend>Identity and organization</legend>
         <div className="ecommerce-field-grid ecommerce-field-grid--three">
-          <label>SKU<input value={form.sku} onChange={(event) => update("sku", event.target.value)} required /></label>
-          <label>Barcode<input value={form.barcode} onChange={(event) => update("barcode", event.target.value)} /></label>
+          <label>
+            <span className="ecommerce-field-label">SKU <span className="ecommerce-field-optional">Automatic</span></span>
+            <input aria-label="SKU" aria-describedby="product-sku-help" value={form.sku} onChange={(event) => update("sku", event.target.value)} />
+            <small id="product-sku-help" className="ecommerce-field-help">Leave empty and Madar will generate a unique product code.</small>
+          </label>
+          <label>
+            <span className="ecommerce-field-label">Barcode <span className="ecommerce-field-optional">Optional</span></span>
+            <input aria-label="Barcode" aria-describedby="product-barcode-help" value={form.barcode} onChange={(event) => update("barcode", event.target.value)} />
+            <small id="product-barcode-help" className="ecommerce-field-help">Enter the printed barcode only when the product has one.</small>
+          </label>
           <label>Brand<input value={form.brand} onChange={(event) => update("brand", event.target.value)} /></label>
-          <label>Product type<select value={form.product_type} onChange={(event) => update("product_type", event.target.value)}><option value="physical">Physical</option><option value="digital">Digital</option><option value="service">Service</option></select></label>
+          <label>Product type<select value={form.product_type} onChange={(event) => update("product_type", event.target.value)} required><option value="" disabled>Choose product type</option><option value="physical">Physical</option><option value="digital">Digital</option><option value="service">Service</option></select></label>
           <label>Category<select value={form.category_id} onChange={(event) => update("category_id", event.target.value)}><option value="">Uncategorized</option>{catalog.categories.map((category) => <option key={category.id} value={category.id}>{translatedName(category)}</option>)}</select></label>
-          <label>Status<select value={form.status} onChange={(event) => update("status", event.target.value)}><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
+          <label>Status<select value={form.status} onChange={(event) => update("status", event.target.value)} required><option value="" disabled>Choose status</option><option value="draft">Draft</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select></label>
         </div>
         {catalog.tags.length > 0 && (
           <div className="ecommerce-tag-picker">
@@ -239,71 +310,121 @@ function ProductFields({ form, setForm, catalog }) {
 
       <fieldset className="ecommerce-form-section">
         <legend>Pricing</legend>
-        <div className="ecommerce-field-grid ecommerce-field-grid--four">
-          <label>Price<input type="number" min="0" step="0.01" value={form.price} onChange={(event) => update("price", event.target.value)} required /></label>
-          <label>Compare-at price<input type="number" min="0" step="0.01" value={form.compare_at_price} onChange={(event) => update("compare_at_price", event.target.value)} /></label>
-          <label>Cost price<input type="number" min="0" step="0.01" value={form.cost_price} onChange={(event) => update("cost_price", event.target.value)} /></label>
-          <label>Currency<input value={form.currency} onChange={(event) => update("currency", event.target.value)} maxLength={3} required /></label>
+        <div className="ecommerce-field-grid ecommerce-field-grid--three">
+          <label>Regular price<input type="number" min="0" step="0.01" value={form.price} onChange={(event) => update("price", event.target.value)} required /></label>
+          <label><span className="ecommerce-field-label">Discounted price <span className="ecommerce-field-optional">Optional</span></span><input type="number" min="0" max={form.price || undefined} step="0.01" value={form.discount_price} onChange={(event) => update("discount_price", event.target.value)} /><small className="ecommerce-field-help">Leave empty when the product is not on sale.</small></label>
+          <label>Currency<select value={form.currency} onChange={(event) => update("currency", event.target.value)} required><option value="" disabled>Choose currency</option><option value="ILS">Israeli shekel (ILS)</option><option value="USD">US dollar (USD)</option><option value="JOD">Jordanian dinar (JOD)</option><option value="EUR">Euro (EUR)</option></select></label>
         </div>
       </fieldset>
 
       <fieldset className="ecommerce-form-section">
         <legend>Inventory</legend>
         <div className="ecommerce-field-grid ecommerce-field-grid--three">
-          <label>Quantity<input type="number" min="0" value={form.inventory_quantity} onChange={(event) => update("inventory_quantity", event.target.value)} /></label>
-          <label>Low-stock threshold<input type="number" min="0" value={form.low_stock_threshold} onChange={(event) => update("low_stock_threshold", event.target.value)} /></label>
-          <label className="ecommerce-check"><input type="checkbox" checked={form.track_inventory} onChange={(event) => update("track_inventory", event.target.checked)} />Track inventory</label>
-          <label className="ecommerce-check"><input type="checkbox" checked={form.allow_backorder} onChange={(event) => update("allow_backorder", event.target.checked)} />Allow backorders</label>
+          <label>Current stock<input type="number" min="0" value={form.inventory_quantity} required onChange={(event) => update("inventory_quantity", event.target.value)} /><small className="ecommerce-field-help">How many items are available now.</small></label>
+          <label>Warn me when stock reaches<input type="number" min="0" value={form.low_stock_threshold} required onChange={(event) => update("low_stock_threshold", event.target.value)} /><small className="ecommerce-field-help">Madar will show a low-stock warning at this number or below.</small></label>
+          <div className="ecommerce-check-row"><label className="ecommerce-check"><input type="checkbox" checked={form.track_inventory} onChange={(event) => update("track_inventory", event.target.checked)} /><span>Track inventory</span></label>
+          <label className="ecommerce-check"><input type="checkbox" checked={form.allow_backorder} onChange={(event) => update("allow_backorder", event.target.checked)} /><span className="ecommerce-check-copy"><strong>Let customers order when sold out</strong><small>Customers can still place an order when stock reaches zero.</small></span></label></div>
         </div>
       </fieldset>
 
-      <fieldset className="ecommerce-form-section">
-        <legend>Media, shipping, and tax</legend>
-        <label>Image URLs (one per line)<textarea rows={3} value={form.images} onChange={(event) => update("images", event.target.value)} placeholder="https://example.com/product.jpg" /></label>
-        <div className="ecommerce-field-grid ecommerce-field-grid--four">
+      <fieldset className="ecommerce-form-section ecommerce-form-section--media">
+        <legend>Images and weight</legend>
+        <div className="ecommerce-product-images">
+          <div className="ecommerce-product-images-header">
+            <div><strong>Product gallery</strong><span>The first image will be the main product image.</span></div>
+            <span className="ecommerce-product-image-count">{productImages.length} of 4</span>
+          </div>
+          <div className={`ecommerce-product-image-grid${productImages.length ? " has-images" : ""}`}>
+            {productImages.map((imageUrl, index) => (
+              <figure key={imageUrl}>
+                <img src={resolveMediaUrl(imageUrl)} alt={`Product image ${index + 1}`} />
+                <figcaption>{index === 0 ? "Main image" : `Image ${index + 1}`}</figcaption>
+                <button type="button" onClick={() => removeProductImage(imageUrl)} aria-label={`Remove product image ${index + 1}`}><X size={15} /></button>
+              </figure>
+            ))}
+            {productImages.length < 4 && (
+              <label
+                className={`ecommerce-product-image-upload${imageUploadBusy ? " is-busy" : ""}${imageDragActive ? " is-dragging" : ""}`}
+                onDragEnter={(event) => { event.preventDefault(); setImageDragActive(true); }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={() => setImageDragActive(false)}
+                onDrop={dropProductImages}
+              >
+                <span className="ecommerce-product-image-upload-icon"><ImagePlus size={23} /></span>
+                <strong>{imageUploadBusy ? "Uploading images…" : productImages.length ? "Add another image" : "Add product images"}</strong>
+                <span>{imageUploadBusy ? "Please keep this window open." : "Drag and drop, or click to browse"}</span>
+                <small>PNG, JPG, or WebP · 25 MB maximum</small>
+                <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={imageUploadBusy} aria-label="Upload product images" onChange={uploadProductImages} />
+              </label>
+            )}
+          </div>
+          {imageUploadError && <div className="ecommerce-error" role="alert">{imageUploadError}</div>}
+        </div>
+        <div className="ecommerce-field-grid ecommerce-field-grid--two">
           <label>Weight<input type="number" min="0" step="0.001" value={form.weight} onChange={(event) => update("weight", event.target.value)} /></label>
-          <label>Unit<select value={form.weight_unit} onChange={(event) => update("weight_unit", event.target.value)}><option value="kg">kg</option><option value="g">g</option><option value="lb">lb</option><option value="oz">oz</option></select></label>
-          <label className="ecommerce-check"><input type="checkbox" checked={form.requires_shipping} onChange={(event) => update("requires_shipping", event.target.checked)} />Requires shipping</label>
-          <label className="ecommerce-check"><input type="checkbox" checked={form.taxable} onChange={(event) => update("taxable", event.target.checked)} />Taxable</label>
+          <label>Unit<select value={form.weight_unit} onChange={(event) => update("weight_unit", event.target.value)} required><option value="" disabled>Choose unit</option><option value="kg">kg</option><option value="g">g</option><option value="lb">lb</option><option value="oz">oz</option></select></label>
+
         </div>
       </fieldset>
 
-      <fieldset className="ecommerce-form-section">
-        <legend>SEO</legend>
-        <label>SEO title<input value={form.seo_title} onChange={(event) => update("seo_title", event.target.value)} maxLength={200} /></label>
-        <label>SEO description<textarea rows={3} value={form.seo_description} onChange={(event) => update("seo_description", event.target.value)} maxLength={500} /></label>
-      </fieldset>
+
     </>
   );
 }
 
+function requiredFieldLabel(field) {
+  const explicitLabel = field.getAttribute("aria-label");
+  if (explicitLabel) return explicitLabel;
+  const label = field.closest("label");
+  const directText = Array.from(label?.childNodes || [])
+    .find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
+    ?.textContent.trim();
+  const labelText = directText || label?.querySelector(":scope > span")?.textContent?.trim() || "this field";
+  const languageCard = field.closest(".ecommerce-translation-card")?.querySelector(":scope > strong")?.textContent?.trim();
+  return languageCard && labelText === "Name" ? `${languageCard} name` : labelText;
+}
 export default function EcommercePage({ section = "products", user }) {
   const { i18n } = useTranslation(["dashboard"]);
   const config = SECTION_CONFIG[section] || SECTION_CONFIG.products;
   const Icon = config.icon;
   const language = i18n?.resolvedLanguage?.split("-")[0] || "en";
   const cacheScope = user?.id ? `user-${user.id}` : "authenticated";
-  const [catalog, setCatalog] = useState({ tags: [], categories: [], products: [] });
-  const [status, setStatus] = useState("loading");
-  const [error, setError] = useState("");
+  const initialCatalogSnapshot = useMemo(() => readEcommerceCatalogCacheSnapshot(cacheScope), [cacheScope]);
+  const [catalog, setCatalog] = useState(() => initialCatalogSnapshot?.catalog || { tags: [], categories: [], products: [] });
+  const [status, setStatus] = useState(() => initialCatalogSnapshot ? "ready" : "loading");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(() => blankForm(section));
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = useCallback(({ type = "error", title, message }) => {
+    setToast({ id: Date.now(), type, title, message });
+  }, []);
 
   const loadCatalog = useCallback(async () => {
-    setStatus("loading");
-    setError("");
+    const cached = readEcommerceCatalogCacheSnapshot(cacheScope);
+    if (cached) {
+      setCatalog(cached.catalog);
+      setStatus("ready");
+    } else {
+      setStatus("loading");
+    }
     try {
-      const data = await fetchEcommerceCatalog({ scope: cacheScope });
+      const data = await fetchEcommerceCatalog({ scope: cacheScope, force: Boolean(cached?.isStale) });
       setCatalog({ tags: data?.tags || [], categories: data?.categories || [], products: data?.products || [] });
       setStatus("ready");
     } catch (loadError) {
-      setError(loadError.message || "Could not load the catalog.");
+      if (cached) {
+        setStatus("ready");
+        return;
+      }
+      const message = loadError.message || "Could not load the catalog.";
       setStatus("error");
+      showToast({ type: "error", title: "Could not load ecommerce", message });
     }
-  }, [cacheScope]);
+  }, [cacheScope, showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadCatalog, 0);
@@ -320,32 +441,60 @@ export default function EcommercePage({ section = "products", user }) {
   const openCreate = () => {
     setEditing(null);
     setForm(blankForm(section));
-    setError("");
     setFormOpen(true);
   };
   const openEdit = (item) => {
     setEditing(item);
     setForm(itemToForm(section, item));
-    setError("");
     setFormOpen(true);
   };
   const closeForm = () => { if (!saving) setFormOpen(false); };
 
   const submit = async (event) => {
     event.preventDefault();
+    const formElement = event.currentTarget;
+    const invalidField = Array.from(formElement.elements)
+      .find((field) => field.willValidate && !field.validity.valid);
+    if (invalidField) {
+      const fieldLabel = requiredFieldLabel(invalidField);
+      const action = invalidField.tagName === "SELECT" ? "Choose" : "Enter";
+      showToast({
+        type: "error",
+        title: "Complete the required fields",
+        message: `${action} ${fieldLabel.toLowerCase()} before saving.`,
+      });
+      invalidField.focus({ preventScroll: true });
+      invalidField.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    const wasEditing = Boolean(editing?.id);
     setSaving(true);
-    setError("");
     try {
-      await saveEcommerceItem(
+      const result = await saveEcommerceItem(
         section,
         editing?.id,
         payloadFromForm(section, form),
         { scope: cacheScope },
       );
+      const savedItem = result?.[config.singular];
+      if (savedItem?.id) {
+        setCatalog((current) => ({
+          ...current,
+          [section]: current[section].some((item) => item.id === savedItem.id)
+            ? current[section].map((item) => item.id === savedItem.id ? savedItem : item)
+            : [savedItem, ...current[section]],
+        }));
+      }
       setFormOpen(false);
-      await loadCatalog();
+      showToast({
+        type: "success",
+        title: `${config.singular[0].toUpperCase()}${config.singular.slice(1)} saved`,
+        message: wasEditing ? "Your changes were saved successfully." : `The new ${config.singular} was created successfully.`,
+      });
     } catch (saveError) {
-      setError(saveError.message || "Could not save this item.");
+      const message = saveError.message || `Could not save this ${config.singular}.`;
+      showToast({ type: "error", title: `Could not save ${config.singular}`, message });
     } finally {
       setSaving(false);
     }
@@ -353,17 +502,24 @@ export default function EcommercePage({ section = "products", user }) {
 
   const remove = async (item) => {
     if (!window.confirm(`Delete ${translatedName(item, language)}?`)) return;
-    setError("");
     try {
       await deleteEcommerceItem(section, item.id, { scope: cacheScope });
-      await loadCatalog();
+      setCatalog((current) => ({
+        ...current,
+        [section]: current[section].filter((candidate) => candidate.id !== item.id),
+      }));
+      showToast({
+        type: "success",
+        title: `${config.singular[0].toUpperCase()}${config.singular.slice(1)} deleted`,
+        message: `${translatedName(item, language)} was removed.`,
+      });
     } catch (deleteError) {
-      setError(deleteError.message || "Could not delete this item.");
+      const message = deleteError.message || `Could not delete this ${config.singular}.`;
+      showToast({ type: "error", title: `Could not delete ${config.singular}`, message });
     }
   };
-
   const activeCount = items.filter((item) => item.status === "active").length;
-  const draftCount = items.filter((item) => item.status === "draft").length;
+  const inactiveCount = items.filter((item) => item.status === "inactive").length;
 
   return (
     <section className="ecommerce-page" aria-labelledby={`ecommerce-${section}-title`}>
@@ -376,10 +532,8 @@ export default function EcommercePage({ section = "products", user }) {
         <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />Add {config.singular}</button>
       </header>
 
-      {error && <div className="ecommerce-error" role="alert">{error}</div>}
-
       <div className="ecommerce-summary-grid" aria-label="Catalog overview">
-        {[[`Total ${config.title.toLowerCase()}`, items.length, Icon], ["Active", activeCount, CheckCircle2], ["Drafts", draftCount, Boxes]].map(([label, value, SummaryIcon]) => (
+        {[[`Total ${config.title.toLowerCase()}`, items.length, Icon], ["Active", activeCount, CheckCircle2], ["Inactive", inactiveCount, Boxes]].map(([label, value, SummaryIcon]) => (
           <article className="ecommerce-summary-card" key={label}><span className="ecommerce-summary-icon"><SummaryIcon size={20} /></span><div><strong>{value}</strong><span>{label}</span></div></article>
         ))}
       </div>
@@ -417,17 +571,23 @@ export default function EcommercePage({ section = "products", user }) {
         <div className="ecommerce-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeForm(); }}>
           <section className="ecommerce-modal" role="dialog" aria-modal="true" aria-labelledby="ecommerce-form-title">
             <header><div><span>{editing ? "Edit" : "Create"}</span><h2 id="ecommerce-form-title">{editing ? `Edit ${config.singular}` : `New ${config.singular}`}</h2></div><button type="button" onClick={closeForm} aria-label="Close"><X size={20} /></button></header>
-            <form onSubmit={submit}>
+            <form onSubmit={submit} noValidate>
               <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} />
               {section === "tags" && <CommonFields form={form} setForm={setForm} />}
-              {section === "categories" && <><CommonFields form={form} setForm={setForm} /><fieldset className="ecommerce-form-section"><legend>Hierarchy</legend><div className="ecommerce-field-grid"><label>Parent category<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">Top level</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label>Sort order<input type="number" min="0" value={form.sort_order} onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /></label></div></fieldset></>}
-              {section === "products" && <><div className="ecommerce-field-grid"><label>Slug<input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} placeholder="generated-from-name" /></label></div><ProductFields form={form} setForm={setForm} catalog={catalog} /></>}
-              {error && <div className="ecommerce-error" role="alert">{error}</div>}
+              {section === "categories" && <><CommonFields form={form} setForm={setForm} /><fieldset className="ecommerce-form-section"><legend>Hierarchy</legend><div className="ecommerce-field-grid"><label>Parent category<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">Top level</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>Display position</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label="Display position" aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /><small id="category-display-position-help" className="ecommerce-field-help">Lower numbers appear first. Use 0 for the first position.</small></label></div></fieldset></>}
+              {section === "products" && <><div className="ecommerce-field-grid"><label>Slug<input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required /></label></div><ProductFields form={form} setForm={setForm} catalog={catalog} /></>}
               <footer><button type="button" className="ecommerce-secondary-button" onClick={closeForm}>Cancel</button><button type="submit" className="ecommerce-primary-button" disabled={saving}>{saving && <LoaderCircle size={17} className="is-spinning" />}{saving ? "Saving…" : "Save"}</button></footer>
             </form>
           </section>
         </div>
       )}
-    </section>
+      <AuthToast
+        key={toast?.id}
+        type={toast?.type}
+        title={toast?.title}
+        message={toast?.message}
+        dir={language === "ar" ? "rtl" : "ltr"}
+        onDismiss={() => setToast(null)}
+      />    </section>
   );
 }

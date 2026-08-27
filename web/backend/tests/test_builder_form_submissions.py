@@ -1163,6 +1163,7 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 "brand": None,
                 "footer_store_name": None,
                 "logo_url": None,
+                "loading_image_url": None,
                 "contact_email": None,
                 "phone": None,
                 "description": None,

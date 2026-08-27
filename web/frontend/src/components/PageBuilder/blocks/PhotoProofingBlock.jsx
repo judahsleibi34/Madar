@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Heart, Images, RotateCcw, X } from "lucide-react";
 
-import { resolveMediaUrl } from "../../../utils/media";
+import { getResponsiveMediaProps } from "../../../utils/media";
 import { parsePhotoProofingContent } from "../core/PageBuilder.uploadHandlers";
 import "./PhotoProofingBlock.css";
 
@@ -29,7 +29,10 @@ export default function PhotoProofingBlock({ content, settings = {}, disabled = 
       ...photo,
       id: `proof-${index + 1}`,
       description: index === 0 ? settings.description || photo.description : "",
-      image: resolveMediaUrl(photo.image),
+      imageSource: photo.image,
+      imageProps: getResponsiveMediaProps(photo.image, {
+        sizes: "(max-width: 720px) 94vw, 76vw",
+      }),
     })),
     [content, settings.description]
   );
@@ -134,7 +137,7 @@ export default function PhotoProofingBlock({ content, settings = {}, disabled = 
     <div className="photo-proofing-launcher">
       <div className="photo-proofing-launcher-collage" aria-hidden="true">
         {photos.slice(0, 3).map((photo, index) => (
-          <img key={photo.id} src={photo.image} alt="" style={{ "--proof-preview-index": index }} />
+          <img key={photo.id} {...getResponsiveMediaProps(photo.imageSource, { widths: [320, 480, 768], fallbackWidth: 480, sizes: "30vw" })} alt="" loading="lazy" decoding="async" style={{ "--proof-preview-index": index }} />
         ))}
         {photos.length === 0 && <span><Images size={34} /></span>}
       </div>
@@ -184,7 +187,7 @@ export default function PhotoProofingBlock({ content, settings = {}, disabled = 
                 onPointerUp={handlePointerEnd}
                 onPointerCancel={handlePointerEnd}
               >
-                <img src={currentPhoto.image} alt={currentPhoto.title} draggable="false" />
+                <img {...currentPhoto.imageProps} alt={currentPhoto.title} decoding="async" draggable="false" />
                 <span className="photo-proofing-decision is-reject" style={{ opacity: rejectStrength }}>PASS</span>
                 <span className="photo-proofing-decision is-like" style={{ opacity: likeStrength }}>KEEP</span>
                 <footer><strong>{currentPhoto.title}</strong>{currentPhoto.description && <span>{currentPhoto.description}</span>}</footer>

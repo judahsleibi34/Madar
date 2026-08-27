@@ -1,4 +1,4 @@
-"""Small bounded in-process cache for public ecommerce catalog reads."""
+"""Small bounded in-process cache for tenant ecommerce catalog reads."""
 
 from __future__ import annotations
 
@@ -56,11 +56,13 @@ def ecommerce_cache_key(tenant_id: int, namespace: str, **parts: Any) -> str:
     return f"{int(tenant_id)}:{namespace}:{normalized}"
 
 
-def read_ecommerce_cache(key: str) -> Any | None:
+def read_ecommerce_cache(key: str, tenant_id: int | None = None) -> Any | None:
     now = time.monotonic()
     with _cache_lock:
         entry = _cache.get(key)
         if entry is None:
+            return None
+        if tenant_id is not None and entry.tenant_id != int(tenant_id):
             return None
         if entry.expires_at <= now:
             _cache.pop(key, None)
@@ -101,7 +103,7 @@ def get_or_create_ecommerce_cache(
     *,
     ttl_seconds: int | None = None,
 ) -> tuple[Any, bool]:
-    cached = read_ecommerce_cache(key)
+    cached = read_ecommerce_cache(key, tenant_id)
     if cached is not None:
         return cached, True
     created = factory()

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { createReservationFormItem, normalizeReservationFormItems } from "./reservationForm";
+import {
+  createReservationFormItem,
+  getReservationAnswerError,
+  isValidRegionalPhone,
+  isValidReservationEmail,
+  normalizeReservationFormItems,
+  normalizeReservationPhone,
+} from "./reservationForm";
 
 describe("reservation form schema", () => {
   it("creates editable presets and normalizes unsafe or duplicate controls", () => {
@@ -26,5 +33,16 @@ describe("reservation form schema", () => {
     expect(normalized.filter((item) => item.type === "availability")).toEqual([
       expect.objectContaining({ label: "Pick a time" }),
     ]);
+  });
+  it("validates dedicated email and Palestinian or Israeli phone fields", () => {
+    expect(createReservationFormItem("email")).toEqual(expect.objectContaining({ type: "email", required: true }));
+    expect(createReservationFormItem("phone")).toEqual(expect.objectContaining({ type: "phone", required: true }));
+    expect(isValidReservationEmail("person@example.com")).toBe(true);
+    expect(isValidReservationEmail("not-an-email")).toBe(false);
+    expect(isValidRegionalPhone("+970 59 123 4567")).toBe(true);
+    expect(isValidRegionalPhone("00972-50-123-4567")).toBe(true);
+    expect(isValidRegionalPhone("+971 50 123 4567")).toBe(false);
+    expect(normalizeReservationPhone("00970 (59) 123-4567")).toBe("+970591234567");
+    expect(getReservationAnswerError({ type: "phone" }, "+971501234567")).toContain("+970");
   });
 });

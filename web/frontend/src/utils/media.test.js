@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveDocumentUrl, resolveMediaUrl } from "./media";
+import { getResponsiveMediaProps, resolveDocumentUrl, resolveMediaUrl } from "./media";
 
 
 describe("resolveMediaUrl", () => {
@@ -27,6 +27,19 @@ describe("resolveMediaUrl", () => {
     expect(resolveMediaUrl("https://images.example.com/photo.png")).toBe(
       "https://images.example.com/photo.png"
     );
+  });
+
+  it("builds stable responsive variants only for managed images", () => {
+    const props = getResponsiveMediaProps(
+      "/uploads/tenant_7/builder_assets/56fee3e0f73c4110abdf423d501fb835.png",
+      { widths: [480, 1024], fallbackWidth: 1024, sizes: "50vw" }
+    );
+    expect(props.src).toMatch(/\?v=3&w=1024$/);
+    expect(props.srcSet).toContain("&w=480 480w");
+    expect(props.srcSet).toContain("&w=1024 1024w");
+    expect(props.sizes).toBe("50vw");
+    expect(getResponsiveMediaProps("https://images.example.com/photo.png"))
+      .toEqual({ src: "https://images.example.com/photo.png" });
   });
 });
 

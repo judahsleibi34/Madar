@@ -157,7 +157,40 @@ class PublicPublicationIsolationTests(unittest.TestCase):
         )
         self.assertEqual(profile["brand"], "Bound brand")
         self.assertEqual(profile["footer_store_name"], "Bound footer")
-        self.assertEqual(profile["theme"], {"accent": "#c66f50", "primary": "#365849"})
+        self.assertEqual(
+            profile["loading_image_url"],
+            "/uploads/tenant_1/builder_assets/loading.png",
+        )
+
+    def test_bootstrap_uses_brand_and_loading_image_from_published_snapshot(self):
+        settings = {
+            "tenant_id": 1,
+            "published_project_id": "project-a",
+            "brand": "Stale settings brand",
+            "logo_url": "/uploads/stale-logo.png",
+        }
+        bound = project(
+            published_schema=schema(
+                chrome={
+                    "brand": "PalCode Academy Portal",
+                    "logoUrl": "/uploads/published-logo.png",
+                    "loadingImageUrl": "/uploads/published-loading.png",
+                },
+            )
+        )
+        with patch.object(public_site_routes, "enforce_public_rate_limit"), patch.object(
+            public_site_routes, "resolve_website_settings", return_value=settings
+        ), patch.object(
+            public_site_routes, "require_public_runtime_entitlement"
+        ), patch.object(
+            public_site_routes, "get_bound_published_project", return_value=bound
+        ) as get_project:
+            result = public_site_routes.get_public_site_bootstrap("alpha", RequestStub())
+
+        self.assertEqual(result["site"]["brand"], "PalCode Academy Portal")
+        self.assertEqual(result["site"]["logo_url"], "/uploads/published-logo.png")
+        self.assertEqual(result["site"]["loading_image_url"], "/uploads/published-loading.png")
+        get_project.assert_called_once_with(settings, require_pages=False)
 
     def test_unknown_hostname_identifier_fails_closed(self):
         fake = FakeSupabase(website_settings=[])

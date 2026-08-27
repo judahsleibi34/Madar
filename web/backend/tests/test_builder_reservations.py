@@ -568,3 +568,28 @@ class ReservationCustomAnswerValidationTests(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(HTTPException) as raised:
                 public_site_routes.validate_reservation_custom_answers(self.block, payload)
             self.assertEqual(raised.exception.status_code, 400)
+    def test_validates_and_normalizes_email_and_regional_phone_answers(self):
+        block = {"reservation": {"formItems": [
+            {"id": "email", "type": "email", "label": "Email", "required": True},
+            {"id": "phone", "type": "phone", "label": "Phone", "required": True},
+        ]}}
+        accepted = [
+            ("person@example.com", "+970 59 123 4567", "+970591234567"),
+            ("person@example.co.il", "00972-50-123-4567", "+972501234567"),
+            ("person@example.ps", "056-123-4567", "0561234567"),
+        ]
+
+        for email, phone, normalized_phone in accepted:
+            payload = {"customAnswers": {"email": email, "phone": phone}}
+            public_site_routes.validate_reservation_custom_answers(block, payload)
+            self.assertEqual(payload["customAnswers"]["phone"], normalized_phone)
+
+        rejected = [
+            ({"email": "not-an-email", "phone": "+970591234567"}, "reservation_email_invalid"),
+            ({"email": "person@example.com", "phone": "+971501234567"}, "reservation_phone_invalid"),
+            ({"email": "person@example.com", "phone": "+97250123"}, "reservation_phone_invalid"),
+        ]
+        for answers, code in rejected:
+            with self.subTest(answers=answers), self.assertRaises(HTTPException) as raised:
+                public_site_routes.validate_reservation_custom_answers(block, {"customAnswers": answers})
+            self.assertEqual(raised.exception.detail["code"], code)
