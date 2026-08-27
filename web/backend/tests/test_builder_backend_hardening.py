@@ -11,6 +11,18 @@ from fastapi.testclient import TestClient
 import database
 from routes import builder_routes
 from services.tenant_service import TenantContext, require_builder_admin_access
+from tests.entitlement_test_support import installed_business_fixture
+
+
+_entitlement_fixture = installed_business_fixture(1, 2)
+
+
+def setUpModule():
+    _entitlement_fixture.__enter__()
+
+
+def tearDownModule():
+    _entitlement_fixture.__exit__(None, None, None)
 
 
 class FakeQuery:

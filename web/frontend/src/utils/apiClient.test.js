@@ -44,10 +44,20 @@ describe("apiClient response readers", () => {
     expect(data).toEqual({ ok: true, value: 12 });
   });
 
-  it("readApiResponse handles empty non-JSON responses with a fallback detail", async () => {
+  it("readApiResponse handles empty non-JSON responses with a controlled detail", async () => {
     const data = await readApiResponse(textResponse("", { statusText: "No Content" }));
 
-    expect(data).toEqual({ detail: "No Content" });
+    expect(data).toEqual({ detail: "The server returned an unexpected response." });
+  });
+
+  it("readApiResponse never surfaces or parses unexpected HTML", async () => {
+    const data = await readApiResponse(textResponse(
+      "<!doctype html><title>Internal proxy response</title>",
+      { status: 502, headers: { "Content-Type": "text/html" } }
+    ));
+
+    expect(data).toEqual({ detail: "The server returned an unexpected response." });
+    expect(JSON.stringify(data)).not.toContain("doctype");
   });
 
   it("readApiError extracts useful messages from JSON-like error payloads", () => {

@@ -295,3 +295,70 @@
     grid-column: 2;
   }
 }
+/* Mobile form previews must size grid children against the shell's content
+   box. A saved 100% width on a direct child otherwise adds the shell padding
+   a second time and pushes sections/actions past the right edge. */
+@media (max-width: 640px) {
+  .builder-form-preview-shell {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .builder-form-preview-shell > :where(
+    .builder-form-preview-header,
+    .form-page-counter-title,
+    .builder-form-preview-section,
+    .builder-form-preview-quiz-state,
+    .builder-form-preview-success,
+    .builder-form-preview-error,
+    .builder-form-preview-actions
+  ) {
+    box-sizing: border-box;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-inline: 0 !important;
+    justify-self: stretch;
+  }
+
+  .builder-form-preview-section,
+  .builder-form-preview-question,
+  .builder-form-preview-question > label,
+  .builder-form-preview-actions,
+  .builder-form-preview-action-group {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .builder-form-preview-question :where(
+    input:not([type="checkbox"]):not([type="radio"]),
+    textarea,
+    select
+  ) {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* Embedded published forms can be rendered by either the free-positioned or
+   row/column layout path. Keep the sizing invariant on the form itself so it
+   does not depend on which wrapper SiteRenderer selected. */
+@media (max-width: 640px) {
+  .runtime-form {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .runtime-form > :not(.runtime-honeypot) {
+    box-sizing: border-box;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-inline: 0 !important;
+    justify-self: stretch;
+  }
+}

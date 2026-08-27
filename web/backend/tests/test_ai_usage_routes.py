@@ -10,6 +10,18 @@ from fastapi.testclient import TestClient
 
 from data_analysis.ai.planner import AIPlannerError
 from data_analysis.routes import analysis_routes
+from tests.entitlement_test_support import installed_business_fixture
+
+
+_entitlement_fixture = installed_business_fixture(1, 2, extra_capabilities=("ai_analytics",))
+
+
+def setUpModule():
+    _entitlement_fixture.__enter__()
+
+
+def tearDownModule():
+    _entitlement_fixture.__exit__(None, None, None)
 
 
 SAFE_PLANNER_RESPONSE = {

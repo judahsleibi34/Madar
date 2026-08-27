@@ -6,6 +6,18 @@ from fastapi.testclient import TestClient
 
 from routes import builder_routes, public_site_routes
 from services.tenant_service import TenantContext
+from tests.entitlement_test_support import installed_business_fixture
+
+
+_entitlement_fixture = installed_business_fixture(1, 2)
+
+
+def setUpModule():
+    _entitlement_fixture.__enter__()
+
+
+def tearDownModule():
+    _entitlement_fixture.__exit__(None, None, None)
 
 
 class FakeResponse:
@@ -123,6 +135,8 @@ class FakeSupabase:
                     "user_id": 2,
                     "subdomain": "tenant-site",
                     "published_project_id": "project-1",
+                    "brand": " Tenant Brand ",
+                    "logo_url": " https://cdn.example.test/logo.png ",
                 }
             ],
             "builder_projects": [
@@ -444,6 +458,47 @@ if __name__ == "__main__":
     unittest.main()
 
 class PublicSiteContractTests(unittest.TestCase):
+    def test_public_site_bootstrap_returns_only_public_loading_profile(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["website_settings"][0]["private_note"] = "do not expose"
+        published = fake_supabase.tables["builder_projects"][0]
+        published["published_version"] = 4
+        published["published_schema"]["siteChrome"] = {
+            "brand": "Published Brand",
+            "footerStoreName": "Published Store",
+            "logoUrl": "https://cdn.example.test/published-logo.png",
+        }
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit") as rate_limit:
+            response = client.get("/public/sites/tenant-site/bootstrap")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["site"]["brand"], "Published Brand")
+        self.assertEqual(body["site"]["footer_store_name"], "Published Store")
+        self.assertEqual(body["site"]["logo_url"], "https://cdn.example.test/published-logo.png")
+        self.assertEqual(body["publication"]["project_id"], "project-1")
+        self.assertEqual(body["publication"]["published_version"], 4)
+        self.assertEqual(body["publication"]["published_at"], "2026-06-03T13:00:00+00:00")
+        self.assertNotEqual(body["site"]["brand"], fake_supabase.tables["website_settings"][0]["brand"].strip())
+        rate_limit.assert_called_once()
+        self.assertNotIn("private_note", response.text)
+
+    def test_public_site_bootstrap_rejects_unpublished_site(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["website_settings"][0]["published_project_id"] = None
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get("/public/sites/tenant-site/bootstrap")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Published site not found")
+
     def test_public_site_preserves_published_page_routing_metadata_only(self):
         fake_supabase = FakeSupabase()
         published_schema = {

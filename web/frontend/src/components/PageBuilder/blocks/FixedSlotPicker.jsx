@@ -1,5 +1,5 @@
-import { CalendarDays } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { normalizeTimeSlotsByDate } from "./reservationAvailability";
 
 const normalizeOptions = (items) => [...new Set(
@@ -13,6 +13,17 @@ const parseLocalDate = (dateValue) => {
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day, 12);
 };
+
+const formatLocalDate = (date) => {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1, 12);
+
+const shiftMonth = (date, offset) => (
+  new Date(date.getFullYear(), date.getMonth() + offset, 1, 12)
+);
 
 const formatSlotTime = (timeValue, lang) => {
   const [hours, minutes] = String(timeValue).split(":").map(Number);
@@ -36,6 +47,7 @@ export default function FixedSlotPicker({
   onSelect,
 }) {
   const fixedDates = useMemo(() => normalizeOptions(dates).sort(), [dates]);
+  const availableDateSet = useMemo(() => new Set(fixedDates), [fixedDates]);
   const normalizedTimesByDate = useMemo(
     () => normalizeTimeSlotsByDate(fixedDates, times, timesByDate),
     [fixedDates, times, timesByDate]
@@ -46,12 +58,39 @@ export default function FixedSlotPicker({
     [activeDate, normalizedTimesByDate]
   );
   const activeDateValue = parseLocalDate(activeDate);
-  const fullDateFormatter = new Intl.DateTimeFormat(lang, {
+  const initialCalendarDate = activeDateValue || new Date();
+  const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(initialCalendarDate));
+  const fullDateFormatter = useMemo(() => new Intl.DateTimeFormat(lang, {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  });
+  }), [lang]);
+  const monthFormatter = useMemo(() => new Intl.DateTimeFormat(lang, {
+    month: "long",
+    year: "numeric",
+  }), [lang]);
+  const weekdayFormatter = useMemo(() => new Intl.DateTimeFormat(lang, {
+    weekday: "short",
+  }), [lang]);
+  const weekdays = useMemo(() => Array.from({ length: 7 }, (_, index) => (
+    weekdayFormatter.format(new Date(2026, 0, 4 + index, 12))
+  )), [weekdayFormatter]);
+  const calendarCells = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstWeekday = new Date(year, month, 1, 12).getDay();
+    const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = index - firstWeekday + 1;
+      return day > 0 && day <= daysInMonth ? new Date(year, month, day, 12) : null;
+    });
+  }, [calendarMonth]);
+
+  useEffect(() => {
+    if (!activeDateValue) return;
+    setCalendarMonth(startOfMonth(activeDateValue));
+  }, [activeDate]);
 
   useEffect(() => {
     if (selectedDate || fixedDates.length === 0) return;
@@ -69,25 +108,55 @@ export default function FixedSlotPicker({
 
       {fixedDates.length > 0 ? (
         <div className="fixed-slot-booking-controls">
-          <label className="fixed-slot-date-control">
-            <span>Appointment date</span>
-            <div>
-              <select
-                aria-label="Appointment date"
-                value={activeDate}
+          <section className="fixed-slot-calendar" aria-label="Appointment date">
+            <header>
+              <button
+                type="button"
+                aria-label="Previous month"
                 disabled={disabled}
-                onChange={(event) => onSelect?.(event.target.value, "")}
+                onClick={() => setCalendarMonth((current) => shiftMonth(current, -1))}
               >
-                {fixedDates.map((dateValue) => {
-                  const date = parseLocalDate(dateValue);
-                  return date ? (
-                    <option value={dateValue} key={dateValue}>{fullDateFormatter.format(date)}</option>
-                  ) : null;
-                })}
-              </select>
-              <CalendarDays size={17} aria-hidden="true" />
+                <ChevronLeft size={20} aria-hidden="true" />
+              </button>
+              <p aria-live="polite">{monthFormatter.format(calendarMonth)}</p>
+              <button
+                type="button"
+                aria-label="Next month"
+                disabled={disabled}
+                onClick={() => setCalendarMonth((current) => shiftMonth(current, 1))}
+              >
+                <ChevronRight size={20} aria-hidden="true" />
+              </button>
+            </header>
+
+            <div className="fixed-slot-calendar-weekdays" aria-hidden="true">
+              {weekdays.map((weekday, index) => <span key={`${weekday}-${index}`}>{weekday}</span>)}
             </div>
-          </label>
+
+            <div className="fixed-slot-calendar-days">
+              {calendarCells.map((date, index) => {
+                if (!date) return <span className="is-empty" aria-hidden="true" key={`empty-${index}`} />;
+                const dateValue = formatLocalDate(date);
+                const available = availableDateSet.has(dateValue);
+                const selected = dateValue === activeDate;
+                const dateLabel = fullDateFormatter.format(date);
+                return (
+                  <button
+                    type="button"
+                    className={`${available ? "is-available" : "is-unavailable"} ${selected ? "is-selected" : ""}`}
+                    key={dateValue}
+                    aria-label={`${dateLabel}${available ? ", available" : ", unavailable"}`}
+                    aria-pressed={selected}
+                    disabled={disabled || !available}
+                    onClick={() => onSelect?.(dateValue, "")}
+                  >
+                    <span>{date.getDate()}</span>
+                    {available && <i aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
           <div className="fixed-slot-times">
             <span>Available time slots</span>

@@ -35,6 +35,32 @@ describe("Page Builder typography theme", () => {
     expect(variables["--theme-text-inverse"]).toBe("#ffe1e1");
   });
 
+  it("inherits website colors for forms and reservations unless explicitly overridden", () => {
+    const inherited = getPageBuilderThemeVars({
+      background: "#f3efe7",
+      softSurface: "#e4ebe2",
+      surface: "#fffdf8",
+      text: "#21312a",
+      muted: "#68736d",
+      accent: "#365849",
+      buttonText: "#ffffff",
+    });
+
+    expect(inherited["--form-theme-bg"]).toBe("#f3efe7");
+    expect(inherited["--form-theme-surface"]).toBe("#fffdf8");
+    expect(inherited["--form-theme-input"]).toBe("#e4ebe2");
+    expect(inherited["--form-theme-text"]).toBe("#21312a");
+    expect(inherited["--form-theme-muted"]).toBe("#68736d");
+    expect(inherited["--form-theme-accent"]).toBe("#365849");
+    expect(inherited["--form-theme-button-text"]).toBe("#ffffff");
+
+    const overridden = getPageBuilderThemeVars({
+      accent: "#365849",
+      form: { accent: "#123456" },
+    });
+    expect(overridden["--form-theme-accent"]).toBe("#123456");
+  });
+
   it("exposes a dedicated header background color with a safe default", () => {
     expect(getPageBuilderThemeVars({ headerBackground: "#123456" })["--theme-header-background"])
       .toBe("#123456");

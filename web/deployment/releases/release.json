@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 81,
+    "compatible_max": 86,
+    "target": 86,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 81,
+    "rollback_compatible_max": 86
+  },
+  "migration_policy": "manual-locked-backup-first-forward-repair",
+  "notes": "Compatibility bridge for schema 083-086 reconciliation. Deploy and validate while schema 083 is serving, then apply the backup-gated locked expand migrations 084-086. Migration 084 reconciles builder_form_drafts that may already exist while schema attestation remains 083; 085 installs channel-aware notification delivery resolution; 086 retires legacy Gemini pricing metadata. The running rollback target is attested from its own /health/version before traffic promotion.",
+  "migration_manifest": "migrations-084-086.json"
+}

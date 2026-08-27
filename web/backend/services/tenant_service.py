@@ -4,6 +4,7 @@ from fastapi import HTTPException, Request, Response
 
 from database import service_supabase
 from services.auth_service import require_regular_user
+from services.tenant_lifecycle_service import tenant_is_active
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,15 @@ def get_current_tenant_context(
 
     if not membership:
         raise HTTPException(status_code=403, detail="Active tenant membership required")
+
+    if not tenant_is_active(tenant_id):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "tenant_deletion_pending",
+                "message": "This workspace is closed while deletion is being completed.",
+            },
+        )
 
     return TenantContext(
         tenant_id=tenant_id,

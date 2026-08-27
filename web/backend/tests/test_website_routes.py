@@ -7,6 +7,18 @@ from fastapi.testclient import TestClient
 
 from routes import public_site_routes, website_routes
 from services import website_settings_service
+from tests.entitlement_test_support import installed_business_fixture
+
+
+_entitlement_fixture = installed_business_fixture(7)
+
+
+def setUpModule():
+    _entitlement_fixture.__enter__()
+
+
+def tearDownModule():
+    _entitlement_fixture.__exit__(None, None, None)
 
 
 def build_website_client():

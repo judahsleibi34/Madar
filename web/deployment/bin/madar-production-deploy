@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly REPO_ROOT="/home/madar/saas/Madar"
+readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-/usr/local/lib/madar/web/deployment/bin/madar-release-deploy}"
+
+if [[ ! -x "$RELEASE_DEPLOY" ]]; then
+    echo "[madar-production] ERROR: immutable release deployer is not installed." >&2
+    exit 1
+fi
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal)" ]]; then
+    echo "[madar-production] ERROR: production checkout contains local changes." >&2
+    exit 1
+fi
+
+git -C "$REPO_ROOT" fetch origin main
+readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
+readonly CONTROL_PLANE_GUARD="/usr/local/lib/madar/web/deployment/bin/madar-control-plane-guard"
+
+[[ -x "$CONTROL_PLANE_GUARD" ]] || {
+    echo "[madar-production] ERROR: control-plane guard is unavailable." >&2
+    exit 1
+}
+"$CONTROL_PLANE_GUARD" "$TARGET_SHA"
+
+"$RELEASE_DEPLOY" "$TARGET_SHA" "$@"
+git -C "$REPO_ROOT" merge --ff-only "$TARGET_SHA"
+echo "[madar-production] Production checkout advanced after successful promotion: ${TARGET_SHA:0:12}"

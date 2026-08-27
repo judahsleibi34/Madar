@@ -338,7 +338,7 @@ Confirmed protections and limits include:
 - aggregate-focused responses;
 - planner output validation against allowed columns and operations;
 - output length and result validation;
-- a mock provider for safe testing and a Gemini provider path;
+- a mock provider for safe testing and explicit provider configuration;
 - provider abstraction for additional providers, although not every named provider adapter is complete;
 - generated code disabled by default in production;
 - when enabled, an isolated subprocess protocol with time, memory, process, filesystem, environment, network-attempt, and output controls.

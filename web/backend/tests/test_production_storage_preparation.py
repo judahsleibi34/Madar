@@ -9,19 +9,14 @@ ROOT = Path(
     or Path(__file__).resolve().parents[2]
 ).resolve()
 SCRIPT = ROOT / "scripts" / "prepare_production_storage.sh"
-DROP_IN = (
-    ROOT
-    / "deployment"
-    / "systemd"
-    / "madar-auto-deploy.service.d"
-    / "storage-preparation.conf"
-)
+STORAGE_UNIT = ROOT / "deployment" / "systemd" / "madar-storage-prepare.service"
+LEGACY_DROP_IN = ROOT / "deployment" / "systemd" / "madar-auto-deploy.service.d" / "storage-preparation.conf"
 
 
 class ProductionStoragePreparationTests(unittest.TestCase):
     def setUp(self):
         self.script = SCRIPT.read_text(encoding="utf-8")
-        self.drop_in = DROP_IN.read_text(encoding="utf-8")
+        self.unit = STORAGE_UNIT.read_text(encoding="utf-8")
 
     def test_all_and_only_fixed_storage_roots_are_prepared(self):
         expected = {
@@ -34,23 +29,34 @@ class ProductionStoragePreparationTests(unittest.TestCase):
         self.assertEqual(configured, expected)
         self.assertIn("if (( $# != 0 ))", self.script)
         self.assertNotIn("STORAGE_PATHS:-", self.script)
+        self.assertIn('"$SCRIPT_DIR/../.."', self.script)
 
     def test_creation_ownership_mode_and_preservation_are_explicit(self):
         self.assertIn("install -d", self.script)
         self.assertIn("readonly STORAGE_UID=65534", self.script)
         self.assertIn("readonly STORAGE_GID=65534", self.script)
-        self.assertIn("readonly STORAGE_MODE=0755", self.script)
-        self.assertIn('chown -R -- "$STORAGE_UID:$STORAGE_GID" "$target_path"', self.script)
+        self.assertIn("readonly STORAGE_MODE=0700", self.script)
+        self.assertIn("if (( REPAIR ))", self.script)
+        self.assertNotIn('chown -R -- "$STORAGE_UID:$STORAGE_GID" "$target_path"', self.script)
+        self.assertIn("find \"$target_path\" -xdev -type f", self.script)
+        self.assertIn("chmod 0600", self.script)
         self.assertNotRegex(self.script, r"\brm\b|\btruncate\b|chmod\s+777")
         self.assertIn('[[ -L "$target_path" ]]', self.script)
 
-    def test_root_preparation_precedes_compose_deployment(self):
-        self.assertIn("ExecStartPre=+", self.drop_in)
-        self.assertIn("/scripts/prepare_production_storage.sh", self.drop_in)
+    def test_storage_preparation_is_explicit_one_time_provisioning(self):
+        self.assertFalse(LEGACY_DROP_IN.exists())
+        self.assertIn("Type=oneshot", self.unit)
+        self.assertIn("/web/scripts/prepare_production_storage.sh", self.unit)
+        self.assertIn("RemainAfterExit=true", self.unit)
         self.assertNotIn("docker compose", self.script)
 
     def test_backend_image_remains_non_root(self):
         dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("chmod -R a+rX /app", dockerfile)
+        self.assertLess(
+            dockerfile.index("chmod -R a+rX /app"),
+            dockerfile.index("USER 65534:65534"),
+        )
         self.assertRegex(dockerfile, r"(?m)^USER 65534:65534$")
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         backend_section = compose.split("\n  backend:\n", 1)[1].split("\n  notification-worker:\n", 1)[0]

@@ -245,6 +245,111 @@ class EntitlementMatrixTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 entitlement_service.require_entitlement(7, "website_publish")
 
+    def test_missing_subscription_fails_closed(self):
+        with patch.dict(environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}), \
+             patch.object(entitlement_service, "_canonical_records", return_value=([], [])), \
+             patch.object(entitlement_service, "_legacy_features", return_value=[]):
+            state = entitlement_service.get_tenant_entitlements(7)
+        self.assertEqual(state["capabilities"], [])
+        self.assertEqual(state["allowances"], {})
+        self.assertTrue(state["review_required"])
+
+    def test_enforcement_enabled_preserves_inactive_tenant_402(self):
+        with patch.dict(environ, {
+            "COMMERCIAL_ENTITLEMENTS_ENFORCED": "true",
+            "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true",
+        }), patch.object(
+            entitlement_service,
+            "_canonical_records",
+            return_value=([{"tenant_id": 7, "plan_id": "business_plus", "state": "canceled"}], []),
+        ), patch.object(entitlement_service, "_legacy_features", return_value=[]):
+            with self.assertRaises(HTTPException) as context:
+                entitlement_service.require_entitlement(7, "website_publish")
+        self.assertEqual(context.exception.status_code, 402)
+
+    def test_enforcement_disabled_entitles_unmapped_and_canceled_tenants(self):
+        for records in (([], []), ([{
+            "tenant_id": 7, "plan_id": "business_plus", "state": "canceled"
+        }], [])):
+            with self.subTest(records=records), patch.dict(environ, {
+                "COMMERCIAL_ENTITLEMENTS_ENFORCED": "false",
+                "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true",
+            }), patch.object(
+                entitlement_service, "_canonical_records", side_effect=AssertionError("lookup must be bypassed")
+            ):
+                state = entitlement_service.require_entitlement(7, "website_publish")
+                self.assertEqual(state["source"], "operator_configuration_override")
+                self.assertIn("reservations", state["capabilities"])
+                self.assertGreater(entitlement_service.get_storage_quota_bytes(7), 0)
+
+    def test_duplicate_entitled_subscription_is_rejected(self):
+        rows = [
+            {"id": 1, "tenant_id": 7, "plan_id": "forms", "state": "active"},
+            {"id": 2, "tenant_id": 7, "plan_id": "website", "state": "grace"},
+        ]
+        with patch.dict(environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}), \
+             patch.object(entitlement_service, "_canonical_records", return_value=(rows, [])):
+            with self.assertRaises(HTTPException) as context:
+                entitlement_service.get_tenant_entitlements(7)
+        self.assertEqual(context.exception.status_code, 503)
+
+    def test_inactive_subscription_grants_nothing(self):
+        with patch.dict(environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}), \
+             patch.object(entitlement_service, "_canonical_records", return_value=([{
+                 "id": 1, "tenant_id": 7, "plan_id": "business_plus", "state": "suspended"
+             }], [])), patch.object(entitlement_service, "_legacy_features", return_value=[]):
+            state = entitlement_service.get_tenant_entitlements(7)
+        self.assertEqual(state["source"], "canonical_inactive")
+        self.assertEqual(state["capabilities"], [])
+
+    def test_trial_and_grace_are_explicit_entitled_states(self):
+        for subscription_state in ("trial", "grace"):
+            rows = [{"id": 1, "tenant_id": 7, "plan_id": "website", "state": subscription_state}]
+            with self.subTest(state=subscription_state), patch.dict(
+                environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}
+            ), patch.object(entitlement_service, "_canonical_records", return_value=(rows, [])), patch.object(
+                entitlement_service, "_rows", return_value=[]
+            ):
+                state = entitlement_service.get_tenant_entitlements(7)
+            self.assertIn("website_publish", state["capabilities"])
+
+    def test_cancelled_expired_past_due_and_malformed_states_grant_nothing(self):
+        for subscription_state in ("cancelled", "expired", "past_due", "", "unknown"):
+            rows = [{"id": 1, "tenant_id": 7, "plan_id": "business_plus", "state": subscription_state}]
+            with self.subTest(state=subscription_state), patch.dict(
+                environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}
+            ), patch.object(entitlement_service, "_canonical_records", return_value=(rows, [])), patch.object(
+                entitlement_service, "_legacy_features", return_value=[]
+            ):
+                state = entitlement_service.get_tenant_entitlements(7)
+            self.assertEqual(state["capabilities"], [])
+
+    def test_unknown_active_plan_and_dependency_failure_fail_closed(self):
+        with patch.dict(environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}), patch.object(
+            entitlement_service,
+            "_canonical_records",
+            return_value=([{"id": 1, "tenant_id": 7, "plan_id": "forged", "state": "active"}], []),
+        ), patch.object(entitlement_service, "_rows", return_value=[]):
+            state = entitlement_service.get_tenant_entitlements(7)
+        self.assertEqual(state["capabilities"], [])
+        with patch.object(entitlement_service.service_supabase, "table", side_effect=TimeoutError("offline")):
+            with self.assertRaises(HTTPException) as context:
+                entitlement_service._canonical_records(7)
+        self.assertEqual(context.exception.status_code, 503)
+
+    def test_licensed_ai_is_separate_from_provider_availability(self):
+        addon = [{"addon_id": "ai_analytics_starter", "state": "active", "quantity": 1}]
+        with patch.dict(environ, {
+            "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true",
+            "AI_FEATURE_ENABLED": "false",
+        }, clear=False), patch.object(
+            entitlement_service, "_canonical_records", return_value=self.canonical_state("business", addon)
+        ), patch.object(entitlement_service, "_rows", return_value=[]):
+            state = entitlement_service.get_tenant_entitlements(7)
+        self.assertIn("ai_analytics", state["capabilities"])
+        self.assertNotIn("ai_analytics", state["operational_capabilities"])
+        self.assertEqual(state["capability_availability"]["ai_analytics"], "provider_unavailable")
+
 
 if __name__ == "__main__":
     unittest.main()

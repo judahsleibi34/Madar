@@ -13,6 +13,7 @@ export default function ResponsesTable({
   updateSubmissionStatus,
   formatSavedValue,
   isQuiz,
+  incompleteView = false,
 }) {
   const columnCount = fields.length + 2 + (isQuiz ? 1 : 0);
 
@@ -57,7 +58,7 @@ export default function ResponsesTable({
                 onClick={() => setSelectedResponseId(response.id)}
               >
                 <td>
-                  {response.backendSubmission ? (
+                  {response.backendSubmission && !incompleteView ? (
                     <select
                       className="response-status-select"
                       value={response.status || t.newStatus}

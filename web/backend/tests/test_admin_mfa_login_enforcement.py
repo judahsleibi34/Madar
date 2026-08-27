@@ -108,7 +108,7 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
         set_pending_mfa_cookie.assert_called_once()
         set_auth_cookies.assert_not_called()
 
-    def test_admin_with_no_verified_factor_is_not_locked_out_yet(self):
+    def test_admin_with_no_verified_factor_gets_enrollment_only_session(self):
         client = build_auth_client()
 
         with patch.object(auth_routes, "enforce_auth_rate_limit"), \
@@ -118,7 +118,7 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
              patch.object(auth_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(auth_routes, "create_pending_mfa_client", return_value=SimpleNamespace()), \
              patch.object(auth_routes, "verified_totp_factors_for_client", return_value=[]), \
-             patch.object(auth_routes, "set_auth_cookies", return_value="csrf"), \
+             patch.object(auth_routes, "set_auth_cookies", return_value="csrf") as set_auth_cookies, \
              patch.object(auth_routes, "set_pending_mfa_cookie") as set_pending_mfa_cookie, \
              patch.object(auth_routes, "record_security_event"):
             response = client.post(
@@ -127,7 +127,27 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()["mfa_enrollment_recommended"])
+        self.assertEqual(response.json()["restricted_session"], "mfa_enrollment_only")
+        self.assertTrue(response.json()["mfa_enrollment_required"])
+        set_pending_mfa_cookie.assert_called_once()
+        set_auth_cookies.assert_not_called()
+
+    def test_admin_factor_lookup_error_fails_closed(self):
+        client = build_auth_client()
+        with patch.object(auth_routes, "enforce_auth_rate_limit"), \
+             patch.object(auth_routes.supabase.auth, "sign_in_with_password", return_value=auth_response()), \
+             patch.object(auth_routes, "get_local_user_by_auth_id", return_value=ADMIN_USER), \
+             patch.object(auth_routes, "is_admin_mfa_login_enforcement_enabled", return_value=True), \
+             patch.object(auth_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
+             patch.object(auth_routes, "create_pending_mfa_client", return_value=SimpleNamespace()), \
+             patch.object(auth_routes, "verified_totp_factors_for_client", side_effect=TimeoutError()), \
+             patch.object(auth_routes, "set_auth_cookies") as set_auth_cookies, \
+             patch.object(auth_routes, "set_pending_mfa_cookie") as set_pending_mfa_cookie, \
+             patch.object(auth_routes, "record_security_event"):
+            response = client.post("/auth/login", json={"email": "admin@example.com", "password": "password123"})
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "mfa_provider_unavailable")
+        set_auth_cookies.assert_not_called()
         set_pending_mfa_cookie.assert_not_called()
 
     def test_mfa_verify_success_sets_normal_cookies_and_clears_pending_cookie(self):

@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 
@@ -114,7 +115,12 @@ df["score"].plot()
             validate_generated_code(code, approved_columns=["score"])
 
     def test_free_plan_defaults_to_five_daily_questions_and_output_cap(self):
-        summary = get_ai_runtime_summary("free")
+        with patch.dict(
+            os.environ,
+            {"AI_MOCK_MODE": "true"},
+            clear=False,
+        ):
+            summary = get_ai_runtime_summary("free")
 
         self.assertEqual(summary["limits"]["daily_messages"], 5)
         self.assertEqual(summary["max_output_tokens"], 900)

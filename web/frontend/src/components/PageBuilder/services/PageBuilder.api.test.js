@@ -8,6 +8,7 @@ import {
   fetchBuilderProject,
   fetchProtectedSitePage,
   fetchPublicSite,
+  fetchPublicSiteBootstrap,
   listBuilderProjects,
   fetchBuilderSiteMembers,
   publishBuilderProject,
@@ -125,6 +126,20 @@ describe("builder project cloud API", () => {
     expect(result.project.published_schema.pages[0].id).toBe("home");
     expect(apiFetch).toHaveBeenCalledWith(
       "/api/public/sites/tenant-site",
+      { method: "GET", cache: "no-store" }
+    );
+  });
+
+  it("fetches the public loading profile without browser caching", async () => {
+    apiFetch.mockResolvedValueOnce(jsonResponse({
+      site: { subdomain: "tenant-site", brand: "Tenant", logo_url: "/logo.png" },
+    }));
+
+    const result = await fetchPublicSiteBootstrap("tenant-site");
+
+    expect(result.site.brand).toBe("Tenant");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/public/sites/tenant-site/bootstrap",
       { method: "GET", cache: "no-store" }
     );
   });

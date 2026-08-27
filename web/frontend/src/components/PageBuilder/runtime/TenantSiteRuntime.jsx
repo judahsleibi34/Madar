@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
+  fetchPublicFormDraft,
   fetchPublicForm,
   fetchBuilderProject,
   fetchProtectedSitePage,
@@ -11,10 +12,21 @@ import {
   loginTenantVisitor,
   logoutTenantVisitor,
   registerTenantVisitor,
+  savePublicFormDraft,
   submitPublicBuilderEvent,
   submitPublicFormSubmission,
+  startPublicQuizAttempt,
+  finalizePublicQuizAttempt,
 } from "../services/PageBuilder.api";
 import { createFormIdempotencyKey } from "./formSubmission";
+import RuntimeFormToast from "./RuntimeFormToast";
+import { getRuntimeFieldError } from "./formValidation";
+import { getSubmissionErrorGuidance } from "./formSubmissionErrors";
+import {
+  readRuntimeFormDrafts,
+  removeRuntimeFormDraft,
+  saveRuntimeFormDraft,
+} from "./formDraftStorage";
 import { getFormSections } from "../core/PageBuilder.factories";
 import { createElementRenderer } from "../core/PageBuilder.elementRenderer";
 import SiteRenderer from "../core/PageBuilder.siteRenderer";
@@ -342,30 +354,16 @@ const inputTypeForField = (fieldType) => {
   return "text";
 };
 
-const getSubmissionErrorMessage = (error, copy = runtimeFallbackCopy) => {
-  const detail = error?.data?.detail;
-  const code = detail?.code || error?.code || "";
-
-  if (code === "submission_rejected") {
-    return "This submission could not be accepted. Review it and try again.";
-  }
-
-  if (typeof detail === "string") return detail;
-
-  if (detail?.message === "Required field is missing") {
-    return `${detail.field_label || copy.errors.requiredFallback} ${copy.errors.requiredSuffix}`;
-  }
-
-  if (detail?.message === "Submission contains unknown fields") {
-    return copy.errors.unknownFields;
-  }
-
-  if (error?.status === 404) return copy.errors.unavailable;
-  if (error?.status === 429) return copy.errors.tooMany;
-
-  if (!navigator.onLine) return copy.errors.offline;
-
-  return copy.errors.generic;
+const focusRuntimeField = (fieldId) => {
+  if (!fieldId || typeof document === "undefined") return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const field = Array.from(document.querySelectorAll("[data-runtime-field-id]"))
+      .find((element) => element.dataset.runtimeFieldId === String(fieldId));
+    if (!field) return;
+    field.scrollIntoView({ behavior: "smooth", block: "center" });
+    const control = field.querySelector("input, select, textarea, button");
+    control?.focus({ preventScroll: true });
+  }));
 };
 
 const unsupportedWorkspacePaths = new Set([
@@ -481,16 +479,97 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [formAnswers, setFormAnswers] = useState({});
   const [formHoneypots, setFormHoneypots] = useState({});
   const [formStatus, setFormStatus] = useState({});
+  const [formFieldErrors, setFormFieldErrors] = useState({});
   const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
+  const [formResumeTokens, setFormResumeTokens] = useState({});
+  const [quizAttempts, setQuizAttempts] = useState({});
   const [authPanelModes, setAuthPanelModes] = useState({});
   const [publicActionMessage, setPublicActionMessage] = useState("");
+  const [formToast, setFormToast] = useState(null);
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
   const publicSubmissionStartedAtRef = useRef(Date.now());
   const formIdempotencyKeysRef = useRef({});
   const protectedPageRequestRef = useRef("");
   const pendingProtectedPageRef = useRef("");
+  const loadedResumeTokenRef = useRef("");
+
+  const showFormToast = useCallback((title, message) => {
+    setFormToast({ id: Date.now(), title, message });
+  }, []);
+
+  const dismissFormToast = useCallback(() => setFormToast(null), []);
+
+  useEffect(() => {
+    if (draftPreview) return;
+
+    const drafts = readRuntimeFormDrafts(getTenantBrandStorage(), cleanSubdomain);
+    const restoredAnswers = {};
+    const restoredPages = {};
+    const restoredLanguages = {};
+    const restoredResumeTokens = {};
+    const restoredStatuses = {};
+
+    Object.entries(drafts).forEach(([instanceKey, draft]) => {
+      restoredAnswers[instanceKey] = draft.answers || {};
+      restoredPages[instanceKey] = Math.max(0, Number(draft.pageIndex) || 0);
+      restoredLanguages[instanceKey] = draft.language || "en";
+      if (draft.resumeToken) {
+        restoredResumeTokens[instanceKey] = draft.resumeToken;
+      }
+      restoredStatuses[instanceKey] = {
+        submitting: false,
+        error: "",
+        success: runtimeFallbackCopy.runtime.resumeLaterRestored,
+      };
+    });
+
+    setFormAnswers(restoredAnswers);
+    setFormPages(restoredPages);
+    setFormLanguages(restoredLanguages);
+    setFormResumeTokens(restoredResumeTokens);
+    setFormStatus(restoredStatuses);
+  }, [cleanSubdomain, draftPreview]);
+
+  useEffect(() => {
+    const resumeToken = new URLSearchParams(location.search).get("resume") || "";
+    if (draftPreview || !standaloneFormId || !resumeToken || loadedResumeTokenRef.current === resumeToken) return;
+    loadedResumeTokenRef.current = resumeToken;
+    const instanceKey = `published-form-link_${standaloneFormId}`;
+    let cancelled = false;
+    fetchPublicFormDraft(cleanSubdomain, standaloneFormId, resumeToken)
+      .then((draft) => {
+        if (cancelled || !draft) return;
+        const answers = draft.answers || {};
+        const pageIndex = Math.max(0, Number(draft.pageIndex) || 0);
+        const language = draft.language || "en";
+        setFormAnswers((current) => ({ ...current, [instanceKey]: answers }));
+        setFormPages((current) => ({ ...current, [instanceKey]: pageIndex }));
+        setFormLanguages((current) => ({ ...current, [instanceKey]: language }));
+        setFormResumeTokens((current) => ({ ...current, [instanceKey]: resumeToken }));
+        setFormStatus((current) => ({
+          ...current,
+          [instanceKey]: { submitting: false, error: "", success: runtimeFallbackCopy.runtime.resumeLaterRestored },
+        }));
+        saveRuntimeFormDraft(getTenantBrandStorage(), cleanSubdomain, instanceKey, {
+          formId: standaloneFormId,
+          answers,
+          pageIndex,
+          language,
+          draftId: draft.id,
+          resumeToken,
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const guidance = getSubmissionErrorGuidance(error, [], runtimeFallbackCopy);
+        showFormToast("Could not resume this form", guidance.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanSubdomain, draftPreview, location.search, showFormToast, standaloneFormId]);
 
   const loadProtectedPage = useCallback(async (pageReference) => {
     const cleanReference = String(pageReference || "").replace(/^\/+/, "");
@@ -1092,6 +1171,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         [fieldId]: value,
       },
     }));
+    setFormFieldErrors((prev) => ({
+      ...prev,
+      [instanceKey]: {
+        ...(prev[instanceKey] || {}),
+        [fieldId]: "",
+      },
+    }));
     setFormStatus((prev) => ({
       ...prev,
       [instanceKey]: {
@@ -1137,18 +1223,77 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     }, {});
   };
 
-  const getMissingFieldForSection = (form, section, instanceKey) => {
+  const saveRuntimeFormForLater = async (form, instanceKey, formElementId = "") => {
+    const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
+    const formCopy = getTenantRuntimeContent(formLang);
+    const answers = buildSubmissionAnswers(form, instanceKey);
+    const locallySaved = saveRuntimeFormDraft(
+      getTenantBrandStorage(),
+      cleanSubdomain,
+      instanceKey,
+      {
+        formId: form.id,
+        answers,
+        pageIndex: formPages[instanceKey] || 0,
+        language: formLang,
+        resumeToken: formResumeTokens[instanceKey] || "",
+      }
+    );
+    setFormStatus((prev) => ({
+      ...prev,
+      [instanceKey]: { submitting: true, error: "", success: "" },
+    }));
+    try {
+      const savedDraft = await savePublicFormDraft(cleanSubdomain, form.id, {
+        answers,
+        form_element_id: formElementId,
+        page_index: formPages[instanceKey] || 0,
+        language: formLang,
+        resume_token: formResumeTokens[instanceKey] || null,
+        honeypot: formHoneypots[instanceKey] || "",
+        submission_elapsed_ms: Math.min(
+          86_400_000,
+          Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
+        ),
+      });
+      const resumeToken = savedDraft?.resumeToken || formResumeTokens[instanceKey] || "";
+      setFormResumeTokens((current) => ({ ...current, [instanceKey]: resumeToken }));
+      saveRuntimeFormDraft(getTenantBrandStorage(), cleanSubdomain, instanceKey, {
+        formId: form.id,
+        answers,
+        pageIndex: formPages[instanceKey] || 0,
+        language: formLang,
+        draftId: savedDraft?.id,
+        resumeToken,
+      });
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: { submitting: false, error: "", success: formCopy.runtime.resumeLaterSaved },
+      }));
+    } catch (error) {
+      const guidance = getSubmissionErrorGuidance(error, getRuntimeFormFields(form), formCopy);
+      const message = locallySaved
+        ? `${guidance.message} Your progress is saved on this browser only.`
+        : guidance.message;
+      showFormToast("Could not save progress online", message);
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: { submitting: false, error: message, success: "" },
+      }));
+    }
+  };
+
+  const getRuntimeValidationErrors = (form, fields, instanceKey) => {
     const enteredAnswers = formAnswers[instanceKey] || {};
 
-    return getVisibleFieldsForInstance(form, section?.fields || [], instanceKey).find((field) => {
-      if (!field.required) return false;
-
+    return getVisibleFieldsForInstance(form, fields || [], instanceKey).reduce((errors, field) => {
       const value = normalizeRuntimeAnswerValue(
         enteredAnswers[field.id] !== undefined ? enteredAnswers[field.id] : field.defaultValue
       );
-
-      return isEmptyAnswer(value);
-    });
+      const error = getRuntimeFieldError(field, value);
+      if (error) errors[field.id] = error;
+      return errors;
+    }, {});
   };
 
   const setRuntimeFormPage = (instanceKey, pageIndex, pageCount = 1) => {
@@ -1168,20 +1313,25 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   };
 
   const goToNextFormPage = (form, instanceKey, currentPage, currentPageIndex, pageCount) => {
-    const missingField = draftPreview
-      ? null
-      : getMissingFieldForSection(form, currentPage, instanceKey);
+    const fieldErrors = draftPreview
+      ? {}
+      : getRuntimeValidationErrors(form, currentPage?.fields || [], instanceKey);
+    const firstInvalidFieldId = Object.keys(fieldErrors)[0];
 
-    if (missingField) {
+    if (firstInvalidFieldId) {
+      const message = fieldErrors[firstInvalidFieldId];
+      setFormFieldErrors((prev) => ({ ...prev, [instanceKey]: fieldErrors }));
+      showFormToast("Please check the form", message);
       setFormStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           ...(prev[instanceKey] || {}),
           submitting: false,
           success: "",
-          error: `${getLocalizedValue(missingField, "label", formLanguages[instanceKey] || "en") || runtimeCopy.errors.requiredFallback} ${runtimeCopy.errors.requiredSuffix}`,
+          error: message,
         },
       }));
+      focusRuntimeField(firstInvalidFieldId);
       return;
     }
 
@@ -1194,19 +1344,28 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const answers = buildSubmissionAnswers(form, instanceKey);
     const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
     const formCopy = getTenantRuntimeContent(formLang);
-    const missingField = getVisibleFieldsForInstance(form, getRuntimeFormFields(form), instanceKey).find(
-      (field) => field.required && isEmptyAnswer(answers[field.id])
-    );
+    const fieldErrors = getRuntimeValidationErrors(form, getRuntimeFormFields(form), instanceKey);
+    const firstInvalidFieldId = Object.keys(fieldErrors)[0];
 
-    if (missingField) {
+    if (firstInvalidFieldId) {
+      const message = fieldErrors[firstInvalidFieldId];
+      const firstInvalidPage = getFormSections(form).findIndex((section) =>
+        (section.fields || []).some((field) => field.id === firstInvalidFieldId)
+      );
+      setFormFieldErrors((prev) => ({ ...prev, [instanceKey]: fieldErrors }));
+      if (firstInvalidPage >= 0) {
+        setFormPages((prev) => ({ ...prev, [instanceKey]: firstInvalidPage }));
+      }
+      showFormToast("Please check the form", message);
       setFormStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           submitting: false,
           success: "",
-          error: `${getLocalizedValue(missingField, "label", formLang) || formCopy.errors.requiredFallback} ${formCopy.errors.requiredSuffix}`,
+          error: message,
         },
       }));
+      focusRuntimeField(firstInvalidFieldId);
       return;
     }
 
@@ -1220,39 +1379,104 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     formIdempotencyKeysRef.current[instanceKey] = idempotencyKey;
 
     try {
-      await submitPublicFormSubmission(cleanSubdomain, form.id, {
-        answers,
-        form_element_id: formElementId,
-        honeypot: formHoneypots[instanceKey] || "",
-        submission_elapsed_ms: Math.min(
-          86_400_000,
-          Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
-        ),
-      }, { idempotencyKey });
+      const activeAttempt = quizAttempts[instanceKey];
+      const response = form.mode === "quiz"
+        ? await finalizePublicQuizAttempt(cleanSubdomain, form.id, activeAttempt?.id, answers)
+        : await submitPublicFormSubmission(cleanSubdomain, form.id, {
+            answers,
+            form_element_id: formElementId,
+            resume_token: formResumeTokens[instanceKey] || null,
+            honeypot: formHoneypots[instanceKey] || "",
+            submission_elapsed_ms: Math.min(
+              86_400_000,
+              Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)
+            ),
+          }, { idempotencyKey });
 
       delete formIdempotencyKeysRef.current[instanceKey];
+      removeRuntimeFormDraft(getTenantBrandStorage(), cleanSubdomain, instanceKey);
+      setFormResumeTokens((prev) => ({ ...prev, [instanceKey]: "" }));
       setFormAnswers((prev) => ({ ...prev, [instanceKey]: {} }));
+      setFormFieldErrors((prev) => ({ ...prev, [instanceKey]: {} }));
       setFormHoneypots((prev) => ({ ...prev, [instanceKey]: "" }));
       setFormPages((prev) => ({ ...prev, [instanceKey]: 0 }));
+      if (form.mode === "quiz") {
+        setQuizAttempts((prev) => ({ ...prev, [instanceKey]: null }));
+      }
       setFormStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           submitting: false,
           error: "",
-          success: getLocalizedValue(form, "successMessage", formLang) || formCopy.runtime.successMessage,
+          success: response?.result?.score !== undefined && response?.result?.score !== null
+            ? `Score: ${response.result.score}%`
+            : getLocalizedValue(form, "successMessage", formLang) || formCopy.runtime.successMessage,
         },
       }));
     } catch (error) {
       if (error?.code === "idempotency_conflict") {
         delete formIdempotencyKeysRef.current[instanceKey];
       }
+      const draftSaved = saveRuntimeFormDraft(
+        getTenantBrandStorage(),
+        cleanSubdomain,
+        instanceKey,
+        {
+          formId: form.id,
+          answers: formAnswers[instanceKey] || {},
+          pageIndex: formPages[instanceKey] || 0,
+          language: formLang,
+        }
+      );
+      const guidance = getSubmissionErrorGuidance(error, getRuntimeFormFields(form), formCopy);
+      const message = `${guidance.message} ${draftSaved
+        ? "Your progress was saved in this browser."
+        : "Keep this page open so you do not lose your answers."}`;
+      if (guidance.firstFieldId) {
+        const firstInvalidPage = getFormSections(form).findIndex((section) =>
+          (section.fields || []).some((field) => field.id === guidance.firstFieldId)
+        );
+        setFormFieldErrors((prev) => ({
+          ...prev,
+          [instanceKey]: {
+            ...(prev[instanceKey] || {}),
+            ...guidance.fieldErrors,
+          },
+        }));
+        if (firstInvalidPage >= 0) {
+          setFormPages((prev) => ({ ...prev, [instanceKey]: firstInvalidPage }));
+        }
+        focusRuntimeField(guidance.firstFieldId);
+      }
+      showFormToast(guidance.title, message);
       setFormStatus((prev) => ({
         ...prev,
         [instanceKey]: {
           submitting: false,
           success: "",
-          error: getSubmissionErrorMessage(error, formCopy),
+          error: message,
         },
+      }));
+    }
+  };
+
+  const startRuntimeQuiz = async (form, instanceKey) => {
+    const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
+    const formCopy = getTenantRuntimeContent(formLang);
+    setFormStatus((prev) => ({ ...prev, [instanceKey]: { submitting: true, success: "", error: "" } }));
+    try {
+      const response = await startPublicQuizAttempt(cleanSubdomain, form.id, {
+        honeypot: formHoneypots[instanceKey] || "",
+        submission_elapsed_ms: Math.min(86_400_000, Math.max(0, Date.now() - publicSubmissionStartedAtRef.current)),
+      });
+      setQuizAttempts((prev) => ({ ...prev, [instanceKey]: response?.attempt || null }));
+      setFormStatus((prev) => ({ ...prev, [instanceKey]: { submitting: false, success: "", error: "" } }));
+    } catch (error) {
+      const guidance = getSubmissionErrorGuidance(error, getRuntimeFormFields(form), formCopy);
+      showFormToast(guidance.title, guidance.message);
+      setFormStatus((prev) => ({
+        ...prev,
+        [instanceKey]: { submitting: false, success: "", error: guidance.message },
       }));
     }
   };
@@ -1355,11 +1579,13 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file && maxBytes && file.size > maxBytes) {
+                const message = formCopy.errors.fileTooLarge.replace("{size}", field.maxFileSizeMb);
+                showFormToast("File is too large", message);
                 setFormStatus((prev) => ({
                   ...prev,
                   [instanceKey]: {
                     ...(prev[instanceKey] || {}),
-                    error: formCopy.errors.fileTooLarge.replace("{size}", field.maxFileSizeMb),
+                    error: message,
                   },
                 }));
                 event.target.value = "";
@@ -1524,6 +1750,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const instanceKey = `${formElementId || "form"}_${form.id}`;
     const status = formStatus[instanceKey] || {};
     const isSubmitting = Boolean(status.submitting);
+    const isQuiz = form.mode === "quiz";
+    const quizAttempt = quizAttempts[instanceKey];
     const languageMode = normalizeLanguageMode(form.languageMode || form.localeMode || form.defaultLanguage || "en");
     const formLang = formLanguages[instanceKey] || getDefaultFormLanguage(form, "en");
     const formCopy = getTenantRuntimeContent(formLang);
@@ -1547,6 +1775,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         </div>
 
         {visibleFields.map((field) => {
+          const fieldError = formFieldErrors[instanceKey]?.[field.id] || "";
           const label = getLocalizedValue(field, "label", formLang) || field.label;
           const helpText = field.showDetailsEditor === true
             ? getLocalizedValue(field, "helpText", formLang) || field.helpText
@@ -1557,8 +1786,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
           );
 
           return (
-            <div className="runtime-question" key={field.id}>
-              <div className="runtime-question-field" dir={fieldDirection}>
+            <div
+              className={`runtime-question ${fieldError ? "has-error" : ""}`}
+              data-runtime-field-id={field.id}
+              key={field.id}
+            >
+              <div
+                className="runtime-question-field"
+                dir={fieldDirection}
+                aria-invalid={fieldError ? "true" : undefined}
+              >
                 <span className="runtime-question-title" dir={fieldDirection}>
                   {label}
                   {field.required && <span className="form-required-marker" aria-hidden="true"> *</span>}
@@ -1569,6 +1806,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
                   </small>
                 )}
                 {renderRuntimeField(field, form, instanceKey, isSubmitting, formLang)}
+                {fieldError && <strong className="runtime-field-error" role="alert">{fieldError}</strong>}
               </div>
             </div>
           );
@@ -1577,10 +1815,27 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       );
     };
 
+    if (isQuiz && !quizAttempt) {
+      return (
+        <div className="runtime-form" dir={formDir}>
+          <div className="quiz-start-panel">
+            <strong>Ready to start?</strong>
+            <p>Timing and scoring are enforced by the server. Focus detection is browser advisory.</p>
+            {status.error && <p className="runtime-form-message runtime-form-error">{status.error}</p>}
+            {status.success && <p className="runtime-form-message runtime-form-success">{status.success}</p>}
+            <button type="button" className="runtime-submit" disabled={isSubmitting} onClick={() => startRuntimeQuiz(form, instanceKey)}>
+              {isSubmitting ? formCopy.runtime.submitting : "Start quiz"}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <form
         className="runtime-form"
         dir={formDir}
+        noValidate
         onSubmit={(event) => submitRuntimeForm(event, form, formElementId, instanceKey)}
       >
         <label className="runtime-honeypot" aria-hidden="true">
@@ -1648,19 +1903,31 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
               : ""}
           </span>
 
-          {isPagedForm && currentPageIndex < formSections.length - 1 ? (
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => goToNextFormPage(form, instanceKey, currentPage, currentPageIndex, formSections.length)}
-            >
-              {formCopy.runtime.next}
-            </button>
-          ) : (
-            <button type="submit" className="runtime-submit" disabled={isSubmitting}>
-              {isSubmitting ? formCopy.runtime.submitting : formCopy.runtime.submit}
-            </button>
-          )}
+          <div className="runtime-form-actions">
+            {!isQuiz && form.resumeLaterEnabled !== false && (
+              <button
+                type="button"
+                className="runtime-resume-later"
+                disabled={isSubmitting || draftPreview}
+                onClick={() => saveRuntimeFormForLater(form, instanceKey, formElementId)}
+              >
+                {formCopy.runtime.resumeLater}
+              </button>
+            )}
+            {isPagedForm && currentPageIndex < formSections.length - 1 ? (
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => goToNextFormPage(form, instanceKey, currentPage, currentPageIndex, formSections.length)}
+              >
+                {formCopy.runtime.next}
+              </button>
+            ) : (
+              <button type="submit" className="runtime-submit" disabled={isSubmitting}>
+                {isSubmitting ? formCopy.runtime.submitting : formCopy.runtime.submit}
+              </button>
+            )}
+          </div>
         </div>
       </form>
     );
@@ -2149,6 +2416,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         </div>
       )}
       {renderMainContent()}
+      <RuntimeFormToast toast={formToast} onDismiss={dismissFormToast} />
       {publicActionMessage && (
         <div className="tenant-runtime-action-message" role="status" aria-live="polite">
           <span>{publicActionMessage}</span>

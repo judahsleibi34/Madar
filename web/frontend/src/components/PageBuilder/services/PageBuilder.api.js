@@ -613,6 +613,32 @@ export const fetchBuilderFormSubmissionsPage = async (
   };
 };
 
+export const fetchBuilderFormDraftsPage = async (
+  projectId,
+  { form_id, limit = 20, offset = 0 } = {}
+) => {
+  const params = new URLSearchParams();
+  if (form_id) params.set("form_id", form_id);
+  if (limit !== undefined && limit !== null) params.set("limit", String(limit));
+  if (offset !== undefined && offset !== null) params.set("offset", String(offset));
+  const query = params.toString();
+  const response = await apiFetch(
+    getApiUrl(`/builder/projects/${projectId}/form-drafts${query ? `?${query}` : ""}`),
+    { method: "GET", cache: "no-store" }
+  );
+  const data = await parseJsonResponse(response);
+  const drafts = data?.items || data?.drafts || [];
+  return {
+    submissions: drafts,
+    pagination: data?.pagination || {
+      limit,
+      offset,
+      count: drafts.length,
+      has_more: drafts.length >= limit,
+    },
+  };
+};
+
 export const updateBuilderFormSubmissionStatus = async (
   projectId,
   submissionId,
@@ -630,6 +656,40 @@ export const updateBuilderFormSubmissionStatus = async (
   const data = await parseJsonResponse(response);
   return data?.submission || null;
 };
+
+export const updateBuilderFormRecord = async (
+  projectId,
+  recordId,
+  answers,
+  { incomplete = false } = {}
+) => {
+  const collection = incomplete ? "form-drafts" : "form-submissions";
+  const response = await apiFetch(
+    getApiUrl(`/builder/projects/${projectId}/${collection}/${recordId}`),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
+    }
+  );
+
+  const data = await parseJsonResponse(response);
+  return data?.record || data?.draft || data?.submission || null;
+};
+
+export const deleteBuilderFormRecord = async (
+  projectId,
+  recordId,
+  { incomplete = false } = {}
+) => {
+  const collection = incomplete ? "form-drafts" : "form-submissions";
+  const response = await apiFetch(
+    getApiUrl(`/builder/projects/${projectId}/${collection}/${recordId}`),
+    { method: "DELETE" }
+  );
+  return parseJsonResponse(response);
+};
+
 
 export const submitPublicFormSubmission = async (
   subdomain,
@@ -653,6 +713,54 @@ export const submitPublicFormSubmission = async (
     }
   );
 
+  return parseJsonResponse(response);
+};
+
+export const savePublicFormDraft = async (subdomain, formId, payload) => {
+  const response = await apiFetch(
+    getApiUrl(`/public/sites/${subdomain}/forms/${encodeURIComponent(formId)}/drafts`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  const data = await parseJsonResponse(response);
+  return data?.draft || null;
+};
+
+export const fetchPublicFormDraft = async (subdomain, formId, resumeToken) => {
+  const response = await apiFetch(
+    getApiUrl(
+      `/public/sites/${subdomain}/forms/${encodeURIComponent(formId)}/drafts/${encodeURIComponent(resumeToken)}`
+    ),
+    { method: "GET", cache: "no-store" }
+  );
+  const data = await parseJsonResponse(response);
+  return data?.draft || null;
+};
+
+export const startPublicQuizAttempt = async (subdomain, formId, payload = {}) => {
+  const response = await apiFetch(
+    getApiUrl(`/public/sites/${subdomain}/forms/${formId}/attempts`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  return parseJsonResponse(response);
+};
+
+export const finalizePublicQuizAttempt = async (subdomain, formId, attemptId, answers) => {
+  const response = await apiFetch(
+    getApiUrl(`/public/sites/${subdomain}/forms/${formId}/attempts/${attemptId}/finalize`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
+    }
+  );
   return parseJsonResponse(response);
 };
 

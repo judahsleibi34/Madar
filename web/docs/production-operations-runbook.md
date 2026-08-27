@@ -46,17 +46,20 @@ The worker claims bounded batches, uses leased rows, retries with bounded expone
 
 Builder assets and private/generated artifacts must use the explicit durable mounts in Compose; private artifacts are served only through authenticated routes. Run asset cleanup dry-run first:
 
-Before Compose startup, install the reviewed systemd drop-in at
+From the web application root, before Compose startup, install the reviewed systemd drop-in at
 `deployment/systemd/madar-auto-deploy.service.d/storage-preparation.conf` and
 run `systemctl daemon-reload`. Its privileged `ExecStartPre` invokes
 `scripts/prepare_production_storage.sh` before the unprivileged deployment
 service can reach Compose. The script accepts no arguments and only prepares
-`backend/private_uploads`, `backend/avatar_uploads`,
+the repository-root paths `backend/private_uploads`, `backend/avatar_uploads`,
 `backend/private_generated_charts`, and `backend/uploads`: missing directories
 are created at mode `0755`, and existing content is retained while ownership is
 repaired to UID/GID `65534:65534`. Never replace this with environment-selected
 paths, container-side `chown`, or `chmod 777`. Verify the installed drop-in with
 `systemctl cat madar-auto-deploy.service` before the next deployment.
+
+The monorepo-specific Compose, environment-file, persistent-path, project-name,
+and rollback requirements are documented in `docs/monorepo-deployment.md`.
 
 ```bash
 docker compose run --rm --no-deps backend python scripts/cleanup_builder_assets.py --limit 100

@@ -5,8 +5,13 @@ import ResponsesHeader from "./components/ResponsesHeader";
 import ResponsesSidebar from "./components/ResponsesSidebar";
 import ResponsesSummary from "./components/ResponsesSummary";
 import ResponsesTable from "./components/ResponsesTable";
+import ResponsesToolbar from "./components/ResponsesToolbar";
 import { useBuilderResponsesData } from "./hooks/useBuilderResponsesData";
-
+import { openResponsesSpreadsheetTab } from "./utils/openResponsesSpreadsheetTab";
+import "../../../styles/admin/PageBuilder/incomplete-drafts.css";
+import "../../../styles/admin/PageBuilder/responses-spreadsheet-actions.css";
+import "../../../styles/admin/PageBuilder/response-record-actions.css";
+import "../../../styles/admin/PageBuilder/responses-settings-menu.css";
 export default function BuilderResponsesPage({
   lang = "en",
   user = null,
@@ -15,9 +20,11 @@ export default function BuilderResponsesPage({
   activeForm,
   selectForm,
   getFormFields,
+  updateActiveForm,
   formatSavedValue,
   showToast,
 }) {
+  const [responseView, setResponseView] = useState("completed");
   const [assistantQuestion, setAssistantQuestion] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const activeLang = lang === "ar" ? "ar" : "en";
@@ -32,6 +39,7 @@ export default function BuilderResponsesPage({
     showToast,
     user,
     t,
+    responseView: responseView === "incomplete" ? "incomplete" : "completed",
   });
   const isQuiz = data.selectedForm?.mode === "quiz";
   const connectedCollection = data.selectedForm?.connectedCollectionId
@@ -41,6 +49,30 @@ export default function BuilderResponsesPage({
     : null;
   const activeFieldFilters = data.selectedFieldIds?.length || 0;
   const activeStatusFilters = data.selectedStatuses?.length || 0;
+  const resumeSubdomain = project?.publish?.subdomain || "";
+  const resumeUrl = responseView === "incomplete" && data.selectedResponse?.resumeToken && resumeSubdomain
+    ? `/forms/${encodeURIComponent(resumeSubdomain)}/${encodeURIComponent(data.selectedFormId)}?resume=${encodeURIComponent(data.selectedResponse.resumeToken)}`
+    : "";
+
+  const openSpreadsheetPreview = () => {
+    if (!data.selectedForm) {
+      showToast?.(t.noForm);
+      return;
+    }
+
+    const opened = openResponsesSpreadsheetTab({
+      form: data.selectedForm,
+      fields: data.fields,
+      responses: data.displayedResponses,
+      formatSavedValue,
+      isQuiz,
+      labels: t,
+    });
+
+    if (!opened) {
+      showToast?.(t.spreadsheetPopupBlocked);
+    }
+  };
 
   const runResponseAssistant = () => {
     if (!data.selectedForm) {
@@ -98,19 +130,48 @@ export default function BuilderResponsesPage({
         />
 
         <main className="results-table-card">
-          {data.selectedForm ? (
-            <>
-              <div className="results-table-header">
-                <div>
-                  <span className="workspace-kicker">{t.selectedForm}</span>
-                  <h2>{data.selectedForm.title}</h2>
-                  <p>
-                    {connectedCollection
-                      ? `${t.savingTo} ${connectedCollection.name}`
-                      : t.savedOnly}
-                  </p>
-                </div>
+          {responseView === "__legacy" && <section
+            className="responses-workspace-toolbar"
+            aria-labelledby="responses-settings-title"
+          >
+            {data.selectedForm ? (
+              <div className="responses-workspace-title">
+                <span className="workspace-kicker">{t.settingsKicker}</span>
+                <h2 id="responses-settings-title">{t.responseViews}</h2>
+                <p>
+                  {data.selectedForm.title} · {connectedCollection
+                    ? `${t.savingTo} ${connectedCollection.name}`
+                    : t.savedOnly}
+                </p>
+              </div>
+            ) : (
+              <div aria-hidden="true" />
+            )}
 
+            <div className="responses-view-tabs" role="tablist" aria-label={t.responseViews}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={responseView === "completed"}
+              tabIndex={responseView === "completed" ? 0 : -1}
+              className={responseView === "completed" ? "active" : ""}
+              onClick={() => setResponseView("completed")}
+            >
+              {t.completedTab}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={responseView === "incomplete"}
+              tabIndex={responseView === "incomplete" ? 0 : -1}
+              className={responseView === "incomplete" ? "active" : ""}
+              onClick={() => setResponseView("incomplete")}
+            >
+              {t.incompleteTab}
+            </button>
+            </div>
+
+            {data.selectedForm ? (
                 <div className="responses-table-controls">
                   {data.hasBackendPagination && (
                     <div className="responses-pagination-controls">
@@ -150,8 +211,22 @@ export default function BuilderResponsesPage({
                     {data.displayedResponses.length === 1 ? t.match : t.matches}
                   </div>
                 </div>
-              </div>
+            ) : (
+              <div aria-hidden="true" />
+            )}
+          </section>}
 
+          <ResponsesToolbar
+            t={t}
+            responseView={responseView}
+            setResponseView={setResponseView}
+            data={data}
+            updateActiveForm={updateActiveForm}
+            showToast={showToast}
+          />
+
+          {data.selectedForm ? (
+              <>
               <div className="form-info-grid">
                 <article>
                   <span>{t.required}</span>
@@ -187,12 +262,23 @@ export default function BuilderResponsesPage({
                 setSelectedResponseId={data.setSelectedResponseId}
                 formatSavedValue={formatSavedValue}
                 isQuiz={isQuiz}
+                incompleteView={responseView === "incomplete"}
+                resumeUrl={resumeUrl}
+                onOpenSpreadsheet={openSpreadsheetPreview}
+                recordMutation={data.recordMutatingById[data.selectedResponse?.id] || ""}
+                onUpdateRecord={data.updateResponseRecord}
+                onDeleteRecord={data.deleteResponseRecord}
+                showToast={showToast}
               />
 
               <ResponsesTable
                 t={t}
                 fields={data.fields}
                 displayedResponses={data.displayedResponses}
+                recordMutation={data.recordMutatingById[data.selectedResponse?.id] || ""}
+                onUpdateRecord={data.updateResponseRecord}
+                onDeleteRecord={data.deleteResponseRecord}
+                showToast={showToast}
                 responses={data.responses}
                 responsesLoading={data.responsesLoading}
                 responsesError={data.responsesError}
@@ -202,6 +288,7 @@ export default function BuilderResponsesPage({
                 updateSubmissionStatus={data.updateSubmissionStatus}
                 formatSavedValue={formatSavedValue}
                 isQuiz={isQuiz}
+                incompleteView={responseView === "incomplete"}
               />
 
               <section className="responses-assistant-panel daw-card daw-assistant-card">

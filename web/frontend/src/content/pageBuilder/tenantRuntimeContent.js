@@ -51,6 +51,7 @@ export const tenantRuntimeContent = {
       offline: "Network connection lost. Please try again.",
       generic: "Could not submit the form. Please try again.",
       fileTooLarge: "File is larger than {size}MB.",
+      resumeLaterFailed: "Could not save your progress in this browser.",
     },
     runtime: {
       subdomain: "my-site",
@@ -70,6 +71,9 @@ export const tenantRuntimeContent = {
       sectionsCount: "{count} sections",
       submitting: "Submitting...",
       submit: "Submit",
+      resumeLater: "Resume later",
+      resumeLaterSaved: "Progress saved. Return on this device to finish later.",
+      resumeLaterRestored: "Your saved progress has been restored.",
       successMessage: "Thank you. Your response has been submitted.",
       fileStorageNote: "File storage will attach after backend storage is connected.",
       yes: "Yes",

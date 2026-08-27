@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+/* eslint-disable react-refresh/only-export-components -- shared icon registry is intentionally colocated with its renderer */
+import { createElement, useState } from "react";
 import {
   ArrowRight,
   Baby,
@@ -50,7 +51,6 @@ import {
   Droplets,
   ChevronDown,
   ChevronUp,
-  Search,
   Zap,
 } from "lucide-react";
 
@@ -145,23 +145,15 @@ export function BuilderIcon({ name = "Sparkles", size = 20, ...props }) {
   if (!name || name === "none") return null;
   const Icon = builderIconsByName.get(name) || Sparkles;
   const resolvedName = builderIconsByName.has(name) ? name : "Sparkles";
-  return <Icon data-builder-icon={resolvedName} size={size} strokeWidth={1.8} {...props} />;
+  return createElement(Icon, { "data-builder-icon": resolvedName, size, strokeWidth: 1.8, ...props });
 }
 
 export default function PageBuilderIconPicker({ value = "Sparkles", onChange }) {
   const collapsedIconCount = 12;
   const selectedIconIndex = builderIconOptions.findIndex(([name]) => name === value);
   const [expanded, setExpanded] = useState(selectedIconIndex >= collapsedIconCount);
-  const [query, setQuery] = useState("");
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredOptions = useMemo(() => {
-    if (!normalizedQuery) return builderIconOptions;
-    return builderIconOptions.filter(([name, label, , category, keywords]) =>
-      `${name} ${label} ${category} ${keywords}`.toLowerCase().includes(normalizedQuery)
-    );
-  }, [normalizedQuery]);
-  const showAll = expanded || Boolean(normalizedQuery);
-  const visibleOptions = showAll ? filteredOptions : builderIconOptions.slice(0, collapsedIconCount);
+  const showAll = expanded;
+  const visibleOptions = showAll ? builderIconOptions : builderIconOptions.slice(0, collapsedIconCount);
 
   const renderOption = ([name, label, Icon]) => (
     <button
@@ -180,16 +172,6 @@ export default function PageBuilderIconPicker({ value = "Sparkles", onChange }) 
   return (
     <div className="builder-icon-picker" role="group" aria-label="Choose an icon">
       <span className="builder-icon-picker-label">Icon <small>{builderIconOptions.length} available</small></span>
-      {false && <div className="builder-icon-picker-search">
-        <Search size={16} aria-hidden="true" />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search icons — ring, cross, camera…"
-          aria-label="Search icons"
-        />
-      </div>}
       {!showAll ? <span className="builder-icon-category-label">Popular</span> : null}
       {!showAll ? <div className="builder-icon-picker-grid">
         <button
@@ -215,10 +197,9 @@ export default function PageBuilderIconPicker({ value = "Sparkles", onChange }) 
               </section>
             );
           })}
-          {!visibleOptions.length ? <p className="builder-icon-picker-empty">No icons match “{query.trim()}”.</p> : null}
         </div>
       )}
-      {!normalizedQuery ? <button
+      <button
         type="button"
         className="builder-icon-picker-toggle"
         aria-expanded={expanded}
@@ -226,7 +207,7 @@ export default function PageBuilderIconPicker({ value = "Sparkles", onChange }) 
       >
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         {expanded ? "Collapse icons" : `Show all ${builderIconOptions.length} icons`}
-      </button> : null}
+      </button>
     </div>
   );
 }

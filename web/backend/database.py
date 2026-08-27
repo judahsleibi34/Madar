@@ -4,7 +4,9 @@ from pathlib import Path
 
 import httpx
 import dotenv
-from supabase import create_client, Client, ClientOptions
+from supabase import Client, ClientOptions
+
+from services.supabase_api_key import create_api_key_compatible_client
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +113,7 @@ def create_supabase_client(supabase_key: str) -> Client:
             keepalive_expiry=15.0,
         ),
     )
-    return create_client(
+    return create_api_key_compatible_client(
         SUPABASE_URL,
         supabase_key,
         options=ClientOptions(
@@ -125,4 +127,3 @@ def create_supabase_client(supabase_key: str) -> Client:
 
 supabase: Client = create_supabase_client(SUPABASE_ANON_KEY)
 service_supabase: Client = create_supabase_client(SUPABASE_SERVICE_KEY)
-

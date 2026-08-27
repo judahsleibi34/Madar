@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowRight, Mail, Menu, Phone, Search, ShoppingBag, ShoppingCart, X } from "lucide-react";
 
@@ -397,6 +397,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const locale = urlFilters.get("locale") || document.documentElement.lang || "en";
   const [catalog, setCatalog] = useState(EMPTY_CATALOG);
   const [site, setSite] = useState(null);
+  const siteRef = useRef(null);
   const [productDetail, setProductDetail] = useState(null);
   const [requestStatus, setRequestStatus] = useState({
     key: "",
@@ -438,7 +439,10 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
 
   useEffect(() => {
     let cancelled = false;
-    const request = productSlug
+    const demoProduct = getPilatesDemoProduct(productSlug);
+    const request = productSlug && demoProduct && isPilatesDemoSite(siteRef.current)
+      ? Promise.resolve({ ...demoProduct, site: siteRef.current })
+      : productSlug
       ? fetchPublicEcommerceProduct(subdomain, productSlug, locale)
       : contactRoute
         ? fetchPublicEcommerceProfile(subdomain)
@@ -454,11 +458,24 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     request
       .then((result) => {
         if (cancelled) return;
-        setSite(result?.site || null);
+        const nextSite = result?.site || siteRef.current || null;
+        siteRef.current = nextSite;
+        setSite(nextSite);
         if (productSlug) {
           setProductDetail(result || null);
         } else {
-          setCatalog(result?.catalog || EMPTY_CATALOG);
+          const remoteCatalog = result?.catalog || EMPTY_CATALOG;
+          setCatalog(
+            isPilatesDemoSite(nextSite) && remoteCatalog.products.length === 0
+              ? getPilatesDemoCatalog({
+                  search: filters.search,
+                  category: filters.category,
+                  tag: filters.tag,
+                  sort: filters.sort,
+                  page: filters.page,
+                })
+              : remoteCatalog
+          );
           setProductDetail(null);
         }
         setRequestStatus({ key: requestKey, loading: false, error: "" });

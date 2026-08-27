@@ -1,7 +1,9 @@
 """Server-authoritative commercial entitlement evaluation.
 
-Canonical records take precedence. Unmigrated tenants use an explicit legacy
-compatibility path so rollout cannot unexpectedly remove published content.
+Canonical records are authoritative. Missing, malformed, ambiguous, or
+unmigrated commercial state grants no paid capability. Existing published-site
+continuity is handled narrowly by ``require_public_runtime_entitlement`` rather
+than by a catalog-wide compatibility grant.
 """
 
 from __future__ import annotations
@@ -20,12 +22,7 @@ from services.commercial_catalog import CAPABILITIES, GIB, get_product
 
 logger = logging.getLogger(__name__)
 ACTIVE_STATE = "active"
-LEGACY_COMPAT_CAPABILITIES = frozenset(CAPABILITIES) - {
-    "private_google_drive",
-    "ocr",
-    "hosted_email_mailbox",
-    "custom_domain",
-}
+ENTITLED_STATES = frozenset({"active", "trial", "grace"})
 LEGACY_PLAN_MAP = {
     "forms_data": "forms",
     "cms": "website",
@@ -37,6 +34,22 @@ LEGACY_BUILDER_MAP = {
     "data": "forms",
     "website": "website",
     "reservation": "business_plus",
+}
+
+# TODO(payment-gateway): TEMPORARY operational override only. Production sets
+# COMMERCIAL_ENTITLEMENTS_ENFORCED=false until payment gateway integration and
+# commercial tenant assignments are ready. Set it back to true to restore the
+# canonical subscription/add-on policy; no data migration is required.
+TEMPORARY_OVERRIDE_ALLOWANCES = {
+    "storage_bytes": 10 * GIB,
+    "included_workspace_operators": 10_000,
+    "workspace_seats": 0,
+    "published_websites": 1,
+    "active_builder_projects": None,
+    "forms": None,
+    "form_submissions": None,
+    "reservation_requests": None,
+    "standard_tokens": 1_500_000,
 }
 
 
@@ -95,11 +108,17 @@ def _canonical_records(tenant_id: int | str) -> tuple[list[dict[str, Any]], list
         # active canonical subscription.
         return None
     except Exception as error:
-        logger.info(
-            "entitlements.canonical_schema_unavailable",
+        logger.warning(
+            "entitlements.canonical_lookup_failed",
             extra={"tenant_id": tenant_id, "error_type": type(error).__name__},
         )
-        return None
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail(
+                "entitlement_dependency_unavailable",
+                "Subscription access could not be verified.",
+            ),
+        ) from error
 
 
 def _legacy_features(tenant_id: int | str) -> list[dict[str, Any]]:
@@ -150,66 +169,135 @@ def _plan_entitlements(plan_id: str | None) -> tuple[set[str], dict[str, int | N
     return set(product.get("capabilities") or []), dict(product.get("allowances") or {})
 
 
-def _unmigrated_compatibility_state(tenant_id: int | str, *, legacy=None) -> dict[str, Any]:
+def _ai_provider_configured() -> bool:
+    provider = os.getenv("AI_PROVIDER", "").strip().lower()
+    if not _env_enabled("AI_FEATURE_ENABLED", False):
+        return False
+    if provider == "openai":
+        return bool(os.getenv("OPENAI_API_KEY", "").strip())
+    return False
+
+
+def _env_enabled(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def commercial_entitlements_enforced() -> bool:
+    """Return the reversible operator-controlled commercial policy state."""
+    return _env_enabled("COMMERCIAL_ENTITLEMENTS_ENFORCED", True)
+
+
+def _temporary_operator_override_state(tenant_id: int | str) -> dict[str, Any]:
+    capabilities = set(CAPABILITIES)
+    operational, availability = _operational_capabilities(capabilities)
     return {
-        "tenant_id": tenant_id,
-        "source": "legacy_grandfathered",
-        "plan_id": None,
+        "tenant_id": int(tenant_id),
+        "source": "operator_configuration_override",
+        "plan_id": "temporary_all_capabilities",
         "subscription": None,
         "subscriptions": [],
-        "active_addons": [],
-        "capabilities": sorted(LEGACY_COMPAT_CAPABILITIES),
-        "allowances": {
-            "storage_bytes": 5 * GIB,
-            "included_workspace_operators": 1,
-            "published_websites": 1,
-            "active_builder_projects": None,
-            "forms": None,
-            "form_submissions": None,
-            "reservation_requests": None,
-        },
+        # Preserve the existing AI metering integration while the tenant's
+        # canonical commercial records are intentionally ignored.
+        "active_addons": [
+            {"addon_id": "ai_analytics_plus", "state": ACTIVE_STATE, "quantity": 1}
+        ],
+        "capabilities": sorted(capabilities),
+        "operational_capabilities": sorted(operational),
+        "capability_availability": availability,
+        "allowances": dict(TEMPORARY_OVERRIDE_ALLOWANCES),
+        "legacy_features": [],
+        "review_required": False,
+        "commercial_entitlements_enforced": False,
+    }
+
+
+if not commercial_entitlements_enforced():
+    # This runs once per backend process, never once per request.
+    logger.warning(
+        "commercial entitlement enforcement disabled by operator configuration"
+    )
+
+
+def _operational_capabilities(capabilities: set[str]) -> tuple[set[str], dict[str, str]]:
+    operational = set(capabilities)
+    availability: dict[str, str] = {}
+    if "ai_analytics" in operational and not _ai_provider_configured():
+        operational.remove("ai_analytics")
+        availability["ai_analytics"] = "provider_unavailable"
+    elif "ai_analytics" in operational:
+        availability["ai_analytics"] = "operational"
+    return operational, availability
+
+
+def _unentitled_state(
+    tenant_id: int | str,
+    *,
+    source: str,
+    subscriptions: list[dict[str, Any]] | None = None,
+    addons: list[dict[str, Any]] | None = None,
+    legacy: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "tenant_id": tenant_id,
+        "source": source,
+        "plan_id": None,
+        "subscription": None,
+        "subscriptions": list(subscriptions or []),
+        "active_addons": list(addons or []),
+        "capabilities": [],
+        "operational_capabilities": [],
+        "capability_availability": {},
+        "allowances": {},
         "legacy_features": list(legacy or []),
         "review_required": True,
     }
 
 
 def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
+    if not commercial_entitlements_enforced():
+        return _temporary_operator_override_state(tenant_id)
+
     # The repository's offline suite intentionally uses dummy Supabase URLs.
     # Tests that exercise canonical lookup behavior opt in explicitly.
     if _offline_test_compatibility():
-        return _unmigrated_compatibility_state(tenant_id)
+        return _unentitled_state(tenant_id, source="offline_test_unentitled")
 
     records = _canonical_records(tenant_id)
     if records is not None:
         subscriptions, addons = records
-        active_subscription = next(
-            (row for row in subscriptions if row.get("state") == ACTIVE_STATE),
-            None,
-        )
+        entitled_subscriptions = [
+            row for row in subscriptions
+            if str(row.get("state") or "").strip().lower() in ENTITLED_STATES
+        ]
+        if len(entitled_subscriptions) > 1:
+            logger.error(
+                "entitlements.ambiguous_subscription_state",
+                extra={"tenant_id": tenant_id, "count": len(entitled_subscriptions)},
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=error_detail(
+                    "entitlement_state_ambiguous",
+                    "Subscription access could not be verified.",
+                ),
+            )
+        active_subscription = entitled_subscriptions[0] if entitled_subscriptions else None
         if subscriptions or addons:
             plan_id = str((active_subscription or {}).get("plan_id") or "") or None
             if active_subscription:
                 capabilities, allowances = _plan_entitlements(plan_id)
                 source = "canonical"
             else:
-                legacy = _legacy_features(tenant_id)
-                legacy_plan_id = _legacy_plan_id(legacy)
-                if legacy_plan_id:
-                    capabilities, allowances = _plan_entitlements(legacy_plan_id)
-                    plan_id = legacy_plan_id
-                    source = "canonical_addons_legacy_base"
-                else:
-                    capabilities = set(LEGACY_COMPAT_CAPABILITIES)
-                    allowances = {
-                        "storage_bytes": 5 * GIB,
-                        "included_workspace_operators": 1,
-                        "published_websites": 1,
-                        "active_builder_projects": None,
-                        "forms": None,
-                        "form_submissions": None,
-                        "reservation_requests": None,
-                    }
-                    source = "canonical_addons_grandfathered_base"
+                return _unentitled_state(
+                    tenant_id,
+                    source="canonical_inactive",
+                    subscriptions=subscriptions,
+                    addons=addons,
+                    legacy=_legacy_features(tenant_id),
+                )
             active_addons: list[dict[str, Any]] = []
             for addon in addons:
                 if addon.get("state") != ACTIVE_STATE:
@@ -241,6 +329,7 @@ def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
                     "entitlements.subdomain_grandfather_lookup_unavailable",
                     extra={"tenant_id": tenant_id},
                 )
+            operational, availability = _operational_capabilities(capabilities)
             return {
                 "tenant_id": int(tenant_id),
                 "source": source,
@@ -249,31 +338,18 @@ def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
                 "subscriptions": subscriptions,
                 "active_addons": active_addons,
                 "capabilities": sorted(capabilities),
+                "operational_capabilities": sorted(operational),
+                "capability_availability": availability,
                 "allowances": allowances,
                 "review_required": not bool(active_subscription),
             }
 
     legacy = _legacy_features(tenant_id)
-    plan_id = _legacy_plan_id(legacy)
-    if plan_id:
-        capabilities, allowances = _plan_entitlements(plan_id)
-        source = "legacy_mapped"
-    else:
-        # Preserve access for ambiguous or pre-commercial tenants. Administrators
-        # must resolve these records before strict canonical enforcement.
-        return _unmigrated_compatibility_state(tenant_id, legacy=legacy)
-    return {
-        "tenant_id": int(tenant_id),
-        "source": source,
-        "plan_id": plan_id,
-        "subscription": None,
-        "subscriptions": [],
-        "active_addons": [],
-        "capabilities": sorted(capabilities),
-        "allowances": allowances,
-        "legacy_features": legacy,
-        "review_required": plan_id is None,
-    }
+    return _unentitled_state(
+        tenant_id,
+        source="missing_canonical_subscription",
+        legacy=legacy,
+    )
 
 
 def has_entitlement(tenant_id: int | str, capability: str) -> bool:
@@ -290,8 +366,18 @@ def require_entitlement(
     message: str | None = None,
 ) -> dict[str, Any]:
     state = get_tenant_entitlements(tenant_id)
-    if capability in set(state["capabilities"]):
+    active = set(state.get("operational_capabilities", state["capabilities"]))
+    if capability in active:
         return state
+    if capability in set(state["capabilities"]):
+        raise HTTPException(
+            status_code=503,
+            detail=error_detail(
+                "capability_dependency_unavailable",
+                f"The {capability.replace('_', ' ')} dependency is unavailable.",
+                context={"capability": capability},
+            ),
+        )
     raise HTTPException(
         status_code=402,
         detail=error_detail(
@@ -309,7 +395,7 @@ def require_any_entitlement(
     message: str,
 ) -> dict[str, Any]:
     state = get_tenant_entitlements(tenant_id)
-    active = set(state["capabilities"])
+    active = set(state.get("operational_capabilities", state["capabilities"]))
     if any(capability in active for capability in capabilities):
         return state
     raise HTTPException(

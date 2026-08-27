@@ -9,6 +9,18 @@ from fastapi.testclient import TestClient
 
 from data_analysis import services as data_services
 from data_analysis.routes import data_routes
+from tests.entitlement_test_support import installed_business_fixture
+
+
+_entitlement_fixture = installed_business_fixture(1, 2)
+
+
+def setUpModule():
+    _entitlement_fixture.__enter__()
+
+
+def tearDownModule():
+    _entitlement_fixture.__exit__(None, None, None)
 
 
 def fake_user_scope(user_id, request, response):

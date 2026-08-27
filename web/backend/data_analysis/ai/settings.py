@@ -14,7 +14,7 @@ load_dotenv(AI_ENV_PATH)
 
 
 SUPPORTED_PLANS = {"free", "pro", "enterprise"}
-SUPPORTED_PROVIDERS = {"mock", "gemini", "openai", "deepseek"}
+SUPPORTED_PROVIDERS = {"mock", "openai", "deepseek"}
 
 
 @dataclass(frozen=True)
@@ -116,7 +116,10 @@ def is_mock_mode_enabled() -> bool:
 
 
 def get_default_provider() -> str:
-    provider = get_str_env("AI_PROVIDER", "gemini").lower()
+    provider = get_str_env("AI_PROVIDER", "").lower()
+
+    if not provider:
+        raise AISettingsError("AI_PROVIDER must be explicitly configured")
 
     if provider not in SUPPORTED_PROVIDERS:
         raise AISettingsError(f"Unsupported AI_PROVIDER: {provider}")
@@ -146,14 +149,12 @@ def get_model_for_plan(plan_name: str | None) -> str:
         return "mock"
 
     env_name = f"AI_{plan.upper()}_MODEL"
+    model = get_str_env(env_name, "")
 
-    fallback_model = {
-        "free": "gemini-2.5-flash",
-        "pro": "gemini-2.5-flash",
-        "enterprise": "gpt-5.5",
-    }.get(plan, "gemini-2.5-flash")
+    if not model:
+        raise AISettingsError(f"{env_name} must be explicitly configured")
 
-    return get_str_env(env_name, fallback_model)
+    return model
 
 
 def get_model_config_for_plan(plan_name: str | None) -> AIModelConfig:
@@ -262,9 +263,7 @@ def get_provider_api_key(provider: str) -> str:
     if normalized_provider == "mock":
         return ""
 
-    if normalized_provider == "gemini":
-        key = get_str_env("GEMINI_API_KEY", "")
-    elif normalized_provider == "openai":
+    if normalized_provider == "openai":
         key = get_str_env("OPENAI_API_KEY", "")
     elif normalized_provider == "deepseek":
         key = get_str_env("DEEPSEEK_API_KEY", "")

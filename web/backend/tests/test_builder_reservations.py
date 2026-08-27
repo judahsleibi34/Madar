@@ -16,6 +16,18 @@ from tests.test_builder_form_submissions import (
     build_public_client,
     fake_context,
 )
+from tests.entitlement_test_support import installed_business_fixture
+
+
+_entitlement_fixture = installed_business_fixture(1, 2)
+
+
+def setUpModule():
+    _entitlement_fixture.__enter__()
+
+
+def tearDownModule():
+    _entitlement_fixture.__exit__(None, None, None)
 
 RESERVATION_ID = "33333333-3333-4333-8333-333333333333"
 

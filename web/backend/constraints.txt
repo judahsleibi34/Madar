@@ -1,6 +1,6 @@
 # Tested Linux/Python 3.12 container lock. Regenerate only through the documented update workflow.
 aiohappyeyeballs==2.7.1
-aiohttp==3.14.1
+aiohttp==3.14.3
 aiosignal==1.4.0
 annotated-doc==0.0.4
 annotated-types==0.7.0
@@ -21,7 +21,7 @@ click==8.4.1
 colorama==0.4.6
 comm==0.2.3
 contourpy==1.3.3
-cryptography==48.0.0
+cryptography==50.0.0
 cycler==0.12.1
 dateutils==0.6.12
 decorator==5.3.1
@@ -37,12 +37,11 @@ fonttools==4.63.0
 frozenlist==1.8.0
 fsspec==2026.4.0
 google-auth==2.56.0
-google-genai==2.11.0
 greenlet==3.5.3
 gw_dsl_parser==0.1.49.1
 h11==0.16.0
-h2==4.3.0
-hpack==4.1.0
+h2==4.4.1
+hpack==4.2.0
 http_ece==1.2.1
 httpcore==1.0.9
 httpx==0.28.1
@@ -119,7 +118,7 @@ sniffio==1.3.1
 SQLAlchemy==2.0.51
 sqlglot==30.12.0
 stack-data==0.6.3
-starlette==1.1.0
+starlette==1.3.1
 statsmodels==0.14.6
 storage3==2.30.0
 StrEnum==0.4.15

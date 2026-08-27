@@ -3,8 +3,13 @@ set -Eeuo pipefail
 
 # This script is deliberately non-configurable: only Madar's four trusted bind
 # mount roots may be created or recursively re-owned.
+REPAIR=0
+if [[ "${1:-}" == "--repair" ]]; then
+    REPAIR=1
+    shift
+fi
 if (( $# != 0 )); then
-    echo "Usage: $0" >&2
+    echo "Usage: $0 [--repair]" >&2
     exit 64
 fi
 
@@ -14,10 +19,13 @@ if (( EUID != 0 )); then
 fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-REPOSITORY_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
+# The web sources moved below web/, but the production data directories must
+# remain at the repository root so existing bind mounts keep the same host
+# paths across the monorepo transition.
+REPOSITORY_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly STORAGE_UID=65534
 readonly STORAGE_GID=65534
-readonly STORAGE_MODE=0755
+readonly STORAGE_MODE=0700
 readonly -a STORAGE_PATHS=(
     "backend/private_uploads"
     "backend/avatar_uploads"
@@ -38,8 +46,15 @@ for relative_path in "${STORAGE_PATHS[@]}"; do
         -m "$STORAGE_MODE" \
         -- "$target_path"
 
-    # Existing content is retained. Recursive ownership is required because
-    # tenant directories may have been created by an older root-run container.
-    chown -R -- "$STORAGE_UID:$STORAGE_GID" "$target_path"
     chmod "$STORAGE_MODE" -- "$target_path"
+    if (( REPAIR )); then
+        # Deliberately explicit operator repair, never a timer hot path.
+        find "$target_path" -xdev -type d -exec chown "$STORAGE_UID:$STORAGE_GID" -- {} +
+        find "$target_path" -xdev -type d -exec chmod 0700 -- {} +
+        find "$target_path" -xdev -type f -exec chown "$STORAGE_UID:$STORAGE_GID" -- {} +
+        find "$target_path" -xdev -type f -exec chmod 0600 -- {} +
+    elif [[ "$(stat -c '%u:%g' "$target_path")" != "$STORAGE_UID:$STORAGE_GID" ]]; then
+        echo "Storage ownership mismatch: $relative_path (run once with --repair)" >&2
+        exit 1
+    fi
 done

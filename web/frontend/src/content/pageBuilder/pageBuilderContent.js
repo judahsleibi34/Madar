@@ -82,6 +82,13 @@ const templateModalTextEn = {
 };
 
 const starterTextEn = {
+  pilates: {
+    category: "Featured demo",
+    title: "Pilates Studio + Shop",
+    subtitle:
+      "A complete responsive studio site with fixed class slots, booking details, and a color-synced product shop.",
+    tags: ["Reservations", "Store", "Responsive"],
+  },
   showcase: {
     category: "Demo",
     title: "Full Builder Showcase",

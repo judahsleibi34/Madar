@@ -28,6 +28,12 @@ const TABLET_FLUID_TYPES = new Set([
 ]);
 
 const TABLET_MEDIA_TYPES = new Set(["image", "imageButton", "video", "embed"]);
+const MOBILE_STACKED_TYPES = new Set([
+  "formBlock",
+  "reservationBlock",
+  "loginBlock",
+  "registrationBlock",
+]);
 
 const getResponsiveButtonPosition = (node, source, bounds) => {
   const alignment = node.element?.styles?.alignSelf;
@@ -108,10 +114,35 @@ export const resolveResponsiveElementSizing = (
   if (viewportMode === "mobile") {
     const width = Math.max(1, finite(artboardWidth, 390));
     const bounds = getMobileContentBounds(width);
+    const horizontalScale = bounds.width / width;
+    const rowMemberIds = new Set();
+    nodes.forEach((node, index) => {
+      if (nodes.some((other, otherIndex) => otherIndex !== index && sharesAuthoredRow(node, other))) {
+        rowMemberIds.add(node.element.id);
+      }
+    });
 
     return nodes.map((node) => {
       const source = node.position;
       if (node.flowRole === "underText" || node.element?.layer === "behindText") return node;
+
+      if (MOBILE_STACKED_TYPES.has(node.element?.type)) {
+        return {
+          ...node,
+          position: { ...source, x: bounds.x, width: bounds.width },
+        };
+      }
+
+      if (rowMemberIds.has(node.element.id)) {
+        return {
+          ...node,
+          position: {
+            ...source,
+            x: round(bounds.x + source.x * horizontalScale),
+            width: round(Math.min(bounds.width, source.width * horizontalScale)),
+          },
+        };
+      }
 
       if (
         node.element?.type === "imageButton" &&

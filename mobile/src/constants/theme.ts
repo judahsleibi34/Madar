@@ -1,4 +1,4 @@
-﻿export const colors = {
+export const colors = {
   cream: "#F4F0E8",
   navy: "#121530",
   red: "#852C21",

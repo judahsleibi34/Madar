@@ -34,6 +34,7 @@ from services.builder_asset_validation import (
 from services.audit_service import record_audit_event
 from services.api_errors import error_detail
 from services.billing_service import require_publish_entitlement
+from services.form_draft_service import build_form_draft_token
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
 from services.site_permission_service import assign_project_role, project_role_keys
 from services.storage_quota_service import (
@@ -461,6 +462,7 @@ def assert_json_object(
     field_name: str = "draft_schema",
     *,
     validate_urls: bool = True,
+    validate_colors: bool = True,
 ) -> dict:
     if value is None:
         return {}
@@ -484,7 +486,8 @@ def assert_json_object(
         if validate_urls
         else value
     )
-    validate_builder_button_colors(validated, field_name=field_name)
+    if validate_colors:
+        validate_builder_button_colors(validated, field_name=field_name)
     return validated
 
 
@@ -1095,6 +1098,20 @@ class BuilderFormSubmissionStatusUpdate(BaseModel):
 class BuilderReservationStatusUpdate(BaseModel):
     status: str = Field(..., min_length=1)
 
+class BuilderFormRecordUpdate(BaseModel):
+    answers: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("answers")
+    @classmethod
+    def validate_answers(cls, value):
+        return assert_json_object(
+            value,
+            field_name="answers",
+            validate_urls=False,
+            validate_colors=False,
+        )
+
+
 
 class BuilderSiteMemberCreate(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=160)
@@ -1402,6 +1419,45 @@ def format_form_submission(row: dict):
         "quiz": row.get("quiz_result"),
         "field_snapshot": row.get("field_snapshot") or [],
     }
+
+
+def format_form_draft(row: dict):
+    return {
+        "id": row.get("id"),
+        "formId": row.get("form_id"),
+        "formTitle": row.get("form_title"),
+        "formVersion": row.get("form_version"),
+        "status": "Incomplete",
+        "answers": row.get("answers") or {},
+        "fieldSnapshot": row.get("field_snapshot") or [],
+        "pageIndex": max(0, int(row.get("page_index") or 0)),
+        "language": row.get("language") or "en",
+        "createdAt": row.get("updated_at") or row.get("created_at"),
+        "resumeToken": build_form_draft_token(str(row.get("id"))),
+    }
+
+
+def get_builder_form_record(
+    table_name: str,
+    *,
+    tenant_id: int,
+    project_id: str,
+    record_id: str,
+    not_found_detail: str,
+) -> dict:
+    record_response = (
+        service_supabase.table(table_name)
+        .select("*")
+        .eq("tenant_id", tenant_id)
+        .eq("project_id", project_id)
+        .eq("id", record_id)
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(record_response, "data", None) or []
+    if not rows:
+        raise HTTPException(status_code=404, detail=not_found_detail)
+    return rows[0]
 
 
 def pagination_response(rows: list[Any], limit: int, offset: int):
@@ -2676,6 +2732,257 @@ def list_builder_form_submissions(
         "limit": limit,
         "offset": offset,
     }
+
+
+@router.get("/users/{user_id}/builder/projects/{project_id}/form-drafts", include_in_schema=False)
+@router.get("/builder/projects/{project_id}/form-drafts")
+def list_builder_form_drafts(
+    project_id: str,
+    request: Request,
+    response: Response,
+    form_id: Optional[str] = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    require_entitlement(context.tenant_id, "response_management")
+    get_project_for_tenant(project_id, context.tenant_id)
+    query = (
+        service_supabase.table("builder_form_drafts")
+        .select("*")
+        .eq("tenant_id", context.tenant_id)
+        .eq("project_id", project_id)
+    )
+    if form_id:
+        query = query.eq("form_id", form_id.strip())
+    drafts_response = query.order("updated_at", desc=True).range(offset, offset + limit).execute()
+    drafts, pagination = pagination_response(
+        [format_form_draft(row) for row in (drafts_response.data or [])],
+        limit,
+        offset,
+    )
+    return {
+        "success": True,
+        "project_id": project_id,
+        "items": drafts,
+        "drafts": drafts,
+        "pagination": pagination,
+        "limit": limit,
+        "offset": offset,
+    }
+
+def update_builder_form_record_answers(
+    *,
+    table_name: str,
+    project_id: str,
+    record_id: str,
+    record_update: BuilderFormRecordUpdate,
+    request: Request,
+    response: Response,
+    not_found_detail: str,
+    formatter,
+    audit_target: str,
+):
+    context = require_builder_context_without_admin_account_access(request, response)
+    require_entitlement(context.tenant_id, "response_management")
+    get_project_for_tenant(project_id, context.tenant_id)
+    existing = get_builder_form_record(
+        table_name,
+        tenant_id=context.tenant_id,
+        project_id=project_id,
+        record_id=record_id,
+        not_found_detail=not_found_detail,
+    )
+    update_payload = {"answers": record_update.answers}
+    if table_name == "builder_form_drafts":
+        update_payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        update_response = (
+            service_supabase.table(table_name)
+            .update(update_payload)
+            .eq("tenant_id", context.tenant_id)
+            .eq("project_id", project_id)
+            .eq("id", record_id)
+            .execute()
+        )
+    except APIError as error:
+        logger.warning(
+            "builder.form_record_update_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "user_id": context.user_id,
+                "project_id": project_id,
+                "record_id": record_id,
+                "record_type": audit_target,
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(status_code=500, detail="Could not update this record")
+
+    rows = getattr(update_response, "data", None) or []
+    record = rows[0] if rows else None
+    if not record:
+        raise HTTPException(status_code=404, detail=not_found_detail)
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action=f"builder.{audit_target.removeprefix('builder_')}_updated",
+        target_type=audit_target,
+        target_id=record_id,
+        metadata={
+            "project_id": project_id,
+            "form_id": record.get("form_id") or existing.get("form_id"),
+            "edited_fields": sorted(record_update.answers.keys()),
+        },
+    )
+    return {"success": True, "record": formatter(record)}
+
+
+def delete_builder_form_record(
+    *,
+    table_name: str,
+    project_id: str,
+    record_id: str,
+    request: Request,
+    response: Response,
+    not_found_detail: str,
+    audit_target: str,
+):
+    context = require_builder_context_without_admin_account_access(request, response)
+    require_entitlement(context.tenant_id, "response_management")
+    get_project_for_tenant(project_id, context.tenant_id)
+    existing = get_builder_form_record(
+        table_name,
+        tenant_id=context.tenant_id,
+        project_id=project_id,
+        record_id=record_id,
+        not_found_detail=not_found_detail,
+    )
+
+    try:
+        (
+            service_supabase.table(table_name)
+            .delete()
+            .eq("tenant_id", context.tenant_id)
+            .eq("project_id", project_id)
+            .eq("id", record_id)
+            .execute()
+        )
+    except APIError as error:
+        logger.warning(
+            "builder.form_record_delete_failed",
+            extra={
+                "tenant_id": context.tenant_id,
+                "user_id": context.user_id,
+                "project_id": project_id,
+                "record_id": record_id,
+                "record_type": audit_target,
+                "error_type": type(error).__name__,
+            },
+        )
+        raise HTTPException(status_code=500, detail="Could not delete this record")
+
+    record_audit_event(
+        request=request,
+        tenant_id=context.tenant_id,
+        actor_user_id=context.user_id,
+        action=f"builder.{audit_target.removeprefix('builder_')}_deleted",
+        target_type=audit_target,
+        target_id=record_id,
+        metadata={
+            "project_id": project_id,
+            "form_id": existing.get("form_id"),
+        },
+    )
+    return {"success": True, "deleted_id": record_id}
+
+
+@router.patch("/users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}", include_in_schema=False)
+@router.patch("/builder/projects/{project_id}/form-submissions/{submission_id}")
+def update_builder_form_submission(
+    project_id: str,
+    submission_id: str,
+    submission_update: BuilderFormRecordUpdate,
+    request: Request,
+    response: Response,
+):
+    result = update_builder_form_record_answers(
+        table_name="builder_form_submissions",
+        project_id=project_id,
+        record_id=submission_id,
+        record_update=submission_update,
+        request=request,
+        response=response,
+        not_found_detail="Form submission not found",
+        formatter=format_form_submission,
+        audit_target="builder_form_submission",
+    )
+    return {**result, "submission": result["record"]}
+
+
+@router.delete("/users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}", include_in_schema=False)
+@router.delete("/builder/projects/{project_id}/form-submissions/{submission_id}")
+def delete_builder_form_submission(
+    project_id: str,
+    submission_id: str,
+    request: Request,
+    response: Response,
+):
+    return delete_builder_form_record(
+        table_name="builder_form_submissions",
+        project_id=project_id,
+        record_id=submission_id,
+        request=request,
+        response=response,
+        not_found_detail="Form submission not found",
+        audit_target="builder_form_submission",
+    )
+
+
+@router.patch("/users/{user_id}/builder/projects/{project_id}/form-drafts/{draft_id}", include_in_schema=False)
+@router.patch("/builder/projects/{project_id}/form-drafts/{draft_id}")
+def update_builder_form_draft(
+    project_id: str,
+    draft_id: str,
+    draft_update: BuilderFormRecordUpdate,
+    request: Request,
+    response: Response,
+):
+    result = update_builder_form_record_answers(
+        table_name="builder_form_drafts",
+        project_id=project_id,
+        record_id=draft_id,
+        record_update=draft_update,
+        request=request,
+        response=response,
+        not_found_detail="Form draft not found",
+        formatter=format_form_draft,
+        audit_target="builder_form_draft",
+    )
+    return {**result, "draft": result["record"]}
+
+
+@router.delete("/users/{user_id}/builder/projects/{project_id}/form-drafts/{draft_id}", include_in_schema=False)
+@router.delete("/builder/projects/{project_id}/form-drafts/{draft_id}")
+def delete_builder_form_draft(
+    project_id: str,
+    draft_id: str,
+    request: Request,
+    response: Response,
+):
+    return delete_builder_form_record(
+        table_name="builder_form_drafts",
+        project_id=project_id,
+        record_id=draft_id,
+        request=request,
+        response=response,
+        not_found_detail="Form draft not found",
+        audit_target="builder_form_draft",
+    )
+
 
 
 @router.get("/users/{user_id}/builder/projects/{project_id}/form-submissions/{submission_id}", include_in_schema=False)

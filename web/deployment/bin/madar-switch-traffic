@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Atomically switch the stable loopback proxy to a validated release slot."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import json
+import tempfile
+import time
+from datetime import datetime, timezone
+import urllib.request
+from pathlib import Path
+
+PORTS = {"blue": (8101, 3100), "green": (8201, 3200)}
+
+
+def _read_json(url: str) -> dict:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        return json.loads(response.read())
+
+
+def _atomic_bytes(target: Path, content: bytes, mode: int = 0o644) -> None:
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, mode)
+        os.replace(temporary, target)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _reload(driver: str, container: str) -> None:
+    if driver == "nginx":
+        subprocess.run(["nginx", "-t"], check=True)
+        subprocess.run(["systemctl", "reload", "nginx"], check=True)
+        return
+    subprocess.run(["docker", "exec", container, "nginx", "-t"], check=True)
+    subprocess.run(["docker", "exec", container, "nginx", "-s", "reload"], check=True)
+
+
+def _wait_for_stable_route(expected_sha: str) -> None:
+    backend_url = os.getenv("MADAR_STABLE_BACKEND_URL", "http://127.0.0.1:8001").rstrip("/")
+    frontend_url = os.getenv("MADAR_STABLE_FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/") + "/"
+    attempts = max(2, min(int(os.getenv("MADAR_SWITCH_VERIFY_ATTEMPTS", "20")), 120))
+    delay = max(0.05, min(float(os.getenv("MADAR_SWITCH_VERIFY_DELAY_SECONDS", "0.25")), 5.0))
+    last_error: Exception | None = None
+    for _attempt in range(attempts):
+        try:
+            identity = _read_json(f"{backend_url}/health/version")
+            with urllib.request.urlopen(frontend_url, timeout=5) as response:
+                if identity.get("release_sha") == expected_sha and response.status == 200:
+                    return
+        except Exception as error:  # bounded verification records no response body
+            last_error = error
+        time.sleep(delay)
+    raise RuntimeError("stable_route_identity_not_observed") from last_error
+
+
+def main() -> int:
+    if len(sys.argv) != 2 or sys.argv[1] not in PORTS:
+        raise SystemExit("usage: madar-switch-traffic blue|green")
+    slot = sys.argv[1]
+    backend, frontend = PORTS[slot]
+    for url in (f"http://127.0.0.1:{backend}/health/ready", f"http://127.0.0.1:{frontend}/"):
+        with urllib.request.urlopen(url, timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError(f"candidate target is not ready: {slot}")
+    expected_identity = _read_json(f"http://127.0.0.1:{backend}/health/version")
+    expected_sha = str(expected_identity.get("release_sha") or "")
+    if len(expected_sha) != 40 or any(character not in "0123456789abcdef" for character in expected_sha):
+        raise RuntimeError("candidate release identity is invalid")
+    driver = os.getenv("MADAR_TRAFFIC_SWITCH_DRIVER", "nginx").strip().lower()
+    if driver == "file-proxy":
+        target = Path(os.getenv("MADAR_ACTIVE_TARGET_FILE", "")).resolve()
+        if not str(target) or str(target) == "/":
+            raise RuntimeError("MADAR_ACTIVE_TARGET_FILE is required for file-proxy")
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        payload = {
+            "slot": slot,
+            "backend_port": backend,
+            "frontend_port": frontend,
+            "switched_at": datetime.now(timezone.utc).isoformat(),
+        }
+        descriptor, temporary = tempfile.mkstemp(prefix=".active-target.", dir=target.parent)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, target)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print(f"Madar traffic target: {slot}")
+        return 0
+    if driver not in {"nginx", "docker-nginx"}:
+        raise RuntimeError("unsupported traffic switch driver")
+    target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/releases/active-upstreams.conf"))
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    upstream_host = "127.0.0.1"
+    content = (
+        f"upstream madar_backend_active {{ server {upstream_host}:{backend}; }}\n"
+        f"upstream madar_frontend_active {{ server {upstream_host}:{frontend}; }}\n"
+    )
+    previous = target.read_bytes() if target.exists() else None
+    container = os.getenv("MADAR_PROXY_CONTAINER", "madar-release-proxy").strip()
+    try:
+        _atomic_bytes(target, content.encode("utf-8"))
+        if driver == "nginx":
+            _reload(driver, container)
+        elif driver == "docker-nginx":
+            running = subprocess.run(
+                ["docker", "inspect", "--format", "{{.State.Running}}", container],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            )
+            if running.returncode != 0 or running.stdout.strip() != "true":
+                if os.getenv("MADAR_TRAFFIC_SWITCH_ALLOW_STOPPED_PROXY", "false").lower() == "true":
+                    print(f"Madar traffic target prepared: {slot}")
+                    return 0
+                raise RuntimeError("release_proxy_not_running")
+            _reload(driver, container)
+        else:
+            raise RuntimeError("unsupported traffic switch driver")
+        _wait_for_stable_route(expected_sha)
+    except Exception:
+        if previous is not None:
+            _atomic_bytes(target, previous)
+        elif target.exists():
+            target.unlink()
+        # A failed validation must restore both the durable target file and the
+        # live proxy routing. Failure here is deliberately surfaced by the
+        # caller's retained known-good/manual-intervention path.
+        try:
+            _reload(driver, container)
+        except Exception:
+            pass
+        raise
+    print(f"Madar traffic target: {slot}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

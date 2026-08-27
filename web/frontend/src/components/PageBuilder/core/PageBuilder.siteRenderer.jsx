@@ -196,13 +196,26 @@ const SiteRenderer = forwardRef(function SiteRenderer({
         authoredDesktopPosition,
         logicalWidth
       );
+      const anchorElement = underTextRelationship
+        ? visibleElements.find((candidate) => candidate.id === underTextRelationship.anchorElementId)
+        : null;
+      const anchorRequestedPosition = anchorElement
+        ? (getDirectElementPosition?.(anchorElement, section, mode) || getArtboardElementPosition(anchorElement, mode))
+        : null;
+      const anchoredProjectedPosition = underTextRelationship && anchorRequestedPosition
+        ? {
+            ...projectedDesktopPosition,
+            y: Number(anchorRequestedPosition.y || 0)
+              + Number(underTextRelationship.offsetY || 0) * (logicalWidth / 1200),
+          }
+        : projectedDesktopPosition;
       const tabletDriftLimit = logicalWidth * 0.35;
       const hasBrokenTabletVerticalPlacement = mode === "tablet"
         && Math.abs(
           Number(requestedPosition.y || 0) - Number(projectedDesktopPosition.y || 0)
         ) > tabletDriftLimit;
       const savedPosition = mode === "tablet" && isUnderTextImage
-        ? projectedDesktopPosition
+        ? anchoredProjectedPosition
         : hasBrokenTabletVerticalPlacement
           ? { ...requestedPosition, y: projectedDesktopPosition.y }
           : requestedPosition;
@@ -218,12 +231,8 @@ const SiteRenderer = forwardRef(function SiteRenderer({
         element,
         readingOrderPosition: authoredDesktopPosition,
         flowRole: isUnderTextImage ? "underText" : "normal",
-        anchorElementId: mode === "desktop"
-          ? underTextRelationship?.anchorElementId || null
-          : null,
-        anchorOffsetY: mode === "desktop"
-          ? (underTextRelationship?.offsetY || 0) * (logicalWidth / 1200)
-          : 0,
+        anchorElementId: underTextRelationship?.anchorElementId || null,
+        anchorOffsetY: (underTextRelationship?.offsetY || 0) * (logicalWidth / 1200),
         position: {
           ...savedPosition,
           height: usesFixedEditorialCardHeight

@@ -56,7 +56,7 @@
 
 .runtime-form-pagination {
   display: grid;
-  grid-template-columns: minmax(112px, 140px) minmax(96px, 1fr) minmax(112px, 140px);
+  grid-template-columns: minmax(112px, 140px) minmax(96px, 1fr) minmax(240px, 300px);
   align-items: center;
   gap: 10px;
   padding-top: 12px;
@@ -105,6 +105,88 @@
   justify-self: stretch;
 }
 
+.runtime-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 8px;
+}
+
+.runtime-form-actions > button {
+  flex: 1 1 112px;
+  width: auto;
+}
+
+.runtime-form-pagination button.runtime-resume-later {
+  background: transparent;
+  color: var(--form-theme-accent);
+}
+
+.runtime-form-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  width: min(390px, calc(100vw - 32px));
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--form-theme-accent) 32%, transparent);
+  border-left: 4px solid var(--form-theme-accent);
+  border-radius: 12px;
+  background: var(--form-theme-surface);
+  color: var(--form-theme-text);
+  box-shadow: 0 14px 38px rgba(var(--theme-shadow-rgb), 0.2);
+  animation: runtime-form-toast-enter 180ms ease-out both;
+}
+
+.runtime-form-toast-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--form-theme-accent) 14%, transparent);
+  color: var(--form-theme-accent);
+  font-weight: 950;
+}
+
+.runtime-form-toast-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.runtime-form-toast-copy strong,
+.runtime-form-toast-copy span {
+  overflow-wrap: anywhere;
+}
+
+.runtime-form-toast-copy strong { font-size: 13px; }
+.runtime-form-toast-copy span {
+  color: var(--form-theme-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runtime-form-toast > button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--form-theme-muted);
+  cursor: pointer;
+  font-size: 20px;
+}
+
+@keyframes runtime-form-toast-enter {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .runtime-question label,
 .runtime-question-field {
   display: grid;
@@ -113,6 +195,27 @@
   font-weight: 850;
   color: var(--form-theme-text);
   text-align: start;
+}
+
+.runtime-question.has-error .runtime-question-field,
+.builder-form-preview-question.has-error > label {
+  border-left: 3px solid var(--theme-danger);
+  padding-left: 10px;
+}
+
+.runtime-question.has-error input:not([type="checkbox"]):not([type="radio"]),
+.runtime-question.has-error textarea,
+.runtime-question.has-error select,
+.builder-form-preview-question.has-error input:not([type="checkbox"]):not([type="radio"]),
+.builder-form-preview-question.has-error textarea,
+.builder-form-preview-question.has-error select {
+  border-color: var(--theme-danger);
+}
+
+.runtime-field-error {
+  color: var(--theme-danger);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .runtime-question {
@@ -4544,7 +4647,7 @@ body.theme-dark .runtime-language-switch button:hover:not(.active),
 
 .builder-form-preview-actions {
   display: grid;
-  grid-template-columns: minmax(112px, 140px) minmax(96px, 1fr) minmax(112px, 140px);
+  grid-template-columns: minmax(112px, 140px) minmax(96px, 1fr) minmax(240px, 300px);
   align-items: center;
   gap: 10px;
   padding-top: 14px;
@@ -4552,7 +4655,7 @@ body.theme-dark .runtime-language-switch button:hover:not(.active),
 }
 
 .builder-form-preview-actions.is-single {
-  grid-template-columns: minmax(112px, 140px);
+  grid-template-columns: minmax(240px, 300px);
   justify-content: end;
 }
 
@@ -4571,6 +4674,18 @@ body.theme-dark .runtime-language-switch button:hover:not(.active),
   width: 100%;
 }
 
+.builder-form-preview-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 8px;
+}
+
+.builder-form-preview-action-group > button {
+  flex: 1 1 112px;
+  width: auto;
+}
+
 .builder-form-preview-actions button:last-child,
 .builder-form-preview-shell > button {
   border-color: transparent;
@@ -4581,6 +4696,22 @@ body.theme-dark .runtime-language-switch button:hover:not(.active),
 .builder-form-preview-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+@media (max-width: 640px) {
+  .runtime-form-pagination,
+  .builder-form-preview-actions {
+    grid-template-columns: minmax(76px, 1fr) auto minmax(76px, 1fr);
+  }
+
+  .builder-form-preview-actions.is-single {
+    grid-template-columns: minmax(112px, 1fr);
+  }
+
+  .runtime-form-actions,
+  .builder-form-preview-action-group {
+    flex-direction: column;
+  }
 }
 
 .builder-form-preview-success {

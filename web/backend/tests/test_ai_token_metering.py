@@ -31,8 +31,8 @@ class AiTokenMeteringTests(unittest.TestCase):
         with token_metering.capture_provider_usage() as captured:
             token_metering.record_provider_usage(
                 {
-                    "provider": "gemini",
-                    "model": "gemini-test",
+                    "provider": "openai",
+                    "model": "openai-test",
                     "input_tokens": 11,
                     "output_tokens": 7,
                     "cached_input_tokens": 3,
@@ -58,8 +58,8 @@ class AiTokenMeteringTests(unittest.TestCase):
             [],
             fallback_input="abc",
             fallback_output="defgh",
-            provider="gemini",
-            model="gemini-test",
+            provider="openai",
+            model="openai-test",
         )
         self.assertTrue(usage["estimated"])
         self.assertEqual(usage["usage_source"], "server_estimate")
