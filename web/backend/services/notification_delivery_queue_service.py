@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -54,8 +55,17 @@ def resolve_outbox_notification(row: dict[str, Any], *, client=None) -> int:
             # recovered after the settling window.
             raise ResolutionDeferred("legacy_tenant_event_settling")
     response = (client or service_supabase).rpc(
-        "resolve_notification_outbox",
-        {"p_outbox_id": outbox_id, "p_now": _now().isoformat()},
+        "resolve_notification_outbox_v2",
+        {
+            "p_outbox_id": outbox_id,
+            "p_now": _now().isoformat(),
+            "p_email_enabled": os.getenv(
+                "EMAIL_CHANNEL_ENABLED", "false"
+            ).strip().lower() in {"1", "true", "yes", "on"},
+            "p_web_push_enabled": os.getenv(
+                "WEB_PUSH_ENABLED", "false"
+            ).strip().lower() in {"1", "true", "yes", "on"},
+        },
     ).execute()
     data = getattr(response, "data", None)
     if isinstance(data, list):

@@ -231,10 +231,21 @@ def check_notification_queue() -> str:
         maximum_dead = int(os.getenv("NOTIFICATION_QUEUE_MAX_DEAD", "0"))
         if min(maximum_depth, maximum_age, maximum_dead) < 0:
             return "misconfigured"
+        if "outbox_dead" in metrics:
+            relevant_dead = int(metrics.get("outbox_dead") or 0)
+            relevant_dead += int(metrics.get("delivery_internal_dead") or 0)
+            if _env_bool("EMAIL_CHANNEL_ENABLED", False):
+                relevant_dead += int(metrics.get("delivery_email_dead") or 0)
+            if _env_bool("WEB_PUSH_ENABLED", False):
+                relevant_dead += int(metrics.get("delivery_web_push_dead") or 0)
+        else:
+            # Compatibility fallback for legacy metrics/test doubles.
+            relevant_dead = int(metrics.get("dead") or 0)
+
         if (
             metrics.get("queue_depth", 0) > maximum_depth
             or metrics.get("oldest_pending_age_seconds", 0) > maximum_age
-            or metrics.get("dead", 0) > maximum_dead
+            or relevant_dead > maximum_dead
         ):
             return "backlogged"
         return "ok"

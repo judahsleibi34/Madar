@@ -220,7 +220,7 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
     try:
         delivery_response = (
             database_client.table("notification_deliveries")
-            .select("status,created_at")
+            .select("status,created_at,channel")
             .in_("status", ["pending", "processing", "dead", "sent"])
             .limit(5000)
             .execute()
@@ -250,6 +250,15 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
         if pending_dates
         else 0
     )
+    delivery_dead_by_channel = {
+        channel: sum(
+            row.get("status") == "dead" and row.get("channel") == channel
+            for row in delivery_rows
+        )
+        for channel in ("internal", "email", "web_push")
+    }
+    delivery_dead = sum(delivery_dead_by_channel.values())
+
     return {
         "queue_depth": counts["pending"] + counts["failed"] + sum(
             row.get("status") in {"pending", "processing"} for row in delivery_rows
@@ -257,9 +266,12 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
         "oldest_pending_age_seconds": oldest_age,
         **{
             **counts,
-            "dead": counts["dead"] + sum(
-                row.get("status") == "dead" for row in delivery_rows
-            ),
+            "outbox_dead": counts["dead"],
+            "delivery_dead": delivery_dead,
+            "delivery_internal_dead": delivery_dead_by_channel["internal"],
+            "delivery_email_dead": delivery_dead_by_channel["email"],
+            "delivery_web_push_dead": delivery_dead_by_channel["web_push"],
+            "dead": counts["dead"] + delivery_dead,
         },
         "delivery_pending": sum(
             row.get("status") == "pending" for row in delivery_rows
