@@ -62,7 +62,7 @@ for number in range(84, 1000):
 
     previous = number - 1
 
-    if re.search(r"\\bcurrent_schema\\b", text):
+    if re.search(r"\bcurrent_schema\b", text):
         fail(
             f"{number:03d}: reserved CURRENT_SCHEMA identifier "
             "must not be used as a PL/pgSQL variable"
@@ -80,7 +80,7 @@ for number in range(84, 1000):
         )
 
     guards = re.findall(
-        rf"v_schema_version\\s*<>\\s*{previous}\\b",
+        rf"v_schema_version\s*<>\s*{previous}\b",
         text,
     )
 
