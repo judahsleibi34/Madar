@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowRight, Mail, Menu, Phone, Search, ShoppingBag, ShoppingCart, X } from "lucide-react";
 
@@ -8,6 +8,7 @@ import {
   fetchPublicEcommerceProfile,
 } from "../../services/ecommerceApi";
 import { getResponsiveMediaProps } from "../../utils/media";
+import { getPilatesDemoCatalog, getPilatesDemoProduct, isPilatesDemoSite } from "./pilatesDemoCatalog";
 import "../../styles/public/ecommerce-storefront.css";
 
 const EMPTY_CATALOG = {
@@ -39,9 +40,10 @@ const readCart = (key) => {
 };
 
 function ProductImage({ product, className = "", eager = false }) {
+  const [failed, setFailed] = useState(false);
   const source = product?.images?.[0];
-  if (source) {
-    return <img className={className} {...getResponsiveMediaProps(source, { sizes: "(max-width: 700px) 100vw, 33vw" })} alt={product.name} loading={eager ? "eager" : "lazy"} fetchPriority={eager ? "high" : "auto"} />;
+  if (source && !failed) {
+    return <img className={className} {...getResponsiveMediaProps(source, { sizes: "(max-width: 700px) 100vw, 33vw" })} alt={product.name} loading={eager ? "eager" : "lazy"} decoding="async" fetchPriority={eager ? "high" : "auto"} onError={() => setFailed(true)} />;
   }
   return (
     <div className={`${className} live-store-image-placeholder`.trim()} aria-label="No product image">
@@ -277,11 +279,11 @@ function ProductGallery({ product }) {
 }
 
 
-function ProductCard({ product, category, locale, productPath, onAdd }) {
+function ProductCard({ product, category, locale, productPath, onAdd, eager = false }) {
   return (
     <article className="live-store-product-card">
       <Link className="live-store-product-image" to={productPath}>
-        <ProductImage product={product} />
+        <ProductImage product={product} eager={eager} />
         <span className="live-store-product-view">View product</span>
       </Link>
       <div className="live-store-product-body">
@@ -307,7 +309,7 @@ function ProductCard({ product, category, locale, productPath, onAdd }) {
 }
 
 
-function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, productBasePath, onAdd }) {
+function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, productBasePath, onAdd, isFormFlow }) {
   const featuredProducts = catalog.products.slice(0, 4);
   const featuredCategories = catalog.categories.filter((item) => !item.parent_id).slice(0, 3);
   const leadProduct = featuredProducts[0];
@@ -317,11 +319,12 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
     <div className="live-store-landing">
       <section className="live-store-landing-hero">
         <div className="live-store-landing-copy">
-          <h1 className="live-store-welcome-title">Welcome to {brand}</h1>
-          <h2 className="live-store-hero-subtitle">See what's new.</h2>
-          <p>{site?.description || `Browse the latest products and collections from ${brand}.`}</p>
+          <p className="live-store-eyebrow">{isFormFlow ? "FORM & FLOW · PILATES STUDIO EDIT" : `Welcome to ${brand}`}</p>
+          <h1 className="live-store-welcome-title">{isFormFlow ? "Pilates essentials for movement, strength, and recovery." : `Welcome to ${brand}`}</h1>
+          <h2 className="live-store-hero-subtitle">{isFormFlow ? "Made for women who move with intention." : "See what's new."}</h2>
+          <p>{isFormFlow ? "Shop studio wear, Reformer accessories, and calming recovery rituals selected to complement every class." : (site?.description || `Browse the latest products and collections from ${brand}.`)}</p>
           <div className="live-store-landing-actions">
-            <Link className="live-store-primary-link" to={shopPath}>Browse products <ArrowRight size={18} /></Link>
+            <Link className="live-store-primary-link" to={shopPath}>{isFormFlow ? "Shop the studio edit" : "Browse products"} <ArrowRight size={18} /></Link>
             {featuredCategories[0] && <Link className="live-store-text-link" to={`${shopPath}?category=${encodeURIComponent(featuredCategories[0].slug)}`}>Shop {featuredCategories[0].name}</Link>}
           </div>
           {(productTotal > 0 || catalog.categories.length > 0) && (
@@ -345,7 +348,7 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
 
       {featuredCategories.length > 0 && (
         <section className="live-store-landing-section">
-          <header><div><p className="live-store-eyebrow">Browse by category</p><h2>Find what suits you.</h2></div><Link to={shopPath}>View all <ArrowRight size={17} /></Link></header>
+          <header><div><p className="live-store-eyebrow">{isFormFlow ? "Move your way" : "Browse by category"}</p><h2>{isFormFlow ? "Designed for practice and pause." : "Find what suits you."}</h2></div><Link to={shopPath}>View all <ArrowRight size={17} /></Link></header>
           <div className="live-store-category-grid">
             {featuredCategories.map((category, index) => (
               <Link key={category.id} to={`${shopPath}?category=${encodeURIComponent(category.slug)}`}>
@@ -359,11 +362,11 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
       )}
 
       <section className="live-store-landing-section live-store-featured-section">
-        <header><div><p className="live-store-eyebrow">Latest arrivals</p><h2>Featured products</h2></div><Link to={shopPath}>Shop all <ArrowRight size={17} /></Link></header>
+        <header><div><p className="live-store-eyebrow">{isFormFlow ? "The studio edit" : "Latest arrivals"}</p><h2>{isFormFlow ? "Useful things for movement and recovery" : "Featured products"}</h2></div><Link to={shopPath}>Shop all <ArrowRight size={17} /></Link></header>
         {featuredProducts.length > 0 ? (
           <div className="live-store-grid">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${productBasePath}/product/${encodeURIComponent(product.slug)}`} onAdd={onAdd} />
+            {featuredProducts.map((product, index) => (
+              <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${productBasePath}/product/${encodeURIComponent(product.slug)}`} onAdd={onAdd} eager={index < 3} />
             ))}
           </div>
         ) : (
@@ -372,7 +375,7 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
       </section>
 
       <section className="live-store-landing-cta">
-        <div><p className="live-store-eyebrow">The complete collection</p><h2>Ready to find your next favorite?</h2></div>
+        <div><p className="live-store-eyebrow">{isFormFlow ? "Form & Flow essentials" : "The complete collection"}</p><h2>{isFormFlow ? "Carry the studio feeling with you." : "Ready to find your next favorite?"}</h2></div>
         <Link className="live-store-primary-link" to={shopPath}>Browse all products <ArrowRight size={18} /></Link>
       </section>
     </div>
@@ -394,7 +397,9 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const categoriesRoute = /^categories\/?$/.test(routeTail);
   const contactRoute = /^contact\/?$/.test(routeTail);
   const urlFilters = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const locale = urlFilters.get("locale") || document.documentElement.lang || "en";
+  // Public stores are independent of the dashboard shell language. Without an
+  // explicit locale, catalog content is English and must stay LTR.
+  const locale = "en";
   const [catalog, setCatalog] = useState(EMPTY_CATALOG);
   const [site, setSite] = useState(null);
   const siteRef = useRef(null);
@@ -430,9 +435,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     filters.sort,
     filters.page,
     locale,
-    isLanding,
     contactRoute,
-    routeTail,
   ]);
   const loading = requestStatus.key !== requestKey || requestStatus.loading;
   const error = requestStatus.key === requestKey ? requestStatus.error : "";
@@ -502,9 +505,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     filters.sort,
     filters.page,
     requestKey,
-    isLanding,
     contactRoute,
-    routeTail,
   ]);
 
   const setFilter = (key, value, resetPage = true) => {
@@ -526,17 +527,33 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     [catalog.categories]
   );
   const brand = site?.brand || site?.footer_store_name || "Madar Store";
-  const savedTheme = site?.store_theme || {};
+  const isFormFlow = subdomain.toLowerCase() === "madar-demo" || brand.toLowerCase() === "form & flow";
+  const savedTheme = site?.store_theme || site?.theme || {};
   const storeStyle = {
     "--store-accent": savedTheme.accent,
     "--store-paper": savedTheme.background,
-    "--store-soft": savedTheme.surface,
+    "--store-soft": savedTheme.softSurface || savedTheme.surface,
     "--store-ink": savedTheme.text,
     "--store-muted": savedTheme.muted,
+    "--store-night": savedTheme.accentDark || savedTheme.text,
   };
 
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const previous = { rootDir: root.getAttribute("dir"), rootLang: root.getAttribute("lang"), bodyDir: body?.getAttribute("dir") };
+    root.setAttribute("dir", "ltr");
+    root.setAttribute("lang", "en");
+    body?.setAttribute("dir", "ltr");
+    return () => {
+      if (previous.rootDir === null) root.removeAttribute("dir"); else root.setAttribute("dir", previous.rootDir);
+      if (previous.rootLang === null) root.removeAttribute("lang"); else root.setAttribute("lang", previous.rootLang);
+      if (body) { if (previous.bodyDir === null) body.removeAttribute("dir"); else body.setAttribute("dir", previous.bodyDir); }
+    };
+  }, []);
+
   return (
-    <div className="live-store" style={storeStyle} dir={String(locale).startsWith("ar") ? "rtl" : "ltr"}>
+    <div className={`live-store${isFormFlow ? " is-form-flow" : ""}`} style={storeStyle} dir="ltr" lang="en">
       <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cart.length} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} />
       <main>
 
@@ -544,7 +561,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         {!loading && error && <div className="live-store-state is-error"><h2>Store unavailable</h2><p>{error}</p></div>}
 
         {!loading && !error && isLanding && (
-          <StoreLanding brand={brand} site={site} catalog={catalog} categoryById={categoryById} locale={locale} shopPath={shopPath} productBasePath={homePath} onAdd={addToCart} />
+          <StoreLanding brand={brand} site={site} catalog={catalog} categoryById={categoryById} locale={locale} shopPath={shopPath} productBasePath={homePath} onAdd={addToCart} isFormFlow={isFormFlow} />
         )}
 
         {!loading && !error && categoriesRoute && (
@@ -589,7 +606,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
             </aside>
             <div className="live-store-results">
               <div className="live-store-toolbar"><p>Showing <strong>{catalog.pagination.total}</strong> results</p><select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} aria-label="Sort products"><option value="latest">Latest products</option><option value="price_low">Price: Low to high</option><option value="price_high">Price: High to low</option><option value="name">Name</option></select></div>
-              {catalog.products.length > 0 ? <div className="live-store-grid">{catalog.products.map((product) => <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${homePath}/product/${encodeURIComponent(product.slug)}`} onAdd={addToCart} />)}</div> : <div className="live-store-empty"><ShoppingBag size={38} /><h2>No products found</h2><p>Try another category, tag, or search term.</p></div>}
+              {catalog.products.length > 0 ? <div className="live-store-grid">{catalog.products.map((product, index) => <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${homePath}/product/${encodeURIComponent(product.slug)}`} onAdd={addToCart} eager={index < 3} />)}</div> : <div className="live-store-empty"><ShoppingBag size={38} /><h2>No products found</h2><p>Try another category, tag, or search term.</p></div>}
               {catalog.pagination.pages > 1 && <nav className="live-store-pagination" aria-label="Product pages">{Array.from({ length: catalog.pagination.pages }, (_, index) => index + 1).map((page) => <button type="button" key={page} className={Number(filters.page) === page ? "is-active" : ""} onClick={() => setFilter("page", String(page), false)}>{page}</button>)}</nav>}
               </div>
             </div>

@@ -58,6 +58,7 @@ export default function App() {
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
+  const isFormFlowDemoRoute = /^\/(?:site|store|forms)\/madar-demo(?:\/|$)/i.test(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
   const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
 
@@ -218,15 +219,15 @@ export default function App() {
   }, [normalizeUser, refreshAuthSession]);
 
   useEffect(() => {
-    const safeLanguage = lang === "ar" ? "ar" : "en";
+    const safeLanguage = isFormFlowDemoRoute ? "en" : (lang === "ar" ? "ar" : "en");
     const direction = safeLanguage === "ar" ? "rtl" : "ltr";
 
     document.documentElement.lang = safeLanguage;
     document.documentElement.dir = direction;
     document.body.dir = direction;
 
-    setAppLanguage(safeLanguage);
-  }, [lang]);
+    if (!isFormFlowDemoRoute) setAppLanguage(safeLanguage);
+  }, [isFormFlowDemoRoute, lang]);
 
   useEffect(() => {
     const handleI18nLanguageChange = (nextLanguage) => {
@@ -624,8 +625,10 @@ export default function App() {
   ) : isTenantSiteRoute ? (
     <PageSkeleton
       label="Loading site"
-      lang={lang}
+      lang={isFormFlowDemoRoute ? "en" : lang}
       variant="tenant-runtime"
+      brand={isFormFlowDemoRoute ? "Form & Flow" : ""}
+      imageUrl={isFormFlowDemoRoute ? "/form-flow-pilates-loading.jpg" : ""}
     />
   ) : (
     <PageSkeleton label={t("common:actions.loading")} lang={lang} variant="public-page" />
@@ -704,7 +707,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
-      <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page">
+      <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page" delay={isTenantSiteRoute ? 0 : undefined}>
         <RouteErrorBoundary
           key={errorSurface}
           surface={errorSurface}

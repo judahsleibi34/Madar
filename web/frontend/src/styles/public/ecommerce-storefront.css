@@ -16,12 +16,19 @@
   background: var(--theme-bg, #f3efe7);
   color: var(--store-ink);
   font-family: var(--theme-font-family, Inter), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  direction: ltr !important;
+  text-align: left;
+  unicode-bidi: isolate;
 }
 
 .live-store *,
 .live-store *::before,
 .live-store *::after {
   box-sizing: border-box;
+}
+
+.live-store * {
+  direction: ltr !important;
 }
 
 .live-store a {
@@ -109,7 +116,7 @@
   color: var(--store-ink);
 }
 
-[dir="rtl"] .live-store-header-search input {
+.live-store[dir="rtl"] .live-store-header-search input {
   padding: 0 14px 0 42px;
 }
 
@@ -199,7 +206,7 @@
   background: var(--store-paper);
 }
 
-[dir="rtl"] .live-store-search input {
+.live-store[dir="rtl"] .live-store-search input {
   padding: 0 15px 0 44px;
 }
 
@@ -1378,4 +1385,35 @@
 
 @media (prefers-reduced-motion: reduce) {
   .live-store-skeleton-block { animation: none; }
+}
+
+/* The connected public shop is always English/LTR, even inside an RTL dashboard shell. */
+.live-store .live-store-header-inner {
+  direction: ltr !important;
+  grid-template-areas: "brand nav search cart";
+}
+.live-store .live-store-brand { grid-area: brand; }
+.live-store .live-store-mobile-menu { grid-area: menu; }
+.live-store .live-store-header nav { grid-area: nav; }
+.live-store .live-store-header-search { grid-area: search; }
+.live-store .live-store-cart { grid-area: cart; }
+
+.live-store.is-form-flow .live-store-landing-hero {
+  background: linear-gradient(135deg, var(--store-paper), color-mix(in srgb, var(--store-soft) 62%, var(--store-paper)));
+}
+.live-store.is-form-flow .live-store-welcome-title { color: var(--store-night); }
+.live-store.is-form-flow .live-store-hero-subtitle { color: var(--store-accent); }
+.live-store.is-form-flow .live-store-landing-visual { border-radius: 110px 8px 8px 8px; }
+.live-store.is-form-flow .live-store-landing-visual::before { border-radius: 86px 3px 3px 3px; }
+
+@media (max-width: 900px) and (min-width: 761px) {
+  .live-store .live-store-header-inner {
+    grid-template-areas: "brand nav cart" "search search search";
+  }
+}
+
+@media (max-width: 760px) {
+  .live-store .live-store-header-inner {
+    grid-template-areas: "brand menu cart" "search search search";
+  }
 }

@@ -819,16 +819,7 @@
   box-shadow: none;
 }
 
-.reservation-block.is-fixed-slots .fixed-slot-date-control select {
-  min-height: 42px;
-  padding-inline-end: 42px;
-  appearance: none;
-}
-
-.fixed-slot-date-control svg {
-  position: absolute;
-  top: 50%;
-  inset-inline-end: 14px;
+.fixed-slot-calendar-days > button.is-unavailable {
   color: var(--form-theme-muted, var(--theme-text-soft));
   opacity: 0.38;
 }

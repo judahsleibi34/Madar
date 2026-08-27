@@ -16,7 +16,7 @@ describe("EcommerceStorePage", () => {
     const { container } = render(
       <MemoryRouter><EcommerceStorePage /></MemoryRouter>
     );
-    expect((await screen.findByTitle("Live ecommerce store")).getAttribute("src")).toBe("/store/olive-house");
+    expect((await screen.findByTitle("Live ecommerce store")).getAttribute("src")).toBe("/site/olive-house/shop");
     expect(screen.getByRole("link", { name: "Open live store" }).getAttribute("href")).toBe("https://madarportal.com/site/olive-house/shop");
     expect(screen.queryByText("Published storefront")).toBeNull();
     expect(screen.queryByText("Customer view")).toBeNull();

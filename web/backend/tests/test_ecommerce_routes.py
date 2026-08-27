@@ -7,6 +7,7 @@ from routes.public_site_routes import (
     _filter_catalog_taxonomy,
     _localized_catalog_text,
     _public_catalog_product,
+    build_public_site_profile,
     build_public_store_profile,
 )
 
@@ -34,6 +35,28 @@ class EcommerceRoutesTests(unittest.TestCase):
         self.assertEqual(profile["description"], "Local goods")
         self.assertEqual(profile["store_theme"]["accent"], "#287a55")
         self.assertEqual(profile["store_theme"]["background"], "#ffffff")
+
+    def test_site_bound_store_inherits_the_published_builder_theme(self):
+        profile = build_public_site_profile(
+            {},
+            "form-flow",
+            {"published_schema": {
+                "theme": {
+                    "primary": "#365849",
+                    "background": "#f3efe7",
+                    "softSurface": "#e4ebe2",
+                    "text": "#21312a",
+                    "muted": "#68736d",
+                },
+                "siteChrome": {"brand": "Form & Flow"},
+            }},
+        )
+
+        self.assertEqual(profile["brand"], "Form & Flow")
+        self.assertEqual(profile["store_theme"]["accent"], "#365849")
+        self.assertEqual(profile["store_theme"]["background"], "#f3efe7")
+        self.assertEqual(profile["store_theme"]["surface"], "#e4ebe2")
+        self.assertEqual(profile["store_theme"]["text"], "#21312a")
 
     def test_public_store_profile_does_not_require_a_website_project(self):
         settings = {

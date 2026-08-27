@@ -750,8 +750,22 @@ def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> 
     has_published_snapshot = isinstance(schema, dict)
     chrome = schema.get("siteChrome") if has_published_snapshot else {}
     chrome = chrome if isinstance(chrome, dict) else {}
+    builder_theme = schema.get("theme") if has_published_snapshot else {}
+    builder_theme = builder_theme if isinstance(builder_theme, dict) else {}
     fallback = settings if not has_published_snapshot else {}
     fallback_name = fallback.get("footer_store_name") or fallback.get("brand")
+    inherited_store_theme = {
+        "accent": builder_theme.get("primary") or builder_theme.get("accent"),
+        "background": builder_theme.get("background"),
+        "surface": builder_theme.get("softSurface") or builder_theme.get("surface"),
+        "text": builder_theme.get("text"),
+        "muted": builder_theme.get("muted"),
+    }
+    inherited_store_theme = {
+        key: value for key, value in inherited_store_theme.items() if value
+    }
+    saved_store_theme = settings.get("ecommerce_theme")
+    saved_store_theme = saved_store_theme if isinstance(saved_store_theme, dict) else {}
     return {
         "subdomain": subdomain,
         "brand": chrome.get("brand") or chrome.get("brandName") or fallback_name,
@@ -761,7 +775,11 @@ def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> 
         "contact_email": chrome.get("contactEmail") or fallback.get("contact_email"),
         "phone": chrome.get("phone") or fallback.get("phone"),
         "description": chrome.get("description") or fallback.get("description"),
-        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **(settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {})},
+        "store_theme": {
+            **DEFAULT_PUBLIC_STORE_THEME,
+            **inherited_store_theme,
+            **saved_store_theme,
+        },
     }
 
 def build_public_form(form: dict) -> dict:

@@ -97,8 +97,26 @@ export const uploadEcommerceProductImage = async (file) => {
 
 
 const PUBLIC_STORE_FRESH_MS = 60_000;
-const PUBLIC_STORE_STALE_MS = 5 * 60_000;
+const PUBLIC_STORE_STALE_MS = 30 * 60_000;
 const PUBLIC_STORE_MAX_ENTRIES = 80;
+const PUBLIC_STORE_STORAGE_KEY = "madar-public-store-cache-v2";
+
+const readStoredPublicStoreResponses = () => {
+  try {
+    const stored = JSON.parse(globalThis.sessionStorage?.getItem(PUBLIC_STORE_STORAGE_KEY) || "{}");
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeStoredPublicStoreResponses = (entries) => {
+  try {
+    globalThis.sessionStorage?.setItem(PUBLIC_STORE_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // Memory caching remains available when session storage is unavailable.
+  }
+};
 const publicStoreResponseCache = new Map();
 const publicStoreRequests = new Map();
 
@@ -108,7 +126,23 @@ const rememberPublicStoreResponse = (url, data) => {
   while (publicStoreResponseCache.size > PUBLIC_STORE_MAX_ENTRIES) {
     publicStoreResponseCache.delete(publicStoreResponseCache.keys().next().value);
   }
+  const entries = readStoredPublicStoreResponses();
+  entries[url] = { data, storedAt: Date.now() };
+  Object.keys(entries)
+    .sort((first, second) => Number(entries[second]?.storedAt || 0) - Number(entries[first]?.storedAt || 0))
+    .slice(PUBLIC_STORE_MAX_ENTRIES)
+    .forEach((oldUrl) => { delete entries[oldUrl]; });
+  writeStoredPublicStoreResponses(entries);
   return data;
+};
+
+const readCachedPublicStoreResponse = (url) => {
+  const memoryEntry = publicStoreResponseCache.get(url);
+  if (memoryEntry) return memoryEntry;
+  const storedEntry = readStoredPublicStoreResponses()[url];
+  if (!storedEntry || Date.now() - Number(storedEntry.storedAt || 0) > PUBLIC_STORE_STALE_MS) return null;
+  publicStoreResponseCache.set(url, storedEntry);
+  return storedEntry;
 };
 
 const loadPublicStoreResponse = (url) => {
@@ -129,7 +163,7 @@ const loadPublicStoreResponse = (url) => {
 
 const fetchPublicStoreResponse = (path) => {
   const url = getApiUrl(path);
-  const cached = publicStoreResponseCache.get(url);
+  const cached = readCachedPublicStoreResponse(url);
   if (cached) {
     const age = Date.now() - cached.storedAt;
     if (age <= PUBLIC_STORE_FRESH_MS) return Promise.resolve(cached.data);
@@ -145,6 +179,7 @@ const fetchPublicStoreResponse = (path) => {
 export const clearPublicEcommerceCache = () => {
   publicStoreResponseCache.clear();
   publicStoreRequests.clear();
+  try { globalThis.sessionStorage?.removeItem(PUBLIC_STORE_STORAGE_KEY); } catch { /* no-op */ }
 };
 
 const publicStoreProfilePath = (subdomain) =>
@@ -176,6 +211,9 @@ export const fetchPublicEcommerceCatalog = async (subdomain, filters = {}) => {
   );
   return rememberEmbeddedStoreProfile(subdomain, data);
 };
+
+export const preloadPublicEcommerceCatalog = (subdomain) =>
+  fetchPublicEcommerceCatalog(subdomain, { sort: "latest", page: "1", locale: "en", limit: "12" }).catch(() => null);
 
 export const fetchPublicEcommerceProduct = async (subdomain, slug, locale = "en") => {
   const data = await fetchPublicStoreResponse(

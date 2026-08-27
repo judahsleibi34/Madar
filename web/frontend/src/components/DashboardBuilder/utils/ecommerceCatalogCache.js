@@ -1,4 +1,4 @@
-export const ECOMMERCE_CATALOG_CACHE_VERSION = 2;
+export const ECOMMERCE_CATALOG_CACHE_VERSION = 3;
 
 const STORAGE_KEY = `madar-ecommerce-catalog-cache-v${ECOMMERCE_CATALOG_CACHE_VERSION}`;
 const MAX_AGE_MS = 3 * 60 * 1000;

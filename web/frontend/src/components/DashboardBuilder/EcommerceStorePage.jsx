@@ -35,7 +35,7 @@ export default function EcommerceStorePage() {
 
   const subdomain = String(website?.subdomain || "").trim();
   const livePath = subdomain
-    ? `/store/${encodeURIComponent(subdomain)}`
+    ? `/site/${encodeURIComponent(subdomain)}/shop`
     : "";
   const liveUrl = useMemo(
     () => (

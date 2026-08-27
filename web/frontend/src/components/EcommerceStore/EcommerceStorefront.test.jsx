@@ -15,6 +15,11 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   localStorage.clear();
+  document.documentElement.lang = "en";
+  document.documentElement.removeAttribute("dir");
+  document.body.removeAttribute("dir");
+
+
 });
 
 const catalog = {
@@ -75,6 +80,28 @@ describe("EcommerceStorefront", () => {
       expect.objectContaining({ search: "chair" })
     );
   });
+  it("defaults public English catalogs to LTR independently of the dashboard language", async () => {
+    document.documentElement.lang = "ar";
+    document.documentElement.dir = "rtl";
+    document.body.dir = "rtl";
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+
+    render(
+      <MemoryRouter initialEntries={["/store/demo"]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByRole("heading", { level: 1, name: "Welcome to Test Store" });
+    expect(document.querySelector(".live-store").getAttribute("dir")).toBe("ltr");
+    expect(document.documentElement.getAttribute("dir")).toBe("ltr");
+    expect(document.body.getAttribute("dir")).toBe("ltr");
+    expect(fetchPublicEcommerceCatalog).toHaveBeenCalledWith(
+      "demo",
+      expect.objectContaining({ locale: "en" })
+    );
+  });
+
   it("shows all uploaded product images in the product gallery", async () => {
     fetchPublicEcommerceProduct.mockResolvedValue({
       site: { brand: "Test Store" },
@@ -154,6 +181,39 @@ describe("EcommerceStorefront", () => {
     expect(document.querySelector(".live-store").style.getPropertyValue("--store-accent")).toBe("#287a55");
     expect(screen.queryByRole("textbox")).toBeNull();
   });
+  it("maps the published builder theme payload into every storefront color token", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      ...catalog,
+      site: {
+        brand: "Form & Flow",
+        theme: {
+          accent: "#365849",
+          accentDark: "#294438",
+          background: "#f3efe7",
+          surface: "#fffdf8",
+          softSurface: "#e4ebe2",
+          text: "#21312a",
+          muted: "#68736d",
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/store/demo"]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByRole("heading", { level: 1, name: "Pilates essentials for movement, strength, and recovery." });
+    expect(screen.getByText("Made for women who move with intention.")).toBeTruthy();
+    expect(document.querySelector(".live-store").classList.contains("is-form-flow")).toBe(true);
+    const style = document.querySelector(".live-store").style;
+    expect(style.getPropertyValue("--store-accent")).toBe("#365849");
+    expect(style.getPropertyValue("--store-paper")).toBe("#f3efe7");
+    expect(style.getPropertyValue("--store-soft")).toBe("#e4ebe2");
+    expect(style.getPropertyValue("--store-night")).toBe("#294438");
+  });
+
   it("provides native store pages without relying on a builder website", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue({
       site: {
@@ -217,4 +277,41 @@ describe("EcommerceStorefront", () => {
     expect(skeleton.classList.contains(className)).toBe(true);
     expect(skeleton.querySelectorAll(".live-store-skeleton-block").length).toBeGreaterThan(1);
   });
+  it("loads visible product images first, lazy-loads the rest, and replaces failed images", async () => {
+    const products = Array.from({ length: 4 }, (_, index) => ({
+      id: `product-${index + 1}`,
+      name: `Pilates product ${index + 1}`,
+      slug: `pilates-product-${index + 1}`,
+      price: "24.00",
+      currency: "USD",
+      in_stock: true,
+      images: [`/form-flow-products/product-${index + 1}.jpg`],
+    }));
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      site: { brand: "Form & Flow" },
+      catalog: {
+        categories: [],
+        tags: [],
+        products,
+        pagination: { page: 1, pages: 1, total: 4, limit: 12 },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/store/demo/catalog"]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    const first = await screen.findByAltText("Pilates product 1");
+    expect(first.getAttribute("loading")).toBe("eager");
+    expect(screen.getByAltText("Pilates product 3").getAttribute("loading")).toBe("eager");
+    const fourth = screen.getByAltText("Pilates product 4");
+    expect(fourth.getAttribute("loading")).toBe("lazy");
+    expect(fourth.getAttribute("decoding")).toBe("async");
+
+    fireEvent.error(fourth);
+    expect(screen.getByLabelText("No product image")).toBeTruthy();
+  });
+
 });
