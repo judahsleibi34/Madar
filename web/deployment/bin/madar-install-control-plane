@@ -19,7 +19,9 @@ done
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 deployment_root="$(cd -- "$script_dir/.." && pwd)"
+web_root="$(cd -- "$deployment_root/.." && pwd)"
 install_root=/usr/local/lib/madar/web/deployment
+alert_hook_source="$web_root/scripts/madar_alert_hook.sh"
 
 declare -a tracked_files=(
   docker-compose.release.yml
@@ -40,15 +42,26 @@ declare -a units=(
   madar-auto-deploy.service
   madar-auto-deploy.timer
   madar-release-proxy.service
+  madar-ops-alert@.service
 )
 
 if (( ! apply )); then
   printf 'would install immutable Madar control plane under %s\n' "$install_root"
+  printf 'would install operations alert hook at /usr/local/lib/madar/madar_alert_hook.sh\n'
   printf 'would preserve replaced operational files under %s\n' "$backup_root"
   printf 'would leave madar-auto-deploy.timer stopped\n'
   exit 0
 fi
 [[ $EUID -eq 0 ]] || { echo "--apply requires root" >&2; exit 1; }
+
+[[ -f "$alert_hook_source" && -x "$alert_hook_source" ]] || {
+  echo "missing or non-executable alert hook source: $alert_hook_source" >&2
+  exit 1
+}
+[[ -f "$deployment_root/systemd/madar-ops-alert@.service" ]] || {
+  echo "missing operations alert systemd template" >&2
+  exit 1
+}
 
 install -d -m 0700 "$backup_root"
 for current in \
@@ -57,7 +70,9 @@ for current in \
   /etc/systemd/system/madar-auto-deploy.service \
   /etc/systemd/system/madar-auto-deploy.timer \
   /etc/systemd/system/madar-auto-deploy.service.d \
-  /etc/systemd/system/madar-release-proxy.service; do
+  /etc/systemd/system/madar-release-proxy.service \
+  /etc/systemd/system/madar-ops-alert@.service \
+  /usr/local/lib/madar/madar_alert_hook.sh; do
   if [[ -e "$current" || -L "$current" ]]; then
     cp -a -- "$current" "$backup_root/$(basename "$current")"
   fi
@@ -96,6 +111,8 @@ find /usr/local/lib/madar -type d -exec chown root:madar {} +
 find /usr/local/lib/madar -type d -exec chmod 0750 {} +
 install -o root -g root -m 0755 \
   "$deployment_root/bin/madar-auto-deploy" /usr/local/sbin/madar-auto-deploy
+install -o root -g root -m 0755 \
+  "$alert_hook_source" /usr/local/lib/madar/madar_alert_hook.sh
 for unit in "${units[@]}"; do
   install -o root -g root -m 0644 \
     "$deployment_root/systemd/$unit" "/etc/systemd/system/$unit"

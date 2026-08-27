@@ -1,7 +1,7 @@
 [Unit]
-Description=Madar provider-neutral operations alert for %I
+Description=Madar provider-neutral operations alert for %i
 
 [Service]
 Type=oneshot
 EnvironmentFile=-/etc/madar/alerts.env
-ExecStart=/usr/local/lib/madar/madar_alert_hook.sh systemd_failure %I
+ExecStart=/usr/local/lib/madar/madar_alert_hook.sh systemd_failure %i
