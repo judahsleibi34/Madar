@@ -1,0 +1,29 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 84,
+      "path": "web/database/migrations/084_create_builder_form_drafts.sql",
+      "sha256": "388489f3fe39b8b9ae0108e594c2fedde72801bb979a7cedb6bfacaa82cd042c",
+      "from_schema": 83,
+      "to_schema": 84,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 85,
+      "path": "web/database/migrations/085_filter_disabled_notification_channels.sql",
+      "sha256": "9e979ca57078efa1c6f05923727b6ddda388bd2e48a2eeca7fe8809b72050ee9",
+      "from_schema": 84,
+      "to_schema": 85,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 86,
+      "path": "web/database/migrations/086_retire_legacy_gemini_provider.sql",
+      "sha256": "19a60be3ab230101005999a9e2c5fb3cc63192a58fa8de1db9344ceacde575ab",
+      "from_schema": 85,
+      "to_schema": 86,
+      "compatibility": "expand-only"
+    }
+  ]
+}

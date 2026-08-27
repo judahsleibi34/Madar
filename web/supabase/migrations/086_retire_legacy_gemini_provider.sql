@@ -1,3 +1,5 @@
+begin;
+
 -- Retire the legacy Gemini AI-provider pricing metadata.
 --
 -- Migration 071 remains immutable because it records the historical schema
@@ -9,3 +11,37 @@ update public.ai_token_model_multipliers
 set active = false
 where lower(provider) = 'gemini'
   and active is distinct from false;
+
+do $$
+declare
+  current_schema integer;
+begin
+  select schema_version
+  into current_schema
+  from public.application_schema_state
+  where contract_key = 'core'
+  for update;
+
+  if current_schema is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'migration_086_schema_state_missing';
+  end if;
+
+  if current_schema <> 85 then
+    raise exception using
+      errcode = 'P0001',
+      message = format(
+        'migration_086_expected_schema_85_got_%s',
+        current_schema
+      );
+  end if;
+
+  update public.application_schema_state
+  set schema_version = 86,
+      applied_at = now()
+  where contract_key = 'core';
+end;
+$$;
+
+commit;

@@ -1,3 +1,5 @@
+begin;
+
 -- Gate notification delivery materialization on runtime channel capabilities.
 --
 -- The legacy resolve_notification_outbox RPC is intentionally preserved for
@@ -170,3 +172,39 @@ revoke all on function public.resolve_notification_outbox_v2(
 grant execute on function public.resolve_notification_outbox_v2(
   uuid, timestamptz, boolean, boolean
 ) to service_role;
+
+do $$
+declare
+  current_schema integer;
+begin
+  select schema_version
+  into current_schema
+  from public.application_schema_state
+  where contract_key = 'core'
+  for update;
+
+  if current_schema is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'migration_085_schema_state_missing';
+  end if;
+
+  if current_schema <> 84 then
+    raise exception using
+      errcode = 'P0001',
+      message = format(
+        'migration_085_expected_schema_84_got_%s',
+        current_schema
+      );
+  end if;
+
+  update public.application_schema_state
+  set schema_version = 85,
+      applied_at = now()
+  where contract_key = 'core';
+end;
+$$;
+
+notify pgrst, 'reload schema';
+
+commit;

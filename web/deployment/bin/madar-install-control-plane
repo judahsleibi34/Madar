@@ -35,6 +35,7 @@ declare -a tracked_files=(
   lib/release_deployer.py
   releases/release.json
   releases/migrations-082-083.json
+  releases/migrations-084-086.json
   proxy/docker-compose.yml
   proxy/nginx.conf
 )

@@ -50,5 +50,36 @@ using (
   )
 );
 
+do $$
+declare
+  current_schema integer;
+begin
+  select schema_version
+  into current_schema
+  from public.application_schema_state
+  where contract_key = 'core'
+  for update;
+
+  if current_schema is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'migration_084_schema_state_missing';
+  end if;
+
+  if current_schema <> 83 then
+    raise exception using
+      errcode = 'P0001',
+      message = format(
+        'migration_084_expected_schema_83_got_%s',
+        current_schema
+      );
+  end if;
+
+  update public.application_schema_state
+  set schema_version = 84,
+      applied_at = now()
+  where contract_key = 'core';
+end;
+$$;
 notify pgrst, 'reload schema';
 commit;
