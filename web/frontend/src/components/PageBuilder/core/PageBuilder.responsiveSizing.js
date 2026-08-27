@@ -28,6 +28,12 @@ const TABLET_FLUID_TYPES = new Set([
 ]);
 
 const TABLET_MEDIA_TYPES = new Set(["image", "imageButton", "video", "embed"]);
+const MOBILE_STACKED_TYPES = new Set([
+  "formBlock",
+  "reservationBlock",
+  "loginBlock",
+  "registrationBlock",
+]);
 
 const getResponsiveButtonPosition = (node, source, bounds) => {
   const alignment = node.element?.styles?.alignSelf;
@@ -119,6 +125,13 @@ export const resolveResponsiveElementSizing = (
     return nodes.map((node) => {
       const source = node.position;
       if (node.flowRole === "underText" || node.element?.layer === "behindText") return node;
+
+      if (MOBILE_STACKED_TYPES.has(node.element?.type)) {
+        return {
+          ...node,
+          position: { ...source, x: bounds.x, width: bounds.width },
+        };
+      }
 
       if (rowMemberIds.has(node.element.id)) {
         return {

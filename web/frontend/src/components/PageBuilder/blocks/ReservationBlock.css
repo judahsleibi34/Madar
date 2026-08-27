@@ -700,12 +700,6 @@
   gap: 20px;
 }
 
-.fixed-slot-date-control {
-  display: grid;
-  gap: 7px;
-}
-
-.fixed-slot-date-control > span,
 .reservation-block.is-fixed-slots .fixed-slot-times > span {
   color: var(--form-theme-text, var(--theme-text));
   font-size: 11px;
@@ -714,23 +708,118 @@
   text-transform: none;
 }
 
-.fixed-slot-date-control > div {
+.fixed-slot-calendar {
+  min-width: 0;
+  border-top: 1px solid var(--form-theme-border, var(--theme-border));
+  padding-top: 14px;
+  color: var(--form-theme-text, var(--theme-text));
+}
+
+.fixed-slot-calendar > header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.fixed-slot-calendar > header p {
+  margin: 0;
+  color: var(--form-theme-text, var(--theme-text));
+  font-size: 15px;
+  font-weight: 550;
+  text-align: center;
+}
+
+.fixed-slot-calendar > header button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  color: var(--form-theme-text, var(--theme-text));
+  box-shadow: none;
+}
+
+.fixed-slot-calendar > header button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 10%, transparent);
+  color: var(--form-theme-accent, var(--theme-primary));
+}
+
+.fixed-slot-calendar-weekdays,
+.fixed-slot-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.fixed-slot-calendar-weekdays {
+  margin-bottom: 5px;
+}
+
+.fixed-slot-calendar-weekdays span {
+  padding-block: 4px;
+  color: var(--form-theme-text, var(--theme-text));
+  font-size: 11px;
+  font-weight: 550;
+  text-align: center;
+}
+
+.fixed-slot-calendar-days > button,
+.fixed-slot-calendar-days > .is-empty {
+  min-width: 0;
+  min-height: 36px;
+  aspect-ratio: 1;
+}
+
+.fixed-slot-calendar-days > button {
   position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 0;
+  padding: 2px;
+  background: transparent;
+  color: var(--form-theme-text, var(--theme-text));
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
 }
 
-.reservation-block.is-fixed-slots .fixed-slot-date-control select {
-  min-height: 42px;
-  padding-inline-end: 42px;
-  appearance: none;
-}
-
-.fixed-slot-date-control svg {
-  position: absolute;
-  top: 50%;
-  right: 14px;
+.fixed-slot-calendar-days > button.is-unavailable {
   color: var(--form-theme-muted, var(--theme-text-soft));
-  pointer-events: none;
-  transform: translateY(-50%);
+  opacity: 0.38;
+}
+
+.fixed-slot-calendar-days > button.is-available:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--form-theme-accent, var(--theme-primary)) 10%, transparent);
+  color: var(--form-theme-accent, var(--theme-primary));
+}
+
+.fixed-slot-calendar-days > button.is-selected {
+  background: var(--form-theme-accent, var(--theme-primary));
+  color: var(--form-theme-button-text, var(--theme-text-inverse));
+}
+
+.fixed-slot-calendar-days > button:focus-visible {
+  outline: 2px solid var(--form-theme-accent, var(--theme-primary));
+  outline-offset: 2px;
+}
+
+.fixed-slot-calendar-days > button i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--form-theme-accent, var(--theme-primary));
+}
+
+.fixed-slot-calendar-days > button.is-selected i {
+  background: var(--form-theme-button-text, var(--theme-text-inverse));
 }
 
 .reservation-block.is-fixed-slots .fixed-slot-times {

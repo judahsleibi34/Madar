@@ -257,7 +257,30 @@ export const defaultSiteChrome = {
   footerLanguageLabel: "AR",
 };
 
+export const PILATES_DEMO_THEME = {
+  mode: "light",
+  name: "Form & Flow",
+  background: "#f3efe7",
+  surface: "#fffdf8",
+  headerBackground: "#fffdf8",
+  softSurface: "#e4ebe2",
+  text: "#21312a",
+  muted: "#68736d",
+  primary: "#365849",
+  accent: "#365849",
+  accentDark: "#294438",
+  buttonText: "#ffffff",
+  border: "rgba(54, 88, 73, 0.16)",
+  radius: 22,
+  fontFamily: "Inter",
+};
+
 export const starterSystems = [
+  {
+    id: "pilates",
+    title: "Pilates Studio + Shop",
+    subtitle: "Responsive class booking with fixed slots and a matching wellness storefront.",
+  },
   {
     id: "website",
     title: "Website + Contact Form",

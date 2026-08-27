@@ -733,6 +733,7 @@ def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> 
         "contact_email": chrome.get("contactEmail"),
         "phone": chrome.get("phone"),
         "description": chrome.get("description"),
+        "theme": schema.get("theme") if isinstance(schema.get("theme"), dict) else {},
     }
 
 

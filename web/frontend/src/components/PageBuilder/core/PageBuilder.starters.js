@@ -1,4 +1,5 @@
-import { defaultSiteChrome } from "./PageBuilder.constants";
+import { defaultSiteChrome, PILATES_DEMO_THEME } from "./PageBuilder.constants";
+export { PILATES_DEMO_THEME } from "./PageBuilder.constants";
 import { getStarterContent } from "../../../content/pageBuilder";
 import {
   createField,
@@ -494,6 +495,10 @@ const clearStarterRecords = ({ form, collection }) => {
 };
 
 export const buildStarterProject = (starterId = "website") => {
+  if (starterId === "pilates") {
+    return buildPilatesDemoProject();
+  }
+
   const common = createBaseRolesAndUsers();
 
   if (starterId === "showcase") {
@@ -1061,4 +1066,303 @@ export const buildStarterProject = (starterId = "website") => {
   });
 };
 
-export const createInitialProject = () => buildStarterProject("showcase");
+export const createInitialProject = () => buildStarterProject("pilates");
+
+const formatLocalDate = (date) => {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const createPilatesAvailability = () => {
+  const offsets = [1, 2, 4, 6, 8];
+  const dates = offsets.map((offset) => {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() + offset);
+    return formatLocalDate(date);
+  });
+  const schedules = [
+    ["07:30", "09:00", "17:30"],
+    ["08:00", "10:30", "18:30"],
+    ["07:30", "12:00", "17:30"],
+    ["09:00", "11:00", "18:30"],
+    ["08:00", "10:30", "16:30"],
+  ];
+
+  return {
+    availableDates: dates,
+    timeSlots: [...new Set(schedules.flat())],
+    timeSlotsByDate: Object.fromEntries(dates.map((date, index) => [date, schedules[index]])),
+  };
+};
+
+const pilatesHeroSection = (bookingPageId) =>
+  createSection({
+    name: "Pilates Hero",
+    layout: {
+      width: "large",
+      paddingY: "large",
+      background: "var(--theme-bg)",
+      minHeight: 620,
+    },
+    rows: [
+      createRow([
+        createColumn([
+          createElement("text", {
+            content: "FORM & FLOW PILATES · SMALL GROUP STUDIO",
+            styles: { color: "var(--theme-accent)", fontWeight: "800", letterSpacing: "0.08em" },
+          }),
+          createElement("heading", {
+            content: "Move with strength. Leave with space.",
+            styles: { fontSize: "58px", lineHeight: "1.02", color: "var(--theme-text)" },
+          }),
+          createElement("text", {
+            content: "Thoughtful reformer and mat Pilates in a calm, welcoming studio. Small classes, attentive coaching, and movement that meets you where you are.",
+          }),
+          createElement("button", {
+            content: "Book a class",
+            action: {
+              type: "goToPage",
+              pageId: bookingPageId,
+            },
+            styles: { backgroundColor: "var(--theme-accent)", color: "var(--theme-button-text)" },
+          }),
+        ]),
+        createColumn([
+          createElement("image", {
+            name: "Pilates Studio",
+            content: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1400&auto=format&fit=crop",
+            styles: { borderRadius: "32px", alignSelf: "stretch" },
+          }),
+        ]),
+      ]),
+    ],
+  });
+
+const PILATES_CLASSES = [
+  { title: "Reformer Foundations", description: "A supportive 50-minute class for learning the equipment and building confident fundamentals.", image: "https://images.unsplash.com/photo-1632077804406-188472f1a810?w=1000&auto=format&fit=crop" },
+  { title: "Reformer Flow", description: "A balanced full-body session combining strength, mobility, and smooth transitions.", image: "https://images.unsplash.com/photo-1599901860904-17e6ed7083a0?w=1000&auto=format&fit=crop" },
+  { title: "Mat & Mobility", description: "Low-impact core work and restorative mobility with props, breath, and careful pacing.", image: "https://images.unsplash.com/photo-1575052814086-f385e2e2ad1b?w=1000&auto=format&fit=crop" },
+];
+
+const pilatesClassesSection = (bookingPageId) =>
+  createSection({
+    name: "Pilates Classes",
+    layout: { width: "large", paddingY: "large", background: "var(--theme-surface)" },
+    rows: [
+      createRow([
+        createColumn([
+          createElement("text", {
+            content: "CLASSES FOR EVERY BODY",
+            styles: { color: "var(--theme-accent)", fontWeight: "800", letterSpacing: "0.08em", textAlign: "center" },
+          }),
+          createElement("heading", {
+            content: "Choose your way to move",
+            styles: { fontSize: "42px", textAlign: "center", alignSelf: "stretch" },
+          }),
+          createElement("text", {
+            content: "Every class is built around control, breath, alignment, and progress you can feel.",
+            styles: { textAlign: "center", alignSelf: "stretch" },
+          }),
+        ]),
+      ]),
+      createRow([
+        createColumn([
+          createElement("carousel", {
+            name: "Pilates Class Gallery",
+            content: PILATES_CLASSES.map((item) => (
+              `${item.title}\n${item.description}\n${item.image}`
+            )).join("\n\n"),
+            autoScroll: false,
+            styles: {
+              backgroundColor: "var(--theme-surface)",
+              borderRadius: "24px",
+              alignSelf: "stretch",
+              "--carousel-height": "460px",
+            },
+          }),
+          createElement("button", {
+            content: "View schedule & book",
+            action: { type: "goToPage", pageId: bookingPageId },
+            styles: { backgroundColor: "var(--theme-accent)", color: "var(--theme-button-text)" },
+          }),
+        ]),
+      ]),
+    ],
+  });
+
+const createPilatesReservationElement = () => {
+  const availability = createPilatesAvailability();
+  return createElement("reservationBlock", {
+    name: "Pilates Class Booking",
+    reservation: {
+      title: "Reserve your Reformer class",
+      description: "Choose one of the studio's fixed class times, then leave your details. This demo uses sample availability and does not charge a card.",
+      services: ["Reformer Pilates"],
+      fields: ["name", "email", "phone", "notes"],
+      formItems: [],
+      bookingMode: "fixed",
+      ...availability,
+      submitLabel: "Reserve my spot",
+    },
+    styles: {
+      backgroundColor: "var(--theme-surface)",
+      borderRadius: "24px",
+      alignSelf: "stretch",
+    },
+  });
+};
+
+const pilatesBookingSection = () =>
+  createSection({
+    name: "Book a Class",
+    layout: {
+      width: "large",
+      paddingY: "large",
+      background: "var(--theme-bg-soft)",
+      minHeight: 760,
+    },
+    rows: [
+      createRow([
+        createColumn([
+          createElement("text", {
+            content: "YOUR NEXT CLASS",
+            styles: { color: "var(--theme-accent)", fontWeight: "800", letterSpacing: "0.08em" },
+          }),
+          createElement("heading", {
+            content: "A simple booking flow with real fixed slots.",
+            styles: { fontSize: "42px", lineHeight: "1.08" },
+          }),
+          createElement("text", {
+            content: "Pick a studio date and time, add your contact details, and reserve. Class capacity, schedules, and submissions remain connected to the reservation workspace.",
+          }),
+          createElement("list", {
+            content: "Small groups of up to 8\nBeginner-friendly coaching\nAll equipment included\nArrive 10 minutes early",
+          }),
+          createElement("image", {
+            name: "Reformer class preparation",
+            content: "https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=1200&auto=format&fit=crop",
+            styles: { borderRadius: "24px", alignSelf: "stretch" },
+          }),
+        ]),
+        createColumn([createPilatesReservationElement()]),
+      ]),
+    ],
+  });
+
+const PILATES_DEMO_PRODUCTS = [
+  {
+    name: "Studio Grip Socks",
+    description: "Soft organic-cotton grip socks for stable reformer sessions.",
+    price: "$18",
+    image: "https://images.unsplash.com/photo-1582966772680-860e372bb558?w=900&auto=format&fit=crop",
+  },
+  {
+    name: "Cork Massage Ball",
+    description: "A compact recovery tool for feet, hips, shoulders, and travel days.",
+    price: "$14",
+    image: "https://images.unsplash.com/photo-1599447292180-45fd84092ef4?w=900&auto=format&fit=crop",
+  },
+  {
+    name: "Everyday Studio Bottle",
+    description: "A lightweight insulated bottle for class, commute, and weekends.",
+    price: "$28",
+    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=900&auto=format&fit=crop",
+  },
+  {
+    name: "Linen Carry Tote",
+    description: "A relaxed studio tote with room for layers, water, and essentials.",
+    price: "$32",
+    image: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=900&auto=format&fit=crop",
+  },
+  {
+    name: "Recovery Tea Blend",
+    description: "A caffeine-free botanical blend for a slower post-class ritual.",
+    price: "$16",
+    image: "https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?w=900&auto=format&fit=crop",
+  },
+  {
+    name: "Movement Journal",
+    description: "A simple notebook for class notes, goals, and small wins.",
+    price: "$20",
+    image: "https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop",
+  },
+];
+
+const pilatesShopSection = () =>
+  createSection({
+    name: "Studio Shop",
+    layout: {
+      width: "large",
+      paddingY: "large",
+      background: "var(--theme-surface)",
+      minHeight: 760,
+    },
+    rows: [
+      createRow([
+        createColumn([
+          createElement("text", {
+            content: "THE STUDIO EDIT",
+            styles: { color: "var(--theme-accent)", fontWeight: "800", letterSpacing: "0.08em", textAlign: "center" },
+          }),
+          createElement("heading", {
+            content: "Useful things for movement and recovery",
+            styles: { fontSize: "40px", textAlign: "center", alignSelf: "stretch" },
+          }),
+        ]),
+      ]),
+      createRow([
+        createColumn([
+          createElement("carousel", {
+            name: "Studio Shop Gallery",
+            content: PILATES_DEMO_PRODUCTS.map((product) => (
+              `${product.name}\n${product.description} · ${product.price}\n${product.image}`
+            )).join("\n\n"),
+            autoScroll: false,
+            styles: {
+              backgroundColor: "var(--theme-surface)",
+              borderRadius: "24px",
+              alignSelf: "stretch",
+              "--carousel-height": "460px",
+            },
+          }),
+        ]),
+      ]),
+    ],
+  });
+
+const buildPilatesDemoProject = () => {
+  const common = createBaseRolesAndUsers();
+  const bookingPage = createPage("Book a Class", [pilatesBookingSection()]);
+  const studioPage = createPage("Studio", [
+    pilatesHeroSection(bookingPage.id),
+    pilatesClassesSection(bookingPage.id),
+  ]);
+  const shopPage = createPage("Shop", [pilatesShopSection()]);
+
+  return createProject({
+    name: "Form & Flow",
+    theme: PILATES_DEMO_THEME,
+    siteChrome: {
+      ...defaultSiteChrome,
+      brand: "Form & Flow",
+      footerStoreName: "Form & Flow",
+      headerButtonLabel: "Book a class",
+      headerButtonHref: "Book a Class",
+      headerButtonPageId: bookingPage.id,
+      footerShopLinks: "Studio\nBook a Class\nShop",
+      footerHelpLinks: "First visit\nClass guide\nStudio etiquette",
+      footerSocialLinks: "Instagram\nYouTube\nPinterest",
+      footerPaymentMethods: "Visa\nMastercard\nApple Pay",
+      description: "Small-group Pilates, thoughtful coaching, and a studio edit for everyday movement.",
+      contactEmail: "hello@formandflow.example",
+      phone: "+1 555 014 2026",
+    },
+    pages: [studioPage, bookingPage, shopPage],
+    forms: [],
+    collections: [],
+    workflows: [],
+    roles: common.roles,
+    users: common.users,
+  });
+};

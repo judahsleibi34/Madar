@@ -105,10 +105,21 @@ export const getThemeFontStack = (fontFamily) => {
   return `${JSON.stringify(selectedFont)}, "IBM Plex Sans Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", ${genericFamily}`;
 };
 
-const getSafeFormTheme = (theme = {}) => ({
-  ...defaultFormTheme,
-  ...((theme || {}).form || {}),
-});
+const getSafeFormTheme = (theme = {}) => {
+  const websiteTheme = getSafeWebsiteTheme(theme);
+
+  return {
+    ...defaultFormTheme,
+    background: resolveThemeColor(websiteTheme.background, defaultFormTheme.background),
+    surface: resolveThemeColor(websiteTheme.surface, defaultFormTheme.surface),
+    inputBackground: resolveThemeColor(websiteTheme.softSurface, defaultFormTheme.inputBackground),
+    text: resolveThemeColor(websiteTheme.text, defaultFormTheme.text),
+    muted: resolveThemeColor(websiteTheme.muted, defaultFormTheme.muted),
+    accent: resolveThemeColor(websiteTheme.accent, defaultFormTheme.accent),
+    buttonText: resolveThemeColor(websiteTheme.buttonText, defaultFormTheme.buttonText),
+    ...((theme || {}).form || {}),
+  };
+};
 
 export const getWebsiteThemeVars = (theme = {}) => {
   const safeTheme = getSafeWebsiteTheme(theme);

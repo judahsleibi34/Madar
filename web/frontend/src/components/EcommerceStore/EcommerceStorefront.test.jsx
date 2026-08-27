@@ -67,3 +67,62 @@ describe("EcommerceStorefront", () => {
     );
   });
 });
+
+describe("EcommerceStorefront theme synchronization", () => {
+  it("applies the published website theme to the store root", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      ...catalog,
+      site: {
+        brand: "Form & Flow",
+        theme: {
+          background: "#f3efe7",
+          surface: "#fffdf8",
+          text: "#21312a",
+          muted: "#68736d",
+          primary: "#365849",
+          accent: "#365849",
+          accentDark: "#294438",
+          buttonText: "#ffffff",
+        },
+      },
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/site/demo/shop"]}>
+        <Routes>
+          <Route path="/site/:subdomain/shop" element={<EcommerceStorefront />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findAllByText("Form & Flow");
+    const store = container.querySelector(".live-store");
+    expect(store.style.getPropertyValue("--theme-bg")).toBe("#f3efe7");
+    expect(store.style.getPropertyValue("--theme-primary")).toBe("#365849");
+    expect(store.style.getPropertyValue("--madar-navy")).toBe("#365849");
+  });
+
+  it("shows the Pilates dummy catalog when the connected store is empty", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      site: { brand: "Form & Flow" },
+      catalog: {
+        categories: [],
+        tags: [],
+        products: [],
+        pagination: { page: 1, pages: 1, total: 0, limit: 12 },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/site/demo/shop"]}>
+        <Routes>
+          <Route path="/site/:subdomain/shop" element={<EcommerceStorefront />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Studio Grip Socks")).toBeTruthy();
+    expect(screen.getByText("Movement Journal")).toBeTruthy();
+    expect(screen.getByText(/Showing/).textContent).toContain("6");
+  });
+});

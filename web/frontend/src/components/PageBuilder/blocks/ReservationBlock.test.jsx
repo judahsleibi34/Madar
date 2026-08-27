@@ -32,7 +32,7 @@ describe("ReservationBlock fixed slots", () => {
     fireEvent.click(slot);
     expect(slot.getAttribute("aria-pressed")).toBe("true");
 
-    expect(screen.getByLabelText("Appointment date").value).toBe("2026-07-14");
+    expect(screen.getByRole("button", { name: /Tuesday, July 14, 2026, available/i }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.change(screen.getByLabelText("Full name *"), { target: { value: "Madar User" } });
     fireEvent.change(screen.getByLabelText("Email address *"), { target: { value: "user@example.com" } });
     fireEvent.change(screen.getByLabelText("Phone number *"), { target: { value: "+972599000000" } });
@@ -65,10 +65,27 @@ describe("ReservationBlock fixed slots", () => {
     expect(screen.getByRole("button", { name: /July 14, 2026 at 9:00 AM/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /July 14, 2026 at 4:00 PM/i })).toBeNull();
 
-    fireEvent.change(screen.getByLabelText("Appointment date"), { target: { value: "2026-07-15" } });
+    fireEvent.click(screen.getByRole("button", { name: /Wednesday, July 15, 2026, available/i }));
     expect(screen.getByRole("button", { name: /July 15, 2026 at 4:00 PM/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /July 15, 2026 at 9:00 AM/i })).toBeNull();
   });
+  it("navigates months and exposes only configured dates as available", () => {
+    render(
+      <ReservationBlock
+        bookingMode="restricted"
+        availableDates={["2026-07-31", "2026-08-03"]}
+        timeSlots={["09:00"]}
+      />
+    );
+
+    expect(screen.getByText("July 2026")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Friday, July 31, 2026, available/i }).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: /Thursday, July 30, 2026, unavailable/i }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    expect(screen.getByText("August 2026")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Monday, August 3, 2026, available/i }).disabled).toBe(false);
+  });
+
   it("updates the public choices when Reservations-page slots change", async () => {
     const { rerender } = render(
       <ReservationBlock
@@ -88,7 +105,7 @@ describe("ReservationBlock fixed slots", () => {
       />
     );
 
-    await waitFor(() => expect(screen.getByLabelText("Appointment date").value).toBe("2026-07-20"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Monday, July 20, 2026, available/i })).toBeTruthy());
     expect(screen.getByRole("button", { name: /July 20, 2026 at 2:30 PM/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /July 14, 2026 at 9:00 AM/i })).toBeNull();
   });

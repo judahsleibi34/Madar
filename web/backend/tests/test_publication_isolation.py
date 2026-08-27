@@ -15,10 +15,11 @@ from routes import public_site_routes
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def schema(*, body="Tenant A", default_id="home", pages=None, chrome=None):
+def schema(*, body="Tenant A", default_id="home", pages=None, chrome=None, theme=None):
     return {
         "defaultPageId": default_id,
         "siteChrome": chrome or {"brand": "Tenant A", "footerStoreName": "Tenant A"},
+        "theme": theme or {},
         "forms": [],
         "pages": pages or [
             {
@@ -141,6 +142,7 @@ class PublicPublicationIsolationTests(unittest.TestCase):
         bound = project(
             published_schema=schema(
                 body="Bound body",
+                theme={"accent": "#c66f50", "primary": "#365849"},
                 chrome={
                     "brand": "Bound brand",
                     "footerStoreName": "Bound footer",
@@ -155,6 +157,7 @@ class PublicPublicationIsolationTests(unittest.TestCase):
         )
         self.assertEqual(profile["brand"], "Bound brand")
         self.assertEqual(profile["footer_store_name"], "Bound footer")
+        self.assertEqual(profile["theme"], {"accent": "#c66f50", "primary": "#365849"})
 
     def test_unknown_hostname_identifier_fails_closed(self):
         fake = FakeSupabase(website_settings=[])

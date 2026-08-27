@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Menu, Search, ShoppingBag, X } from "lucide-react";
 
@@ -6,6 +6,12 @@ import {
   fetchPublicEcommerceCatalog,
   fetchPublicEcommerceProduct,
 } from "../../services/ecommerceApi";
+import { getPageBuilderThemeVars } from "../PageBuilder/core/PageBuilder.theme";
+import {
+  getPilatesDemoCatalog,
+  getPilatesDemoProduct,
+  isPilatesDemoSite,
+} from "./pilatesDemoCatalog";
 import "../../styles/public/ecommerce-storefront.css";
 
 const EMPTY_CATALOG = {
@@ -160,6 +166,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
   const locale = urlFilters.get("locale") || document.documentElement.lang || "en";
   const [catalog, setCatalog] = useState(EMPTY_CATALOG);
   const [site, setSite] = useState(null);
+  const siteRef = useRef(null);
   const [productDetail, setProductDetail] = useState(null);
   const [requestStatus, setRequestStatus] = useState({
     key: "",
@@ -193,7 +200,10 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
 
   useEffect(() => {
     let cancelled = false;
-    const request = productSlug
+    const demoProduct = getPilatesDemoProduct(productSlug);
+    const request = productSlug && demoProduct && isPilatesDemoSite(siteRef.current)
+      ? Promise.resolve({ ...demoProduct, site: siteRef.current })
+      : productSlug
       ? fetchPublicEcommerceProduct(subdomain, productSlug, locale)
       : fetchPublicEcommerceCatalog(subdomain, {
           search: filters.search,
@@ -206,11 +216,24 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
     request
       .then((result) => {
         if (cancelled) return;
-        setSite(result?.site || null);
+        const nextSite = result?.site || siteRef.current || null;
+        siteRef.current = nextSite;
+        setSite(nextSite);
         if (productSlug) {
           setProductDetail(result || null);
         } else {
-          setCatalog(result?.catalog || EMPTY_CATALOG);
+          const remoteCatalog = result?.catalog || EMPTY_CATALOG;
+          setCatalog(
+            isPilatesDemoSite(nextSite) && remoteCatalog.products.length === 0
+              ? getPilatesDemoCatalog({
+                  search: filters.search,
+                  category: filters.category,
+                  tag: filters.tag,
+                  sort: filters.sort,
+                  page: filters.page,
+                })
+              : remoteCatalog
+          );
           setProductDetail(null);
         }
         setRequestStatus({ key: requestKey, loading: false, error: "" });
@@ -260,7 +283,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "" 
   const brand = site?.brand || site?.footer_store_name || "Madar Store";
 
   return (
-    <div className="live-store" dir={String(locale).startsWith("ar") ? "rtl" : "ltr"}>
+    <div
+      className="live-store"
+      dir={String(locale).startsWith("ar") ? "rtl" : "ltr"}
+      style={getPageBuilderThemeVars(site?.theme)}
+    >
       <StoreHeader brand={brand} cartCount={cart.length} shopPath={shopPath} homePath={homePath} />
       <main>
         <section className="live-store-hero">

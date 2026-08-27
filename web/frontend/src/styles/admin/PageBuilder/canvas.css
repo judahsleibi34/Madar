@@ -2637,3 +2637,48 @@
   color: var(--theme-text-inverse);
   background: var(--madar-red-dark);
 }
+.direct-element-frame-formBlock :where(
+  .builder-element-formBlock,
+  .runtime-form,
+  .runtime-form-header,
+  .runtime-form-section,
+  .runtime-form-section-header,
+  .runtime-question,
+  .runtime-question-field,
+  .runtime-form-pagination,
+  .runtime-form-actions
+) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Container queries remain the primary form layout rule. This viewport
+   fallback also covers embedded previews and older mobile WebViews. */
+.site-renderer-artboard.viewport-mobile .direct-element-frame-formBlock .runtime-form-pagination {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.site-renderer-artboard.viewport-mobile .direct-element-frame-formBlock :where(
+  .runtime-form-pagination > *,
+  .runtime-form-actions,
+  .runtime-form-actions > button
+) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.site-renderer-artboard.viewport-mobile .direct-element-frame-formBlock .runtime-form-page-count {
+  justify-self: start;
+}
+/* A padded grid's direct children must use the grid area's automatic width.
+   Percentage widths retain the outer frame width and overflow by the inset. */
+.direct-element-frame-formBlock .runtime-form > :not(.runtime-honeypot) {
+  width: auto !important;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline: 0;
+}

@@ -130,4 +130,15 @@ describe("mobile responsive element sizing", () => {
     expect(button.position.x).toBe(bounds.x);
     expect(button.position.width).toBe(bounds.width);
   });
+
+  it("stacks side-by-side interactive panels into the full mobile content lane", () => {
+    const bounds = getMobileContentBounds(390);
+    const result = resolveResponsiveElementSizing([
+      entry("form", "formBlock", { x: 10, y: 80, width: 175, height: 460 }),
+      entry("login", "loginBlock", { x: 205, y: 80, width: 175, height: 260 }),
+    ], "mobile", 390);
+
+    expect(result[0].position).toEqual({ x: bounds.x, y: 80, width: bounds.width, height: 460 });
+    expect(result[1].position).toEqual({ x: bounds.x, y: 80, width: bounds.width, height: 260 });
+  });
 });
