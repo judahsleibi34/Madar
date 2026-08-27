@@ -22,6 +22,13 @@ fi
 
 git -C "$REPO_ROOT" fetch --quiet origin main
 readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
+readonly CONTROL_PLANE_GUARD="/usr/local/lib/madar/web/deployment/bin/madar-control-plane-guard"
+
+[[ -x "$CONTROL_PLANE_GUARD" ]] || {
+    echo "[madar-auto-deploy] ERROR: control-plane guard is unavailable." >&2
+    exit 1
+}
+"$CONTROL_PLANE_GUARD" "$TARGET_SHA"
 readarray -t RELEASE_STATE < <(python3 - "$STATE_ROOT/state.json" "$TARGET_SHA" <<'PY'
 import json,sys
 from datetime import datetime, timezone

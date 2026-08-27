@@ -129,6 +129,14 @@ class ReleaseBootstrapTests(unittest.TestCase):
 
     def test_inactive_candidate_masks_active_worker_requirements_until_cutover(self):
         operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations.compatibility = release_cli.Compatibility(
+            schema_min=81,
+            schema_max=86,
+            target_schema=86,
+            migration_class="expand-only",
+            rollback_schema_min=81,
+            rollback_schema_max=86,
+        )
         operations.release_root = Path("/tmp/release")
         operations.env_file = Path("/tmp/release.env")
         operations.schema_version = lambda: 83

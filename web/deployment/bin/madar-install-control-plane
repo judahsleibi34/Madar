@@ -20,25 +20,34 @@ done
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 deployment_root="$(cd -- "$script_dir/.." && pwd)"
 web_root="$(cd -- "$deployment_root/.." && pwd)"
+repo_root="$(cd -- "$web_root/.." && pwd)"
 install_root=/usr/local/lib/madar/web/deployment
 alert_hook_source="$web_root/scripts/madar_alert_hook.sh"
 
 declare -a tracked_files=(
   docker-compose.release.yml
   bin/madar-auto-deploy
+  bin/madar-control-plane-guard
   bin/madar-production-deploy
   bin/madar-release-deploy
+  bin/madar-migrate
   bin/madar-switch-traffic
   lib/__init__.py
   lib/environment_file.py
   lib/migration_executor.py
   lib/release_deployer.py
   releases/release.json
-  releases/migrations-082-083.json
-  releases/migrations-084-086.json
   proxy/docker-compose.yml
   proxy/nginx.conf
 )
+
+while IFS= read -r manifest_name; do
+  tracked_files+=("releases/${manifest_name}")
+done < <(
+  find "$deployment_root/releases"     -maxdepth 1     -type f     -name 'migrations-*.json'     -printf '%f\n' |
+      LC_ALL=C sort
+)
+
 declare -a units=(
   madar-auto-deploy.service
   madar-auto-deploy.timer
@@ -55,6 +64,16 @@ if (( ! apply )); then
 fi
 [[ $EUID -eq 0 ]] || { echo "--apply requires root" >&2; exit 1; }
 
+source_sha="$(git -C "$repo_root" rev-parse HEAD)"
+[[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "control-plane source SHA is invalid" >&2
+  exit 1
+}
+[[ -z "$(git -C "$repo_root" status --porcelain --untracked-files=normal)" ]] || {
+  echo "control-plane source worktree must be clean and committed" >&2
+  exit 1
+}
+
 [[ -f "$alert_hook_source" && -x "$alert_hook_source" ]] || {
   echo "missing or non-executable alert hook source: $alert_hook_source" >&2
   exit 1
@@ -66,6 +85,7 @@ fi
 
 install -d -m 0700 "$backup_root"
 for current in \
+  /usr/local/lib/madar/web/deployment \
   /usr/local/sbin/madar-auto-deploy \
   /home/madar/docker_auto.sh \
   /etc/systemd/system/madar-auto-deploy.service \
@@ -108,6 +128,11 @@ for relative in "${tracked_files[@]}"; do
   [[ "$relative" == bin/* ]] && mode=0755
   install -D -o root -g root -m "$mode" "$source_path" "$install_root/$relative"
 done
+
+printf '%s\n' "$source_sha" >"$install_root/CONTROL_PLANE_SOURCE_SHA"
+chown root:root "$install_root/CONTROL_PLANE_SOURCE_SHA"
+chmod 0644 "$install_root/CONTROL_PLANE_SOURCE_SHA"
+
 find /usr/local/lib/madar -type d -exec chown root:madar {} +
 find /usr/local/lib/madar -type d -exec chmod 0750 {} +
 install -o root -g root -m 0755 \

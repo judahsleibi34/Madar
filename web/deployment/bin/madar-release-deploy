@@ -73,10 +73,17 @@ class ScriptSourceParser(HTMLParser):
 
 
 class DockerGitOperations:
-    def __init__(self, repo: Path, state_root: Path, env_file: Path):
+    def __init__(
+        self,
+        repo: Path,
+        state_root: Path,
+        env_file: Path,
+        compatibility: Compatibility,
+    ):
         self.repo = repo
         self.state_root = state_root
         self.env_file = env_file
+        self.compatibility = compatibility
         self.release_root: Path | None = None
 
     def run(self, command: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None, capture: bool = False) -> str:
@@ -217,8 +224,8 @@ class DockerGitOperations:
             "MADAR_PARSER_SUBNET": subnets["parser"],
             "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
             "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
-            "SCHEMA_COMPATIBLE_MIN": "81",
-            "SCHEMA_COMPATIBLE_MAX": "83",
+            "SCHEMA_COMPATIBLE_MIN": str(self.compatibility.schema_min),
+            "SCHEMA_COMPATIBLE_MAX": str(self.compatibility.schema_max),
             "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
             "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
             "DATA_DELETION_WORKER_REQUIRED": "true" if workers_active and self.schema_version() >= 83 else "false",
@@ -265,6 +272,15 @@ class DockerGitOperations:
         ], cwd=web, env=self._environment(sha, slot, images, workers_active=workers_active))
 
     def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None:
+        if self.release_root is None:
+            raise RuntimeError("release_source_not_prepared")
+
+        candidate_compatibility = Compatibility.load(
+            self.release_root / "web/deployment/releases/release.json"
+        )
+        if candidate_compatibility != self.compatibility:
+            raise RuntimeError("control_plane_release_contract_mismatch")
+
         for component in ("backend", "frontend", "worker"):
             recorded = str(images[component])
             tag, separator, expected_id = recorded.partition("@")
@@ -272,6 +288,14 @@ class DockerGitOperations:
                 raise RuntimeError(f"candidate_image_identity_changed:{component}")
         self._compose(sha, slot, images, "config", "--quiet")
         self.run([sys.executable, str(self.release_root / "web/scripts/check_migrations.py")])
+        self.run([
+            sys.executable,
+            str(self.release_root / "web/scripts/check_migration_transitions.py"),
+        ])
+        self.run([
+            sys.executable,
+            str(self.release_root / "web/scripts/check_secret_hygiene.py"),
+        ])
         storage_root = Path(os.getenv("MADAR_STORAGE_ROOT", str(self.repo / "backend")))
         for relative in ("uploads", "avatar_uploads", "private_uploads", "private_generated_charts"):
             path = storage_root / relative
@@ -370,6 +394,13 @@ class DockerGitOperations:
                     last_failure = "readiness:" + ",".join(degraded[:12])
                 elif identity.get("release_sha") != sha:
                     last_failure = "release_identity_mismatch"
+                elif (
+                    str(identity.get("schema_compatible_min"))
+                    != str(self.compatibility.schema_min)
+                    or str(identity.get("schema_compatible_max"))
+                    != str(self.compatibility.schema_max)
+                ):
+                    last_failure = "release_schema_contract_mismatch"
                 else:
                     frontend_base = f"http://127.0.0.1:{ports['frontend']}"
                     with urllib.request.urlopen(f"{frontend_base}/", timeout=5) as response:
@@ -647,7 +678,7 @@ def main() -> int:
     env_file = Path(os.getenv("MADAR_ENV_FILE", str(repo / ".env"))).resolve()
     load_environment_file(env_file)
     compatibility = Compatibility.load(WEB_ROOT / "deployment/releases/release.json")
-    operations = DockerGitOperations(repo, state_root, env_file)
+    operations = DockerGitOperations(repo, state_root, env_file, compatibility)
     if args.prepare_only:
         result = prepare_release(
             sha=args.sha.lower(), slot=args.slot, state_root=state_root,

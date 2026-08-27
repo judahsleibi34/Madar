@@ -15,6 +15,14 @@ fi
 
 git -C "$REPO_ROOT" fetch origin main
 readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
+readonly CONTROL_PLANE_GUARD="/usr/local/lib/madar/web/deployment/bin/madar-control-plane-guard"
+
+[[ -x "$CONTROL_PLANE_GUARD" ]] || {
+    echo "[madar-production] ERROR: control-plane guard is unavailable." >&2
+    exit 1
+}
+"$CONTROL_PLANE_GUARD" "$TARGET_SHA"
+
 "$RELEASE_DEPLOY" "$TARGET_SHA" "$@"
 git -C "$REPO_ROOT" merge --ff-only "$TARGET_SHA"
 echo "[madar-production] Production checkout advanced after successful promotion: ${TARGET_SHA:0:12}"
