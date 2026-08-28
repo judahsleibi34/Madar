@@ -383,6 +383,17 @@ function requiredFieldLabel(field) {
   const languageCard = field.closest(".ecommerce-translation-card")?.querySelector(":scope > strong")?.textContent?.trim();
   return languageCard && labelText === "Name" ? `${languageCard} name` : labelText;
 }
+
+function EcommercePageSkeleton() {
+  return (
+    <div className="ecommerce-page-skeleton" role="status" aria-label="Loading online store catalog">
+      <header><div><i /><i /><i /></div><i /></header>
+      <section>{Array.from({ length: 3 }, (_, index) => <i key={index} />)}</section>
+      <article><header><div><i /><i /></div><i /></header>{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</article>
+    </div>
+  );
+}
+
 export default function EcommercePage({ section = "products", user }) {
   const { i18n } = useTranslation(["dashboard"]);
   const config = SECTION_CONFIG[section] || SECTION_CONFIG.products;
@@ -422,7 +433,7 @@ export default function EcommercePage({ section = "products", user }) {
       }
       const message = loadError.message || "Could not load the catalog.";
       setStatus("error");
-      showToast({ type: "error", title: "Could not load ecommerce", message });
+      showToast({ type: "error", title: "Could not load online store", message });
     }
   }, [cacheScope, showToast]);
 
@@ -521,11 +532,15 @@ export default function EcommercePage({ section = "products", user }) {
   const activeCount = items.filter((item) => item.status === "active").length;
   const inactiveCount = items.filter((item) => item.status === "inactive").length;
 
+  if (status === "loading") {
+    return <section className="ecommerce-page"><EcommercePageSkeleton /></section>;
+  }
+
   return (
     <section className="ecommerce-page" aria-labelledby={`ecommerce-${section}-title`}>
       <header className="ecommerce-page-header">
         <div>
-          <span className="ecommerce-page-kicker">Ecommerce</span>
+          <span className="ecommerce-page-kicker">Online Store</span>
           <h1 id={`ecommerce-${section}-title`}>{config.title}</h1>
           <p>{config.description}</p>
         </div>
@@ -540,13 +555,11 @@ export default function EcommercePage({ section = "products", user }) {
 
       <section className="ecommerce-list-card" aria-labelledby={`ecommerce-${section}-list-title`}>
         <header className="ecommerce-list-header">
-          <div><span>Ecommerce</span><h2 id={`ecommerce-${section}-list-title`}>{config.title}</h2></div>
+          <div><span>Online Store</span><h2 id={`ecommerce-${section}-list-title`}>{config.title}</h2></div>
           <label className="ecommerce-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${config.title.toLowerCase()}`} /></label>
         </header>
 
-        {status === "loading" ? (
-          <div className="ecommerce-loading"><LoaderCircle size={26} className="is-spinning" />Loading catalog…</div>
-        ) : filteredItems.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <div className="ecommerce-empty-state"><span><Icon size={27} /></span><h3>{query ? "No matching results" : `No ${config.title.toLowerCase()} yet`}</h3><p>{query ? "Try a different search." : `Select “Add ${config.singular}” to create the first one.`}</p></div>
         ) : (
           <div className="ecommerce-record-list">

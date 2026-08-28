@@ -182,7 +182,7 @@ export default function DashboardSidebar({
     pathname: location.pathname,
   });
   const [ecommerceExpansion, setEcommerceExpansion] = useState({
-    open: ecommerceRouteActive,
+    open: false,
     pathname: location.pathname,
   });
   const [settingsExpansion, setSettingsExpansion] = useState({
@@ -305,10 +305,7 @@ export default function DashboardSidebar({
     workspaceExpansion.pathname === location.pathname
       ? workspaceExpansion.open
       : workspaceRouteActive;
-  const ecommerceIsExpanded =
-    ecommerceExpansion.pathname === location.pathname
-      ? ecommerceExpansion.open
-      : ecommerceRouteActive;
+  const ecommerceIsExpanded = ecommerceExpansion.open;
   const settingsIsExpanded =
     settingsExpansion.pathname === location.pathname
       ? settingsExpansion.open
@@ -563,7 +560,7 @@ export default function DashboardSidebar({
               controls="dashboard-sidebar-ecommerce"
               expanded={ecommerceIsExpanded}
               icon={ShoppingBag}
-              label={t("sidebar.ecommerce", { defaultValue: "Ecommerce" })}
+              label={t("sidebar.ecommerce", { defaultValue: "Online Store" })}
               onClick={() => {
                 if (!ecommerceRouteActive) {
                   setEcommerceExpansion({

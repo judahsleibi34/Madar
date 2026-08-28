@@ -212,7 +212,21 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
         <header>
           <div><h2 id="devices-title">{copy.devicesTitle}</h2><p>{copy.devicesDescription}</p></div>
         </header>
-        {loading && <p className="device-settings-message">{copy.loading}</p>}
+        {loading && (
+          <div className="device-settings-skeleton" aria-label={copy.loading} role="status">
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="device-skeleton-row" aria-hidden="true">
+                <span className="device-skeleton-icon" />
+                <div className="device-skeleton-copy">
+                  <i className="device-skeleton-title" />
+                  <i className="device-skeleton-line" />
+                  <i className="device-skeleton-line is-short" />
+                </div>
+                <span className="device-skeleton-action" />
+              </div>
+            ))}
+          </div>
+        )}
         {error && <p className="device-settings-message is-error" role="alert">{error}</p>}
         {!loading && !error && (
           <div className="device-settings-list">

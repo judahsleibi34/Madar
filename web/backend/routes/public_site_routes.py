@@ -8,7 +8,9 @@ import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Literal, Optional
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from urllib.parse import urlparse
 
@@ -171,6 +173,37 @@ class TenantLoginRequest(BaseModel):
 
 class PublicReservationCancellationRequest(BaseModel):
     token: str = Field(..., min_length=32, max_length=256)
+
+
+class PublicStoreOrderItemCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: UUID
+    quantity: int = Field(..., ge=1, le=99)
+
+
+class PublicStoreOrderCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_name: str = Field(..., min_length=2, max_length=160)
+    email: EmailStr
+    phone: str = Field(..., min_length=5, max_length=50)
+    address_line_1: str = Field(..., min_length=3, max_length=240)
+    address_line_2: str = Field(default="", max_length=240)
+    city: str = Field(..., min_length=2, max_length=120)
+    postal_code: str = Field(default="", max_length=30)
+    country: str = Field(..., min_length=2, max_length=120)
+    notes: str = Field(default="", max_length=1000)
+    payment_method: Literal["cash_on_delivery"] = "cash_on_delivery"
+    items: list[PublicStoreOrderItemCreate] = Field(..., min_length=1, max_length=50)
+
+    @field_validator("items")
+    @classmethod
+    def unique_products(cls, value):
+        product_ids = [item.product_id for item in value]
+        if len(product_ids) != len(set(product_ids)):
+            raise ValueError("Each product can appear only once")
+        return value
 
 
 def rows(response):
@@ -724,6 +757,13 @@ def get_bound_published_form(settings: dict, form_id: str):
 
 
 DEFAULT_PUBLIC_STORE_THEME = {
+    "accent": "#852c21",
+    "background": "#ffffff",
+    "surface": "#f5f1eb",
+    "text": "#162033",
+    "muted": "#667085",
+}
+LEGACY_DEFAULT_PUBLIC_STORE_THEME = {
     "accent": "#2463eb",
     "background": "#ffffff",
     "surface": "#f7f8fa",
@@ -733,6 +773,9 @@ DEFAULT_PUBLIC_STORE_THEME = {
 
 def build_public_store_profile(settings: dict, subdomain: str) -> dict:
     """Build storefront identity without reading any page-builder project."""
+    saved_theme = settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {}
+    if saved_theme == LEGACY_DEFAULT_PUBLIC_STORE_THEME:
+        saved_theme = {}
     return {
         "subdomain": subdomain,
         "brand": settings.get("footer_store_name") or settings.get("brand"),
@@ -742,7 +785,7 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
         "contact_email": settings.get("contact_email"),
         "phone": settings.get("phone"),
         "description": settings.get("description"),
-        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **(settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {})},
+        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **saved_theme},
     }
 
 def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> dict:
@@ -2476,6 +2519,104 @@ def get_public_catalog_product(
         "success": True,
         "site": site_profile,
         **result,
+    }
+
+
+@router.post("/sites/{subdomain}/orders", status_code=201)
+def create_public_store_order(
+    subdomain: str,
+    payload: PublicStoreOrderCreate,
+    request: Request,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "store_order_create", clean_subdomain)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    requested = {str(item.product_id): item.quantity for item in payload.items}
+
+    product_rows = rows(
+        service_supabase.table("ecommerce_products")
+        .select("id,sku,translations,status,price,currency,track_inventory,inventory_quantity,allow_backorder")
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+        .in_("id", list(requested))
+        .execute()
+    )
+    by_id = {str(product.get("id")): product for product in product_rows}
+    if set(by_id) != set(requested):
+        raise HTTPException(status_code=409, detail="One or more products are no longer available")
+
+    currencies = {str(product.get("currency") or "USD") for product in product_rows}
+    if len(currencies) != 1:
+        raise HTTPException(status_code=409, detail="Products with different currencies cannot share an order")
+    currency = next(iter(currencies))
+    subtotal = Decimal("0.00")
+    order_items = []
+    for product_id, quantity in requested.items():
+        product = by_id[product_id]
+        available = int(product.get("inventory_quantity") or 0)
+        if bool(product.get("track_inventory")) and not bool(product.get("allow_backorder")) and quantity > available:
+            raise HTTPException(status_code=409, detail="A product does not have enough stock")
+        unit_price = Decimal(str(product.get("price") or "0")).quantize(Decimal("0.01"))
+        line_total = (unit_price * quantity).quantize(Decimal("0.01"))
+        subtotal += line_total
+        order_items.append({
+            "tenant_id": tenant_id,
+            "product_id": product_id,
+            "sku": str(product.get("sku") or ""),
+            "product_name": _localized_catalog_text(product.get("translations"), "en")["name"],
+            "quantity": quantity,
+            "unit_price": str(unit_price),
+            "line_total": str(line_total),
+        })
+
+    order_number = f"MD-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{secrets.token_hex(3).upper()}"
+    created_order = first_row(
+        service_supabase.table("ecommerce_orders").insert({
+            "tenant_id": tenant_id,
+            "order_number": order_number,
+            "status": "pending",
+            "payment_status": "unpaid",
+            "payment_method": payload.payment_method,
+            "currency": currency,
+            "subtotal": str(subtotal),
+            "total": str(subtotal),
+            "customer_name": payload.customer_name.strip(),
+            "customer_email": str(payload.email).lower(),
+            "customer_phone": payload.phone.strip(),
+            "address_line_1": payload.address_line_1.strip(),
+            "address_line_2": payload.address_line_2.strip(),
+            "city": payload.city.strip(),
+            "postal_code": payload.postal_code.strip(),
+            "country": payload.country.strip(),
+            "notes": payload.notes.strip(),
+        }).execute()
+    )
+    if not created_order:
+        raise HTTPException(status_code=503, detail="Could not create the order")
+
+    order_id = str(created_order.get("id"))
+    try:
+        service_supabase.table("ecommerce_order_items").insert([
+            {**item, "order_id": order_id}
+            for item in order_items
+        ]).execute()
+    except Exception:
+        service_supabase.table("ecommerce_orders").delete().eq("id", order_id).eq("tenant_id", tenant_id).execute()
+        raise
+
+    return {
+        "success": True,
+        "order": {
+            "id": order_id,
+            "order_number": order_number,
+            "status": "pending",
+            "payment_status": "unpaid",
+            "payment_method": payload.payment_method,
+            "currency": currency,
+            "subtotal": str(subtotal),
+            "total": str(subtotal),
+        },
     }
 
 

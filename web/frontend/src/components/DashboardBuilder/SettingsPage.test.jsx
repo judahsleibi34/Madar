@@ -205,6 +205,57 @@ describe("SettingsPage canonical email handling", () => {
       })
     );
   });
+
+  it("saves the public store name from the dedicated Online Store tab", async () => {
+    const currentUser = { id: 24, tenant_id: 7, email: "owner@example.com" };
+    apiFetch.mockImplementation((url, options = {}) => {
+      if (String(url).includes("/website/settings") && options.method === "PUT") {
+        return Promise.resolve(response({
+          website: {
+            footer_store_name: "Madar Store",
+            logo_url: "/uploads/tenant_7/builder_assets/store.png",
+            description: "Store description",
+            contact_email: "shop@example.com",
+            phone: "+970000000",
+          },
+        }));
+      }
+      if (String(url).includes("/website/settings")) {
+        return Promise.resolve(response({
+          website: {
+            standard_path_slug: "demo",
+            footer_store_name: "Previous Store",
+            description: "Store description",
+            contact_email: "shop@example.com",
+            phone: "+970000000",
+          },
+        }));
+      }
+      return Promise.resolve(response({ user: currentUser }));
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/settings?tab=ecommerce"]}>
+        <SettingsPage user={currentUser} onUserUpdated={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    const storeName = await screen.findByLabelText(/^store name/i);
+    expect(storeName.value).toBe("Previous Store");
+    fireEvent.change(storeName, { target: { value: "Madar Store" } });
+    fireEvent.click(screen.getByRole("button", { name: /save store details/i }));
+
+    await waitFor(() => {
+      const saveCall = apiFetch.mock.calls.find(([, options]) => options?.method === "PUT");
+      expect(JSON.parse(saveCall[1].body)).toEqual({
+        footer_store_name: "Madar Store",
+        logo_url: "",
+        description: "Store description",
+        contact_email: "shop@example.com",
+        phone: "+970000000",
+      });
+    });
+  });
 });
 
 afterEach(() => {

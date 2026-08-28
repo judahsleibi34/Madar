@@ -1,7 +1,7 @@
 {
   "sidebar": {
     "workspace": "Workspace",
-    "ecommerce": "Ecommerce",
+    "ecommerce": "Online Store",
     "tags": "Tags",
     "categories": "Categories",
     "products": "Products",
@@ -30,7 +30,7 @@
     "security": "Security"
   },
   "ecommercePages": {
-    "kicker": "Ecommerce",
+    "kicker": "Online Store",
     "overview": "Catalog overview",
     "summary": {
       "active": "Active",

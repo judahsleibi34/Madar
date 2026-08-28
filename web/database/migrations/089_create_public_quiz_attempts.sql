@@ -144,7 +144,7 @@ grant execute on function public.start_public_quiz_attempt(jsonb,integer) to ser
 grant execute on function public.finalize_public_quiz_attempt(uuid,integer,uuid,text,integer,jsonb,jsonb,jsonb,text) to service_role;
 
 insert into public.application_schema_state(contract_key,schema_version,applied_at)
-values('core',82,now()) on conflict(contract_key) do update
+values('core',89,now()) on conflict(contract_key) do update
 set schema_version=excluded.schema_version,applied_at=excluded.applied_at;
 
 notify pgrst, 'reload schema';
