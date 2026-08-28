@@ -402,7 +402,7 @@ grant execute on function public.create_data_deletion_request(text,integer,integ
 grant execute on function public.claim_data_deletion_requests(text,integer,timestamptz,integer) to service_role;
 
 insert into public.application_schema_state(contract_key,schema_version,applied_at)
-values('core',83,now()) on conflict(contract_key) do update
+values('core',90,now()) on conflict(contract_key) do update
 set schema_version=excluded.schema_version,applied_at=excluded.applied_at;
 
 notify pgrst,'reload schema';

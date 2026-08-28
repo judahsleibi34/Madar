@@ -20,7 +20,7 @@ const labels = {
   "sidebar.home": "Home",
   "sidebar.dashboard": "Dashboard",
   "sidebar.workspace": "Workspace",
-  "sidebar.ecommerce": "Ecommerce",
+  "sidebar.ecommerce": "Online Store",
   "sidebar.tags": "Tags",
   "sidebar.categories": "Categories",
   "sidebar.products": "Products",
@@ -107,7 +107,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
       "Home",
       "Dashboard",
       "Workspace",
-      "Ecommerce",
+      "Online Store",
       "CV Rerank",
       "My Plan",
     ]);
@@ -125,7 +125,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     renderSidebar();
 
     const workspace = screen.getByRole("button", { name: "Workspace" });
-    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
+    const ecommerce = screen.getByRole("button", { name: "Online Store" });
 
     expect(
       workspace.compareDocumentPosition(ecommerce) &
@@ -145,14 +145,19 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Store" })).toBeTruthy();
   });
 
-  it("opens Ecommerce on a child route and highlights the active page", () => {
+  it("keeps Ecommerce collapsed on a child route until the parent is clicked", () => {
     renderSidebar("/ecommerce/categories");
 
-    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
-    const categories = screen.getByRole("button", { name: "Categories" });
+    const ecommerce = screen.getByRole("button", { name: "Online Store" });
 
-    expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
     expect(ecommerce.classList.contains("active-parent")).toBe(true);
+    expect(screen.queryByRole("button", { name: "Categories" })).toBeNull();
+
+    fireEvent.click(ecommerce);
+
+    const categories = screen.getByRole("button", { name: "Categories" });
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
     expect(categories.getAttribute("aria-current")).toBe("page");
     expect(
       screen.getByRole("button", { name: "Products" }).hasAttribute("aria-current"),
@@ -161,7 +166,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
 
   it("renders CV Rerank before My Plan as a top-level active route", () => {
     renderSidebar("/ecommerce/cv-rerank");
-    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
+    const ecommerce = screen.getByRole("button", { name: "Online Store" });
     const cvRerank = screen.getByRole("button", { name: "CV Rerank" });
     const myPlan = screen.getByRole("button", { name: "My Plan" });
 
@@ -171,9 +176,16 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(cvRerank.compareDocumentPosition(myPlan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("opens Ecommerce and highlights Store on the live view route", () => {
+  it("keeps Ecommerce collapsed on the live view route until clicked", () => {
     renderSidebar("/ecommerce/store");
-    expect(screen.getByRole("button", { name: "Ecommerce" }).getAttribute("aria-expanded")).toBe("true");
+
+    const ecommerce = screen.getByRole("button", { name: "Online Store" });
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("button", { name: "Store" })).toBeNull();
+
+    fireEvent.click(ecommerce);
+
+    expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: "Store" }).getAttribute("aria-current")).toBe("page");
   });
 
@@ -181,7 +193,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     renderSidebar();
 
     const workspace = screen.getByRole("button", { name: "Workspace" });
-    const ecommerce = screen.getByRole("button", { name: "Ecommerce" });
+    const ecommerce = screen.getByRole("button", { name: "Online Store" });
     const settings = screen.getByRole("button", { name: "Settings" });
 
     fireEvent.click(workspace);

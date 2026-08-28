@@ -58,7 +58,6 @@ export default function App() {
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
-  const isFormFlowDemoRoute = /^\/(?:site|store|forms)\/madar-demo(?:\/|$)/i.test(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
   const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
 
@@ -219,15 +218,15 @@ export default function App() {
   }, [normalizeUser, refreshAuthSession]);
 
   useEffect(() => {
-    const safeLanguage = isFormFlowDemoRoute ? "en" : (lang === "ar" ? "ar" : "en");
+    const safeLanguage = lang === "ar" ? "ar" : "en";
     const direction = safeLanguage === "ar" ? "rtl" : "ltr";
 
     document.documentElement.lang = safeLanguage;
     document.documentElement.dir = direction;
     document.body.dir = direction;
 
-    if (!isFormFlowDemoRoute) setAppLanguage(safeLanguage);
-  }, [isFormFlowDemoRoute, lang]);
+    setAppLanguage(safeLanguage);
+  }, [lang]);
 
   useEffect(() => {
     const handleI18nLanguageChange = (nextLanguage) => {
@@ -625,10 +624,8 @@ export default function App() {
   ) : isTenantSiteRoute ? (
     <PageSkeleton
       label="Loading site"
-      lang={isFormFlowDemoRoute ? "en" : lang}
+      lang={lang}
       variant="tenant-runtime"
-      brand={isFormFlowDemoRoute ? "Form & Flow" : ""}
-      imageUrl={isFormFlowDemoRoute ? "/form-flow-pilates-loading.jpg" : ""}
     />
   ) : (
     <PageSkeleton label={t("common:actions.loading")} lang={lang} variant="public-page" />

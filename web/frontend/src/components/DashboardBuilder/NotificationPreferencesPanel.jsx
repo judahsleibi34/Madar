@@ -53,34 +53,62 @@ export default function NotificationPreferencesPanel({ copy, showNotification })
     CATEGORY_ORDER.indexOf(left.category) - CATEGORY_ORDER.indexOf(right.category)
     || CHANNEL_ORDER.indexOf(left.channel) - CHANNEL_ORDER.indexOf(right.channel)
   ));
+  const groups = CATEGORY_ORDER.map((category) => ({
+    category,
+    preferences: rows.filter((preference) => preference.category === category),
+  })).filter((group) => group.preferences.length > 0);
 
   return (
-    <section className="settings-card" aria-labelledby="notification-preferences-title">
-      <header>
+    <section className="settings-card notification-preferences-card" aria-labelledby="notification-preferences-title">
+      <header className="notification-preferences-header">
         <h2 id="notification-preferences-title">{copy.title}</h2>
         <p>{copy.description}</p>
       </header>
-      {loading ? <p>{copy.loading}</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
-      {!loading && !error ? (
-        <div className="settings-form-grid">
-          {rows.map((preference) => {
-            const key = `${preference.category}:${preference.channel}`;
-            return (
-              <label key={key} className="settings-wide-field">
-                <span>{copy.categories[preference.category]} — {copy.channels[preference.channel]}</span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(preference.enabled)}
-                  disabled={saving === key}
-                  onChange={() => update(preference)}
-                />
-              </label>
-            );
-          })}
+      {loading ? (
+        <div className="notification-preferences-skeleton" aria-label={copy.loading} role="status">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="notification-skeleton-card" aria-hidden="true">
+              <span className="notification-skeleton-title" />
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="notification-skeleton-row">
+                  <i className="notification-skeleton-label" />
+                  <i className="notification-skeleton-toggle" />
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       ) : null}
-      <small>{copy.deviceNote}</small>
+      {error ? <p className="notification-preferences-error" role="alert">{error}</p> : null}
+      {!loading && !error ? (
+        <div className="notification-preferences-grid">
+          {groups.map((group) => (
+            <article key={group.category} className="notification-preference-group">
+              <h3>{copy.categories[group.category]}</h3>
+              <div>
+                {group.preferences.map((preference) => {
+                  const key = `${preference.category}:${preference.channel}`;
+                  return (
+                    <label key={key} className="notification-preference-row">
+                      <span>{copy.channels[preference.channel]}</span>
+                      <span className="notification-preference-toggle">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(preference.enabled)}
+                          disabled={saving === key}
+                          onChange={() => update(preference)}
+                        />
+                        <span aria-hidden="true" />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+      <footer className="notification-preferences-note"><small>{copy.deviceNote}</small></footer>
     </section>
   );
 }

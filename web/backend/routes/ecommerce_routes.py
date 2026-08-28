@@ -25,6 +25,13 @@ PRODUCT_IMAGE_ASSET_PATTERN = re.compile(
     r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp))$"
 )
 DEFAULT_STORE_THEME = {
+    "accent": "#852c21",
+    "background": "#ffffff",
+    "surface": "#f5f1eb",
+    "text": "#162033",
+    "muted": "#667085",
+}
+LEGACY_DEFAULT_STORE_THEME = {
     "accent": "#2463eb",
     "background": "#ffffff",
     "surface": "#f7f8fa",
@@ -354,6 +361,8 @@ def _store_theme_for_tenant(tenant_id: int) -> dict[str, str]:
         .limit(1)
     )
     saved = rows[0].get("ecommerce_theme") if rows else {}
+    if saved == LEGACY_DEFAULT_STORE_THEME:
+        saved = {}
     return {**DEFAULT_STORE_THEME, **(saved if isinstance(saved, dict) else {})}
 
 

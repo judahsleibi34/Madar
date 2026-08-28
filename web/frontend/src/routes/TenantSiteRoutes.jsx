@@ -45,18 +45,8 @@ export default function TenantSiteRoutes() {
     return () => window.clearTimeout(timeoutId);
   }, [currentSubdomain, isShopRoute]);
 
-  const isFormFlowDemoRoute = /^\/(?:site|store|forms)\/madar-demo(?:\/|$)/i.test(location.pathname);
-  const fallback = isFormFlowDemoRoute ? (
-    <PageSkeleton
-      label="Loading Form & Flow"
-      variant="tenant-runtime"
-      brand="Form & Flow"
-      imageUrl="/form-flow-pilates-loading.jpg"
-    />
-  ) : undefined;
-
   return (
-    <RouteSuspense label="Loading site" variant="tenant-runtime" delay={0} fallback={fallback}>
+    <RouteSuspense label="Loading site" variant="tenant-runtime" delay={0}>
       <Routes>
         <Route path="/forms/:subdomain/:formId" element={<TenantSiteRuntime />} />
         <Route path="/store/:subdomain/*" element={<EcommerceStorefront />} />

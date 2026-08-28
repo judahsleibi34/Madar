@@ -66,13 +66,14 @@ const resolveSupportedAssetUrl = (
     return "";
   }
 
-  const resolvedUrl = `${API_BASE_URL}${relativeSource}`;
-
   if (managedPattern.test(relativeSource)) {
+    const resolvedUrl = `${API_BASE_URL}${relativeSource}`;
     return `${resolvedUrl}?v=${MANAGED_ASSET_CACHE_VERSION}`;
   }
 
-  return resolvedUrl;
+  // Public application assets are served by the storefront origin. Only
+  // managed uploads live behind the API/media service.
+  return relativeSource;
 };
 
 export const resolveMediaUrl = (value) => resolveSupportedAssetUrl(value, {

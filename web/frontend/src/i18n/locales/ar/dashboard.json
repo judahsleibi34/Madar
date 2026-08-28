@@ -1,6 +1,6 @@
 {
   "sidebar": {
-    "ecommerce": "التجارة الإلكترونية",
+    "ecommerce": "المتجر الإلكتروني",
     "tags": "الوسوم",
     "categories": "الفئات",
     "products": "المنتجات",
@@ -28,7 +28,7 @@
     "security": "الأمان"
   },
   "ecommercePages": {
-    "kicker": "التجارة الإلكترونية",
+    "kicker": "المتجر الإلكتروني",
     "overview": "نظرة عامة على الكتالوج",
     "summary": {
       "active": "نشط",

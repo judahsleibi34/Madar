@@ -29,6 +29,12 @@ describe("resolveMediaUrl", () => {
     );
   });
 
+  it("keeps public storefront assets on the storefront origin", () => {
+    expect(resolveMediaUrl("/form-flow-products/lavender-eye-pillow.jpg")).toBe(
+      "/form-flow-products/lavender-eye-pillow.jpg"
+    );
+  });
+
   it("builds stable responsive variants only for managed images", () => {
     const props = getResponsiveMediaProps(
       "/uploads/tenant_7/builder_assets/56fee3e0f73c4110abdf423d501fb835.png",

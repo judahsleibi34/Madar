@@ -263,9 +263,46 @@ export default function SecurityMfaPage({ lang = "en", embedded = false, cacheKe
       )}
 
       {loading ? (
-        <div className="security-mfa-panel security-mfa-loading" role="status">
-          <RefreshCw size={18} />
-          {t("securityMfa.loading")}
+        <div
+          className="security-mfa-grid security-mfa-skeleton"
+          role="status"
+          aria-label={t("securityMfa.loading")}
+        >
+          {[0, 1].map((panel) => (
+            <section key={panel} className="security-mfa-panel security-skeleton-panel" aria-hidden="true">
+              <div className="security-skeleton-heading">
+                <span className="security-skeleton-icon" />
+                <div>
+                  <i className="security-skeleton-title" />
+                  <i className="security-skeleton-line" />
+                </div>
+              </div>
+              <div className="security-skeleton-status-grid">
+                {[0, 1, 2].map((item) => (
+                  <div key={item}>
+                    <i className="security-skeleton-label" />
+                    <i className="security-skeleton-value" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+          <section
+            className="security-mfa-panel security-mfa-enroll-panel security-skeleton-panel"
+            aria-hidden="true"
+          >
+            <div className="security-skeleton-heading">
+              <span className="security-skeleton-icon" />
+              <div>
+                <i className="security-skeleton-title" />
+                <i className="security-skeleton-line" />
+              </div>
+            </div>
+            <div className="security-skeleton-enroll">
+              <span className="security-skeleton-input" />
+              <span className="security-skeleton-action" />
+            </div>
+          </section>
         </div>
       ) : (
         <div className="security-mfa-grid">

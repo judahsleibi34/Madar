@@ -9,6 +9,7 @@ vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceCatalog: vi.fn(),
   fetchPublicEcommerceProduct: vi.fn(),
   fetchPublicEcommerceProfile: vi.fn(),
+  createPublicEcommerceOrder: vi.fn(),
 }));
 
 afterEach(() => {
@@ -38,6 +39,34 @@ function LocationProbe() {
 }
 
 describe("EcommerceStorefront", () => {
+  it("shows the cart subtotal and opens the checkout page", async () => {
+    localStorage.setItem("madar-store-cart:demo", JSON.stringify([{
+      id: "43b86c1a-fbf7-41d3-a58a-cbe07fc8459f",
+      slug: "lavender-eye-pillow",
+      name: "Lavender Linen Eye Pillow",
+      quantity: 2,
+      price: "28.00",
+      currency: "USD",
+      images: ["/form-flow-products/lavender-eye-pillow.jpg"],
+    }]));
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+
+    render(
+      <MemoryRouter initialEntries={["/store/demo"]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open cart, 2 items" }));
+    expect(screen.getByText("Subtotal").parentElement.textContent).toContain("$56.00");
+    fireEvent.click(screen.getByRole("link", { name: /Proceed to checkout/ }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Checkout" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Place order" })).toBeTruthy();
+    expect(fetchPublicEcommerceProfile).toHaveBeenCalledWith("demo");
+  });
+
   it("supports catalog and store-wide search from URL state", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
     render(
@@ -92,7 +121,7 @@ describe("EcommerceStorefront", () => {
       </MemoryRouter>
     );
 
-    await screen.findByRole("heading", { level: 1, name: "Welcome to Test Store" });
+    await screen.findByRole("heading", { level: 1, name: "Test Store" });
     expect(document.querySelector(".live-store").getAttribute("dir")).toBe("ltr");
     expect(document.documentElement.getAttribute("dir")).toBe("ltr");
     expect(document.body.getAttribute("dir")).toBe("ltr");
@@ -172,8 +201,7 @@ describe("EcommerceStorefront", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Welcome to Olive House" })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 2, name: "See what's new." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Olive House" })).toBeTruthy();
     expect(screen.getAllByText("Made locally for thoughtful homes.")).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "Home" })).toBeTruthy();
     expect(screen.getAllByText("Olive tray").length).toBeGreaterThan(0);
@@ -204,9 +232,8 @@ describe("EcommerceStorefront", () => {
       </MemoryRouter>
     );
 
-    await screen.findByRole("heading", { level: 1, name: "Pilates essentials for movement, strength, and recovery." });
-    expect(screen.getByText("Made for women who move with intention.")).toBeTruthy();
-    expect(document.querySelector(".live-store").classList.contains("is-form-flow")).toBe(true);
+    await screen.findByRole("heading", { level: 1, name: "Form & Flow" });
+    expect(document.querySelector(".live-store").classList.contains("is-form-flow")).toBe(false);
     const style = document.querySelector(".live-store").style;
     expect(style.getPropertyValue("--store-accent")).toBe("#365849");
     expect(style.getPropertyValue("--store-paper")).toBe("#f3efe7");
@@ -254,7 +281,7 @@ describe("EcommerceStorefront", () => {
     expect(fetchPublicEcommerceCatalog).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("link", { name: "Home" }));
-    expect(await screen.findByRole("heading", { level: 1, name: "Welcome to Standalone Store" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Standalone Store" })).toBeTruthy();
   });
   it.each([
     ["home", "/store/demo", "Loading home page", "is-landing"],

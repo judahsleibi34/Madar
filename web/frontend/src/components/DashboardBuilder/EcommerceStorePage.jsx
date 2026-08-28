@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Settings, ShoppingBag } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
 
@@ -9,10 +9,13 @@ const STOREFRONT_ORIGIN = String(
 ).replace(/\/$/, "");
 
 export default function EcommerceStorePage() {
+  const location = useLocation();
+  const draftPreview = new URLSearchParams(location.search).get("preview") === "draft";
   const [website, setWebsite] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [frameVersion, setFrameVersion] = useState(0);
+  const [frameReady, setFrameReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +48,8 @@ export default function EcommerceStorePage() {
     ),
     [subdomain]
   );
+  const previewPath = livePath ? `${livePath}${draftPreview ? "?preview=draft" : ""}` : "";
+  const openUrl = draftPreview ? previewPath : liveUrl;
 
   return (
     <main className="ecommerce-store-admin">
@@ -52,26 +57,26 @@ export default function EcommerceStorePage() {
         <div>
           <span className="ecommerce-store-admin-kicker">
             <ShoppingBag size={16} aria-hidden="true" />
-            Ecommerce
+            Online Store
           </span>
-          <h1>Store preview</h1>
-          <p>Review the published customer experience. Active products and store details update automatically.</p>
+          <h1>{draftPreview ? "Draft preview" : "Published store"}</h1>
+          <p>{draftPreview ? "This private browser preview uses your unpublished design draft. Nothing here is live yet." : "Review the customer experience currently available in production."}</p>
         </div>
         {liveUrl && (
           <div className="ecommerce-store-admin-actions">
-            <button type="button" onClick={() => setFrameVersion((value) => value + 1)}>
+            <button type="button" onClick={() => { setFrameReady(false); setFrameVersion((value) => value + 1); }}>
               <RefreshCw size={16} aria-hidden="true" />
               Refresh
             </button>
-            <a href={liveUrl} target="_blank" rel="noreferrer">
+            <a href={openUrl} target="_blank" rel="noreferrer">
               <ExternalLink size={16} aria-hidden="true" />
-              Open live store
+              {draftPreview ? "Open preview" : "Open production store"}
             </a>
           </div>
         )}
       </header>
 
-      {loading && <div className="ecommerce-store-admin-state">Loading your live storeâ€¦</div>}
+      {loading && <div className="ecommerce-store-page-skeleton" role="status" aria-label="Loading store preview"><i /><i /><i /></div>}
       {!loading && error && (
         <div className="ecommerce-store-admin-state is-error">
           <h2>Store preview unavailable</h2>
@@ -88,11 +93,13 @@ export default function EcommerceStorePage() {
       )}
       {!loading && !error && subdomain && (
         <section className="ecommerce-store-frame-shell">
+          {!frameReady && <div className="ecommerce-store-frame-loading" role="status" aria-label="Loading storefront"><i /><i /><i /><i /></div>}
           <iframe
             key={frameVersion}
-            src={livePath}
-            title="Live ecommerce store"
+            src={previewPath}
+            title={draftPreview ? "Draft online store preview" : "Published online store"}
             className="ecommerce-store-frame"
+            onLoad={() => setFrameReady(true)}
           />
         </section>
       )}

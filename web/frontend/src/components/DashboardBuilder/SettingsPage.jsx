@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bell, Globe2, ImagePlus, KeyRound, MonitorSmartphone, Save, ShieldCheck, UserRound, X } from "lucide-react";
+import { Bell, ExternalLink, Globe2, ImagePlus, KeyRound, MonitorSmartphone, Save, ShieldCheck, ShoppingBag, UserRound, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SmartLink from "../SmartLink";
 import {
@@ -21,6 +21,7 @@ import {
 import { getBuilderAssetFileName } from "../PageBuilder/core/PageBuilder.uploadHandlers";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
+import { clearPublicEcommerceCache } from "../../services/ecommerceApi";
 import { getSettingsContent } from "../../content";
 import { buildProfilePayload } from "./profilePayload";
 import SecurityMfaPage from "./SecurityMfaPage";
@@ -258,7 +259,9 @@ export default function SettingsPage({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
+  const [isSavingStore, setIsSavingStore] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [failedLogoUrl, setFailedLogoUrl] = useState("");
 
   const isArabic = lang === "ar";
   const t = getSettingsContent(lang);
@@ -280,7 +283,7 @@ export default function SettingsPage({
       };
   const requestedTab = new URLSearchParams(location.search).get("tab");
   const initialAllowedTab =
-    initialTab === "security" || (!accountOnly && ["website", "devices", "notifications"].includes(initialTab))
+    initialTab === "security" || (!accountOnly && ["website", "ecommerce", "devices", "notifications"].includes(initialTab))
       ? initialTab
       : "profile";
   const activeTab = location.pathname.startsWith("/settings/security")
@@ -289,6 +292,8 @@ export default function SettingsPage({
       ? "security"
       : requestedTab === "website" && !accountOnly
         ? "website"
+        : requestedTab === "ecommerce" && !accountOnly
+          ? "ecommerce"
         : requestedTab === "devices" && !accountOnly
           ? "devices"
           : requestedTab === "notifications" && !accountOnly
@@ -297,11 +302,13 @@ export default function SettingsPage({
   const tabLabels = isArabic
     ? { profile: "الملف الشخصي", website: "الموقع", security: "الأمان", devices: t.devices.tab, notifications: t.notificationPreferences.tab }
     : { profile: "Profile", website: "Website", security: "Security", devices: t.devices.tab, notifications: t.notificationPreferences.tab };
+  tabLabels.ecommerce = t.onlineStoreTab;
   const settingsTabs = [
     { id: "profile", label: tabLabels.profile, icon: UserRound },
     ...(!accountOnly
       ? [
           { id: "website", label: tabLabels.website, icon: Globe2 },
+          { id: "ecommerce", label: tabLabels.ecommerce, icon: ShoppingBag },
           { id: "devices", label: tabLabels.devices, icon: MonitorSmartphone },
           { id: "notifications", label: tabLabels.notifications, icon: Bell },
         ]
@@ -314,17 +321,8 @@ export default function SettingsPage({
       return;
     }
 
-    if (tabId === "website") {
-      navigate("/settings?tab=website");
-      return;
-    }
-
-    if (tabId === "devices") {
-      navigate("/settings?tab=devices");
-      return;
-    }
-    if (tabId === "notifications") {
-      navigate("/settings?tab=notifications");
+    if (["website", "ecommerce", "devices", "notifications"].includes(tabId)) {
+      navigate(`/settings?tab=${tabId}`);
       return;
     }
 
@@ -392,7 +390,10 @@ export default function SettingsPage({
     resizeTextareaToContent(descriptionTextareaRef.current);
   }, [siteForm.description]);
 
-  const canShowLogoImage = isDirectImageUrl(siteForm.logoUrl);
+  const resolvedLogoUrl = resolveMediaUrl(siteForm.logoUrl);
+  const canShowLogoImage = isDirectImageUrl(siteForm.logoUrl)
+    && Boolean(resolvedLogoUrl)
+    && failedLogoUrl !== siteForm.logoUrl;
 
   const showNotification = (type, message) => {
     setNotification({ type, message });
@@ -490,6 +491,29 @@ export default function SettingsPage({
       ...prev,
       subdomain: errors.subdomain || "",
       brand: errors.brand || "",
+      contactEmail: errors.contactEmail || "",
+      logoUrl: errors.logoUrl || "",
+    }));
+
+    return errors;
+  };
+
+  const validateStoreForm = () => {
+    const errors = {};
+
+    if (!siteForm.footerStoreName.trim()) {
+      errors.footerStoreName = t.storeNameRequired;
+    }
+    if (siteForm.contactEmail.trim() && !isValidEmail(siteForm.contactEmail)) {
+      errors.contactEmail = t.contactEmailInvalid;
+    }
+    if (siteForm.logoUrl.trim() && !isDirectImageUrl(siteForm.logoUrl)) {
+      errors.logoUrl = t.invalidLogoUrl;
+    }
+
+    setFieldErrors((prev) => ({
+      ...prev,
+      footerStoreName: errors.footerStoreName || "",
       contactEmail: errors.contactEmail || "",
       logoUrl: errors.logoUrl || "",
     }));
@@ -832,6 +856,61 @@ export default function SettingsPage({
     }
   };
 
+  const saveStoreSettings = async (event) => {
+    event.preventDefault();
+
+    const errors = validateStoreForm();
+    if (Object.keys(errors).length > 0) {
+      showNotification("error", t.fixErrors);
+      return;
+    }
+
+    const storeName = siteForm.footerStoreName.trim();
+    setIsSavingStore(true);
+
+    try {
+      const response = await apiFetch(`${API_URL}/website/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          footer_store_name: storeName,
+          logo_url: siteForm.logoUrl,
+          description: siteForm.description,
+          contact_email: siteForm.contactEmail,
+          phone: siteForm.phone,
+        }),
+      });
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        if (response.status === 401) throw new Error(t.sessionExpired);
+        throw new Error(getApiErrorMessage(data.detail, t.storeSaveError));
+      }
+
+      const savedWebsite = data.website || {};
+      const nextProject = {
+        ...project,
+        siteChrome: {
+          ...defaultSiteChrome,
+          ...(project.siteChrome || {}),
+          footerStoreName: savedWebsite.footer_store_name ?? storeName,
+          logoUrl: savedWebsite.logo_url ?? siteForm.logoUrl,
+          description: savedWebsite.description ?? siteForm.description,
+          contactEmail: savedWebsite.contact_email ?? siteForm.contactEmail,
+          phone: savedWebsite.phone ?? siteForm.phone,
+        },
+      };
+      localStorage.setItem(scopedStorageKey, JSON.stringify(nextProject));
+      setProject(nextProject);
+      clearPublicEcommerceCache();
+      showNotification("success", data.message || t.storeSaved);
+    } catch (error) {
+      showNotification("error", error.message || t.storeSaveError);
+    } finally {
+      setIsSavingStore(false);
+    }
+  };
+
   return (
     <section className="settings-page" dir={isArabic ? "rtl" : "ltr"}>
       <SettingsNotification
@@ -1020,14 +1099,9 @@ export default function SettingsPage({
             <div className="settings-profile-avatar">
               {canShowLogoImage ? (
                 <img
-                  src={resolveMediaUrl(siteForm.logoUrl)}
+                  src={resolvedLogoUrl}
                   alt={siteForm.brand || t.websiteLogoAlt}
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                    event.currentTarget.parentElement?.classList.add(
-                      "logo-load-failed"
-                    );
-                  }}
+                  onError={() => setFailedLogoUrl(siteForm.logoUrl)}
                 />
               ) : (
                 <span>
@@ -1113,16 +1187,6 @@ export default function SettingsPage({
               </label>
 
               <label>
-                {t.footerName}
-                <input
-                  value={siteForm.footerStoreName}
-                  onChange={(event) =>
-                    updateSiteField("footerStoreName", event.target.value)
-                  }
-                />
-              </label>
-
-              <label>
                 {t.contactEmail}
                 <input
                   type="email"
@@ -1180,6 +1244,144 @@ export default function SettingsPage({
               {isSavingSite ? t.saving : t.saveWebsite}
             </button>
           </div>
+          </form>
+        )}
+
+        {activeTab === "ecommerce" && !accountOnly && (
+          <form
+            className="settings-card settings-profile-card settings-website-card"
+            onSubmit={saveStoreSettings}
+            noValidate
+          >
+            <div className="settings-profile-cover">
+              <div>
+                <span>{t.onlineStoreTitle}</span>
+                <strong>{siteForm.footerStoreName || t.storeName}</strong>
+              </div>
+            </div>
+
+            <div className="settings-profile-summary">
+              <div className="settings-profile-avatar">
+                {canShowLogoImage ? (
+                  <img
+                    src={resolvedLogoUrl}
+                    alt={siteForm.footerStoreName || t.storeLogoAlt}
+                    onError={() => setFailedLogoUrl(siteForm.logoUrl)}
+                  />
+                ) : (
+                  <span><ShoppingBag size={30} aria-hidden="true" /></span>
+                )}
+              </div>
+              <div>
+                <h2>{t.onlineStoreTitle}</h2>
+                <p>{t.onlineStoreDescription}</p>
+              </div>
+              <label
+                className="settings-file-button settings-profile-upload"
+                aria-disabled={isUploadingLogo}
+              >
+                {isUploadingLogo ? t.uploadingLogo : t.uploadStoreLogo}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  hidden
+                  disabled={isUploadingLogo}
+                  onChange={uploadWebsiteLogo}
+                />
+              </label>
+            </div>
+
+            <div className="settings-profile-body">
+              <div className="settings-form-grid">
+                <label className="settings-wide-field">
+                  {t.storeName}
+                  <input
+                    value={siteForm.footerStoreName}
+                    className={fieldErrors.footerStoreName ? "field-has-error" : ""}
+                    onChange={(event) => updateSiteField("footerStoreName", event.target.value)}
+                  />
+                  {fieldErrors.footerStoreName && (
+                    <span className="settings-field-error">{fieldErrors.footerStoreName}</span>
+                  )}
+                  <small>{t.storeNameHelp}</small>
+                </label>
+
+                <label>
+                  {t.storeLogo}
+                  <input
+                    value={getBuilderAssetFileName(siteForm.logoUrl)}
+                    className={fieldErrors.logoUrl ? "field-has-error" : ""}
+                    readOnly
+                  />
+                  {fieldErrors.logoUrl && (
+                    <span className="settings-field-error">{fieldErrors.logoUrl}</span>
+                  )}
+                </label>
+
+                <label>
+                  {t.contactEmail}
+                  <input
+                    type="email"
+                    value={siteForm.contactEmail}
+                    className={fieldErrors.contactEmail ? "field-has-error" : ""}
+                    onChange={(event) => updateSiteField("contactEmail", event.target.value)}
+                  />
+                  {fieldErrors.contactEmail && (
+                    <span className="settings-field-error">{fieldErrors.contactEmail}</span>
+                  )}
+                </label>
+
+                <label>
+                  {t.contactPhone}
+                  <input
+                    type="tel"
+                    value={siteForm.phone}
+                    onChange={(event) => updateSiteField("phone", event.target.value)}
+                  />
+                </label>
+
+                <label className="settings-wide-field">
+                  {t.storeDescription}
+                  <textarea
+                    ref={(textarea) => {
+                      descriptionTextareaRef.current = textarea;
+                      resizeTextareaToContent(textarea);
+                    }}
+                    rows={1}
+                    value={siteForm.description}
+                    onChange={(event) => {
+                      resizeTextareaToContent(event.currentTarget);
+                      updateSiteField("description", event.target.value);
+                    }}
+                  />
+                </label>
+
+                <label className="settings-wide-field">
+                  {t.storeAddress}
+                  <input
+                    value={`madarportal.com/site/${sanitizeSubdomain(siteForm.subdomain)}/shop`}
+                    readOnly
+                  />
+                  <small>{t.storeAddressHelp}</small>
+                </label>
+              </div>
+            </div>
+
+            <div className="settings-profile-actions settings-website-profile-actions">
+              <SmartLink
+                to={`/site/${encodeURIComponent(sanitizeSubdomain(siteForm.subdomain))}/shop`}
+                className="settings-reset-password-button"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink size={18} />
+                {t.openStore}
+              </SmartLink>
+              <button className="settings-save-button" type="submit" disabled={isSavingStore}>
+                <Save size={18} />
+                {isSavingStore ? t.saving : t.saveStore}
+              </button>
+            </div>
           </form>
         )}
 

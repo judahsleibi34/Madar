@@ -221,3 +221,9 @@ export const fetchPublicEcommerceProduct = async (subdomain, slug, locale = "en"
   );
   return rememberEmbeddedStoreProfile(subdomain, data);
 };
+
+export const createPublicEcommerceOrder = (subdomain, payload) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/orders`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
