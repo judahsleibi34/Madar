@@ -251,7 +251,13 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
 
 
 @app.get("/uploads/tenant_{tenant_id}/builder_assets/{filename}")
-def get_public_builder_asset(tenant_id: int, filename: str, w: int | None = None):
+def get_public_builder_asset(
+    tenant_id: int,
+    filename: str,
+    request: Request,
+    response: Response,
+    w: int | None = None,
+):
     if tenant_id <= 0:
         raise HTTPException(status_code=404, detail="Asset was not found.")
 
