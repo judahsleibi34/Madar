@@ -1,0 +1,21 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 87,
+      "path": "web/database/migrations/087_add_inactive_ecommerce_status.sql",
+      "sha256": "9da18d8089916ecf895e862093a24dd653d6b716307a725f2ef7d36d50c94a8a",
+      "from_schema": 86,
+      "to_schema": 87,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 88,
+      "path": "web/database/migrations/088_add_ecommerce_store_theme.sql",
+      "sha256": "37fde3e850f53ac2bf47cfb9d5d40080fa8ea5e20ef66f4d2528eb55c984f2e5",
+      "from_schema": 87,
+      "to_schema": 88,
+      "compatibility": "expand-only"
+    }
+  ]
+}
