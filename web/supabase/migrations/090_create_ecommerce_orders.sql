@@ -63,5 +63,37 @@ drop trigger if exists set_ecommerce_orders_updated_at on public.ecommerce_order
 create trigger set_ecommerce_orders_updated_at before update on public.ecommerce_orders
 for each row execute function public.set_updated_at();
 
+do $$
+declare
+  v_schema_version public.application_schema_state.schema_version%TYPE;
+begin
+  select schema_version
+  into v_schema_version
+  from public.application_schema_state
+  where contract_key = 'core'
+  for update;
+
+  if v_schema_version is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'migration_090_schema_state_missing';
+  end if;
+
+  if v_schema_version <> 89 then
+    raise exception using
+      errcode = 'P0001',
+      message = format(
+        'migration_090_expected_schema_89_got_%s',
+        v_schema_version
+      );
+  end if;
+
+  update public.application_schema_state
+  set schema_version = 90,
+      applied_at = now()
+  where contract_key = 'core';
+end;
+$$;
+
 notify pgrst, 'reload schema';
 commit;
