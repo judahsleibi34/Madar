@@ -2632,6 +2632,11 @@ def get_public_site_bootstrap(subdomain: str, request: Request):
     return {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain, project),
+        "publication": {
+            "project_id": str(project.get("id") or ""),
+            "published_version": int(project.get("published_version") or 0),
+            "published_at": project.get("last_published_at"),
+        },
     }
 
 
@@ -2775,6 +2780,11 @@ def get_public_form(subdomain: str, form_id: str, request: Request, response: Re
     return {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain, project),
+        "publication": {
+            "project_id": str(project.get("id") or ""),
+            "published_version": int(project.get("published_version") or 0),
+            "published_at": project.get("last_published_at"),
+        },
         "form": build_public_form(form),
         "theme": published_schema.get("theme") or {},
         "language": published_schema.get("language") or published_schema.get("lang") or "en",

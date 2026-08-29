@@ -257,7 +257,7 @@ export function openResponsesSpreadsheetTab({
   const lettersRow = addElement(documentRef, tableHead, "tr");
   addElement(documentRef, lettersRow, "th", "sheet-corner");
 
-  const headers = [labels.status, labels.created];
+  const headers = [labels.status, labels.created, labels.submittedBy];
   if (isQuiz) headers.push(labels.score);
   headers.push(...fields.map((field) => field.label));
 
@@ -270,6 +270,7 @@ export function openResponsesSpreadsheetTab({
     const row = [
       response.status || labels.newStatus,
       response.createdAt ? new Date(response.createdAt).toLocaleString() : "",
+      response.submittedBy?.email || response.submittedBy?.name || labels.guestSubmitter,
     ];
     if (isQuiz) row.push(response.quiz?.score ?? "");
     row.push(...fields.map((field) => formatSavedValue(response.answers?.[field.id]) || ""));
