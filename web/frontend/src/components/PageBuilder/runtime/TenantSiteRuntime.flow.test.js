@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   cacheTenantBrand,
+  getPublicationSnapshot,
   getRuntimeAuthFlow,
   getVerifiedPublicationBoundary,
+  hasNewerPublication,
   getTenantBrandFallback,
   getTenantLoadingLogoUrl,
   getRuntimeCanvasScale,
@@ -102,6 +104,25 @@ describe("public publication boundary", () => {
       project: { ...payload.project, site_id: "" },
     }, "alpha", "madarportal.com")).toBeNull();
   });
+
+  it("detects a newer publication from the lightweight bootstrap payload", () => {
+    const current = { projectId: "project-1", publishedVersion: 4 };
+    const next = getPublicationSnapshot({
+      publication: { project_id: "project-1", published_version: 5 },
+    });
+
+    expect(next).toEqual({ projectId: "project-1", publishedVersion: 5 });
+    expect(hasNewerPublication(current, next)).toBe(true);
+    expect(hasNewerPublication(current, {
+      projectId: "project-1",
+      publishedVersion: 4,
+    })).toBe(false);
+    expect(hasNewerPublication(current, {
+      projectId: "project-2",
+      publishedVersion: 1,
+    })).toBe(true);
+  });
+
 
   it("prioritizes the custom loading image over the site logos", () => {
     expect(getTenantLoadingLogoUrl({

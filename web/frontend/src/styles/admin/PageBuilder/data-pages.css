@@ -843,6 +843,21 @@
   font-weight: 900;
 }
 
+.page-builder .response-submitter {
+  display: grid;
+  min-width: 150px;
+  gap: 2px;
+}
+
+.page-builder .response-submitter strong {
+  color: var(--madar-text);
+}
+
+.page-builder .response-submitter small {
+  color: var(--madar-muted);
+  font-size: 11px;
+}
+
 .page-builder .results-empty-state,
 .page-builder .analytics-empty {
   display: grid;

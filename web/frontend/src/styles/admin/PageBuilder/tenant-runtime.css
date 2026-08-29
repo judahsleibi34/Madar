@@ -1298,3 +1298,43 @@ body.theme-dark .tenant-site-runtime .tenant-runtime-page .runtime-form-paginati
   background: var(--theme-surface);
   animation: tenant-brand-arrive 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+.tenant-publication-warning-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(var(--theme-shadow-rgb), 0.56);
+  backdrop-filter: blur(4px);
+}
+
+.tenant-publication-warning {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid var(--theme-border);
+  border-radius: 20px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  box-shadow: 0 24px 80px rgba(var(--theme-shadow-rgb), 0.3);
+}
+
+.tenant-publication-warning h2,
+.tenant-publication-warning p {
+  margin: 0;
+}
+
+.tenant-publication-warning p {
+  color: var(--theme-muted);
+  line-height: 1.65;
+}
+
+.tenant-publication-warning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}

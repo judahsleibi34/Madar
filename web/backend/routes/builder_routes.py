@@ -1406,7 +1406,45 @@ def bind_first_published_project_if_unbound(
         )
     return rows[0], True
 
-def format_form_submission(row: dict):
+def get_form_submission_submitters(submission_rows: list[dict], tenant_id: int, project_id: str) -> dict[str, dict]:
+    user_ids = list({row.get("site_user_id") for row in submission_rows if row.get("site_user_id") is not None})
+    membership_ids = list({row.get("site_membership_id") for row in submission_rows if row.get("site_membership_id") is not None})
+    users_by_id = {}
+    memberships_by_id = {}
+    role_by_membership_id = {}
+    if user_ids:
+        result = service_supabase.table("users").select("id,first_name,last_name,email").in_("id", user_ids).execute()
+        users_by_id = {str(user.get("id")): user for user in (getattr(result, "data", None) or [])}
+    if membership_ids:
+        result = service_supabase.table("tenant_site_memberships").select("id,user_id,role").eq("tenant_id", tenant_id).in_("id", membership_ids).execute()
+        memberships_by_id = {str(row.get("id")): row for row in (getattr(result, "data", None) or [])}
+        result = service_supabase.table("tenant_site_project_role_assignments").select("membership_id,role_id").eq("project_id", project_id).in_("membership_id", membership_ids).execute()
+        assignments = getattr(result, "data", None) or []
+        role_ids = list({row.get("role_id") for row in assignments if row.get("role_id") is not None})
+        roles_by_id = {}
+        if role_ids:
+            result = service_supabase.table("tenant_site_project_roles").select("id,role_key,deleted_at").eq("project_id", project_id).in_("id", role_ids).execute()
+            roles_by_id = {str(row.get("id")): row.get("role_key") for row in (getattr(result, "data", None) or []) if not row.get("deleted_at")}
+        role_by_membership_id = {str(row.get("membership_id")): roles_by_id.get(str(row.get("role_id"))) for row in assignments}
+    submitters = {}
+    for submission in submission_rows:
+        membership_id = submission.get("site_membership_id")
+        membership = memberships_by_id.get(str(membership_id), {})
+        user_id = submission.get("site_user_id") or membership.get("user_id")
+        user = users_by_id.get(str(user_id), {})
+        name = " ".join(part for part in (str(user.get("first_name") or "").strip(), str(user.get("last_name") or "").strip()) if part).strip()
+        submitters[str(submission.get("id"))] = {
+            "user_id": user_id,
+            "membership_id": membership_id,
+            "name": name or str(user.get("email") or "Guest"),
+            "email": str(user.get("email") or ""),
+            "role": role_by_membership_id.get(str(membership_id)) or membership.get("role") or ("member" if user_id else "guest"),
+            "authenticated": bool(user_id),
+        }
+    return submitters
+
+
+def format_form_submission(row: dict, submitted_by: dict | None = None):
     return {
         "id": row.get("id"),
         "form_id": row.get("form_id"),
@@ -1418,6 +1456,10 @@ def format_form_submission(row: dict):
         "answers": row.get("answers") or {},
         "quiz": row.get("quiz_result"),
         "field_snapshot": row.get("field_snapshot") or [],
+        "submitted_by": submitted_by or {
+            "user_id": None, "membership_id": None, "name": "Guest",
+            "email": "", "role": "guest", "authenticated": False,
+        },
     }
 
 
@@ -2714,11 +2756,10 @@ def list_builder_form_submissions(
         .range(offset, offset + limit)
         .execute()
     )
+    submission_rows = submissions_response.data or []
+    submitters = get_form_submission_submitters(submission_rows, context.tenant_id, project_id)
     submissions, pagination = pagination_response(
-        [
-            format_form_submission(row)
-            for row in (submissions_response.data or [])
-        ],
+        [format_form_submission(row, submitters.get(str(row.get("id")))) for row in submission_rows],
         limit,
         offset,
     )

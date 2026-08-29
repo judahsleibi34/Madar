@@ -84,6 +84,25 @@ import {
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
 const MADAR_ATTRIBUTION_URL = "https://madar.app/";
 const TENANT_BRAND_CACHE_PREFIX = "madar:tenant-brand:";
+const PUBLICATION_VERSION_POLL_MS = 30_000;
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getPublicationSnapshot = (payload) => {
+  const publication = payload?.publication || payload?.project;
+  const projectId = String(publication?.project_id || "").trim();
+  const publishedVersion = Number(publication?.published_version);
+  if (!projectId || !Number.isInteger(publishedVersion) || publishedVersion < 0) return null;
+  return { projectId, publishedVersion };
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const hasNewerPublication = (current, next) => {
+  if (!current || !next) return false;
+  return (
+    next.projectId !== current.projectId ||
+    next.publishedVersion > current.publishedVersion
+  );
+};
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const getTenantBrandFallback = (subdomain) =>
@@ -476,6 +495,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
   const [publicSiteState, setPublicSiteState] = useState("loading");
   const [publicationBoundary, setPublicationBoundary] = useState(null);
+  const [publicationUpdate, setPublicationUpdate] = useState(null);
   const [formAnswers, setFormAnswers] = useState({});
   const [formHoneypots, setFormHoneypots] = useState({});
   const [formStatus, setFormStatus] = useState({});
@@ -494,6 +514,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const protectedPageRequestRef = useRef("");
   const pendingProtectedPageRef = useRef("");
   const loadedResumeTokenRef = useRef("");
+  const detectedPublicationRef = useRef("");
 
   const showFormToast = useCallback((title, message) => {
     setFormToast({ id: Date.now(), title, message });
@@ -757,6 +778,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     setProject(null);
     setPublicSiteProfile(null);
     setPublicationBoundary(null);
+    setPublicationUpdate(null);
+    detectedPublicationRef.current = "";
     setPublicSiteState("loading");
 
     if (!standaloneFormId) {
@@ -779,6 +802,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
         if (standaloneFormId) {
           setPublicSiteProfile(publicContent?.site || null);
+          const standalonePublication = getPublicationSnapshot(publicContent);
+          if (standalonePublication) {
+            setPublicationBoundary(standalonePublication);
+          }
           if (publicContent?.form && typeof publicContent.form === "object") {
             setProject({
               forms: [publicContent.form],
@@ -830,6 +857,57 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       cancelled = true;
     };
   }, [cleanSubdomain, draftPreview, projectId, standaloneFormId]);
+  useEffect(() => {
+    if (draftPreview || !publicationBoundary) return undefined;
+
+    let cancelled = false;
+    let checking = false;
+    const currentPublication = {
+      projectId: publicationBoundary.projectId,
+      publishedVersion: publicationBoundary.publishedVersion,
+    };
+
+    const checkForPublicationUpdate = async () => {
+      if (
+        cancelled ||
+        checking ||
+        document.visibilityState === "hidden" ||
+        !document.querySelector(".tenant-runtime-page .runtime-form")
+      ) return;
+      checking = true;
+      try {
+        const bootstrap = await fetchPublicSiteBootstrap(cleanSubdomain);
+        const nextPublication = getPublicationSnapshot(bootstrap);
+        if (!cancelled && hasNewerPublication(currentPublication, nextPublication)) {
+          const fingerprint = `${nextPublication.projectId}:${nextPublication.publishedVersion}`;
+          if (detectedPublicationRef.current !== fingerprint) {
+            detectedPublicationRef.current = fingerprint;
+            setPublicationUpdate(nextPublication);
+          }
+        }
+      } catch {
+        // A temporary version-check failure must not interrupt a form in progress.
+      } finally {
+        checking = false;
+      }
+    };
+
+    const interval = window.setInterval(checkForPublicationUpdate, PUBLICATION_VERSION_POLL_MS);
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") checkForPublicationUpdate();
+    };
+    window.addEventListener("focus", checkForPublicationUpdate);
+    document.addEventListener("visibilitychange", checkWhenVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", checkForPublicationUpdate);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
+    };
+  }, [cleanSubdomain, draftPreview, publicationBoundary]);
+
+
   const site = {
     ...defaultSiteChrome,
     ...(publicSiteProfile
@@ -2416,6 +2494,32 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         </div>
       )}
       {renderMainContent()}
+      {publicationUpdate && (
+        <div className="tenant-publication-warning-backdrop">
+          <section
+            className="tenant-publication-warning"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="tenant-publication-warning-title"
+          >
+            <span className="workspace-kicker">New form version available</span>
+            <h2 id="tenant-publication-warning-title">Refresh to use the latest form</h2>
+            <p>
+              This form was updated while you had it open. Save any unfinished work,
+              then refresh the page to load the new version.
+            </p>
+            <div className="tenant-publication-warning-actions">
+              <button type="button" className="page-primary-action" onClick={() => window.location.reload()}>
+                Refresh page
+              </button>
+              <button type="button" className="secondary-button" onClick={() => setPublicationUpdate(null)}>
+                Keep working
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <RuntimeFormToast toast={formToast} onDismiss={dismissFormToast} />
       {publicActionMessage && (
         <div className="tenant-runtime-action-message" role="status" aria-live="polite">

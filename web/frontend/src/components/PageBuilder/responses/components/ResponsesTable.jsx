@@ -15,7 +15,7 @@ export default function ResponsesTable({
   isQuiz,
   incompleteView = false,
 }) {
-  const columnCount = fields.length + 2 + (isQuiz ? 1 : 0);
+  const columnCount = fields.length + 3 + (isQuiz ? 1 : 0);
 
   return (
     <div className="results-table-wrap">
@@ -24,6 +24,7 @@ export default function ResponsesTable({
           <tr>
             <th>{t.reviewStatus}</th>
             <th>{t.created}</th>
+            <th>{t.submittedBy}</th>
             {isQuiz && <th>{t.score}</th>}
             {fields.map((field) => (
               <th key={field.id}>{field.label}</th>
@@ -77,7 +78,13 @@ export default function ResponsesTable({
                 </td>
 
                 <td>{response.createdAt ? new Date(response.createdAt).toLocaleString() : "-"}</td>
-
+                <td>
+                  <span className="response-submitter">
+                    <strong>{response.submittedBy?.name || t.guestSubmitter}</strong>
+                    {response.submittedBy?.email ? <small>{response.submittedBy.email}</small> : null}
+                    <small>{response.submittedBy?.role || t.guestRole}</small>
+                  </span>
+                </td>
                 {isQuiz && (
                   <td>
                     {response.quiz?.score === null || response.quiz?.score === undefined

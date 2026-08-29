@@ -6,13 +6,16 @@ import {
   fetchBuilderFormSubmissionsPage,
   updateBuilderFormSubmissionStatus,
 } from "../../services/PageBuilder.api";
-import { RESPONSE_PAGE_SIZE, SUBMISSION_STATUSES } from "../constants";
+import { RESPONSE_PAGE_SIZE } from "../constants";
 import {
+  getAnswerSearchText,
+  getDynamicStatusOptions,
   getResponseLoadMessage,
+  getResponseStatusValues,
   hasAnswerValue,
+  isStatusField,
   normalizeBackendResponse,
   normalizeStatus,
-  uniqueByNormalizedStatus,
 } from "../utils/responsesUtils";
 import {
   createResponsesCacheKey,
@@ -191,10 +194,8 @@ export function useBuilderResponsesData({
 
   const fields = selectedForm ? getFormFields(selectedForm) : [];
   const responses = getDisplayResponsesForForm(selectedForm);
-  const dynamicStatusOptions = uniqueByNormalizedStatus([
-    ...responses.map((response) => response.status || "New"),
-    ...SUBMISSION_STATUSES,
-  ]);
+  const statusFields = fields.filter(isStatusField);
+  const dynamicStatusOptions = getDynamicStatusOptions(fields, responses);
   const selectedFieldSet = new Set(selectedFieldIds);
   const selectedStatusSet = new Set(selectedStatuses.map(normalizeStatus));
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -203,9 +204,10 @@ export function useBuilderResponsesData({
     String(formatSavedValue(response.answers?.[field.id]) || "").toLowerCase();
 
   const responseMatchesSearch = (response) => {
-    const matchesStatus =
-      selectedStatusSet.size === 0 ||
-      selectedStatusSet.has(normalizeStatus(response.status || "New"));
+    const matchesStatus = selectedStatusSet.size === 0 || getResponseStatusValues(
+      response,
+      statusFields
+    ).some((status) => selectedStatusSet.has(normalizeStatus(status)));
 
     if (!matchesStatus) return false;
     if (!normalizedQuery) return true;
@@ -221,7 +223,20 @@ export function useBuilderResponsesData({
 
     if (selectedFieldSet.size > 0) return false;
 
-    return [response.status, response.createdAt, response.quiz?.score]
+    // Include values retained from an older form schema or supplied by a
+    // connected ecommerce record, such as a product name.
+    if (getAnswerSearchText(response.answers, formatSavedValue).includes(normalizedQuery)) {
+      return true;
+    }
+
+    return [
+      response.status,
+      response.createdAt,
+      response.quiz?.score,
+      response.submittedBy?.name,
+      response.submittedBy?.email,
+      response.submittedBy?.role,
+    ]
       .filter((value) => value !== undefined && value !== null)
       .join(" ")
       .toLowerCase()
@@ -332,7 +347,15 @@ export function useBuilderResponsesData({
 
       setBackendResponsesByForm((current) => {
         const nextResponses = (current[selectedFormId] || []).map((submission) =>
-          submission.id === submissionId ? normalizedSubmission : submission
+          submission.id === submissionId
+            ? {
+                ...normalizedSubmission,
+                submittedBy:
+                  updatedSubmission?.submitted_by || updatedSubmission?.submittedBy
+                    ? normalizedSubmission.submittedBy
+                    : submission.submittedBy,
+              }
+            : submission
         );
 
         if (selectedPagination) {
@@ -370,7 +393,15 @@ export function useBuilderResponsesData({
 
       setBackendResponsesByForm((current) => {
         const nextResponses = (current[selectedFormId] || []).map((record) =>
-          record.id === recordId ? normalizedRecord : record
+          record.id === recordId
+            ? {
+                ...normalizedRecord,
+                submittedBy:
+                  updatedRecord?.submitted_by || updatedRecord?.submittedBy
+                    ? normalizedRecord.submittedBy
+                    : record.submittedBy,
+              }
+            : record
         );
         if (selectedPagination) {
           writeResponsesCache(selectedCacheKey, nextResponses, selectedPagination);

@@ -125,6 +125,10 @@ class FakeQuery:
         self.neq_filters.append((column, value))
         return self
 
+    def in_(self, column, values):
+        self.filters.append((column, set(values)))
+        return self
+
     @property
     def not_(self):
         return self
@@ -174,7 +178,10 @@ class FakeQuery:
         rows = list(self.supabase.tables.get(self.table_name, []))
 
         for column, value in self.filters:
-            rows = [row for row in rows if row.get(column) == value]
+            if isinstance(value, set):
+                rows = [row for row in rows if row.get(column) in value]
+            else:
+                rows = [row for row in rows if row.get(column) == value]
 
         for column, value in self.neq_filters:
             rows = [row for row in rows if row.get(column) != value]
@@ -257,6 +264,10 @@ class FakeSupabase:
                 }
             ],
             "builder_form_drafts": [],
+            "users": [],
+            "tenant_site_memberships": [],
+            "tenant_site_project_role_assignments": [],
+            "tenant_site_project_roles": [],
         }
 
     def table(self, table_name):
@@ -747,6 +758,31 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(body["pagination"]["offset"], 0)
         self.assertFalse(body["pagination"]["has_more"])
         self.assertEqual(body["submissions"][0]["answers"], {"field_name": "Existing"})
+        self.assertEqual(body["submissions"][0]["submitted_by"]["name"], "Guest")
+
+    def test_submission_submitter_hydration_includes_user_and_role(self):
+        fake_supabase = FakeSupabase()
+        submission = fake_supabase.tables["builder_form_submissions"][0]
+        submission.update({"site_user_id": 31, "site_membership_id": 41})
+        fake_supabase.tables["users"].append(
+            {"id": 31, "first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.com"}
+        )
+        fake_supabase.tables["tenant_site_memberships"].append(
+            {"id": 41, "tenant_id": 1, "user_id": 31, "role": "customer"}
+        )
+        fake_supabase.tables["tenant_site_project_role_assignments"].append(
+            {"membership_id": 41, "project_id": PROJECT_ID, "role_id": "role-vip"}
+        )
+        fake_supabase.tables["tenant_site_project_roles"].append(
+            {"id": "role-vip", "project_id": PROJECT_ID, "role_key": "vip", "deleted_at": None}
+        )
+        with patch.object(builder_routes, "service_supabase", fake_supabase):
+            submitter = builder_routes.get_form_submission_submitters([submission], 1, PROJECT_ID)[SUBMISSION_ID]
+        self.assertEqual(submitter, {
+            "user_id": 31, "membership_id": 41, "name": "Ada Lovelace",
+            "email": "ada@example.com", "role": "vip", "authenticated": True,
+        })
+
 
     def test_builder_project_list_default_pagination(self):
         fake_supabase = FakeSupabase()
