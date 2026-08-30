@@ -12,6 +12,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { getAdminDashboardContent } from "../../content";
+import WeeklyScreenTimePanel from "./WeeklyScreenTimePanel";
 
 const cashData = [18000, 24500, 22000, 31000, 38500, 42000, 51000, 62000];
 const userSignalData = [
@@ -81,8 +82,10 @@ function SignalCard({ label, value, trend, percent }) {
 }
 
 export default function Dashboard({
+  currentUser = null,
   lang = "en",
   themeMode = "light",
+  weeklyScreenTimeSeconds = 0,
 }) {
   const safeLang = lang === "ar" ? "ar" : "en";
   const t = getAdminDashboardContent(lang);
@@ -147,6 +150,11 @@ export default function Dashboard({
           variant="navy"
         />
       </section>
+
+      <WeeklyScreenTimePanel
+        currentUser={currentUser}
+        currentSeconds={weeklyScreenTimeSeconds}
+      />
 
       <section className="admin-monitor-grid">
         <article className="dashboard-panel admin-user-signals-panel">

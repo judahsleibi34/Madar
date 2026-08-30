@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { getResponsesContent } from "../../../content/pageBuilder";
 import ResponsesDataBrowser from "./components/ResponsesDataBrowser";
 import ResponsesHeader from "./components/ResponsesHeader";
@@ -8,6 +9,11 @@ import ResponsesTable from "./components/ResponsesTable";
 import ResponsesToolbar from "./components/ResponsesToolbar";
 import { useBuilderResponsesData } from "./hooks/useBuilderResponsesData";
 import { openResponsesSpreadsheetTab } from "./utils/openResponsesSpreadsheetTab";
+import {
+  getResponseView,
+  getResponseViewPath,
+  hasResponseViewPath,
+} from "./utils/responsesViewRouting";
 import "../../../styles/admin/PageBuilder/incomplete-drafts.css";
 import "../../../styles/admin/PageBuilder/responses-spreadsheet-actions.css";
 import "../../../styles/admin/PageBuilder/response-record-actions.css";
@@ -24,7 +30,19 @@ export default function BuilderResponsesPage({
   formatSavedValue,
   showToast,
 }) {
-  const [responseView, setResponseView] = useState("completed");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const responseView = getResponseView(location.pathname, location.search);
+
+  const setResponseView = (nextView) => {
+    navigate(getResponseViewPath(location.pathname, nextView));
+  };
+
+  useEffect(() => {
+    if (!hasResponseViewPath(location.pathname)) {
+      navigate(getResponseViewPath(location.pathname, responseView), { replace: true });
+    }
+  }, [location.pathname, navigate, responseView]);
   const [assistantQuestion, setAssistantQuestion] = useState("");
   const [assistantReply, setAssistantReply] = useState("");
   const activeLang = lang === "ar" ? "ar" : "en";

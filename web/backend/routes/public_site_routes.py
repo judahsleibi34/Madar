@@ -41,6 +41,7 @@ from services.ecommerce_cache_service import (
     read_ecommerce_cache,
     write_ecommerce_cache,
 )
+from services.screen_time_service import record_screen_time
 from services.site_permission_service import (
     assign_project_role,
     has_project_permission,
@@ -90,6 +91,10 @@ DEFAULT_RESERVATION_DURATION_MINUTES = 30
 FRONTEND_URL = resolve_frontend_url()
 
 
+class PublicScreenTimeHeartbeat(BaseModel):
+    active_seconds: int = Field(..., ge=1, le=60)
+
+
 class PublicFormSubmissionCreate(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
     form_element_id: Optional[str] = None
@@ -107,6 +112,7 @@ class PublicFormDraftUpsert(BaseModel):
     page_index: int = Field(default=0, ge=0, le=1000)
     language: str = Field(default="en", min_length=1, max_length=12)
     resume_token: Optional[str] = Field(default=None, max_length=300)
+    draft_name: Optional[str] = Field(default=None, max_length=120)
     honeypot: Optional[str] = Field(default=None, max_length=200)
     submission_elapsed_ms: Optional[int] = Field(default=None, ge=0, le=86_400_000)
 
@@ -1613,12 +1619,20 @@ def format_public_form_draft(row: dict) -> dict[str, Any]:
     return {
         "id": row.get("id"),
         "formId": row.get("form_id"),
+        "name": row.get("draft_name") or row.get("form_title") or "Incomplete form",
         "answers": row.get("answers") or {},
         "pageIndex": max(0, int(row.get("page_index") or 0)),
         "language": row.get("language") or "en",
         "savedAt": row.get("updated_at") or row.get("created_at"),
         "resumeToken": build_form_draft_token(str(row.get("id"))),
     }
+
+
+def normalize_form_draft_name(value: str | None, fallback: str | None = None) -> str:
+    normalized = " ".join(str(value or "").split()).strip()
+    if not normalized:
+        normalized = " ".join(str(fallback or "Incomplete form").split()).strip()
+    return (normalized or "Incomplete form")[:120]
 
 
 def require_form_draft_token(value: str | None) -> str:
@@ -2342,6 +2356,27 @@ def tenant_visitor_status(subdomain: str, request: Request, response: Response):
         return {"logged_in": False, "user": None}
 
 
+@router.post("/sites/{subdomain}/screen-time/heartbeat")
+def create_public_screen_time_heartbeat(
+    subdomain: str,
+    payload: PublicScreenTimeHeartbeat,
+    request: Request,
+    response: Response,
+):
+    user_row, membership = require_tenant_visitor(subdomain, request, response)
+    enforce_public_rate_limit(
+        request,
+        "screen_time_heartbeat",
+        str(user_row.get("id") or subdomain),
+    )
+    record_screen_time(
+        tenant_id=int(membership.get("tenant_id")),
+        user_id=int(user_row.get("id")),
+        active_seconds=payload.active_seconds,
+    )
+    return {"success": True}
+
+
 @router.post("/sites/{subdomain}/auth/logout")
 def logout_tenant_visitor(subdomain: str, response: Response):
     normalize_subdomain(subdomain)
@@ -2989,6 +3024,59 @@ def finalize_public_quiz_attempt(
     }
 
 
+@router.get("/sites/{subdomain}/forms/{form_id}/drafts")
+def list_public_builder_form_drafts(
+    subdomain: str,
+    form_id: str,
+    request: Request,
+    response: Response,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    clean_form_id = (form_id or "").strip()
+    enforce_public_form_submission_rate_limit(
+        request,
+        "draft_list",
+        f"{clean_subdomain}:{clean_form_id}",
+    )
+    settings = resolve_website_settings(clean_subdomain, request=request)
+    require_public_runtime_entitlement(settings, "public_form_links")
+    tenant_id = resolve_tenant_id(settings)
+    project, _form, _ = get_bound_published_form(settings, clean_form_id)
+    identity = authorize_site_resource(
+        subdomain=clean_subdomain,
+        request=request,
+        response=response,
+        project=project,
+        capability="submit_protected_form",
+        resource_type="form",
+        resource_id=clean_form_id,
+    )
+    if not identity:
+        return {"success": True, "drafts": [], "items": []}
+
+    identity_user, _identity_membership = identity
+    site_user_id = identity_user.get("id")
+    if not site_user_id:
+        return {"success": True, "drafts": [], "items": []}
+
+    drafts_response = (
+        service_supabase.table("builder_form_drafts")
+        .select("*")
+        .eq("tenant_id", tenant_id)
+        .eq("project_id", project.get("id"))
+        .eq("form_id", clean_form_id)
+        .eq("site_user_id", site_user_id)
+        .order("updated_at", desc=True)
+        .limit(25)
+        .execute()
+    )
+    drafts = [
+        format_public_form_draft(row)
+        for row in (drafts_response.data or [])
+    ]
+    return {"success": True, "drafts": drafts, "items": drafts}
+
+
 @router.get("/sites/{subdomain}/forms/{form_id}/drafts/{resume_token}")
 def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: str, request: Request, response: Response):
     clean_subdomain = normalize_subdomain(subdomain)
@@ -3065,6 +3153,7 @@ def save_public_builder_form_draft(
         "form_id": clean_form_id,
         "form_title": form.get("title"),
         "form_version": project.get("published_version"),
+        "draft_name": normalize_form_draft_name(draft.draft_name, form.get("title")),
         "answers": cleaned_answers,
         "field_snapshot": copy.deepcopy(get_form_fields(form)),
         "form_element_id": draft.form_element_id,

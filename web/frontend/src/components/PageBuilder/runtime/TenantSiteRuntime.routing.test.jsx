@@ -6,6 +6,7 @@ import TenantSiteRuntime, { getBuilderPreviewBasePath } from "./TenantSiteRuntim
 import {
   fetchBuilderProject,
   fetchProtectedSitePage,
+  fetchPublicForm,
   fetchPublicSite,
   fetchPublicSiteBootstrap,
   getTenantVisitorStatus,
@@ -16,6 +17,7 @@ vi.mock("../services/PageBuilder.api", async () => ({
   ...(await vi.importActual("../services/PageBuilder.api")),
   fetchBuilderProject: vi.fn(),
   fetchProtectedSitePage: vi.fn(),
+  fetchPublicForm: vi.fn(),
   fetchPublicSite: vi.fn(),
   fetchPublicSiteBootstrap: vi.fn(),
   getTenantVisitorStatus: vi.fn(),
@@ -118,6 +120,78 @@ const renderPublic = ({
     </MemoryRouter>
   );
 };
+
+const renderStandaloneForm = () => {
+  getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
+  fetchPublicForm.mockResolvedValue({
+    site: { subdomain: "tenant-site", brand: "Route Test", logo_url: "" },
+    publication: {
+      project_id: "project-1",
+      published_version: 1,
+      published_at: "2026-08-29T10:00:00+00:00",
+    },
+    form: {
+      id: "form-1",
+      name: "Versioned form",
+      sections: [],
+      settings: {},
+    },
+    theme: {},
+    language: "en",
+  });
+
+  return render(
+    <MemoryRouter initialEntries={["/forms/tenant-site/form-1"]}>
+      <Routes>
+        <Route path="/forms/:subdomain/:formId" element={<TenantSiteRuntime />} />
+      </Routes>
+    </MemoryRouter>
+  );
+};
+
+describe("TenantSiteRuntime publication updates", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("warns an open form about each newer publication without repeating a dismissed version", async () => {
+    const intervalSpy = vi.spyOn(window, "setInterval");
+    fetchPublicSiteBootstrap.mockResolvedValue({
+      publication: { project_id: "project-1", published_version: 2 },
+    });
+    renderStandaloneForm();
+
+    await waitFor(() => {
+      expect(document.querySelector(".tenant-runtime-page .runtime-form")).toBeTruthy();
+    });
+    expect(
+      intervalSpy.mock.calls.some(([, delay]) => delay === 30_000)
+    ).toBe(true);
+
+    fireEvent.focus(window);
+    expect(
+      (await screen.findByRole("alertdialog")).textContent
+    ).toContain("Refresh to use the latest form");
+    expect(screen.getByRole("button", { name: "Refresh page" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep working" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    fireEvent.focus(window);
+    await waitFor(() => {
+      expect(fetchPublicSiteBootstrap).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    fetchPublicSiteBootstrap.mockResolvedValue({
+      publication: { project_id: "project-1", published_version: 3 },
+    });
+    fireEvent.focus(window);
+    expect(await screen.findByRole("alertdialog")).toBeTruthy();
+  });
+});
 
 describe("TenantSiteRuntime explicit project preview", () => {
   beforeEach(() => vi.clearAllMocks());

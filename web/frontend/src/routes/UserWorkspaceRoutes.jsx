@@ -53,6 +53,7 @@ export default function UserWorkspaceRoutes({
   shellProps,
   themeMode,
   user,
+  weeklyScreenTimeSeconds = 0,
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -115,6 +116,7 @@ export default function UserWorkspaceRoutes({
             user={user}
             themeMode={themeMode}
             onThemeModeChange={shellProps.onThemeModeChange}
+            weeklyScreenTimeSeconds={weeklyScreenTimeSeconds}
           />
         )}
       />

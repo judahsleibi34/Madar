@@ -30,6 +30,7 @@ import { subscribeAppInstalled } from "./pwa/installPromptStore";
 import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
 import { NotificationProvider } from "./notifications/NotificationProvider";
 import NotificationToastViewport from "./notifications/NotificationToastViewport";
+import useWeeklyScreenTime from "./hooks/useWeeklyScreenTime";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
 
@@ -60,6 +61,7 @@ export default function App() {
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
   const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
+  const weeklyScreenTimeSeconds = useWeeklyScreenTime(isLoggedIn ? user : null);
 
   const getCurrentReturnTo = () =>
     encodeURIComponent(
@@ -671,6 +673,7 @@ export default function App() {
           shellProps={shellProps}
           themeMode={themeMode}
           user={user}
+          weeklyScreenTimeSeconds={weeklyScreenTimeSeconds}
         />
       );
     } else {
@@ -682,6 +685,7 @@ export default function App() {
           shellProps={shellProps}
           themeMode={themeMode}
           user={user}
+          weeklyScreenTimeSeconds={weeklyScreenTimeSeconds}
         />
       );
     }

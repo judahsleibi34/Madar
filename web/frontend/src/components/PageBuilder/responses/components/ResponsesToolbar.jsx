@@ -6,6 +6,23 @@ const RESPONSE_VIEWS = [
   ["incomplete", "incompleteTab"],
 ];
 
+function applySelectedTabStyle(node, selected) {
+  if (!node) return;
+
+  const selectedStyles = {
+    background: "var(--theme-primary)",
+    "background-color": "var(--theme-primary)",
+    "border-color": "var(--theme-primary)",
+    color: "var(--theme-text-inverse)",
+    "-webkit-text-fill-color": "var(--theme-text-inverse)",
+  };
+
+  Object.entries(selectedStyles).forEach(([property, value]) => {
+    if (selected) node.style.setProperty(property, value, "important");
+    else node.style.removeProperty(property);
+  });
+}
+
 export default function ResponsesToolbar({
   t,
   responseView,
@@ -45,6 +62,7 @@ export default function ResponsesToolbar({
             key={view}
             type="button"
             role="tab"
+            ref={(node) => applySelectedTabStyle(node, responseView === view)}
             aria-selected={responseView === view}
             tabIndex={responseView === view ? 0 : -1}
             className={responseView === view ? "active" : ""}
