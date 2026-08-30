@@ -33,7 +33,6 @@ export const saveRuntimeFormDraft = (
     const drafts = readRuntimeFormDrafts(storage, siteIdentifier);
     drafts[instanceKey] = {
       formId: String(draft?.formId || ""),
-      draftName: String(draft?.draftName || "").trim().slice(0, 120),
       answers: draft?.answers && typeof draft.answers === "object" ? draft.answers : {},
       pageIndex: Math.max(0, Number(draft?.pageIndex) || 0),
       language: String(draft?.language || "en").slice(0, 12),
@@ -67,4 +66,3 @@ export const removeRuntimeFormDraft = (storage, siteIdentifier, instanceKey) => 
     // Saving progress is best-effort when browser storage is unavailable.
   }
 };
-

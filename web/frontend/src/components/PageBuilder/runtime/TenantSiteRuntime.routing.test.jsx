@@ -166,9 +166,11 @@ describe("TenantSiteRuntime publication updates", () => {
     await waitFor(() => {
       expect(document.querySelector(".tenant-runtime-page .runtime-form")).toBeTruthy();
     });
-    expect(
-      intervalSpy.mock.calls.some(([, delay]) => delay === 30_000)
-    ).toBe(true);
+    await waitFor(() => {
+      expect(
+        intervalSpy.mock.calls.some(([, delay]) => delay === 30_000)
+      ).toBe(true);
+    });
 
     fireEvent.focus(window);
     expect(

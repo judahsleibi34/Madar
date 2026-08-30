@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 81,
-    "compatible_max": 90,
-    "target": 90,
+    "compatible_max": 92,
+    "target": 92,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
-    "rollback_compatible_max": 88
+    "rollback_compatible_max": 90
   },
   "migration_policy": "manual-locked-backup-first-forward-repair",
-  "notes": "Compatibility bridge for schema 089-090. Deploy and validate while schema 088 is serving, then apply the backup-gated locked expand migrations 089-090. Migration 089 updates only untouched ecommerce themes to the Madar palette; 090 adds tenant-owned ecommerce order tables with RLS enabled and service-role-only access. The retained schema-088 release remains the rollback target until migration begins; after schema advances, forward repair is required by policy.",
-  "migration_manifest": "migrations-089-090.json"
+  "notes": "Compatibility bridge for schema 091-092. Deploy and validate while schema 090 is serving, then apply the backup-gated locked expand migrations 091-092. Migration 091 adds bounded names for saved form drafts; 092 adds tenant-owned workspace screen-time aggregation with service-role-only writes. The retained schema-090 release remains the rollback target until migration begins; after schema advances, forward repair is required by policy.",
+  "migration_manifest": "migrations-091-092.json"
 }

@@ -1,7 +1,6 @@
 import { lazy, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
-import PageSkeleton from "../components/common/PageSkeleton";
 import RouteSuspense from "../components/common/RouteSuspense";
 import { preloadPublicEcommerceCatalog } from "../services/ecommerceApi";
 import { getBrandedMadarSubdomain } from "../utils/hostedAddress";

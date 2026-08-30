@@ -19,7 +19,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['playwright.config.js', 'e2e/**/*.js'],
+    files: ['playwright.config.js', 'e2e/**/*.js', '**/*.test.{js,jsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,

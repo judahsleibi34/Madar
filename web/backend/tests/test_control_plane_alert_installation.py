@@ -3,7 +3,9 @@ from pathlib import Path
 import unittest
 
 
-WEB_ROOT = Path(__file__).resolve().parents[2]
+WEB_ROOT = Path(
+    os.getenv("MADAR_TEST_REPOSITORY_ROOT", Path(__file__).resolve().parents[2])
+)
 INSTALLER = WEB_ROOT / "deployment/bin/madar-install-control-plane"
 ALERT_UNIT = WEB_ROOT / "deployment/systemd/madar-ops-alert@.service"
 ALERT_HOOK = WEB_ROOT / "scripts/madar_alert_hook.sh"
