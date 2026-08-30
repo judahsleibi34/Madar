@@ -12,17 +12,48 @@ def current_week_start() -> date:
     return today - timedelta(days=today.weekday())
 
 
+def _schema_before_screen_time(error: Exception) -> bool:
+    raw = str(error).lower()
+    missing_object = (
+        "workspace_screen_time" in raw or "record_workspace_screen_time" in raw
+    ) and (
+        "pgrst202" in raw
+        or "pgrst205" in raw
+        or "schema cache" in raw
+        or "does not exist" in raw
+        or "could not find" in raw
+    )
+    if not missing_object:
+        return False
+    try:
+        response = (
+            service_supabase.table("application_schema_state")
+            .select("schema_version")
+            .eq("contract_key", "core")
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(response, "data", None) or []
+        return len(rows) == 1 and int(rows[0].get("schema_version", -1)) < 92
+    except Exception:
+        return False
+
+
 def record_screen_time(*, tenant_id: int, user_id: int, active_seconds: int) -> None:
     seconds = max(1, min(MAX_HEARTBEAT_SECONDS, int(active_seconds)))
-    service_supabase.rpc(
-        "record_workspace_screen_time",
-        {
-            "p_tenant_id": int(tenant_id),
-            "p_user_id": int(user_id),
-            "p_activity_date": datetime.now(timezone.utc).date().isoformat(),
-            "p_active_seconds": seconds,
-        },
-    ).execute()
+    try:
+        service_supabase.rpc(
+            "record_workspace_screen_time",
+            {
+                "p_tenant_id": int(tenant_id),
+                "p_user_id": int(user_id),
+                "p_activity_date": datetime.now(timezone.utc).date().isoformat(),
+                "p_active_seconds": seconds,
+            },
+        ).execute()
+    except Exception as error:
+        if not _schema_before_screen_time(error):
+            raise
 
 
 def _rows(response) -> list[dict[str, Any]]:
@@ -46,14 +77,19 @@ def get_weekly_screen_time(
         range_start = today - timedelta(days=6)
     range_end = today
 
-    activity_rows = _rows(
-        service_supabase.table("workspace_screen_time_daily")
-        .select("user_id,active_seconds")
-        .eq("tenant_id", tenant_id)
-        .gte("activity_date", range_start.isoformat())
-        .lte("activity_date", range_end.isoformat())
-        .execute()
-    )
+    try:
+        activity_rows = _rows(
+            service_supabase.table("workspace_screen_time_daily")
+            .select("user_id,active_seconds")
+            .eq("tenant_id", tenant_id)
+            .gte("activity_date", range_start.isoformat())
+            .lte("activity_date", range_end.isoformat())
+            .execute()
+        )
+    except Exception as error:
+        if not _schema_before_screen_time(error):
+            raise
+        activity_rows = []
     seconds_by_user: dict[int, int] = {}
     for row in activity_rows:
         user_id = int(row.get("user_id") or 0)

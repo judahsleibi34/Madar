@@ -1642,6 +1642,53 @@ def require_form_draft_token(value: str | None) -> str:
     return draft_id
 
 
+def require_form_draft_owner(row: dict, identity) -> None:
+    """Keep named-user drafts private while retaining anonymous bearer drafts."""
+    owner_user_id = row.get("site_user_id")
+    if owner_user_id is None:
+        return
+    identity_user = identity[0] if identity else {}
+    if str(identity_user.get("id") or "") != str(owner_user_id):
+        raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
+
+
+def schema_090_missing_draft_name(error: Exception) -> bool:
+    raw = str(error).lower()
+    missing_column = "draft_name" in raw and (
+        "pgrst204" in raw or "schema cache" in raw or "does not exist" in raw
+    )
+    if not missing_column:
+        return False
+    try:
+        state = first_row(
+            service_supabase.table("application_schema_state")
+            .select("schema_version")
+            .eq("contract_key", "core")
+            .limit(1)
+            .execute()
+        )
+        return int((state or {}).get("schema_version", -1)) == 90
+    except Exception:
+        return False
+
+
+def write_public_form_draft(payload: dict, *, draft_id: str | None, tenant_id: int):
+    def execute(write_payload: dict):
+        query = service_supabase.table("builder_form_drafts")
+        if draft_id:
+            return query.update(write_payload).eq("id", draft_id).eq("tenant_id", tenant_id).execute()
+        return query.insert(write_payload).execute()
+
+    try:
+        return execute(payload)
+    except Exception as error:
+        if not schema_090_missing_draft_name(error):
+            raise
+        bridge_payload = dict(payload)
+        bridge_payload.pop("draft_name", None)
+        return execute(bridge_payload)
+
+
 def format_submission(row: dict):
     return {
         "id": row.get("id"),
@@ -3087,7 +3134,7 @@ def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: st
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
     project, _form, _ = get_bound_published_form(settings, clean_form_id)
-    authorize_site_resource(
+    identity = authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,
         response=response,
@@ -3109,6 +3156,7 @@ def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: st
     saved = first_row(draft_response)
     if not saved:
         raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
+    require_form_draft_owner(saved, identity)
     return {"success": True, "draft": format_public_form_draft(saved)}
 
 
@@ -3178,17 +3226,21 @@ def save_public_builder_form_draft(
                 .limit(1)
                 .execute()
             )
-            if not first_row(existing_response):
+            existing = first_row(existing_response)
+            if not existing:
                 raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
-            saved_response = (
-                service_supabase.table("builder_form_drafts")
-                .update(payload)
-                .eq("id", draft_id)
-                .eq("tenant_id", tenant_id)
-                .execute()
+            require_form_draft_owner(existing, identity)
+            saved_response = write_public_form_draft(
+                payload,
+                draft_id=draft_id,
+                tenant_id=tenant_id,
             )
         else:
-            saved_response = service_supabase.table("builder_form_drafts").insert(payload).execute()
+            saved_response = write_public_form_draft(
+                payload,
+                draft_id=None,
+                tenant_id=tenant_id,
+            )
         saved = first_row(saved_response)
         if not saved:
             raise RuntimeError("form_draft_empty_result")
@@ -3329,15 +3381,32 @@ def submit_public_builder_form(
         increment_operational_usage(tenant_id, "form_submissions")
     if resume_draft_id:
         try:
-            (
+            draft_response = (
                 service_supabase.table("builder_form_drafts")
-                .delete()
+                .select("id,site_user_id")
                 .eq("id", resume_draft_id)
                 .eq("tenant_id", tenant_id)
                 .eq("project_id", project.get("id"))
                 .eq("form_id", clean_form_id)
+                .limit(1)
                 .execute()
             )
+            saved_draft = first_row(draft_response)
+            if saved_draft:
+                require_form_draft_owner(saved_draft, identity)
+                (
+                    service_supabase.table("builder_form_drafts")
+                    .delete()
+                    .eq("id", resume_draft_id)
+                    .eq("tenant_id", tenant_id)
+                    .eq("project_id", project.get("id"))
+                    .eq("form_id", clean_form_id)
+                    .execute()
+                )
+        except HTTPException:
+            # Submission succeeded; an unowned draft must remain untouched and
+            # the response must not reveal that another user's draft exists.
+            pass
         except Exception as error:
             logger.warning(
                 "public.form_draft_cleanup_failed",

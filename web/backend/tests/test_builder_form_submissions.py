@@ -1203,6 +1203,13 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 "contact_email": None,
                 "phone": None,
                 "description": None,
+                "store_theme": {
+                    "accent": "#852c21",
+                    "background": "#ffffff",
+                    "surface": "#f5f1eb",
+                    "text": "#162033",
+                    "muted": "#667085",
+                },
             },
         )
         self.assertEqual(
@@ -1752,6 +1759,22 @@ class PublicSiteTenantResolutionTests(unittest.TestCase):
             tenant_id = public_site_routes.resolve_tenant_id(settings)
 
         self.assertEqual(tenant_id, 11)
+
+
+class PublicFormDraftOwnershipTests(unittest.TestCase):
+    def test_named_draft_rejects_a_different_authenticated_user(self):
+        with self.assertRaises(HTTPException) as captured:
+            public_site_routes.require_form_draft_owner(
+                {"site_user_id": 77},
+                ({"id": 88}, {"tenant_id": 1}),
+            )
+        self.assertEqual(captured.exception.status_code, 404)
+
+    def test_anonymous_draft_remains_bearer_token_accessible(self):
+        public_site_routes.require_form_draft_owner(
+            {"site_user_id": None},
+            None,
+        )
 
 if __name__ == "__main__":
     unittest.main()

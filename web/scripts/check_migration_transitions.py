@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-DB = ROOT / "web/database/migrations"
-SB = ROOT / "web/supabase/migrations"
+WEB_ROOT = Path(__file__).resolve().parents[1]
+DB = WEB_ROOT / "database/migrations"
+SB = WEB_ROOT / "supabase/migrations"
 
 errors: list[str] = []
 

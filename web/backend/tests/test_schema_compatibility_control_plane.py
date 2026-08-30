@@ -8,7 +8,10 @@ from unittest import TestCase
 from unittest.mock import patch
 
 
-WEB_ROOT = Path(__file__).resolve().parents[2]
+WEB_ROOT = Path(
+    os.getenv("MADAR_TEST_REPOSITORY_ROOT")
+    or Path(__file__).resolve().parents[2]
+).resolve()
 RELEASE_DEPLOY = WEB_ROOT / "deployment/bin/madar-release-deploy"
 INSTALLER = WEB_ROOT / "deployment/bin/madar-install-control-plane"
 MIGRATE = WEB_ROOT / "deployment/bin/madar-migrate"

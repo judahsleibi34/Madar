@@ -58,8 +58,11 @@ export default function FixedSlotPicker({
     [activeDate, normalizedTimesByDate]
   );
   const activeDateValue = parseLocalDate(activeDate);
-  const initialCalendarDate = activeDateValue || new Date();
-  const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(initialCalendarDate));
+  const activeCalendarMonth = startOfMonth(activeDateValue || new Date());
+  const [calendarView, setCalendarView] = useState(null);
+  const calendarMonth = calendarView?.activeDate === activeDate
+    ? calendarView.month
+    : activeCalendarMonth;
   const fullDateFormatter = useMemo(() => new Intl.DateTimeFormat(lang, {
     weekday: "long",
     day: "numeric",
@@ -76,21 +79,16 @@ export default function FixedSlotPicker({
   const weekdays = useMemo(() => Array.from({ length: 7 }, (_, index) => (
     weekdayFormatter.format(new Date(2026, 0, 4 + index, 12))
   )), [weekdayFormatter]);
-  const calendarCells = useMemo(() => {
-    const year = calendarMonth.getFullYear();
-    const month = calendarMonth.getMonth();
-    const firstWeekday = new Date(year, month, 1, 12).getDay();
-    const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
-    return Array.from({ length: 42 }, (_, index) => {
-      const day = index - firstWeekday + 1;
-      return day > 0 && day <= daysInMonth ? new Date(year, month, day, 12) : null;
-    });
-  }, [calendarMonth]);
-
-  useEffect(() => {
-    if (!activeDateValue) return;
-    setCalendarMonth(startOfMonth(activeDateValue));
-  }, [activeDate]);
+  const calendarYear = calendarMonth.getFullYear();
+  const calendarMonthIndex = calendarMonth.getMonth();
+  const firstWeekday = new Date(calendarYear, calendarMonthIndex, 1, 12).getDay();
+  const daysInMonth = new Date(calendarYear, calendarMonthIndex + 1, 0, 12).getDate();
+  const calendarCells = Array.from({ length: 42 }, (_, index) => {
+    const day = index - firstWeekday + 1;
+    return day > 0 && day <= daysInMonth
+      ? new Date(calendarYear, calendarMonthIndex, day, 12)
+      : null;
+  });
 
   useEffect(() => {
     if (selectedDate || fixedDates.length === 0) return;
@@ -114,7 +112,10 @@ export default function FixedSlotPicker({
                 type="button"
                 aria-label="Previous month"
                 disabled={disabled}
-                onClick={() => setCalendarMonth((current) => shiftMonth(current, -1))}
+                onClick={() => setCalendarView({
+                  activeDate,
+                  month: shiftMonth(calendarMonth, -1),
+                })}
               >
                 <ChevronLeft size={20} aria-hidden="true" />
               </button>
@@ -123,7 +124,10 @@ export default function FixedSlotPicker({
                 type="button"
                 aria-label="Next month"
                 disabled={disabled}
-                onClick={() => setCalendarMonth((current) => shiftMonth(current, 1))}
+                onClick={() => setCalendarView({
+                  activeDate,
+                  month: shiftMonth(calendarMonth, 1),
+                })}
               >
                 <ChevronRight size={20} aria-hidden="true" />
               </button>

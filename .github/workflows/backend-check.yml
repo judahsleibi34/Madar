@@ -13,10 +13,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify dependency and migration locks
+      - name: Verify deterministic release preflight checks
         run: |
           python3 web/scripts/check_dependency_locks.py
           python3 web/scripts/check_migrations.py
+          python3 web/scripts/check_migration_transitions.py
+          python3 web/scripts/check_secret_hygiene.py
 
       - name: Build locked backend image
         run: docker build -t madar-backend-test web/backend

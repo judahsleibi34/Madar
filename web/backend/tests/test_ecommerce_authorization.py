@@ -1,7 +1,7 @@
+import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import pytest
 from fastapi import HTTPException, Request, Response
 
 from routes import ecommerce_routes
@@ -61,80 +61,105 @@ def context(tenant_id=7, role="member"):
     return SimpleNamespace(tenant_id=tenant_id, user_id=12, role=role)
 
 
-def test_every_private_ecommerce_route_uses_the_authorization_gate():
-    private_routes = [route for route in ecommerce_routes.router.routes if route.path.startswith("/ecommerce")]
-    assert private_routes
-    for route in private_routes:
-        assert "_require_ecommerce_access" in route.endpoint.__code__.co_names, route.path
-
-
-def test_ecommerce_access_disables_platform_account_impersonation():
-    with patch.object(
-        ecommerce_routes,
-        "require_active_tenant_member",
-        return_value=context(),
-    ) as authorize:
-        resolved = ecommerce_routes._require_ecommerce_access(request(), Response())
-
-    assert resolved.tenant_id == 7
-    authorize.assert_called_once()
-    assert authorize.call_args.kwargs == {"allow_admin_account_access": False}
-
-
-def test_ecommerce_access_rejects_an_unknown_membership_role():
-    with patch.object(
-        ecommerce_routes,
-        "require_active_tenant_member",
-        return_value=context(role="customer"),
-    ):
-        with pytest.raises(HTTPException) as error:
-            ecommerce_routes._require_ecommerce_access(request(), Response())
-
-    assert error.value.status_code == 403
-
-
-def test_catalog_read_returns_only_the_authenticated_tenant_rows():
-    database = TenantSupabase({
-        "ecommerce_tags": [
-            {"id": "tag-7", "tenant_id": 7},
-            {"id": "tag-8", "tenant_id": 8},
-        ],
-        "ecommerce_categories": [
-            {"id": "category-7", "tenant_id": 7},
-            {"id": "category-8", "tenant_id": 8},
-        ],
-        "ecommerce_products": [
-            {"id": "product-7", "tenant_id": 7},
-            {"id": "product-8", "tenant_id": 8},
-        ],
-        "ecommerce_product_tags": [
-            {"tenant_id": 7, "product_id": "product-7", "tag_id": "tag-7"},
-            {"tenant_id": 8, "product_id": "product-8", "tag_id": "tag-8"},
-        ],
-    })
-
-    with patch.object(ecommerce_routes, "service_supabase", database):
-        catalog = ecommerce_routes._catalog_for_tenant(7)
-
-    assert [row["id"] for row in catalog["tags"]] == ["tag-7"]
-    assert [row["id"] for row in catalog["categories"]] == ["category-7"]
-    assert [row["id"] for row in catalog["products"]] == ["product-7"]
-    assert catalog["products"][0]["tag_ids"] == ["tag-7"]
-    assert all(("tenant_id", 7) in query.filters for query in database.queries)
-
-
-def test_cross_tenant_record_lookup_is_hidden_as_not_found():
-    database = TenantSupabase({
-        "ecommerce_products": [{"id": "00000000-0000-0000-0000-000000000008", "tenant_id": 8}],
-    })
-
-    with patch.object(ecommerce_routes, "service_supabase", database):
-        with pytest.raises(HTTPException) as error:
-            ecommerce_routes._tenant_row(
-                "ecommerce_products",
-                "00000000-0000-0000-0000-000000000008",
-                7,
+class EcommerceAuthorizationTests(unittest.TestCase):
+    def test_every_private_ecommerce_route_uses_the_authorization_gate(self):
+        private_routes = [
+            route
+            for route in ecommerce_routes.router.routes
+            if route.path.startswith("/ecommerce")
+        ]
+        self.assertTrue(private_routes)
+        for route in private_routes:
+            self.assertIn(
+                "_require_ecommerce_access",
+                route.endpoint.__code__.co_names,
+                route.path,
             )
 
-    assert error.value.status_code == 404
-    assert "tenant" not in str(error.value.detail).lower()
+    def test_ecommerce_access_disables_platform_account_impersonation(self):
+        with patch.object(
+            ecommerce_routes,
+            "require_active_tenant_member",
+            return_value=context(),
+        ) as authorize:
+            resolved = ecommerce_routes._require_ecommerce_access(request(), Response())
+
+        self.assertEqual(resolved.tenant_id, 7)
+        authorize.assert_called_once()
+        self.assertEqual(
+            authorize.call_args.kwargs,
+            {"allow_admin_account_access": False},
+        )
+
+    def test_ecommerce_access_rejects_an_unknown_membership_role(self):
+        with patch.object(
+            ecommerce_routes,
+            "require_active_tenant_member",
+            return_value=context(role="customer"),
+        ):
+            with self.assertRaises(HTTPException) as captured:
+                ecommerce_routes._require_ecommerce_access(request(), Response())
+
+        self.assertEqual(captured.exception.status_code, 403)
+
+    def test_catalog_read_returns_only_the_authenticated_tenant_rows(self):
+        database = TenantSupabase({
+            "ecommerce_tags": [
+                {"id": "tag-7", "tenant_id": 7},
+                {"id": "tag-8", "tenant_id": 8},
+            ],
+            "ecommerce_categories": [
+                {"id": "category-7", "tenant_id": 7},
+                {"id": "category-8", "tenant_id": 8},
+            ],
+            "ecommerce_products": [
+                {"id": "product-7", "tenant_id": 7},
+                {"id": "product-8", "tenant_id": 8},
+            ],
+            "ecommerce_product_tags": [
+                {"tenant_id": 7, "product_id": "product-7", "tag_id": "tag-7"},
+                {"tenant_id": 8, "product_id": "product-8", "tag_id": "tag-8"},
+            ],
+        })
+
+        with patch.object(ecommerce_routes, "service_supabase", database):
+            catalog = ecommerce_routes._catalog_for_tenant(7)
+
+        self.assertEqual([row["id"] for row in catalog["tags"]], ["tag-7"])
+        self.assertEqual(
+            [row["id"] for row in catalog["categories"]],
+            ["category-7"],
+        )
+        self.assertEqual(
+            [row["id"] for row in catalog["products"]],
+            ["product-7"],
+        )
+        self.assertEqual(catalog["products"][0]["tag_ids"], ["tag-7"])
+        self.assertTrue(
+            all(("tenant_id", 7) in query.filters for query in database.queries)
+        )
+
+    def test_cross_tenant_record_lookup_is_hidden_as_not_found(self):
+        database = TenantSupabase({
+            "ecommerce_products": [
+                {
+                    "id": "00000000-0000-0000-0000-000000000008",
+                    "tenant_id": 8,
+                }
+            ],
+        })
+
+        with patch.object(ecommerce_routes, "service_supabase", database):
+            with self.assertRaises(HTTPException) as captured:
+                ecommerce_routes._tenant_row(
+                    "ecommerce_products",
+                    "00000000-0000-0000-0000-000000000008",
+                    7,
+                )
+
+        self.assertEqual(captured.exception.status_code, 404)
+        self.assertNotIn("tenant", str(captured.exception.detail).lower())
+
+
+if __name__ == "__main__":
+    unittest.main()
