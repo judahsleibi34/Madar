@@ -1,10 +1,10 @@
 [Unit]
 Description=One-time Madar private storage preparation
-ConditionPathExists=/home/madar/saas/Madar/web/scripts/prepare_production_storage.sh
+ConditionPathExists=/srv/madar/production/web/scripts/prepare_production_storage.sh
 
 [Service]
 Type=oneshot
 User=root
 Group=root
-ExecStart=/home/madar/saas/Madar/web/scripts/prepare_production_storage.sh
+ExecStart=/srv/madar/production/web/scripts/prepare_production_storage.sh
 RemainAfterExit=true

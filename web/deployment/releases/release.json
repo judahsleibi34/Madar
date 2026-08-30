@@ -8,7 +8,7 @@
     "rollback_compatible_min": 81,
     "rollback_compatible_max": 90
   },
-  "migration_policy": "manual-locked-backup-first-forward-repair",
-  "notes": "Compatibility bridge for schema 091-092. Deploy and validate while schema 090 is serving, then apply the backup-gated locked expand migrations 091-092. Migration 091 adds bounded names for saved form drafts; 092 adds tenant-owned workspace screen-time aggregation with service-role-only writes. The retained schema-090 release remains the rollback target until migration begins; after schema advances, forward repair is required by policy.",
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "notes": "Compatibility bridge for schema 091-092. Promote and accept while schema 090 is serving; only after this bridge is known-good may the separately locked automation create and verify a complete backup, apply the pinned expand migrations 091-092, and revalidate the active release. The retained schema-090 release remains a traffic rollback target only until migration begins; after schema advances, forward repair is required by policy.",
   "migration_manifest": "migrations-091-092.json"
 }

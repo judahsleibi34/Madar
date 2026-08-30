@@ -134,6 +134,37 @@ class MigrationExecutorTests(unittest.TestCase):
                     backup_verifier=lambda _path: None,
                 ).run()
 
+    def test_manifest_rejects_repository_escape_and_unsupported_class(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository, manifest_path, _backup = self.fixture(root)
+            raw = json.loads(manifest_path.read_text())
+            raw["migrations"][0]["path"] = "../outside.sql"
+            manifest_path.write_text(json.dumps(raw))
+            with self.assertRaisesRegex(ValueError, "escapes repository"):
+                MigrationManifest.load(manifest_path, repository)
+
+            _repository, manifest_path, _backup = self.fixture(root / "class")
+            raw = json.loads(manifest_path.read_text())
+            raw["migrations"][0]["compatibility"] = "coordinated"
+            manifest_path.write_text(json.dumps(raw))
+            with self.assertRaisesRegex(ValueError, "expand/forward-compatible"):
+                MigrationManifest.load(manifest_path, _repository)
+
+    def test_manifest_rejects_noncontiguous_transitions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository, manifest_path, _backup = self.fixture(root)
+            raw = json.loads(manifest_path.read_text())
+            raw["migrations"][1].update(
+                number=84,
+                from_schema=83,
+                to_schema=84,
+            )
+            manifest_path.write_text(json.dumps(raw))
+            with self.assertRaisesRegex(ValueError, "not contiguous"):
+                MigrationManifest.load(manifest_path, repository)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,9 +3,12 @@
 Before changing deployment, migrations, schema compatibility, Docker/Compose,
 production runtime code, release-sensitive backend/frontend code, or opening a
 PR targeting `main`, read [`docs/production-release-policy.md`](docs/production-release-policy.md).
+Before changing automatic migration orchestration, also read
+[`docs/automated-database-migration-architecture.md`](docs/automated-database-migration-architecture.md).
 
-The current implementation is authoritative. If deployment-gating code or
-compatibility metadata changes, update the policy in the same change. Run every
+The current implementation is authoritative. If deployment-gating code,
+automatic migration orchestration, or compatibility metadata changes, update
+the applicable policy and architecture documents in the same change. Run every
 applicable release-policy check before declaring work ready, and report gates
 that cannot be tested locally.
 

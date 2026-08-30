@@ -44,7 +44,7 @@ def main() -> int:
                 "MADAR_MIGRATION_REPOSITORY_ROOT",
                 os.getenv(
                     "MADAR_PRODUCTION_REPO",
-                    "/home/madar/saas/Madar",
+                    "/srv/madar/production",
                 ),
             )
         ),

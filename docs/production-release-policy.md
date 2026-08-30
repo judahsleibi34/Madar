@@ -10,6 +10,11 @@ release state machine records it as `known_good`; fetching or building a commit,
 starting an inactive slot, switching the proxy, or passing one health request is
 not acceptance by itself.
 
+The separate [automated database migration architecture](automated-database-migration-architecture.md)
+blueprint explains the post-known-good bridge, backup, migration, recovery, and
+forward-repair state machine. This policy remains the specification of enforced
+gates; the blueprint explains their orchestration and rationale.
+
 The current implementation is authoritative. This document must represent that
 implementation, not replace it. If code and documentation disagree, stop and
 investigate the discrepancy. Do not weaken code to make this document true, and
@@ -29,30 +34,87 @@ Primary implementation:
 - `web/scripts/check_migrations.py`
 - `web/scripts/check_migration_transitions.py`
 
+### Canonical production path contract
+
+`web/deployment/production-paths.conf` is the single tracked Node 2 production
+path contract. Its current values are:
+
+```text
+MADAR_PRODUCTION_REPO=/srv/madar/production
+MADAR_ENV_FILE=/etc/madar/production.env
+MADAR_DEPLOY_STATE_ROOT=/var/lib/madar/releases
+MADAR_STORAGE_ROOT=/var/lib/madar/storage
+MADAR_ACTIVE_UPSTREAMS_FILE=/var/lib/madar/proxy/active-upstreams.conf
+MADAR_PROXY_CONFIG_ROOT=/var/lib/madar/proxy
+MADAR_CONTROL_PLANE_ROOT=/opt/madar/control-plane/deployment
+MADAR_MIGRATION_BACKUP_SCRIPT=/opt/madar/control-plane/deployment/scripts/backup_madar.sh
+MADAR_MIGRATION_BACKUP_VERIFY_SCRIPT=/opt/madar/control-plane/deployment/scripts/verify_backup.sh
+```
+
+The auto-deploy unit loads the protected backup environment first and this
+root-owned contract second. Consequently backup credentials and
+`MADAR_BACKUP_DIR` remain operator configuration, while the production,
+state, storage, proxy, controller, and migration-backup executable paths
+cannot be redirected by that environment file.
+
+The one authoritative root-owned controller is
+`/opt/madar/control-plane/deployment`. Historical `/home/madar/...` paths are
+legacy evidence or compatibility-entrypoint locations, not current defaults.
+`/usr/local/lib/madar/web/deployment` was an intermediate controller root and
+must not remain simultaneously authoritative. General operational helpers such
+as the alert and scheduled backup scripts may remain under
+`/usr/local/lib/madar`; that does not make them a second release controller.
+
+The installer performs an explicit cutover: it requires the canonical repo,
+environment, backup environment, initialized release state, storage, and proxy
+roots; requires an empty explicit backup directory outside both controller
+roots; backs up both a current `/opt` controller and any legacy `/usr/local`
+controller under unambiguous names; refuses to run while the timer is active or
+enabled or the deploy service is active; installs and marks the `/opt` copy;
+installs units that name `/opt`; then retires the legacy
+controller/entrypoints before `daemon-reload`. It never
+creates or relocates release state. The timer remains stopped for operator
+review. Do not copy isolated files or edit the provenance marker.
+
+The new controller is assembled in a root-owned staging directory and published
+as an exact tree only after every tracked file, operational migration-backup
+script, and provenance marker is ready. The backed-up prior tree is then
+replaced, so removed stale files cannot survive beneath a marker for newer
+source.
+
 ## B. Candidate eligibility (automatic production gate)
 
 `madar-auto-deploy` and `madar-production-deploy` require a clean production
 checkout, including tracked and untracked files, before fetching `origin/main`.
-The fetched candidate is resolved to a full Git SHA. `ReleaseDeployer.deploy()`
-accepts only a 40-character lowercase hexadecimal SHA.
+The fetched candidate is resolved to a full lowercase Git SHA. The CLI
+normalizes its argument and `ReleaseDeployer.deploy()` requires 40 hexadecimal
+characters.
 
-Before eligibility evaluation, `madar-control-plane-guard` must exist and pass.
+Before eligibility evaluation, `madar-control-plane-guard` from the canonical
+`/opt` root must exist and pass.
 It validates the candidate SHA, the installed root-owned
 `CONTROL_PLANE_SOURCE_SHA` marker, and local availability of both commits. Any
 change between the installed controller source and candidate under
-`web/deployment` or `web/scripts/madar_alert_hook.sh` requires a reviewed,
+`web/deployment`, `web/scripts/madar_alert_hook.sh`,
+`web/scripts/backup_madar.sh`, or `web/scripts/verify_backup.sh` requires a reviewed,
 root-owned control-plane reinstall. The installer itself requires a clean,
 committed source tree, preserves replaced files in an explicit backup directory,
-and refuses to run while the auto-deploy timer is active or enabled.
+and refuses to run while the auto-deploy timer is active or enabled or the
+deploy service is active.
 
 The immutable release state must already contain a full
 `known_good_release.sha`. Then:
 
-- candidate equals known-good: no deployment;
+- candidate equals known-good: do not redeploy; enter the idempotent
+  post-acceptance migration coordinator, which either no-ops, observes a
+  completed target, suppresses a bounded retry, or continues an opted-in
+  manifest;
 - `origin/main` is behind known-good: no action and no rollback;
 - known-good is not an ancestor of candidate: reject main divergence;
 - known-good is an ancestor and no watched runtime path changed: fast-forward
-  the production checkout without a runtime deployment;
+  only after giving the application-equivalent known-good SHA's pending
+  migration coordinator an opportunity to complete; then advance the checkout
+  without a runtime deployment;
 - a still-suppressed failed SHA: no retry;
 - otherwise: invoke the immutable production deployer.
 
@@ -150,10 +212,12 @@ must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
 Current bridge contract after this policy update is schema range `81..92`, target
-`92`, class `expand-only`, rollback metadata `81..90`, and manifest
-`migrations-091-092.json`. It is designed to promote while schema 90 is live,
-then execute reviewed 90→91→92 migrations separately. Code that touches new
-objects must remain safe during that bridge interval.
+`92`, class `expand-only`, rollback metadata `81..90`, manifest
+`migrations-091-092.json`, and migration policy
+`automatic-after-known-good-backup-first-forward-repair`. It promotes and is
+accepted while schema 90 is live. Only afterward may the separate coordinator
+create a verified backup and execute 90→91→92. Code that touches new objects
+must remain safe throughout that bridge interval.
 
 Implemented by `web/deployment/lib/release_deployer.py :: Compatibility.load()`
 and `ReleaseDeployer.deploy()`, plus `DockerGitOperations.schema_version()`,
@@ -245,14 +309,97 @@ validator and valid neighboring migrations before creating a migration.
 
 Implemented by `web/scripts/check_migration_transitions.py`.
 
-## G. Explicit migration execution rules (not automatic release promotion)
+## G. Post-acceptance and explicit migration execution rules
 
-Traffic promotion never applies or reverses database migrations. The supported
-workflow first promotes a compatible bridge release and then an operator runs
-`madar-migrate` with an already-created backup.
+Traffic promotion never applies or reverses database migrations. A migration-
+bearing release must first pass the complete promotion state machine and be
+durably `known_good` while its source schema is still serving. Automatic
+migration is a separate post-acceptance phase under the same host
+`deploy.lock`; the SQL executor additionally takes the PostgreSQL advisory lock.
+It never calls traffic switching or the promotion rollback handler.
 
-`madar-migrate` requires a database URL, expected release SHA, explicit Git
-repository root, backup path, and migration state file. Git top-level must equal
+### Automatic post-acceptance coordinator
+
+Automation is opt-in per release. It runs only when `release.json` contains the
+exact policy
+`automatic-after-known-good-backup-first-forward-repair`. `none`, the former
+manual policy, missing values, and any other value do not authorize automatic
+SQL. The installed and immutable-worktree `release.json` documents must be
+byte-semantically equal as parsed JSON. The release class and every manifest
+entry must be `expand-only` or `forward-compatible`; the manifest final target
+must equal the release target; and its whole source-to-target interval must be
+inside the bridge compatibility range.
+
+Before backup creation or opening the migration-executor connection, the
+coordinator requires all of the following (including a read-only live-schema
+query):
+
+- the requested full SHA is exactly `state.json.known_good_release.sha` and its
+  slot is the active blue/green slot;
+- no release is in progress and no rollback failure awaits recovery;
+- the immutable release worktree is clean, detached at the exact SHA, and its
+  installed/candidate release contract and manifest identity agree;
+- both migration-tree validators pass again from immutable source;
+- migration files exist and match every pinned SHA-256;
+- the active slot and stable backend/frontend validate as that known-good SHA;
+- live core schema is in the candidate range and within the manifest interval;
+- for the first transition, rollback metadata contains the source schema and
+  the completed promotion history contains a distinct retained target whose
+  recorded compatibility contains that source schema; immediately before the
+  forward phase, the coordinator re-attests that retained process's SHA and
+  source-schema compatibility directly from its running version endpoint.
+
+The systemd auto-deploy service loads `/etc/madar/backup.env` before the
+canonical path contract; the former supplies protected libpq `PG*`
+credentials and `MADAR_BACKUP_DIR`, while the latter pins the executable and
+storage paths. Credentials are not placed on the command line. The root-owned,
+provenance-covered `backup_madar.sh` creates a new complete PostgreSQL-and-file backup using the
+canonical storage directories and identifies it with the serving release SHA
+and image build timestamp. `verify_backup.sh` must validate format members,
+completion metadata, all SHA-256 values, and the PostgreSQL dump TOC before the
+database advisory lock is attempted. Automation additionally requires backup
+output to be one timestamp-named direct child of the configured backup root,
+requires format 3, and attests the backup ID, serving release SHA, and
+pre-migration source schema from `manifest.json`; a merely well-formed backup for a different
+release or schema is rejected.
+
+Automation state is durable under
+`/var/lib/madar/releases/migrations/<SHA>/`. `execution.json` is the SQL
+executor record; `automation.json` covers backup, execution, worker refresh,
+post-migration health, failure semantics, and retry time. If any transition has
+already advanced the schema, a retry is allowed only with the same recorded
+backup under the configured backup root. Missing or substituted resume backup
+attestation fails closed. A target reached by a prior explicit reviewed run is
+not given a fabricated post-fact backup claim.
+
+After the final target is observed, the controller recreates schema-gated
+workers for the active bridge, repeats active-slot and stable-proxy validation,
+and only then updates the known-good record's observed schema. Backup,
+execution, and post-migration validation failures are recorded as
+`failed_forward_repair_required`; precondition failures stop before mutation
+and are reported directly. Retry defaults to 15 minutes and is bounded to
+5..1440 minutes. A failure never makes the accepted bridge bad,
+never restores schema, and never routes traffic to the now-schema-incompatible
+old slot. The next same-SHA auto-deploy cycle re-enters this coordinator and
+either honors retry suppression or safely resumes.
+
+Implemented by `web/deployment/bin/madar-auto-deploy`,
+`madar-production-deploy`, and `madar-release-deploy ::
+automatic_migrate_known_good()`, `_create_verified_migration_backup()`,
+`_validate_stable_known_good()`, and `refresh_active_workers()`.
+
+### Explicit migration runner
+
+The operator-facing `madar-migrate` remains available for reviewed explicit
+execution with an already-created backup. It uses the same manifest and
+executor gates. It requires an expected release SHA, explicit Git repository
+root, backup path, migration state file, and database URL supplied by
+`MADAR_MIGRATION_DATABASE_URL` or `--database-url`. Prefer the protected
+environment variable so the secret is not exposed in argv. The automatic
+coordinator instead uses the same protected libpq `PG*` environment already
+required by its backup operation.
+
+Git top-level must equal
 the supplied root; the worktree must be clean; HEAD must equal the expected SHA.
 The manifest comes from the command or the clean release's `release.json` and
 must be a basename matching `migrations-*.json`. A concrete manifest SHA must
@@ -264,7 +411,8 @@ repository-contained paths, a non-empty list, `to_schema == number`,
 or `forward-compatible`. Before connecting, every migration file must exist and
 match its pinned SHA-256.
 
-The executor first runs `web/scripts/verify_backup.sh`. The backup must contain
+The executor verifies migration file/checksum inputs and then runs
+`web/scripts/verify_backup.sh`. The backup must contain
 the required database, checksum, environment metadata, and file-asset members;
 format-specific completion/manifest files must be valid; all checksums must pass;
 and `pg_restore --list` must read the dump. Only then does the executor acquire
@@ -280,7 +428,8 @@ system is resumed or forward-repaired—never automatically reverse-migrated.
 
 Implemented by `web/deployment/bin/madar-migrate`,
 `web/deployment/lib/migration_executor.py :: MigrationManifest.load()` and
-`LockedMigrationExecutor.run()`, and `web/scripts/verify_backup.sh`.
+`LockedMigrationExecutor.verify_migrations()`/`run()`, and
+`web/scripts/verify_backup.sh`.
 
 ## H. Preflight (automatic production gate)
 
@@ -425,6 +574,14 @@ then required; do not erase the evidence or force a new release through.
 
 Implemented by `ReleaseDeployer.deploy()`.
 
+Post-acceptance migration failures are intentionally outside these blue/green
+rollback branches. Before the first schema change the retained old slot is still
+a viable traffic target and the new complete backup exists. Once any schema
+transition commits, the old slot may be schema-incompatible; automation records
+forward-repair-required state, retains the accepted bridge in traffic, retains
+the original backup and execution evidence, and retries only after the bounded
+delay. It never attempts reverse SQL or a proxy switch.
+
 ## P. Interrupted deployment recovery
 
 Every phase checkpoints `in_progress_release`. At the start of the next locked
@@ -438,17 +595,18 @@ Implemented by `ReleaseDeployer._checkpoint()` and `_recover_interrupted()`.
 
 ## Q. Other repository and operational checks
 
-| Check | Production auto-deploy | Explicit migration execution | CI/manual status |
-| --- | --- | --- | --- |
-| `check_migrations.py` | Yes, preflight | Not called by `madar-migrate` | Backend CI |
-| `check_migration_transitions.py` | Yes, preflight | Not called by `madar-migrate` | Backend CI |
-| `check_secret_hygiene.py` | Yes, preflight | No | Backend CI |
-| `check_dependency_locks.py` | No | No | Backend and frontend CI |
-| `check_host_capacity.sh` | No | No | Installed periodic host-capacity service/timer; host-specific |
-| `rehearse_migration_*.sh` | No | No | Manual, migration-specific rehearsals |
-| backend test suite/image build | No direct call | No | Backend CI |
-| frontend lint/tests/build/audit | No direct call; production image build does build frontend | No | Frontend CI |
-| `verify_backup.sh` | No | Yes, mandatory before migration lock | Manual migration execution |
+| Check | Release promotion | Automatic post-acceptance migration | Explicit migration execution | CI/manual status |
+| --- | --- | --- | --- | --- |
+| `check_migrations.py` | Yes, preflight | Yes, rerun before backup | No | Backend CI |
+| `check_migration_transitions.py` | Yes, preflight | Yes, rerun before backup | No | Backend CI |
+| `check_secret_hygiene.py` | Yes, preflight | No | No | Backend CI |
+| `check_dependency_locks.py` | No | No | No | Backend and frontend CI |
+| `check_host_capacity.sh` | No | No | No | Installed periodic host-capacity service/timer; host-specific |
+| `rehearse_migration_*.sh` | No | No | No | Manual, migration-specific rehearsals |
+| backend test suite/image build | Image build only | No | No | Backend CI |
+| frontend lint/tests/build/audit | Production image build runs the build | No | No | Frontend CI |
+| `backup_madar.sh` | No | Yes, new complete backup | No | Scheduled/manual backup tooling |
+| `verify_backup.sh` | No | Yes, before DB lock and again in executor | Yes, mandatory before DB lock | Manual/automated migration execution |
 
 This table describes calls proven by current code. GitHub branch protection is
 external configuration; workflow presence alone does not prove that checks are
@@ -488,6 +646,7 @@ document and update it when behavior changed:
 - `release_deployer.py`
 - `migration_executor.py`
 - `madar-migrate`
+- `production-paths.conf` and tracked systemd/installer path contracts
 - `check_migrations.py`
 - `check_migration_transitions.py`
 - deployment compatibility metadata, manifests, or release contract

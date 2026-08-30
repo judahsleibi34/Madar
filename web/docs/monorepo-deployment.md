@@ -1,82 +1,76 @@
-# Monorepo web deployment
+# Production monorepo deployment
 
-The Git checkout and web Compose project now have distinct roots:
+This page is a short operator orientation. The complete, maintained release
+acceptance and migration contract is
+[`docs/production-release-policy.md`](../../docs/production-release-policy.md).
+Read that policy and the current implementation before changing production
+deployment behavior.
+
+## Current Node 2 layout
 
 ```text
-REPO_ROOT=/home/madar/saas/Madar
-WEB_ROOT=/home/madar/saas/Madar/web
-COMPOSE_FILE=/home/madar/saas/Madar/web/docker-compose.yml
-ENV_FILE=/home/madar/saas/Madar/.env
-COMPOSE_PROJECT=madar
+MADAR_PRODUCTION_REPO=/srv/madar/production
+MADAR_ENV_FILE=/etc/madar/production.env
+MADAR_DEPLOY_STATE_ROOT=/var/lib/madar/releases
+MADAR_STORAGE_ROOT=/var/lib/madar/storage
+MADAR_PROXY_CONFIG_ROOT=/var/lib/madar/proxy
+MADAR_CONTROL_PLANE_ROOT=/opt/madar/control-plane/deployment
 ```
 
-Git fetch, status, revision, and reset operations remain rooted at
-`REPO_ROOT`. Production Compose commands must use all of the following:
+The production checkout is a source and Git reference. Accepted application
+releases run from detached immutable worktrees below the release-state root;
+the active blue/green slot is never rebuilt in place. Persistent uploads and
+generated files live below the storage root and are mounted into release
+containers. The root-owned controller under `/opt` is the sole authoritative
+auto-deploy controller. Its tracked path values are installed from
+`web/deployment/production-paths.conf`.
 
-```bash
-docker compose \
-  --project-name madar \
-  --project-directory /home/madar/saas/Madar/web \
-  --env-file /home/madar/saas/Madar/.env \
-  -f /home/madar/saas/Madar/web/docker-compose.yml \
-  --profile workers \
-  config --quiet
-```
+The Compose CLI must receive the immutable release's `web` directory as its
+project directory, the release Compose file plus the installed release
+override, and `/etc/madar/production.env` as its environment file. Operators
+must not run an in-place Compose rebuild from the production checkout or move
+release state to a new directory.
 
-The CLI `--env-file` supplies interpolation values. The deployment script also
-exports the same absolute `MADAR_ENV_FILE`, so the backend, notification worker,
-and calendar worker service-level `env_file` declarations load that exact file.
-The file remains outside Git and must stay mode `0600` or otherwise readable
-only by the deployment identity.
+## Control-plane installation
 
-## Temporary commercial-entitlement override
+Install only through the reviewed
+`web/deployment/bin/madar-install-control-plane` procedure in an approved
+maintenance window. It requires the auto-deploy timer and service to be
+stopped, backs up the installed controller and legacy entrypoints, publishes
+an exact root-owned `/opt` tree with a source-SHA provenance marker, retires the
+old `/usr/local/lib/madar/web/deployment` controller, reloads systemd, and
+leaves the timer stopped for operator review. Never update the provenance
+marker or isolated installed files by hand.
 
-`COMMERCIAL_ENTITLEMENTS_ENFORCED=false` is a temporary production setting
-until the payment gateway and commercial tenant assignments are ready. It
-grants authenticated tenants the implemented commercial capability set without
-changing authentication, tenant isolation, permissions, MFA/AAL2, or canonical
-billing data. Set the value back to `true` and deploy normally to restore the
-canonical subscription/add-on policy; no database change is required.
+## Database migrations
 
-The four writable application mounts intentionally remain under
-`REPO_ROOT/backend/`, matching the paths used before the monorepo move. Code and
-read-only migration/script mounts resolve under `WEB_ROOT`. Redis uses tmpfs and
-PostgreSQL is external to this Compose stack; neither is recreated by the path
-change. The production script exports `MADAR_STORAGE_ROOT` as the absolute
-legacy directory; the Compose fallback `../backend` provides the same result
-when commands are run from `web/`.
+Traffic promotion and SQL execution remain separate safety phases. A release
+must first pass immutable build, compatibility, rollback, preflight, deep
+validation, worker cutover, traffic switching, observation, and durable
+`known_good` acceptance while the source schema is serving. Only an explicitly
+opted-in expand/forward-compatible release may then enter the separately
+locked, backup-first automatic migration coordinator. That coordinator pins
+checksums, verifies a complete release/schema-bound backup, applies only a
+contiguous manifest under a PostgreSQL advisory lock, and revalidates the
+serving bridge and workers. A partially advanced schema is forward-repaired;
+it is never hidden by a traffic rollback to an incompatible application.
 
-## Deployment-script installation gate
+The reviewed explicit `madar-migrate` path remains available for releases that
+do not opt into automation. Neither path permits production SQL from a mutable
+checkout or without the documented backup, manifest, release-identity, and
+schema-transition gates.
 
-The reviewed source copies are:
+## Commercial-entitlement setting
 
-- `web/deployment/bin/madar-auto-deploy`
-- `web/deployment/bin/madar-production-deploy`
+`COMMERCIAL_ENTITLEMENTS_ENFORCED=false` remains the temporary compatibility
+setting for environments that have not completed payment-gateway and
+commercial-tenant assignment rollout. It changes commercial capability
+enforcement, not authentication, tenant isolation, permissions, MFA/AAL2, or
+canonical billing data. Restore `true` through the protected production
+environment and a normal reviewed release when that rollout is complete.
 
-They are candidates for `/usr/local/sbin/madar-auto-deploy` and
-`/home/madar/docker_auto.sh`. Do not replace the live scripts while the timer is
-active: because production is behind `origin/main`, the next timer event would
-immediately attempt a deployment. An operator must first establish an approved
-maintenance/deployment window, prevent timer races, install and checksum the
-reviewed files, install the updated storage-preparation drop-in, run
-`systemctl daemon-reload`, validate the exact Compose command above, and only
-then explicitly start or re-enable the deployment path.
+## Local development
 
-The deploy script preserves the Compose project name `madar`, includes the
-notification-worker profile, validates configuration before building, waits for
-container health, checks backend readiness and frontend HTTP health, and can
-select the old root Compose layout after resetting to a pre-monorepo commit.
-Migrations are deliberately not automatic because application rollback cannot
-undo schema or data changes safely.
-
-## Manual development
-
-From `web/`, use the repository-root environment file explicitly:
-
-```bash
-docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.dev.yml config
-```
-
-Use a non-production environment file for local development whenever possible.
-The mobile application has its own dependency and build lifecycle and is not a
-Compose service.
+From `web/`, use an explicit non-production environment file with
+`docker-compose.yml` and `docker-compose.dev.yml`. Development defaults and
+historical incident documents do not redefine the production path contract.
