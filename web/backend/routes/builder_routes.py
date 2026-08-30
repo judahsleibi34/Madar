@@ -37,6 +37,7 @@ from services.billing_service import require_publish_entitlement
 from services.form_draft_service import build_form_draft_token
 from services.rate_limit_service import enforce_builder_asset_upload_rate_limit
 from services.site_permission_service import assign_project_role, project_role_keys
+from services.screen_time_service import get_weekly_screen_time, record_screen_time
 from services.storage_quota_service import (
     StorageSafetyError,
     finish_storage,
@@ -1113,6 +1114,10 @@ class BuilderFormRecordUpdate(BaseModel):
 
 
 
+class ScreenTimeHeartbeat(BaseModel):
+    active_seconds: int = Field(..., ge=1, le=60)
+
+
 class BuilderSiteMemberCreate(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=160)
     email: EmailStr
@@ -1468,6 +1473,7 @@ def format_form_draft(row: dict):
         "id": row.get("id"),
         "formId": row.get("form_id"),
         "formTitle": row.get("form_title"),
+        "name": row.get("draft_name") or row.get("form_title") or "Incomplete form",
         "formVersion": row.get("form_version"),
         "status": "Incomplete",
         "answers": row.get("answers") or {},
@@ -2165,6 +2171,42 @@ def update_builder_site_binding(
     return {
         "success": True,
         "binding": format_public_project_binding(rows[0], project),
+    }
+
+
+@router.post("/screen-time/heartbeat")
+def create_screen_time_heartbeat(
+    payload: ScreenTimeHeartbeat,
+    request: Request,
+    response: Response,
+):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    record_screen_time(
+        tenant_id=context.tenant_id,
+        user_id=context.user_id,
+        active_seconds=payload.active_seconds,
+    )
+    return {"success": True}
+
+
+@router.get("/screen-time/weekly")
+def read_weekly_screen_time(
+    request: Request,
+    response: Response,
+    project_id: Optional[str] = Query(default=None),
+    period: str = Query(default="week", pattern="^(today|week|month)$"),
+):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    if project_id:
+        get_project_for_tenant(project_id, context.tenant_id)
+    return {
+        "success": True,
+        **get_weekly_screen_time(
+            tenant_id=context.tenant_id,
+            current_user_id=context.user_id,
+            project_id=project_id,
+            period=period,
+        ),
     }
 
 

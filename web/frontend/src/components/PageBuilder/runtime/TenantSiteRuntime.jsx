@@ -9,6 +9,7 @@ import {
   fetchPublicSite,
   fetchPublicSiteBootstrap,
   getTenantVisitorStatus,
+  listPublicFormDrafts,
   loginTenantVisitor,
   logoutTenantVisitor,
   registerTenantVisitor,
@@ -27,6 +28,11 @@ import {
   removeRuntimeFormDraft,
   saveRuntimeFormDraft,
 } from "./formDraftStorage";
+import {
+  addCompletedFormPage,
+  completedFormPagesBefore,
+  getFormPageNavigationItems,
+} from "./formPageNavigation";
 import { getFormSections } from "../core/PageBuilder.factories";
 import { createElementRenderer } from "../core/PageBuilder.elementRenderer";
 import SiteRenderer from "../core/PageBuilder.siteRenderer";
@@ -51,6 +57,7 @@ import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
 import { resolveReservationBlockValue } from "../core/PageBuilder.reservations";
 import { getResponsiveMediaProps, resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
+import useWeeklyScreenTime from "../../../hooks/useWeeklyScreenTime";
 import { getReservationErrorMessage } from "./reservationSubmission";
 import {
   getDefaultPublicPage,
@@ -502,19 +509,28 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [formFieldErrors, setFormFieldErrors] = useState({});
   const [reservationStatus, setReservationStatus] = useState({});
   const [formPages, setFormPages] = useState({});
+  const [completedFormPages, setCompletedFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
   const [formResumeTokens, setFormResumeTokens] = useState({});
+  const [formDraftNames, setFormDraftNames] = useState({});
+  const [draftSaveDialog, setDraftSaveDialog] = useState(null);
+  const [incompleteDraftDialog, setIncompleteDraftDialog] = useState(null);
   const [quizAttempts, setQuizAttempts] = useState({});
   const [authPanelModes, setAuthPanelModes] = useState({});
   const [publicActionMessage, setPublicActionMessage] = useState("");
   const [formToast, setFormToast] = useState(null);
   const [tenantAuth, setTenantAuth] = useState({ loading: !draftPreview, user: null, message: "", error: "" });
+  useWeeklyScreenTime(draftPreview ? null : tenantAuth.user, {
+    endpoint: "/public/sites/" + encodeURIComponent(cleanSubdomain) + "/screen-time/heartbeat",
+    scope: "site:" + cleanSubdomain,
+  });
   const publicSubmissionStartedAtRef = useRef(Date.now());
   const formIdempotencyKeysRef = useRef({});
   const protectedPageRequestRef = useRef("");
   const pendingProtectedPageRef = useRef("");
   const loadedResumeTokenRef = useRef("");
   const detectedPublicationRef = useRef("");
+  const promptedIncompleteDraftsRef = useRef("");
 
   const showFormToast = useCallback((title, message) => {
     setFormToast({ id: Date.now(), title, message });
@@ -530,14 +546,22 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const restoredPages = {};
     const restoredLanguages = {};
     const restoredResumeTokens = {};
+    const restoredDraftNames = {};
     const restoredStatuses = {};
+    const restoredCompletedPages = {};
 
     Object.entries(drafts).forEach(([instanceKey, draft]) => {
       restoredAnswers[instanceKey] = draft.answers || {};
       restoredPages[instanceKey] = Math.max(0, Number(draft.pageIndex) || 0);
+      restoredCompletedPages[instanceKey] = completedFormPagesBefore(
+        restoredPages[instanceKey],
+      );
       restoredLanguages[instanceKey] = draft.language || "en";
       if (draft.resumeToken) {
         restoredResumeTokens[instanceKey] = draft.resumeToken;
+      }
+      if (draft.draftName) {
+        restoredDraftNames[instanceKey] = draft.draftName;
       }
       restoredStatuses[instanceKey] = {
         submitting: false,
@@ -548,8 +572,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
 
     setFormAnswers(restoredAnswers);
     setFormPages(restoredPages);
+    setCompletedFormPages(restoredCompletedPages);
     setFormLanguages(restoredLanguages);
     setFormResumeTokens(restoredResumeTokens);
+    setFormDraftNames(restoredDraftNames);
     setFormStatus(restoredStatuses);
   }, [cleanSubdomain, draftPreview]);
 
@@ -567,8 +593,15 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         const language = draft.language || "en";
         setFormAnswers((current) => ({ ...current, [instanceKey]: answers }));
         setFormPages((current) => ({ ...current, [instanceKey]: pageIndex }));
+        setCompletedFormPages((current) => ({
+          ...current,
+          [instanceKey]: completedFormPagesBefore(pageIndex),
+        }));
         setFormLanguages((current) => ({ ...current, [instanceKey]: language }));
         setFormResumeTokens((current) => ({ ...current, [instanceKey]: resumeToken }));
+        setFormDraftNames((current) => ({
+          ...current, [instanceKey]: draft.name || "Incomplete form",
+        }));
         setFormStatus((current) => ({
           ...current,
           [instanceKey]: { submitting: false, error: "", success: runtimeFallbackCopy.runtime.resumeLaterRestored },
@@ -1413,6 +1446,10 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       return;
     }
 
+    setCompletedFormPages((current) => ({
+      ...current,
+      [instanceKey]: addCompletedFormPage(current[instanceKey], currentPageIndex),
+    }));
     setRuntimeFormPage(instanceKey, currentPageIndex + 1, pageCount);
   };
 
@@ -1478,6 +1515,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       setFormFieldErrors((prev) => ({ ...prev, [instanceKey]: {} }));
       setFormHoneypots((prev) => ({ ...prev, [instanceKey]: "" }));
       setFormPages((prev) => ({ ...prev, [instanceKey]: 0 }));
+      setCompletedFormPages((prev) => ({ ...prev, [instanceKey]: [] }));
       if (form.mode === "quiz") {
         setQuizAttempts((prev) => ({ ...prev, [instanceKey]: null }));
       }
@@ -1841,6 +1879,21 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       Math.min(Number(formPages[instanceKey] || 0), Math.max(formSections.length - 1, 0))
     );
     const currentPage = formSections[currentPageIndex];
+    const validCompletedPages = (completedFormPages[instanceKey] || []).filter(
+      (pageIndex) =>
+        Object.keys(
+          getRuntimeValidationErrors(
+            form,
+            formSections[pageIndex]?.fields || [],
+            instanceKey,
+          ),
+        ).length === 0,
+    );
+    const pageNavigationItems = getFormPageNavigationItems(
+      formSections.length,
+      currentPageIndex,
+      validCompletedPages,
+    );
     const renderRuntimeFormPage = (section) => {
       const visibleFields = getVisibleFieldsForInstance(form, section.fields || [], instanceKey);
       return (
@@ -1973,13 +2026,38 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             <span />
           )}
 
-          <span className="runtime-form-page-count">
-            {isPagedForm
-              ? formCopy.runtime.pageCount
-                  .replace("{current}", currentPageIndex + 1)
-                  .replace("{total}", formSections.length)
-              : ""}
-          </span>
+<div className="runtime-form-page-navigation">
+            <span className="runtime-form-page-count">
+              {isPagedForm
+                ? formCopy.runtime.pageCount
+                    .replace("{current}", currentPageIndex + 1)
+                    .replace("{total}", formSections.length)
+                : ""}
+            </span>
+            {isPagedForm && (
+              <div className="runtime-form-page-numbers" role="navigation" aria-label="Form pages">
+                {pageNavigationItems.map((item) => (
+                  <button
+                    key={item.index}
+                    type="button"
+                    className={
+                      "runtime-form-page-number" +
+                      (item.isCurrent ? " is-current" : "") +
+                      (item.isCompleted ? " is-completed" : "")
+                    }
+                    aria-current={item.isCurrent ? "page" : undefined}
+                    aria-label={`Page ${item.index + 1}`}
+                    disabled={item.isDisabled || isSubmitting}
+                    onClick={() =>
+                      setRuntimeFormPage(instanceKey, item.index, formSections.length)
+                    }
+                  >
+                    {item.index + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="runtime-form-actions">
             {!isQuiz && form.resumeLaterEnabled !== false && (

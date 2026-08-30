@@ -1346,7 +1346,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
 }
 
 .admin-dashboard-page .user-dashboard-page .user-dashboard-hero {
-  margin-bottom: 28px;
+  margin-bottom: 8px;
   background: transparent !important;
   background-image: none !important;
 }
@@ -1355,26 +1355,62 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   color: var(--theme-text) !important;
 }
 
+.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions a {
+  min-height: 42px;
+  padding: 0 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: 11px;
+  font-size: 0.88rem;
+  font-weight: 750;
+  line-height: 1;
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions a:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--theme-primary-rgb), 0.5);
+}
+
+.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions a.is-primary {
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+  border-color: var(--theme-primary);
+}
+
 .admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card {
   grid-column: span 3;
   min-width: 0;
-  min-height: 190px;
+  min-height: 164px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 28px;
-  padding: 22px;
+  gap: 20px;
+  padding: 19px;
   color: var(--theme-text);
   background: var(--theme-surface) !important;
   background-image: none !important;
   border: 1px solid var(--theme-border);
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.05);
 }
 
@@ -1393,16 +1429,16 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
 }
 
 .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-icon {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--theme-primary);
   background: rgba(var(--theme-primary-rgb), 0.1);
   border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-label {
@@ -1418,7 +1454,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   display: block;
   overflow-wrap: anywhere;
   color: var(--theme-text);
-  font-size: clamp(1.75rem, 2.3vw, 2.35rem);
+  font-size: clamp(1.65rem, 2vw, 2.1rem);
   font-weight: 800;
   letter-spacing: -0.035em;
   line-height: 1.05;
@@ -1468,6 +1504,15 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
 }
 
 @media (max-width: 640px) {
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions a {
+    justify-content: flex-start;
+  }
+
   .admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1479,7 +1524,19 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   }
 
   .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card {
-    min-height: 168px;
+    min-height: 152px;
     padding: 18px;
   }
+}
+
+/* Keep the selected responses view visibly active after click. */
+html body .page-builder .responses-workspace-toolbar
+  .responses-view-tabs > button[aria-selected="true"] {
+  border-color: var(--theme-primary) !important;
+  background: var(--theme-primary) !important;
+  background-color: var(--theme-primary) !important;
+  background-image: none !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+  box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.28) !important;
 }

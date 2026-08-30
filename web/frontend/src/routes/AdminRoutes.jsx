@@ -24,6 +24,7 @@ export default function AdminRoutes({
   shellProps,
   themeMode,
   user,
+  weeklyScreenTimeSeconds = 0,
 }) {
   const renderShell = (children, options = {}) => (
     <DashboardShell
@@ -62,6 +63,8 @@ export default function AdminRoutes({
               user={user}
               themeMode={themeMode}
               onThemeModeChange={shellProps.onThemeModeChange}
+              currentUser={user}
+              weeklyScreenTimeSeconds={weeklyScreenTimeSeconds}
             />
           )}
         />

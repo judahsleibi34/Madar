@@ -1,15 +1,27 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import {
   BellRing,
   CalendarClock,
+  CircleCheckBig,
   CreditCard,
+  ExternalLink,
   FileText,
   HardDrive,
   KeyRound,
+  ListRestart,
   Users,
 } from "lucide-react";
 import { STORAGE_KEY } from "../PageBuilder/core/PageBuilder.constants";
+import { getLocalTenantPath } from "../PageBuilder/core/PageBuilder.routing";
+import { getBuilderWorkspacePath } from "../PageBuilder/core/PageBuilder.workspaceRouting";
+import WeeklyScreenTimePanel from "./WeeklyScreenTimePanel";
+import {
+  getDashboardCacheScope,
+  readDashboardMetricsCache,
+  writeDashboardMetricsCache,
+} from "./utils/dashboardSnapshotCache";
 import {
   fetchBuilderSiteMembers,
   fetchBuilderStorageUsage,
@@ -33,6 +45,8 @@ const EMPTY_METRICS = {
   quotaBytes: 0,
   permittedUsers: 0,
   permissionTypes: [],
+  projectId: "",
+  websitePath: "",
 };
 
 function toTitleCase(value) {
@@ -145,10 +159,11 @@ async function loadAllReservations() {
   return reservations;
 }
 
-export default function UserDashboard({ user }) {
+function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = "" }) {
   const { t } = useTranslation();
-  const [metrics, setMetrics] = useState(EMPTY_METRICS);
-  const [loading, setLoading] = useState(true);
+  const initialMetrics = readDashboardMetricsCache(cacheScope);
+  const [metrics, setMetrics] = useState(() => initialMetrics || EMPTY_METRICS);
+  const [loading, setLoading] = useState(() => !initialMetrics);
 
   const displayName =
     user?.first_name ||
@@ -168,11 +183,18 @@ export default function UserDashboard({ user }) {
     let cancelled = false;
 
     const loadMetrics = async () => {
+      const cachedMetrics = readDashboardMetricsCache(cacheScope);
+      if (cachedMetrics) {
+        setMetrics(cachedMetrics);
+        setLoading(false);
+      }
+
       let records;
       try {
         const result = await listBuilderProjects({ limit: 100 });
         records = result.projects;
       } catch {
+        if (cachedMetrics) return;
         records = [];
       }
 
@@ -184,6 +206,11 @@ export default function UserDashboard({ user }) {
           : localProject
             ? [localProject]
             : [];
+      const primaryProject = projects[0] || null;
+      const primaryRecord = records[0] || null;
+      const projectId = String(
+        primaryRecord?.id || primaryRecord?.project_id || primaryProject?.id || ""
+      );
 
       const [storage, reservations, memberGroups] = await Promise.all([
         fetchBuilderStorageUsage().catch(() => null),
@@ -210,7 +237,7 @@ export default function UserDashboard({ user }) {
       const usedBytes =
         Number(storage?.used_bytes || 0) + Number(storage?.reserved_bytes || 0);
 
-      setMetrics({
+      const nextMetrics = {
         projects: projects.length,
         forms: projects.reduce(
           (total, project) => total + (Array.isArray(project?.forms) ? project.forms.length : 0),
@@ -228,7 +255,11 @@ export default function UserDashboard({ user }) {
         quotaBytes: Number(storage?.quota_bytes || 0),
         permittedUsers: uniqueMembers.size,
         permissionTypes: getPermissionTypes(projects),
-      });
+        projectId,
+        websitePath: primaryProject ? getLocalTenantPath(primaryProject) : "",
+      };
+      writeDashboardMetricsCache(cacheScope, nextMetrics);
+      setMetrics(nextMetrics);
       setLoading(false);
     };
 
@@ -236,7 +267,7 @@ export default function UserDashboard({ user }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [cacheScope]);
 
   const cards = useMemo(() => {
     const projectNote =
@@ -316,6 +347,15 @@ export default function UserDashboard({ user }) {
     ];
   }, [metrics, planLabel, planStatus]);
 
+  const responsesPath = metrics.projectId
+    ? getBuilderWorkspacePath(metrics.projectId, "responses", "builder-responses")
+    : "/builder-responses";
+  const websitePath = metrics.websitePath || (
+    metrics.projectId
+      ? getBuilderWorkspacePath(metrics.projectId, "publish")
+      : "/page-builder"
+  );
+
   return (
     <div className="user-dashboard-page">
       <header className="user-dashboard-hero">
@@ -335,6 +375,21 @@ export default function UserDashboard({ user }) {
           })}
         </p>
       </header>
+
+      <nav className="user-dashboard-quick-actions" aria-label="Form and website shortcuts">
+        <Link to={responsesPath + "/incomplete"}>
+          <ListRestart size={18} aria-hidden="true" />
+          <span>Incomplete forms</span>
+        </Link>
+        <Link to={responsesPath + "/completed"}>
+          <CircleCheckBig size={18} aria-hidden="true" />
+          <span>Completed forms</span>
+        </Link>
+        <Link className="is-primary" to={websitePath}>
+          <ExternalLink size={18} aria-hidden="true" />
+          <span>View website</span>
+        </Link>
+      </nav>
 
       <section
         className="user-dashboard-metrics-grid"
@@ -381,6 +436,23 @@ export default function UserDashboard({ user }) {
           );
         })}
       </section>
+
+      <WeeklyScreenTimePanel
+        currentUser={user}
+        currentSeconds={weeklyScreenTimeSeconds}
+        projectId={metrics.projectId}
+      />
     </div>
+  );
+}
+
+export default function UserDashboard(props) {
+  const cacheScope = getDashboardCacheScope(props.user);
+  return (
+    <UserDashboardContent
+      key={cacheScope || "uncached"}
+      {...props}
+      cacheScope={cacheScope}
+    />
   );
 }

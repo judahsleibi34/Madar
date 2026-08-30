@@ -412,6 +412,18 @@ export const fetchBuilderProject = async (projectId) => {
   return data?.project || null;
 };
 
+export const fetchWeeklyScreenTime = async (projectId = "", period = "week") => {
+  const query = new URLSearchParams();
+  if (projectId) query.set("project_id", projectId);
+  query.set("period", period);
+  const suffix = query.toString() ? "?" + query.toString() : "";
+  const response = await apiFetch(getApiUrl("/screen-time/weekly" + suffix), {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseJsonResponse(response);
+};
+
 export const fetchBuilderSiteMembers = async (projectId) => {
   const response = await apiFetch(
     getApiUrl(`/builder/projects/${projectId}/site-members`),
@@ -727,6 +739,17 @@ export const savePublicFormDraft = async (subdomain, formId, payload) => {
   );
   const data = await parseJsonResponse(response);
   return data?.draft || null;
+};
+
+export const listPublicFormDrafts = async (subdomain, formId) => {
+  const response = await apiFetch(
+    getApiUrl(
+      `/public/sites/${subdomain}/forms/${encodeURIComponent(formId)}/drafts`
+    ),
+    { method: "GET", cache: "no-store" }
+  );
+  const data = await parseJsonResponse(response);
+  return Array.isArray(data?.drafts) ? data.drafts : [];
 };
 
 export const fetchPublicFormDraft = async (subdomain, formId, resumeToken) => {

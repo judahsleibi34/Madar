@@ -160,10 +160,12 @@
   color: var(--madar-text);
 }
 
-.page-builder .responses-workspace-toolbar .responses-view-tabs button.active {
-  background: var(--madar-red);
-  color: var(--theme-text-inverse);
-  box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.2);
+.page-builder .responses-workspace-toolbar .responses-view-tabs button.active,
+.page-builder .responses-workspace-toolbar .responses-view-tabs button[aria-selected="true"] {
+  border-color: var(--madar-red) !important;
+  background: var(--madar-red) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.28);
 }
 
 .page-builder .responses-workspace-toolbar .responses-view-tabs button:focus-visible {
