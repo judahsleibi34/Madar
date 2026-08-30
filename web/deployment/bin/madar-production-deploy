@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly REPO_ROOT="/home/madar/saas/Madar"
-readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-/usr/local/lib/madar/web/deployment/bin/madar-release-deploy}"
+readonly REPO_ROOT="${MADAR_PRODUCTION_REPO:-/srv/madar/production}"
+readonly CONTROL_ROOT="${MADAR_CONTROL_PLANE_ROOT:-/opt/madar/control-plane/deployment}"
+readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-release-deploy}"
 
 if [[ ! -x "$RELEASE_DEPLOY" ]]; then
     echo "[madar-production] ERROR: immutable release deployer is not installed." >&2
@@ -15,7 +16,7 @@ fi
 
 git -C "$REPO_ROOT" fetch origin main
 readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
-readonly CONTROL_PLANE_GUARD="/usr/local/lib/madar/web/deployment/bin/madar-control-plane-guard"
+readonly CONTROL_PLANE_GUARD="$CONTROL_ROOT/bin/madar-control-plane-guard"
 
 [[ -x "$CONTROL_PLANE_GUARD" ]] || {
     echo "[madar-production] ERROR: control-plane guard is unavailable." >&2
@@ -26,3 +27,9 @@ readonly CONTROL_PLANE_GUARD="/usr/local/lib/madar/web/deployment/bin/madar-cont
 "$RELEASE_DEPLOY" "$TARGET_SHA" "$@"
 git -C "$REPO_ROOT" merge --ff-only "$TARGET_SHA"
 echo "[madar-production] Production checkout advanced after successful promotion: ${TARGET_SHA:0:12}"
+
+# This is deliberately a second invocation. Release acceptance and all
+# blue/green rollback handling are complete before migration automation starts.
+# A migration failure therefore leaves the bridge known-good and is retried as
+# forward repair by the next auto-deploy cycle.
+"$RELEASE_DEPLOY" "$TARGET_SHA" --automatic-migrate

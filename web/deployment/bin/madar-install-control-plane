@@ -16,15 +16,25 @@ done
 [[ "$backup_root" = /* && "$backup_root" != / ]] || {
   echo "backup directory must be an explicit absolute path" >&2; exit 2;
 }
+backup_root="$(readlink -m -- "$backup_root")"
+case "$backup_root" in
+  /opt/madar/control-plane|/opt/madar/control-plane/*|\
+  /usr/local/lib/madar/web/deployment|/usr/local/lib/madar/web/deployment/*)
+    echo "backup directory must be outside current and legacy controller roots" >&2
+    exit 2
+    ;;
+esac
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 deployment_root="$(cd -- "$script_dir/.." && pwd)"
 web_root="$(cd -- "$deployment_root/.." && pwd)"
 repo_root="$(cd -- "$web_root/.." && pwd)"
-install_root=/usr/local/lib/madar/web/deployment
+control_plane_root=/opt/madar/control-plane
+install_root="$control_plane_root/deployment"
 alert_hook_source="$web_root/scripts/madar_alert_hook.sh"
 
 declare -a tracked_files=(
+  production-paths.conf
   docker-compose.release.yml
   bin/madar-auto-deploy
   bin/madar-control-plane-guard
@@ -57,12 +67,26 @@ declare -a units=(
 
 if (( ! apply )); then
   printf 'would install immutable Madar control plane under %s\n' "$install_root"
+  printf 'would retire the legacy /usr/local/lib/madar/web/deployment controller after backup\n'
   printf 'would install operations alert hook at /usr/local/lib/madar/madar_alert_hook.sh\n'
   printf 'would preserve replaced operational files under %s\n' "$backup_root"
   printf 'would leave madar-auto-deploy.timer stopped\n'
   exit 0
 fi
 [[ $EUID -eq 0 ]] || { echo "--apply requires root" >&2; exit 1; }
+
+for required in \
+  /srv/madar/production \
+  /etc/madar/production.env \
+  /etc/madar/backup.env \
+  /var/lib/madar/releases/state.json \
+  /var/lib/madar/storage \
+  /var/lib/madar/proxy; do
+  [[ -e "$required" ]] || {
+    echo "canonical production path is not initialized: $required" >&2
+    exit 1
+  }
+done
 
 source_sha="$(git -C "$repo_root" rev-parse HEAD)"
 [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || {
@@ -83,19 +107,39 @@ source_sha="$(git -C "$repo_root" rev-parse HEAD)"
   exit 1
 }
 
+systemctl is-active --quiet madar-auto-deploy.timer && {
+  echo "refusing installation while madar-auto-deploy.timer is active" >&2
+  exit 1
+}
+systemctl is-enabled --quiet madar-auto-deploy.timer && {
+  echo "refusing installation while madar-auto-deploy.timer is enabled" >&2
+  exit 1
+}
+systemctl is-active --quiet madar-auto-deploy.service && {
+  echo "refusing installation while madar-auto-deploy.service is active" >&2
+  exit 1
+}
+
+if [[ -d "$backup_root" && -n "$(find "$backup_root" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+  echo "control-plane backup directory must be empty" >&2
+  exit 1
+fi
 install -d -m 0700 "$backup_root"
-for current in \
-  /usr/local/lib/madar/web/deployment \
-  /usr/local/sbin/madar-auto-deploy \
-  /home/madar/docker_auto.sh \
-  /etc/systemd/system/madar-auto-deploy.service \
-  /etc/systemd/system/madar-auto-deploy.timer \
-  /etc/systemd/system/madar-auto-deploy.service.d \
-  /etc/systemd/system/madar-release-proxy.service \
-  /etc/systemd/system/madar-ops-alert@.service \
-  /usr/local/lib/madar/madar_alert_hook.sh; do
+for specification in \
+  /opt/madar/control-plane/deployment:current-opt-control-plane \
+  /usr/local/lib/madar/web/deployment:legacy-usr-local-control-plane \
+  /usr/local/sbin/madar-auto-deploy:legacy-auto-deploy-entrypoint \
+  /home/madar/docker_auto.sh:legacy-home-entrypoint \
+  /etc/systemd/system/madar-auto-deploy.service:madar-auto-deploy.service \
+  /etc/systemd/system/madar-auto-deploy.timer:madar-auto-deploy.timer \
+  /etc/systemd/system/madar-auto-deploy.service.d:madar-auto-deploy.service.d \
+  /etc/systemd/system/madar-release-proxy.service:madar-release-proxy.service \
+  /etc/systemd/system/madar-ops-alert@.service:madar-ops-alert@.service \
+  /usr/local/lib/madar/madar_alert_hook.sh:madar_alert_hook.sh; do
+  current="${specification%%:*}"
+  backup_name="${specification#*:}"
   if [[ -e "$current" || -L "$current" ]]; then
-    cp -a -- "$current" "$backup_root/$(basename "$current")"
+    cp -a -- "$current" "$backup_root/$backup_name"
   fi
 done
 (
@@ -106,37 +150,48 @@ done
 )
 chmod 0600 "$backup_root/SHA256SUMS"
 
-systemctl is-active --quiet madar-auto-deploy.timer && {
-  echo "refusing installation while madar-auto-deploy.timer is active" >&2
-  exit 1
-}
-systemctl is-enabled --quiet madar-auto-deploy.timer && {
-  echo "refusing installation while madar-auto-deploy.timer is enabled" >&2
-  exit 1
-}
-
 # The controller is immutable/root-owned, but the non-root deployment service
 # must be able to traverse its installation tree.
 install -d -o root -g madar -m 0750 \
-  /usr/local/lib/madar \
-  /usr/local/lib/madar/web \
-  "$install_root"
+  /opt/madar \
+  "$control_plane_root"
+install -d -o root -g madar -m 0750 /usr/local/lib/madar
+stage_root="$control_plane_root/.deployment.install.$$"
+[[ ! -e "$stage_root" ]] || {
+  echo "control-plane staging path already exists: $stage_root" >&2
+  exit 1
+}
+install -d -o root -g madar -m 0750 "$stage_root"
+cleanup_stage() {
+  [[ ! -e "$stage_root" ]] || rm -rf -- "$stage_root"
+}
+trap cleanup_stage EXIT
 for relative in "${tracked_files[@]}"; do
   source_path="$deployment_root/$relative"
   [[ -f "$source_path" ]] || { echo "missing tracked control-plane file: $relative" >&2; exit 1; }
   mode=0644
   [[ "$relative" == bin/* ]] && mode=0755
-  install -D -o root -g root -m "$mode" "$source_path" "$install_root/$relative"
+  install -D -o root -g root -m "$mode" "$source_path" "$stage_root/$relative"
+done
+install -d -o root -g madar -m 0750 "$stage_root/scripts"
+for script in backup_madar.sh verify_backup.sh; do
+  install -o root -g root -m 0755 \
+    "$web_root/scripts/$script" "$stage_root/scripts/$script"
 done
 
-printf '%s\n' "$source_sha" >"$install_root/CONTROL_PLANE_SOURCE_SHA"
-chown root:root "$install_root/CONTROL_PLANE_SOURCE_SHA"
-chmod 0644 "$install_root/CONTROL_PLANE_SOURCE_SHA"
+printf '%s\n' "$source_sha" >"$stage_root/CONTROL_PLANE_SOURCE_SHA"
+chown root:root "$stage_root/CONTROL_PLANE_SOURCE_SHA"
+chmod 0644 "$stage_root/CONTROL_PLANE_SOURCE_SHA"
 
-find /usr/local/lib/madar -type d -exec chown root:madar {} +
-find /usr/local/lib/madar -type d -exec chmod 0750 {} +
-install -o root -g root -m 0755 \
-  "$deployment_root/bin/madar-auto-deploy" /usr/local/sbin/madar-auto-deploy
+find "$stage_root" -type d -exec chown root:madar {} +
+find "$stage_root" -type d -exec chmod 0750 {} +
+
+# Publish an exact controller tree. The previous tree is already copied into
+# the operator-selected backup, so stale removed files cannot survive while a
+# new provenance marker claims the current source.
+rm -rf -- "$install_root"
+mv -T -- "$stage_root" "$install_root"
+trap - EXIT
 install -o root -g root -m 0755 \
   "$alert_hook_source" /usr/local/lib/madar/madar_alert_hook.sh
 for unit in "${units[@]}"; do
@@ -144,12 +199,12 @@ for unit in "${units[@]}"; do
     "$deployment_root/systemd/$unit" "/etc/systemd/system/$unit"
 done
 
-# The old privileged storage-preparation drop-in and direct in-place deployer
-# were preserved above. Remove their live authority before daemon-reload.
+# The old privileged drop-in, in-place deployer, and /usr/local controller were
+# preserved above. Remove their live authority before daemon-reload so systemd
+# can never select between two independent controller copies.
 rm -rf -- /etc/systemd/system/madar-auto-deploy.service.d
 rm -f -- /home/madar/docker_auto.sh
-
-install -d -o madar -g madar -m 0700 /home/madar/.local/state/madar/releases
-install -d -o madar -g madar -m 0755 /home/madar/.local/state/madar/proxy
+rm -f -- /usr/local/sbin/madar-auto-deploy
+rm -rf -- /usr/local/lib/madar/web/deployment
 systemctl daemon-reload
-echo "immutable Madar control plane installed; auto-deploy timer remains stopped"
+echo "immutable Madar control plane installed at $install_root; legacy controller retired; auto-deploy timer remains stopped"

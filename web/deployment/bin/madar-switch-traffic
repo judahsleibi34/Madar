@@ -103,7 +103,7 @@ def main() -> int:
         return 0
     if driver not in {"nginx", "docker-nginx"}:
         raise RuntimeError("unsupported traffic switch driver")
-    target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/releases/active-upstreams.conf"))
+    target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/proxy/active-upstreams.conf"))
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     upstream_host = "127.0.0.1"
     content = (

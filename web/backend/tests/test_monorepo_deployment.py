@@ -23,6 +23,8 @@ BACKEND_DOCKERFILE = WEB_ROOT / "backend" / "Dockerfile"
 FRONTEND_DOCKERFILE = WEB_ROOT / "frontend" / "Dockerfile"
 INSTALLER = WEB_ROOT / "deployment" / "bin" / "madar-install-control-plane"
 LEGACY_ENTRYPOINT = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy-legacy-entrypoint"
+PATH_CONTRACT = WEB_ROOT / "deployment" / "production-paths.conf"
+PROXY_SERVICE = WEB_ROOT / "deployment" / "systemd" / "madar-release-proxy.service"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
@@ -43,15 +45,17 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.frontend_dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
         self.installer = INSTALLER.read_text(encoding="utf-8")
         self.legacy_entrypoint = LEGACY_ENTRYPOINT.read_text(encoding="utf-8")
+        self.path_contract = PATH_CONTRACT.read_text(encoding="utf-8")
+        self.proxy_service = PROXY_SERVICE.read_text(encoding="utf-8")
 
     def test_wrapper_delegates_a_clean_full_sha_to_immutable_deployer(self):
-        self.assertIn('readonly REPO_ROOT="/home/madar/saas/Madar"', self.deploy)
+        self.assertIn('MADAR_PRODUCTION_REPO:-/srv/madar/production', self.deploy)
         self.assertIn('git -C "$REPO_ROOT"', self.deploy)
         self.assertIn("status --porcelain --untracked-files=normal", self.deploy)
         self.assertIn('"$RELEASE_DEPLOY" "$TARGET_SHA"', self.deploy)
         self.assertIn('merge --ff-only "$TARGET_SHA"', self.deploy)
         self.assertIn(
-            "/usr/local/lib/madar/web/deployment/bin/madar-release-deploy",
+            "/opt/madar/control-plane/deployment",
             self.deploy,
         )
 
@@ -114,7 +118,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn('git -C "$REPO_ROOT" fetch', self.wrapper)
         self.assertIn('exec "$DEPLOY_SCRIPT"', self.wrapper)
         self.assertIn(
-            "/usr/local/lib/madar/web/deployment/bin/madar-production-deploy",
+            "/opt/madar/control-plane/deployment",
             self.wrapper,
         )
 
@@ -123,6 +127,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("remains suppressed", self.wrapper)
         self.assertIn("release state is not initialized", self.wrapper)
         self.assertIn('merge-base --is-ancestor "$KNOWN_GOOD" "$TARGET_SHA"', self.wrapper)
+        self.assertIn('"$RELEASE_DEPLOY" "$TARGET_SHA" --automatic-migrate', self.wrapper)
 
     def test_auto_deploy_skips_only_deterministic_runtime_equivalent_commits(self):
         self.assertIn("RUNTIME_PATHS", self.wrapper)
@@ -137,6 +142,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         ):
             self.assertIn(path, self.wrapper)
         self.assertIn('diff --quiet "$KNOWN_GOOD" "$TARGET_SHA"', self.wrapper)
+        self.assertIn('"$RELEASE_DEPLOY" "$KNOWN_GOOD" --automatic-migrate', self.wrapper)
         self.assertIn('merge --ff-only "$TARGET_SHA"', self.wrapper)
         self.assertIn("Application-equivalent main advanced", self.wrapper)
         self.assertIn("production checkout contains local changes", self.wrapper)
@@ -144,23 +150,24 @@ class MonorepoDeploymentTests(unittest.TestCase):
     def test_timer_waits_after_completion_instead_of_retrying_immediately(self):
         self.assertIn("OnActiveSec=2min", self.auto_timer)
         self.assertIn("OnUnitInactiveSec=2min", self.auto_timer)
+        self.assertIn("Persistent=true", self.auto_timer)
         self.assertNotIn("OnUnitActiveSec", self.auto_timer)
         self.assertNotIn("ExecStartPre", self.auto_service)
 
     def test_docker_proxy_is_hardened_and_preserves_forwarded_request_context(self):
         self.assertIn("MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx", self.auto_service)
-        self.assertIn("WorkingDirectory=/home/madar/saas/Madar", self.auto_service)
+        self.assertIn("WorkingDirectory=/srv/madar/production", self.auto_service)
         self.assertIn('driver not in {"nginx", "docker-nginx"}', self.switch)
         self.assertIn("network_mode: host", self.proxy_compose)
         self.assertIn("MADAR_PROXY_CONFIG_ROOT:-/var/lib/madar/proxy", self.proxy_compose)
         self.assertNotIn("MADAR_ACTIVE_UPSTREAMS_FILE:-", self.proxy_compose)
         self.assertIn(
-            "MADAR_ACTIVE_UPSTREAMS_FILE=/home/madar/.local/state/madar/proxy/active-upstreams.conf",
-            self.auto_service,
+            "MADAR_ACTIVE_UPSTREAMS_FILE=/var/lib/madar/proxy/active-upstreams.conf",
+            self.path_contract,
         )
         self.assertIn(
-            "MADAR_DEPLOY_STATE_ROOT=/home/madar/.local/state/madar/releases",
-            self.auto_service,
+            "MADAR_DEPLOY_STATE_ROOT=/var/lib/madar/releases",
+            self.path_contract,
         )
         self.assertIn("stable_route_identity_not_observed", self.switch)
         self.assertIn("MADAR_STABLE_BACKEND_URL", self.switch)
@@ -191,7 +198,8 @@ class MonorepoDeploymentTests(unittest.TestCase):
             self.assertIn("org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP", dockerfile)
 
     def test_control_plane_installer_preserves_layout_and_does_not_start_timer(self):
-        self.assertIn("/usr/local/lib/madar/web/deployment", self.installer)
+        self.assertIn("install_root=\"$control_plane_root/deployment\"", self.installer)
+        self.assertIn("control_plane_root=/opt/madar/control-plane", self.installer)
         self.assertIn("cp -a --", self.installer)
         self.assertIn("systemctl daemon-reload", self.installer)
         self.assertNotIn("systemctl start madar-auto-deploy.timer", self.installer)
@@ -203,8 +211,46 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("chown root:madar", self.installer)
         self.assertIn("chmod 0750", self.installer)
         self.assertIn("refusing installation while madar-auto-deploy.timer is enabled", self.installer)
+        self.assertIn("refusing installation while madar-auto-deploy.service is active", self.installer)
+        self.assertIn("backup directory must be outside current and legacy controller roots", self.installer)
         self.assertIn("rm -rf -- /etc/systemd/system/madar-auto-deploy.service.d", self.installer)
         self.assertIn("rm -f -- /home/madar/docker_auto.sh", self.installer)
+        self.assertIn("rm -rf -- /usr/local/lib/madar/web/deployment", self.installer)
+        self.assertIn("/var/lib/madar/releases/state.json", self.installer)
+
+    def test_canonical_production_path_contract_is_single_and_complete(self):
+        expected = {
+            "MADAR_PRODUCTION_REPO": "/srv/madar/production",
+            "MADAR_ENV_FILE": "/etc/madar/production.env",
+            "MADAR_DEPLOY_STATE_ROOT": "/var/lib/madar/releases",
+            "MADAR_STORAGE_ROOT": "/var/lib/madar/storage",
+            "MADAR_ACTIVE_UPSTREAMS_FILE": "/var/lib/madar/proxy/active-upstreams.conf",
+            "MADAR_PROXY_CONFIG_ROOT": "/var/lib/madar/proxy",
+            "MADAR_CONTROL_PLANE_ROOT": "/opt/madar/control-plane/deployment",
+            "MADAR_MIGRATION_BACKUP_SCRIPT": "/opt/madar/control-plane/deployment/scripts/backup_madar.sh",
+            "MADAR_MIGRATION_BACKUP_VERIFY_SCRIPT": "/opt/madar/control-plane/deployment/scripts/verify_backup.sh",
+        }
+        assignments = dict(
+            line.split("=", 1)
+            for line in self.path_contract.splitlines()
+            if line and not line.startswith("#")
+        )
+        for name, value in expected.items():
+            self.assertEqual(assignments.get(name), value)
+        self.assertIn(
+            "EnvironmentFile=/opt/madar/control-plane/deployment/production-paths.conf",
+            self.auto_service,
+        )
+        self.assertLess(
+            self.auto_service.index("EnvironmentFile=/etc/madar/backup.env"),
+            self.auto_service.index(
+                "EnvironmentFile=/opt/madar/control-plane/deployment/production-paths.conf"
+            ),
+        )
+        self.assertIn(
+            "WorkingDirectory=/opt/madar/control-plane/deployment/proxy",
+            self.proxy_service,
+        )
 
     def test_legacy_entrypoint_delegates_only_to_immutable_controller(self):
         self.assertIn("madar-production-deploy", self.legacy_entrypoint)

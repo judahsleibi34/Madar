@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly REPO_ROOT="/home/madar/saas/Madar"
-readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-/usr/local/lib/madar/web/deployment/bin/madar-production-deploy}"
+readonly REPO_ROOT="${MADAR_PRODUCTION_REPO:-/srv/madar/production}"
+readonly CONTROL_ROOT="${MADAR_CONTROL_PLANE_ROOT:-/opt/madar/control-plane/deployment}"
+readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-production-deploy}"
+readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-release-deploy}"
 readonly STATE_ROOT="${MADAR_DEPLOY_STATE_ROOT:-/var/lib/madar/releases}"
 readonly -a RUNTIME_PATHS=(
   web/backend
@@ -22,7 +24,7 @@ fi
 
 git -C "$REPO_ROOT" fetch --quiet origin main
 readonly TARGET_SHA="$(git -C "$REPO_ROOT" rev-parse origin/main)"
-readonly CONTROL_PLANE_GUARD="/usr/local/lib/madar/web/deployment/bin/madar-control-plane-guard"
+readonly CONTROL_PLANE_GUARD="$CONTROL_ROOT/bin/madar-control-plane-guard"
 
 [[ -x "$CONTROL_PLANE_GUARD" ]] || {
     echo "[madar-auto-deploy] ERROR: control-plane guard is unavailable." >&2
@@ -56,8 +58,11 @@ if [[ ! "$KNOWN_GOOD" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 
 if [[ "$TARGET_SHA" == "$KNOWN_GOOD" ]]; then
-    echo "[madar-auto-deploy] No update. Known-good release: ${TARGET_SHA:0:12}"
-    exit 0
+    # A bridge release is accepted before its backup-gated expand migrations
+    # run. Re-enter the separately locked, idempotent migration phase so a
+    # transient backup/database/health failure is retried without redeploying
+    # or using the failed-release bypass.
+    exec "$RELEASE_DEPLOY" "$TARGET_SHA" --automatic-migrate
 fi
 
 if git -C "$REPO_ROOT" merge-base --is-ancestor "$TARGET_SHA" "$KNOWN_GOOD"; then
@@ -69,6 +74,9 @@ if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$KNOWN_GOOD" "$TARGET_SHA"; t
     exit 1
 fi
 if git -C "$REPO_ROOT" diff --quiet "$KNOWN_GOOD" "$TARGET_SHA" -- "${RUNTIME_PATHS[@]}"; then
+    # A documentation-only fast-forward must not strand a pending migration
+    # for the application-equivalent known-good SHA.
+    "$RELEASE_DEPLOY" "$KNOWN_GOOD" --automatic-migrate
     git -C "$REPO_ROOT" merge --ff-only "$TARGET_SHA" >/dev/null
     echo "[madar-auto-deploy] Application-equivalent main advanced without runtime deployment: ${TARGET_SHA:0:12}"
     exit 0

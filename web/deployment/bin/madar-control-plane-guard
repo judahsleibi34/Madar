@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-repo="${MADAR_PRODUCTION_REPO:-/home/madar/saas/Madar}"
+repo="${MADAR_PRODUCTION_REPO:-/srv/madar/production}"
 target_sha="${1:-}"
-marker="${MADAR_CONTROL_PLANE_SOURCE_SHA_FILE:-/usr/local/lib/madar/web/deployment/CONTROL_PLANE_SOURCE_SHA}"
+marker="${MADAR_CONTROL_PLANE_SOURCE_SHA_FILE:-/opt/madar/control-plane/deployment/CONTROL_PLANE_SOURCE_SHA}"
 
 die() {
   printf '[madar-control-plane] ERROR: %s\n' "$*" >&2
@@ -30,6 +30,8 @@ git -C "$repo" cat-file -e "${target_sha}^{commit}" 2>/dev/null \
 declare -a control_plane_paths=(
   web/deployment
   web/scripts/madar_alert_hook.sh
+  web/scripts/backup_madar.sh
+  web/scripts/verify_backup.sh
 )
 
 if ! git -C "$repo" diff --quiet \
