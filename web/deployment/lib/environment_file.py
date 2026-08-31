@@ -16,13 +16,14 @@ def load_environment_file(
     path: Path,
     *,
     environ: MutableMapping[str, str] | None = None,
+    require_private: bool = True,
 ) -> set[str]:
     """Load dotenv/YAML-style scalar assignments without ever logging values."""
 
     target = environ if environ is not None else os.environ
     if not path.is_file():
         raise RuntimeError("deployment_environment_file_missing")
-    if path.stat().st_mode & 0o077:
+    if require_private and path.stat().st_mode & 0o077:
         raise RuntimeError("deployment_environment_file_permissions_too_broad")
 
     loaded: set[str] = set()

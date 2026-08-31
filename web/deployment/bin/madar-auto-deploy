@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly TRACKED_CONTROL_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+if [[ "$TRACKED_CONTROL_ROOT" == "/opt/madar/control-plane/deployment" ]]; then
+    # Interactive production execution receives the same root-owned path
+    # contract as systemd. The later file is authoritative by design.
+    set -a
+    # shellcheck source=../production-paths.conf
+    source "$TRACKED_CONTROL_ROOT/production-paths.conf"
+    set +a
+fi
+
 readonly REPO_ROOT="${MADAR_PRODUCTION_REPO:-/srv/madar/production}"
 readonly CONTROL_ROOT="${MADAR_CONTROL_PLANE_ROOT:-/opt/madar/control-plane/deployment}"
 readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-production-deploy}"

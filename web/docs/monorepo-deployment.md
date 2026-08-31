@@ -25,6 +25,22 @@ containers. The root-owned controller under `/opt` is the sole authoritative
 auto-deploy controller. Its tracked path values are installed from
 `web/deployment/production-paths.conf`.
 
+For a reviewed environment-only change to the currently active immutable
+release, stop the auto-deploy timer and use the installed controller's explicit
+mode:
+
+```bash
+/opt/madar/control-plane/deployment/bin/madar-release-deploy \
+  <exact-known-good-sha> --refresh-active-runtime --slot <active-slot>
+```
+
+The installed command loads the root-owned production path contract itself.
+It refuses a SHA, slot, schema, image, core-health, Compose, secret-hygiene, or
+storage mismatch before recreating anything. It uses existing images only,
+restores parser/queue workers if absent, performs no migration or traffic
+switch, and requires full slot and stable-route validation before recording
+success. Do not invoke raw production Compose as a config-refresh substitute.
+
 The Compose CLI must receive the immutable release's `web` directory as its
 project directory, the release Compose file plus the installed release
 override, and `/etc/madar/production.env` as its environment file. Operators

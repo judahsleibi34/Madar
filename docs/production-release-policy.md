@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-08-30
+Last implementation review: 2026-09-01
 
 ## A. Purpose and authority
 
@@ -56,6 +56,20 @@ root-owned contract second. Consequently backup credentials and
 `MADAR_BACKUP_DIR` remain operator configuration, while the production,
 state, storage, proxy, controller, and migration-backup executable paths
 cannot be redirected by that environment file.
+
+The installed operator-facing deployment entrypoints also load this same
+root-owned contract when invoked outside systemd. The installed release
+controller applies the contract before reading `production.env`, so a direct
+operator invocation cannot silently lose `MADAR_STORAGE_ROOT` or redirect a
+safety-critical production path through the interactive shell environment.
+Repository/test invocations may retain explicit isolated-path overrides, but
+the release controller always requires an explicit absolute storage root; it
+has no release-local storage fallback.
+
+For active-runtime refresh modes, non-path application settings are re-read
+authoritatively from `MADAR_ENV_FILE` so stale interactive-shell values cannot
+shadow an approved config-file change. The canonical path keys remain protected
+from values in that file.
 
 The one authoritative root-owned controller is
 `/opt/madar/control-plane/deployment`. Historical `/home/madar/...` paths are
@@ -431,6 +445,56 @@ Implemented by `web/deployment/bin/madar-migrate`,
 `LockedMigrationExecutor.verify_migrations()`/`run()`, and
 `web/scripts/verify_backup.sh`.
 
+### Active known-good environment refresh
+
+`madar-release-deploy <full-sha> --refresh-active-runtime --slot <slot>` is the
+supported config-only refresh for an already accepted release. It is not a
+deployment, migration, rollback, or traffic command. The deploy lock is held
+for the complete operation, and all of these conditions must pass before the
+first mutating Compose command:
+
+- the requested SHA and slot exactly equal both `active_slot` and the durable
+  `known_good_release`; no deployment or rollback-recovery record is active;
+- the live schema exactly equals the schema recorded for that known-good
+  release and remains inside the installed release compatibility range;
+- immutable source identity and cleanliness pass;
+- the recorded backend, frontend, and worker image tags still resolve to their
+  digest-pinned identities;
+- Compose configuration, migration validators, secret hygiene, and all four
+  canonical storage directories pass the normal release preflight;
+- the active backend, frontend, Redis, and remote-ingestion containers are
+  running and healthy, with application image identities matching state;
+- candidate and stable version endpoints identify the requested release and
+  compatibility range; and
+- readiness core components (`environment`, `database`, `redis`, `auth`,
+  `storage`, and `schema`) are `ok` on both the slot and stable route.
+
+Pre-refresh readiness may be HTTP 503 only when degradation is limited to the
+services the operation is about to repair: notification worker, calendar-sync
+worker, data-deletion worker, or parser isolation. This exception is scoped to
+the pre-mutation refresh check; normal candidate validation is unchanged.
+
+After preflight, Compose recreates parser worker, backend, notification worker,
+calendar-sync worker, and (for schema 83+) data-deletion worker from the
+already-attested images with `--no-build --force-recreate --wait`. It never
+runs `down`, builds an image, invokes a migration, switches traffic, or changes
+the release checkout. Full candidate readiness and stable backend/frontend
+validation are mandatory afterward. Only then is an
+`active_runtime_refreshed` known-good history event written. A failure before
+that point leaves known-good identity and schema unchanged.
+
+The migration-only `--refresh-active-workers` mode uses the same safe runtime
+repair path after a committed forward schema transition, but permits the live
+schema to be ahead of the previously recorded known-good observation and keeps
+the `post_migration_workers_refreshed` completion event required by migration
+automation.
+
+Implemented by `web/deployment/bin/madar-release-deploy ::
+load_production_path_contract()`, `DockerGitOperations._storage_root()`,
+`preflight()`, `validate_active_refresh_prerequisites()`,
+`refresh_active_runtime_services()`, `_refresh_active_runtime()`, and
+`refresh_active_runtime()`.
+
 ## H. Preflight (automatic production gate)
 
 `DockerGitOperations.preflight()` explicitly performs, in order:
@@ -444,6 +508,11 @@ Implemented by `web/deployment/bin/madar-migrate`,
 6. run `python3 web/scripts/check_secret_hygiene.py`;
 7. require readable/traversable persistent directories for uploads, avatars,
    private uploads, and private generated charts.
+
+Active-runtime refresh invokes this complete preflight before any recreating
+Compose operation. A missing/invalid `MADAR_STORAGE_ROOT`, missing bind source,
+Compose error, or changed image identity therefore fails before the active
+project can be partially mutated.
 
 Container readiness later performs the authoritative storage write probe.
 `check_dependency_locks.py`, host-capacity checks, rehearsal scripts, and test
@@ -646,6 +715,7 @@ document and update it when behavior changed:
 - `release_deployer.py`
 - `migration_executor.py`
 - `madar-migrate`
+- active-runtime refresh behavior in `madar-release-deploy`
 - `production-paths.conf` and tracked systemd/installer path contracts
 - `check_migrations.py`
 - `check_migration_transitions.py`

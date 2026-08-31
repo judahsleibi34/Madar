@@ -37,6 +37,19 @@ class DeploymentEnvironmentFileTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "permissions_too_broad"):
                 load_environment_file(path, environ={})
 
+    def test_non_secret_path_contract_may_be_root_readable(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = self.write_environment(
+                root, "MADAR_STORAGE_ROOT=/var/lib/madar/storage\n", mode=0o644,
+            )
+            environment = {}
+            load_environment_file(
+                path, environ=environment, require_private=False,
+            )
+        self.assertEqual(
+            environment["MADAR_STORAGE_ROOT"], "/var/lib/madar/storage",
+        )
+
     def test_errors_report_line_number_not_value(self):
         with tempfile.TemporaryDirectory() as root:
             path = self.write_environment(root, "VALID=ok\nnot an assignment\n")

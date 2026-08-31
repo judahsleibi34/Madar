@@ -186,6 +186,18 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("permissions_too_broad", self.environment_library)
         self.assertNotIn("print(", self.environment_library)
 
+    def test_operator_refresh_loads_paths_and_has_no_release_local_storage_fallback(self):
+        for entrypoint in (self.deploy, self.wrapper):
+            self.assertIn(
+                'source "$TRACKED_CONTROL_ROOT/production-paths.conf"', entrypoint,
+            )
+        self.assertIn("load_production_path_contract()", self.release_deploy)
+        self.assertIn("--refresh-active-runtime", self.release_deploy)
+        self.assertIn("production_storage_root_not_configured", self.release_deploy)
+        self.assertNotIn('str(self.repo / "backend")', self.release_deploy)
+        self.assertIn("operations.preflight", self.release_deploy)
+        self.assertIn("refresh_active_runtime_services", self.release_deploy)
+
     def test_initial_promotion_requires_prepared_candidate_before_state_adoption(self):
         self.assertIn("candidate_validated_workers_inactive", self.release_deploy)
         self.assertIn("prepared_release_workers_not_active", self.release_deploy)
