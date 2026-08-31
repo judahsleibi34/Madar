@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 81,
-    "compatible_max": 92,
-    "target": 92,
+    "compatible_max": 93,
+    "target": 93,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
-    "rollback_compatible_max": 90
+    "rollback_compatible_max": 92
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Compatibility bridge for schema 091-092. Promote and accept while schema 090 is serving; only after this bridge is known-good may the separately locked automation create and verify a complete backup, apply the pinned expand migrations 091-092, and revalidate the active release. The retained schema-090 release remains a traffic rollback target only until migration begins; after schema advances, forward repair is required by policy.",
-  "migration_manifest": "migrations-091-092.json"
+  "notes": "Compatibility bridge for schema 093. Promote and accept while schema 092 is serving; only after this bridge is known-good may the separately locked automation create and verify a schema-092 backup, apply the pinned expand migration 093, and revalidate the active release. The retained schema-092 release remains a traffic rollback target only until migration begins; after schema advances to 093, forward repair is required by policy.",
+  "migration_manifest": "migrations-093.json"
 }

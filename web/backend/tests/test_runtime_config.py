@@ -39,6 +39,20 @@ class RuntimeConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "SMTP"):
                 validate_runtime_configuration()
 
+    def test_enabled_web_push_without_canonical_vapid_fields_fails_startup(self):
+        environment = {
+            "APP_ENV": "production", "SUPABASE_URL": "https://example.invalid",
+            "SUPABASE_ANON_KEY": "anon", "SUPABASE_SERVICE_KEY": "secret",
+            "CSRF_SECRET": "x" * 40, "FRONTEND_URLS": "https://app.example",
+            "REDIS_URL": "redis://redis:6379/0", "COOKIE_SECURE": "true",
+            "RATE_LIMIT_FAIL_OPEN": "false", "ADMIN_MFA_LOGIN_ENFORCEMENT": "true",
+            "MADAR_RELEASE_SHA": "a" * 40, "WEB_PUSH_ENABLED": "true",
+            "VAPID_PRIVATE_KEY": "deprecated-does-not-count",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "VAPID"):
+                validate_runtime_configuration()
+
     def test_production_accepts_secret_api_key_and_rejects_publishable_key(self):
         environment = {
             "APP_ENV": "production", "SUPABASE_URL": "https://example.invalid",

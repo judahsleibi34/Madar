@@ -211,13 +211,13 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Current bridge contract after this policy update is schema range `81..92`, target
-`92`, class `expand-only`, rollback metadata `81..90`, manifest
-`migrations-091-092.json`, and migration policy
+Current bridge contract after this policy update is schema range `81..93`, target
+`93`, class `expand-only`, rollback metadata `81..92`, manifest
+`migrations-093.json`, and migration policy
 `automatic-after-known-good-backup-first-forward-repair`. It promotes and is
-accepted while schema 90 is live. Only afterward may the separate coordinator
-create a verified backup and execute 90→91→92. Code that touches new objects
-must remain safe throughout that bridge interval.
+accepted while schema 92 is live. Only afterward may the separate coordinator
+create a schema-92-bound verified backup and execute 92→93. Code that touches
+new objects must remain safe throughout that bridge interval.
 
 Implemented by `web/deployment/lib/release_deployer.py :: Compatibility.load()`
 and `ReleaseDeployer.deploy()`, plus `DockerGitOperations.schema_version()`,

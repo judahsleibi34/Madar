@@ -23,6 +23,7 @@ from services.notification_preference_service import (
     notification_category,
     preference_enabled,
 )
+from services.web_push_config import get_web_push_configuration
 
 
 logger = logging.getLogger(__name__)
@@ -334,11 +335,16 @@ def _deliver_email(row: dict[str, Any]) -> None:
 
 
 def _deliver_web_push(row: dict[str, Any]) -> None:
-    public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
-    private_key = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
-    subject = os.getenv("WEB_PUSH_VAPID_SUBJECT", "").strip()
-    if not all((public_key, private_key, subject)):
-        raise DeliveryError("web_push_not_configured")
+    configuration = get_web_push_configuration()
+    if not configuration.administratively_enabled:
+        raise DeliveryError(
+            "web_push_disabled", retryable=False, terminal_outcome="revoked"
+        )
+    if not configuration.configured:
+        raise DeliveryError("web_push_not_configured", retryable=False)
+    public_key = configuration.public_key
+    private_key = configuration.private_key
+    subject = configuration.subject
     try:
         from pywebpush import WebPushException, webpush
     except ImportError as error:

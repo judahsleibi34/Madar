@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 93,
+      "path": "web/database/migrations/093_harden_public_ownership_and_web_push.sql",
+      "sha256": "cae897d0cb23ed25a0e5e8bd4f6811bd4f6cfc5d0f00a9e76b981c6c5d60ac28",
+      "from_schema": 92,
+      "to_schema": 93,
+      "compatibility": "expand-only"
+    }
+  ]
+}

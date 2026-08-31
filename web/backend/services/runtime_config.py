@@ -12,6 +12,7 @@ from services.supabase_api_key import (
     is_opaque_supabase_api_key,
     is_supabase_secret_api_key,
 )
+from services.web_push_config import get_web_push_configuration
 
 
 ConfigClass = Literal["required", "optional", "development-only", "production-only", "secret", "deprecated", "unknown"]
@@ -30,6 +31,7 @@ CONFIG_CLASSIFICATION: dict[str, ConfigClass] = {
     "RATE_LIMIT_FAIL_OPEN": "production-only",
     "ADMIN_MFA_LOGIN_ENFORCEMENT": "production-only",
     "EMAIL_CHANNEL_ENABLED": "optional",
+    "WEB_PUSH_ENABLED": "optional",
     "SMTP_HOST": "secret",
     "SMTP_USERNAME": "secret",
     "SMTP_PASSWORD": "secret",
@@ -201,6 +203,12 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
             raise RuntimeError("administrator MFA login enforcement is disabled")
         if email_enabled and not all(os.getenv(name, "").strip() for name in ("SMTP_HOST", "SMTP_FROM_EMAIL")):
             raise RuntimeError("enabled email channel is missing SMTP configuration")
+        web_push = get_web_push_configuration()
+        if web_push.administratively_enabled and not web_push.configured:
+            raise RuntimeError(
+                "enabled Web Push channel is missing VAPID configuration: "
+                + ",".join(web_push.missing_fields)
+            )
         if not re.fullmatch(r"[0-9a-f]{40}", release_sha):
             raise RuntimeError("production release identity is missing")
         origins = os.getenv("CSRF_TRUSTED_ORIGINS", "").strip() or os.getenv("FRONTEND_URLS", "")

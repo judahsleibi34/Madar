@@ -1,4 +1,5 @@
 import socket
+import os
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,6 +11,7 @@ from starlette.requests import Request
 
 from routes import auth_routes, notification_routes
 from services import notification_delivery_service, notification_service
+from services.installation_service import PushSubscriptionBindingError
 from services.push_subscription_security import UnsafePushEndpoint, validate_push_endpoint
 
 
@@ -97,6 +99,18 @@ class NotificationInboxIsolationTests(unittest.TestCase):
 
 
 class PushEndpointSecurityTests(unittest.TestCase):
+    def setUp(self):
+        self.push_environment = patch.dict(os.environ, {
+            "WEB_PUSH_ENABLED": "true",
+            "WEB_PUSH_VAPID_PUBLIC_KEY": "public",
+            "WEB_PUSH_VAPID_PRIVATE_KEY": "private",
+            "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
+        }, clear=False)
+        self.push_environment.start()
+
+    def tearDown(self):
+        self.push_environment.stop()
+
     def test_rejects_unsafe_url_shapes_and_network_destinations(self):
         unsafe_without_dns = [
             "http://push.example.test/send",
@@ -167,6 +181,55 @@ class PushEndpointSecurityTests(unittest.TestCase):
         self.assertEqual(bind.call_args.kwargs["installation_id"], payload["installation_id"])
         legacy.assert_not_called()
 
+    def test_registration_maps_sanitized_installation_rpc_error(self):
+        app = FastAPI()
+        app.include_router(notification_routes.router)
+        client = TestClient(app)
+        context = SimpleNamespace(tenant_id=22, user_id=7)
+        payload = {
+            "endpoint": "https://push.example.test/send",
+            "keys": {"p256dh": "A" * 87, "auth": "B" * 22},
+            "installation_id": "123e4567-e89b-42d3-a456-426614174000",
+        }
+        failure = PushSubscriptionBindingError(
+            status_code=409,
+            code="installation_unavailable",
+            message="The application installation is not available.",
+        )
+        with patch.object(
+            notification_routes, "get_current_tenant_context", return_value=context
+        ), patch("socket.getaddrinfo", return_value=resolved("8.8.8.8")), patch.object(
+            notification_routes, "bind_push_subscription", side_effect=failure
+        ):
+            response = client.post("/notifications/push-subscriptions", json=payload)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"]["code"], "installation_unavailable")
+
+    def test_registration_respects_disabled_and_misconfigured_channel(self):
+        app = FastAPI()
+        app.include_router(notification_routes.router)
+        client = TestClient(app)
+        context = SimpleNamespace(tenant_id=22, user_id=7)
+        payload = {
+            "endpoint": "https://push.example.test/send",
+            "keys": {"p256dh": "A" * 87, "auth": "B" * 22},
+        }
+        for environment, status, code in (
+            ({"WEB_PUSH_ENABLED": "false"}, 409, "push_channel_disabled"),
+            ({"WEB_PUSH_ENABLED": "true"}, 503, "push_channel_misconfigured"),
+        ):
+            with self.subTest(code=code), patch.dict(
+                os.environ, environment, clear=True
+            ), patch.object(
+                notification_routes,
+                "get_current_tenant_context",
+                return_value=context,
+            ), patch.object(notification_routes, "upsert_web_push_subscription") as upsert:
+                response = client.post("/notifications/push-subscriptions", json=payload)
+            self.assertEqual(response.status_code, status)
+            self.assertEqual(response.json()["detail"]["code"], code)
+            upsert.assert_not_called()
+
     def test_endpoint_revocation_is_authenticated_user_scoped(self):
         app = FastAPI()
         app.include_router(notification_routes.router)
@@ -207,7 +270,7 @@ class ExternalDeliveryMembershipTests(unittest.TestCase):
 
     def test_worker_push_rejects_inactive_member_and_scopes_active_subscription(self):
         base_row = {"channel": "web_push", "tenant_id": 1, "payload": {"title": "Title", "body": "Body"}}
-        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False):
             with self.assertRaisesRegex(notification_delivery_service.DeliveryError, "recipient_inactive"):
                 notification_delivery_service._deliver_web_push({**base_row, "user_id": 11, "subscription_id": "inactive"})
@@ -219,7 +282,7 @@ class ExternalDeliveryMembershipTests(unittest.TestCase):
 
     def test_worker_rechecks_endpoint_safety_before_send_and_revokes_invalid_binding(self):
         row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title", "body": "Body"}}
-        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=UnsafePushEndpoint("push_endpoint_unsafe")), patch("pywebpush.webpush") as send:
             with self.assertRaisesRegex(notification_delivery_service.DeliveryError, "web_push_endpoint_unsafe"):
                 notification_delivery_service._deliver_web_push(row)
@@ -231,7 +294,7 @@ class ExternalDeliveryMembershipTests(unittest.TestCase):
         from pywebpush import WebPushException
 
         row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title"}}
-        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         gone = WebPushException("gone", response=SimpleNamespace(status_code=410))
         with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=gone), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
             notification_delivery_service._deliver_web_push(row)
@@ -307,7 +370,7 @@ class LogoutPushRevocationTests(unittest.TestCase):
         client.tables["tenant_memberships"] = [{"tenant_id": 1, "user_id": 42, "status": "active"}]
         client.tables["web_push_subscriptions"] = [{"id": "binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "installation", "endpoint": "https://push.test/send", "p256dh": "A", "auth": "B", "revoked_at": None}]
         client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "notification_permission": "granted", "revoked_at": "2026-01-01"}]
-        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), self.assertRaisesRegex(notification_delivery_service.DeliveryError, "web_push_installation_inactive"):
             notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "binding", "payload": {}})
 
@@ -316,7 +379,7 @@ class LogoutPushRevocationTests(unittest.TestCase):
         client.tables["tenant_memberships"] = [{"tenant_id": 1, "user_id": 42, "status": "active"}]
         client.tables["web_push_subscriptions"] = [{"id": "binding", "tenant_id": 1, "user_id": 42, "app_installation_id": "installation", "endpoint": "https://push.test/send", "p256dh": "A", "auth": "B", "revoked_at": None}]
         client.tables["app_installations"] = [{"id": "installation", "user_id": 42, "notifications_enabled": True, "notification_permission": "granted", "revoked_at": None}]
-        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush") as send:
             notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "binding", "payload": {}})
         send.assert_called_once()
@@ -332,7 +395,7 @@ class LogoutPushRevocationTests(unittest.TestCase):
             {"id": "denied-installation", "user_id": 42, "notifications_enabled": False, "notification_permission": "denied", "revoked_at": None},
             {"id": "active-installation", "user_id": 42, "notifications_enabled": True, "notification_permission": "granted", "revoked_at": None},
         ]
-        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), self.assertRaisesRegex(notification_delivery_service.DeliveryError, "web_push_installation_inactive"):
             notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "denied-binding", "payload": {}})
         with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush") as send:
@@ -345,7 +408,7 @@ class LogoutPushRevocationTests(unittest.TestCase):
         client.tables["web_push_subscriptions"] = [{"id": "binding", "tenant_id": 1, "user_id": 42, "endpoint": "https://push.test/send", "p256dh": "A", "auth": "B", "revoked_at": None}]
         with patch.object(notification_service, "service_supabase", client):
             self.assertEqual(notification_service.revoke_all_web_push_subscriptions(user_id=42), 1)
-        environment = {"WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
         with patch.object(notification_delivery_service, "service_supabase", client), patch.dict("os.environ", environment, clear=False), self.assertRaisesRegex(notification_delivery_service.DeliveryError, "web_push_subscription_revoked"):
             notification_delivery_service._deliver_web_push({"channel": "web_push", "tenant_id": 1, "user_id": 42, "subscription_id": "binding", "payload": {}})
 

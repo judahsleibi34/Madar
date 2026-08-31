@@ -75,6 +75,7 @@ class NotificationPreferenceTests(unittest.TestCase):
             "payload": {"event_type": "builder.form_submitted", "source_type": "form"},
         }
         with patch.dict(os.environ, {
+            "WEB_PUSH_ENABLED": "true",
             "WEB_PUSH_VAPID_PUBLIC_KEY": "public",
             "WEB_PUSH_VAPID_PRIVATE_KEY": "private",
             "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
