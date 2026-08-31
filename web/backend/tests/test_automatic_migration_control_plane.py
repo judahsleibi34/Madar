@@ -87,7 +87,8 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         (release_dir / "release.json").write_text(
             json.dumps(self.metadata), encoding="utf-8"
         )
-        manifest_source = WEB_ROOT / "deployment/releases/migrations-091-092.json"
+        manifest_name = self.metadata["migration_manifest"]
+        manifest_source = WEB_ROOT / "deployment/releases" / manifest_name
         manifest = json.loads(manifest_source.read_text(encoding="utf-8"))
         for entry in manifest["migrations"]:
             migration = release_root / entry["path"]
@@ -113,7 +114,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 hashlib.sha256(migration.read_bytes()).hexdigest(),
                 entry["sha256"],
             )
-        (release_dir / "migrations-091-092.json").write_text(
+        (release_dir / manifest_name).write_text(
             json.dumps(manifest), encoding="utf-8"
         )
         state_root = root / "state"
@@ -249,7 +250,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
 
                 def run(_self):
                     events.append("execute")
-                    operations.schema = 92
+                    operations.schema = compatibility.target_schema
                     return {"status": "completed"}
 
             def stable(**_kwargs):
@@ -288,7 +289,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         self.assertLess(events.index("backup"), events.index("execute"))
         self.assertLess(events.index("execute"), events.index("refresh"))
 
-    def test_successful_90_to_91_to_92_records_target_only_after_worker_and_route_validation(self):
+    def test_successful_90_to_91_to_92_to_93_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(root)
@@ -309,6 +310,8 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     operations.schema = 91
                     events.append("migration:91->92")
                     operations.schema = 92
+                    events.append("migration:92->93")
+                    operations.schema = 93
                     return {"status": "completed"}
 
             with (
@@ -339,12 +342,12 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 ).read_text()
             )
 
-        self.assertEqual(result["observed_schema"], 92)
+        self.assertEqual(result["observed_schema"], 93)
         self.assertEqual(automation["status"], "completed")
         self.assertEqual(
             automation["phase"], "post_migration_validation_complete"
         )
-        self.assertEqual(state["known_good_release"]["schema"], 92)
+        self.assertEqual(state["known_good_release"]["schema"], 93)
         self.assertEqual(
             state["history"][-1]["phase"],
             "post_migration_workers_refreshed",
@@ -353,6 +356,10 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         self.assertLess(
             events.index("migration:90->91"),
             events.index("migration:91->92"),
+        )
+        self.assertLess(
+            events.index("migration:91->92"),
+            events.index("migration:92->93"),
         )
         first_validation = events.index(f"validate:{self.sha}:green")
         worker_activation = events.index(f"workers:{self.sha}:green")
@@ -383,7 +390,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     pass
 
                 def run(_self):
-                    operations.schema = 92
+                    operations.schema = compatibility.target_schema
                     return {"status": "completed"}
 
             with (
@@ -525,7 +532,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             state_root, operations, compatibility, _events = self.fixture(root)
             manifest_path = (
                 operations.release_root
-                / "web/deployment/releases/migrations-091-092.json"
+                / f"web/deployment/releases/{self.metadata['migration_manifest']}"
             )
             manifest = json.loads(manifest_path.read_text())
             manifest["migrations"][0]["sha256"] = "0" * 64
@@ -572,7 +579,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
 
                 def run(_self):
                     self.assertEqual(_self.backup_dir, backup)
-                    operations.schema = 92
+                    operations.schema = compatibility.target_schema
                     return {"status": "completed"}
 
             with (
@@ -598,7 +605,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     operations=operations,
                 )
 
-        self.assertEqual(result["observed_schema"], 92)
+        self.assertEqual(result["observed_schema"], 93)
         self.assertFalse(any(event.startswith("rollback:") for event in events))
         self.assertFalse(any(event.startswith("traffic:") for event in events))
 

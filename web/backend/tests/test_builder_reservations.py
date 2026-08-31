@@ -1,6 +1,7 @@
 import copy
 import unittest
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -388,6 +389,11 @@ class PublicBuilderReservationTests(unittest.TestCase):
 
 class SiteRecordOwnerAttachmentTests(unittest.TestCase):
     @staticmethod
+    def repository_root() -> Path:
+        local = Path(__file__).resolve().parents[2]
+        return local if (local / "database/migrations").is_dir() else Path("/workspace")
+
+    @staticmethod
     def _fake_client(saved_row):
         client = MagicMock()
         query = MagicMock()
@@ -485,6 +491,72 @@ class SiteRecordOwnerAttachmentTests(unittest.TestCase):
 
         self.assertEqual(result, row)
         client.table.assert_not_called()
+
+    def test_unknown_membership_domain_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "site_record_identity_invalid"):
+            public_site_routes.site_record_owner_fields(
+                ({"id": 31}, {"id": 7, "status": "active"})
+            )
+
+    def test_atomic_rpc_result_needs_no_compatibility_update(self):
+        row = {
+            "id": "reservation-1",
+            "tenant_id": 7,
+            "project_id": "project-1",
+            "site_user_id": 31,
+            "site_membership_id": None,
+        }
+        client = MagicMock()
+        identity = (
+            {"id": 31},
+            {"id": 7, "status": "active", "_access_kind": "staff"},
+        )
+        with patch.object(public_site_routes, "service_supabase", client):
+            result = public_site_routes.reconcile_site_record_owner_after_commit(
+                "builder_reservations", row, identity
+            )
+        self.assertEqual(result, row)
+        client.table.assert_not_called()
+
+    def test_bridge_reconciliation_failure_does_not_falsely_fail_committed_record(self):
+        row = {
+            "id": "reservation-1",
+            "tenant_id": 7,
+            "project_id": "project-1",
+            "site_user_id": None,
+            "site_membership_id": None,
+        }
+        identity = (
+            {"id": 31},
+            {"id": 7, "status": "active", "_access_kind": "staff"},
+        )
+        with patch.object(
+            public_site_routes,
+            "attach_site_record_owner",
+            side_effect=RuntimeError("database unavailable"),
+        ), self.assertLogs(public_site_routes.logger, level="ERROR"):
+            result = public_site_routes.reconcile_site_record_owner_after_commit(
+                "builder_reservations", row, identity
+            )
+        self.assertEqual(result, row)
+
+    def test_schema_093_owns_records_atomically_and_validates_membership_domain(self):
+        root = self.repository_root()
+        sql = (
+            root / "database/migrations/093_harden_public_ownership_and_web_push.sql"
+        ).read_text()
+        mirrored = (
+            root / "supabase/migrations/093_harden_public_ownership_and_web_push.sql"
+        ).read_text()
+        normalized = " ".join(sql.lower().split())
+        self.assertEqual(sql, mirrored)
+        self.assertIn("public.tenant_site_memberships membership", normalized)
+        self.assertIn("membership.tenant_id = p_tenant_id", normalized)
+        self.assertIn("membership.user_id = p_site_user_id", normalized)
+        self.assertIn("set site_user_id = p_site_user_id", normalized)
+        self.assertIn("site_membership_id = p_site_membership_id", normalized)
+        self.assertIn("result := jsonb_set(result, '{reservation}'", normalized)
+        self.assertIn("result := jsonb_set(result, '{submission}'", normalized)
 
 
 class BuilderReservationManagementTests(unittest.TestCase):

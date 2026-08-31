@@ -28,6 +28,28 @@ class RpcClient:
         return Response(self.data)
 
 
+class FailingRpcClient:
+    def __init__(self, error):
+        self.error = error
+
+    def rpc(self, _name, _payload):
+        class Failure:
+            def __init__(self, error):
+                self.error = error
+
+            def execute(self):
+                raise self.error
+
+        return Failure(self.error)
+
+
+class FakeApiError(Exception):
+    def __init__(self, *, message, code="P0001"):
+        super().__init__("redacted test database error")
+        self.message = message
+        self.code = code
+
+
 class TableQuery:
     def __init__(self, client, table):
         self.client = client
@@ -153,6 +175,34 @@ class AppInstallationTests(unittest.TestCase):
         self.assertEqual(payload["p_user_id"], 8)
         self.assertNotIn("p_app_installation_id", payload)
 
+    def test_push_binding_maps_expected_rpc_states_without_exposing_database_details(self):
+        cases = (
+            ("active_tenant_membership_required", 403, "active_tenant_membership_required"),
+            ("app_installation_not_available", 409, "installation_unavailable"),
+            ("unexpected_internal_detail", 503, "push_subscription_unavailable"),
+        )
+        for message, status, code in cases:
+            error = FakeApiError(message=message)
+            with self.subTest(message=message), patch.object(
+                installation_service, "APIError", FakeApiError
+            ), patch.object(
+                installation_service,
+                "service_supabase",
+                FailingRpcClient(error),
+            ), self.assertLogs(installation_service.logger, level="WARNING") as captured:
+                with self.assertRaises(installation_service.PushSubscriptionBindingError) as raised:
+                    installation_service.bind_push_subscription(
+                        user_id=8,
+                        tenant_id=30,
+                        installation_id=self.INSTALLATION_ID,
+                        endpoint="https://push.example/send",
+                        p256dh="key",
+                        auth="auth",
+                    )
+            self.assertEqual(raised.exception.status_code, status)
+            self.assertEqual(raised.exception.code, code)
+            self.assertNotIn(message, " ".join(captured.output))
+
     def test_migration_defines_shared_browser_and_legacy_compatibility_invariants(self):
         root = self.repository_root()
         sql = (root / "database/migrations/074_create_app_installations.sql").read_text()
@@ -165,6 +215,24 @@ class AppInstallationTests(unittest.TestCase):
         self.assertIn("installation.notifications_enabled = true", normalized)
         self.assertIn("enable row level security", normalized)
         self.assertIn("revoke all on public.app_installations from anon, authenticated", normalized)
+
+    def test_schema_093_qualifies_pgcrypto_without_widening_definer_search_path(self):
+        root = self.repository_root()
+        sql = (
+            root / "database/migrations/093_harden_public_ownership_and_web_push.sql"
+        ).read_text()
+        mirrored = (
+            root / "supabase/migrations/093_harden_public_ownership_and_web_push.sql"
+        ).read_text()
+        normalized = " ".join(sql.lower().split())
+        self.assertEqual(sql, mirrored)
+        self.assertIn("extensions.digest(existing_subscription.endpoint", normalized)
+        self.assertIn("security definer set search_path = public", normalized)
+        self.assertNotIn("set search_path = public, extensions", normalized)
+        self.assertIn(
+            "revoke all on function public.bind_web_push_subscription_to_installation",
+            normalized,
+        )
 
     def test_list_route_is_authenticated_user_scoped_and_marks_current(self):
         app = FastAPI()

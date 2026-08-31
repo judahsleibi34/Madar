@@ -101,9 +101,13 @@ Calendar integrations and workers:
 
 Native browser/operating-system notifications:
 
+- `WEB_PUSH_ENABLED` (explicit operator switch; defaults to disabled)
 - `WEB_PUSH_VAPID_PUBLIC_KEY`
 - `WEB_PUSH_VAPID_PRIVATE_KEY`
 - `WEB_PUSH_VAPID_SUBJECT` (a contact URI such as `mailto:ops@example.com`)
+- All three canonical VAPID values are required when `WEB_PUSH_ENABLED=true`.
+  The deprecated `VAPID_PRIVATE_KEY` name is ignored by runtime health and
+  delivery decisions.
 - Run the notification worker (`docker compose --profile workers up`) so queued
   notifications and calendar reminders are delivered while the Madar page is
   closed.

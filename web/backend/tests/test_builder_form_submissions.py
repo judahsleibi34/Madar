@@ -223,6 +223,10 @@ class FakeQuery:
 class FakeSupabase:
     def __init__(self):
         self.tables = {
+            "tenants": [
+                {"tenant_id": 1, "lifecycle_state": "active"},
+                {"tenant_id": 2, "lifecycle_state": "active"},
+            ],
             "website_settings": [
                 {
                     "id": 1,
@@ -323,7 +327,10 @@ class BuilderFormSubmissionTests(unittest.TestCase):
     def test_logged_in_form_submission_records_member_ownership(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
-        identity = ({"id": 31}, {"id": 41, "status": "active"})
+        identity = (
+            {"id": 31},
+            {"id": 41, "status": "active", "_access_kind": "site"},
+        )
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
              patch.object(public_site_routes, "authorize_site_resource", return_value=identity):
@@ -335,6 +342,25 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         saved = fake_supabase.tables["builder_form_submissions"][-1]
         self.assertEqual(saved["site_user_id"], 31)
         self.assertEqual(saved["site_membership_id"], 41)
+
+    def test_staff_form_submission_never_stores_workspace_membership_id(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        identity = (
+            {"id": 31},
+            {"id": 7, "status": "active", "_access_kind": "staff"},
+        )
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "authorize_site_resource", return_value=identity):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+        self.assertEqual(response.status_code, 200)
+        saved = fake_supabase.tables["builder_form_submissions"][-1]
+        self.assertEqual(saved["site_user_id"], 31)
+        self.assertIsNone(saved["site_membership_id"])
 
     def test_member_submissions_endpoint_is_not_exposed(self):
         client = build_public_client(FakeSupabase())

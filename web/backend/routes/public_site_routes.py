@@ -1756,7 +1756,9 @@ def resolve_website_settings(site_identifier: str, *, request: Request):
         ambiguous_code="publication_hostname_ambiguous",
     )
     tenant_id = settings.get("tenant_id")
-    if tenant_id is None or not tenant_is_active(tenant_id):
+    if tenant_id is None or not tenant_is_active(
+        tenant_id, client=service_supabase
+    ):
         raise HTTPException(status_code=404, detail="Published site not found")
     if branded:
         require_branded_subdomain(settings, allow_legacy_routing=True)
@@ -2224,24 +2226,30 @@ def authorize_site_resource(
     return identity
 
 
+def site_record_owner_fields(identity) -> dict[str, Any]:
+    if not identity:
+        return {"site_user_id": None, "site_membership_id": None}
+    user_row, membership = identity
+    access_kind = str(membership.get("_access_kind") or "").strip().lower()
+    user_id = user_row.get("id")
+    if user_id is None or access_kind not in {"site", "staff"}:
+        raise RuntimeError("site_record_identity_invalid")
+    membership_id = membership.get("id") if access_kind == "site" else None
+    if access_kind == "site" and membership_id is None:
+        raise RuntimeError("site_record_identity_invalid")
+    return {
+        "site_user_id": user_id,
+        "site_membership_id": membership_id,
+    }
+
+
 def attach_site_record_owner(table_name: str, row: dict, identity):
     if not identity or not row:
         return row
 
-    user_row, membership = identity
-    access_kind = str(membership.get("_access_kind") or "").strip().lower()
-
-    # site_membership_id references tenant_site_memberships(id), not
-    # tenant_memberships(id). Staff identities therefore must never store
-    # their workspace membership ID in this column.
-    update = {
-        "site_user_id": user_row.get("id"),
-        "site_membership_id": (
-            membership.get("id")
-            if access_kind == "site"
-            else None
-        ),
-    }
+    update = site_record_owner_fields(identity)
+    if all(row.get(field) == value for field, value in update.items()):
+        return row
 
     response = (
         service_supabase.table(table_name)
@@ -2252,6 +2260,25 @@ def attach_site_record_owner(table_name: str, row: dict, identity):
         .execute()
     )
     return first_row(response) or {**row, **update}
+
+
+def reconcile_site_record_owner_after_commit(table_name: str, row: dict, identity):
+    """Bridge compatibility for schema 92 without returning a false failure.
+
+    Schema 93 writes ownership inside the domain transaction and this becomes
+    a no-op. While a schema-92 bridge is active, the compatibility update is a
+    second durable operation. Its failure is observable, but cannot truthfully
+    turn the already-committed customer record into a failed submission.
+    """
+
+    try:
+        return attach_site_record_owner(table_name, row, identity)
+    except Exception as error:
+        logger.error(
+            "public.site_record_owner_reconciliation_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return row
 
 @router.post("/sites/{subdomain}/auth/register")
 def register_tenant_visitor(
@@ -3205,7 +3232,7 @@ def save_public_builder_form_draft(
     answers = draft.answers or {}
     validate_public_answer_payload_limits(answers)
     cleaned_answers = validate_form_draft_answers(form, answers)
-    identity_user, identity_membership = identity or ({}, {})
+    owner_fields = site_record_owner_fields(identity)
     payload = {
         "tenant_id": tenant_id,
         "project_id": project.get("id"),
@@ -3218,8 +3245,7 @@ def save_public_builder_form_draft(
         "form_element_id": draft.form_element_id,
         "page_index": draft.page_index,
         "language": draft.language,
-        "site_user_id": identity_user.get("id"),
-        "site_membership_id": identity_membership.get("id"),
+        **owner_fields,
         "submitter_ip": get_client_ip(request),
         "user_agent": request.headers.get("user-agent", "")[:1000],
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -3312,9 +3338,7 @@ def submit_public_builder_form(
         resource_id=clean_form_id,
     )
 
-    identity_user, identity_membership = identity or ({}, {})
-    site_user_id = identity_user.get("id")
-    site_membership_id = identity_membership.get("id")
+    owner_fields = site_record_owner_fields(identity)
 
     answers = submission.answers or {}
     validate_public_answer_payload_limits(answers)
@@ -3335,8 +3359,7 @@ def submit_public_builder_form(
         "field_snapshot": fields,
         "submitter_ip": submitter_ip,
         "user_agent": user_agent,
-        "site_user_id": site_user_id,
-        "site_membership_id": site_membership_id,
+        **owner_fields,
     }
     request_hash = canonical_request_hash({
         "tenant_id": tenant_id,
@@ -3344,8 +3367,7 @@ def submit_public_builder_form(
         "form_id": clean_form_id,
         "form_version": project.get("published_version"),
         "answers": cleaned_answers,
-        "site_user_id": site_user_id,
-        "site_membership_id": site_membership_id,
+        **owner_fields,
     })
     idempotency_key_hash = (
         hash_public_identifier(f"form-idempotency:{idempotency_key}")
@@ -3373,7 +3395,7 @@ def submit_public_builder_form(
             },
         },
     )
-    saved_submission = attach_site_record_owner(
+    saved_submission = reconcile_site_record_owner_after_commit(
         "builder_form_submissions", saved_submission, identity
     )
 
@@ -3509,7 +3531,7 @@ def submit_public_builder_block_event(
         title = event.title or "New site event"
         body = f"{block_type} triggered an event on the published site."
 
-    identity_user, identity_membership = identity or ({}, {})
+    owner_fields = site_record_owner_fields(identity)
 
     reservation_payload = build_builder_reservation_payload(
         tenant_id=tenant_id,
@@ -3523,8 +3545,7 @@ def submit_public_builder_block_event(
         request=request,
         timing=timing,
     )
-    reservation_payload["site_user_id"] = identity_user.get("id")
-    reservation_payload["site_membership_id"] = identity_membership.get("id")
+    reservation_payload.update(owner_fields)
     stable_request_payload = {
         key: value
         for key, value in reservation_payload.items()
@@ -3580,7 +3601,7 @@ def submit_public_builder_block_event(
             },
         },
     )
-    saved_reservation = attach_site_record_owner(
+    saved_reservation = reconcile_site_record_owner_after_commit(
         "builder_reservations", saved_reservation, identity
     )
     reservation_id = str(saved_reservation.get("id") or "")

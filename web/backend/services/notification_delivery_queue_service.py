@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from database import service_supabase
+from services.web_push_config import get_web_push_configuration
 
 
 logger = logging.getLogger(__name__)
@@ -62,9 +63,7 @@ def resolve_outbox_notification(row: dict[str, Any], *, client=None) -> int:
             "p_email_enabled": os.getenv(
                 "EMAIL_CHANNEL_ENABLED", "false"
             ).strip().lower() in {"1", "true", "yes", "on"},
-            "p_web_push_enabled": os.getenv(
-                "WEB_PUSH_ENABLED", "false"
-            ).strip().lower() in {"1", "true", "yes", "on"},
+            "p_web_push_enabled": get_web_push_configuration().operational,
         },
     ).execute()
     data = getattr(response, "data", None)

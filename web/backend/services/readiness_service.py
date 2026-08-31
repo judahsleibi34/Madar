@@ -24,6 +24,7 @@ from services.calendar_connection_sync_queue_service import (
     get_connection_sync_queue_metrics,
 )
 from services.supabase_api_key import supabase_api_headers
+from services.web_push_config import get_web_push_configuration
 
 try:
     import redis
@@ -236,7 +237,7 @@ def check_notification_queue() -> str:
             relevant_dead += int(metrics.get("delivery_internal_dead") or 0)
             if _env_bool("EMAIL_CHANNEL_ENABLED", False):
                 relevant_dead += int(metrics.get("delivery_email_dead") or 0)
-            if _env_bool("WEB_PUSH_ENABLED", False):
+            if get_web_push_configuration().operational:
                 relevant_dead += int(metrics.get("delivery_web_push_dead") or 0)
         else:
             # Compatibility fallback for legacy metrics/test doubles.
@@ -268,10 +269,10 @@ def check_notification_email() -> str:
 
 
 def check_notification_push() -> str:
-    enabled = _env_bool("WEB_PUSH_ENABLED", False)
-    if not enabled:
-        return "disabled"
-    return "configured" if os.getenv("VAPID_PRIVATE_KEY", "").strip() else "unavailable"
+    try:
+        return get_web_push_configuration().status
+    except RuntimeError:
+        return "misconfigured"
 
 
 def check_backup_freshness() -> str:
