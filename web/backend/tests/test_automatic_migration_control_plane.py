@@ -32,7 +32,7 @@ def load_release_cli():
 
 
 class FakeOperations:
-    def __init__(self, release_root: Path, events: list[str], schema: int = 90):
+    def __init__(self, release_root: Path, events: list[str], schema: int = 92):
         self.release_root = release_root
         self.events = events
         self.schema = schema
@@ -80,7 +80,21 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             )
         )
 
-    def fixture(self, root: Path, *, schema: int = 90):
+    def test_current_manifest_and_rollback_contract_start_at_schema_92(self):
+        manifest = json.loads(
+            (
+                WEB_ROOT
+                / "deployment/releases"
+                / self.metadata["migration_manifest"]
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["migrations"][0]["from_schema"], 92)
+        self.assertEqual(manifest["migrations"][-1]["to_schema"], 93)
+        self.assertEqual(
+            self.metadata["schema"]["rollback_compatible_max"], 92
+        )
+
+    def fixture(self, root: Path, *, schema: int = 92):
         release_root = root / "release"
         release_dir = release_root / "web/deployment/releases"
         release_dir.mkdir(parents=True)
@@ -134,7 +148,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     "sha": "b" * 40,
                     "slot": "blue",
                     "schema_compatible_min": 81,
-                    "schema_compatible_max": 90,
+                    "schema_compatible_max": 92,
                 },
             }],
         }), encoding="utf-8")
@@ -268,7 +282,9 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 patch.object(self.module, "LockedMigrationExecutor", FakeExecutor),
                 patch.object(self.module, "_validate_stable_known_good", stable),
                 patch.object(self.module, "_create_verified_migration_backup", create_backup),
-                patch.object(self.module, "_attest_migration_backup"),
+                patch.object(
+                    self.module, "_attest_migration_backup"
+                ) as attest_backup,
                 patch.object(self.module, "refresh_active_workers", refresh),
                 patch.dict(os.environ, {"MADAR_BACKUP_DIR": str(root / "backups")}),
             ):
@@ -288,8 +304,11 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         )
         self.assertLess(events.index("backup"), events.index("execute"))
         self.assertLess(events.index("execute"), events.index("refresh"))
+        attest_backup.assert_called_once_with(
+            backup, release_sha=self.sha, source_schema=92
+        )
 
-    def test_successful_90_to_91_to_92_to_93_records_target_only_after_worker_and_route_validation(self):
+    def test_successful_92_to_93_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(root)
@@ -305,11 +324,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
 
                 def run(_self):
                     events.append("execute")
-                    self.assertEqual(operations.schema, 90)
-                    events.append("migration:90->91")
-                    operations.schema = 91
-                    events.append("migration:91->92")
-                    operations.schema = 92
+                    self.assertEqual(operations.schema, 92)
                     events.append("migration:92->93")
                     operations.schema = 93
                     return {"status": "completed"}
@@ -353,14 +368,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             "post_migration_workers_refreshed",
         )
         self.assertIn(f"workers:{self.sha}:green", events)
-        self.assertLess(
-            events.index("migration:90->91"),
-            events.index("migration:91->92"),
-        )
-        self.assertLess(
-            events.index("migration:91->92"),
-            events.index("migration:92->93"),
-        )
+        self.assertIn("migration:92->93", events)
         first_validation = events.index(f"validate:{self.sha}:green")
         worker_activation = events.index(f"workers:{self.sha}:green")
         second_validation = events.index(
@@ -553,11 +561,11 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                         operations=operations,
                     )
 
-    def test_partial_committed_transition_reuses_backup_without_old_release_rollback(self):
+    def test_committed_transition_reuses_backup_without_old_release_rollback(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(
-                root, schema=91
+                root, schema=93
             )
             backup_root = root / "backups"
             backup = backup_root / "madar-20260830T000000Z"
@@ -700,19 +708,19 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 "format_version": 3,
                 "status": "complete",
                 "release": {"git_sha": self.sha},
-                "database": {"schema_version": "90"},
+                "database": {"schema_version": "92"},
             }
             (backup / "manifest.json").write_text(json.dumps(manifest))
             self.module._attest_migration_backup(
-                backup, release_sha=self.sha, source_schema=90
+                backup, release_sha=self.sha, source_schema=92
             )
-            manifest["database"]["schema_version"] = "91"
+            manifest["database"]["schema_version"] = "93"
             (backup / "manifest.json").write_text(json.dumps(manifest))
             with self.assertRaisesRegex(
                 RuntimeError, "automatic_migration_backup_identity_mismatch"
             ):
                 self.module._attest_migration_backup(
-                    backup, release_sha=self.sha, source_schema=90
+                    backup, release_sha=self.sha, source_schema=92
                 )
 
 
