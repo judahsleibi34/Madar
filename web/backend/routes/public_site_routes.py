@@ -2227,11 +2227,22 @@ def authorize_site_resource(
 def attach_site_record_owner(table_name: str, row: dict, identity):
     if not identity or not row:
         return row
+
     user_row, membership = identity
+    access_kind = str(membership.get("_access_kind") or "").strip().lower()
+
+    # site_membership_id references tenant_site_memberships(id), not
+    # tenant_memberships(id). Staff identities therefore must never store
+    # their workspace membership ID in this column.
     update = {
         "site_user_id": user_row.get("id"),
-        "site_membership_id": membership.get("id"),
+        "site_membership_id": (
+            membership.get("id")
+            if access_kind == "site"
+            else None
+        ),
     }
+
     response = (
         service_supabase.table(table_name)
         .update(update)

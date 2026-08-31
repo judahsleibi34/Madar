@@ -156,7 +156,10 @@ class PublicBuilderReservationTests(unittest.TestCase):
         fake_supabase = FakeSupabase()
         add_published_reservation_block(fake_supabase)
         client = build_public_client(fake_supabase)
-        identity = ({"id": 31}, {"id": 41, "status": "active"})
+        identity = (
+            {"id": 31},
+            {"id": 41, "status": "active", "_access_kind": "site"},
+        )
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
              patch.object(public_site_routes, "authorize_site_resource", return_value=identity):
@@ -381,6 +384,107 @@ class PublicBuilderReservationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Block not found")
         self.assertNotIn("builder_reservations", fake_supabase.tables)
+
+
+class SiteRecordOwnerAttachmentTests(unittest.TestCase):
+    @staticmethod
+    def _fake_client(saved_row):
+        client = MagicMock()
+        query = MagicMock()
+        query.eq.return_value = query
+        response = MagicMock()
+        response.data = [saved_row]
+
+        client.table.return_value.update.return_value = query
+        query.execute.return_value = response
+        return client
+
+    def test_site_identity_stores_site_membership_id(self):
+        row = {
+            "id": "reservation-1",
+            "tenant_id": 7,
+            "project_id": "project-1",
+        }
+        saved = {
+            **row,
+            "site_user_id": 31,
+            "site_membership_id": 41,
+        }
+        client = self._fake_client(saved)
+
+        identity = (
+            {"id": 31},
+            {"id": 41, "_access_kind": "site"},
+        )
+
+        with patch.object(public_site_routes, "service_supabase", client):
+            result = public_site_routes.attach_site_record_owner(
+                "builder_reservations",
+                row,
+                identity,
+            )
+
+        client.table.assert_called_once_with("builder_reservations")
+        client.table.return_value.update.assert_called_once_with({
+            "site_user_id": 31,
+            "site_membership_id": 41,
+        })
+        self.assertEqual(result["site_user_id"], 31)
+        self.assertEqual(result["site_membership_id"], 41)
+
+    def test_staff_identity_does_not_store_workspace_membership_id(self):
+        row = {
+            "id": "reservation-1",
+            "tenant_id": 7,
+            "project_id": "project-1",
+        }
+        saved = {
+            **row,
+            "site_user_id": 31,
+            "site_membership_id": None,
+        }
+        client = self._fake_client(saved)
+
+        identity = (
+            {"id": 31},
+            {
+                "id": 7,
+                "role": "owner",
+                "_access_kind": "staff",
+            },
+        )
+
+        with patch.object(public_site_routes, "service_supabase", client):
+            result = public_site_routes.attach_site_record_owner(
+                "builder_reservations",
+                row,
+                identity,
+            )
+
+        client.table.return_value.update.assert_called_once_with({
+            "site_user_id": 31,
+            "site_membership_id": None,
+        })
+        self.assertEqual(result["site_user_id"], 31)
+        self.assertIsNone(result["site_membership_id"])
+
+    def test_anonymous_identity_does_not_write_ownership(self):
+        row = {
+            "id": "reservation-1",
+            "tenant_id": 7,
+            "project_id": "project-1",
+        }
+        client = MagicMock()
+
+        with patch.object(public_site_routes, "service_supabase", client):
+            result = public_site_routes.attach_site_record_owner(
+                "builder_reservations",
+                row,
+                None,
+            )
+
+        self.assertEqual(result, row)
+        client.table.assert_not_called()
 
 
 class BuilderReservationManagementTests(unittest.TestCase):
