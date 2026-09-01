@@ -800,6 +800,15 @@ attests the already-installed exact controller, and completes application
 promotion and same-SHA validation. It never treats the serving SHA as a
 controller downgrade candidate.
 
+All installed-guard calls made by this privileged coordinator execute through a
+sanitized `runuser` boundary as the canonical `madar` deployment identity,
+which owns the production repository. The upgrader does not bypass Git's
+dubious-ownership protection with root `safe.directory` configuration. A
+status-1 result from the current guard is not sufficient bridge evidence: the
+independent exact protected-tree delta and every candidate/provenance/ancestry
+attestation above must pass, followed by a successful guard against the
+approved SHA. The guard and ordinary deployer exit semantics are unchanged.
+
 This exception exists only inside the exact-SHA privileged transaction.
 `madar-auto-deploy`, `madar-production-deploy`, and the guard itself remain
 unchanged and fail closed for protected candidate changes. A pre-promotion

@@ -421,6 +421,19 @@ class SystemOperations:
             check=check,
         )
 
+    def production_repository_guard(
+        self, label: str, target_sha: str, *, check: bool = True
+    ) -> CommandResult:
+        """Run the installed guard as the canonical production repo owner."""
+
+        guard = self.control_root / "bin/madar-control-plane-guard"
+        return self.command(
+            label,
+            [str(guard), target_sha],
+            user="madar",
+            check=check,
+        )
+
     def systemctl_state(self, unit: str) -> dict[str, str]:
         enabled = self.command(
             "systemctl_is_enabled", ["/usr/bin/systemctl", "is-enabled", unit],
@@ -707,9 +720,8 @@ class SystemOperations:
             raise UpgradeError("production_head_invalid")
         if not LOWER_SHA_RE.fullmatch(installed_sha):
             raise UpgradeError("installed_provenance_invalid")
-        guard = self.control_root / "bin/madar-control-plane-guard"
-        current_guard = self.command(
-            "guard_current", [str(guard), production_sha], check=False
+        current_guard = self.production_repository_guard(
+            "guard_current", production_sha, check=False
         )
         if current_guard.returncode == 0:
             return "normal_compatible"
@@ -750,7 +762,7 @@ class SystemOperations:
         if ancestry.returncode != 0:
             raise UpgradeError("controller_bridge_not_forward_ancestor")
         self.require_clean_repository()
-        self.command("guard_approved_bridge", [str(guard), approved_sha])
+        self.production_repository_guard("guard_approved_bridge", approved_sha)
         if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
             raise UpgradeError("canonical_git_remote_changed")
         return "controller_ahead_bridge"
@@ -1038,8 +1050,7 @@ class SystemOperations:
     def verify_installed_controller(self, approved_sha: str) -> None:
         if self.installed_sha() != approved_sha:
             raise UpgradeError("installed_provenance_mismatch")
-        guard = self.control_root / "bin/madar-control-plane-guard"
-        self.command("guard_candidate", [str(guard), approved_sha])
+        self.production_repository_guard("guard_candidate", approved_sha)
         parse_contract(self.contract_path)
         for path in self.control_root.rglob("*"):
             if path.is_symlink() or path.stat().st_uid != 0:
@@ -1196,8 +1207,7 @@ class SystemOperations:
         try:
             if self.installed_sha() != previous_sha:
                 return False
-            guard = self.control_root / "bin/madar-control-plane-guard"
-            self.command("guard_restore", [str(guard), production_sha])
+            self.production_repository_guard("guard_restore", production_sha)
             self.attest_serving(production_sha)
             return True
         except UpgradeError:
