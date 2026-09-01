@@ -504,6 +504,76 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
   });
 
+  it("converts an auto-layout text component to draggable direct layout from the move toolbar", async () => {
+    const autoLayoutSchema = {
+      ...schemaA,
+      pages: [{
+        ...schemaA.pages[0],
+        sections: [{
+          id: "section-auto",
+          name: "Generated hero",
+          mode: "auto",
+          rows: [{
+            id: "row-auto",
+            layout: { columns: "1", align: "center", gap: "medium" },
+            columns: [{
+              id: "column-auto",
+              name: "Generated copy",
+              layout: { align: "left" },
+              elements: [{
+                id: "generated-auto-text",
+                type: "text",
+                mode: "auto",
+                name: "Generated eyebrow",
+                content: "Palestinian ideas. Lasting change.",
+                styles: { color: "#005571", fontSize: "17px" },
+              }],
+            }],
+          }],
+          freeElements: [],
+          layout: { width: "large", minHeight: 320 },
+        }],
+      }],
+    };
+    apiMocks.fetchBuilderProject.mockResolvedValueOnce({
+      id: projectId,
+      name: autoLayoutSchema.name,
+      slug: autoLayoutSchema.slug,
+      status: "draft",
+      draft_revision: 100,
+      draft_schema: autoLayoutSchema,
+      published_revision: 0,
+      published_version: 0,
+      published_schema: autoLayoutSchema,
+      updated_at: "2026-07-15T10:00:00.000Z",
+    });
+
+    const mounted = render(
+      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+    await screen.findByLabelText("Page name");
+
+    const editor = mounted.container.querySelector(".builder-element-text");
+    fireEvent.click(editor);
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent.mouseUp(editor);
+
+    const moveHandle = await screen.findByRole("button", { name: "Move component" });
+    fireEvent.pointerDown(moveHandle, { pointerId: 9, clientX: 220, clientY: 180 });
+
+    await waitFor(() => {
+      expect(mounted.container.querySelector('[data-builder-element-id="generated-auto-text"]'))
+        .not.toBeNull();
+      expect(mounted.container.querySelector(".site-section.direct-layout-section"))
+        .not.toBeNull();
+    });
+  });
   it.skipIf(!actualCrashSchema)("edits copied mixed-format text from the current saved schema", async () => {
     apiMocks.fetchBuilderProject.mockResolvedValueOnce({
       id: projectId,

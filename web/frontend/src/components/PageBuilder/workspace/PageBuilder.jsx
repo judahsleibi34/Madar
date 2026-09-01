@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlignCenter,
@@ -4241,7 +4242,7 @@ export default function PageBuilder({
   };
 
   const startDrag = useCallback((event, element, interaction = "move", forceInteraction = false) => {
-    if (preview || element.mode !== "direct") return;
+    if (preview) return;
 
     const additiveSelection = event.shiftKey || event.ctrlKey || event.metaKey;
     if (interaction === "move" && additiveSelection) {
@@ -4262,11 +4263,35 @@ export default function PageBuilder({
       (["input", "textarea", "select", "option", "button"].includes(tagName) || isSelectableText)
     ) return;
 
+    let directElement = element;
+    let convertedSourceSection = null;
+
+    if (element.mode !== "direct") {
+      const location = findElementLocation(element.id);
+      const sourceSection = activePage?.sections.find((section) => section.id === location?.sectionId);
+      if (!sourceSection) return;
+
+      convertedSourceSection = convertSectionToDirectLayout(sourceSection);
+      directElement = (convertedSourceSection.freeElements || []).find(
+        (candidate) => candidate.id === element.id
+      );
+      if (!directElement) return;
+
+      flushSync(() => {
+        updateSections((sections) => sections.map((section) =>
+          section.id === convertedSourceSection.id ? convertedSourceSection : section
+        ));
+        setSelectedElementIds([directElement.id]);
+        setSelected({ type: "element", id: directElement.id });
+      });
+    }
+
     event.stopPropagation();
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
 
-    const elementFrame = event.currentTarget.closest?.(".direct-element-frame");
+    const elementFrame = event.currentTarget.closest?.(".direct-element-frame") ||
+      findBuilderDataElement(canvasShellRef.current, "data-builder-element-id", directElement.id);
     const parentGeometry = getImmediateParentCanvasGeometry(elementFrame, {
       coordinateScale: 1,
     });
@@ -4282,14 +4307,15 @@ export default function PageBuilder({
     if (!immediateParent || !pointer) return;
 
     const sourceSectionId = immediateParent.dataset?.sectionId || "";
-    const sourceSection = activePage?.sections.find((section) => section.id === sourceSectionId);
+    const sourceSection = convertedSourceSection ||
+      activePage?.sections.find((section) => section.id === sourceSectionId);
     const sourceElements = sourceSection?.freeElements || [];
     const selectedIdsInSection = effectiveSelectedElementIds.filter((elementId) =>
       sourceElements.some((candidate) => candidate.id === elementId)
     );
-    const groupElementIds = interaction === "move" && selectedIdsInSection.includes(element.id)
+    const groupElementIds = interaction === "move" && selectedIdsInSection.includes(directElement.id)
       ? selectedIdsInSection
-      : [element.id];
+      : [directElement.id];
     const groupElements = groupElementIds
       .map((elementId) => sourceElements.find((candidate) => candidate.id === elementId))
       .filter(Boolean);
@@ -4318,9 +4344,9 @@ export default function PageBuilder({
       return [candidate.id, position];
     }));
 
-    const minimumSize = getDirectElementMinimumSize(element);
-    let current = groupStartPositions[element.id] || clampElementToBounds(
-      getRenderedFramePosition(element) || element.position?.[viewport] || createPosition()[viewport],
+    const minimumSize = getDirectElementMinimumSize(directElement);
+    let current = groupStartPositions[directElement.id] || clampElementToBounds(
+      getRenderedFramePosition(directElement) || directElement.position?.[viewport] || createPosition()[viewport],
       pointer.bounds,
       {
         minWidth: minimumSize.width,
@@ -4330,8 +4356,8 @@ export default function PageBuilder({
     );
     if (
       interaction === "resize" &&
-      element.type === "heading" &&
-      element.directWidthMode !== "fixed"
+      directElement.type === "heading" &&
+      directElement.directWidthMode !== "fixed"
     ) {
       current = {
         ...current,
@@ -4339,12 +4365,12 @@ export default function PageBuilder({
       };
     }
 
-    if (!effectiveSelectedElementIds.includes(element.id)) {
-      setSelectedElementIds([element.id]);
+    if (!effectiveSelectedElementIds.includes(directElement.id)) {
+      setSelectedElementIds([directElement.id]);
     }
-    setSelected({ type: "element", id: element.id });
+    setSelected({ type: "element", id: directElement.id });
     setDragState({
-      elementId: element.id,
+      elementId: directElement.id,
       groupElementIds,
       groupStartPositions,
       startClientX: event.clientX,
@@ -4362,7 +4388,7 @@ export default function PageBuilder({
       previewSectionHeight: 0,
       interaction,
     });
-  }, [activePage, preview, effectiveSelectedElementIds, viewport]);
+  }, [activePage, effectiveSelectedElementIds, findElementLocation, preview, updateSections, viewport]);
 
   const captureTextSelection = (event, field, itemIndex = null) => {
     setTextSelection(
@@ -5031,6 +5057,14 @@ export default function PageBuilder({
           inlineToolbarInteractionRef.current = false;
         }}
       >
+        <button
+          type="button"
+          aria-label="Move component"
+          title="Drag to move component"
+          onPointerDown={(event) => startDrag(event, selectedElement, "move", true)}
+        >
+          <Move size={16} aria-hidden="true" />
+        </button>
         <select
           aria-label="Text style"
           value={getInlineTextFormatValue()}
