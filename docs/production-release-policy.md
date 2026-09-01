@@ -787,6 +787,27 @@ post-promotion failures leave automation
 disabled; it never automatically restores old controller code, traffic, or
 schema across an irreversible boundary.
 
+The privileged upgrader also recognizes one temporary controller-first
+bootstrap state. It does so only after canonical candidate resolution: installed
+provenance must exactly equal the explicitly approved current `origin/main`
+SHA; the serving production SHA must be its strict forward ancestor; the
+repository, objects, serving identity, service state and canonical paths must
+remain valid; the current guard failure must correspond to the protected-tree
+delta between those two commits; and the installed guard must accept the
+approved SHA. This is recorded as `controller_ahead_bridge`. The upgrader stages
+and validates the candidate, skips redundant controller publication and backup,
+attests the already-installed exact controller, and completes application
+promotion and same-SHA validation. It never treats the serving SHA as a
+controller downgrade candidate.
+
+This exception exists only inside the exact-SHA privileged transaction.
+`madar-auto-deploy`, `madar-production-deploy`, and the guard itself remain
+unchanged and fail closed for protected candidate changes. A pre-promotion
+bridge failure retains the approved controller, old serving application and a
+disabled timer; a post-promotion failure remains forward-repair-only. Successful
+completion restores the timer's captured state exactly, including preserving an
+initially disabled/inactive state.
+
 The detailed trust model, phases, self-update behavior, audit locations,
 failure boundaries, operator commands and initial bootstrap procedure are in
 [`control-plane-upgrade-architecture.md`](control-plane-upgrade-architecture.md).

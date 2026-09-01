@@ -58,6 +58,27 @@ If main advances, rewrites, diverges, or changes remote identity after the
 operator chose the SHA, the transaction fails. It never substitutes a newer
 head or accepts a local arbitrary ref.
 
+Candidate authorization deliberately precedes controller-compatibility
+classification. The current serving application is attested first without
+interpreting a guard failure. Only after the approved SHA has been verified as
+canonical `origin/main`, as a commit, and as a forward descendant may the
+upgrader run the installed guard and classify one of these states:
+
+- `normal_compatible`: the installed guard accepts the currently serving
+  application SHA. Existing installation/protected-change behavior applies.
+- `controller_ahead_bridge`: the guard rejects the serving SHA specifically
+  because protected trees differ, while installed provenance exactly equals
+  the approved current-main SHA, the serving SHA is its strict ancestor, both
+  objects are available commits, the repository remains canonical and clean,
+  and the installed guard accepts the approved SHA.
+
+The second state is a narrow privileged-upgrader exception for the intentional
+controller-first bootstrap boundary. It does not make a generic failed guard,
+unrelated/rewritten history, an arbitrary CLI SHA, a different installed SHA,
+or a downgrade acceptable. Ordinary `madar-auto-deploy` and
+`madar-production-deploy` continue to invoke the unchanged guard against their
+candidate and remain blocked on protected changes.
+
 ## Privileged staging and TOCTOU boundary
 
 After fetching, root creates a unique mode-0700 transaction below
@@ -126,14 +147,15 @@ switches remain authorized inside the credential-bearing transient unit.
 | Phase | Audit name | Mutation boundary and result |
 | --- | --- | --- |
 | 0 | `exclusive_lock` | Root-only upgrade lock; a second invocation fails before mutation. |
-| 1–2 | `current_production_preflight` | Validate caller, installed provenance, clean production HEAD, release state, active/stable identity/readiness, schema compatibility, migration terminal state, workers/frontend/proxy, canonical paths, service and timer. Existing degradation stops the run. |
-| 3 | `candidate_resolution` | Least-privileged fetch; exact origin/main, commit, remote and fast-forward ancestry checks. |
-| 4 | `protected_change_detection` | If no protected diff exists, return `not_required` without quiescing; ordinary auto-deploy remains responsible. |
+| 1 | `current_production_preflight` | Validate caller, installed provenance, clean production HEAD, release state, active/stable identity/readiness, schema compatibility, migration terminal state, workers/frontend/proxy, canonical paths, service and timer. Existing degradation stops the run. This phase does not trust the CLI SHA to authorize a bridge. |
+| 2 | `candidate_resolution` | Least-privileged fetch/read-only remote check; exact origin/main, commit, canonical remote and forward ancestry checks. |
+| 3 | `controller_compatibility` | Run the current guard and classify only `normal_compatible` or the fully attested `controller_ahead_bridge` described above. |
+| 4 | `protected_change_detection` | In normal state, no protected diff returns `not_required`; ordinary auto-deploy remains responsible. An authorized controller-ahead bridge continues even though installed provenance already equals the candidate. |
 | 5 | `automation_quiesce` | Capture timer state, disable/stop timer, stop service, arm interlock, release normal deploy lock. |
 | 6 | `candidate_staging` | Create the protected exact-SHA Git bundle and detached root-owned tree. |
 | 7 | `candidate_static_preflight` | Required-path, symlink, digest, syntax, contract, ownership, ACL, filesystem capability and capacity validation. |
 | 8 | `installer_dry_run` | Execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. |
-| 9 | `control_plane_install` / `control_plane_install_attestation` | Create protected backup and atomically install; attest provenance, guard, modes, units, paths, backup hashes and absence of legacy authority. |
+| 9 | `control_plane_install` / `control_plane_install_attestation` | Normally create a protected backup and atomically install, then attest provenance, guard, modes, units, paths, backup hashes and absence of legacy authority. For `controller_ahead_bridge`, skip publication and backup creation and instead use `preinstalled_control_plane_attestation` to verify the already-installed exact candidate controller. |
 | 10 | `controlled_candidate_deployment` | Issue a one-cycle systemd credential and synchronously run the exact ordinary auto-deploy entrypoint in a hardened transient unit while the timer remains disabled. The canonical controller alone may build, migrate, promote or advance production Git. |
 | 11 | serving attestation | Require production HEAD, installed provenance, active/known-good state, stable and slot SHA/readiness, schema range, workers, frontend and proxy target to agree. Require a terminal migration outcome. |
 | 12 | `same_sha_idempotence` | Run the same systemd path with a new token. Require stable health and byte-identical release state, proxy target and migration automation state: no rebuild, switch, SQL, backup, or identity mutation. |
@@ -178,6 +200,16 @@ files, traffic, schema, or timer state.
   attempted. Migration backup, attestation, execution state, release state and
   artifacts are retained. The accepted compatible bridge remains the repair
   base.
+
+For a preinstalled controller-ahead bridge, there is no old-controller restore
+boundary inside the governed transaction: the approved controller was already
+installed before invocation. A failure before application promotion keeps the
+old application serving, preserves the approved controller, leaves automation
+disabled, and records
+`controller_ahead_bridge_application_untouched_timer_disabled`. A failure after
+promotion uses the ordinary forward-repair semantics. Dry-run failures never
+quiesce automation or alter an interlock. On success the exact pre-transaction
+timer state is restored, so an initially disabled timer remains disabled.
 
 An inactive previous slot with stopped queue workers is not a production
 failure. An active/stable readiness failure always is.
@@ -256,6 +288,16 @@ write authority over an ancestor permits replacement of an otherwise private
 child. The installer may create its own mode-0700
 `/var/lib/madar-control-plane` hierarchy after the shared dry-run preflight has
 attested `/`, `/var`, and `/var/lib`; it never changes those system parents.
+
+That manual controller-first publication intentionally creates a temporary
+split state: installed controller at the explicitly approved future release,
+serving application at its older known-good ancestor. The governed upgrader is
+then run for that same exact SHA. It classifies the authorized bridge, stages
+and validates the candidate, performs installer dry-run and installed-controller
+attestation, but does not reinstall or downgrade the controller and does not
+fabricate a new controller backup. Its controlled deployment promotes the
+application through the canonical immutable release machinery, runs same-SHA
+validation, and restores the timer's captured state.
 
 ## Implementation and test map
 

@@ -234,6 +234,10 @@ class AuditRecord:
     same_sha_validation: str | None = None
     stable_readiness: str | None = None
     active_readiness: str | None = None
+    controller_compatibility: str | None = None
+    controller_preinstalled: bool = False
+    controller_installation_required: bool | None = None
+    controller_installation_performed: bool = False
     controller_installed: bool = False
     application_promoted: bool = False
     failure_semantics: str | None = None
@@ -645,7 +649,6 @@ class SystemOperations:
         guard = self.control_root / "bin/madar-control-plane-guard"
         if not guard.is_file() or not os.access(guard, os.X_OK):
             raise UpgradeError("installed_control_plane_guard_unavailable")
-        self.command("guard_current", [str(guard), production_sha])
         for path in (self.state_root, self.storage_root, self.proxy_file.parent):
             if not path.exists() or path.is_symlink():
                 raise UpgradeError("canonical_production_path_invalid")
@@ -692,6 +695,65 @@ class SystemOperations:
         self.require_clean_repository()
         if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
             raise UpgradeError("canonical_git_remote_changed")
+
+    def validate_controller_compatibility(
+        self, approved_sha: str, current: dict[str, Any]
+    ) -> str:
+        """Classify controller compatibility only after candidate authorization."""
+
+        production_sha = str(current.get("production_sha") or "")
+        installed_sha = str(current.get("installed_sha") or "")
+        if not LOWER_SHA_RE.fullmatch(production_sha):
+            raise UpgradeError("production_head_invalid")
+        if not LOWER_SHA_RE.fullmatch(installed_sha):
+            raise UpgradeError("installed_provenance_invalid")
+        guard = self.control_root / "bin/madar-control-plane-guard"
+        current_guard = self.command(
+            "guard_current", [str(guard), production_sha], check=False
+        )
+        if current_guard.returncode == 0:
+            return "normal_compatible"
+        if current_guard.returncode != 1:
+            raise UpgradeError("installed_controller_guard_failure")
+
+        # A failed guard is not itself bridge authorization. Prove that it is
+        # specifically the protected-tree delta between the installed future
+        # controller and the serving ancestor, then re-attest every exact-SHA
+        # invariant established by candidate resolution.
+        protected_delta = self.madar_git(
+            "git_current_controller_delta", "diff", "--quiet",
+            installed_sha, production_sha, "--", *PROTECTED_PATHS,
+            check=False,
+        )
+        if protected_delta.returncode != 1:
+            raise UpgradeError("installed_controller_guard_failure")
+        if installed_sha != approved_sha or production_sha == approved_sha:
+            raise UpgradeError("installed_controller_not_approved_bridge")
+        if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
+            raise UpgradeError("canonical_git_remote_mismatch")
+        resolved = self.madar_git(
+            "git_bridge_resolve_main", "rev-parse",
+            "refs/remotes/origin/main^{commit}",
+        ).stdout
+        if resolved != approved_sha:
+            raise UpgradeError("approved_sha_not_current_origin_main")
+        for label, sha in (
+            ("git_bridge_production_type", production_sha),
+            ("git_bridge_installed_type", installed_sha),
+        ):
+            if self.madar_git(label, "cat-file", "-t", sha).stdout != "commit":
+                raise UpgradeError("controller_bridge_object_not_commit")
+        ancestry = self.madar_git(
+            "git_bridge_ancestry", "merge-base", "--is-ancestor",
+            production_sha, approved_sha, check=False,
+        )
+        if ancestry.returncode != 0:
+            raise UpgradeError("controller_bridge_not_forward_ancestor")
+        self.require_clean_repository()
+        self.command("guard_approved_bridge", [str(guard), approved_sha])
+        if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
+            raise UpgradeError("canonical_git_remote_changed")
+        return "controller_ahead_bridge"
 
     def protected_change_required(self, approved_sha: str) -> bool:
         installed = self.installed_sha()
@@ -973,7 +1035,7 @@ class SystemOperations:
         if self.installed_sha() != approved_sha:
             raise UpgradeError("installed_provenance_mismatch")
 
-    def verify_install(self, approved_sha: str, backup: Path) -> None:
+    def verify_installed_controller(self, approved_sha: str) -> None:
         if self.installed_sha() != approved_sha:
             raise UpgradeError("installed_provenance_mismatch")
         guard = self.control_root / "bin/madar-control-plane-guard"
@@ -1004,14 +1066,6 @@ class SystemOperations:
             or stat.S_IMODE(upgrader.stat().st_mode) != 0o755
         ):
             raise UpgradeError("installed_bootstrapper_invalid")
-        sums = backup / "SHA256SUMS"
-        if not sums.is_file() or sums.is_symlink():
-            raise UpgradeError("control_plane_backup_manifest_missing")
-        self.command(
-            "control_plane_backup_verify",
-            ["/usr/bin/sha256sum", "--check", "SHA256SUMS"],
-            cwd=backup,
-        )
         legacy = (
             Path("/usr/local/lib/madar/web/deployment"),
             Path("/usr/local/sbin/madar-auto-deploy"),
@@ -1027,6 +1081,17 @@ class SystemOperations:
             or str(self.contract_path) not in service
         ):
             raise UpgradeError("installed_systemd_contract_invalid")
+
+    def verify_install(self, approved_sha: str, backup: Path) -> None:
+        self.verify_installed_controller(approved_sha)
+        sums = backup / "SHA256SUMS"
+        if not sums.is_file() or sums.is_symlink():
+            raise UpgradeError("control_plane_backup_manifest_missing")
+        self.command(
+            "control_plane_backup_verify",
+            ["/usr/bin/sha256sum", "--check", "SHA256SUMS"],
+            cwd=backup,
+        )
 
     def write_authorization(self, approved_sha: str) -> None:
         require_root_directory(self.runtime_root, mode=0o711)
@@ -1150,6 +1215,7 @@ class UpgradeCoordinator:
         self.success = False
 
     def execute(self, *, dry_run: bool) -> None:
+        self.record.dry_run = dry_run
         self.audit.phase("current_production_preflight")
         before = self.operations.current_preflight(lock_deployment=not dry_run)
         self.record.previous_control_plane_sha = before["installed_sha"]
@@ -1164,8 +1230,27 @@ class UpgradeCoordinator:
         self.record.candidate_sha = self.record.approved_sha
         self.audit.persist()
 
+        self.audit.phase("controller_compatibility")
+        controller_compatibility = self.operations.validate_controller_compatibility(
+            self.record.approved_sha, before
+        )
+        self.record.controller_compatibility = controller_compatibility
+        self.record.controller_preinstalled = (
+            controller_compatibility == "controller_ahead_bridge"
+        )
+        self.record.controller_installation_required = not (
+            self.record.controller_preinstalled
+        )
+        self.audit.persist()
+
         self.audit.phase("protected_change_detection")
-        if not self.operations.protected_change_required(self.record.approved_sha):
+        protected_change = self.operations.protected_change_required(
+            self.record.approved_sha
+        )
+        if self.record.controller_preinstalled and protected_change:
+            raise UpgradeError("preinstalled_controller_identity_drift")
+        if not self.record.controller_preinstalled and not protected_change:
+            self.record.controller_installation_required = False
             self.record.status = "not_required"
             self.record.failure_semantics = "ordinary_auto_deploy_required"
             self.record.completed_at = utc_now()
@@ -1196,13 +1281,17 @@ class UpgradeCoordinator:
         )
         if backup.exists() or backup.is_symlink():
             raise UpgradeError("control_plane_backup_path_already_exists")
-        self.record.backup_path = str(backup)
+        if self.record.controller_installation_required:
+            self.record.backup_path = str(backup)
         self.audit.persist()
 
         self.audit.phase("installer_dry_run")
         self.operations.installer_dry_run(self.candidate, backup)
         if self.operations.protected_tree_digest(self.candidate) != candidate_digest:
             raise UpgradeError("candidate_changed_after_dry_run")
+        if self.record.controller_preinstalled:
+            self.audit.phase("preinstalled_control_plane_attestation")
+            self.operations.verify_installed_controller(self.record.approved_sha)
         if dry_run:
             self.audit.phase("candidate_cleanup")
             self.operations.cleanup_staging(self.transaction)
@@ -1215,21 +1304,25 @@ class UpgradeCoordinator:
             self.audit.persist()
             return
 
-        self.audit.phase("control_plane_install")
-        try:
-            self.operations.installer_apply(
-                self.candidate, backup, self.record.approved_sha
-            )
-        finally:
+        if not self.record.controller_preinstalled:
+            self.audit.phase("control_plane_install")
             try:
-                self.record.controller_installed = (
-                    self.operations.installed_sha() == self.record.approved_sha
+                self.operations.installer_apply(
+                    self.candidate, backup, self.record.approved_sha
                 )
-            except UpgradeError:
-                self.record.controller_installed = False
-            self.audit.persist()
-        self.audit.phase("control_plane_install_attestation")
-        self.operations.verify_install(self.record.approved_sha, backup)
+            finally:
+                try:
+                    self.record.controller_installed = (
+                        self.operations.installed_sha() == self.record.approved_sha
+                    )
+                    self.record.controller_installation_performed = (
+                        self.record.controller_installed
+                    )
+                except UpgradeError:
+                    self.record.controller_installed = False
+                self.audit.persist()
+            self.audit.phase("control_plane_install_attestation")
+            self.operations.verify_install(self.record.approved_sha, backup)
 
         self.audit.phase("controlled_candidate_deployment")
         self.operations.run_deploy_service(
@@ -1271,7 +1364,19 @@ class UpgradeCoordinator:
 
     def handle_failure(self, error: Exception) -> None:
         code = str(error) if isinstance(error, UpgradeError) else "unexpected_internal_error"
-        if self.record.controller_installed and not self.record.application_promoted:
+        if self.record.dry_run:
+            self.record.status = "failed"
+            self.record.error_code = code[:200]
+            self.record.completed_at = utc_now()
+            self.record.failure_semantics = "dry_run_no_mutation"
+            if self.record.timer_state_before:
+                self.record.timer_state_after = dict(self.record.timer_state_before)
+            self.audit.log(f"failure code={self.record.error_code}")
+            self.audit.persist()
+            return
+        if (
+            self.record.controller_installed or self.record.controller_preinstalled
+        ) and not self.record.application_promoted:
             promoted = self.operations.known_good_identity(self.record.approved_sha)
             if promoted:
                 self.record.application_promoted = True
@@ -1282,6 +1387,10 @@ class UpgradeCoordinator:
         self.record.completed_at = utc_now()
         if self.record.application_promoted:
             self.record.failure_semantics = "post_promotion_forward_repair_timer_disabled"
+        elif self.record.controller_preinstalled:
+            self.record.failure_semantics = (
+                "controller_ahead_bridge_application_untouched_timer_disabled"
+            )
         elif self.record.controller_installed:
             self.record.failure_semantics = "post_install_manual_intervention_timer_disabled"
         else:
@@ -1304,7 +1413,7 @@ class UpgradeCoordinator:
                     self.record.failure_semantics = (
                         "pre_install_restore_not_attested_timer_disabled"
                     )
-        if self.record.controller_installed:
+        if self.record.controller_installed or self.record.controller_preinstalled:
             try:
                 self.operations.disable_automation_for_failure()
                 self.operations.arm_interlock(self.record.approved_sha)
@@ -1320,9 +1429,15 @@ class UpgradeCoordinator:
         self.audit.persist()
 
     def cleanup(self) -> None:
-        self.operations.clear_authorization()
+        if not self.record.dry_run:
+            self.operations.clear_authorization()
         self.operations.close_locks()
-        if self.success or not self.record.controller_installed:
+        if not self.record.dry_run and (
+            self.success or not (
+                self.record.controller_installed
+                or self.record.controller_preinstalled
+            )
+        ):
             self.operations.clear_interlock()
         try:
             self.operations.cleanup_staging(self.transaction)
@@ -1374,6 +1489,15 @@ def print_success(record: AuditRecord, audit: AuditWriter) -> None:
     )
     print(f"schema: {schema_before} -> {schema_after}")
     print(f"migration result: {record.migration_result or 'not_run'}")
+    print(
+        "controller compatibility: "
+        f"{record.controller_compatibility or 'not_classified'}"
+    )
+    print(
+        "controller installation: "
+        f"required={record.controller_installation_required} "
+        f"performed={record.controller_installation_performed}"
+    )
     print(f"stable readiness: {record.stable_readiness or 'not_attested'}")
     print(f"active readiness: {record.active_readiness or 'not_attested'}")
     print(f"same-SHA verification: {record.same_sha_validation or 'not_run'}")
@@ -1410,6 +1534,10 @@ def print_failure(record: AuditRecord, audit: AuditWriter) -> None:
     print(f"schema: {current_schema}", file=sys.stderr)
     print(f"timer state: {timer}", file=sys.stderr)
     print(f"candidate controller installed: {record.controller_installed}", file=sys.stderr)
+    print(
+        f"candidate controller preinstalled: {record.controller_preinstalled}",
+        file=sys.stderr,
+    )
     print(f"candidate application promoted: {record.application_promoted}", file=sys.stderr)
     print(f"failure semantics: {record.failure_semantics}", file=sys.stderr)
     print(f"audit record: {audit.json_path}", file=sys.stderr)
@@ -1417,6 +1545,13 @@ def print_failure(record: AuditRecord, audit: AuditWriter) -> None:
         print(
             "next action: keep traffic on the known-good candidate and diagnose "
             "forward repair; do not roll back schema or traffic automatically",
+            file=sys.stderr,
+        )
+    elif record.controller_preinstalled:
+        print(
+            "next action: keep the timer disabled and diagnose the authorized "
+            "controller-ahead bridge; no controller backup was created by this "
+            "transaction",
             file=sys.stderr,
         )
     elif record.controller_installed:
