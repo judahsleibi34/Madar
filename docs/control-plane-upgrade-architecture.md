@@ -79,6 +79,24 @@ or a downgrade acceptable. Ordinary `madar-auto-deploy` and
 `madar-production-deploy` continue to invoke the unchanged guard against their
 candidate and remain blocked on protected changes.
 
+Every installed-guard invocation made by the privileged coordinator runs under
+the sanitized canonical `madar` deployment identity. The production repository
+is owned by `madar`; running its Git inspection as root would correctly trigger
+Git's dubious-ownership defense. The coordinator does not add a root
+`safe.directory` exception, alter repository ownership, or modify Git
+configuration. This identity rule covers current-controller compatibility,
+approved bridge attestation, post-install candidate attestation, and the
+pre-install restoration-safety check. Ordinary deployers already run as
+`madar`, so their execution model is unchanged.
+
+The guard retains its existing exit-code contract, where status 1 can describe
+either a protected-tree difference or a guard-internal failure. The privileged
+bridge never treats that status alone as authorization: it independently
+requires an exact protected-path diff, canonical candidate identity, forward
+ancestry, clean repository, exact installed provenance, and a successful guard
+against the approved SHA. A context or Git failure therefore remains
+fail-closed without changing the ordinary deployers' guard semantics.
+
 ## Privileged staging and TOCTOU boundary
 
 After fetching, root creates a unique mode-0700 transaction below

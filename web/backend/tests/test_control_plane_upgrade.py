@@ -848,8 +848,84 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         guard_approved = operations.command.call_args_list[1]
         self.assertEqual(guard_current.args[1][-1], production)
         self.assertFalse(guard_current.kwargs["check"])
+        self.assertEqual(guard_current.kwargs["user"], "madar")
         self.assertEqual(guard_approved.args[1][-1], approved)
+        self.assertEqual(guard_approved.kwargs["user"], "madar")
         operations.require_clean_repository.assert_called_once()
+
+    def test_repository_guard_uses_canonical_madar_identity_without_git_bypass(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.control_root = Path("/opt/madar/control-plane/deployment")
+        operations.command = mock.Mock(
+            return_value=upgrade.CommandResult("", "", 0)
+        )
+
+        operations.production_repository_guard(
+            "guard_candidate", self.SHA, check=False
+        )
+
+        call = operations.command.call_args
+        self.assertEqual(call.args[0], "guard_candidate")
+        self.assertEqual(
+            call.args[1],
+            [
+                "/opt/madar/control-plane/deployment/bin/"
+                "madar-control-plane-guard",
+                self.SHA,
+            ],
+        )
+        self.assertEqual(call.kwargs["user"], "madar")
+        self.assertFalse(call.kwargs["check"])
+        self.assertNotIn("safe.directory", " ".join(call.args[1]))
+
+    def test_repository_guard_command_crosses_sanitized_runuser_boundary(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.audit = None
+        operations.control_root = Path("/opt/madar/control-plane/deployment")
+        completed = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with mock.patch.object(
+            upgrade.subprocess, "run", return_value=completed
+        ) as run:
+            operations.production_repository_guard("guard_current", self.SHA)
+
+        command = run.call_args.args[0]
+        self.assertEqual(
+            command[:6],
+            [
+                "/usr/sbin/runuser", "-u", "madar", "--",
+                "/usr/bin/env", "-i",
+            ],
+        )
+        self.assertIn("HOME=/home/madar", command)
+        self.assertIn("USER=madar", command)
+        self.assertIn("GIT_CONFIG_GLOBAL=/dev/null", command)
+        self.assertNotIn("safe.directory", " ".join(command))
+
+    def test_installed_and_restore_guards_share_repository_identity_helper(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.installed_sha = mock.Mock(return_value=self.SHA)
+        operations.production_repository_guard = mock.Mock(
+            side_effect=upgrade.UpgradeError("stop_after_guard")
+        )
+
+        with self.assertRaisesRegex(upgrade.UpgradeError, "stop_after_guard"):
+            operations.verify_installed_controller(self.SHA)
+        operations.production_repository_guard.assert_called_once_with(
+            "guard_candidate", self.SHA
+        )
+
+        production = "1" * 40
+        operations.production_repository_guard.reset_mock(side_effect=True)
+        operations.production_repository_guard.return_value = upgrade.CommandResult(
+            "", "", 0
+        )
+        operations.attest_serving = mock.Mock()
+        self.assertTrue(operations.preinstall_restore_safe(self.SHA, production))
+        operations.production_repository_guard.assert_called_once_with(
+            "guard_restore", production
+        )
+        operations.attest_serving.assert_called_once_with(production)
 
     def test_normal_controller_compatibility_keeps_existing_guard_semantics(self):
         production = "1" * 40
@@ -866,6 +942,9 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         )
         operations.madar_git.assert_not_called()
         self.assertEqual(operations.command.call_count, 1)
+        self.assertEqual(
+            operations.command.call_args.kwargs["user"], "madar"
+        )
 
     def test_controller_ahead_must_equal_approved_current_main(self):
         production = "1" * 40
