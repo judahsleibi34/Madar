@@ -72,7 +72,11 @@ class SchemaCompatibilityControlPlaneTests(TestCase):
                 "2026-08-27T00:00:00Z",
         }
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(
+            os.environ,
+            {"MADAR_STORAGE_ROOT": "/var/lib/madar/storage"},
+            clear=True,
+        ):
             environment = operations._environment(
                 "a" * 40,
                 "green",

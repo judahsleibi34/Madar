@@ -57,8 +57,24 @@ class FakeOperations:
     def validate_candidate(self, sha: str, slot: str) -> None:
         self.events.append(f"validate:{sha}:{slot}")
 
-    def activate_workers(self, sha: str, slot: str, _images: dict) -> None:
+    def preflight(self, sha: str, slot: str, _images: dict, schema: int) -> None:
+        self.events.append(f"preflight:{sha}:{slot}:{schema}")
+
+    def validate_active_refresh_prerequisites(
+        self, sha: str, slot: str, _images: dict,
+    ) -> None:
+        self.events.append(f"pre-refresh:{sha}:{slot}")
+
+    def refresh_active_runtime_services(
+        self, sha: str, slot: str, _images: dict,
+    ) -> None:
         self.events.append(f"workers:{sha}:{slot}")
+
+    def validate_stable_candidate(self, sha: str) -> None:
+        identity = self._json("http://127.0.0.1:8001/health/version")
+        readiness = self._json("http://127.0.0.1:8001/health/ready")
+        if identity.get("release_sha") != sha or not readiness.get("ready"):
+            raise RuntimeError("stable_proxy_active_refresh_validation_failed")
 
     def switch_traffic(self, slot: str) -> None:
         self.events.append(f"traffic:{slot}")
@@ -138,6 +154,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             "known_good_release": {
                 "sha": self.sha,
                 "slot": "green",
+                "schema": schema,
                 "images": {"build_timestamp": "2026-08-30T00:00:00Z"},
             },
             "history": [{
@@ -157,6 +174,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         compatibility = self.module.Compatibility.load(
             WEB_ROOT / "deployment/releases/release.json"
         )
+        operations.compatibility = compatibility
         return state_root, operations, compatibility, events
 
     def run_production_wrapper(self, root: Path, *, fail_promotion: bool):
@@ -369,13 +387,11 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         )
         self.assertIn(f"workers:{self.sha}:green", events)
         self.assertIn("migration:92->93", events)
-        first_validation = events.index(f"validate:{self.sha}:green")
+        pre_refresh_validation = events.index(f"pre-refresh:{self.sha}:green")
         worker_activation = events.index(f"workers:{self.sha}:green")
-        second_validation = events.index(
-            f"validate:{self.sha}:green", first_validation + 1
-        )
-        self.assertLess(first_validation, worker_activation)
-        self.assertLess(worker_activation, second_validation)
+        full_validation = events.index(f"validate:{self.sha}:green")
+        self.assertLess(pre_refresh_validation, worker_activation)
+        self.assertLess(worker_activation, full_validation)
         self.assertIn(
             "http:http://127.0.0.1:8001/health/version", events
         )
@@ -421,7 +437,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 patch.dict(os.environ, {"MADAR_BACKUP_DIR": str(root / "backups")}),
             ):
                 with self.assertRaisesRegex(
-                    RuntimeError, "stable_proxy_post_migration_validation_failed"
+                    RuntimeError, "stable_proxy_active_refresh_validation_failed"
                 ):
                     self.module.automatic_migrate_known_good(
                         sha=self.sha,
@@ -440,7 +456,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 ).read_text()
             )
 
-        self.assertNotIn("schema", state["known_good_release"])
+        self.assertEqual(state["known_good_release"]["schema"], 92)
         self.assertEqual(
             automation["status"], "failed_forward_repair_required"
         )

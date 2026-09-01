@@ -1,6 +1,6 @@
 # Automated database migration architecture
 
-Last implementation review: 2026-08-30
+Last implementation review: 2026-09-01
 
 ## 1. Purpose, authority, and scope
 
@@ -335,12 +335,23 @@ health, stable backend `/health/version` SHA, stable backend `/health/ready`, an
 stable frontend HTTP 200. After SQL it requires the target schema and calls
 `refresh_active_workers()`.
 
-Worker refresh rechecks known-good SHA/slot identity, requires a schema that can
-support the data-deletion worker, verifies immutable source, validates the
-active candidate, activates all schema-gated workers from known-good image
-attestations, validates the candidate again, and validates stable-route version
-and readiness. It then updates `known_good_release.schema` and appends the
-`post_migration_workers_refreshed` history event atomically.
+Worker refresh rechecks active known-good SHA/slot identity, requires a schema
+that can support the data-deletion worker, verifies immutable source, and runs
+the full image/Compose/migration/secret/storage preflight before mutation. Its
+pre-refresh health check requires core serving health and exact active/stable
+identity while allowing only notification, calendar, deletion, or parser
+outages that the refresh owns. It then recreates parser worker, backend, and all
+schema-gated queue workers from the known-good image attestations, requires full
+candidate readiness, and validates stable-route backend/frontend health. It
+updates `known_good_release.schema` and appends the
+`post_migration_workers_refreshed` history event atomically only after those
+checks pass.
+
+The same implementation underlies the separate `--refresh-active-runtime`
+operator mode for config-only refreshes. That mode additionally requires live
+schema to equal the already-recorded known-good schema and records
+`active_runtime_refreshed`; migration automation permits the just-committed
+forward schema to be ahead of the prior observation.
 
 Only after that returns does the coordinator atomically write final
 `automation.json` completion. Thus a target schema without refreshed workers

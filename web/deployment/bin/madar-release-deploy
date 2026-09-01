@@ -57,6 +57,73 @@ SLOT_SUBNETS = {
     },
 }
 
+PRODUCTION_PATH_KEYS = (
+    "MADAR_PRODUCTION_REPO",
+    "MADAR_ENV_FILE",
+    "MADAR_DEPLOY_STATE_ROOT",
+    "MADAR_STORAGE_ROOT",
+    "MADAR_ACTIVE_UPSTREAMS_FILE",
+    "MADAR_PROXY_CONFIG_ROOT",
+    "MADAR_CONTROL_PLANE_ROOT",
+    "MADAR_RELEASE_DEPLOY_BIN",
+    "MADAR_PRODUCTION_DEPLOY_BIN",
+    "MADAR_TRAFFIC_SWITCH_COMMAND",
+    "MADAR_MIGRATION_BACKUP_SCRIPT",
+    "MADAR_MIGRATION_BACKUP_VERIFY_SCRIPT",
+)
+
+ACCEPTED_READINESS_STATES = {
+    "ok", "disabled", "configured", "not_required", "development",
+}
+ACTIVE_REFRESH_COMPONENTS = {
+    "notification_worker",
+    "calendar_sync_worker",
+    "data_deletion_worker",
+    "parser_isolation",
+}
+ACTIVE_REFRESH_CORE_COMPONENTS = {
+    "environment",
+    "database",
+    "redis",
+    "auth",
+    "storage",
+    "schema",
+}
+
+
+def load_production_path_contract(*, installed: bool | None = None) -> dict[str, str]:
+    """Apply the tracked path contract before production configuration."""
+
+    contract_file = WEB_ROOT / "deployment" / "production-paths.conf"
+    contract: dict[str, str] = {}
+    load_environment_file(
+        contract_file,
+        environ=contract,
+        require_private=False,
+    )
+    missing = [name for name in PRODUCTION_PATH_KEYS if not contract.get(name)]
+    if missing:
+        raise RuntimeError("production_path_contract_incomplete")
+    if installed is None:
+        installed = SCRIPT.resolve() == Path(contract["MADAR_RELEASE_DEPLOY_BIN"]).resolve()
+    for name in PRODUCTION_PATH_KEYS:
+        if installed:
+            os.environ[name] = contract[name]
+        else:
+            os.environ.setdefault(name, contract[name])
+    return contract
+
+
+def load_active_runtime_environment(env_file: Path) -> set[str]:
+    """Load active-service configuration while preserving canonical paths."""
+
+    runtime: dict[str, str] = {}
+    loaded = load_environment_file(env_file, environ=runtime)
+    for name, value in runtime.items():
+        if name not in PRODUCTION_PATH_KEYS:
+            os.environ[name] = value
+    return loaded
+
 
 def supabase_server_headers(key: str) -> dict[str, str]:
     """Keep opaque Supabase API keys out of the JWT Authorization header."""
@@ -93,6 +160,16 @@ class DockerGitOperations:
         self.env_file = env_file
         self.compatibility = compatibility
         self.release_root: Path | None = None
+
+    @staticmethod
+    def _storage_root() -> Path:
+        raw = os.getenv("MADAR_STORAGE_ROOT", "").strip()
+        if not raw:
+            raise RuntimeError("production_storage_root_not_configured")
+        root = Path(raw)
+        if not root.is_absolute() or root == Path("/"):
+            raise RuntimeError("production_storage_root_invalid")
+        return root.resolve()
 
     def run(self, command: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None, capture: bool = False) -> str:
         completed = subprocess.run(
@@ -267,9 +344,7 @@ class DockerGitOperations:
         if not workers_active:
             env["CALENDAR_FEATURE_ENABLED"] = "false"
             env["CALENDAR_SYNC_REQUIRED"] = "false"
-        storage_root = os.getenv("MADAR_STORAGE_ROOT", "").strip()
-        if storage_root:
-            env["MADAR_STORAGE_ROOT"] = str(Path(storage_root).resolve())
+        env["MADAR_STORAGE_ROOT"] = str(self._storage_root())
         return env
 
     def _compose(
@@ -319,7 +394,7 @@ class DockerGitOperations:
             sys.executable,
             str(self.release_root / "web/scripts/check_secret_hygiene.py"),
         ])
-        storage_root = Path(os.getenv("MADAR_STORAGE_ROOT", str(self.repo / "backend")))
+        storage_root = self._storage_root()
         for relative in ("uploads", "avatar_uploads", "private_uploads", "private_generated_charts"):
             path = storage_root / relative
             # The deploy operator may intentionally have read/traverse only;
@@ -348,6 +423,25 @@ class DockerGitOperations:
         self._compose(
             sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
             "--wait", "--wait-timeout", "180", *services, workers_active=True,
+        )
+
+    def refresh_active_runtime_services(
+        self, sha: str, slot: str, images: dict[str, str],
+    ) -> None:
+        """Recreate only active services whose runtime environment is mutable."""
+
+        services = [
+            "parser-worker",
+            "backend",
+            "notification-worker",
+            "calendar-sync-worker",
+        ]
+        if self.schema_version() >= 83:
+            services.append("data-deletion-worker")
+        self._compose(
+            sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
+            "--wait", "--wait-timeout", "180", *services,
+            workers_active=True,
         )
 
     @staticmethod
@@ -386,6 +480,128 @@ class DockerGitOperations:
     def _json(self, url: str) -> dict:
         with urllib.request.urlopen(url, timeout=5) as response:
             return json.loads(response.read())
+
+    def _json_allow_unready(self, url: str) -> dict:
+        try:
+            return self._json(url)
+        except urllib.error.HTTPError as error:
+            if error.code != 503:
+                raise
+            return json.loads(error.read())
+
+    def _container_state(self, name: str) -> tuple[str, str, str] | None:
+        completed = subprocess.run(
+            [
+                "docker", "inspect", "--format",
+                "{{.Image}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+                name,
+            ],
+            check=False, text=True, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        if completed.returncode != 0:
+            return None
+        value = completed.stdout.strip()
+        parts = value.split("|", 2)
+        if len(parts) != 3:
+            raise RuntimeError("active_runtime_container_state_invalid")
+        return parts[0], parts[1], parts[2]
+
+    @staticmethod
+    def _recorded_image_id(images: dict[str, str], component: str) -> str:
+        _tag, separator, image_id = str(images.get(component) or "").partition("@")
+        if separator != "@" or not image_id.startswith("sha256:"):
+            raise RuntimeError(f"immutable_image_digest_missing:{component}")
+        return image_id
+
+    def _validate_refresh_health_payload(
+        self, *, sha: str, readiness: dict, identity: dict,
+    ) -> None:
+        if identity.get("release_sha") != sha:
+            raise RuntimeError("active_refresh_release_identity_mismatch")
+        if (
+            str(identity.get("schema_compatible_min"))
+            != str(self.compatibility.schema_min)
+            or str(identity.get("schema_compatible_max"))
+            != str(self.compatibility.schema_max)
+        ):
+            raise RuntimeError("active_refresh_schema_contract_mismatch")
+        components = readiness.get("components")
+        if not isinstance(components, dict):
+            raise RuntimeError("active_refresh_readiness_invalid")
+        if any(components.get(name) != "ok" for name in ACTIVE_REFRESH_CORE_COMPONENTS):
+            raise RuntimeError("active_refresh_core_prerequisite_failed")
+        degraded = sorted(
+            name for name, state in components.items()
+            if state not in ACCEPTED_READINESS_STATES
+            and name not in ACTIVE_REFRESH_COMPONENTS
+        )
+        if degraded:
+            raise RuntimeError(
+                "active_refresh_nonrepairable_readiness:" + ",".join(degraded[:12])
+            )
+
+    def validate_active_refresh_prerequisites(
+        self, sha: str, slot: str, images: dict[str, str],
+    ) -> None:
+        """Validate serving identity while allowing only refreshable outages."""
+
+        backend_id = self._recorded_image_id(images, "backend")
+        frontend_id = self._recorded_image_id(images, "frontend")
+        worker_id = self._recorded_image_id(images, "worker")
+        required = {
+            f"madar-{slot}-backend": backend_id,
+            f"madar-{slot}-frontend": frontend_id,
+            f"madar-{slot}-redis": None,
+            f"madar-{slot}-remote-ingestion-worker": worker_id,
+        }
+        for name, expected_id in required.items():
+            state = self._container_state(name)
+            if state is None or state[1:] != ("running", "healthy"):
+                raise RuntimeError(f"active_refresh_prerequisite_unhealthy:{name}")
+            if expected_id is not None and state[0] != expected_id:
+                raise RuntimeError(f"active_refresh_image_identity_mismatch:{name}")
+        for service in (
+            "parser-worker", "notification-worker", "calendar-sync-worker",
+            "data-deletion-worker",
+        ):
+            name = f"madar-{slot}-{service}"
+            state = self._container_state(name)
+            if state is not None and state[0] != worker_id:
+                raise RuntimeError(f"active_refresh_image_identity_mismatch:{name}")
+
+        ports = SLOT_PORTS[slot]
+        readiness = self._json_allow_unready(
+            f"http://127.0.0.1:{ports['backend']}/health/ready"
+        )
+        identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
+        self._validate_refresh_health_payload(
+            sha=sha, readiness=readiness, identity=identity,
+        )
+        stable_readiness = self._json_allow_unready(
+            "http://127.0.0.1:8001/health/ready"
+        )
+        stable_identity = self._json("http://127.0.0.1:8001/health/version")
+        self._validate_refresh_health_payload(
+            sha=sha, readiness=stable_readiness, identity=stable_identity,
+        )
+        frontend_base = f"http://127.0.0.1:{ports['frontend']}"
+        with urllib.request.urlopen(f"{frontend_base}/", timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError("active_refresh_frontend_unavailable")
+            self._validate_frontend_api_origin(frontend_base, response.read())
+        with urllib.request.urlopen("http://127.0.0.1:3000/", timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError("active_refresh_stable_frontend_unavailable")
+
+    def validate_stable_candidate(self, sha: str) -> None:
+        stable_identity = self._json("http://127.0.0.1:8001/health/version")
+        stable_readiness = self._json("http://127.0.0.1:8001/health/ready")
+        if stable_identity.get("release_sha") != sha or not stable_readiness.get("ready"):
+            raise RuntimeError("stable_proxy_active_refresh_validation_failed")
+        with urllib.request.urlopen("http://127.0.0.1:3000/", timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError("stable_proxy_frontend_validation_failed")
 
     def _validate_frontend_api_origin(self, frontend_base: str, html: bytes) -> None:
         parser = ScriptSourceParser()
@@ -651,8 +867,9 @@ def adopt_prepared_release(
     return adopted
 
 
-def refresh_active_workers(
+def _refresh_active_runtime(
     *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
+    allow_schema_advance: bool, event_phase: str,
 ) -> dict:
     state_file = state_root / "state.json"
     try:
@@ -660,29 +877,61 @@ def refresh_active_workers(
     except (OSError, ValueError) as error:
         raise RuntimeError("release_state_missing_or_invalid") from error
     known_good = state.get("known_good_release") or {}
-    if known_good.get("sha") != sha or known_good.get("slot") != slot:
+    if (
+        state.get("active_slot") != slot
+        or known_good.get("sha") != sha
+        or known_good.get("slot") != slot
+    ):
         raise RuntimeError("active_release_identity_mismatch")
+    if state.get("in_progress_release") or state.get("rollback_failure"):
+        raise RuntimeError("active_release_recovery_state_present")
     schema = operations.schema_version()
     if schema < 83:
         raise RuntimeError("data_deletion_worker_schema_not_ready")
+    recorded_schema = int(known_good.get("schema", -1))
+    if allow_schema_advance:
+        if schema < recorded_schema:
+            raise RuntimeError("active_release_schema_mismatch")
+    elif schema != recorded_schema:
+        raise RuntimeError("active_release_schema_mismatch")
+    if not operations.compatibility.schema_min <= schema <= operations.compatibility.schema_max:
+        raise RuntimeError("active_release_schema_incompatible")
     operations.verify_source(sha)
+    operations.preflight(sha, slot, known_good["images"], schema)
+    operations.validate_active_refresh_prerequisites(sha, slot, known_good["images"])
+    operations.refresh_active_runtime_services(sha, slot, known_good["images"])
     operations.validate_candidate(sha, slot)
-    operations.activate_workers(sha, slot, known_good["images"])
-    operations.validate_candidate(sha, slot)
-    stable_identity = operations._json("http://127.0.0.1:8001/health/version")
-    stable_readiness = operations._json("http://127.0.0.1:8001/health/ready")
-    if stable_identity.get("release_sha") != sha or not stable_readiness.get("ready"):
-        raise RuntimeError("stable_proxy_post_migration_validation_failed")
+    operations.validate_stable_candidate(sha)
     known_good["schema"] = schema
     event = {
         "release_sha": sha, "candidate_slot": slot, "traffic_target": slot,
         "schema": {"observed": schema}, "status": "known_good",
-        "phase": "post_migration_workers_refreshed",
+        "phase": event_phase,
         "completed_at": utc_now().isoformat(),
     }
     state.setdefault("history", []).append(event)
     atomic_json(state_file, state)
     return event
+
+
+def refresh_active_workers(
+    *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
+) -> dict:
+    return _refresh_active_runtime(
+        sha=sha, slot=slot, state_root=state_root, operations=operations,
+        allow_schema_advance=True,
+        event_phase="post_migration_workers_refreshed",
+    )
+
+
+def refresh_active_runtime(
+    *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
+) -> dict:
+    return _refresh_active_runtime(
+        sha=sha, slot=slot, state_root=state_root, operations=operations,
+        allow_schema_advance=False,
+        event_phase="active_runtime_refreshed",
+    )
 
 
 AUTOMATIC_MIGRATION_POLICY = (
@@ -1113,13 +1362,21 @@ def main() -> int:
     mode.add_argument("--activate-prepared", action="store_true", help="Activate workers for a previously prepared candidate")
     mode.add_argument("--adopt-prepared", action="store_true", help="Adopt a promoted initial candidate as immutable known-good")
     mode.add_argument("--refresh-active-workers", action="store_true", help="Refresh the active release after reaching schema 83")
+    mode.add_argument(
+        "--refresh-active-runtime", action="store_true",
+        help="Safely apply environment changes to the exact active known-good release",
+    )
     mode.add_argument("--automatic-migrate", action="store_true", help="Run an opted-in migration only after this SHA is known-good")
     parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
-    repo = Path(os.getenv("MADAR_PRODUCTION_REPO", "/srv/madar/production")).resolve()
-    state_root = Path(os.getenv("MADAR_DEPLOY_STATE_ROOT", "/var/lib/madar/releases")).resolve()
-    env_file = Path(os.getenv("MADAR_ENV_FILE", "/etc/madar/production.env")).resolve()
-    load_environment_file(env_file)
+    load_production_path_contract()
+    repo = Path(os.environ["MADAR_PRODUCTION_REPO"]).resolve()
+    state_root = Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]).resolve()
+    env_file = Path(os.environ["MADAR_ENV_FILE"]).resolve()
+    if args.refresh_active_workers or args.refresh_active_runtime:
+        load_active_runtime_environment(env_file)
+    else:
+        load_environment_file(env_file)
     compatibility = Compatibility.load(WEB_ROOT / "deployment/releases/release.json")
     operations = DockerGitOperations(repo, state_root, env_file, compatibility)
     if args.automatic_migrate:
@@ -1155,6 +1412,14 @@ def main() -> int:
     if args.refresh_active_workers:
         with deployment_lock(state_root):
             result = refresh_active_workers(
+                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                operations=operations,
+            )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    if args.refresh_active_runtime:
+        with deployment_lock(state_root):
+            result = refresh_active_runtime(
                 sha=args.sha.lower(), slot=args.slot, state_root=state_root,
                 operations=operations,
             )
