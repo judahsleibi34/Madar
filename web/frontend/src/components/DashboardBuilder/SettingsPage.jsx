@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bell, ExternalLink, Globe2, ImagePlus, KeyRound, MonitorSmartphone, Save, ShieldCheck, ShoppingBag, UserRound, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -920,9 +920,9 @@ export default function SettingsPage({
         onClose={clearNotification}
       />
 
-      <header className="settings-header">
+      <header className="settings-header app-page-intro">
         <div>
-          <p>{pageCopy.eyebrow}</p>
+
           <h1>{pageCopy.title}</h1>
           <span>{pageCopy.subtitle}</span>
         </div>
@@ -959,7 +959,6 @@ export default function SettingsPage({
         >
           <div className="settings-profile-cover">
             <div>
-              <span>{pageCopy.eyebrow}</span>
               <strong>
                 {accountForm.first_name || accountForm.email || t.userAlt}
               </strong>

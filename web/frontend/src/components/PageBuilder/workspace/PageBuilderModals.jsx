@@ -86,7 +86,6 @@ export default function PageBuilderModals({
           >
             <div className="modal-header">
               <div>
-                <span className="modal-eyebrow">Layout check</span>
                 <h2 id="overlap-warning-title">
                   Almost ready to preview
                 </h2>
@@ -149,7 +148,6 @@ export default function PageBuilderModals({
                 <AlertTriangle size={24} />
               </div>
               <div>
-                <span className="modal-eyebrow">Publish check</span>
                 <h2 id="publish-overlap-warning-title">Check your layout before going live</h2>
                 <p>
                   {publishOverlapWarnings.length} area{publishOverlapWarnings.length === 1 ? "" : "s"} may be hard to read. You can fix the layout now or publish it as it is.
@@ -210,7 +208,6 @@ export default function PageBuilderModals({
           >
             <div className="modal-header">
               <div>
-                <span className="modal-eyebrow">{templateCopy.eyebrow}</span>
                 <h2>{templateCopy.title}</h2>
                 <p>{templateCopy.description}</p>
               </div>

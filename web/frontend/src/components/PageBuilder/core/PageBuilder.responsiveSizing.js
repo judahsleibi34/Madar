@@ -13,6 +13,7 @@ const TABLET_FLUID_TYPES = new Set([
   "thinDivider",
   "card",
   "carousel",
+  "logoSlider",
   "carouselCards",
   "carouselSplit",
   "carouselSpotlight",

@@ -244,15 +244,14 @@ export default function ArchivePage({ user }) {
       <div className="builder-desktop-shell archive-builder-shell">
         <header className="builder-topbar">
           <div className="builder-brand">
-            <h1>{workspaceName}</h1>
+            <strong className="builder-brand-name">{workspaceName}</strong>
             <p>Review, clean, and analyze your collected data.</p>
           </div>
         </header>
 
         <div className="archive-page daw-page">
-          <header className="archive-header daw-header">
+          <header className="archive-header daw-header app-page-intro">
             <div>
-              <span className="archive-kicker daw-kicker">Archive</span>
               <h1 id="archive-title">Saved work history</h1>
               <p>
                 Keep old tasks, cleaned datasets, deleted charts, and report drafts

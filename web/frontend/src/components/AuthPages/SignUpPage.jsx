@@ -438,13 +438,13 @@ export default function SignUpPage({
   return (
     <main className="register-page" dir={pageDir}>
       <form className="login-card register-card" onSubmit={handleSubmit} dir={pageDir}>
-        <div className="login-heading">
+        <div className="login-heading app-page-intro">
           <h1>{t("signup.title")}</h1>
           <p>{t("signup.subtitle")}</p>
         </div>
 
         {isTenantOnboarding && (
-          <div className="auth-section-title">{t("signup.accountSection")}</div>
+          <h2 className="auth-section-title">{t("signup.accountSection")}</h2>
         )}
 
         <div className="register-row">
@@ -541,7 +541,7 @@ export default function SignUpPage({
 
         {isTenantOnboarding && (
           <>
-            <div className="auth-section-title">{t("signup.businessSection")}</div>
+            <h2 className="auth-section-title">{t("signup.businessSection")}</h2>
 
             <div className="register-row">
               <label>

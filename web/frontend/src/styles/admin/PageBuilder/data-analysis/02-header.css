@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Header
    ============================================================ */
 
@@ -16,7 +16,7 @@
   display: inline-flex;
   width: fit-content;
   margin-bottom: 8px;
-  color: var(--action-primary, #9b2f25);
+  color: var(--action-primary, var(--theme-primary));
   font-size: 13px;
   font-weight: 950;
   line-height: 1.2;

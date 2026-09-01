@@ -598,7 +598,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   cursor: pointer;
   list-style: none;
 }
@@ -666,7 +666,7 @@
 .builder-canvas:is(.viewport-tablet, .viewport-mobile)
 .built-site-mobile-menu-panel .built-site-mobile-menu-cta {
   background: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 :is(.page-builder.preview-mode, .tenant-runtime-page)

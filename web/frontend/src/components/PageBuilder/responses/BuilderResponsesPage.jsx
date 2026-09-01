@@ -154,7 +154,6 @@ export default function BuilderResponsesPage({
           >
             {data.selectedForm ? (
               <div className="responses-workspace-title">
-                <span className="workspace-kicker">{t.settingsKicker}</span>
                 <h2 id="responses-settings-title">{t.responseViews}</h2>
                 <p>
                   {data.selectedForm.title} · {connectedCollection

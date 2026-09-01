@@ -130,8 +130,8 @@
   }
 
   .mobile-menu-auth .btn-login:hover {
-    border-color: var(--theme-primary);
-    color: var(--theme-primary);
+    border-color: var(--color-accent-text);
+    color: var(--color-accent-text);
     background: rgba(var(--theme-primary-rgb), 0.04);
   }
 
@@ -152,8 +152,8 @@
 
   .mobile-menu-lang .lang-mobile-btn.active,
   .mobile-menu-lang .lang-mobile-btn:hover {
-    border-color: var(--theme-primary);
-    color: var(--theme-primary);
+    border-color: var(--color-accent-text);
+    color: var(--color-accent-text);
     background: rgba(var(--theme-primary-rgb), 0.05);
   }
 

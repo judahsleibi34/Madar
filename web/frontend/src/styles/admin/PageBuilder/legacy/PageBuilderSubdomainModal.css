@@ -67,7 +67,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border: 1px solid var(--madar-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: 14px;
   overflow: hidden;
   background: var(--theme-surface);

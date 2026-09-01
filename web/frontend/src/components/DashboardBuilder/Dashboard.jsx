@@ -99,9 +99,8 @@ export default function Dashboard({
       data-language={safeLang}
       data-theme={themeMode}
     >
-      <header className="admin-dashboard-header">
+      <header className="admin-dashboard-header app-page-intro">
         <div>
-          <span className="admin-dashboard-eyebrow">{t.eyebrow}</span>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
           <div className="admin-dashboard-header-meta" aria-label={t.platformHealth}>

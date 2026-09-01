@@ -37,7 +37,6 @@
 @import "/src/styles/admin/PageBuilder/project-chooser.css";
 @import "./theme-refinement.css";
 @import "./route-refinement.css";
-@import "/src/styles/dark-compact-summaries.css";
 @import "/src/styles/settings-item-flattening.css";
 @import "/src/styles/preview-theme-isolation.css";
 @import "/src/styles/theme-transition.css";
@@ -377,7 +376,7 @@
   justify-self: start;
   border: 0;
   background: transparent;
-  color: var(--theme-surface);
+  color: var(--theme-text-soft);
   cursor: pointer;
   padding: 0;
   font-weight: 800;
@@ -397,7 +396,7 @@
 
 .tenant-footer-contact p {
   margin: 0;
-  color: var(--theme-surface);
+  color: var(--theme-text-soft);
   line-height: 1.6;
 }
 
@@ -425,7 +424,7 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  color: var(--theme-surface);
+  color: var(--theme-text-soft);
 }
 
 .tenant-footer-bottom p {
@@ -435,7 +434,7 @@
 .tenant-footer-bottom :is(button, a) {
   border: 0;
   background: transparent;
-  color: var(--theme-surface);
+  color: var(--theme-text-soft);
   font-weight: 900;
   cursor: pointer;
   text-decoration: none;

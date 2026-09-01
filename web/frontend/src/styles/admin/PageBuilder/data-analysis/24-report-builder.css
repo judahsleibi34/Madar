@@ -301,7 +301,7 @@
   justify-content: center;
   gap: 6px;
   min-height: 32px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 8px;
   padding: 0 10px;
   background: var(--theme-surface);
@@ -413,7 +413,7 @@
 
 .page-builder .daw-report-drag-handle:hover {
   background: var(--theme-surface-2);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .page-builder .daw-report-drag-handle:active {
@@ -430,7 +430,7 @@
 }
 
 .page-builder .daw-report-block-library > button:hover {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.1);
 }
@@ -532,13 +532,13 @@
 }
 
 .page-builder .daw-report-variable-library button:hover {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.1);
 }
 
 .page-builder .daw-report-variable-library button > svg {
   flex: 0 0 auto;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .page-builder .daw-report-variable-library button > span {
@@ -628,7 +628,7 @@
   flex: 0 0 auto;
   min-width: 34px;
   min-height: 32px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 7px;
   padding: 0 8px;
   background: var(--theme-surface-2) !important;
@@ -714,7 +714,7 @@
 
 .page-builder .daw-document-toolbar .daw-toolbar-palette-menu > button:hover,
 .page-builder .daw-document-toolbar .daw-toolbar-palette-menu > button.active {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   transform: scale(1.06);
 }
 
@@ -732,7 +732,7 @@
   min-width: 0;
   width: 100%;
   height: 30px;
-  border: 1px solid var(--theme-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: 6px;
   padding: 0 6px !important;
   background: var(--theme-surface-2) !important;
@@ -755,18 +755,18 @@
 
 .page-builder .daw-document-toolbar button:hover,
 .page-builder .daw-document-toolbar select:hover {
-  border-color: var(--theme-primary);
-  color: var(--theme-primary) !important;
+  border-color: var(--color-accent-text);
+  color: var(--color-accent-text) !important;
 }
 
 .page-builder .daw-document-toolbar .daw-toolbar-danger {
   border-color: rgba(var(--theme-danger-rgb), 0.32);
-  color: var(--theme-danger) !important;
+  color: var(--color-status-danger-text) !important;
 }
 
 .page-builder .daw-document-toolbar .daw-toolbar-danger:hover {
-  border-color: var(--theme-danger);
-  color: var(--theme-danger) !important;
+  border-color: var(--color-status-danger-text);
+  color: var(--color-status-danger-text) !important;
 }
 
 .page-builder .daw-document-toolbar select {
@@ -812,17 +812,17 @@
 
 .page-builder .daw-report-drop-zone:hover > button,
 .page-builder .daw-report-drop-zone.is-active > button {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .page-builder .daw-report-drop-zone.is-active {
   border: 1px dashed var(--theme-primary);
   background: rgba(var(--theme-primary-rgb), 0.08);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .page-builder .daw-report-empty-canvas.is-drop-active {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.06);
 }
 
@@ -953,7 +953,7 @@
 }
 
 .page-builder .daw-report-page-block.is-selected {
-  border-inline-start-color: var(--theme-primary);
+  border-inline-start-color: var(--color-accent-text);
   box-shadow: none;
 }
 
@@ -1057,7 +1057,7 @@
   top: 0;
   z-index: 1;
   background: var(--theme-surface-2) !important;
-  color: var(--daw-block-text, #0f1d38) !important;
+  color: var(--daw-block-text, var(--theme-text)) !important;
   font-weight: 900;
 }
 
@@ -1144,7 +1144,7 @@
 
 .page-builder .daw-report-builder .daw-report-properties input:focus,
 .page-builder .daw-report-builder .daw-report-properties textarea:focus {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb), 0.1);
 }
 
@@ -1179,8 +1179,8 @@
 
 .page-builder .daw-report-block-actions .is-danger {
   grid-column: 1 / -1;
-  border-color: var(--theme-danger);
-  color: var(--theme-danger) !important;
+  border-color: var(--color-status-danger-text);
+  color: var(--color-status-danger-text) !important;
 }
 
 @media (max-width: 1280px) {
@@ -1254,7 +1254,7 @@
 }
 
 .page-builder .daw-report-panel-heading span {
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
   letter-spacing: 0.08em;
 }
 
@@ -1278,7 +1278,7 @@
 .page-builder .daw-report-builder .daw-report-properties input,
 .page-builder .daw-report-builder .daw-report-properties textarea,
 .page-builder .daw-report-builder .daw-report-properties select {
-  border: 1px solid var(--theme-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: 8px !important;
   background: var(--theme-bg-soft) !important;
   color: var(--theme-text) !important;
@@ -1287,15 +1287,15 @@
 
 .page-builder .daw-report-file-button:hover,
 .page-builder .daw-report-preview-button:hover {
-  border-color: var(--theme-primary) !important;
-  color: var(--theme-primary) !important;
+  border-color: var(--color-accent-text) !important;
+  color: var(--color-accent-text) !important;
   background: rgba(var(--theme-primary-rgb), 0.08) !important;
   box-shadow: none !important;
 }
 
 .page-builder .daw-report-block-library > button {
   min-height: 58px;
-  border: 1px solid var(--theme-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: 8px !important;
   background: transparent !important;
   color: var(--theme-text) !important;
@@ -1305,15 +1305,15 @@
 }
 
 .page-builder .daw-report-block-library > button:hover {
-  border-color: var(--theme-primary) !important;
+  border-color: var(--color-accent-text) !important;
   background: rgba(var(--theme-primary-rgb), 0.08) !important;
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
   box-shadow: none !important;
   transform: none !important;
 }
 
 .page-builder .daw-report-block-library > button:disabled {
-  border-color: var(--theme-border) !important;
+  border-color: var(--color-border-control) !important;
   background: transparent !important;
   color: var(--theme-text-muted) !important;
   opacity: 0.58;
@@ -1352,7 +1352,7 @@
   gap: 7px;
   width: 100%;
   min-height: 38px;
-  border: 1px solid var(--theme-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: 8px;
   padding: 0 12px;
   background: var(--theme-bg-soft) !important;
@@ -1432,7 +1432,7 @@
 }
 
 .page-builder .daw-report-page-block.is-selected {
-  border-inline-start-color: var(--theme-primary) !important;
+  border-inline-start-color: var(--color-accent-text) !important;
 }
 
 .page-builder .daw-report-spacer-block,

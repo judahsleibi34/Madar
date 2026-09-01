@@ -61,7 +61,7 @@
 .pricing-section-heading > span {
   display: inline-flex;
   margin-bottom: 10px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -207,7 +207,7 @@
 .pricing-choice-card span {
   display: inline-flex;
   margin-bottom: 18px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 13px;
   font-weight: 950;
   letter-spacing: 0.08em;
@@ -246,7 +246,7 @@
   place-items: center;
   border-radius: 999px;
   background: var(--theme-surface-2);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-style: normal;
   font-size: 20px;
   font-weight: 950;
@@ -285,7 +285,7 @@
   min-height: 42px;
   border-radius: 999px;
   padding: 10px 15px;
-  border: 1px solid var(--theme-border, rgba(var(--theme-shadow-rgb), 0.14));
+  border: 1px solid var(--color-border-control);
   background: var(--theme-surface);
   color: var(--theme-text);
   cursor: pointer;
@@ -302,7 +302,7 @@
 
 .pricing-back-button:hover {
   transform: translateY(-1px);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   border-color: rgba(var(--theme-primary-rgb), 0.38);
   box-shadow: 0 12px 28px rgba(var(--theme-shadow-rgb), 0.08);
 }
@@ -403,7 +403,7 @@
 
 .pricing-plan-top strong {
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .pricing-plan-card h3 {
@@ -536,7 +536,7 @@
 
 .pricing-feature-list li.included span {
   background: rgba(var(--theme-success-rgb), 0.11);
-  color: var(--theme-success);
+  color: var(--color-status-success-text);
 }
 
 .pricing-feature-list li.muted {
@@ -602,7 +602,7 @@
 
 .pricing-plan-button.secondary:hover:not(:disabled) {
   border-color: rgba(var(--theme-primary-rgb), 0.38);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 /* CUSTOM PLAN */
@@ -709,7 +709,7 @@
 .pricing-module-content small {
   display: block;
   margin-top: 8px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   line-height: 1.5;
   font-weight: 900;
@@ -878,6 +878,11 @@ body.theme-dark .pricing-module-check span,
 body.theme-dark .pricing-custom-price {
   background: var(--theme-surface-2);
   border-color: var(--theme-border);
+}
+
+[data-theme="dark"] .pricing-back-button,
+body.theme-dark .pricing-back-button {
+  border-color: var(--color-border-control);
 }
 
 [data-theme="dark"] .pricing-hero h1,
@@ -1125,7 +1130,7 @@ body.theme-dark .pricing-plan-button.secondary {
   place-items: center;
   border-radius: 12px;
   background: var(--theme-surface);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .pricing-page[dir="rtl"] .pricing-tool-icon {
@@ -1220,7 +1225,7 @@ body.theme-dark .pricing-plan-button.secondary {
 .pricing-limit-list li svg {
   flex: 0 0 auto;
   margin-top: 1px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .pricing-storage-callout {
@@ -1235,7 +1240,7 @@ body.theme-dark .pricing-plan-button.secondary {
 }
 
 .pricing-storage-callout svg {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .pricing-storage-callout p {
@@ -1284,7 +1289,7 @@ body.theme-dark .pricing-plan-button.secondary {
 }
 
 .pricing-mini-plan strong {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 28px;
   line-height: 1;
   font-weight: 950;
@@ -1663,7 +1668,7 @@ body.theme-dark .pricing-storage-callout {
 
 .pricing-catalog-heading > div > span,
 .pricing-includes-label {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -1728,7 +1733,7 @@ body.theme-dark .pricing-storage-callout {
   padding: 4px 7px;
   border-radius: 999px;
   background: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 10px;
   font-style: normal;
   font-weight: 900;
@@ -1830,7 +1835,7 @@ body.theme-dark .pricing-storage-callout {
 }
 
 .pricing-addons-heading > div > span {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -1904,7 +1909,7 @@ body.theme-dark .pricing-storage-callout {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 11px;
   font-weight: 850;
 }
@@ -1924,7 +1929,7 @@ body.theme-dark .pricing-storage-callout {
 }
 
 .pricing-addon-price strong {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 30px;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -1967,7 +1972,7 @@ body.theme-dark .pricing-storage-callout {
   padding: 5px 8px;
   border-radius: 999px;
   background: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 10px;
   font-weight: 850;
   white-space: nowrap;

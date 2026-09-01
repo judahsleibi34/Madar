@@ -241,7 +241,7 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
     return answer === option;
   });
 
-const carouselElementTypes = new Set(["card", "carousel", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
+const carouselElementTypes = new Set(["card", "carousel", "logoSlider", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
 const authElementTypes = new Set(["loginBlock", "registrationBlock"]);
 
 const getPageElements = (page) =>
@@ -2235,7 +2235,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     <main className="tenant-runtime-main">
       <section className={`tenant-runtime-card tenant-runtime-status-${state}`}>
         {state === "loading" && <span className="tenant-runtime-loader" aria-hidden="true" />}
-        <p className="tenant-eyebrow">madarportal.com/site/{cleanSubdomain}</p>
         <h1>{title}</h1>
         <p>{body}</p>
         {state === "unavailable" && (
@@ -2567,7 +2566,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             aria-modal="true"
             aria-labelledby="tenant-publication-warning-title"
           >
-            <span className="workspace-kicker">New form version available</span>
             <h2 id="tenant-publication-warning-title">Refresh to use the latest form</h2>
             <p>
               This form was updated while you had it open. Save any unfinished work,

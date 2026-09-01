@@ -463,9 +463,8 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
 
   return (
     <section className="user-management-page">
-      <header className="admin-dashboard-header user-management-header">
+      <header className="admin-dashboard-header user-management-header app-page-intro">
         <div>
-          <span className="user-management-kicker">{labels.kicker}</span>
           <h1>{labels.title}</h1>
           <p>{labels.subtitle}</p>
         </div>

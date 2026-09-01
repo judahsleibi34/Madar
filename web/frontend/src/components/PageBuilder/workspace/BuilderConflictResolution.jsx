@@ -96,7 +96,6 @@ export default function BuilderConflictResolution({
           >
             <div className="modal-header">
               <div>
-                <span className="modal-eyebrow">Cloud save protection</span>
                 <h2 id="builder-conflict-dialog-title">Resolve editing conflict</h2>
                 <p>
                   This browser has local edits based on an older project version. A newer version exists on Madar.

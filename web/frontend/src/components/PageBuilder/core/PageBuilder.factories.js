@@ -255,6 +255,22 @@ export const createElement = (type = "text", overrides = {}) => {
         "--carousel-height": "390px",
       },
     },
+    logoSlider: {
+      name: factoryCopy.elements.logoSlider.name,
+      logoSliderTitle: factoryCopy.elements.logoSlider.title,
+      logoSliderSubtitle: factoryCopy.elements.logoSlider.subtitle,
+      carouselVariant: "logos",
+      autoScroll: true,
+      autoScrollMs: 3200,
+      content: factoryCopy.elements.logoSlider.content,
+      styles: {
+        ...base.styles,
+        backgroundColor: "var(--theme-surface)",
+        borderRadius: "18px",
+        alignSelf: "stretch",
+        "--carousel-height": "260px",
+      },
+    },
     photoProofing: {
       name: factoryCopy.elements.photoProofing.name,
       content: factoryCopy.elements.photoProofing.content,

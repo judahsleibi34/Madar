@@ -95,7 +95,7 @@ export default function ResetPasswordPage({ lang = "en" }) {
   return (
     <main className="login-page" dir={pageDir}>
       <form className="login-card" onSubmit={handleSubmit} dir={pageDir}>
-        <div className="login-heading">
+        <div className="login-heading app-page-intro">
           <h1>{t("resetPassword.title")}</h1>
           <p>{t("resetPassword.subtitle")}</p>
         </div>

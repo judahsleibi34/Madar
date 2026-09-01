@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { KeyRound, QrCode, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -255,8 +255,8 @@ export default function SecurityMfaPage({ lang = "en", embedded = false, cacheKe
   return (
     <section className="security-mfa-page" dir={isArabic ? "rtl" : "ltr"}>
       {!embedded && (
-        <header className="security-mfa-header">
-          <span>{t("securityMfa.eyebrow")}</span>
+        <header className="security-mfa-header app-page-intro">
+
           <h1>{t("securityMfa.title")}</h1>
           <p>{t("securityMfa.subtitle")}</p>
         </header>

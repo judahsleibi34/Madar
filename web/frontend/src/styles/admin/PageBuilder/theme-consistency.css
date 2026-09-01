@@ -115,7 +115,7 @@
 /* Compact form summary is one grouped region, not four nested cards. */
 .page-builder .forms-sidebar-stats {
   background: transparent !important;
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   box-shadow: none !important;
 }
 
@@ -302,7 +302,7 @@
   min-height: 42px !important;
   padding: 9px 11px !important;
   background: var(--pb-surface-raised) !important;
-  border: 1px solid var(--pb-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: var(--pb-radius-sm) !important;
   color: var(--pb-text) !important;
   font-size: 13px !important;
@@ -382,7 +382,7 @@
   min-height: 40px !important;
   padding: 8px 11px !important;
   background: var(--pb-surface-raised) !important;
-  border: 1px solid var(--pb-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: var(--pb-radius-sm) !important;
   color: var(--pb-text) !important;
   font-size: 12px !important;
@@ -392,7 +392,7 @@
 
 .page-builder .builder-inspector :is(.full-width-action, .element-action-grid button):hover {
   background: var(--pb-accent-soft) !important;
-  border-color: color-mix(in srgb, var(--pb-accent) 45%, var(--pb-border)) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 45%, var(--color-border-control)) !important;
   color: var(--pb-accent) !important;
 }
 
@@ -400,7 +400,7 @@
   width: 100% !important;
   min-height: 42px !important;
   background: color-mix(in srgb, var(--pb-danger) 10%, var(--pb-surface)) !important;
-  border: 1px solid color-mix(in srgb, var(--pb-danger) 35%, var(--pb-border)) !important;
+  border: 1px solid color-mix(in srgb, var(--pb-danger) 35%, var(--color-border-control)) !important;
   border-radius: var(--pb-radius-sm) !important;
   color: var(--pb-danger) !important;
   font-weight: 800 !important;
@@ -428,7 +428,7 @@
   min-height: 38px !important;
   padding: 7px 8px !important;
   background: var(--pb-surface-raised) !important;
-  border: 1px solid var(--pb-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: calc(var(--pb-radius-sm) - 2px) !important;
   color: var(--pb-text) !important;
   font-size: 12px !important;
@@ -438,7 +438,7 @@
 
 .page-builder .builder-inspector .element-clipboard-actions > button:hover:not(:disabled) {
   background: var(--pb-accent-soft) !important;
-  border-color: color-mix(in srgb, var(--pb-accent) 45%, var(--pb-border)) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 45%, var(--color-border-control)) !important;
   color: var(--pb-accent) !important;
 }
 
@@ -549,7 +549,7 @@
 }
 
 .page-builder .builder-inspector .carousel-slide-card[open] > summary {
-  border-bottom: 1px solid var(--pb-border) !important;
+  border-bottom: 1px solid var(--color-border-control) !important;
 }
 
 .page-builder .builder-inspector .carousel-slide-card-body {
@@ -640,7 +640,7 @@
   width: 100% !important;
   min-height: 40px !important;
   background: var(--pb-surface-raised) !important;
-  border: 1px solid var(--pb-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: var(--pb-radius-sm) !important;
   color: var(--pb-text) !important;
   font-weight: 700 !important;
@@ -671,7 +671,7 @@
   .quiz-options-drawer
 ) :is(input, textarea, select) {
   background: var(--pb-surface-raised) !important;
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   color: var(--pb-text) !important;
   -webkit-text-fill-color: var(--pb-text) !important;
   box-shadow: none !important;
@@ -752,7 +752,7 @@
 
 .page-builder .workspace-tabs button:hover {
   background: var(--pb-surface-raised) !important;
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   color: var(--pb-text) !important;
   -webkit-text-fill-color: var(--pb-text) !important;
 }
@@ -775,7 +775,7 @@
   .template-picker-modal,
   .quiz-options-drawer
 ) button:not(.builder-element-button):not(.builder-element-imageButton):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger) {
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   background: var(--pb-surface-raised) !important;
   color: var(--pb-text) !important;
   -webkit-text-fill-color: var(--pb-text) !important;
@@ -793,7 +793,7 @@
   .template-picker-modal,
   .quiz-options-drawer
 ) button:not(.builder-element-button):not(.builder-element-imageButton):not(.page-primary-action):not(.forms-primary-action):not(.runtime-submit):not(.danger-button):not(.danger-lite):not(.form-command-button-danger):hover {
-  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--color-border-control)) !important;
   background: var(--pb-accent-soft) !important;
   color: var(--pb-accent) !important;
   -webkit-text-fill-color: var(--pb-accent) !important;
@@ -808,7 +808,7 @@
 }
 
 .page-builder :is(.danger-button, .danger-lite, .form-command-button-danger, .page-delete-action) {
-  border-color: color-mix(in srgb, var(--pb-danger) 34%, var(--pb-border)) !important;
+  border-color: color-mix(in srgb, var(--pb-danger) 34%, var(--color-border-control)) !important;
   background: color-mix(in srgb, var(--pb-danger) 10%, var(--pb-surface)) !important;
   color: var(--pb-danger) !important;
   -webkit-text-fill-color: var(--pb-danger) !important;
@@ -830,24 +830,24 @@
 }
 
 .page-builder :is(.workspace-kicker, .forms-panel-eyebrow, .simple-action-group-title) {
-  color: var(--theme-primary) !important;
-  -webkit-text-fill-color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
+  -webkit-text-fill-color: var(--color-accent-text) !important;
   letter-spacing: 0.06em;
 }
 
 .page-builder.theme-dark :is(.workspace-kicker, .forms-panel-eyebrow, .simple-action-group-title) {
-  color: var(--theme-primary-hover) !important;
-  -webkit-text-fill-color: var(--theme-primary-hover) !important;
+  color: var(--color-accent-text) !important;
+  -webkit-text-fill-color: var(--color-accent-text) !important;
 }
 
 .page-builder :is(.workspace-header h2, .forms-panel-heading h2) {
-  color: var(--theme-primary) !important;
-  -webkit-text-fill-color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
+  -webkit-text-fill-color: var(--color-accent-text) !important;
 }
 
 .page-builder.theme-dark :is(.workspace-header h2, .forms-panel-heading h2) {
-  color: var(--theme-primary-hover) !important;
-  -webkit-text-fill-color: var(--theme-primary-hover) !important;
+  color: var(--color-accent-text) !important;
+  -webkit-text-fill-color: var(--color-accent-text) !important;
 }
 
 .page-builder button:disabled {
@@ -886,7 +886,7 @@
 }
 
 .page-builder .workspace-tabs button:hover {
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   background: var(--pb-surface-raised) !important;
   color: var(--pb-text) !important;
   -webkit-text-fill-color: var(--pb-text) !important;
@@ -957,7 +957,7 @@
 ) {
   background: var(--builder-neutral-surface) !important;
   background-image: none !important;
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
 }
 
 .page-builder.theme-dark :is(
@@ -1212,7 +1212,7 @@
 }
 
 .page-builder .users-header-actions button:not(.primary-action) {
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   background: var(--pb-surface-raised) !important;
   color: var(--pb-text) !important;
   -webkit-text-fill-color: var(--pb-text) !important;
@@ -1220,7 +1220,7 @@
 }
 
 .page-builder .users-header-actions button:not(.primary-action):hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--color-border-control)) !important;
   background: var(--pb-accent-soft) !important;
   color: var(--pb-accent) !important;
   -webkit-text-fill-color: var(--pb-accent) !important;
@@ -1373,7 +1373,7 @@
 .page-builder .site-chrome-list-row input,
 .page-builder .site-chrome-list-row select {
   min-height: 42px;
-  border-color: var(--pb-border-strong);
+  border-color: var(--color-border-control);
   border-radius: var(--pb-radius-sm);
   background: var(--pb-surface);
   color: var(--pb-text);
@@ -1434,7 +1434,7 @@
 .page-builder .site-chrome-color-control button {
   min-height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--pb-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: 8px;
   background: var(--pb-surface-raised);
   color: var(--pb-text);
@@ -1512,7 +1512,7 @@
 .page-builder .site-chrome-list-row button {
   width: 36px;
   min-height: 36px;
-  border-color: var(--pb-border);
+  border-color: var(--color-border-control);
   border-radius: var(--pb-radius-sm);
   background: var(--pb-surface);
   color: var(--pb-muted);
@@ -1724,14 +1724,14 @@
 ) {
   background: var(--builder-surface-3) !important;
   background-image: none !important;
-  border-color: var(--builder-border) !important;
+  border-color: var(--color-border-control) !important;
   color: var(--builder-text) !important;
 }
 
 .page-builder.theme-dark :is(input, textarea, select, [role="combobox"], .daw-multi-select-trigger, .daw-multi-select-menu) {
   background: var(--builder-surface-2) !important;
   background-image: none !important;
-  border-color: var(--builder-border) !important;
+  border-color: var(--color-border-control) !important;
   color: var(--builder-text) !important;
   -webkit-text-fill-color: var(--builder-text) !important;
   box-shadow: none !important;
@@ -1771,7 +1771,7 @@
 ) {
   background: var(--builder-surface-2) !important;
   background-image: none !important;
-  border-color: var(--builder-border) !important;
+  border-color: var(--color-border-control) !important;
   color: var(--builder-text) !important;
   -webkit-text-fill-color: var(--builder-text) !important;
 }
@@ -1792,7 +1792,7 @@
   .daw-group-grid button
 ):hover {
   background: color-mix(in srgb, var(--builder-surface-2) 95%, white) !important;
-  border-color: var(--builder-border-strong) !important;
+  border-color: var(--color-border-control) !important;
 }
 
 .page-builder.theme-dark :is(
@@ -1934,13 +1934,13 @@ body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(.active, [aria-
    Editing tools item and its icon. */
 :root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-mode-select {
   background: var(--theme-surface) !important;
-  border-color: var(--theme-border) !important;
+  border-color: var(--color-border-control) !important;
   color: var(--theme-text) !important;
 }
 
 :root:not([data-theme="dark"]) body:not(.theme-dark) .page-builder .panel-navigator button {
   background: var(--theme-surface) !important;
-  border-color: var(--theme-border) !important;
+  border-color: var(--color-border-control) !important;
   color: var(--theme-text) !important;
   -webkit-text-fill-color: var(--theme-text) !important;
 }
@@ -1961,7 +1961,7 @@ body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(.active, [aria-
   --tool-item-muted: var(--theme-text-muted);
   --tool-item-icon: var(--theme-text);
   background: var(--theme-surface) !important;
-  border-color: color-mix(in srgb, var(--theme-primary) 42%, var(--theme-border)) !important;
+  border-color: color-mix(in srgb, var(--theme-primary) 42%, var(--color-border-control)) !important;
   color: var(--tool-item-text) !important;
   -webkit-text-fill-color: var(--tool-item-text) !important;
   box-shadow: inset 3px 0 0 var(--theme-primary) !important;
@@ -2029,8 +2029,8 @@ body.theme-dark:has(.page-builder.theme-dark) .admin-sidebar :is(.active, [aria-
 }
 
 .page-builder .workspace-tabs button.active {
-  color: var(--theme-primary) !important;
-  -webkit-text-fill-color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
+  -webkit-text-fill-color: var(--color-accent-text) !important;
 }
 
 :root[data-theme="dark"] .page-builder .workspace-tabs button,
@@ -2117,7 +2117,7 @@ html.theme-dark body .page-builder nav.workspace-tabs > button.active {
   .form-command-button-primary
 ):not(:disabled):hover {
   background: var(--theme-primary-hover) !important;
-  border-color: var(--theme-primary-hover) !important;
+  border-color: var(--color-accent-text) !important;
   color: var(--theme-text-inverse) !important;
   -webkit-text-fill-color: var(--theme-text-inverse) !important;
   box-shadow: none !important;
@@ -2140,8 +2140,8 @@ html.theme-dark body .page-builder nav.workspace-tabs > button.active {
   background-image: none !important;
   border: 0 !important;
   border-radius: 8px !important;
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
   box-shadow: none !important;
   font-size: 14px !important;
   font-weight: 800 !important;
@@ -2158,8 +2158,8 @@ html.theme-dark body .page-builder nav.workspace-tabs > button.active {
 .page-builder .builder-inspector .carousel-slide-image-control .upload-image-button:hover,
 .page-builder .builder-inspector .carousel-slide-card > summary:hover .carousel-slide-edit-hint.primary-action {
   background: var(--action-primary-hover, var(--theme-primary-hover)) !important;
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
 }
 
 .page-builder .builder-inspector :is(.danger-button, .danger-lite) {
@@ -2316,7 +2316,7 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
   .reservation-step-actions button,
   .reservation-list-heading button
 ) {
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   border-radius: var(--pb-radius-sm) !important;
   background: var(--pb-surface-raised) !important;
   color: var(--pb-text) !important;
@@ -2330,14 +2330,14 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
   .reservation-step-actions button,
   .reservation-list-heading button
 ):hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--pb-border)) !important;
+  border-color: color-mix(in srgb, var(--pb-accent) 42%, var(--color-border-control)) !important;
   background: var(--pb-accent-soft) !important;
   color: var(--pb-accent) !important;
   -webkit-text-fill-color: var(--pb-accent) !important;
 }
 
 .page-builder .reservations-workspace .reservation-setup-steps button {
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   border-radius: var(--pb-radius-sm) !important;
   background: var(--pb-surface-muted) !important;
   color: var(--pb-muted) !important;
@@ -2381,7 +2381,7 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
 }
 
 .page-builder .reservations-workspace .reservation-calendar-days button:hover:not(:disabled) {
-  border-color: var(--pb-border) !important;
+  border-color: var(--color-border-control) !important;
   background: var(--pb-accent-soft) !important;
   color: var(--pb-accent) !important;
   -webkit-text-fill-color: var(--pb-accent) !important;
@@ -2420,7 +2420,7 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
   .reservation-date-card > button,
   .reservation-bullet-row > button
 ) {
-  border-color: color-mix(in srgb, var(--pb-danger) 34%, var(--pb-border)) !important;
+  border-color: color-mix(in srgb, var(--pb-danger) 34%, var(--color-border-control)) !important;
   background: color-mix(in srgb, var(--pb-danger) 10%, var(--pb-surface)) !important;
   color: var(--pb-danger) !important;
   -webkit-text-fill-color: var(--pb-danger) !important;
@@ -2506,7 +2506,7 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
 .page-builder .workspace-page .builder-canvas .builder-element-button,
 .page-builder .workspace-page .direct-element-frame-button .builder-element-button {
   background: var(--madar-red) !important;
-  background-color: var(--madar-red) !important;
+  background-color: var(--color-accent-text) !important;
   background-image: none !important;
   border-color: transparent !important;
   border-radius: 8px !important;
@@ -2533,7 +2533,7 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
 }
 
 .page-builder .workspace-page .workspace-card-carousel .product-carousel-arrow:hover {
-  border-color: var(--theme-primary) !important;
+  border-color: var(--color-accent-text) !important;
   background: var(--theme-primary) !important;
   color: var(--theme-text-inverse) !important;
 }

@@ -166,7 +166,6 @@ export default function PageBuilderUsersTab({
     <div className="workspace-page users-workspace-page">
       <header className="workspace-header users-workspace-header">
         <div>
-          <span className="workspace-kicker">Access control</span>
           <h2>Users and roles</h2>
           <p>
             Manage everyone registered on this subdomain, including accounts
@@ -222,7 +221,6 @@ export default function PageBuilderUsersTab({
         <section className="dashboard-panel users-panel">
           <div className="users-panel-heading">
             <div>
-              <span className="workspace-kicker">Team</span>
               <h3>Subdomain users</h3>
               <p>{siteUsers.length} registered and admin-created account{siteUsers.length === 1 ? "" : "s"}.</p>
             </div>
@@ -358,7 +356,6 @@ export default function PageBuilderUsersTab({
         <aside className="dashboard-panel users-roles-panel">
           <div className="users-panel-heading">
             <div>
-              <span className="workspace-kicker">Roles</span>
               <h3>Role permissions</h3>
               <p>{editableRolePermissions} of {totalPermissions} permissions enabled.</p>
             </div>
@@ -542,7 +539,6 @@ onClick={() => {
           >
             <div className="user-create-modal-header">
               <div>
-                <span className="workspace-kicker">Subdomain access</span>
                 <h3 id="create-site-user-title">Add user</h3>
                 <p>Create an account that can sign in to this published site.</p>
               </div>

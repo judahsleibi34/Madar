@@ -142,7 +142,6 @@ export default function PhotoProofingBlock({ content, settings = {}, disabled = 
         {photos.length === 0 && <span><Images size={34} /></span>}
       </div>
       <div className="photo-proofing-launcher-copy">
-        <span className="photo-proofing-kicker"><Images size={15} /> Client photo selection</span>
         <h3>{title}</h3>
         <p>{description}</p>
         <div><strong>{photos.length}</strong><span>photos ready to review</span></div>

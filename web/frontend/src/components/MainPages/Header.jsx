@@ -109,7 +109,7 @@ export default function Header({
             height="828"
             decoding="async"
           />
-          <h1 className="brand-name">{t("common:app.brand")}</h1>
+          <span className="brand-name">{t("common:app.brand")}</span>
         </Link>
 
         <nav className="nav-menu" aria-label={t("common:navigation.main")}>

@@ -9,7 +9,7 @@
 .page-builder .responses-view-tabs button {
   min-height: 40px;
   padding: 0 18px;
-  border: 1px solid var(--madar-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 10px;
   background: var(--madar-surface-soft);
   color: var(--madar-text-muted);
@@ -20,9 +20,9 @@
 
 .page-builder .responses-view-tabs button:hover,
 .page-builder .responses-view-tabs button.active {
-  border-color: var(--madar-red);
+  border-color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.12);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 
 .page-builder .responses-resume-action {
@@ -52,7 +52,7 @@
 /* Responses workspace hierarchy and status toolbar */
 .page-builder .responses-results-page > .responses-results-header .workspace-kicker {
   margin-bottom: 6px;
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 950;
   line-height: 1.2;
@@ -162,7 +162,7 @@
 
 .page-builder .responses-workspace-toolbar .responses-view-tabs button.active,
 .page-builder .responses-workspace-toolbar .responses-view-tabs button[aria-selected="true"] {
-  border-color: var(--madar-red) !important;
+  border-color: var(--color-accent-text) !important;
   background: var(--madar-red) !important;
   color: var(--theme-text-inverse) !important;
   box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.28);
@@ -247,7 +247,7 @@
 }
 
 .page-builder .responses-workspace-title .workspace-kicker {
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-size: 11px;
   letter-spacing: 0.07em;
 }
@@ -291,7 +291,7 @@
 
 .page-builder .response-settings-header .workspace-kicker {
   margin: 0 0 6px;
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-size: 11px;
   letter-spacing: 0.08em;
 }
@@ -375,7 +375,7 @@
 }
 
 .page-builder .response-setting-switch input:checked + span {
-  border-color: var(--madar-red);
+  border-color: var(--color-accent-text);
   background: var(--madar-red);
 }
 

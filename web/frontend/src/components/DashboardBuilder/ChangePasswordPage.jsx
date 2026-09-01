@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
 
@@ -156,11 +156,11 @@ export default function ChangePasswordPage({ lang = "en" }) {
           {t.backToSettings}
         </button>
 
-        <div className="change-password-heading">
-          <span>{t.eyebrow}</span>
+        <header className="change-password-heading app-page-intro">
+
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
-        </div>
+        </header>
 
         {status && <div className="change-password-status">{status}</div>}
         {error && <div className="change-password-error">{error}</div>}

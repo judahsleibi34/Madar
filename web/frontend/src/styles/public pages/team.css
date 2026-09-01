@@ -19,7 +19,7 @@
   margin: 0 auto 52px;
 }
 
-.team-hero h1 {
+.team-hero :is(h1, h2) {
   margin: 0 0 14px;
   color: var(--theme-text);
   font-size: 42px;
@@ -57,7 +57,7 @@
 }
 .team-profile-card:hover {
   transform: translateY(-10px) scale(1.02);
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   box-shadow: 0 28px 60px rgba(var(--theme-primary-rgb), 0.18);
 }
 
@@ -99,7 +99,7 @@
   margin-top: 34px;
 }
 
-.profile-content h2 {
+.profile-content :is(h2, h3) {
   margin: 0 0 8px;
   color: var(--theme-text);
   font-size: 26px;
@@ -108,7 +108,7 @@
 
 .profile-role {
   margin: 0 0 18px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 14px;
   font-weight: 800;
   text-transform: uppercase;
@@ -142,7 +142,7 @@ html[dir="rtl"] .profile-glow {
     margin: 0 auto;
   }
 
-  .team-hero h1 {
+  .team-hero :is(h1, h2) {
     font-size: 34px;
   }
 }
@@ -157,7 +157,7 @@ html[dir="rtl"] .profile-glow {
     padding: 28px;
   }
 
-  .profile-content h2 {
+  .profile-content :is(h2, h3) {
     font-size: 23px;
   }
 }
@@ -181,7 +181,7 @@ html[dir="rtl"] .profile-glow {
   margin: 0 auto 52px;
 }
 
-.team-hero h1 {
+.team-hero :is(h1, h2) {
   margin: 0 0 14px;
   color: var(--theme-text);
   font-size: 42px;
@@ -220,7 +220,7 @@ html[dir="rtl"] .profile-glow {
 
 .team-profile-card:hover {
   transform: translateY(-10px) scale(1.02);
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   box-shadow: 0 28px 60px rgba(var(--theme-primary-rgb), 0.18);
 }
 
@@ -272,7 +272,7 @@ html[dir="rtl"] .profile-glow {
   z-index: 2;
 }
 
-.profile-content h2 {
+.profile-content :is(h2, h3) {
   margin: 0 0 8px;
   color: var(--theme-text);
   font-size: 26px;
@@ -281,7 +281,7 @@ html[dir="rtl"] .profile-glow {
 
 .profile-role {
   margin: 0 0 18px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 14px;
   font-weight: 800;
   text-transform: uppercase;
@@ -309,7 +309,7 @@ html[dir="rtl"] .profile-glow {
   border-radius: 999px;
   border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
   background: rgba(var(--theme-primary-rgb), 0.06);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -331,7 +331,7 @@ html[dir="rtl"] .profile-glow {
 .profile-icon-link:hover {
   background: var(--theme-primary);
   color: var(--theme-text-inverse);
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   transform: translateY(-3px);
   box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.22);
 }
@@ -364,7 +364,7 @@ html[dir="rtl"] .profile-links {
     height: 320px;
   }
 
-  .team-hero h1 {
+  .team-hero :is(h1, h2) {
     font-size: 34px;
   }
 }
@@ -386,7 +386,7 @@ html[dir="rtl"] .profile-links {
     padding: 24px;
   }
 
-  .profile-content h2 {
+  .profile-content :is(h2, h3) {
     font-size: 23px;
   }
 
@@ -536,7 +536,7 @@ html[dir="rtl"] .profile-links {
 .lang-dropdown button:hover,
 .lang-dropdown button.active {
   background: rgba(var(--theme-primary-rgb), 0.07);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   transform: none;
   box-shadow: none;
 }
@@ -546,8 +546,8 @@ body.theme-dark .team-page {
   color: var(--theme-text);
 }
 
-html[data-theme="dark"] .team-hero h1,
-body.theme-dark .team-hero h1 {
+html[data-theme="dark"] .team-hero :is(h1, h2),
+body.theme-dark .team-hero :is(h1, h2) {
   color: var(--theme-text);
 }
 
@@ -570,21 +570,21 @@ body.theme-dark .team-profile-card:hover {
   box-shadow: 0 28px 64px rgba(var(--theme-black-rgb), 0.34);
 }
 
-html[data-theme="dark"] .profile-content h2,
-body.theme-dark .profile-content h2 {
+html[data-theme="dark"] .profile-content :is(h2, h3),
+body.theme-dark .profile-content :is(h2, h3) {
   color: var(--theme-text);
 }
 
 html[data-theme="dark"] .profile-role,
 body.theme-dark .profile-role {
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }
 
 html[data-theme="dark"] .profile-role .gradient-text,
 body.theme-dark .profile-role .gradient-text {
   background: none !important;
   -webkit-text-fill-color: currentColor !important;
-  color: var(--theme-primary-hover) !important;
+  color: var(--color-accent-text) !important;
 }
 
 html[data-theme="dark"] .profile-description,
@@ -596,5 +596,5 @@ html[data-theme="dark"] .profile-icon-link,
 body.theme-dark .profile-icon-link {
   background: var(--theme-surface-2);
   border-color: var(--theme-border);
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }

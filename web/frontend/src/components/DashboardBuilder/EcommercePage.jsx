@@ -538,9 +538,8 @@ export default function EcommercePage({ section = "products", user }) {
 
   return (
     <section className="ecommerce-page" aria-labelledby={`ecommerce-${section}-title`}>
-      <header className="ecommerce-page-header">
+      <header className="ecommerce-page-header app-page-intro">
         <div>
-          <span className="ecommerce-page-kicker">Online Store</span>
           <h1 id={`ecommerce-${section}-title`}>{config.title}</h1>
           <p>{config.description}</p>
         </div>
@@ -555,7 +554,7 @@ export default function EcommercePage({ section = "products", user }) {
 
       <section className="ecommerce-list-card" aria-labelledby={`ecommerce-${section}-list-title`}>
         <header className="ecommerce-list-header">
-          <div><span>Online Store</span><h2 id={`ecommerce-${section}-list-title`}>{config.title}</h2></div>
+          <div><h2 id={`ecommerce-${section}-list-title`}>Manage {config.title.toLowerCase()}</h2></div>
           <label className="ecommerce-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${config.title.toLowerCase()}`} /></label>
         </header>
 

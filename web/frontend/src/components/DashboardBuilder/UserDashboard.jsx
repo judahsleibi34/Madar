@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
@@ -358,10 +358,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 
   return (
     <div className="user-dashboard-page">
-      <header className="user-dashboard-hero">
-        <span className="user-dashboard-eyebrow">
-          {t("userDashboard.eyebrow", { defaultValue: "Workspace" })}
-        </span>
+      <header className="user-dashboard-hero app-page-intro">
         <h1>
           {t("userDashboard.welcome", {
             name: displayName,

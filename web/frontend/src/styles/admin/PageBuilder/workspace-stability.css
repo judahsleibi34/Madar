@@ -103,8 +103,8 @@
 
 .page-builder nav.workspace-tabs > :is(button, a):hover {
   background: rgba(var(--theme-primary-rgb), 0.09) !important;
-  color: var(--theme-primary-hover) !important;
-  -webkit-text-fill-color: var(--theme-primary-hover) !important;
+  color: var(--color-accent-text) !important;
+  -webkit-text-fill-color: var(--color-accent-text) !important;
 }
 
 .page-builder nav.workspace-tabs > :is(button, a).active {
@@ -121,14 +121,14 @@
 
 .page-builder.theme-light .site-chrome-workspace > .workspace-header h2,
 .page-builder.theme-light .users-workspace-page > .workspace-header h2 {
-  color: #000 !important;
-  -webkit-text-fill-color: #000 !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
 }
 
 .page-builder.theme-dark .site-chrome-workspace > .workspace-header h2,
 .page-builder.theme-dark .users-workspace-page > .workspace-header h2 {
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: var(--pb-text) !important;
 }
 
 /* Match the clear Responses page heading hierarchy across the management
@@ -157,8 +157,8 @@
   .publish-workspace
 ) > .workspace-header .workspace-kicker {
   margin: 0 0 6px !important;
-  color: var(--theme-primary) !important;
-  -webkit-text-fill-color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
+  -webkit-text-fill-color: var(--color-accent-text) !important;
   font-size: 12px !important;
   font-weight: 900 !important;
   line-height: 1.2 !important;

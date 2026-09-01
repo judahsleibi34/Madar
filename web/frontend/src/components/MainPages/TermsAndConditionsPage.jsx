@@ -7,22 +7,22 @@ export default function TermsAndConditionsPage({ lang = "en" }) {
   const page = t("terms", { returnObjects: true });
 
   return (
-    <main
+    <section
       id="terms"
       className="privacy-policy-page terms-and-conditions-page"
       dir={currentLang === "ar" ? "rtl" : "ltr"}
       lang={currentLang}
     >
-      <header className="privacy-policy-hero">
+      <header className="privacy-policy-hero app-page-section-heading app-major-section">
         <p>{page.updated}</p>
-        <h1>{page.title}</h1>
+        <h2>{page.title}</h2>
         <span>{page.intro}</span>
       </header>
 
       <div className="privacy-policy-content">
         {page.sections.map((section) => (
           <section className="privacy-policy-section" key={section.title}>
-            <h2>{section.title}</h2>
+            <h3>{section.title}</h3>
             <p>{section.body}</p>
           </section>
         ))}
@@ -32,6 +32,6 @@ export default function TermsAndConditionsPage({ lang = "en" }) {
           <Link to="/privacy-policy">{page.privacyLink}</Link>.
         </p>
       </div>
-    </main>
+    </section>
   );
 }

@@ -78,6 +78,7 @@ export const getClosestColumnIdFromEvent = (event) => {
 export const getCarouselVariant = (element) => {
   if (element.carouselVariant) return element.carouselVariant;
   if (element.type === "card") return "cards";
+  if (element.type === "logoSlider") return "logos";
   if (element.type === "carouselCards") return "cards";
   if (element.type === "carouselSplit") return "split";
   if (element.type === "carouselSpotlight") return "spotlight";

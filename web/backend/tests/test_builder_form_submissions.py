@@ -1572,6 +1572,33 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertNotIn("another-form", str(body))
         self.assertNotIn("sample", str(body))
 
+    def test_standalone_published_form_opens_without_a_live_website_project(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["website_settings"][0]["published_project_id"] = None
+        standalone_project_id = "standalone-project"
+        fake_supabase.tables["builder_projects"].append(
+            {
+                "id": standalone_project_id,
+                "tenant_id": 1,
+                "name": "Standalone published form",
+                "slug": "standalone-form",
+                "status": "published",
+                "published_schema": copy.deepcopy(PUBLISHED_SCHEMA),
+                "published_version": 1,
+                "last_published_at": "2026-06-03T15:00:00+00:00",
+                "updated_at": "2026-06-03T15:00:00+00:00",
+            }
+        )
+        fake_supabase.tables["builder_projects"][0]["status"] = "archived"
+        client = build_public_client(fake_supabase)
+
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get(f"/public/sites/tenant-site/forms/{FORM_ID}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["form"]["id"], FORM_ID)
+        self.assertEqual(response.json()["publication"]["project_id"], standalone_project_id)
     def test_public_submission_rejects_bound_draft_project(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"][0]["status"] = "draft"

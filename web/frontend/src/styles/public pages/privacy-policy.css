@@ -15,7 +15,7 @@
 
 .privacy-policy-hero p {
   margin: 0 0 12px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
@@ -48,7 +48,7 @@
   padding-top: 24px;
 }
 
-.privacy-policy-section h2 {
+.privacy-policy-section :is(h2, h3) {
   margin: 0 0 10px;
   color: var(--theme-text);
   font-size: 22px;
@@ -71,17 +71,17 @@
 }
 
 .privacy-policy-related-link a {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-weight: 800;
   text-underline-offset: 3px;
 }
 
 html[data-theme="dark"] .privacy-policy-page,
 body.theme-dark .privacy-policy-page,
-html[data-theme="dark"] .privacy-policy-hero h1,
-body.theme-dark .privacy-policy-hero h1,
-html[data-theme="dark"] .privacy-policy-section h2,
-body.theme-dark .privacy-policy-section h2 {
+html[data-theme="dark"] .privacy-policy-hero h2,
+body.theme-dark .privacy-policy-hero h2,
+html[data-theme="dark"] .privacy-policy-section :is(h2, h3),
+body.theme-dark .privacy-policy-section :is(h2, h3) {
   color: var(--theme-text);
 }
 

@@ -14,7 +14,7 @@
 
 .settings-header p {
   margin: 0 0 8px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 13px;
   font-weight: 950;
   text-transform: uppercase;
@@ -108,13 +108,13 @@
 }
 
 .settings-toast-error span {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .settings-toast button {
   width: 30px;
   height: 30px;
-  border: 0;
+  border: 1px solid var(--color-border-control);
   border-radius: 10px;
   display: grid;
   place-items: center;
@@ -126,7 +126,7 @@
 
 .settings-toast button:hover {
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 @keyframes settingsToastIn {
@@ -317,7 +317,7 @@
 }
 
 .settings-field-error {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 850;
   line-height: 1.35;
@@ -329,7 +329,7 @@
   border-radius: 16px;
   padding: 16px;
   background: rgba(var(--theme-primary-rgb), 0.06);
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
   text-align: center;
   min-height: 58px;
   align-content: center;
@@ -394,7 +394,7 @@
   gap: 9px;
   cursor: pointer;
   background: rgba(var(--theme-primary-rgb), 0.055);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-weight: 950;
   box-shadow: none;
   text-decoration: none;
@@ -687,7 +687,7 @@
 .security-mfa-enroll-form input,
 .security-mfa-verify-flow input {
   min-height: 44px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 8px;
   padding: 0 12px;
 }
@@ -703,7 +703,7 @@
 
 .security-mfa-danger {
   border: 1px solid rgba(var(--theme-danger-rgb), 0.24);
-  color: var(--theme-danger);
+  color: var(--color-status-danger-text);
   background: rgba(var(--theme-danger-rgb), 0.08);
   border-radius: 8px;
   min-height: 40px;
@@ -745,12 +745,12 @@
 
 .security-mfa-success {
   background: rgba(var(--theme-success-rgb), 0.1);
-  color: var(--theme-success);
+  color: var(--color-status-success-text);
 }
 
 .security-mfa-error {
   background: rgba(var(--theme-danger-rgb), 0.08);
-  color: var(--theme-danger);
+  color: var(--color-status-danger-text);
 }
 
 .security-mfa-empty,

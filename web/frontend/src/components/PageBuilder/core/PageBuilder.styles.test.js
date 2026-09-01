@@ -130,6 +130,7 @@ describe("getBuilderFreeElementStyle", () => {
       "image",
       "card",
       "carousel",
+      "logoSlider",
       "list",
       "divider",
       "thinDivider",

@@ -111,11 +111,8 @@ export default function NotificationsPage({ user }) {
       aria-labelledby="notifications-title"
       dir={direction}
     >
-      <header className="notifications-page-header">
+      <header className="notifications-page-header app-page-intro">
         <div>
-          <span className="notifications-kicker">
-            {t("notifications.kicker")}
-          </span>
           <h1 id="notifications-title">{t("notifications.title")}</h1>
           <p>{t("notifications.subtitle")}</p>
         </div>

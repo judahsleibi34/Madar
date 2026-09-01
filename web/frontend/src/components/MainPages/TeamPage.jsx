@@ -1,4 +1,4 @@
-﻿import FadeIn from "../Animations/FadeIn";
+import FadeIn from "../Animations/FadeIn";
 import GradientText from "../Animations/GradientText";
 import { getTeamContent } from "../../content";
 
@@ -34,12 +34,12 @@ export default function TeamPage({ lang = "en" }) {
   const t = getTeamContent(lang);
 
   return (
-    <main id="team" className="team-page">
+    <section id="team" className="team-page">
       <FadeIn>
-        <section className="team-hero">
-          <h1><GradientText pauseOnHover>{t.title}</GradientText></h1>
+        <header className="team-hero app-page-section-heading app-major-section">
+          <h2><GradientText pauseOnHover>{t.title}</GradientText></h2>
           <p>{t.subtitle}</p>
-        </section>
+        </header>
       </FadeIn>
 
       <section className="team-grid" aria-label={t.title}>
@@ -64,7 +64,7 @@ export default function TeamPage({ lang = "en" }) {
               </div>
 
               <div className="profile-content">
-                <h2>{member.name}</h2>
+                <h3>{member.name}</h3>
                 <p className="profile-role"><GradientText pauseOnHover>{member.role}</GradientText></p>
                 <p className="profile-description">{member.description}</p>
 
@@ -100,7 +100,7 @@ export default function TeamPage({ lang = "en" }) {
           </FadeIn>
         ))}
       </section>
-    </main>
+    </section>
   );
 }
 

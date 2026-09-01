@@ -76,8 +76,7 @@ export function RestrictedAccessWindow({
   return (
     <section className="restricted-access-page">
       <div className="restricted-access-card" role="status">
-        <div className="restricted-access-content">
-          <p className="restricted-access-eyebrow">{title}</p>
+        <div className="restricted-access-content app-page-intro">
           <h1>{title}</h1>
           <p>{message}</p>
         </div>

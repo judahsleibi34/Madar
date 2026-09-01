@@ -102,7 +102,7 @@
 /* Active compact icon */
 .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active {
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 html.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active,

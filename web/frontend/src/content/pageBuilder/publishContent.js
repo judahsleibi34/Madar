@@ -2,7 +2,7 @@ const publishContentEn = {
   scope: "Builder site",
   title: "Publish site",
   description:
-    "Publishing controls the Builder website. Saved forms are shared independently from the Forms workspace.",
+    "Publish the Builder website and its standalone form links from one place.",
   statusTitle: "Site status",
   projectLabel: "Builder project",
   stateLabel: "Site state",
@@ -44,6 +44,7 @@ const publishContentEn = {
   formQrPreview: "Form QR preview",
   noFormToShare: "Create and save a form before sharing its live link.",
   noPublishedFormLink: "Configure a workspace address before sharing the live form.",
+  formNotPublished: "Publish this saved form to create its live link.",
 };
 
 export const publishContent = {

@@ -142,7 +142,7 @@ export default function BuilderProjectChooser({
 
   return (
     <section className="builder-project-chooser" aria-busy={["loading", "loading-more", "creating"].includes(status)}>
-      <header className="builder-project-chooser-header">
+      <header className="builder-project-chooser-header app-page-intro">
         <h1>Choose a project</h1>
         <span>Each project opens with its own cloud draft and recovery copy.</span>
       </header>

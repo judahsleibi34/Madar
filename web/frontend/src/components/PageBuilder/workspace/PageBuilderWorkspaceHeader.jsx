@@ -11,6 +11,7 @@ export default function PageBuilderWorkspaceHeader({
   displayName,
   handlePreviewClick,
   hideWorkspaceTabs,
+  historyControls,
   openPreviewPage,
   preview,
   project,
@@ -45,6 +46,7 @@ export default function PageBuilderWorkspaceHeader({
       <PageBuilderSubbar
         preview={preview}
         hideWorkspaceTabs={hideWorkspaceTabs}
+        historyControls={historyControls}
         viewports={viewports}
         viewport={viewport}
         setViewport={setViewport}

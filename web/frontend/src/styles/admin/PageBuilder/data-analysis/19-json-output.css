@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    JSON output
    ============================================================ */
 
@@ -9,7 +9,7 @@
   border-radius: 18px;
   padding: 16px;
   background: var(--theme-surface);
-  color: #e5e7eb;
+  color: var(--theme-text);
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;

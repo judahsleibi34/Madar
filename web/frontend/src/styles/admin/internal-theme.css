@@ -1,0 +1,447 @@
+/* Canonical theme contract for authenticated application chrome.
+   Customer-authored canvases, form previews, and tenant runtimes are excluded. */
+
+.authenticated-shell,
+.authenticated-main {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.authenticated-shell {
+  --internal-content-max-width: var(--layout-max-width);
+  --internal-page-gutter: var(--auth-page-inline, var(--page-gutter));
+  --internal-page-block: var(--auth-page-top, var(--page-top-space));
+  --internal-card-padding: var(--auth-card-padding, var(--space-6));
+  --internal-section-gap: var(--auth-space-6, var(--space-6));
+  --internal-control-height: var(--auth-control-height, var(--control-height));
+}
+
+.authenticated-main {
+  scrollbar-color: var(--color-border-strong) var(--color-bg);
+}
+
+.authenticated-main > :where(
+  .admin-dashboard-shell,
+  .user-dashboard-page,
+  .settings-page,
+  .notifications-page,
+  .archive-page,
+  .my-plan-page,
+  .security-mfa-page,
+  .change-password-page,
+  .admin-account-access-page,
+  .user-management-page,
+  .reservation-calendar-page,
+  .ecommerce-page,
+  .ecommerce-theme-page,
+  .ecommerce-store-admin-page,
+  .cv-rerank-page,
+  .restricted-access-page
+) {
+  width: min(100%, var(--internal-content-max-width));
+  margin-inline: auto;
+  color: var(--color-text);
+}
+
+/* Authenticated navigation uses the same global surface hierarchy. */
+.authenticated-shell > .admin-sidebar {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.authenticated-shell .admin-sidebar :where(
+  .admin-sidebar-brand,
+  .admin-sidebar-nav,
+  .admin-sidebar-bottom,
+  .admin-sidebar-user,
+  .admin-sidebar-subnav
+) {
+  color: var(--color-text);
+}
+
+.authenticated-shell .admin-sidebar :where(
+  .admin-sidebar-brand-text > span,
+  .admin-sidebar-user-info > span,
+  .admin-sidebar-language-label
+) {
+  color: var(--color-text-muted);
+}
+
+.authenticated-shell .admin-sidebar :where(button, a) {
+  color: var(--color-text-soft);
+}
+
+.authenticated-shell .admin-sidebar :where(button, a):hover {
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+}
+
+.authenticated-shell .admin-sidebar :where(button, a).active,
+.authenticated-shell .admin-sidebar :where(button, a).active-parent,
+.authenticated-shell .admin-sidebar :where(button, a)[aria-current="page"] {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.authenticated-shell .dashboard-mobile-menu-button {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  color: var(--color-text);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.authenticated-shell .dashboard-sidebar-backdrop {
+  background: var(--app-backdrop);
+}
+
+/* Shared internal page intro. Geometry is independent of theme mode. */
+.authenticated-main :where(
+  .admin-dashboard-header,
+  .user-dashboard-hero,
+  .notifications-page-header,
+  .settings-header,
+  .security-mfa-header,
+  .change-password-heading,
+  .admin-access-hero,
+  .user-management-header,
+  .my-plan-header,
+  .reservation-calendar-toolbar,
+  .ecommerce-page-header,
+  .ecommerce-store-admin-header,
+  .cv-rerank-header,
+  .archive-header,
+  .workspace-header,
+  .daw-header
+) {
+  color: var(--color-text);
+}
+
+.authenticated-main :where(h1) {
+  color: var(--color-text);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-line);
+}
+
+.authenticated-main :where(h2) {
+  color: var(--color-text);
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-line);
+}
+
+.authenticated-main :where(h3) {
+  color: var(--color-text);
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-line);
+}
+
+.authenticated-main :where(h4) {
+  color: var(--color-text);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-line);
+}
+
+.authenticated-main :where(p, li, dd) {
+  color: var(--color-text-soft);
+}
+
+.authenticated-main :where(small, dt, figcaption, .muted, .metadata) {
+  color: var(--color-text-muted);
+}
+
+/* Cards, panels, list rows, and empty states share one surface system. */
+.authenticated-main :where(
+  .overview-card,
+  .dashboard-panel,
+  .admin-signal-card,
+  .user-dashboard-stat,
+  .user-dashboard-panel,
+  .user-dashboard-form-data-card,
+  .settings-card,
+  .settings-security-panel,
+  .notifications-summary-grid > article,
+  .notifications-board,
+  .notification-card,
+  .my-plan-current-card,
+  .my-plan-card,
+  .security-mfa-panel,
+  .change-password-card,
+  .user-management-row,
+  .user-management-panel,
+  .ecommerce-summary-card,
+  .ecommerce-list-card,
+  .ecommerce-form-section,
+  .ecommerce-theme-controls,
+  .ecommerce-theme-preview,
+  .ecommerce-store-admin-card,
+  .calendar-panel,
+  .calendar-history-drawer,
+  .cv-rerank-card,
+  .restricted-access-card,
+  .builder-project-card,
+  .builder-project-chooser-panel
+) {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  box-shadow: var(--app-card-shadow);
+}
+
+.authenticated-main :where(
+  .admin-dashboard-header-meta > span,
+  .dashboard-panel-meta,
+  .user-dashboard-toolbar,
+  .notifications-toolbar,
+  .settings-security-item,
+  .my-plan-meta-grid > *,
+  .my-plan-usage-grid > *,
+  .ecommerce-summary-card footer,
+  .calendar-toolbar-group,
+  .archive-summary-card
+) {
+  background: var(--color-surface-soft);
+  border-color: var(--color-border);
+  color: var(--color-text-soft);
+}
+
+/* Controls inherit the root theme instead of owning light/dark colors. */
+.authenticated-main :where(input, select, textarea):not(.builder-canvas *):not(.tenant-site-runtime *) {
+  min-height: var(--internal-control-height);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border-control);
+  color: var(--color-text);
+  caret-color: var(--color-accent-text);
+  box-shadow: var(--app-control-shadow);
+}
+
+.authenticated-main :where(input, select, textarea):not(.builder-canvas *):not(.tenant-site-runtime *)::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+.authenticated-main :where(input, select, textarea):not(.builder-canvas *):not(.tenant-site-runtime *):hover {
+  border-color: var(--color-border-strong);
+}
+
+.authenticated-main :where(input, select, textarea):not(.builder-canvas *):not(.tenant-site-runtime *):focus {
+  border-color: var(--color-focus-indicator);
+  outline: 2px solid var(--color-focus-indicator);
+  outline-offset: 2px;
+  box-shadow: var(--app-focus-ring);
+}
+
+.authenticated-main :where(input, select, textarea):not(.builder-canvas *):not(.tenant-site-runtime *):disabled {
+  background: var(--color-disabled-bg);
+  border-color: var(--color-disabled-border);
+  color: var(--color-disabled-text);
+  opacity: 1;
+}
+
+.authenticated-main :where(label, legend) {
+  color: var(--color-text);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  font-weight: var(--weight-semibold);
+}
+
+/* Shared button variants retain identical geometry in both modes. */
+.authenticated-main :where(button, [role="button"]):not(.builder-canvas *):not(.tenant-site-runtime *) {
+  min-height: var(--internal-control-height);
+  border: 1px solid var(--color-border-control);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+}
+
+.authenticated-main :where(
+  .primary-action,
+  .admin-access-submit,
+  .ecommerce-primary-action,
+  .calendar-primary-action,
+  .settings-save-button,
+  .my-plan-primary-action
+) {
+  background: var(--color-primary);
+  border-color: var(--color-accent-text);
+  color: var(--color-text-inverse);
+}
+
+.authenticated-main :where(
+  .secondary-action,
+  .outline-action,
+  .ghost-action,
+  .settings-secondary-button,
+  .calendar-secondary-action
+) {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  color: var(--color-text);
+}
+
+/* Tables and data grids use the same surface roles. */
+.authenticated-main :where(table, .calendar-reservations-table, .responses-table, .daw-data-grid) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.authenticated-main :where(thead, th) {
+  background: var(--color-surface-soft);
+  border-color: var(--color-divider);
+  color: var(--color-text-soft);
+}
+
+.authenticated-main :where(td, tr) {
+  border-color: var(--color-divider);
+  color: var(--color-text);
+}
+
+.authenticated-main :where(tbody tr):hover {
+  background: var(--color-primary-soft);
+}
+
+/* Menus and overlays are token-driven, including portaled builder dialogs. */
+.authenticated-main :where(
+  .notification-popover,
+  .responses-settings-popover,
+  .daw-column-menu-panel,
+  .daw-multi-select-menu,
+  .daw-report-source-popover
+) {
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  box-shadow: var(--app-panel-shadow);
+}
+
+:is(
+  .builder-modal-backdrop,
+  .page-delete-modal-backdrop,
+  .quiz-drawer-backdrop,
+  .calendar-modal-backdrop,
+  .ecommerce-modal-backdrop,
+  .user-create-modal-backdrop,
+  .daw-modal-backdrop
+) {
+  background: var(--app-backdrop);
+}
+
+:is(
+  .builder-modal,
+  .page-delete-modal,
+  .quiz-options-drawer,
+  .calendar-modal,
+  .ecommerce-modal,
+  .user-create-modal,
+  .daw-modal,
+  .madar-website-name-modal
+) {
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  box-shadow: var(--app-modal-shadow);
+}
+
+:is(
+  .builder-modal,
+  .page-delete-modal,
+  .quiz-options-drawer,
+  .calendar-modal,
+  .ecommerce-modal,
+  .user-create-modal,
+  .daw-modal,
+  .madar-website-name-modal
+) :where(h1, h2, h3, h4, strong, label) {
+  color: var(--color-text);
+}
+
+:is(
+  .builder-modal,
+  .page-delete-modal,
+  .quiz-options-drawer,
+  .calendar-modal,
+  .ecommerce-modal,
+  .user-create-modal,
+  .daw-modal,
+  .madar-website-name-modal
+) :where(p, span, small) {
+  color: var(--color-text-soft);
+}
+
+/* Loading and error states stay inside the same background hierarchy. */
+.dashboard-skeleton-layout,
+.dashboard-skeleton-page {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.dashboard-skeleton-sidebar,
+.skeleton-card,
+.skeleton-panel,
+.auth-skeleton-card {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.skeleton-circle,
+.skeleton-line,
+.skeleton-card::before,
+.skeleton-panel::before,
+.auth-skeleton-line,
+.auth-skeleton-button {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-soft),
+    var(--color-primary-soft),
+    var(--color-surface-soft)
+  );
+  background-size: 220% 100%;
+}
+
+/* Page Builder chrome consumes global tokens through compatibility aliases.
+   The authored canvas keeps its own tenant-selected theme. */
+.page-builder {
+  --pb-bg: var(--color-bg);
+  --pb-surface: var(--color-surface);
+  --pb-surface-raised: var(--color-surface-elevated);
+  --pb-surface-muted: var(--color-surface-soft);
+  --pb-border: var(--color-border);
+  --pb-border-strong: var(--color-border-strong);
+  --pb-hover: var(--color-surface-soft);
+  --pb-selected: var(--color-primary-soft);
+  --pb-text: var(--color-text);
+  --pb-muted: var(--color-text-muted);
+  --pb-accent: var(--color-accent-text);
+  --pb-accent-soft: var(--color-primary-soft);
+  background: var(--pb-bg);
+  color: var(--pb-text);
+}
+
+.page-builder :where(
+  .builder-topbar,
+  .builder-subbar,
+  .workspace-header,
+  .builder-sidebar,
+  .builder-inspector,
+  .builder-side-panel,
+  .builder-panel,
+  .forms-workbench,
+  .responses-workspace,
+  .data-analysis-workspace
+):not(.builder-canvas *) {
+  border-color: var(--pb-border);
+  color: var(--pb-text);
+}
+
+.page-builder :where(
+  .builder-topbar,
+  .builder-subbar,
+  .workspace-header,
+  .builder-sidebar,
+  .builder-inspector,
+  .builder-side-panel,
+  .builder-panel
+):not(.builder-canvas *) {
+  background: var(--pb-surface);
+}
+
+/* Theme mode changes color variables only; structural declarations are shared. */
