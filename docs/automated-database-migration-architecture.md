@@ -53,9 +53,12 @@ The architecture is designed to:
 6. recover safely after a process crash or reboot without replaying an already
    committed transition;
 7. validate the active application, refreshed workers, and stable route before
-   recording final migration completion; and
+   recording final migration completion;
 8. turn post-commit failure into a bounded, observable forward-repair workflow
-   rather than attempting an unsafe rollback.
+   rather than attempting an unsafe rollback; and
+9. durably classify a later release accepted at an already-reached target as a
+   backup-free no-op without confusing it with an interrupted migration owned
+   by that release.
 
 ## 3. Why bridge first
 
@@ -89,7 +92,7 @@ schema downgrade capability.
 | `madar-production-deploy` | For a new runtime SHA, synchronously promotes the bridge, fast-forwards the production checkout, then makes a separate synchronous `--automatic-migrate` invocation. |
 | `madar-release-deploy` | Owns the process-level deployment lock and exposes normal promotion and automatic-migration modes. |
 | `ReleaseDeployer.deploy()` | Runs ordinary immutable blue/green promotion and atomically establishes `known_good_release`, `active_slot`, and a `known_good`/`complete` history event. It never runs migration SQL. |
-| `automatic_migrate_known_good()` | Proves bridge identity, policy, compatibility, manifest, SQL, stable health, rollback attestation, and backup; invokes the executor; then refreshes workers and validates the active/stable application. |
+| `automatic_migrate_known_good()` | Proves bridge identity, policy, compatibility, manifest, SQL checksums, and stable health. It either records a proven fresh already-at-target no-op, or proves rollback/backup identity, invokes the executor, and then refreshes workers and validates the active/stable application. |
 | `MigrationManifest.load()` | Validates manifest release identity, repository-contained paths, supported classes, sequential transitions, and non-empty contiguity. |
 | `LockedMigrationExecutor` | Revalidates checksums and backup, obtains the PostgreSQL advisory lock, checks live core schema, executes each transactional SQL file, and records per-file progress. |
 | Backup/verify scripts | Create a timestamped complete backup and verify its manifest and artifacts. The coordinator additionally binds its manifest to release SHA and source schema. |
@@ -119,6 +122,8 @@ systemd persistent timer
            -> deployment lock
            -> automatic_migrate_known_good()
               -> identity/policy/manifest/checksum/health/compatibility gates
+              -> target already observed at this SHA's acceptance and no
+                 per-SHA migration state: durable already_at_target no-op
               -> rollback-target attestation at source schema
               -> verified backup
               -> LockedMigrationExecutor.run()
@@ -205,7 +210,7 @@ this table does not invent persistence states.
 | `post_migration_validation` | `automation.json` has `status=running`, `phase=post_migration_validation`; target schema is checked before workers are refreshed. |
 | `complete` | `automation.json` has `status=completed`, `phase=post_migration_validation_complete`; `state.json.known_good_release.schema` equals target and history contains `post_migration_workers_refreshed`. |
 | `not_requested` | Returned, not durably created, when policy is absent or not the exact supported value; phase is `manual_or_no_migration_policy`. |
-| `already_at_target` | Executor result used when the target was reached by an explicit reviewed run and no execution state exists. Automation still performs post-migration validation before recording completion; it does not invent a retroactive backup. |
+| `already_at_target` | `automation.json` has `status=completed`, `phase=already_at_target`, `execution_status=already_at_target`, and `backup=null`. It is permitted only when this SHA has no prior automation or execution file and both its known-good record and its own `known_good`/`complete` acceptance event observed the target. Identity, policy, manifest, checksum, validator, stable-route, and schema checks still run first. No backup, database connection, executor `run()`, SQL, worker refresh, or prior-release backup rebinding occurs. |
 | `failed_forward_repair_required` | Durable automation failure after mutation-phase state begins. The phase becomes `backup_creation_failed`, `migration_execution_failed`, or `post_migration_validation_failed`, with bounded `retry_after` and a truncated failure code. |
 | `retry_suppressed` | Returned view of a prior forward-repair failure before `retry_after`; the durable failure remains unchanged. |
 | executor `failed` | `execution.json` records the SQL executor error and any connection rollback error. Committed schema, not this file alone, controls resume. |
@@ -328,12 +333,26 @@ The same SHA and source schema are required when reusing a backup. A completed
 automation record at the observed target returns immediately. Invalid or
 missing durable state fails closed.
 
+A fresh later release accepted with the live target already recorded is a
+different case from crash recovery. With no per-SHA migration files, its
+acceptance-time target observation proves that the transition predates that
+release's migration phase. It records `already_at_target` atomically. If either
+per-SHA state file exists, or acceptance recorded the source schema, the
+coordinator cannot use this classification; advanced schema then requires the
+exact original release-bound backup attestation.
+
 ## 13. Worker refresh and application validation
 
 Automation validates the serving bridge before backup: active-slot candidate
 health, stable backend `/health/version` SHA, stable backend `/health/ready`, and
 stable frontend HTTP 200. After SQL it requires the target schema and calls
 `refresh_active_workers()`.
+
+The fresh `already_at_target` path has no worker-refresh phase: ordinary release
+promotion already activated and observed that release at the target, and the
+coordinator repeats active/stable validation before recording the no-op. Any
+executed or resumed transition still requires the worker refresh described
+below.
 
 Worker refresh rechecks active known-good SHA/slot identity, requires a schema
 that can support the data-deletion worker, verifies immutable source, and runs
@@ -353,9 +372,10 @@ schema to equal the already-recorded known-good schema and records
 `active_runtime_refreshed`; migration automation permits the just-committed
 forward schema to be ahead of the prior observation.
 
-Only after that returns does the coordinator atomically write final
-`automation.json` completion. Thus a target schema without refreshed workers
-and active/stable-route validation is not final success.
+Only after that returns does the coordinator atomically write an executed
+transition's final `automation.json` completion. Thus a target schema reached
+by this release's migration without refreshed workers and active/stable-route
+validation is not final success.
 
 ## 14. Point of no return, rollback, and forward repair
 
@@ -422,16 +442,17 @@ The following are the mandatory design invariants. Test names are from
 
 | # | Invariant | Code enforcement | Principal tests |
 | --- | --- | --- | --- |
-| 1 | No automatic migration occurs before the bridge application is active and durably known-good. | `ReleaseDeployer.deploy()` persists `known_good`/`complete` before returning; `madar-production-deploy` invokes migration only after that return; `automatic_migrate_known_good()` rechecks SHA, slot, active slot, recovery state, and stable serving health. | `test_automatic_migration_control_plane.py :: test_ordinary_release_invokes_migration_after_promotion_and_fast_forward`, `test_bridge_promotion_failure_invokes_zero_migration`, `test_non_known_good_release_is_refused`; `test_release_deployer.py :: test_success_records_immutable_known_good_release`, `test_every_pre_switch_failure_leaves_active_target_untouched`. |
+| 1 | No automatic migration occurs before the bridge application is active and durably known-good. | `ReleaseDeployer.deploy()` persists `known_good`/`complete` before returning; `madar-production-deploy` invokes migration only after that return; `automatic_migrate_known_good()` rechecks SHA, slot, active slot, recovery state, and stable serving health. | `test_automatic_migration_control_plane.py :: test_ordinary_release_invokes_migration_after_promotion_and_fast_forward`, `test_bridge_promotion_failure_invokes_zero_migration`, `test_refuses_non_known_good_sha_before_backup_or_database`; `test_release_deployer.py :: test_success_records_immutable_known_good_release`, `test_every_pre_switch_failure_leaves_active_target_untouched`. |
 | 2 | No automatic migration occurs unless active known-good SHA exactly matches the release/manifest being migrated. | `automatic_migrate_known_good()` exact SHA/slot checks; installed/candidate contract equality; manifest SHA rebinding or exact comparison. | `test_refuses_non_known_good_sha_before_backup_or_database`, `test_refuses_manifest_drift_before_backup_or_database`. |
 | 3 | No automatic migration occurs without the explicit supported automatic migration policy. | Exact comparison with `AUTOMATIC_MIGRATION_POLICY`; otherwise `not_requested`. | `test_unapproved_migration_policy_is_a_noop`. |
 | 4 | Only migration classes permitted by `migration_executor.py` run automatically. | Release class check plus `MigrationManifest.load()` per-entry allow-list for `expand-only`/`forward-compatible`. | `test_unsupported_release_class_is_rejected_before_backup`; `test_migration_executor.py :: test_manifest_rejects_repository_escape_and_unsupported_class`. |
-| 5 | No migration occurs without a verified backup satisfying implemented identity/freshness rules. | `_create_verified_migration_backup()`, `_attest_migration_backup()`, executor `backup_verifier`, and resume-backup validation. | `test_backup_failure_is_durable_and_next_attempt_is_suppressed`, `test_backup_manifest_is_bound_to_release_and_source_schema`, `test_partial_committed_transition_reuses_backup_without_old_release_rollback`; `test_backup_tooling.py :: test_backup_is_published_only_after_verified_completion`, `test_failed_backup_never_occupies_final_recovery_path`, `test_verifier_rejects_missing_member_and_checksum_mismatch`. |
+| 5 | No migration occurs without a verified backup satisfying implemented identity/freshness rules. | `_create_verified_migration_backup()`, `_attest_migration_backup()`, executor `backup_verifier`, and resume-backup validation. | `test_backup_failure_is_durable_and_next_attempt_is_suppressed`, `test_backup_manifest_is_bound_to_release_and_source_schema`, `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_backup_tooling.py :: test_backup_is_published_only_after_verified_completion`, `test_failed_backup_never_occupies_final_recovery_path`, `test_verifier_rejects_missing_member_and_checksum_mismatch`. |
 | 6 | Every migration is repository-contained, manifest-listed, checksum-pinned, contiguous, and starts from attested expected schema. | `MigrationManifest.load()`, `verify_migrations()`, executor schema/transition checks, and both migration validators. | `test_migration_executor.py :: test_manifest_rejects_repository_escape_and_unsupported_class`, `test_manifest_rejects_noncontiguous_transitions`, `test_refuses_checksum_mismatch_before_opening_database`, `test_applies_contiguous_manifest_and_writes_durable_state`; `test_automatic_migration_control_plane.py :: test_backup_and_execution_begin_only_after_known_good_validation`. |
-| 7 | A completed schema transition is never blindly replayed after interruption. | Executor compares live schema to each `to_schema` and records `already_applied`; database schema is authoritative. The persistent timer and same-known-good branch re-enter that idempotent path after reboot. | `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`; `test_automatic_migration_control_plane.py :: test_partial_committed_transition_reuses_backup_without_old_release_rollback`; `test_monorepo_deployment.py :: test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state`, `test_timer_waits_after_completion_instead_of_retrying_immediately`. |
-| 8 | Once DB schema exceeds the previous release's compatibility maximum, automatic traffic rollback to it is prohibited. | Retained target is validated only at source before mutation; automatic migration has no switch/restore path and partial resume requires the original backup. | `test_partial_committed_transition_reuses_backup_without_old_release_rollback`; `test_release_deployer.py :: test_retained_target_is_attested_against_observed_schema_before_start`. |
-| 9 | Reverse SQL migrations are not automatically attempted. | Manifests require one-step forward transitions; executor skips reached targets and has no reverse executor; coordinator failure semantics are forward-repair-only. | `test_partial_committed_transition_reuses_backup_without_old_release_rollback`; `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`. |
-| 10 | Final success waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; completion write occurs last. | `test_successful_90_to_91_to_92_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
+| 7 | A completed schema transition is never blindly replayed after interruption. | Executor compares live schema to each `to_schema` and records `already_applied`; database schema is authoritative. The persistent timer and same-known-good branch re-enter that idempotent path after reboot. | `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`; `test_automatic_migration_control_plane.py :: test_committed_transition_reuses_backup_without_old_release_rollback`; `test_monorepo_deployment.py :: test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state`, `test_timer_waits_after_completion_instead_of_retrying_immediately`. |
+| 8 | Once DB schema exceeds the previous release's compatibility maximum, automatic traffic rollback to it is prohibited. | Retained target is validated only at source before mutation; automatic migration has no switch/restore path and partial resume requires the original backup. | `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_release_deployer.py :: test_retained_target_is_attested_against_observed_schema_before_start`. |
+| 9 | Reverse SQL migrations are not automatically attempted. | Manifests require one-step forward transitions; executor skips reached targets and has no reverse executor; coordinator failure semantics are forward-repair-only. | `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`. |
+| 10 | Final success after an executed transition waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; transition completion write occurs last. A proven fresh `already_at_target` release has already passed promotion workers/observation and repeats stable validation before recording its nonexecuting result. | `test_successful_92_to_93_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`, `test_prior_release_migrates_then_later_release_noops_idempotently`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
+| 11 | A later release accepted at an already-reached target neither borrows the prior release's backup nor bypasses a genuine current-release resume. | Fresh no-op requires no per-SHA state plus matching known-good and acceptance-time target observations. Any current-release state retains exact SHA/source backup attestation. | `test_prior_release_migrates_then_later_release_noops_idempotently`, `test_current_release_partial_state_without_backup_still_fails_closed`, `test_current_release_substituted_resume_backup_still_fails_closed`. |
 
 Static orchestration tests in `test_monorepo_deployment.py` additionally verify
 that the installed wrappers contain the same-known-good recovery branch, the

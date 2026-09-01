@@ -325,9 +325,10 @@ Implemented by `web/scripts/check_migration_transitions.py`.
 
 ## G. Post-acceptance and explicit migration execution rules
 
-Traffic promotion never applies or reverses database migrations. A migration-
-bearing release must first pass the complete promotion state machine and be
-durably `known_good` while its source schema is still serving. Automatic
+Traffic promotion never applies or reverses database migrations. When a schema
+transition is pending, its migration-bearing bridge release must first pass the
+complete promotion state machine and be durably `known_good` while its source
+schema is still serving. Automatic
 migration is a separate post-acceptance phase under the same host
 `deploy.lock`; the SQL executor additionally takes the PostgreSQL advisory lock.
 It never calls traffic switching or the promotion rollback handler.
@@ -383,12 +384,32 @@ executor record; `automation.json` covers backup, execution, worker refresh,
 post-migration health, failure semantics, and retry time. If any transition has
 already advanced the schema, a retry is allowed only with the same recorded
 backup under the configured backup root. Missing or substituted resume backup
-attestation fails closed. A target reached by a prior explicit reviewed run is
-not given a fabricated post-fact backup claim.
+attestation fails closed.
 
-After the final target is observed, the controller recreates schema-gated
-workers for the active bridge, repeats active-slot and stable-proxy validation,
-and only then updates the known-good record's observed schema. Backup,
+A later application release may be accepted after an earlier release already
+reached the same manifest target. After all identity, policy, manifest,
+checksum, validator, stable-route, and live-schema checks pass, the coordinator
+records a durable backup-free `already_at_target` completion only when all of
+the following prove that this is not a resume:
+
+- this SHA has neither `automation.json` nor `execution.json`;
+- its current `known_good_release.schema` already equals the target; and
+- its own `known_good`/`complete` acceptance history event records the target as
+  the observed schema.
+
+This no-op does not create or attest a backup, open a database connection, call
+the executor's `run()`, run SQL, rebind an earlier release's backup, or recreate
+workers. The nonexecuting checksum verifier still validates every manifest
+input. Subsequent
+same-SHA cycles return the same completed record. The presence of any
+current-release migration state, or an acceptance observation below target,
+disqualifies the no-op and preserves the original release-bound resume backup
+requirements. A missing or substituted backup then fails closed.
+
+After an executed transition's final target is observed, the controller
+recreates schema-gated workers for the active bridge, repeats active-slot and
+stable-proxy validation, and only then updates the known-good record's observed
+schema. Backup,
 execution, and post-migration validation failures are recorded as
 `failed_forward_repair_required`; precondition failures stop before mutation
 and are reported directly. Retry defaults to 15 minutes and is bounded to

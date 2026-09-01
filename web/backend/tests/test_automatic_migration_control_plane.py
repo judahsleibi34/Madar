@@ -161,6 +161,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 "release_sha": self.sha,
                 "status": "known_good",
                 "phase": "complete",
+                "schema": {"observed": schema},
                 "previous_known_good_release": {
                     "sha": "b" * 40,
                     "slot": "blue",
@@ -550,6 +551,28 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                         operations=operations,
                     )
 
+    def test_refuses_wrong_active_slot_before_backup_or_database(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, _events = self.fixture(root)
+            state = json.loads((state_root / "state.json").read_text())
+            state["active_slot"] = "blue"
+            (state_root / "state.json").write_text(json.dumps(state))
+            with patch.object(
+                self.module,
+                "_create_verified_migration_backup",
+                side_effect=AssertionError("backup must not run"),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "automatic_migration_bridge_not_known_good"
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha,
+                        state_root=state_root,
+                        compatibility=compatibility,
+                        operations=operations,
+                    )
+
     def test_refuses_manifest_drift_before_backup_or_database(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -569,6 +592,44 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     RuntimeError,
                     "automatic_migration_manifest_contract_mismatch",
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha,
+                        state_root=state_root,
+                        compatibility=compatibility,
+                        operations=operations,
+                    )
+
+    def test_already_at_target_still_enforces_migration_checksum(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, _events = self.fixture(
+                root, schema=93
+            )
+            candidate_manifest = (
+                operations.release_root
+                / f"web/deployment/releases/{self.metadata['migration_manifest']}"
+            )
+            manifest = json.loads(candidate_manifest.read_text())
+            manifest["migrations"][0]["sha256"] = "0" * 64
+            candidate_manifest.write_text(json.dumps(manifest))
+            installed = root / "installed/deployment/releases"
+            installed.mkdir(parents=True)
+            (installed / "release.json").write_text(json.dumps(self.metadata))
+            (installed / self.metadata["migration_manifest"]).write_text(
+                json.dumps(manifest)
+            )
+            with (
+                patch.object(self.module, "WEB_ROOT", root / "installed"),
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    side_effect=AssertionError("backup must not run"),
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "migration_checksum_mismatch:93"
                 ):
                     self.module.automatic_migrate_known_good(
                         sha=self.sha,
@@ -632,6 +693,327 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         self.assertEqual(result["observed_schema"], 93)
         self.assertFalse(any(event.startswith("rollback:") for event in events))
         self.assertFalse(any(event.startswith("traffic:") for event in events))
+
+    def test_prior_release_migrates_then_later_release_noops_idempotently(self):
+        previous_sha = self.sha
+        current_sha = "c" * 40
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, events = self.fixture(root)
+            backup_root = root / "backups"
+            old_backup = backup_root / "madar-20260831T195925Z"
+            old_backup.mkdir(parents=True)
+            old_manifest = old_backup / "manifest.json"
+            old_manifest.write_text(json.dumps({
+                "format_version": 3,
+                "status": "complete",
+                "backup_id": old_backup.name,
+                "release": {"git_sha": previous_sha},
+                "database": {"schema_version": "92"},
+            }))
+
+            class TransitionExecutor:
+                def __init__(_self, **kwargs):
+                    _self.state_file = kwargs["state_file"]
+                    _self.backup_dir = kwargs["backup_dir"]
+
+                def verify_migrations(_self):
+                    events.append("previous-checksums")
+
+                def run(_self):
+                    events.append("previous-sql:92->93")
+                    operations.schema = 93
+                    _self.state_file.parent.mkdir(parents=True, exist_ok=True)
+                    _self.state_file.write_text(json.dumps({
+                        "release_sha": previous_sha,
+                        "status": "completed",
+                        "backup": {
+                            "path": str(_self.backup_dir),
+                            "verified": True,
+                        },
+                        "observed_schema": 93,
+                    }))
+                    return {"status": "completed"}
+
+            with (
+                patch.object(
+                    self.module, "LockedMigrationExecutor", TransitionExecutor,
+                ),
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    return_value=old_backup,
+                ),
+                patch.object(
+                    self.module,
+                    "refresh_active_workers",
+                    return_value={"phase": "post_migration_workers_refreshed"},
+                ),
+                patch.dict(os.environ, {"MADAR_BACKUP_DIR": str(backup_root)}),
+            ):
+                prior_result = self.module.automatic_migrate_known_good(
+                    sha=previous_sha,
+                    state_root=state_root,
+                    compatibility=compatibility,
+                    operations=operations,
+                )
+
+            state = json.loads((state_root / "state.json").read_text())
+            state["known_good_release"] = {
+                **state["known_good_release"],
+                "sha": current_sha,
+                "slot": "blue",
+                "schema": 93,
+            }
+            state["active_slot"] = "blue"
+            state["history"].extend([
+                {
+                    "release_sha": previous_sha,
+                    "status": "known_good",
+                    "phase": "post_migration_workers_refreshed",
+                    "schema": {"observed": 93},
+                },
+                {
+                    "release_sha": current_sha,
+                    "status": "known_good",
+                    "phase": "complete",
+                    "schema": {"observed": 93, "target": 93},
+                    "previous_known_good_release": {
+                        "sha": previous_sha,
+                        "slot": "green",
+                        "schema_compatible_min": 81,
+                        "schema_compatible_max": 93,
+                    },
+                },
+            ])
+            (state_root / "state.json").write_text(json.dumps(state))
+            old_execution = (
+                state_root / "migrations" / previous_sha / "execution.json"
+            )
+            old_manifest_before = old_manifest.read_bytes()
+            old_execution_before = old_execution.read_bytes()
+
+            class NoSqlExecutor:
+                verify_count = 0
+
+                def __init__(_self, **_kwargs):
+                    pass
+
+                def verify_migrations(_self):
+                    NoSqlExecutor.verify_count += 1
+                    events.append("current-checksums")
+
+                def run(_self):
+                    raise AssertionError("SQL must not run at an accepted target")
+
+            with (
+                patch.object(self.module, "LockedMigrationExecutor", NoSqlExecutor),
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    side_effect=AssertionError("backup must not be created"),
+                ),
+                patch.object(
+                    self.module,
+                    "_attest_migration_backup",
+                    side_effect=AssertionError("backup must not be rebound"),
+                ),
+                patch.object(
+                    self.module,
+                    "refresh_active_workers",
+                    side_effect=AssertionError("no-op must not recreate workers"),
+                ),
+            ):
+                first = self.module.automatic_migrate_known_good(
+                    sha=current_sha,
+                    state_root=state_root,
+                    compatibility=compatibility,
+                    operations=operations,
+                )
+                second = self.module.automatic_migrate_known_good(
+                    sha=current_sha,
+                    state_root=state_root,
+                    compatibility=compatibility,
+                    operations=operations,
+                )
+
+            automation = json.loads((
+                state_root / "migrations" / current_sha / "automation.json"
+            ).read_text())
+            current_execution_exists = (
+                state_root / "migrations" / current_sha / "execution.json"
+            ).exists()
+            old_manifest_after = old_manifest.read_bytes()
+            old_execution_after = old_execution.read_bytes()
+
+        self.assertEqual(prior_result["execution_status"], "completed")
+        self.assertIn("previous-sql:92->93", events)
+        self.assertEqual(first, second)
+        self.assertEqual(first["status"], "completed")
+        self.assertEqual(first["phase"], "already_at_target")
+        self.assertEqual(first["execution_status"], "already_at_target")
+        self.assertIsNone(first["backup"])
+        self.assertEqual(automation, first)
+        self.assertFalse(current_execution_exists)
+        self.assertEqual(old_manifest_after, old_manifest_before)
+        self.assertEqual(old_execution_after, old_execution_before)
+        self.assertEqual(NoSqlExecutor.verify_count, 2)
+        self.assertFalse(any(event.startswith("traffic:") for event in events))
+
+    def test_current_release_partial_state_without_backup_still_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, _events = self.fixture(
+                root, schema=93
+            )
+            state = json.loads((state_root / "state.json").read_text())
+            state["known_good_release"]["schema"] = 92
+            state["history"][-1]["schema"] = {"observed": 92}
+            (state_root / "state.json").write_text(json.dumps(state))
+            migration_state = state_root / "migrations" / self.sha
+            migration_state.mkdir(parents=True)
+            (migration_state / "automation.json").write_text(json.dumps({
+                "release_sha": self.sha,
+                "status": "running",
+                "phase": "migration_execution",
+            }))
+            (migration_state / "execution.json").write_text(json.dumps({
+                "release_sha": self.sha,
+                "status": "running",
+                "phase": "migration_93",
+                "migrations": [{"number": 93, "status": "applying"}],
+            }))
+            with (
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    side_effect=AssertionError("new backup must not be created"),
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "automatic_migration_resume_backup_attestation_missing",
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha,
+                        state_root=state_root,
+                        compatibility=compatibility,
+                        operations=operations,
+                    )
+
+    def test_source_schema_acceptance_cannot_be_reclassified_without_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, _events = self.fixture(
+                root, schema=93
+            )
+            state = json.loads((state_root / "state.json").read_text())
+            state["known_good_release"]["schema"] = 92
+            state["history"][-1]["schema"] = {"observed": 92}
+            (state_root / "state.json").write_text(json.dumps(state))
+            with (
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    side_effect=AssertionError("backup must not be fabricated"),
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "automatic_migration_resume_backup_attestation_missing",
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha,
+                        state_root=state_root,
+                        compatibility=compatibility,
+                        operations=operations,
+                    )
+
+    def test_current_release_substituted_resume_backup_still_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, _events = self.fixture(
+                root, schema=93
+            )
+            state = json.loads((state_root / "state.json").read_text())
+            state["known_good_release"]["schema"] = 92
+            state["history"][-1]["schema"] = {"observed": 92}
+            (state_root / "state.json").write_text(json.dumps(state))
+            backup_root = root / "backups"
+            backup = backup_root / "madar-20260831T195925Z"
+            backup.mkdir(parents=True)
+            (backup / "manifest.json").write_text(json.dumps({
+                "format_version": 3,
+                "status": "complete",
+                "backup_id": backup.name,
+                "release": {"git_sha": "b" * 40},
+                "database": {"schema_version": "92"},
+            }))
+            migration_state = state_root / "migrations" / self.sha
+            migration_state.mkdir(parents=True)
+            (migration_state / "execution.json").write_text(json.dumps({
+                "release_sha": self.sha,
+                "status": "failed",
+                "backup": {"path": str(backup), "verified": True},
+            }))
+
+            class NoSqlExecutor:
+                def __init__(_self, **_kwargs):
+                    pass
+
+                def verify_migrations(_self):
+                    pass
+
+                def run(_self):
+                    raise AssertionError("SQL must not run with substituted backup")
+
+            with (
+                patch.object(self.module, "LockedMigrationExecutor", NoSqlExecutor),
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    side_effect=AssertionError("must not replace resume backup"),
+                ),
+                patch.dict(os.environ, {"MADAR_BACKUP_DIR": str(backup_root)}),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "automatic_migration_backup_identity_mismatch"
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha,
+                        state_root=state_root,
+                        compatibility=compatibility,
+                        operations=operations,
+                    )
+
+    def test_schema_above_target_fails_before_backup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, _events = self.fixture(
+                root, schema=94
+            )
+            with (
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    side_effect=AssertionError("backup must not run"),
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "automatic_migration_live_schema_incompatible"
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha,
+                        state_root=state_root,
+                        compatibility=compatibility,
+                        operations=operations,
+                    )
 
     def test_backup_failure_is_durable_and_next_attempt_is_suppressed(self):
         with tempfile.TemporaryDirectory() as directory:

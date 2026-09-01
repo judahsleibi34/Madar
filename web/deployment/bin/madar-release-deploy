@@ -1156,22 +1156,22 @@ def automatic_migrate_known_good(
     if current_schema < source_schema or current_schema > target_schema:
         raise RuntimeError(f"automatic_migration_unexpected_schema:{current_schema}")
 
+    acceptance = next(
+        (
+            event for event in reversed(state.get("history") or [])
+            if isinstance(event, dict)
+            and event.get("release_sha") == sha
+            and event.get("status") == "known_good"
+            and event.get("phase") == "complete"
+        ),
+        None,
+    )
     if current_schema == source_schema:
         if not (
             compatibility.rollback_schema_min <= current_schema
             <= compatibility.rollback_schema_max
         ):
             raise RuntimeError("automatic_migration_rollback_contract_invalid")
-        acceptance = next(
-            (
-                event for event in reversed(state.get("history") or [])
-                if isinstance(event, dict)
-                and event.get("release_sha") == sha
-                and event.get("status") == "known_good"
-                and event.get("phase") == "complete"
-            ),
-            None,
-        )
         retained = (
             acceptance.get("previous_known_good_release")
             if isinstance(acceptance, dict)
@@ -1213,10 +1213,14 @@ def automatic_migrate_known_good(
                 }
         except (TypeError, ValueError) as error:
             raise RuntimeError("automatic_migration_retry_state_invalid") from error
-    if (
-        prior_automation.get("status") == "completed"
-        and current_schema == target_schema
-    ):
+    if prior_automation.get("status") == "completed":
+        if (
+            current_schema != target_schema
+            or prior_automation.get("release_sha") != sha
+            or str(prior_automation.get("target_schema")) != str(target_schema)
+            or str(prior_automation.get("observed_schema")) != str(target_schema)
+        ):
+            raise RuntimeError("automatic_migration_completed_state_invalid")
         return prior_automation
 
     backup: Path | None = None
@@ -1225,6 +1229,37 @@ def automatic_migrate_known_good(
         if execution_file.exists()
         else {}
     )
+    acceptance_schema = (
+        acceptance.get("schema") if isinstance(acceptance, dict) else None
+    )
+    if (
+        current_schema == target_schema
+        and not automation_file.exists()
+        and not execution_file.exists()
+        and str(known_good.get("schema")) == str(target_schema)
+        and isinstance(acceptance_schema, dict)
+        and str(acceptance_schema.get("observed"))
+        == str(target_schema)
+    ):
+        # A later application release may be accepted after an earlier release
+        # already completed this manifest's target. Prove that the target was
+        # observed during this release's own promotion and that this SHA owns no
+        # migration state before recording a durable no-op. Any current-release
+        # state instead enters the release-bound resume checks below.
+        result = {
+            "release_sha": sha,
+            "source_schema": source_schema,
+            "target_schema": target_schema,
+            "observed_schema": current_schema,
+            "backup": None,
+            "execution_status": "already_at_target",
+            "status": "completed",
+            "phase": "already_at_target",
+            "completed_at": utc_now().isoformat(),
+            "failure_semantics": "not_required_already_at_target",
+        }
+        atomic_json(automation_file, result)
+        return result
     prior_backup = str((prior_execution.get("backup") or {}).get("path") or "")
     if prior_backup:
         if not Path(prior_backup).is_absolute():
@@ -1276,40 +1311,30 @@ def automatic_migrate_known_good(
     }
     atomic_json(automation_file, automation)
     try:
-        if current_schema == target_schema and not prior_execution:
-            # The target may have been reached by an explicit reviewed run. Do
-            # not manufacture a post-fact backup attestation; validate and
-            # record the serving release below.
-            execution_result = {
-                "release_sha": sha,
-                "observed_schema": current_schema,
-                "status": "already_at_target",
-            }
-        else:
-            if backup is None:
-                backup = _create_verified_migration_backup(
-                    sha=sha,
-                    known_good=known_good,
-                    storage_root=Path(
-                        os.getenv("MADAR_STORAGE_ROOT", "/var/lib/madar/storage")
-                    ).resolve(),
-                )
-                automation["backup"] = str(backup)
-                automation["phase"] = "migration_execution"
-                atomic_json(automation_file, automation)
-            _attest_migration_backup(
-                backup, release_sha=sha, source_schema=source_schema,
+        if backup is None:
+            backup = _create_verified_migration_backup(
+                sha=sha,
+                known_good=known_good,
+                storage_root=Path(
+                    os.getenv("MADAR_STORAGE_ROOT", "/var/lib/madar/storage")
+                ).resolve(),
             )
-            executor = LockedMigrationExecutor(
-                connection_factory=lambda: psycopg.connect(
-                    os.getenv("MADAR_MIGRATION_DATABASE_URL", "")
-                ),
-                manifest=manifest,
-                state_file=execution_file,
-                backup_dir=backup,
-                backup_verifier=verify_backup,
-            )
-            execution_result = executor.run()
+            automation["backup"] = str(backup)
+            automation["phase"] = "migration_execution"
+            atomic_json(automation_file, automation)
+        _attest_migration_backup(
+            backup, release_sha=sha, source_schema=source_schema,
+        )
+        executor = LockedMigrationExecutor(
+            connection_factory=lambda: psycopg.connect(
+                os.getenv("MADAR_MIGRATION_DATABASE_URL", "")
+            ),
+            manifest=manifest,
+            state_file=execution_file,
+            backup_dir=backup,
+            backup_verifier=verify_backup,
+        )
+        execution_result = executor.run()
         automation["phase"] = "post_migration_validation"
         atomic_json(automation_file, automation)
         if operations.schema_version() != target_schema:
