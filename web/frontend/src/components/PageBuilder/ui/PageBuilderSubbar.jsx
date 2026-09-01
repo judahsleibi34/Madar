@@ -1,6 +1,7 @@
 export default function PageBuilderSubbar({
   preview,
   hideWorkspaceTabs,
+  historyControls,
   viewports,
   viewport,
   setViewport,
@@ -13,6 +14,7 @@ export default function PageBuilderSubbar({
         <div className="builder-subbar-inner">
           {renderWorkspaceNavigator()}
           <div className="builder-subbar-actions">
+            {historyControls}
             {artboardCameraControls}
           </div>
         </div>

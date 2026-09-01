@@ -241,7 +241,7 @@ const isCheckboxOptionChecked = (answers, option, optionIndex) =>
     return answer === option;
   });
 
-const carouselElementTypes = new Set(["card", "carousel", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
+const carouselElementTypes = new Set(["card", "carousel", "logoSlider", "carouselCards", "carouselSplit", "carouselSpotlight", "carouselStack", "carouselEditorial", "circularGallery"]);
 const authElementTypes = new Set(["loginBlock", "registrationBlock"]);
 
 const getPageElements = (page) =>

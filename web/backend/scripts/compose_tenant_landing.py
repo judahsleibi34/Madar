@@ -188,6 +188,35 @@ def image(name: str, source: str, *, radius: str = "24px", logo: bool = False) -
     )
 
 
+def logo_slider(
+    name: str,
+    logos: list[tuple[str, str]],
+    *,
+    title: str,
+    subtitle: str,
+) -> dict[str, Any]:
+    content = "\n\n".join(
+        f"{partner_name}\nPartner\n{source}"
+        for partner_name, source in logos
+    )
+    return element(
+        "logoSlider",
+        name,
+        content,
+        logoSliderTitle=title,
+        logoSliderSubtitle=subtitle,
+        carouselVariant="logos",
+        autoScroll=True,
+        autoScrollMs=3200,
+        styles={
+            "backgroundColor": "var(--theme-surface)",
+            "borderRadius": "22px",
+            "alignSelf": "stretch",
+            "--carousel-height": "270px",
+        },
+    )
+
+
 def editorial_card(name: str, title: str, description: str, source: str, *, page_id: str = "", url: str = "", label: str = "Explore") -> dict[str, Any]:
     target = action("goToPage", pageId=page_id) if page_id else action("openUrl", url=url, openInNewTab=True)
     return element(
@@ -415,15 +444,14 @@ def build_pages(home_id: str) -> list[dict[str, Any]]:
         ),
         section(
             "partners",
-            [
-                row("partner heading", [column("partner heading copy", [
-                    text("partner eyebrow", "TRUSTED COLLABORATION", eyebrow=True, centered=True),
-                    heading("partner title", "Donors and partners", 2, centered=True),
-                    text("partner intro", "Organizations working alongside Ibtikar to strengthen learning, livelihoods and inclusive communities.", centered=True),
-                ])]),
-                row("partner logos one", [column(f"partner logo column {index}", [image(name, url, radius="14px", logo=True)]) for index, (name, url) in enumerate(DONOR_LOGOS[:5], 1)], gap="small"),
-                row("partner logos two", [column(f"partner logo column {index + 5}", [image(name, url, radius="14px", logo=True)]) for index, (name, url) in enumerate(DONOR_LOGOS[5:], 1)], gap="small"),
-            ],
+            [row("partner logo slider", [column("partner slider column", [
+                logo_slider(
+                    "Donors and partners slider",
+                    DONOR_LOGOS,
+                    title="Donors and partners",
+                    subtitle="Organizations working alongside Ibtikar to strengthen learning, livelihoods and inclusive communities.",
+                ),
+            ])])],
             background="var(--theme-surface)",
         ),
         section(

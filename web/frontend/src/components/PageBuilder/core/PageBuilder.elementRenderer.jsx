@@ -402,6 +402,8 @@ export const createElementRenderer = ({
               autoScroll={renderMode !== "editing" && Boolean(element.autoScroll)}
               autoScrollMs={element.autoScrollMs}
               content={element.content}
+              logoSliderSubtitle={element.logoSliderSubtitle}
+              logoSliderTitle={element.logoSliderTitle}
               name={element.name}
               variant={getCarouselVariant(element)}
             />

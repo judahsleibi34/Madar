@@ -19,6 +19,7 @@ export const elementGroups = [...new Set(elementTypes.map((item) => item.group))
 export const carouselElementTypes = new Set([
   "card",
   "carousel",
+  "logoSlider",
   "carouselCards",
   "carouselSplit",
   "carouselSpotlight",
