@@ -2,12 +2,53 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import logging
+import re
 from typing import Any
 
 from database import service_supabase
+from postgrest.exceptions import APIError
 
 
 logger = logging.getLogger(__name__)
+SAFE_POSTGREST_CODE = re.compile(r"^[A-Z0-9_]{1,20}$", re.IGNORECASE)
+
+
+class PushSubscriptionBindingError(RuntimeError):
+    """Sanitized expected or dependency failure from the binding RPC."""
+
+    def __init__(self, *, status_code: int, code: str, message: str):
+        super().__init__(code)
+        self.status_code = status_code
+        self.code = code
+        self.public_message = message
+
+
+def _safe_postgrest_code(error: APIError) -> str:
+    value = str(getattr(error, "code", "") or "").strip()
+    return value if SAFE_POSTGREST_CODE.fullmatch(value) else "postgrest_error"
+
+
+def _binding_error(error: APIError) -> PushSubscriptionBindingError:
+    # Only compare known server-authored sentinel messages. Never return or log
+    # raw PostgREST details, which can contain database or request material.
+    message = str(getattr(error, "message", "") or "").strip().lower()
+    if message == "active_tenant_membership_required":
+        return PushSubscriptionBindingError(
+            status_code=403,
+            code="active_tenant_membership_required",
+            message="An active workspace membership is required.",
+        )
+    if message == "app_installation_not_available":
+        return PushSubscriptionBindingError(
+            status_code=409,
+            code="installation_unavailable",
+            message="The application installation is not available.",
+        )
+    return PushSubscriptionBindingError(
+        status_code=503,
+        code="push_subscription_unavailable",
+        message="Push subscription registration is temporarily unavailable.",
+    )
 
 
 def _row(response) -> dict[str, Any] | None:
@@ -53,20 +94,30 @@ def bind_push_subscription(
     auth: str,
     user_agent: str = "",
 ) -> dict[str, Any] | None:
-    return _row(
-        service_supabase.rpc(
-            "bind_web_push_subscription_to_installation",
-            {
-                "p_user_id": int(user_id),
-                "p_tenant_id": int(tenant_id),
-                "p_installation_id": str(installation_id),
-                "p_endpoint": endpoint,
-                "p_p256dh": p256dh,
-                "p_auth": auth,
-                "p_user_agent": user_agent[:1000],
+    try:
+        return _row(
+            service_supabase.rpc(
+                "bind_web_push_subscription_to_installation",
+                {
+                    "p_user_id": int(user_id),
+                    "p_tenant_id": int(tenant_id),
+                    "p_installation_id": str(installation_id),
+                    "p_endpoint": endpoint,
+                    "p_p256dh": p256dh,
+                    "p_auth": auth,
+                    "p_user_agent": user_agent[:1000],
+                },
+            ).execute()
+        )
+    except APIError as error:
+        logger.warning(
+            "notifications.push_subscription_binding_failed",
+            extra={
+                "error_type": type(error).__name__,
+                "error_code": _safe_postgrest_code(error),
             },
-        ).execute()
-    )
+        )
+        raise _binding_error(error) from error
 
 
 def revoke_installation_push_bindings(

@@ -29,11 +29,37 @@ create index if not exists builder_form_drafts_user_form_idx
   )
   where site_user_id is not null;
 
-insert into public.application_schema_state(contract_key, schema_version, applied_at)
-values ('core', 91, now())
-on conflict(contract_key) do update
-set schema_version = excluded.schema_version,
-    applied_at = excluded.applied_at;
+do $$
+declare
+  v_schema_version public.application_schema_state.schema_version%TYPE;
+begin
+  select schema_version
+  into v_schema_version
+  from public.application_schema_state
+  where contract_key = 'core'
+  for update;
+
+  if v_schema_version is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'migration_091_schema_state_missing';
+  end if;
+
+  if v_schema_version <> 90 then
+    raise exception using
+      errcode = 'P0001',
+      message = format(
+        'migration_091_expected_schema_90_got_%s',
+        v_schema_version
+      );
+  end if;
+
+  update public.application_schema_state
+  set schema_version = 91,
+      applied_at = now()
+  where contract_key = 'core';
+end;
+$$;
 
 notify pgrst, 'reload schema';
 commit;

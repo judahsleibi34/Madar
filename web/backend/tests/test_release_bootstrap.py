@@ -32,6 +32,9 @@ class FakeResponse:
 class FakeOperations:
     def __init__(self):
         self.calls = []
+        self.compatibility = release_cli.Compatibility(
+            81, 83, 83, "expand-only", 81, 83,
+        )
 
     def verify_source(self, sha): self.calls.append(("verify_source", sha))
     def build(self, sha, slot):
@@ -46,6 +49,12 @@ class FakeOperations:
     def preflight(self, sha, slot, images, schema): self.calls.append(("preflight", sha, slot, schema))
     def start_candidate(self, sha, slot, images): self.calls.append(("start_candidate", sha, slot))
     def validate_candidate(self, sha, slot): self.calls.append(("validate_candidate", sha, slot))
+    def validate_active_refresh_prerequisites(self, sha, slot, images):
+        self.calls.append(("validate_active_refresh_prerequisites", sha, slot))
+    def refresh_active_runtime_services(self, sha, slot, images):
+        self.calls.append(("refresh_active_runtime_services", sha, slot))
+    def validate_stable_candidate(self, sha):
+        self.calls.append(("validate_stable_candidate", sha))
     def stop_candidate(self, slot): self.calls.append(("stop_candidate", slot))
     def activate_workers(self, sha, slot, images): self.calls.append(("activate_workers", sha, slot))
     def deactivate_workers(self, release): self.calls.append(("deactivate_workers", release["slot"]))
@@ -145,6 +154,7 @@ class ReleaseBootstrapTests(unittest.TestCase):
             "worker": "backend@sha256:1", "build_timestamp": "2026-08-25T00:00:00Z",
         }
         with patch.dict(os.environ, {
+            "MADAR_STORAGE_ROOT": "/var/lib/madar/storage",
             "NOTIFICATION_WORKER_ENABLED": "true",
             "DATA_DELETION_WORKER_ENABLED": "true",
             "CALENDAR_FEATURE_ENABLED": "true",
@@ -186,7 +196,7 @@ class ReleaseBootstrapTests(unittest.TestCase):
             persisted = json.loads((root_path / "state.json").read_text())
         self.assertEqual(result["phase"], "post_migration_workers_refreshed")
         self.assertEqual(persisted["known_good_release"]["schema"], 83)
-        self.assertIn(("activate_workers", SHA, "green"), operations.calls)
+        self.assertIn(("refresh_active_runtime_services", SHA, "green"), operations.calls)
 
 
 if __name__ == "__main__":

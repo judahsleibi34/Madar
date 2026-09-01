@@ -223,6 +223,10 @@ class FakeQuery:
 class FakeSupabase:
     def __init__(self):
         self.tables = {
+            "tenants": [
+                {"tenant_id": 1, "lifecycle_state": "active"},
+                {"tenant_id": 2, "lifecycle_state": "active"},
+            ],
             "website_settings": [
                 {
                     "id": 1,
@@ -323,7 +327,10 @@ class BuilderFormSubmissionTests(unittest.TestCase):
     def test_logged_in_form_submission_records_member_ownership(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
-        identity = ({"id": 31}, {"id": 41, "status": "active"})
+        identity = (
+            {"id": 31},
+            {"id": 41, "status": "active", "_access_kind": "site"},
+        )
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
              patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
              patch.object(public_site_routes, "authorize_site_resource", return_value=identity):
@@ -335,6 +342,25 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         saved = fake_supabase.tables["builder_form_submissions"][-1]
         self.assertEqual(saved["site_user_id"], 31)
         self.assertEqual(saved["site_membership_id"], 41)
+
+    def test_staff_form_submission_never_stores_workspace_membership_id(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        identity = (
+            {"id": 31},
+            {"id": 7, "status": "active", "_access_kind": "staff"},
+        )
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_form_submission_rate_limit"), \
+             patch.object(public_site_routes, "authorize_site_resource", return_value=identity):
+            response = client.post(
+                f"/public/sites/tenant-site/forms/{FORM_ID}/submissions",
+                json={"answers": {"field_name": "Ada"}},
+            )
+        self.assertEqual(response.status_code, 200)
+        saved = fake_supabase.tables["builder_form_submissions"][-1]
+        self.assertEqual(saved["site_user_id"], 31)
+        self.assertIsNone(saved["site_membership_id"])
 
     def test_member_submissions_endpoint_is_not_exposed(self):
         client = build_public_client(FakeSupabase())
@@ -1203,6 +1229,13 @@ class BuilderFormSubmissionTests(unittest.TestCase):
                 "contact_email": None,
                 "phone": None,
                 "description": None,
+                "store_theme": {
+                    "accent": "#852c21",
+                    "background": "#ffffff",
+                    "surface": "#f5f1eb",
+                    "text": "#162033",
+                    "muted": "#667085",
+                },
             },
         )
         self.assertEqual(
@@ -1779,6 +1812,22 @@ class PublicSiteTenantResolutionTests(unittest.TestCase):
             tenant_id = public_site_routes.resolve_tenant_id(settings)
 
         self.assertEqual(tenant_id, 11)
+
+
+class PublicFormDraftOwnershipTests(unittest.TestCase):
+    def test_named_draft_rejects_a_different_authenticated_user(self):
+        with self.assertRaises(HTTPException) as captured:
+            public_site_routes.require_form_draft_owner(
+                {"site_user_id": 77},
+                ({"id": 88}, {"tenant_id": 1}),
+            )
+        self.assertEqual(captured.exception.status_code, 404)
+
+    def test_anonymous_draft_remains_bearer_token_accessible(self):
+        public_site_routes.require_form_draft_owner(
+            {"site_user_id": None},
+            None,
+        )
 
 if __name__ == "__main__":
     unittest.main()

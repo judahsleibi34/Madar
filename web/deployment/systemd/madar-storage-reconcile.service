@@ -9,6 +9,6 @@ User=madar
 Group=madar
 UMask=0077
 EnvironmentFile=/etc/madar/runtime.env
-WorkingDirectory=/home/madar/saas/Madar/web/backend
+WorkingDirectory=/srv/madar/production/web/backend
 ExecStart=/usr/bin/flock --nonblock /run/lock/madar-storage-reconcile.lock /usr/bin/python3 scripts/reconcile_storage.py --apply --include-assets --limit 100
 NoNewPrivileges=true

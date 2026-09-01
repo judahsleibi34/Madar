@@ -1710,6 +1710,53 @@ def require_form_draft_token(value: str | None) -> str:
     return draft_id
 
 
+def require_form_draft_owner(row: dict, identity) -> None:
+    """Keep named-user drafts private while retaining anonymous bearer drafts."""
+    owner_user_id = row.get("site_user_id")
+    if owner_user_id is None:
+        return
+    identity_user = identity[0] if identity else {}
+    if str(identity_user.get("id") or "") != str(owner_user_id):
+        raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
+
+
+def schema_090_missing_draft_name(error: Exception) -> bool:
+    raw = str(error).lower()
+    missing_column = "draft_name" in raw and (
+        "pgrst204" in raw or "schema cache" in raw or "does not exist" in raw
+    )
+    if not missing_column:
+        return False
+    try:
+        state = first_row(
+            service_supabase.table("application_schema_state")
+            .select("schema_version")
+            .eq("contract_key", "core")
+            .limit(1)
+            .execute()
+        )
+        return int((state or {}).get("schema_version", -1)) == 90
+    except Exception:
+        return False
+
+
+def write_public_form_draft(payload: dict, *, draft_id: str | None, tenant_id: int):
+    def execute(write_payload: dict):
+        query = service_supabase.table("builder_form_drafts")
+        if draft_id:
+            return query.update(write_payload).eq("id", draft_id).eq("tenant_id", tenant_id).execute()
+        return query.insert(write_payload).execute()
+
+    try:
+        return execute(payload)
+    except Exception as error:
+        if not schema_090_missing_draft_name(error):
+            raise
+        bridge_payload = dict(payload)
+        bridge_payload.pop("draft_name", None)
+        return execute(bridge_payload)
+
+
 def format_submission(row: dict):
     return {
         "id": row.get("id"),
@@ -1777,7 +1824,9 @@ def resolve_website_settings(site_identifier: str, *, request: Request):
         ambiguous_code="publication_hostname_ambiguous",
     )
     tenant_id = settings.get("tenant_id")
-    if tenant_id is None or not tenant_is_active(tenant_id):
+    if tenant_id is None or not tenant_is_active(
+        tenant_id, client=service_supabase
+    ):
         raise HTTPException(status_code=404, detail="Published site not found")
     if branded:
         require_branded_subdomain(settings, allow_legacy_routing=True)
@@ -2245,14 +2294,31 @@ def authorize_site_resource(
     return identity
 
 
+def site_record_owner_fields(identity) -> dict[str, Any]:
+    if not identity:
+        return {"site_user_id": None, "site_membership_id": None}
+    user_row, membership = identity
+    access_kind = str(membership.get("_access_kind") or "").strip().lower()
+    user_id = user_row.get("id")
+    if user_id is None or access_kind not in {"site", "staff"}:
+        raise RuntimeError("site_record_identity_invalid")
+    membership_id = membership.get("id") if access_kind == "site" else None
+    if access_kind == "site" and membership_id is None:
+        raise RuntimeError("site_record_identity_invalid")
+    return {
+        "site_user_id": user_id,
+        "site_membership_id": membership_id,
+    }
+
+
 def attach_site_record_owner(table_name: str, row: dict, identity):
     if not identity or not row:
         return row
-    user_row, membership = identity
-    update = {
-        "site_user_id": user_row.get("id"),
-        "site_membership_id": membership.get("id"),
-    }
+
+    update = site_record_owner_fields(identity)
+    if all(row.get(field) == value for field, value in update.items()):
+        return row
+
     response = (
         service_supabase.table(table_name)
         .update(update)
@@ -2262,6 +2328,25 @@ def attach_site_record_owner(table_name: str, row: dict, identity):
         .execute()
     )
     return first_row(response) or {**row, **update}
+
+
+def reconcile_site_record_owner_after_commit(table_name: str, row: dict, identity):
+    """Bridge compatibility for schema 92 without returning a false failure.
+
+    Schema 93 writes ownership inside the domain transaction and this becomes
+    a no-op. While a schema-92 bridge is active, the compatibility update is a
+    second durable operation. Its failure is observable, but cannot truthfully
+    turn the already-committed customer record into a failed submission.
+    """
+
+    try:
+        return attach_site_record_owner(table_name, row, identity)
+    except Exception as error:
+        logger.error(
+            "public.site_record_owner_reconciliation_failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return row
 
 @router.post("/sites/{subdomain}/auth/register")
 def register_tenant_visitor(
@@ -3155,7 +3240,7 @@ def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: st
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
     project, _form, _ = get_published_form_for_site(settings, clean_form_id)
-    authorize_site_resource(
+    identity = authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,
         response=response,
@@ -3177,6 +3262,7 @@ def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: st
     saved = first_row(draft_response)
     if not saved:
         raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
+    require_form_draft_owner(saved, identity)
     return {"success": True, "draft": format_public_form_draft(saved)}
 
 
@@ -3214,7 +3300,7 @@ def save_public_builder_form_draft(
     answers = draft.answers or {}
     validate_public_answer_payload_limits(answers)
     cleaned_answers = validate_form_draft_answers(form, answers)
-    identity_user, identity_membership = identity or ({}, {})
+    owner_fields = site_record_owner_fields(identity)
     payload = {
         "tenant_id": tenant_id,
         "project_id": project.get("id"),
@@ -3227,8 +3313,7 @@ def save_public_builder_form_draft(
         "form_element_id": draft.form_element_id,
         "page_index": draft.page_index,
         "language": draft.language,
-        "site_user_id": identity_user.get("id"),
-        "site_membership_id": identity_membership.get("id"),
+        **owner_fields,
         "submitter_ip": get_client_ip(request),
         "user_agent": request.headers.get("user-agent", "")[:1000],
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -3246,17 +3331,21 @@ def save_public_builder_form_draft(
                 .limit(1)
                 .execute()
             )
-            if not first_row(existing_response):
+            existing = first_row(existing_response)
+            if not existing:
                 raise api_error(404, "form_draft_not_found", "This saved form could not be found.")
-            saved_response = (
-                service_supabase.table("builder_form_drafts")
-                .update(payload)
-                .eq("id", draft_id)
-                .eq("tenant_id", tenant_id)
-                .execute()
+            require_form_draft_owner(existing, identity)
+            saved_response = write_public_form_draft(
+                payload,
+                draft_id=draft_id,
+                tenant_id=tenant_id,
             )
         else:
-            saved_response = service_supabase.table("builder_form_drafts").insert(payload).execute()
+            saved_response = write_public_form_draft(
+                payload,
+                draft_id=None,
+                tenant_id=tenant_id,
+            )
         saved = first_row(saved_response)
         if not saved:
             raise RuntimeError("form_draft_empty_result")
@@ -3317,9 +3406,7 @@ def submit_public_builder_form(
         resource_id=clean_form_id,
     )
 
-    identity_user, identity_membership = identity or ({}, {})
-    site_user_id = identity_user.get("id")
-    site_membership_id = identity_membership.get("id")
+    owner_fields = site_record_owner_fields(identity)
 
     answers = submission.answers or {}
     validate_public_answer_payload_limits(answers)
@@ -3340,8 +3427,7 @@ def submit_public_builder_form(
         "field_snapshot": fields,
         "submitter_ip": submitter_ip,
         "user_agent": user_agent,
-        "site_user_id": site_user_id,
-        "site_membership_id": site_membership_id,
+        **owner_fields,
     }
     request_hash = canonical_request_hash({
         "tenant_id": tenant_id,
@@ -3349,8 +3435,7 @@ def submit_public_builder_form(
         "form_id": clean_form_id,
         "form_version": project.get("published_version"),
         "answers": cleaned_answers,
-        "site_user_id": site_user_id,
-        "site_membership_id": site_membership_id,
+        **owner_fields,
     })
     idempotency_key_hash = (
         hash_public_identifier(f"form-idempotency:{idempotency_key}")
@@ -3378,7 +3463,7 @@ def submit_public_builder_form(
             },
         },
     )
-    saved_submission = attach_site_record_owner(
+    saved_submission = reconcile_site_record_owner_after_commit(
         "builder_form_submissions", saved_submission, identity
     )
 
@@ -3397,15 +3482,32 @@ def submit_public_builder_form(
         increment_operational_usage(tenant_id, "form_submissions")
     if resume_draft_id:
         try:
-            (
+            draft_response = (
                 service_supabase.table("builder_form_drafts")
-                .delete()
+                .select("id,site_user_id")
                 .eq("id", resume_draft_id)
                 .eq("tenant_id", tenant_id)
                 .eq("project_id", project.get("id"))
                 .eq("form_id", clean_form_id)
+                .limit(1)
                 .execute()
             )
+            saved_draft = first_row(draft_response)
+            if saved_draft:
+                require_form_draft_owner(saved_draft, identity)
+                (
+                    service_supabase.table("builder_form_drafts")
+                    .delete()
+                    .eq("id", resume_draft_id)
+                    .eq("tenant_id", tenant_id)
+                    .eq("project_id", project.get("id"))
+                    .eq("form_id", clean_form_id)
+                    .execute()
+                )
+        except HTTPException:
+            # Submission succeeded; an unowned draft must remain untouched and
+            # the response must not reveal that another user's draft exists.
+            pass
         except Exception as error:
             logger.warning(
                 "public.form_draft_cleanup_failed",
@@ -3497,7 +3599,7 @@ def submit_public_builder_block_event(
         title = event.title or "New site event"
         body = f"{block_type} triggered an event on the published site."
 
-    identity_user, identity_membership = identity or ({}, {})
+    owner_fields = site_record_owner_fields(identity)
 
     reservation_payload = build_builder_reservation_payload(
         tenant_id=tenant_id,
@@ -3511,8 +3613,7 @@ def submit_public_builder_block_event(
         request=request,
         timing=timing,
     )
-    reservation_payload["site_user_id"] = identity_user.get("id")
-    reservation_payload["site_membership_id"] = identity_membership.get("id")
+    reservation_payload.update(owner_fields)
     stable_request_payload = {
         key: value
         for key, value in reservation_payload.items()
@@ -3568,7 +3669,7 @@ def submit_public_builder_block_event(
             },
         },
     )
-    saved_reservation = attach_site_record_owner(
+    saved_reservation = reconcile_site_record_owner_after_commit(
         "builder_reservations", saved_reservation, identity
     )
     reservation_id = str(saved_reservation.get("id") or "")

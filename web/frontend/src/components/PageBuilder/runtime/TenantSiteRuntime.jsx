@@ -9,7 +9,6 @@ import {
   fetchPublicSite,
   fetchPublicSiteBootstrap,
   getTenantVisitorStatus,
-  listPublicFormDrafts,
   loginTenantVisitor,
   logoutTenantVisitor,
   registerTenantVisitor,
@@ -512,9 +511,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const [completedFormPages, setCompletedFormPages] = useState({});
   const [formLanguages, setFormLanguages] = useState({});
   const [formResumeTokens, setFormResumeTokens] = useState({});
-  const [formDraftNames, setFormDraftNames] = useState({});
-  const [draftSaveDialog, setDraftSaveDialog] = useState(null);
-  const [incompleteDraftDialog, setIncompleteDraftDialog] = useState(null);
   const [quizAttempts, setQuizAttempts] = useState({});
   const [authPanelModes, setAuthPanelModes] = useState({});
   const [publicActionMessage, setPublicActionMessage] = useState("");
@@ -530,7 +526,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const pendingProtectedPageRef = useRef("");
   const loadedResumeTokenRef = useRef("");
   const detectedPublicationRef = useRef("");
-  const promptedIncompleteDraftsRef = useRef("");
 
   const showFormToast = useCallback((title, message) => {
     setFormToast({ id: Date.now(), title, message });
@@ -546,7 +541,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     const restoredPages = {};
     const restoredLanguages = {};
     const restoredResumeTokens = {};
-    const restoredDraftNames = {};
     const restoredStatuses = {};
     const restoredCompletedPages = {};
 
@@ -560,9 +554,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
       if (draft.resumeToken) {
         restoredResumeTokens[instanceKey] = draft.resumeToken;
       }
-      if (draft.draftName) {
-        restoredDraftNames[instanceKey] = draft.draftName;
-      }
       restoredStatuses[instanceKey] = {
         submitting: false,
         error: "",
@@ -575,7 +566,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     setCompletedFormPages(restoredCompletedPages);
     setFormLanguages(restoredLanguages);
     setFormResumeTokens(restoredResumeTokens);
-    setFormDraftNames(restoredDraftNames);
     setFormStatus(restoredStatuses);
   }, [cleanSubdomain, draftPreview]);
 
@@ -599,9 +589,6 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
         }));
         setFormLanguages((current) => ({ ...current, [instanceKey]: language }));
         setFormResumeTokens((current) => ({ ...current, [instanceKey]: resumeToken }));
-        setFormDraftNames((current) => ({
-          ...current, [instanceKey]: draft.name || "Incomplete form",
-        }));
         setFormStatus((current) => ({
           ...current,
           [instanceKey]: { submitting: false, error: "", success: runtimeFallbackCopy.runtime.resumeLaterRestored },

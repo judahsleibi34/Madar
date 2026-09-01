@@ -8,10 +8,10 @@ Type=oneshot
 RemainAfterExit=true
 User=madar
 Group=madar
-Environment=MADAR_PROXY_CONFIG_ROOT=/home/madar/.local/state/madar/proxy
-WorkingDirectory=/home/madar/.local/lib/madar/web/deployment/proxy
-ExecStart=/usr/bin/docker compose --project-name madar-release-proxy --file /home/madar/.local/lib/madar/web/deployment/proxy/docker-compose.yml up -d --no-build --wait --wait-timeout 90
-ExecStop=/usr/bin/docker compose --project-name madar-release-proxy --file /home/madar/.local/lib/madar/web/deployment/proxy/docker-compose.yml stop
+EnvironmentFile=/opt/madar/control-plane/deployment/production-paths.conf
+WorkingDirectory=/opt/madar/control-plane/deployment/proxy
+ExecStart=/usr/bin/docker compose --project-name madar-release-proxy --file /opt/madar/control-plane/deployment/proxy/docker-compose.yml up -d --no-build --wait --wait-timeout 90
+ExecStop=/usr/bin/docker compose --project-name madar-release-proxy --file /opt/madar/control-plane/deployment/proxy/docker-compose.yml stop
 TimeoutStartSec=120
 TimeoutStopSec=30
 

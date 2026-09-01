@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,6 +10,7 @@ from services.notification_action_service import (
     action_kind_for_source,
     normalize_notification_data,
 )
+from services.web_push_config import get_web_push_configuration
 
 logger = logging.getLogger(__name__)
 
@@ -23,21 +23,8 @@ def _rows(response) -> list[dict[str, Any]]:
     return getattr(response, "data", None) or []
 
 
-def _web_push_enabled() -> bool:
-    return bool(
-        os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
-        and os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
-        and os.getenv("WEB_PUSH_VAPID_SUBJECT", "").strip()
-    )
-
-
 def get_web_push_public_config() -> dict[str, Any]:
-    public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
-
-    return {
-        "enabled": bool(public_key and _web_push_enabled()),
-        "public_key": public_key,
-    }
+    return get_web_push_configuration().public_config()
 
 
 def list_user_notifications(

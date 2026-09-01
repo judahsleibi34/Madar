@@ -128,13 +128,17 @@ class LockedMigrationExecutor:
             raise RuntimeError("application_schema_state_missing")
         return int(row[0])
 
-    def run(self) -> dict[str, Any]:
-        self.backup_verifier(self.backup_dir)
+    def verify_migrations(self) -> None:
+        """Verify every pinned input before backup creation or DB access."""
         for migration in self.manifest.migrations:
             if not migration.path.is_file():
                 raise RuntimeError(f"migration_missing:{migration.number}")
             if self._checksum(migration.path) != migration.sha256:
                 raise RuntimeError(f"migration_checksum_mismatch:{migration.number}")
+
+    def run(self) -> dict[str, Any]:
+        self.verify_migrations()
+        self.backup_verifier(self.backup_dir)
 
         state: dict[str, Any] = {
             "release_sha": self.manifest.release_sha,

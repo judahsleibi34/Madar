@@ -3,10 +3,15 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field, UUID4
 
+from services.api_errors import api_error
 from services.push_subscription_security import UnsafePushEndpoint, validate_push_endpoint
-from services.installation_service import bind_push_subscription
+from services.installation_service import (
+    PushSubscriptionBindingError,
+    bind_push_subscription,
+)
 from services.tenant_service import get_current_tenant_context
 from services.notification_service import (
     get_web_push_public_config,
@@ -21,6 +26,7 @@ from services.notification_preference_service import (
     list_notification_preferences,
     set_notification_preference,
 )
+from services.web_push_config import get_web_push_configuration
 
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -163,6 +169,15 @@ def save_push_subscription(
     response: Response,
 ):
     context = _current_context(request, response)
+    configuration = get_web_push_configuration()
+    if not configuration.administratively_enabled:
+        raise api_error(409, "push_channel_disabled", "Web Push is disabled.")
+    if not configuration.configured:
+        raise api_error(
+            503,
+            "push_channel_misconfigured",
+            "Web Push is temporarily unavailable.",
+        )
     try:
         endpoint = validate_push_endpoint(subscription.endpoint)
     except UnsafePushEndpoint as error:
@@ -175,30 +190,51 @@ def save_push_subscription(
             },
         )
         raise HTTPException(status_code=400, detail=str(error)) from error
-    if subscription.installation_id is not None:
-        saved = bind_push_subscription(
-            user_id=context.user_id,
-            tenant_id=context.tenant_id,
-            installation_id=str(subscription.installation_id),
-            endpoint=endpoint,
-            p256dh=subscription.keys.p256dh,
-            auth=subscription.keys.auth,
-            user_agent=request.headers.get("user-agent", ""),
+    try:
+        if subscription.installation_id is not None:
+            saved = bind_push_subscription(
+                user_id=context.user_id,
+                tenant_id=context.tenant_id,
+                installation_id=str(subscription.installation_id),
+                endpoint=endpoint,
+                p256dh=subscription.keys.p256dh,
+                auth=subscription.keys.auth,
+                user_agent=request.headers.get("user-agent", ""),
+            )
+            if not saved:
+                raise api_error(
+                    409,
+                    "installation_unavailable",
+                    "The application installation is not available.",
+                )
+        else:
+            # Temporary rollout compatibility for clients loaded before
+            # migration 074. The same channel contract gates these writes.
+            saved = upsert_web_push_subscription(
+                user_id=context.user_id,
+                tenant_id=context.tenant_id,
+                endpoint=endpoint,
+                p256dh=subscription.keys.p256dh,
+                auth=subscription.keys.auth,
+                user_agent=request.headers.get("user-agent", ""),
+            )
+    except PushSubscriptionBindingError as error:
+        raise api_error(
+            error.status_code, error.code, error.public_message
+        ) from error
+    except APIError as error:
+        logger.warning(
+            "notifications.legacy_push_subscription_failed",
+            extra={
+                "error_type": type(error).__name__,
+                "error_code": "postgrest_error",
+            },
         )
-        if not saved:
-            raise HTTPException(status_code=409, detail="Installation is not available")
-    else:
-        # Temporary rollout compatibility for clients loaded before migration
-        # 074. These rows remain subject to Phase 1 tenant/user checks and are
-        # attached when that browser next reconciles with an installation id.
-        saved = upsert_web_push_subscription(
-            user_id=context.user_id,
-            tenant_id=context.tenant_id,
-            endpoint=endpoint,
-            p256dh=subscription.keys.p256dh,
-            auth=subscription.keys.auth,
-            user_agent=request.headers.get("user-agent", ""),
-        )
+        raise api_error(
+            503,
+            "push_subscription_unavailable",
+            "Push subscription registration is temporarily unavailable.",
+        ) from error
     return {
         "success": True,
         "subscription": {

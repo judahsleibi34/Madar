@@ -13,6 +13,14 @@ from datetime import datetime, timezone
 import urllib.request
 from pathlib import Path
 
+SCRIPT = Path(__file__).resolve()
+WEB_ROOT = SCRIPT.parents[2]
+sys.path.insert(0, str(WEB_ROOT))
+
+from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_upgrade_authorization,
+)
+
 PORTS = {"blue": (8101, 3100), "green": (8201, 3200)}
 
 
@@ -75,6 +83,7 @@ def main() -> int:
     expected_sha = str(expected_identity.get("release_sha") or "")
     if len(expected_sha) != 40 or any(character not in "0123456789abcdef" for character in expected_sha):
         raise RuntimeError("candidate release identity is invalid")
+    require_upgrade_authorization(None)
     driver = os.getenv("MADAR_TRAFFIC_SWITCH_DRIVER", "nginx").strip().lower()
     if driver == "file-proxy":
         target = Path(os.getenv("MADAR_ACTIVE_TARGET_FILE", "")).resolve()
@@ -103,7 +112,7 @@ def main() -> int:
         return 0
     if driver not in {"nginx", "docker-nginx"}:
         raise RuntimeError("unsupported traffic switch driver")
-    target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/releases/active-upstreams.conf"))
+    target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/proxy/active-upstreams.conf"))
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     upstream_host = "127.0.0.1"
     content = (
