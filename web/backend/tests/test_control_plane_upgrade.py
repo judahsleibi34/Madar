@@ -54,6 +54,7 @@ class FakeOperations:
         self.timer = {"enabled": "enabled", "active": "active"}
         self.interlock = False
         self.snapshot = {"state": "unchanged"}
+        self.controller_compatibility = "normal_compatible"
 
     def _event(self, name):
         self.events.append(name)
@@ -74,6 +75,10 @@ class FakeOperations:
 
     def resolve_candidate(self, sha, *, dry_run):
         self._event("resolve_candidate")
+
+    def validate_controller_compatibility(self, sha, current):
+        self._event("validate_controller_compatibility")
+        return self.controller_compatibility
 
     def protected_change_required(self, sha):
         self._event("protected_change_required")
@@ -116,6 +121,11 @@ class FakeOperations:
 
     def verify_install(self, sha, backup):
         self._event("verify_install")
+
+    def verify_installed_controller(self, sha):
+        self._event("verify_installed_controller")
+        if self.installed != sha:
+            raise upgrade.UpgradeError("installed_provenance_mismatch")
 
     def run_deploy_service(self, label, sha):
         self._event(label)
@@ -234,6 +244,52 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         record = upgrade.AuditRecord(approved_sha=self.SHA, dry_run=False)
         audit = upgrade.AuditWriter(Path(root) / "history", record)
         return operations, record, audit, upgrade.UpgradeCoordinator(operations, audit)
+
+    def compatibility_operations(
+        self,
+        *,
+        production,
+        installed,
+        approved,
+        current_guard=1,
+        protected_delta=1,
+        resolved=None,
+        ancestry=0,
+        approved_guard=0,
+    ):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.control_root = Path("/opt/madar/control-plane/deployment")
+        operations.repository_origin = mock.Mock(
+            return_value=upgrade.EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]
+        )
+        operations.require_clean_repository = mock.Mock()
+
+        def command(label, args, check=True, **_kwargs):
+            returncode = {
+                "guard_current": current_guard,
+                "guard_approved_bridge": approved_guard,
+            }.get(label, 0)
+            if check and returncode:
+                raise upgrade.UpgradeError(f"command_failed:{label}")
+            return upgrade.CommandResult("", "", returncode)
+
+        def madar_git(label, *args, **_kwargs):
+            if label == "git_current_controller_delta":
+                return upgrade.CommandResult("", "", protected_delta)
+            if label == "git_bridge_resolve_main":
+                return upgrade.CommandResult(resolved or approved, "", 0)
+            if label in {
+                "git_bridge_production_type", "git_bridge_installed_type",
+            }:
+                return upgrade.CommandResult("commit", "", 0)
+            if label == "git_bridge_ancestry":
+                return upgrade.CommandResult("", "", ancestry)
+            raise AssertionError(f"unexpected Git operation: {label} {args}")
+
+        operations.command = mock.Mock(side_effect=command)
+        operations.madar_git = mock.Mock(side_effect=madar_git)
+        current = {"production_sha": production, "installed_sha": installed}
+        return operations, current
 
     def filesystem_layout(self, root):
         trust_root = Path(root)
@@ -778,6 +834,193 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             operations.resolve_candidate(self.SHA, dry_run=False)
         operations.madar_git.assert_not_called()
 
+    def test_authorized_controller_ahead_bridge_requires_all_attestations(self):
+        production = "1" * 40
+        approved = "2" * 40
+        operations, current = self.compatibility_operations(
+            production=production, installed=approved, approved=approved
+        )
+        result = operations.validate_controller_compatibility(approved, current)
+        self.assertEqual(result, "controller_ahead_bridge")
+        labels = [call.args[0] for call in operations.command.call_args_list]
+        self.assertEqual(labels, ["guard_current", "guard_approved_bridge"])
+        guard_current = operations.command.call_args_list[0]
+        guard_approved = operations.command.call_args_list[1]
+        self.assertEqual(guard_current.args[1][-1], production)
+        self.assertFalse(guard_current.kwargs["check"])
+        self.assertEqual(guard_approved.args[1][-1], approved)
+        operations.require_clean_repository.assert_called_once()
+
+    def test_normal_controller_compatibility_keeps_existing_guard_semantics(self):
+        production = "1" * 40
+        approved = "2" * 40
+        operations, current = self.compatibility_operations(
+            production=production,
+            installed=production,
+            approved=approved,
+            current_guard=0,
+        )
+        self.assertEqual(
+            operations.validate_controller_compatibility(approved, current),
+            "normal_compatible",
+        )
+        operations.madar_git.assert_not_called()
+        self.assertEqual(operations.command.call_count, 1)
+
+    def test_controller_ahead_must_equal_approved_current_main(self):
+        production = "1" * 40
+        installed = "2" * 40
+        approved = "3" * 40
+        operations, current = self.compatibility_operations(
+            production=production, installed=installed, approved=approved
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "installed_controller_not_approved_bridge"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+
+        operations, current = self.compatibility_operations(
+            production=production,
+            installed=approved,
+            approved=approved,
+            resolved="4" * 40,
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "approved_sha_not_current_origin_main"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+
+    def test_production_ahead_of_installed_controller_is_not_a_bridge(self):
+        installed = "1" * 40
+        production = "2" * 40
+        approved = "3" * 40
+        operations, current = self.compatibility_operations(
+            production=production, installed=installed, approved=approved
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "installed_controller_not_approved_bridge"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+
+    def test_controller_bridge_rejects_unrelated_or_incomplete_history(self):
+        production = "1" * 40
+        approved = "2" * 40
+        operations, current = self.compatibility_operations(
+            production=production,
+            installed=approved,
+            approved=approved,
+            ancestry=1,
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "controller_bridge_not_forward_ancestor"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+
+        operations, current = self.compatibility_operations(
+            production=production,
+            installed=approved,
+            approved=approved,
+        )
+
+        def missing_object(label, *args, **kwargs):
+            if label == "git_bridge_production_type":
+                return upgrade.CommandResult("missing", "", 0)
+            return self.compatibility_operations(
+                production=production, installed=approved, approved=approved
+            )[0].madar_git(label, *args, **kwargs)
+
+        operations.madar_git = mock.Mock(side_effect=missing_object)
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "controller_bridge_object_not_commit"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+
+    def test_controller_bridge_rejects_guard_failure_and_non_delta_errors(self):
+        production = "1" * 40
+        approved = "2" * 40
+        operations, current = self.compatibility_operations(
+            production=production,
+            installed=approved,
+            approved=approved,
+            approved_guard=1,
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "command_failed:guard_approved_bridge"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+
+        operations, current = self.compatibility_operations(
+            production=production,
+            installed=approved,
+            approved=approved,
+            protected_delta=0,
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "installed_controller_guard_failure"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+
+        operations, current = self.compatibility_operations(
+            production=production,
+            installed=approved,
+            approved=approved,
+            current_guard=2,
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "installed_controller_guard_failure"
+        ):
+            operations.validate_controller_compatibility(approved, current)
+        operations.madar_git.assert_not_called()
+
+    def test_malformed_installed_provenance_fails_before_candidate_trust(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.deploy_lock_descriptor = 1
+        operations.repository_origin = mock.Mock(
+            return_value=upgrade.EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]
+        )
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value="1" * 40)
+        operations.installed_sha = mock.Mock(
+            side_effect=upgrade.UpgradeError("installed_provenance_invalid")
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "installed_provenance_invalid"
+        ):
+            operations.current_preflight()
+        operations.repository_head.assert_called_once()
+
+        with tempfile.TemporaryDirectory() as root:
+            missing = object.__new__(upgrade.SystemOperations)
+            missing.control_root = Path(root)
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "installed_provenance_missing"
+            ):
+                missing.installed_sha()
+
+    def test_cli_sha_cannot_authorize_bridge_before_candidate_resolution(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root, protected=False, failure="resolve_candidate"
+            )
+            operations.production = "1" * 40
+            operations.installed = self.SHA
+            operations.controller_compatibility = "controller_ahead_bridge"
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "failed:resolve_candidate"
+            ):
+                coordinator.execute(dry_run=True)
+        self.assertNotIn("validate_controller_compatibility", operations.events)
+        self.assertNotIn("protected_change_required", operations.events)
+
+    def test_ordinary_deployers_still_invoke_the_protected_guard(self):
+        for path in (
+            WEB_ROOT / "deployment/bin/madar-auto-deploy",
+            WEB_ROOT / "deployment/bin/madar-production-deploy",
+        ):
+            source = path.read_text(encoding="utf-8")
+            self.assertIn("madar-control-plane-guard", source)
+            self.assertIn('"$CONTROL_PLANE_GUARD" "$TARGET_SHA"', source)
+
     def test_active_container_images_must_match_recorded_immutable_ids(self):
         operations = object.__new__(upgrade.SystemOperations)
         backend_id = "sha256:" + "1" * 64
@@ -830,6 +1073,8 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertEqual(record.migration_result, "already_at_target")
         self.assertIn("deployment_lock=True", operations.events)
         self.assertEqual(record.same_sha_validation, "passed")
+        self.assertTrue(record.controller_installation_required)
+        self.assertTrue(record.controller_installation_performed)
         self.assertLess(
             operations.events.index("controlled_candidate_deployment"),
             operations.events.index("same_sha_idempotence"),
@@ -840,6 +1085,165 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         )
         self.assertEqual(operations.timer, {"enabled": "enabled", "active": "active"})
         self.assertFalse(operations.interlock)
+
+    def test_exact_controller_ahead_bridge_dry_run_is_non_mutating(self):
+        production = "1" * 40
+        approved = self.SHA
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root, protected=False
+            )
+            operations.production = production
+            operations.installed = approved
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {"enabled": "disabled", "active": "inactive"}
+            coordinator.execute(dry_run=True)
+            coordinator.cleanup()
+            payload = json.loads(coordinator.audit.json_path.read_text())
+        self.assertEqual(record.status, "dry_run_complete")
+        self.assertEqual(
+            record.controller_compatibility, "controller_ahead_bridge"
+        )
+        self.assertTrue(record.controller_preinstalled)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+        self.assertFalse(record.controller_installed)
+        self.assertIsNone(record.backup_path)
+        self.assertEqual(record.previous_production_sha, production)
+        self.assertEqual(record.previous_control_plane_sha, approved)
+        self.assertEqual(payload["controller_compatibility"], "controller_ahead_bridge")
+        self.assertTrue(payload["controller_preinstalled"])
+        self.assertLess(
+            operations.events.index("resolve_candidate"),
+            operations.events.index("validate_controller_compatibility"),
+        )
+        self.assertIn("verify_installed_controller", operations.events)
+        for forbidden in (
+            "quiesce", "arm_interlock", "installer_apply", "verify_install",
+            "controlled_candidate_deployment", "same_sha_idempotence",
+            "restore_timer", "disable_automation_for_failure",
+            "clear_interlock", "clear_authorization",
+        ):
+            self.assertNotIn(forbidden, operations.events)
+        self.assertEqual(operations.production, production)
+        self.assertEqual(operations.installed, approved)
+        self.assertEqual(
+            operations.timer, {"enabled": "disabled", "active": "inactive"}
+        )
+
+    def test_preinstalled_controller_bridge_promotes_application_without_reinstall(self):
+        production = "1" * 40
+        approved = self.SHA
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root, protected=False
+            )
+            operations.production = production
+            operations.installed = approved
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {"enabled": "disabled", "active": "inactive"}
+            coordinator.execute(dry_run=False)
+            coordinator.cleanup()
+        self.assertTrue(coordinator.success)
+        self.assertEqual(operations.production, approved)
+        self.assertEqual(operations.installed, approved)
+        self.assertTrue(record.application_promoted)
+        self.assertTrue(record.controller_preinstalled)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+        self.assertFalse(record.controller_installed)
+        self.assertIn("verify_installed_controller", operations.events)
+        self.assertNotIn("installer_apply", operations.events)
+        self.assertNotIn("verify_install", operations.events)
+        self.assertIn("controlled_candidate_deployment", operations.events)
+        self.assertIn("same_sha_idempotence", operations.events)
+        self.assertEqual(record.same_sha_validation, "passed")
+        self.assertEqual(record.failure_semantics, "complete")
+        self.assertEqual(
+            operations.timer, {"enabled": "disabled", "active": "inactive"}
+        )
+
+    def test_preinstalled_bridge_restores_initially_enabled_timer_after_success(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root, protected=False
+            )
+            operations.production = "1" * 40
+            operations.installed = self.SHA
+            operations.controller_compatibility = "controller_ahead_bridge"
+            coordinator.execute(dry_run=False)
+            coordinator.cleanup()
+        self.assertEqual(
+            operations.timer, {"enabled": "enabled", "active": "active"}
+        )
+
+    def test_preinstalled_bridge_failure_before_promotion_preserves_split_state(self):
+        production = "1" * 40
+        approved = self.SHA
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root, protected=False, failure="controlled_candidate_deployment"
+            )
+            operations.production = production
+            operations.installed = approved
+            operations.controller_compatibility = "controller_ahead_bridge"
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertEqual(operations.production, production)
+        self.assertEqual(operations.installed, approved)
+        self.assertFalse(record.application_promoted)
+        self.assertEqual(
+            record.failure_semantics,
+            "controller_ahead_bridge_application_untouched_timer_disabled",
+        )
+        self.assertNotIn("preinstall_restore_safe", operations.events)
+        self.assertNotIn("restore_timer", operations.events)
+        self.assertTrue(operations.interlock)
+        self.assertEqual(
+            operations.timer, {"enabled": "disabled", "active": "inactive"}
+        )
+
+    def test_preinstalled_bridge_failure_after_promotion_is_forward_repair(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root, protected=False, failure="same_sha_idempotence"
+            )
+            operations.production = "1" * 40
+            operations.installed = self.SHA
+            operations.controller_compatibility = "controller_ahead_bridge"
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertEqual(operations.production, self.SHA)
+        self.assertTrue(record.application_promoted)
+        self.assertEqual(
+            record.failure_semantics,
+            "post_promotion_forward_repair_timer_disabled",
+        )
+        self.assertNotIn("restore_timer", operations.events)
+        self.assertTrue(operations.interlock)
+
+    def test_failed_bridge_dry_run_never_mutates_automation_or_interlock(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root, protected=False, failure="verify_installed_controller"
+            )
+            operations.production = "1" * 40
+            operations.installed = self.SHA
+            operations.controller_compatibility = "controller_ahead_bridge"
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=True)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertEqual(record.failure_semantics, "dry_run_no_mutation")
+        for forbidden in (
+            "quiesce", "arm_interlock", "disable_automation_for_failure",
+            "clear_interlock", "clear_authorization", "restore_timer",
+        ):
+            self.assertNotIn(forbidden, operations.events)
 
     def test_initially_disabled_timer_remains_disabled_after_success(self):
         with tempfile.TemporaryDirectory() as root:
