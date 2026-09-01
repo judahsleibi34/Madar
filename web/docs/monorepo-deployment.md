@@ -104,6 +104,12 @@ controlled deployment and same-SHA check, then restore automation. That install
 places `/usr/local/sbin/madar-control-plane-upgrade`. Future protected releases
 must use the one-command workflow.
 
+Use a unique bootstrap backup below
+`/var/lib/madar-control-plane/backups`, not below application-owned
+`/var/lib/madar`. Dry-run performs the complete shared static preflight and
+must pass before apply; apply repeats it before creating the mode-0700 upgrade
+state hierarchy or backup.
+
 Never update the provenance marker or isolated installed files by hand.
 
 ## Database migrations

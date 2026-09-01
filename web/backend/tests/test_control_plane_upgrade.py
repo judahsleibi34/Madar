@@ -1,11 +1,14 @@
 import hashlib
 import importlib.util
+import errno
 import json
 import os
 import stat
+import struct
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 from types import SimpleNamespace
@@ -32,6 +35,7 @@ sys.path.insert(0, str(WEB_ROOT))
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
     require_upgrade_authorization,
 )
+import control_plane_filesystem as filesystem  # noqa: E402
 
 
 class FakeOperations:
@@ -172,6 +176,217 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         record = upgrade.AuditRecord(approved_sha=self.SHA, dry_run=False)
         audit = upgrade.AuditWriter(Path(root) / "history", record)
         return operations, record, audit, upgrade.UpgradeCoordinator(operations, audit)
+
+    def filesystem_layout(self, root):
+        trust_root = Path(root)
+        trust_root.chmod(0o700)
+        source_root = trust_root / "candidate/repository"
+        control_root = trust_root / "opt/madar/control-plane"
+        install_root = control_root / "deployment"
+        launcher_parent = trust_root / "usr/local/sbin"
+        alert_parent = trust_root / "usr/local/lib/madar"
+        systemd_parent = trust_root / "etc/systemd/system"
+        for path in (
+            source_root, install_root, launcher_parent, alert_parent,
+            systemd_parent, trust_root / "var/lib",
+        ):
+            path.mkdir(parents=True, exist_ok=True)
+        for path in trust_root.rglob("*"):
+            if path.is_dir():
+                path.chmod(0o755)
+        return filesystem.InstallFilesystemLayout(
+            source_root=source_root,
+            backup_root=(
+                trust_root / "var/lib/madar-control-plane/backups/pre-candidate"
+            ),
+            control_plane_root=control_root,
+            install_root=install_root,
+            launcher_parent=launcher_parent,
+            alert_parent=alert_parent,
+            systemd_parent=systemd_parent,
+            state_root=trust_root / "var/lib/madar-control-plane",
+            expected_uid=os.getuid(),
+            rename_scratch_root=source_root.parent,
+            trust_root=trust_root,
+        )
+
+    @staticmethod
+    def acl_value(*entries):
+        return struct.pack("<I", filesystem.ACL_XATTR_VERSION) + b"".join(
+            struct.pack("<HHI", *entry) for entry in entries
+        )
+
+    def test_standard_root_owned_0755_parent_is_root_protected(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "var-lib"
+            path.mkdir(mode=0o755)
+            filesystem.require_root_protected_directory(
+                path, expected_uid=os.getuid()
+            )
+
+    def test_group_world_and_non_owner_writable_parents_are_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "parent"
+            path.mkdir()
+            for mode in (0o775, 0o757):
+                with self.subTest(mode=oct(mode)):
+                    path.chmod(mode)
+                    with self.assertRaisesRegex(
+                        filesystem.FilesystemPreflightError,
+                        "root_protected_directory_invalid",
+                    ):
+                        filesystem.require_root_protected_directory(
+                            path, expected_uid=os.getuid()
+                        )
+            metadata = SimpleNamespace(
+                st_uid=os.getuid() + 1, st_mode=stat.S_IFDIR | 0o755
+            )
+            with mock.patch.object(Path, "lstat", return_value=metadata):
+                with self.assertRaisesRegex(
+                    filesystem.FilesystemPreflightError,
+                    "root_protected_directory_invalid",
+                ):
+                    filesystem.require_root_protected_directory(
+                        path, expected_uid=os.getuid()
+                    )
+
+    def test_unsafe_acl_write_grant_is_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "parent"
+            path.mkdir(mode=0o755)
+            acl = self.acl_value(
+                (filesystem.ACL_USER_OBJ, 0o7, 0xFFFFFFFF),
+                (filesystem.ACL_USER, 0o2, os.getuid() + 1),
+                (filesystem.ACL_GROUP_OBJ, 0o5, 0xFFFFFFFF),
+                (filesystem.ACL_MASK, 0o7, 0xFFFFFFFF),
+                (filesystem.ACL_OTHER, 0o5, 0xFFFFFFFF),
+            )
+
+            def getxattr(_path, name, **_kwargs):
+                if name == "system.posix_acl_access":
+                    return acl
+                raise OSError(errno.ENODATA, "no attribute")
+
+            with mock.patch.object(filesystem.os, "getxattr", side_effect=getxattr):
+                with self.assertRaisesRegex(
+                    filesystem.FilesystemPreflightError,
+                    "root_protected_acl_write_grant",
+                ):
+                    filesystem.require_root_protected_directory(
+                        path, expected_uid=os.getuid()
+                    )
+
+    def test_symlink_parent_escape_is_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            trust_root = Path(root)
+            real = trust_root / "real"
+            real.mkdir()
+            link = trust_root / "linked"
+            link.symlink_to(real, target_is_directory=True)
+            with self.assertRaisesRegex(
+                filesystem.FilesystemPreflightError,
+                "root_protected_directory_invalid",
+            ):
+                filesystem.require_root_protected_ancestry(
+                    link,
+                    expected_uid=os.getuid(),
+                    trust_root=trust_root,
+                )
+
+    def test_dry_run_and_apply_share_unchanged_filesystem_preflight(self):
+        with tempfile.TemporaryDirectory() as root:
+            layout = self.filesystem_layout(root)
+            filesystem.validate_installation_filesystem(layout)
+            # Apply re-runs the identical static contract. With no external
+            # change, a successful dry-run remains successful.
+            filesystem.validate_installation_filesystem(layout)
+            for path in layout.state_directories:
+                path.mkdir(mode=0o700, parents=True, exist_ok=True)
+                path.chmod(0o700)
+            filesystem.validate_installation_filesystem(layout)
+            for path in layout.state_directories:
+                self.assertEqual(path.stat().st_uid, os.getuid())
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o700)
+
+        installer = INSTALLER_PATH.read_text(encoding="utf-8")
+        shared = 'control_plane_filesystem.py"'
+        self.assertIn(shared, installer)
+        dry_run_boundary = installer.index("if (( ! apply ))")
+        first_mutation = installer.index("# Establish only the installer-owned")
+        for static_check in (
+            shared,
+            "for required in",
+            'source_sha="$(git -C',
+            '[[ -f "$alert_hook_source"',
+            "systemctl is-active --quiet madar-auto-deploy.timer",
+            "control-plane backup directory must be empty",
+        ):
+            self.assertLess(installer.index(static_check), dry_run_boundary)
+            self.assertLess(installer.index(static_check), first_mutation)
+        self.assertLess(
+            installer.index(shared),
+            installer.index('install -d -m 0700 "$backup_root"'),
+        )
+
+    def test_launcher_backup_and_state_parents_fail_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            layout = self.filesystem_layout(root)
+            layout.launcher_parent.chmod(0o775)
+            with self.assertRaisesRegex(
+                filesystem.FilesystemPreflightError,
+                "root_protected_directory_invalid",
+            ):
+                filesystem.validate_installation_filesystem(layout)
+
+        with tempfile.TemporaryDirectory() as root:
+            layout = self.filesystem_layout(root)
+            launcher = layout.launcher_parent / "madar-control-plane-upgrade"
+            launcher.symlink_to("/tmp/untrusted-launcher")
+            with self.assertRaisesRegex(
+                filesystem.FilesystemPreflightError,
+                "root_protected_file_invalid",
+            ):
+                filesystem.validate_installation_filesystem(layout)
+
+        with tempfile.TemporaryDirectory() as root:
+            layout = self.filesystem_layout(root)
+            external_backup = Path(root) / "var/lib/external-backups"
+            external_backup.mkdir()
+            external_backup.chmod(0o777)
+            layout = replace(
+                layout, backup_root=external_backup / "pre-candidate"
+            )
+            with self.assertRaisesRegex(
+                filesystem.FilesystemPreflightError,
+                "root_protected_directory_invalid",
+            ):
+                filesystem.validate_installation_filesystem(layout)
+
+        with tempfile.TemporaryDirectory() as root:
+            layout = self.filesystem_layout(root)
+            layout.state_root.mkdir(mode=0o755)
+            with self.assertRaisesRegex(
+                filesystem.FilesystemPreflightError,
+                "root_protected_directory_mode_invalid",
+            ):
+                filesystem.validate_installation_filesystem(layout)
+
+    def test_static_parent_rejection_precedes_all_install_mutation(self):
+        with tempfile.TemporaryDirectory() as root:
+            layout = self.filesystem_layout(root)
+            sentinel = layout.install_root / "CONTROL_PLANE_SOURCE_SHA"
+            sentinel.write_text("old-controller", encoding="ascii")
+            layout.control_plane_root.chmod(0o775)
+            with mock.patch.object(filesystem, "require_rename_exchange") as exchange:
+                with self.assertRaisesRegex(
+                    filesystem.FilesystemPreflightError,
+                    "root_protected_directory_invalid",
+                ):
+                    filesystem.validate_installation_filesystem(layout)
+            exchange.assert_not_called()
+            self.assertEqual(sentinel.read_text(encoding="ascii"), "old-controller")
+            self.assertFalse(layout.backup_root.exists())
+            self.assertFalse(layout.state_root.exists())
 
     def test_exact_sha_authorization_rejects_refs_and_abbreviations(self):
         self.assertEqual(upgrade.normalize_sha("A" * 40), "a" * 40)
@@ -497,10 +712,12 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         installer = INSTALLER_PATH.read_text(encoding="utf-8")
         service = SERVICE_PATH.read_text(encoding="utf-8")
         self.assertIn("bin/madar-control-plane-upgrade", installer)
+        self.assertIn("lib/control_plane_filesystem.py", installer)
         self.assertIn("lib/control_plane_upgrade.py", installer)
         self.assertIn("/usr/local/sbin/madar-control-plane-upgrade", installer)
         self.assertIn("RENAME_EXCHANGE = 2", installer)
         self.assertNotIn('rm -rf -- "$install_root"', installer)
+        self.assertNotIn("var_lib_mode", installer)
         self.assertLess(
             installer.index("RENAME_EXCHANGE = 2"),
             installer.index('"$install_root/bin/madar-control-plane-upgrade"'),
