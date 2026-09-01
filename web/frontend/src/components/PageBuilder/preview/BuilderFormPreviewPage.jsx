@@ -15,6 +15,10 @@ import { getPageBuilderThemeVars } from "../core/PageBuilder.theme";
 import { fetchBuilderProject } from "../services/PageBuilder.api";
 import RuntimeFormToast from "../runtime/RuntimeFormToast";
 import { getRuntimeFormErrors } from "../runtime/formValidation";
+import {
+  addCompletedFormPage,
+  getFormPageNavigationItems,
+} from "../runtime/formPageNavigation";
 import "../../../styles/admin/PageBuilder/index.css";
 
 const deferEffectStateUpdate = (callback) => {
@@ -66,6 +70,7 @@ export default function BuilderFormPreviewPage() {
   const formDirection = getDirectionForLanguage(formLang);
   const isPagedForm = sections.length > 1;
   const [pageIndex, setPageIndex] = useState(0);
+  const [completedPages, setCompletedPages] = useState([]);
   const [answers, setAnswers] = useState({});
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState("");
@@ -76,6 +81,19 @@ export default function BuilderFormPreviewPage() {
   const quizCompleteRef = useRef(false);
   const formShellRef = useRef(null);
   const currentSection = sections[Math.min(pageIndex, Math.max(sections.length - 1, 0))];
+  const validCompletedPages = completedPages.filter((completedPageIndex) => {
+    const fields = sections[completedPageIndex]?.fields || [];
+    const values = fields.reduce((current, field) => ({
+      ...current,
+      [field.id]: answers[field.id] !== undefined ? answers[field.id] : field.defaultValue,
+    }), {});
+    return Object.keys(getRuntimeFormErrors(fields, values)).length === 0;
+  });
+  const pageNavigationItems = getFormPageNavigationItems(
+    sections.length,
+    pageIndex,
+    validCompletedPages,
+  );
   const isQuiz = form?.mode === "quiz";
   const quizSettings = useMemo(() => getQuizSettings(form || {}), [form]);
 
@@ -102,6 +120,7 @@ export default function BuilderFormPreviewPage() {
       setQuizDeactivated(false);
       setSubmitted(false);
       setPageIndex(0);
+      setCompletedPages([]);
       setFormError("");
       setFormLang(getDefaultFormLanguage(form, "en"));
     });
@@ -160,10 +179,14 @@ export default function BuilderFormPreviewPage() {
 
   const goNext = () => {
     setFormError("");
+    if (!validateFields(currentSection?.fields || [])) {
+      setFormError("Please answer the required questions before continuing.");
+      return;
+    }
+    setCompletedPages((current) => addCompletedFormPage(current, pageIndex));
     setPageIndex((current) => Math.min(current + 1, sections.length - 1));
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
-
   const goPrevious = () => {
     setFormError("");
     setPageIndex((current) => Math.max(current - 1, 0));
@@ -396,7 +419,26 @@ export default function BuilderFormPreviewPage() {
                   Previous
                 </button>
               )}
-              {isPagedForm && <span className="runtime-form-page-count">Page {pageIndex + 1} of {sections.length}</span>}
+              {isPagedForm && (
+                <div className="runtime-form-page-navigation">
+                  <span className="runtime-form-page-count">Page {pageIndex + 1} of {sections.length}</span>
+                  <div className="runtime-form-page-numbers" role="navigation" aria-label="Form pages">
+                    {pageNavigationItems.map((item) => (
+                      <button
+                        key={item.index}
+                        type="button"
+                        className={`runtime-form-page-number${item.isCurrent ? " is-current" : ""}${item.isCompleted ? " is-completed" : ""}`}
+                        aria-current={item.isCurrent ? "page" : undefined}
+                        aria-label={`Page ${item.index + 1}`}
+                        disabled={item.isDisabled}
+                        onClick={() => setPageIndex(item.index)}
+                      >
+                        {item.index + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="builder-form-preview-action-group">
                 {!isQuiz && form.resumeLaterEnabled !== false && (
                   <button

@@ -95,7 +95,7 @@ describe("PageBuilderPublishTab", () => {
   });
 
   it("uses the production tenant URL for the published form link", () => {
-    render(<PageBuilderPublishTab project={projectWithForm} />);
+    render(<PageBuilderPublishTab project={projectWithForm} publishedFormIds={["form-1"]} />);
 
     expect(
       screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
@@ -115,25 +115,27 @@ describe("PageBuilderPublishTab", () => {
     ).toBeTruthy();
   });
 
-  it("generates a public form URL for a saved draft independently of site publication", () => {
+  it("does not offer a production form URL before that form is published", () => {
     render(
       <PageBuilderPublishTab
         project={{ ...projectWithForm, status: "draft" }}
+        publishedFormIds={[]}
         hasConfiguredSubdomain
       />
     );
 
     expect(
-      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
+      screen.getByPlaceholderText("Publish this saved form to create its live link.")
     ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /preview form/i }).disabled).toBe(true);
   });
-
   it("opens the saved public-form runtime from Preview form", () => {
     const openPublicFormPage = vi.fn();
 
     render(
       <PageBuilderPublishTab
         project={projectWithForm}
+        publishedFormIds={["form-1"]}
         openPublicFormPage={openPublicFormPage}
       />
     );

@@ -174,7 +174,7 @@
 
 .footer-link:hover,
 .footer-link.active {
-  color: var(--theme-text-inverse);
+  color: var(--color-accent-text);
 }
 
 .footer-link:hover::after,

@@ -423,29 +423,33 @@
 
 .tenant-site-standalone-form {
   min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 0;
+  display: block;
+  padding: clamp(16px, 3vw, 48px);
+  background: var(--form-theme-bg) !important;
 }
 
 .tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page {
-  width: min(760px, calc(100% - 32px));
+  width: min(1440px, 100%);
   min-width: 0;
-  min-height: clamp(520px, 70dvh, 900px);
+  min-height: calc(100dvh - clamp(32px, 6vw, 96px));
   margin-inline: auto;
   padding: 0 !important;
-  place-items: stretch;
+  display: block;
   background: transparent !important;
 }
 
 .tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page > .runtime-form {
   width: 100%;
-  height: 100%;
+  height: auto;
   min-width: 0;
   margin: 0;
-  gap: 0;
-  overflow: hidden;
-  padding: 0 !important;
+  gap: clamp(18px, 2vw, 28px);
+  overflow: visible;
+  padding: clamp(24px, 4vw, 64px) !important;
+  border: 1px solid var(--form-theme-border);
+  border-radius: clamp(18px, 2vw, 28px);
+  background: var(--form-theme-surface) !important;
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--form-theme-text) 12%, transparent);
   box-sizing: border-box;
 }
 
@@ -454,12 +458,8 @@
   display: none;
 }
 
-/* Standalone published forms use one continuous white surface. Keep this
-   scoped away from the page-builder canvas so saved editor theme previews
-   remain unchanged. */
-.tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page,
-.tenant-site-runtime.tenant-site-standalone-form
-  .tenant-runtime-form-page > .runtime-form,
+/* Standalone production links render as a full responsive form document.
+   These rules stay isolated from forms embedded in builder website pages. */
 .tenant-site-runtime.tenant-site-standalone-form
   .tenant-runtime-form-page .runtime-form-header,
 .tenant-site-runtime.tenant-site-standalone-form
@@ -470,16 +470,75 @@
   .tenant-runtime-form-page .runtime-question,
 .tenant-site-runtime.tenant-site-standalone-form
   .tenant-runtime-form-page .runtime-form-pagination {
-  background: white !important;
+  background: transparent !important;
+}
+
+.tenant-site-runtime.tenant-site-standalone-form .runtime-form-section {
+  gap: 0;
+}
+
+.tenant-site-runtime.tenant-site-standalone-form .runtime-question {
+  min-height: 0;
+  padding-block: clamp(14px, 1.8vw, 22px);
+}
+
+.tenant-site-runtime.tenant-site-standalone-form .runtime-question-field {
+  gap: 9px;
 }
 
 .tenant-site-runtime.tenant-site-standalone-form
   .runtime-question input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .tenant-site-runtime.tenant-site-standalone-form .runtime-question textarea,
 .tenant-site-runtime.tenant-site-standalone-form .runtime-question select {
-  background: white !important;
+  min-height: 52px;
+  border-color: color-mix(in srgb, var(--form-theme-text) 22%, var(--form-theme-border)) !important;
+  background: var(--form-theme-input) !important;
+  color: var(--form-theme-text) !important;
 }
 
+.tenant-site-runtime.tenant-site-standalone-form .runtime-question textarea {
+  min-height: 132px;
+}
+
+.tenant-site-runtime.tenant-site-standalone-form .runtime-form-pagination {
+  padding-top: clamp(18px, 2vw, 28px);
+}
+
+@media (max-width: 720px) {
+  .tenant-site-standalone-form {
+    padding: 0;
+  }
+
+  .tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page {
+    width: 100%;
+    min-height: 100dvh;
+  }
+
+  .tenant-site-runtime.tenant-site-standalone-form .tenant-runtime-form-page > .runtime-form {
+    min-height: 100dvh;
+    padding: 20px 16px 28px !important;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .tenant-site-runtime.tenant-site-standalone-form .runtime-form-pagination {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .tenant-site-runtime.tenant-site-standalone-form .runtime-form-page-navigation {
+    grid-row: 1;
+  }
+
+  .tenant-site-runtime.tenant-site-standalone-form .runtime-form-pagination > button {
+    grid-row: 2;
+  }
+
+  .tenant-site-runtime.tenant-site-standalone-form .runtime-form-actions {
+    grid-row: 3;
+  }
+}
 .tenant-runtime-loader {
   width: 38px;
   height: 38px;

@@ -1,71 +1,59 @@
-/* Public design variables.
-   These alias the existing theme tokens so redesign work has one predictable entrypoint. */
+/* Shared compatibility aliases for the centralized application design system. */
 :root {
   --color-primary: var(--theme-primary);
   --color-primary-hover: var(--theme-primary-hover);
   --color-secondary: var(--theme-secondary);
   --color-accent: var(--theme-info);
-
   --color-background: var(--theme-bg);
   --color-background-soft: var(--theme-bg-soft);
   --color-surface: var(--theme-surface);
   --color-surface-muted: var(--theme-surface-2);
   --color-card: var(--theme-surface);
-
   --color-text-main: var(--theme-text);
   --color-text-soft: var(--theme-text-soft);
   --color-text-muted: var(--theme-text-muted);
   --color-text-inverse: var(--theme-text-inverse);
   --color-border: var(--theme-border);
   --color-border-strong: var(--theme-border-strong);
-
-  --font-main: Inter, "IBM Plex Sans Arabic", system-ui, sans-serif;
-  --font-heading: Inter, "IBM Plex Sans Arabic", system-ui, sans-serif;
-
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-md: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.625rem;
-  --font-size-2xl: 2.625rem;
-  --font-size-3xl: 3.625rem;
-
-  --font-weight-regular: 400;
-  --font-weight-medium: 650;
-  --font-weight-bold: 800;
-  --font-weight-black: 950;
-
-  --line-height-tight: 1.08;
+  --font-main: var(--font-family-base);
+  --font-heading: var(--font-family-base);
+  --font-size-xs: var(--type-caption-size);
+  --font-size-sm: var(--type-small-size);
+  --font-size-md: var(--type-body-size);
+  --font-size-lg: var(--type-body-lg-size);
+  --font-size-xl: var(--type-h3-size);
+  --font-size-2xl: var(--type-h1-size);
+  --font-size-3xl: var(--type-display-size);
+  --font-weight-regular: var(--weight-regular);
+  --font-weight-medium: var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --font-weight-bold: var(--weight-bold);
+  --font-weight-black: var(--weight-bold);
+  --line-height-tight: 1.25;
   --line-height-base: 1.5;
-  --line-height-relaxed: 1.7;
-
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3.5rem;
-  --space-3xl: 5rem;
-
-  --radius-sm: 0.625rem;
-  --radius-md: var(--app-radius-control);
-  --radius-lg: var(--app-radius-card);
-  --radius-xl: var(--app-radius-panel);
-  --radius-full: 999px;
-
-  --shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.08);
-  --shadow-md: 0 18px 44px rgba(var(--theme-shadow-rgb), 0.14);
-  --shadow-lg: 0 28px 70px rgba(var(--theme-shadow-rgb), 0.22);
-
-  --container-sm: 780px;
-  --container-md: 1060px;
-  --container-lg: 1180px;
-  --container-xl: 1200px;
-
+  --line-height-relaxed: 1.75;
+  --space-xs: var(--space-1);
+  --space-sm: var(--space-2);
+  --space-md: var(--space-4);
+  --space-lg: var(--space-6);
+  --space-xl: var(--space-8);
+  --space-2xl: var(--space-12);
+  --space-3xl: var(--space-20);
+  --radius-sm: var(--radius-small);
+  --radius-md: var(--radius-default);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-large);
+  --radius-full: var(--radius-pill);
+  --shadow-sm: var(--app-shadow-sm);
+  --shadow-md: var(--app-shadow-md);
+  --shadow-lg: var(--app-modal-shadow);
+  --container-sm: var(--content-max-width);
+  --container-md: var(--layout-max-width);
+  --container-lg: var(--layout-max-width);
+  --container-xl: var(--layout-max-width);
   --breakpoint-sm: 620px;
-  --breakpoint-md: 900px;
-  --breakpoint-lg: 1180px;
-
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
   --transition-fast: 0.2s ease;
   --transition-normal: 0.3s ease;
   --z-header: 5000;

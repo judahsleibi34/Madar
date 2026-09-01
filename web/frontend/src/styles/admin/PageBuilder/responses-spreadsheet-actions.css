@@ -25,7 +25,7 @@
   border: 1px solid rgba(var(--theme-primary-rgb), 0.32);
   border-radius: var(--app-radius-control, 10px);
   background: var(--theme-primary-soft);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font: inherit;
   font-size: 12px;
   font-weight: 950;
@@ -34,7 +34,7 @@
 }
 
 .page-builder .responses-spreadsheet-button:hover:not(:disabled) {
-  border-color: var(--madar-red);
+  border-color: var(--color-accent-text);
   background: var(--madar-red);
   color: var(--theme-text-inverse);
 }

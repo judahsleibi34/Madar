@@ -80,7 +80,7 @@
   top: -28px;
   left: 50%;
   transform: translateX(-50%);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 900;
   white-space: nowrap;
@@ -124,7 +124,7 @@
 }
 
 .server-info-list strong {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 14px;
   font-weight: 900;
   text-align: end;
@@ -149,7 +149,7 @@
 }
 
 .metric-row-header strong {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 14px;
   font-weight: 900;
 }

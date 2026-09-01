@@ -200,6 +200,7 @@ export default function FormsTab({
   addConnectedFormSectionToPage,
   openFormPreviewPage,
   saveProject,
+  publishProject,
 
   quizOptionsOpen,
   setQuizOptionsOpen,
@@ -720,17 +721,29 @@ export default function FormsTab({
   };
 
   const saveForm = async () => {
-    if (!saveProject || isSavingForm) return;
+    if ((!publishProject && !saveProject) || isSavingForm) return;
     setIsSavingForm(true);
     try {
-      await saveProject({
-        successMessage: "Form saved and published. Its public form link is live.",
-      });
+      if (publishProject) {
+        await publishProject();
+      } else {
+        await saveProject({ successMessage: "Form saved." });
+      }
     } finally {
       setIsSavingForm(false);
     }
   };
 
+  const previewForm = async () => {
+    if (!openFormPreviewPage || isSavingForm) return;
+    setIsSavingForm(true);
+    try {
+      const saved = saveProject ? await saveProject({ silent: true }) : true;
+      if (saved) openFormPreviewPage(activeForm.id);
+    } finally {
+      setIsSavingForm(false);
+    }
+  };
   const updateFormThemeValue = (key, value) => {
     updateProject?.((prev) => ({
       ...prev,
@@ -956,12 +969,12 @@ export default function FormsTab({
             <section className="simple-action-group forms-form-actions-group">
               <span className="simple-action-group-title">{copy.labels.formActions}</span>
               <FormButton variant="primary" icon={Save} disabled={isSavingForm} onClick={saveForm}>
-                {isSavingForm ? "Saving..." : "Save form"}
+                {isSavingForm ? "Publishing..." : publishProject ? "Save & publish form" : "Save form"}
               </FormButton>
               <FormButton icon={Settings} onClick={() => setQuizOptionsOpen(true)}>
                 {copy.labels.formSettings}
               </FormButton>
-              <FormButton icon={Eye} onClick={() => openFormPreviewPage?.(activeForm.id)}>
+              <FormButton icon={Eye} disabled={isSavingForm} onClick={previewForm}>
                 {copy.labels.previewForm}
               </FormButton>
               <FormButton variant="primary" icon={Send} onClick={() => setShowPublishPanel((value) => !value)}>

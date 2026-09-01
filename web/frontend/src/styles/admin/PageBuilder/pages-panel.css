@@ -95,7 +95,7 @@
 }
 
 .page-builder .panel-navigator button:hover {
-  border-color: var(--madar-border);
+  border-color: var(--color-border-control);
   background: rgba(var(--theme-shadow-rgb), 0.05);
   color: var(--madar-text);
   transform: translateX(2px);
@@ -183,6 +183,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  border: 1px solid var(--color-border-control);
   border-radius: 12px;
   padding: 0 12px;
   font-size: 13px;
@@ -198,7 +199,7 @@
 .page-builder .page-primary-action {
   width: 100%;
   background: var(--madar-gradient);
-  color: #fff;
+  color: var(--theme-text-inverse);
   box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.2);
 }
 
@@ -206,7 +207,7 @@
 .page-builder .page-primary-action *,
 .page-builder .page-delete-action,
 .page-builder .page-delete-action * {
-  color: #fff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 .page-builder .page-primary-action svg,
@@ -237,18 +238,18 @@
 
 .page-builder .page-utility-actions button:hover {
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--madar-red) !important;
+  color: var(--color-accent-text) !important;
 }
 
 .page-builder .page-utility-actions button:hover * {
-  color: var(--madar-red) !important;
+  color: var(--color-accent-text) !important;
 }
 
 .page-builder.theme-dark .page-utility-actions button,
 .page-builder.theme-dark .page-utility-actions button *,
 .page-builder.theme-dark .page-delete-action:not(:disabled),
 .page-builder.theme-dark .page-delete-action:not(:disabled) * {
-  color: #fff !important;
+  color: var(--theme-text-inverse) !important;
 }
 
 .page-builder .page-danger-actions {
@@ -287,13 +288,13 @@
   width: 100%;
   border: 1px solid var(--theme-primary);
   background: var(--theme-primary);
-  color: #fff;
+  color: var(--theme-text-inverse);
 }
 
 .page-builder .page-delete-action:not(:disabled):hover {
   transform: translateY(-1px);
   background: var(--theme-primary-hover);
-  border-color: var(--theme-primary-hover);
+  border-color: var(--color-accent-text);
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
 
@@ -309,7 +310,7 @@
 .page-builder .page-preview-action:hover {
   transform: translateY(-1px);
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 
 .page-builder .page-delete-action:disabled {
@@ -359,7 +360,7 @@
   align-content: center;
   gap: 2px;
   padding: 10px 11px;
-  border: 1px solid var(--madar-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 11px;
   background: var(--madar-surface-soft);
   color: var(--madar-text);
@@ -370,7 +371,7 @@
 .page-builder .section-component-palette button:hover {
   border-color: rgba(var(--theme-primary-rgb), 0.3);
   background: rgba(var(--theme-primary-rgb), 0.08);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 
 .page-builder .section-component-palette button:active {
@@ -410,7 +411,7 @@
 }
 
 .page-builder details[open] > summary {
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 /* ============================================================
    Pages Panel — Main / Branch UI + Inline Delete
@@ -420,7 +421,7 @@
   display: grid;
   gap: 6px;
   padding: 12px;
-  border: 1px solid var(--madar-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 16px;
   background: var(--madar-surface-soft);
 }
@@ -449,7 +450,7 @@
 
 .page-builder .page-kind-pill.branch {
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 
 .page-builder .page-create-grid {
@@ -515,7 +516,7 @@
 }
 
 .page-builder .page-delete-card strong {
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-size: 15px;
   font-weight: 950;
 }

@@ -1,6 +1,6 @@
 .gradient-text {
   display: inline;
-  color: var(--gradient-text-color, var(--theme-primary));
+  color: var(--gradient-text-color, var(--color-accent-text));
   background-image: none;
   animation: none;
 }
@@ -21,7 +21,7 @@
 
 [data-theme="dark"] .gradient-text,
 body.theme-dark .gradient-text {
-  --gradient-text-color: var(--theme-primary-hover);
+  --gradient-text-color: var(--color-accent-text);
 }
 
 @keyframes gradientTextMove {

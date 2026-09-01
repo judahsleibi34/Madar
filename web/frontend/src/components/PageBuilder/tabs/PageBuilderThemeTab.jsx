@@ -297,7 +297,6 @@ export default function PageBuilderThemeTab({
       <section className="theme-section">
         <div className="theme-section-heading">
           <div>
-            <span className="workspace-kicker">{isSidebar ? "Builder themes" : "Builder style"}</span>
             <h3>Canvas look</h3>
             <p>
               {isSidebar

@@ -86,7 +86,7 @@ li {
 a,
 .gradient-text,
 .arabic-name {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .gradient-text {
@@ -130,7 +130,7 @@ textarea,
 .page-builder input,
 .page-builder select,
 .page-builder textarea {
-  border-color: var(--theme-border) !important;
+  border-color: var(--color-border-control) !important;
   background: var(--theme-surface) !important;
   color: var(--theme-text) !important;
 }
@@ -143,13 +143,13 @@ textarea::placeholder {
 input:hover,
 select:hover,
 textarea:hover {
-  border-color: var(--theme-border-strong) !important;
+  border-color: var(--color-border-control) !important;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--theme-primary) !important;
+  border-color: var(--color-accent-text) !important;
   box-shadow: var(--focus-ring) !important;
 }
 
@@ -192,7 +192,7 @@ body.theme-dark .preview-device-toolbar {
 .btn-login:hover,
 .login-signup-text a,
 .forgot-link {
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
 }
 
 .nav-menu a::after {
@@ -213,7 +213,7 @@ body.theme-dark .preview-device-toolbar {
 .reservation-mode-switch button.active {
   background: var(--theme-primary) !important;
   color: var(--theme-text-inverse) !important;
-  border-color: var(--theme-primary) !important;
+  border-color: var(--color-accent-text) !important;
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.2) !important;
 }
 
@@ -228,7 +228,7 @@ body.theme-dark .preview-device-toolbar {
 .builder-topbar-actions > button.primary-action:hover,
 .full-width-action:hover {
   background: var(--theme-primary-hover) !important;
-  border-color: var(--theme-primary-hover) !important;
+  border-color: var(--color-accent-text) !important;
   transform: translateY(-1px);
   box-shadow: 0 16px 32px rgba(var(--theme-primary-rgb), 0.24) !important;
 }
@@ -240,7 +240,7 @@ body.theme-dark .preview-device-toolbar {
 .form-command-button,
 .page-preview-action,
 .page-delete-action {
-  border-color: var(--theme-border) !important;
+  border-color: var(--color-border-control) !important;
   background: var(--theme-surface) !important;
   color: var(--theme-text) !important;
 }
@@ -482,7 +482,7 @@ body.theme-dark .reservation-editor-preview-block {
 
 .danger-button,
 .page-delete-action {
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
 }
 

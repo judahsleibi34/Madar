@@ -1,5 +1,5 @@
 .cv-rerank-page {
-  --cv-rerank-success: #27815f;
+  --cv-rerank-success: var(--color-success);
   width: min(1480px, 100%);
   min-width: 0;
   margin: 0 auto;
@@ -51,7 +51,7 @@
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(300px, 0.78fr) minmax(0, 1.45fr);
-  border: 1px solid var(--dashboard-border, var(--border-color));
+  border: 1px solid var(--color-border-control);
   border-radius: 8px;
   background: var(--dashboard-card, var(--bg-card));
   overflow: hidden;
@@ -64,7 +64,7 @@
 }
 
 .cv-rerank-setup {
-  border-inline-end: 1px solid var(--dashboard-border, var(--border-color));
+  border-inline-end: 1px solid var(--color-border-control);
   background: color-mix(in srgb, var(--dashboard-card, var(--bg-card)) 94%, var(--madar-red) 6%);
 }
 
@@ -79,7 +79,7 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   background: color-mix(in srgb, var(--madar-red) 11%, transparent);
 }
 
@@ -110,7 +110,7 @@
 .cv-rerank-sort select {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--dashboard-border, var(--border-color));
+  border: 1px solid var(--color-border-control);
   border-radius: 7px;
   background: var(--dashboard-input, var(--bg-input));
   color: inherit;
@@ -132,7 +132,7 @@
 
 .cv-rerank-field :is(input, textarea):focus,
 .cv-rerank-sort select:focus {
-  border-color: var(--madar-red);
+  border-color: var(--color-accent-text);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--madar-red) 14%, transparent);
 }
 
@@ -159,12 +159,12 @@
 }
 
 .cv-rerank-dropzone.is-dragging {
-  border-color: var(--madar-red);
+  border-color: var(--color-accent-text);
   background: color-mix(in srgb, var(--madar-red) 8%, var(--dashboard-card, var(--bg-card)));
 }
 
 .cv-rerank-dropzone > svg {
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 
 .cv-rerank-dropzone strong {
@@ -194,7 +194,7 @@
 
 .cv-rerank-dropzone button {
   margin-top: 6px;
-  border: 1px solid var(--dashboard-border, var(--border-color));
+  border: 1px solid var(--color-border-control);
   background: var(--dashboard-card, var(--bg-card));
   color: var(--dashboard-text, var(--text-primary));
 }
@@ -209,7 +209,7 @@
 }
 
 .cv-rerank-secondary {
-  border: 1px solid var(--dashboard-border, var(--border-color));
+  border: 1px solid var(--color-border-control);
   background: var(--dashboard-card, var(--bg-card));
   color: var(--dashboard-text, var(--text-primary));
 }
@@ -225,7 +225,7 @@
   padding: 10px 12px;
   border-inline-start: 3px solid var(--madar-red);
   background: color-mix(in srgb, var(--madar-red) 8%, transparent);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 700;
 }
@@ -260,7 +260,7 @@
 
 .cv-rerank-table {
   min-width: 0;
-  border-block: 1px solid var(--dashboard-border, var(--border-color));
+  border-block: 1px solid var(--color-border-control);
 }
 
 .cv-rerank-table-head,
@@ -282,7 +282,7 @@
 
 .cv-rerank-row {
   min-height: 76px;
-  border-top: 1px solid var(--dashboard-border, var(--border-color));
+  border-top: 1px solid var(--color-border-control);
 }
 
 .cv-rerank-table-body .cv-rerank-row:first-child {
@@ -365,7 +365,7 @@
 
 .cv-rerank-remove:hover {
   background: color-mix(in srgb, var(--madar-red) 10%, transparent);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 
 .cv-rerank-empty {
@@ -402,7 +402,7 @@
 
 @media (max-width: 760px) {
   .cv-rerank-page {
-  --cv-rerank-success: #27815f;
+  --cv-rerank-success: var(--color-success);
     padding: 20px 14px 36px;
   }
 
@@ -416,7 +416,7 @@
 
   .cv-rerank-setup {
     border-inline-end: 0;
-    border-bottom: 1px solid var(--dashboard-border, var(--border-color));
+    border-bottom: 1px solid var(--color-border-control);
   }
 
   .cv-rerank-table-head {

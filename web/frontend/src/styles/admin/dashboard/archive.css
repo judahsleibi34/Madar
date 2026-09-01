@@ -53,7 +53,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.1);
 }
 
@@ -118,7 +118,7 @@
 .archive-list-heading > div > span {
   display: block;
   margin-bottom: 5px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -175,7 +175,7 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   transform: none;
 }
 
@@ -195,7 +195,7 @@
 
 .archive-builder-page .archive-filter-tabs button.is-active {
   border-color: rgba(var(--theme-primary-rgb), 0.28);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: var(--theme-primary-soft);
 }
 
@@ -207,7 +207,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: transparent;
   font-size: 0.67rem;
 }
@@ -232,7 +232,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.1);
   font-size: 0.7rem;
   font-weight: 900;
@@ -289,7 +289,7 @@
 
 .archive-item-title-row span {
   flex: 0 0 auto;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 0.64rem;
   font-weight: 900;
 }
@@ -322,7 +322,7 @@
   width: 34px;
   height: 34px;
   padding: 0;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
@@ -335,7 +335,7 @@
 .archive-builder-page .archive-item-actions button:hover,
 .archive-builder-page .archive-item-actions a:hover {
   border-color: rgba(var(--theme-primary-rgb), 0.22);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: var(--theme-primary-soft);
 }
 
@@ -380,7 +380,7 @@
   min-height: 36px;
   margin-top: 14px;
   padding: 0 12px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 8px;
   color: var(--theme-text);
   background: var(--theme-surface-2);

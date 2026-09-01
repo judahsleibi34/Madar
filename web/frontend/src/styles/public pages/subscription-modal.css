@@ -48,7 +48,7 @@
 .subscription-modal-close:hover,
 .subscription-modal-close:focus-visible {
   background: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   transform: translateY(-1px);
   outline: none;
 }

@@ -133,7 +133,7 @@ export default function CvRerankPage() {
 
   return (
     <main className="cv-rerank-page">
-      <header className="cv-rerank-header">
+      <header className="cv-rerank-header app-page-intro">
         <div>
           <h1>CV Rerank</h1>
           <p>Prioritize candidate CVs against a role profile.</p>

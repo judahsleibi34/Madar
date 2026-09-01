@@ -13,7 +13,7 @@ export default function MainLayout({
   user,
 }) {
   return (
-    <>
+    <div className="public-app-shell">
       <Header
         authChecked={authChecked}
         isLoggedIn={isLoggedIn}
@@ -28,6 +28,6 @@ export default function MainLayout({
       <Outlet />
 
       <Footer lang={lang} />
-    </>
+    </div>
   );
 }

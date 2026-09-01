@@ -148,7 +148,7 @@
 
 .arabic-name {
   display: inline;
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   font-weight: var(--font-weight-bold);
   font-size: 22px;
   font-family: var(--font-main);
@@ -180,7 +180,7 @@ body.theme-dark .hero-description {
 
 [data-theme="dark"] .arabic-name,
 body.theme-dark .arabic-name {
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }
 
 /* ============================================================
@@ -278,15 +278,6 @@ body.theme-dark .arabic-name {
   padding: clamp(28px, 4vw, 42px);
 }
 
-.about-eyebrow {
-  display: inline-flex;
-  margin-bottom: 14px;
-  color: var(--theme-primary);
-  font-size: 12px;
-  font-weight: 950;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
 
 .about-hero h1 {
   max-width: 760px;
@@ -299,7 +290,7 @@ body.theme-dark .arabic-name {
 }
 
 .about-hero h1 span {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .about-hero p {
@@ -332,7 +323,7 @@ body.theme-dark .arabic-name {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: var(--theme-primary-soft);
 }
 
@@ -367,7 +358,7 @@ body.theme-dark .arabic-name {
 }
 
 .about-metric svg {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .about-metric strong {
@@ -398,7 +389,7 @@ body.theme-dark .arabic-name {
 .about-card > span {
   display: inline-flex;
   margin-bottom: 18px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 13px;
   font-weight: 950;
 }

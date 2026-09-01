@@ -13,9 +13,8 @@ export default function AboutSection({ lang }) {
   return (
     <SectionBlock id="about" className="about-section" dir={isRTL ? "rtl" : "ltr"}>
       <FadeIn delay={0}>
-        <div className="about-hero">
+        <div className="about-hero app-page-intro">
           <div className="about-hero-copy">
-            <span className="about-eyebrow">{content.hero.eyebrow}</span>
             <h1>
               {content.hero.titlePrefix} <span>{content.hero.titleHighlight}</span>
             </h1>

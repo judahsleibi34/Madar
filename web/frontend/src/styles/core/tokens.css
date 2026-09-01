@@ -22,9 +22,10 @@
   --surface-3: var(--surface-2);
   --border-subtle: #ddd6ca;
   --border-strong: #c8bfb1;
+  --border-control: #6f7787;
   --text-primary: #162033;
   --text-secondary: #465066;
-  --text-muted: #6f7787;
+  --text-muted: var(--text-secondary);
   --accent: #852c21;
 
   --theme-bg: var(--app-bg);
@@ -51,6 +52,13 @@
   --theme-primary-hover: #6f241b;
   --theme-primary-soft: rgba(133, 44, 33, 0.1);
   --theme-primary-rgb: 133, 44, 33;
+  --accent-text: var(--theme-primary);
+  --heading-accent: var(--theme-primary);
+  --danger-action: var(--status-danger-text);
+  --focus-indicator: var(--theme-primary);
+  --status-success-text: #365849;
+  --status-warning-text: var(--text-primary);
+  --status-danger-text: #b42318;
   --theme-secondary: #6b7654;
   --theme-secondary-soft: rgba(107, 118, 84, 0.12);
   --theme-secondary-rgb: 107, 118, 84;
@@ -83,6 +91,7 @@
   --color-surface-muted: var(--theme-surface-3);
   --color-border: var(--theme-border);
   --color-border-strong: var(--theme-border-strong);
+  --color-border-control: var(--border-control);
   --color-text: var(--theme-text);
   --color-text-soft: var(--theme-text-soft);
   --color-text-muted: var(--theme-text-muted);
@@ -90,6 +99,16 @@
   --color-primary: var(--theme-primary);
   --color-primary-hover: var(--theme-primary-hover);
   --color-primary-soft: var(--theme-primary-soft);
+  --color-accent-text: var(--accent-text);
+  --color-heading-accent: var(--heading-accent);
+  --color-danger-action: var(--danger-action);
+  --color-focus-indicator: var(--focus-indicator);
+  --color-disabled-bg: var(--surface-2);
+  --color-disabled-border: var(--border-control);
+  --color-disabled-text: var(--text-muted);
+  --color-status-success-text: var(--status-success-text);
+  --color-status-warning-text: var(--status-warning-text);
+  --color-status-danger-text: var(--status-danger-text);
   --color-secondary: var(--theme-secondary);
   --color-secondary-soft: var(--theme-secondary-soft);
   --color-info: var(--theme-info);
@@ -115,9 +134,6 @@
   --builder-chrome-surface: var(--surface-1);
   --builder-chrome-surface-raised: var(--surface-2);
   --builder-chrome-surface-muted: var(--surface-2);
-  --app-radius-control: 12px;
-  --app-radius-card: 16px;
-  --app-radius-panel: 18px;
   --app-control-shadow: inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.72);
   --builder-chrome-border: var(--border-subtle);
   --builder-chrome-shadow: var(--app-shadow-sm);
@@ -151,6 +167,7 @@
   --surface-3: var(--surface-2);
   --border-subtle: rgba(255, 255, 255, 0.10);
   --border-strong: rgba(255, 255, 255, 0.17);
+  --border-control: #9ca6b2;
   --text-primary: #f4f6f8;
   --text-secondary: #c8ced6;
   --text-muted: #9ca6b2;
@@ -181,10 +198,17 @@
   --theme-paper-text: var(--text-primary);
   --theme-paper-text-soft: var(--text-secondary);
   --theme-paper-border: var(--border-subtle);
-  --theme-primary: #852C21;
+  --theme-primary: #c94730;
   --theme-primary-hover: #c94730;
-  --theme-primary-soft: rgba(133, 44, 33, 0.14);
-  --theme-primary-rgb: 133, 44, 33;
+  --theme-primary-soft: rgba(196, 69, 58, 0.14);
+  --theme-primary-rgb: 201, 71, 48;
+  --accent-text: var(--text-primary);
+  --heading-accent: var(--theme-danger);
+  --danger-action: var(--theme-danger);
+  --focus-indicator: var(--theme-danger);
+  --status-success-text: var(--theme-success);
+  --status-warning-text: var(--theme-warning);
+  --status-danger-text: var(--text-primary);
   --theme-secondary: #8c9a6b;
   --theme-secondary-soft: rgba(140, 154, 107, 0.14);
   --theme-secondary-rgb: 140, 154, 107;
@@ -216,6 +240,7 @@
   --color-surface-muted: var(--theme-surface-3);
   --color-border: var(--theme-border);
   --color-border-strong: var(--theme-border-strong);
+  --color-border-control: var(--border-control);
   --color-text: var(--theme-text);
   --color-text-soft: var(--theme-text-soft);
   --color-text-muted: var(--theme-text-muted);
@@ -223,6 +248,16 @@
   --color-primary: var(--theme-primary);
   --color-primary-hover: var(--theme-primary-hover);
   --color-primary-soft: var(--theme-primary-soft);
+  --color-accent-text: var(--accent-text);
+  --color-heading-accent: var(--heading-accent);
+  --color-danger-action: var(--danger-action);
+  --color-focus-indicator: var(--focus-indicator);
+  --color-disabled-bg: var(--surface-2);
+  --color-disabled-border: var(--border-control);
+  --color-disabled-text: var(--text-muted);
+  --color-status-success-text: var(--status-success-text);
+  --color-status-warning-text: var(--status-warning-text);
+  --color-status-danger-text: var(--status-danger-text);
   --color-secondary: var(--theme-secondary);
   --color-secondary-soft: var(--theme-secondary-soft);
   --color-info: var(--theme-info);
@@ -244,9 +279,6 @@
   --app-chrome-translucent: color-mix(in srgb, var(--theme-surface) 90%, transparent);
   --app-success-strong: #4ade80;
   --app-success-strong-rgb: 74, 222, 128;
-  --app-radius-control: 14px;
-  --app-radius-card: 22px;
-  --app-radius-panel: 22px;
   --app-control-shadow: none;
   --builder-chrome-bg: var(--app-bg);
   --builder-chrome-surface: var(--surface-1);
@@ -297,4 +329,45 @@
   --admin-focus-ring: var(--app-focus-ring);
   --admin-surface-alpha: var(--app-surface-alpha);
   --admin-success-strong: var(--app-success-strong);
+}
+
+/* UI CONSISTENCY STRUCTURAL TOKENS */
+/* Geometry and typography are deliberately theme-independent. */
+:root {
+  --color-divider: var(--color-border-strong);
+  --color-bg-secondary: var(--theme-bg-soft);
+  --color-surface-elevated: var(--theme-surface-elevated);
+  --font-family-base: Inter, "IBM Plex Sans Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --type-display-size: 36px; --type-display-line: 44px;
+  --type-h1-size: 32px; --type-h1-line: 40px;
+  --type-h2-size: 28px; --type-h2-line: 36px;
+  --type-h3-size: 24px; --type-h3-line: 32px;
+  --type-h4-size: 20px; --type-h4-line: 28px;
+  --type-body-lg-size: 18px; --type-body-lg-line: 28px;
+  --type-body-size: 16px; --type-body-line: 24px;
+  --type-small-size: 14px; --type-small-line: 20px;
+  --type-caption-size: 12px; --type-caption-line: 16px;
+  --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600; --weight-bold: 700;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px; --space-20: 80px;
+  --radius-small: 6px; --radius-default: 8px; --radius-card: 12px; --radius-large: 16px; --radius-pill: 9999px;
+  --app-radius-control: var(--radius-default); --app-radius-card: var(--radius-card); --app-radius-panel: var(--radius-large);
+  --control-height-sm: 36px; --control-height: 44px; --control-height-lg: 48px;
+  --icon-size-sm: 16px; --icon-size: 20px; --icon-size-lg: 24px; --icon-size-feature: 32px;
+  --layout-max-width: 1440px; --content-max-width: 800px; --intro-max-width: 720px;
+  --page-gutter: 48px; --page-top-space: 64px; --section-space: 80px; --app-header-height: 88px;
+}
+@media (max-width: 1024px) {
+  :root { --page-gutter: 32px; --page-top-space: 48px; --section-space: 64px; --app-header-height: 80px; }
+}
+@media (max-width: 620px) {
+  :root {
+    --type-display-size: 32px; --type-display-line: 40px;
+    --type-h1-size: 28px; --type-h1-line: 36px;
+    --type-h2-size: 24px; --type-h2-line: 32px;
+    --type-h3-size: 20px; --type-h3-line: 28px;
+    --type-h4-size: 18px; --type-h4-line: 26px;
+    --type-body-lg-size: 16px; --type-body-lg-line: 24px;
+    --page-gutter: 20px; --page-top-space: 32px; --section-space: 48px; --app-header-height: 72px;
+  }
 }

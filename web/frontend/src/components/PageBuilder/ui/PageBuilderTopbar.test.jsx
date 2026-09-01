@@ -17,6 +17,18 @@ describe("PageBuilderTopbar", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("keeps project identity out of the heading hierarchy when a nested page owns the H1", () => {
+    const view = render(
+      <PageBuilderTopbar
+        project={{ name: "Site" }}
+        activeHelper="Review responses"
+        activeTab="responses"
+      />
+    );
+
+    expect(view.container.querySelector("h1")).toBeNull();
+    expect(view.container.querySelector(".builder-brand-name")?.tagName).toBe("SPAN");
+  });
   it("places the exit preview action in the header", () => {
     const onPreviewClick = vi.fn();
 

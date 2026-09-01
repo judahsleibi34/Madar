@@ -57,6 +57,22 @@ body,
   opacity: 1;
 }
 
+:where(input, select, textarea) {
+  border-color: var(--border-control);
+}
+
+:where(input, select, textarea):disabled {
+  background-color: var(--color-disabled-bg);
+  border-color: var(--color-disabled-border);
+  color: var(--color-disabled-text);
+  opacity: 1;
+}
+
+body :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus-indicator);
+  outline-offset: 2px;
+}
+
 :where(hr, .divider) {
   border-color: var(--border-subtle);
 }

@@ -1,0 +1,36 @@
+/* Application-wide contrast contract.
+   These selectors intentionally carry enough specificity to survive
+   route-level lazy CSS without using !important. Authored tenant output is
+   excluded because its palette is controlled by the site/form author. */
+
+body :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea
+):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *) {
+  border-color: var(--color-border-control);
+}
+
+body :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea
+):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *)::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+body :is(a, button, input, select, textarea, summary, [tabindex]):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *):focus-visible {
+  outline: 2px solid var(--color-focus-indicator);
+  outline-offset: 2px;
+}
+
+body :is(button, input, select, textarea, [role="button"])[disabled][disabled]:not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *),
+body :is(button, input, select, textarea, [role="button"])[aria-disabled="true"][aria-disabled="true"]:not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *) {
+  background-color: var(--color-disabled-bg);
+  background-image: none;
+  border-color: var(--color-disabled-border);
+  color: var(--color-disabled-text);
+  opacity: 1;
+  box-shadow: none;
+}

@@ -4394,7 +4394,7 @@ export default function PageBuilder({
         const style = documentRef.createElement("style");
         style.id = "builder-text-selection-style";
         style.textContent =
-          "::highlight(builder-text-selection){color:inherit;background:rgba(133,44,33,.24)}";
+          "::highlight(builder-text-selection){color:inherit;background:rgba(var(--theme-primary-rgb),.24)}";
         documentRef.head.append(style);
       }
       highlights.set("builder-text-selection", new HighlightConstructor(range.cloneRange()));
@@ -6047,7 +6047,6 @@ export default function PageBuilder({
               <section className="builder-panel pages-manager-panel">
                 <div className="pages-panel-heading">
                   <div>
-                    <span className="pages-panel-eyebrow">Site structure</span>
                     <h2>Pages</h2>
                   </div>
                   <span className="pages-count" aria-label={`${project.pages.length} pages`}>
@@ -7215,7 +7214,6 @@ export default function PageBuilder({
     <div className="workspace-page site-chrome-workspace">
       <header className="workspace-header">
         <div>
-          <span className="workspace-kicker">Global site settings</span>
           <h2>Header & Footer</h2>
           <p>Manage the site header, navigation, footer links, and contact information.</p>
         </div>
@@ -7636,6 +7634,9 @@ export default function PageBuilder({
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
       openPublicFormPage={openPublicFormPage}
+      publishedFormIds={(builderProjectRecord?.published_schema?.forms || [])
+        .map((form) => form?.id)
+        .filter(Boolean)}
       onPreviewSite={handlePreviewClick}
       onUnpublish={unpublishProject}
       isUnpublishing={isUnpublishingProject}
@@ -7729,7 +7730,6 @@ export default function PageBuilder({
         <main className="workspace-page" role="alert" aria-live="assertive">
           <section className="workspace-header">
             <div>
-              <span className="workspace-kicker">Draft recovery</span>
               <h2>{builderProjectLoading ? "Checking for a safe backend copy..." : "This browser draft cannot be read"}</h2>
               <p>
                 The original browser value and its backup were left untouched. Saving and publishing are paused so neither value can be replaced with an empty project.

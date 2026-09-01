@@ -1,11 +1,10 @@
 export default function ResponsesHeader({ t }) {
   return (
-    <div className="workspace-header responses-results-header">
+    <header className="workspace-header responses-results-header app-page-intro">
       <div>
-        <span className="workspace-kicker">{t.kicker}</span>
         <h1>{t.title}</h1>
         <p>{t.subtitle}</p>
       </div>
-    </div>
+    </header>
   );
 }

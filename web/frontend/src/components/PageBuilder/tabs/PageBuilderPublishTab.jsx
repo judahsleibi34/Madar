@@ -43,6 +43,7 @@ export default function PageBuilderPublishTab({
   hasConfiguredSubdomain = false,
   openWebsiteSettings,
   openPublicFormPage,
+  publishedFormIds = null,
   onPreviewSite,
   onUnpublish,
   isUnpublishing = false,
@@ -59,18 +60,27 @@ export default function PageBuilderPublishTab({
   const hasPublicSubdomain = Boolean(publishSubdomain || hasConfiguredSubdomain);
   const configuredLiveSitePath = publishSubdomain ? `/site/${publishSubdomain}/` : "";
   const isPublished = project.status === "published";
+  const isActiveFormPublished = Boolean(activeForm) && (
+    Array.isArray(publishedFormIds)
+      ? publishedFormIds.includes(activeForm.id)
+      : isPublished
+  );
   const resolvedLiveSitePath = isPublished ? liveSitePath || configuredLiveSitePath : "";
   const productionAppOrigin = getProductionAppOrigin();
   const publicLink = resolvedLiveSitePath
     ? `${productionAppOrigin}${resolvedLiveSitePath}`
     : "";
-  const publishedFormLink = activeForm && publishSubdomain
+  const publishedFormLink = isActiveFormPublished && publishSubdomain
     ? getProductionFormUrl(project, activeForm.id)
     : "";
   const publicLinkPlaceholder = hasPublicSubdomain
     ? content.siteNotPublished
     : content.noPublicLink;
-  const formLinkPlaceholder = content.noPublishedFormLink;
+  const formLinkPlaceholder = !hasPublicSubdomain
+    ? content.noPublishedFormLink
+    : !isActiveFormPublished
+      ? content.formNotPublished
+      : content.noPublishedFormLink;
 
   const copyPublicLink = async () => {
     if (!publicLink) return;
@@ -128,7 +138,6 @@ export default function PageBuilderPublishTab({
 
       <header className="workspace-header publish-site-header">
         <div>
-          <span className="workspace-kicker">Publish</span>
           <h2>{content.title}</h2>
           <p>{content.description}</p>
         </div>
@@ -275,7 +284,11 @@ export default function PageBuilderPublishTab({
                     <MessageCircle size={15} aria-hidden="true" />
                     {content.shareForm}
                   </a>
-                  <button type="button" onClick={() => openPublicFormPage?.(activeForm.id)}>
+                  <button
+                    type="button"
+                    disabled={!publishedFormLink || !openPublicFormPage}
+                    onClick={() => openPublicFormPage?.(activeForm.id)}
+                  >
                     <Eye size={15} aria-hidden="true" />
                     {content.previewForm}
                   </button>

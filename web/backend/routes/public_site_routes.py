@@ -753,14 +753,82 @@ def find_form_in_schema(schema: dict, form_id: str) -> dict:
     return matches[0]
 
 
-def get_bound_published_form(settings: dict, form_id: str):
-    project = get_bound_published_project(settings, require_pages=False)
-    published_schema = project.get("published_schema")
-    if not isinstance(published_schema, dict):
+def get_published_form_for_site(settings: dict, form_id: str):
+    """Resolve a published form without requiring its project to be the live website.
+
+    Standalone form links belong to the tenant site, not necessarily to the project
+    currently bound as the site's homepage. Prefer the live project when possible,
+    then look through the tenant's other published snapshots. Draft schemas are
+    deliberately never considered here.
+    """
+
+    tenant_id = resolve_tenant_id(settings)
+    bound_project_id = str(settings.get("published_project_id") or "").strip()
+
+    bound_project_error = None
+    if bound_project_id:
+        try:
+            project = get_bound_published_project(settings, require_pages=False)
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            bound_project_error = exc
+        else:
+            published_schema = project.get("published_schema")
+            if isinstance(published_schema, dict):
+                try:
+                    form = find_form_in_schema(published_schema, form_id)
+                except HTTPException as exc:
+                    if exc.status_code != 404:
+                        raise
+                else:
+                    return project, form, published_schema
+
+    projects_response = (
+        service_supabase.table("builder_projects")
+        .select(
+            "id, tenant_id, name, slug, status, published_schema, "
+            "published_version, published_revision, schema_version, "
+            "last_published_at, updated_at"
+        )
+        .eq("tenant_id", tenant_id)
+        .eq("status", "published")
+        .not_.is_("published_schema", "null")
+        .limit(101)
+        .execute()
+    )
+
+    matches = []
+    for candidate in projects_response.data or []:
+        if str(candidate.get("id") or "") == bound_project_id:
+            continue
+        schema = candidate.get("published_schema")
+        forms = schema.get("forms") if isinstance(schema, dict) else None
+        if not isinstance(forms, list):
+            continue
+        if any(
+            isinstance(form, dict) and str(form.get("id") or "") == form_id
+            for form in forms
+        ):
+            matches.append(candidate)
+
+    if not matches:
+        if bound_project_error is not None:
+            raise bound_project_error
         raise HTTPException(status_code=404, detail="Form not found")
+    if len(matches) != 1:
+        raise api_error(409, "publication_form_ambiguous", "The published form is ambiguous.")
+
+    project = matches[0]
+    project_id = str(project.get("id") or "")
+    published_schema = validate_published_snapshot(
+        project,
+        expected_tenant_id=tenant_id,
+        expected_project_id=project_id,
+        require_pages=False,
+    )
     form = find_form_in_schema(published_schema, form_id)
     return project, form, published_schema
-
 
 DEFAULT_PUBLIC_STORE_THEME = {
     "accent": "#852c21",
@@ -2801,7 +2869,7 @@ def get_public_form(subdomain: str, form_id: str, request: Request, response: Re
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "public_form_links")
-    project, form, published_schema = get_bound_published_form(settings, clean_form_id)
+    project, form, published_schema = get_published_form_for_site(settings, clean_form_id)
     authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,
@@ -2866,7 +2934,7 @@ def start_public_quiz_attempt(
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
-    project, form, _ = get_bound_published_form(settings, clean_form_id)
+    project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if not is_public_quiz(form):
         raise api_error(409, "quiz_mode_required", "This published form is not a quiz.")
     authorize_site_resource(
@@ -2933,7 +3001,7 @@ def finalize_public_quiz_attempt(
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
-    project, form, _ = get_bound_published_form(settings, clean_form_id)
+    project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if not is_public_quiz(form):
         raise api_error(409, "quiz_mode_required", "This published form is not a quiz.")
     authorize_site_resource(
@@ -3041,7 +3109,7 @@ def list_public_builder_form_drafts(
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
-    project, _form, _ = get_bound_published_form(settings, clean_form_id)
+    project, _form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,
@@ -3086,7 +3154,7 @@ def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: st
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
-    project, _form, _ = get_bound_published_form(settings, clean_form_id)
+    project, _form, _ = get_published_form_for_site(settings, clean_form_id)
     authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,
@@ -3133,7 +3201,7 @@ def save_public_builder_form_draft(
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
-    project, form, _ = get_bound_published_form(settings, clean_form_id)
+    project, form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,
@@ -3232,7 +3300,7 @@ def submit_public_builder_form(
     settings = resolve_website_settings(clean_subdomain, request=request)
     require_public_runtime_entitlement(settings, "public_form_links")
     tenant_id = resolve_tenant_id(settings)
-    project, form, _ = get_bound_published_form(settings, clean_form_id)
+    project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if is_public_quiz(form):
         raise api_error(
             409,

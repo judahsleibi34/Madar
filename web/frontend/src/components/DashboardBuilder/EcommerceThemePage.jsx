@@ -100,9 +100,8 @@ export default function EcommerceThemePage({ user }) {
 
   return (
     <main className="ecommerce-theme-page">
-      <header className="ecommerce-page-header">
+      <header className="ecommerce-page-header app-page-intro">
         <div>
-          <span className="ecommerce-page-kicker">Online Store</span>
           <h1>Store design</h1>
           <p>Design safely, preview the draft locally, then publish only when it is ready.</p>
         </div>

@@ -71,7 +71,7 @@ export default function ForgotPasswordPage({ lang = "en", loginPath = "/login" }
   return (
     <main className="login-page" dir={pageDir}>
       <form className="login-card" onSubmit={handleSubmit} dir={pageDir}>
-        <div className="login-heading">
+        <div className="login-heading app-page-intro">
           <h1>{t("forgotPassword.title")}</h1>
           <p>{t("forgotPassword.subtitle")}</p>
         </div>

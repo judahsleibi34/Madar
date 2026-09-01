@@ -344,7 +344,7 @@ export default function LoginPage({
         onSubmit={mfaStep ? handleMfaSubmit : handleSubmit}
         dir={pageDir}
       >
-        <div className="login-heading">
+        <div className="login-heading app-page-intro">
           <h1>{mfaStep ? t("login.mfaTitle") : t("login.title")}</h1>
           <p>{mfaStep ? t("login.mfaSubtitle") : t("login.subtitle")}</p>
         </div>

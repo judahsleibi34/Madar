@@ -94,7 +94,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 13px;
   font-weight: 900;
 }

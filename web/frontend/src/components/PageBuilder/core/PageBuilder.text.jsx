@@ -270,8 +270,8 @@ export const renderRichText = (value, ranges = []) => {
         ...(runOpacity !== null ? { opacity: runOpacity } : {}),
         ...(runHighlight
           ? {
-              backgroundColor: "rgba(133, 44, 33, 0.22)",
-              boxShadow: "0 0 0 2px rgba(133, 44, 33, 0.08)",
+              backgroundColor: "rgba(var(--theme-primary-rgb), 0.22)",
+              boxShadow: "0 0 0 2px rgba(var(--theme-primary-rgb), 0.08)",
             }
           : {}),
       };

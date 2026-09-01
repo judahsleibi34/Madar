@@ -1939,7 +1939,6 @@ export default function DataAnalysisWorkspace({
         >
           <div className="daw-modal-header">
             <div>
-              <span className="daw-kicker">Charts</span>
               <h3 id="daw-visualization-settings-title">
                 Chart setup
               </h3>
@@ -2655,7 +2654,6 @@ export default function DataAnalysisWorkspace({
         <div className="daw-section-card daw-visualization-builder">
           <div className="daw-visualization-builder-header">
             <div>
-              <span className="daw-kicker">Charts</span>
               <h3>Create chart</h3>
               <p>Charts prepared for this report.</p>
             </div>
@@ -2862,9 +2860,8 @@ export default function DataAnalysisWorkspace({
 
   return (
     <div className="daw-page" dir={isArabic ? "rtl" : "ltr"}>
-      <header className="daw-header" id="daw-top">
+      <header className="daw-header app-page-intro" id="daw-top">
         <div>
-          <span className="daw-kicker">{t.kicker}</span>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </div>

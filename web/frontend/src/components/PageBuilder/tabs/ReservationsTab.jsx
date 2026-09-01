@@ -342,9 +342,8 @@ export default function ReservationsTab({
   };
   return (
     <main className="workspace-page reservations-workspace">
-      <header className="workspace-header reservations-header">
+      <header className="workspace-header reservations-header app-page-intro">
         <div>
-          <span className="workspace-kicker">Reservation builder</span>
           <h1>Reservations</h1>
           <p>Set what visitors can book, when they can book it, and how the booking form appears.</p>
         </div>
@@ -355,7 +354,6 @@ export default function ReservationsTab({
         <aside className="object-list reservation-block-list" aria-label="Reservation blocks">
           <div className="reservation-panel-heading">
             <div>
-              <span className="workspace-kicker">Library</span>
               <h2>Saved builds</h2>
             </div>
             <span className="reservation-count">{reservationBlocks.length}</span>
@@ -406,7 +404,6 @@ export default function ReservationsTab({
             <>
               <div className="editor-card-header">
                 <div>
-                  <span className="workspace-kicker">Setup</span>
                   <h2>Configure booking block</h2>
                   <label className="reservation-build-name">
                     <span>Build name</span>
@@ -455,7 +452,6 @@ export default function ReservationsTab({
                 <div className="reservation-settings-section reservation-block-builder-section">
                   <div className="reservation-block-builder-section-heading">
                     <div>
-                      <span className="workspace-kicker">Booking builder</span>
                       <h3>Design your booking block</h3>
                       <p>Add components, arrange them, and edit the selected item.</p>
                     </div>
@@ -478,7 +474,6 @@ export default function ReservationsTab({
                       <CalendarDays size={20} />
                     </span>
                     <div>
-                      <span className="workspace-kicker">Calendar</span>
                       <h3>Available dates</h3>
                       <p>Choose the days visitors can book.</p>
                     </div>
@@ -544,7 +539,6 @@ export default function ReservationsTab({
                 <div className="reservation-settings-section reservation-schedule-section">
                   <div className="reservation-list-heading">
                     <div>
-                      <span className="workspace-kicker">Schedule</span>
                       <h3>{selectedAvailabilityDate ? `Times for ${formatDateLabel(selectedAvailabilityDate)}` : "Choose a date first"}</h3>
                       <p>{selectedAvailabilityDate ? "These times apply only to this date." : "Add or select a date above to manage its times."}</p>
                     </div>
@@ -624,7 +618,6 @@ export default function ReservationsTab({
                 <ListPlus size={24} />
               </div>
               <div className="reservation-empty-copy">
-                <span className="workspace-kicker">Start here</span>
                 <h2>Create your first reservation block</h2>
                 <p>Pick the booking style that matches how you want to handle appointments.</p>
               </div>

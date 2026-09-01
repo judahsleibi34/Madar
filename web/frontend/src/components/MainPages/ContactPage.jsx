@@ -49,7 +49,7 @@ export default function ContactPage({ lang = "en" }) {
 
   return (
     <main className="contact-page" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <HeroBlock className="contact-hero">
+      <HeroBlock className="contact-hero app-page-intro">
         <h1>
           <GradientText pauseOnHover>{content.hero.title}</GradientText>
         </h1>
