@@ -116,6 +116,12 @@ def normalize_sha(value: str) -> str:
     return value.lower()
 
 
+def attest_candidate_bundle_heads(output: str, approved_sha: str) -> None:
+    entries = [line.split() for line in output.splitlines() if line.strip()]
+    if entries != [[approved_sha, "refs/remotes/origin/main"]]:
+        raise UpgradeError("candidate_bundle_identity_mismatch")
+
+
 def sanitized_environment(*, madar_user: bool = False) -> dict[str, str]:
     environment = dict(SAFE_ENVIRONMENT)
     if madar_user:
@@ -374,6 +380,25 @@ class SystemOperations:
                 *args,
             ],
             cwd=cwd,
+        )
+
+    def staging_git(
+        self, label: str, *args: str, timeout: int = 300
+    ) -> CommandResult:
+        """Run Git in private staging with local-file transport only."""
+        return self.command(
+            label,
+            [
+                "/usr/bin/git",
+                "-c", "core.hooksPath=/dev/null",
+                "-c", "core.fsmonitor=false",
+                "-c", "credential.helper=",
+                "-c", "protocol.allow=never",
+                "-c", "protocol.file.allow=always",
+                "-c", "protocol.ext.allow=never",
+                *args,
+            ],
+            timeout=timeout,
         )
 
     def madar_git(
@@ -789,37 +814,64 @@ class SystemOperations:
             "git_bundle_create", "-C", str(self.repo), "bundle", "create",
             str(bundle), "refs/remotes/origin/main",
         )
-        heads = self.command(
-            "git_bundle_heads", ["/usr/bin/git", "bundle", "list-heads", str(bundle)]
-        ).stdout.split()
-        if not heads or heads[0] != approved_sha:
-            raise UpgradeError("candidate_bundle_identity_mismatch")
-        self.command(
-            "git_clone_bundle",
-            [
-                "/usr/bin/git", "-c", "protocol.file.allow=always",
-                "clone", "--no-checkout", str(bundle), str(candidate),
-            ],
+        bundle_heads = self.staging_git(
+            "git_bundle_heads", "bundle", "list-heads", str(bundle)
+        ).stdout
+        attest_candidate_bundle_heads(bundle_heads, approved_sha)
+        # A bundle whose only advertised name is refs/remotes/origin/main is
+        # intentionally not a cloneable branch topology: ordinary clone sees
+        # no refs/heads/* and creates an empty repository.  Initialize a
+        # template-free private repository and import that one attested ref
+        # explicitly.  The fetch URL is the already-created local bundle, so
+        # this phase has no network or mutable-ref fallback.
+        self.staging_git(
+            "git_init_candidate",
+            "init", "--quiet", "--template=", str(candidate),
+        )
+        self.staging_git(
+            "git_verify_bundle",
+            "-C", str(candidate), "bundle", "verify", str(bundle),
+        )
+        staged_ref = "refs/madar-control-plane/approved"
+        self.staging_git(
+            "git_fetch_bundle",
+            "-C", str(candidate), "fetch", "--no-tags",
+            "--no-recurse-submodules", "--no-write-fetch-head",
+            str(bundle), f"refs/remotes/origin/main:{staged_ref}",
             timeout=300,
         )
-        self.command(
+        fetched = self.staging_git(
+            "git_fetched_candidate",
+            "-C", str(candidate), "rev-parse", "--verify",
+            f"{staged_ref}^{{commit}}",
+        ).stdout
+        if fetched != approved_sha:
+            raise UpgradeError("staged_candidate_object_mismatch")
+        self.staging_git(
             "git_checkout_candidate",
-            [
-                "/usr/bin/git", "-c", "core.hooksPath=/dev/null", "-C", str(candidate),
-                "checkout", "--detach", approved_sha,
-            ],
+            "-C", str(candidate), "checkout", "--detach", approved_sha,
         )
-        actual = self.command(
-            "git_staged_head", ["/usr/bin/git", "-C", str(candidate), "rev-parse", "HEAD"]
+        self.staging_git(
+            "git_delete_staging_ref",
+            "-C", str(candidate), "update-ref", "-d", staged_ref,
+            approved_sha,
+        )
+        actual = self.staging_git(
+            "git_staged_head", "-C", str(candidate), "rev-parse", "HEAD"
         ).stdout
-        dirty = self.command(
+        dirty = self.staging_git(
             "git_staged_status",
-            [
-                "/usr/bin/git", "-C", str(candidate), "status", "--porcelain",
-                "--untracked-files=normal",
-            ],
+            "-C", str(candidate), "status", "--porcelain",
+            "--untracked-files=normal",
         ).stdout
-        if actual != approved_sha or dirty:
+        remaining_refs = self.staging_git(
+            "git_staged_refs",
+            "-C", str(candidate), "for-each-ref", "--format=%(refname)",
+        ).stdout
+        remotes = self.staging_git(
+            "git_staged_remotes", "-C", str(candidate), "remote"
+        ).stdout
+        if actual != approved_sha or dirty or remaining_refs or remotes:
             raise UpgradeError("staged_candidate_identity_mismatch")
         return transaction, candidate
 

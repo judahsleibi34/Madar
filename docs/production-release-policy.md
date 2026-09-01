@@ -775,8 +775,10 @@ sudo madar-control-plane-upgrade <exact-candidate-sha>
 The root-owned upgrader pins freshly fetched `origin/main` to that full SHA,
 requires fast-forward ancestry and the canonical remote, validates healthy
 current production, quiesces automation, stages an immutable root-owned Git
-bundle, runs installer dry-run and apply with a verified backup, deploys once
-through a hardened transient systemd unit executing the exact ordinary
+bundle whose sole attested remote-main ref is imported with local-file transport
+into a template-free repository and checked out detached at the exact SHA,
+runs installer dry-run and apply with a verified backup, deploys once through a
+hardened transient systemd unit executing the exact ordinary
 `madar-auto-deploy` entrypoint, independently attests known-good health and
 migration terminal state, runs a deterministic same-SHA cycle, and restores the
 captured timer state. Its root interlock prevents concurrent ordinary/manual

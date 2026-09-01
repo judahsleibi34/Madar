@@ -64,9 +64,18 @@ After fetching, root creates a unique mode-0700 transaction below
 `/var/lib/madar-control-plane/upgrades/staging`. The sibling root is deliberate:
 application-owned `/var/lib/madar` is writable by `madar` and therefore cannot
 parent privileged trust state. The upgrader creates a Git bundle pinned
-to the fetched remote-main ref, verifies the bundle head equals the approved
-SHA, and clones/detaches that bundle into the protected transaction. The staged
-HEAD and cleanliness are re-attested.
+to the fetched remote-main ref and requires its complete advertised-head set to
+be exactly `<approved SHA> refs/remotes/origin/main`. Because a remote-tracking
+ref is not a clone branch, the upgrader does not use ordinary `git clone`.
+Instead it initializes a template-free repository, verifies the bundle there,
+and explicitly fetches only the attested remote-main ref from the local bundle
+into a private temporary ref. All network protocols and extension helpers are
+disabled for this import; hooks, credentials, fsmonitor, caller Git config, and
+replacement objects are disabled throughout staging. The imported commit must
+equal the approved SHA before detached checkout. The temporary ref is then
+deleted, and staging is accepted only if detached `HEAD` still equals the
+approved SHA, the worktree is clean, and no refs or remotes remain. The source
+production repository's refs and worktree are never changed by staging.
 
 Before candidate code executes, the bootstrapper verifies required paths,
 rejects symlinks anywhere in protected paths, hashes the complete protected

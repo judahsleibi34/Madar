@@ -5,6 +5,7 @@ import json
 import os
 import stat
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -170,6 +171,63 @@ class FakeOperations:
 
 class ControlPlaneUpgradeTests(unittest.TestCase):
     SHA = "a" * 40
+
+    @staticmethod
+    def real_git(*args, cwd=None, check=True, environment=None):
+        safe_environment = dict(os.environ)
+        safe_environment.update(
+            GIT_CONFIG_NOSYSTEM="1",
+            GIT_CONFIG_GLOBAL="/dev/null",
+            GIT_TERMINAL_PROMPT="0",
+            GIT_NO_REPLACE_OBJECTS="1",
+        )
+        if environment:
+            safe_environment.update(environment)
+        return subprocess.run(
+            ["/usr/bin/git", *map(str, args)],
+            cwd=cwd,
+            env=safe_environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=check,
+        )
+
+    def real_bundle_source(self, root, *, replacement=False):
+        source = Path(root) / "source"
+        self.real_git("init", "--quiet", "--template=", source)
+        self.real_git("-C", source, "config", "user.name", "Madar test")
+        self.real_git("-C", source, "config", "user.email", "madar@test.invalid")
+        payload = source / "payload.txt"
+        payload.write_text("approved\n", encoding="utf-8")
+        self.real_git("-C", source, "add", "payload.txt")
+        self.real_git("-C", source, "commit", "--quiet", "-m", "approved")
+        approved = self.real_git("-C", source, "rev-parse", "HEAD").stdout.strip()
+        if replacement:
+            payload.write_text("replacement\n", encoding="utf-8")
+            self.real_git("-C", source, "commit", "--quiet", "-am", "replacement")
+            replacement_sha = self.real_git(
+                "-C", source, "rev-parse", "HEAD"
+            ).stdout.strip()
+            # This hostile local replacement must not affect bundle creation
+            # or staged object identity.
+            self.real_git(
+                "-C", source, "replace", approved, replacement_sha
+            )
+        self.real_git(
+            "-C", source, "update-ref", "refs/remotes/origin/main", approved
+        )
+        return source, approved
+
+    @staticmethod
+    def real_stage_operations(source, staging):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.audit = None
+        operations.repo = Path(source)
+        operations.staging_root = Path(staging)
+        operations.staging_root.mkdir()
+        operations.prepare_upgrade_roots = mock.Mock()
+        return operations
 
     def coordinator(self, root, *, protected=True, failure=None):
         operations = FakeOperations(root, protected=protected, failure=failure)
@@ -465,6 +523,251 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         ):
             operations.resolve_candidate(self.SHA, dry_run=False)
 
+    def test_real_remote_tracking_bundle_stages_exact_detached_candidate(self):
+        with tempfile.TemporaryDirectory() as root:
+            source, approved = self.real_bundle_source(root)
+            source_refs = self.real_git("-C", source, "show-ref").stdout
+            source_status = self.real_git(
+                "-C", source, "status", "--porcelain", "--untracked-files=normal"
+            ).stdout
+
+            # Reproduce the exact failed topology: clone does not import a
+            # bundle whose only advertised name is a remote-tracking ref.
+            proof_bundle = Path(root) / "proof.bundle"
+            self.real_git(
+                "-C", source, "bundle", "create", proof_bundle,
+                "refs/remotes/origin/main",
+            )
+            advertised = self.real_git(
+                "bundle", "list-heads", proof_bundle
+            ).stdout.strip()
+            self.assertEqual(
+                advertised, f"{approved} refs/remotes/origin/main"
+            )
+            old_clone = Path(root) / "old-clone"
+            clone = self.real_git(
+                "-c", "protocol.file.allow=always", "clone", "--no-checkout",
+                proof_bundle, old_clone, check=False,
+            )
+            self.assertEqual(clone.returncode, 0)
+            self.assertIn("cloned an empty repository", clone.stderr)
+            old_checkout = self.real_git(
+                "-C", old_clone, "checkout", "--detach", approved, check=False
+            )
+            self.assertNotEqual(old_checkout.returncode, 0)
+            self.assertTrue(
+                "unable to read tree" in old_checkout.stderr
+                or "reference is not a tree" in old_checkout.stderr
+            )
+
+            operations = self.real_stage_operations(
+                source, Path(root) / "staging"
+            )
+            real_command = operations.command
+            staging_commands = []
+
+            def record_command(label, args, **kwargs):
+                staging_commands.append((label, list(args)))
+                return real_command(label, args, **kwargs)
+
+            operations.command = record_command
+            transaction, candidate = operations.stage_candidate(approved)
+            self.assertEqual(
+                self.real_git("-C", candidate, "rev-parse", "HEAD").stdout.strip(),
+                approved,
+            )
+            detached = self.real_git(
+                "-C", candidate, "symbolic-ref", "-q", "HEAD", check=False
+            )
+            self.assertNotEqual(detached.returncode, 0)
+            self.assertEqual(
+                self.real_git(
+                    "-C", candidate, "status", "--porcelain",
+                    "--untracked-files=normal",
+                ).stdout,
+                "",
+            )
+            self.assertEqual(
+                self.real_git(
+                    "-C", candidate, "for-each-ref", "--format=%(refname)"
+                ).stdout,
+                "",
+            )
+            self.assertEqual(self.real_git("-C", candidate, "remote").stdout, "")
+            self.assertFalse((candidate / ".git/hooks").exists())
+            fetch_command = dict(staging_commands)["git_fetch_bundle"]
+            self.assertIn("protocol.allow=never", fetch_command)
+            self.assertIn("protocol.file.allow=always", fetch_command)
+            self.assertIn(str(transaction / "candidate.bundle"), fetch_command)
+            self.assertFalse(
+                any(
+                    value.startswith(("http:", "https:", "ssh:", "git:"))
+                    for value in fetch_command
+                )
+            )
+            self.assertEqual(self.real_git("-C", source, "show-ref").stdout, source_refs)
+            self.assertEqual(
+                self.real_git(
+                    "-C", source, "status", "--porcelain",
+                    "--untracked-files=normal",
+                ).stdout,
+                source_status,
+            )
+            operations.cleanup_staging(transaction)
+            self.assertFalse(transaction.exists())
+
+    def test_real_bundle_staging_ignores_replacements_and_hostile_templates(self):
+        with tempfile.TemporaryDirectory() as root:
+            source, approved = self.real_bundle_source(root, replacement=True)
+            hostile_template = Path(root) / "hostile-template"
+            hooks = hostile_template / "hooks"
+            hooks.mkdir(parents=True)
+            marker = Path(root) / "hook-executed"
+            hook = hooks / "post-checkout"
+            hook.write_text(f"#!/bin/sh\ntouch {marker}\n", encoding="utf-8")
+            hook.chmod(0o755)
+            hostile_config = Path(root) / "hostile.gitconfig"
+            hostile_config.write_text(
+                f"[init]\n\ttemplateDir = {hostile_template}\n"
+                "[url \"https://invalid.example/\"]\n\tinsteadOf = /tmp/\n",
+                encoding="utf-8",
+            )
+            operations = self.real_stage_operations(
+                source, Path(root) / "staging"
+            )
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "GIT_CONFIG_GLOBAL": str(hostile_config),
+                    "GIT_TEMPLATE_DIR": str(hostile_template),
+                    "GIT_DIR": str(source / ".git"),
+                    "GIT_WORK_TREE": str(source),
+                },
+                clear=False,
+            ):
+                transaction, candidate = operations.stage_candidate(approved)
+            self.assertEqual(
+                (candidate / "payload.txt").read_text(encoding="utf-8"),
+                "approved\n",
+            )
+            self.assertFalse(marker.exists())
+            self.assertFalse((candidate / ".git/hooks").exists())
+            self.assertEqual(self.real_git("-C", candidate, "remote").stdout, "")
+            operations.cleanup_staging(transaction)
+
+    def test_bundle_attestation_rejects_wrong_missing_and_multiple_heads(self):
+        approved = "a" * 40
+        for output in (
+            "",
+            f"{'b' * 40} refs/remotes/origin/main\n",
+            f"{approved} refs/heads/main\n",
+            (
+                f"{approved} refs/remotes/origin/main\n"
+                f"{'b' * 40} refs/heads/unexpected\n"
+            ),
+        ):
+            with self.subTest(output=output):
+                with self.assertRaisesRegex(
+                    upgrade.UpgradeError, "candidate_bundle_identity_mismatch"
+                ):
+                    upgrade.attest_candidate_bundle_heads(output, approved)
+        upgrade.attest_candidate_bundle_heads(
+            f"{approved} refs/remotes/origin/main\n", approved
+        )
+
+        with tempfile.TemporaryDirectory() as root:
+            source, actual = self.real_bundle_source(root)
+            operations = self.real_stage_operations(
+                source, Path(root) / "staging"
+            )
+            wrong = "b" * 40
+            self.assertNotEqual(actual, wrong)
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "candidate_bundle_identity_mismatch"
+            ):
+                operations.stage_candidate(wrong)
+            transactions = list(operations.staging_root.iterdir())
+            self.assertEqual(len(transactions), 1)
+            self.assertFalse((transactions[0] / "repository").exists())
+
+            self.real_git(
+                "-C", source, "update-ref", "-d", "refs/remotes/origin/main"
+            )
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "command_failed:git_bundle_create"
+            ):
+                operations.stage_candidate(actual)
+
+    def test_bundle_corruption_after_attestation_fails_before_checkout(self):
+        with tempfile.TemporaryDirectory() as root:
+            source, approved = self.real_bundle_source(root)
+            operations = self.real_stage_operations(
+                source, Path(root) / "staging"
+            )
+            real_command = operations.command
+            labels = []
+
+            def corrupt_after_heads(label, args, **kwargs):
+                labels.append(label)
+                result = real_command(label, args, **kwargs)
+                if label == "git_bundle_heads":
+                    Path(args[-1]).write_bytes(b"corrupted after attestation\n")
+                return result
+
+            operations.command = corrupt_after_heads
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "command_failed:git_verify_bundle"
+            ):
+                operations.stage_candidate(approved)
+            self.assertNotIn("git_checkout_candidate", labels)
+            self.assertNotIn("git_staged_head", labels)
+            transactions = list(operations.staging_root.iterdir())
+            self.assertEqual(len(transactions), 1)
+            candidate = transactions[0] / "repository"
+            self.assertEqual(
+                [entry.name for entry in candidate.iterdir()], [".git"]
+            )
+
+    def test_bundle_fetch_failure_cannot_advance_to_checkout(self):
+        with tempfile.TemporaryDirectory() as root:
+            source, approved = self.real_bundle_source(root)
+            operations = self.real_stage_operations(
+                source, Path(root) / "staging"
+            )
+            real_command = operations.command
+            labels = []
+
+            def corrupt_after_verify(label, args, **kwargs):
+                labels.append(label)
+                result = real_command(label, args, **kwargs)
+                if label == "git_verify_bundle":
+                    bundle = next(
+                        Path(value) for value in args if str(value).endswith(".bundle")
+                    )
+                    bundle.write_bytes(b"corrupted before fetch\n")
+                return result
+
+            operations.command = corrupt_after_verify
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "command_failed:git_fetch_bundle"
+            ):
+                operations.stage_candidate(approved)
+            self.assertNotIn("git_checkout_candidate", labels)
+            self.assertNotIn("git_staged_head", labels)
+
+    def test_staging_failure_never_advances_to_static_preflight_or_installer(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root, failure="stage_candidate"
+            )
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "failed:stage_candidate"
+            ):
+                coordinator.execute(dry_run=False)
+            self.assertNotIn("static_preflight", operations.events)
+            self.assertNotIn("installer_dry_run", operations.events)
+            self.assertNotIn("installer_apply", operations.events)
+
     def test_wrong_canonical_remote_fails_before_fetch(self):
         operations = object.__new__(upgrade.SystemOperations)
         operations.repository_origin = mock.Mock(return_value="file:///tmp/evil")
@@ -556,6 +859,10 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertEqual(record.status, "dry_run_complete")
         self.assertIn("deployment_lock=False", operations.events)
         self.assertIn("installer_dry_run", operations.events)
+        self.assertLess(
+            operations.events.index("stage_candidate"),
+            operations.events.index("static_preflight"),
+        )
         for forbidden in (
             "quiesce", "installer_apply", "controlled_candidate_deployment",
             "same_sha_idempotence", "restore_timer",
