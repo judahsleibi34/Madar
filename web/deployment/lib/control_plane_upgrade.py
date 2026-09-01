@@ -100,6 +100,12 @@ SENSITIVE_ASSIGNMENT = re.compile(
     r"(?i)\b([A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_KEY|"
     r"DATABASE_URL|SUPABASE|VAPID|SMTP|OAUTH|JWT|CSRF)[A-Z0-9_]*)\s*=\s*\S+"
 )
+PYTHON_SYNTAX_VALIDATOR = (
+    "import sys\n"
+    "for filename in sys.argv[1:]:\n"
+    "    with open(filename, 'rb') as source:\n"
+    "        compile(source.read(), filename, 'exec', dont_inherit=True)\n"
+)
 
 
 class UpgradeError(RuntimeError):
@@ -991,24 +997,30 @@ class SystemOperations:
         if candidate_contract != self.contract:
             raise UpgradeError("candidate_path_contract_changed")
         digest = self.protected_tree_digest(candidate)
-        for path in (candidate / "web/deployment/bin").iterdir():
+        bin_files: list[tuple[Path, bytes]] = []
+        for path in sorted((candidate / "web/deployment/bin").iterdir()):
             if not path.is_file() or path.is_symlink():
                 raise UpgradeError("candidate_bin_entry_invalid")
-            first = path.open("rb").readline(256)
+            with path.open("rb") as handle:
+                first = handle.readline(256)
+            bin_files.append((path, first))
             if b"bash" in first:
-                self.command("candidate_bash_syntax", ["/usr/bin/bash", "-n", str(path)])
-        python_files = list((candidate / "web/deployment/lib").glob("*.py"))
+                self.command(
+                    "candidate_bash_syntax",
+                    ["/usr/bin/bash", "-n", str(path)],
+                )
+        python_files = sorted((candidate / "web/deployment/lib").glob("*.py"))
         python_files.extend(
-            path for path in (candidate / "web/deployment/bin").iterdir()
-            if b"python" in path.open("rb").readline(256)
+            path for path, first in bin_files if b"python" in first
         )
-        cache = candidate.parent / "pycache"
-        environment = sanitized_environment()
-        environment["PYTHONPYCACHEPREFIX"] = str(cache)
         try:
             completed = subprocess.run(
-                ["/usr/bin/python3", "-I", "-m", "py_compile", *map(str, python_files)],
-                env=environment,
+                [
+                    "/usr/bin/python3", "-I", "-B", "-c",
+                    PYTHON_SYNTAX_VALIDATOR,
+                    *map(str, python_files),
+                ],
+                env=sanitized_environment(),
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

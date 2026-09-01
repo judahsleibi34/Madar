@@ -3,6 +3,7 @@ import importlib.util
 import errno
 import json
 import os
+import shutil
 import stat
 import struct
 import subprocess
@@ -228,6 +229,40 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "-C", source, "update-ref", "refs/remotes/origin/main", approved
         )
         return source, approved
+
+    def static_preflight_candidate(self, root):
+        fixture_root = Path(root)
+        candidate = fixture_root / "candidate"
+        shutil.copytree(
+            WEB_ROOT / "deployment",
+            candidate / "web/deployment",
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+        )
+        scripts = candidate / "web/scripts"
+        scripts.mkdir(parents=True)
+        for name in (
+            "madar_alert_hook.sh", "backup_madar.sh", "verify_backup.sh",
+        ):
+            shutil.copy2(WEB_ROOT / "scripts" / name, scripts / name)
+
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.audit = None
+        operations.contract = dict(upgrade.EXPECTED_CONTRACT)
+        operations.staging_root = fixture_root / "staging"
+        operations.backup_root = fixture_root / "backups"
+        operations.staging_root.mkdir()
+        operations.backup_root.mkdir()
+        return operations, candidate
+
+    def run_static_preflight(self, operations, candidate):
+        capacity = SimpleNamespace(free=2 * 1024 * 1024 * 1024)
+        with (
+            mock.patch.object(
+                upgrade, "parse_contract", return_value=operations.contract
+            ),
+            mock.patch.object(upgrade.shutil, "disk_usage", return_value=capacity),
+        ):
+            return operations.static_preflight(candidate)
 
     @staticmethod
     def real_stage_operations(source, staging):
@@ -823,6 +858,137 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             self.assertNotIn("static_preflight", operations.events)
             self.assertNotIn("installer_dry_run", operations.events)
             self.assertNotIn("installer_apply", operations.events)
+
+    def test_static_preflight_is_non_mutating_and_creates_no_bytecode(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            digest_before = operations.protected_tree_digest(candidate)
+            artifacts_before = {
+                path.relative_to(candidate)
+                for pattern in ("__pycache__", "*.pyc", "*.pyo")
+                for path in candidate.rglob(pattern)
+            }
+
+            returned_digest = self.run_static_preflight(operations, candidate)
+
+            self.assertEqual(returned_digest, digest_before)
+            self.assertEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+            artifacts_after = {
+                path.relative_to(candidate)
+                for pattern in ("__pycache__", "*.pyc", "*.pyo")
+                for path in candidate.rglob(pattern)
+            }
+            self.assertEqual(artifacts_after, artifacts_before)
+            self.assertEqual(artifacts_after, set())
+
+    def test_static_preflight_accepts_source_encoding_without_bytecode(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            encoded = candidate / "web/deployment/lib/encoded_source.py"
+            encoded.write_bytes(
+                b"# coding: latin-1\nvalue = 'caf\xe9'\n"
+            )
+
+            digest = self.run_static_preflight(operations, candidate)
+
+            self.assertEqual(
+                operations.protected_tree_digest(candidate), digest
+            )
+            self.assertFalse(any(candidate.rglob("*.pyc")))
+            self.assertFalse(any(candidate.rglob("*.pyo")))
+            self.assertFalse(any(candidate.rglob("__pycache__")))
+
+    def test_static_preflight_invalid_python_fails_closed_without_bytecode(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            invalid = candidate / "web/deployment/lib/invalid_source.py"
+            invalid.write_text("def invalid(:\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "candidate_python_syntax_failed"
+            ):
+                self.run_static_preflight(operations, candidate)
+
+            self.assertFalse(any(candidate.rglob("*.pyc")))
+            self.assertFalse(any(candidate.rglob("*.pyo")))
+            self.assertFalse(any(candidate.rglob("__pycache__")))
+
+    def test_static_preflight_uses_isolated_bytecode_free_compile(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            real_run = subprocess.run
+            commands = []
+
+            def record_run(args, **kwargs):
+                commands.append((list(args), dict(kwargs)))
+                return real_run(args, **kwargs)
+
+            with mock.patch.object(
+                upgrade.subprocess, "run", side_effect=record_run
+            ):
+                self.run_static_preflight(operations, candidate)
+
+            python_commands = [
+                (args, kwargs)
+                for args, kwargs in commands
+                if args and args[0] == "/usr/bin/python3"
+            ]
+            self.assertEqual(len(python_commands), 1)
+            args, kwargs = python_commands[0]
+            self.assertEqual(args[1:4], ["-I", "-B", "-c"])
+            self.assertIn("compile(source.read()", args[4])
+            self.assertNotIn("py_compile", args)
+            self.assertNotIn("PYTHONPYCACHEPREFIX", kwargs["env"])
+
+    def test_installer_dry_run_sequence_preserves_static_preflight_digest(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            digest_before = self.run_static_preflight(operations, candidate)
+            backup = operations.backup_root / "pre-candidate"
+            operations.command = mock.Mock(
+                return_value=upgrade.CommandResult("", "", 0)
+            )
+
+            operations.installer_dry_run(candidate, backup)
+
+            self.assertEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+            operations.command.assert_called_once()
+            self.assertEqual(
+                operations.command.call_args.args[0], "installer_dry_run"
+            )
+
+    def test_real_protected_mutation_changes_post_dry_run_digest(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            digest_before = self.run_static_preflight(operations, candidate)
+            operations.command = mock.Mock(
+                return_value=upgrade.CommandResult("", "", 0)
+            )
+            operations.installer_dry_run(
+                candidate, operations.backup_root / "pre-candidate"
+            )
+            tamper = candidate / "web/deployment/tampered_after_dry_run"
+            tamper.write_text("tampered\n", encoding="utf-8")
+
+            self.assertNotEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+
+    def test_post_dry_run_protected_mutation_remains_fail_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(root)
+            operations.protected_tree_digest = mock.Mock(
+                return_value="tampered-protected-tree"
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "candidate_changed_after_dry_run"
+            ):
+                coordinator.execute(dry_run=True)
 
     def test_wrong_canonical_remote_fails_before_fetch(self):
         operations = object.__new__(upgrade.SystemOperations)

@@ -787,6 +787,14 @@ post-promotion failures leave automation
 disabled; it never automatically restores old controller code, traffic, or
 schema across an irreversible boundary.
 
+Candidate static preflight hashes the strict protected tree and validates
+deployment Python syntax with isolated, bytecode-disabled built-in `compile()`
+over the original source bytes. It does not run `py_compile`, depend on
+`PYTHONPYCACHEPREFIX`, remove generated artifacts afterward, or exclude cache
+paths from the digest. The same strict protected-tree digest must still match
+after installer dry-run, so any actual added or changed protected file fails
+closed as `candidate_changed_after_dry_run`.
+
 The privileged upgrader also recognizes one temporary controller-first
 bootstrap state. It does so only after canonical candidate resolution: installed
 provenance must exactly equal the explicitly approved current `origin/main`
