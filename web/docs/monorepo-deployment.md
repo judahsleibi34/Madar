@@ -47,16 +47,64 @@ override, and `/etc/madar/production.env` as its environment file. Operators
 must not run an in-place Compose rebuild from the production checkout or move
 release state to a new directory.
 
-## Control-plane installation
+## Normal and protected releases
 
-Install only through the reviewed
-`web/deployment/bin/madar-install-control-plane` procedure in an approved
-maintenance window. It requires the auto-deploy timer and service to be
-stopped, backs up the installed controller and legacy entrypoints, publishes
-an exact root-owned `/opt` tree with a source-SHA provenance marker, retires the
-old `/usr/local/lib/madar/web/deployment` controller, reloads systemd, and
-leaves the timer stopped for operator review. Never update the provenance
-marker or isolated installed files by hand.
+A normal release is merged to `main` and handled by automatic deployment. A
+release that changes protected control-plane paths is deliberately different:
+
+```text
+merge to main
+→ provenance guard blocks non-root deployment
+→ operator obtains the exact 40-character origin/main SHA
+→ operator authorizes one transaction
+```
+
+```bash
+sudo madar-control-plane-upgrade <exact-40-character-sha>
+```
+
+The command validates healthy production, the pinned Git remote and exact
+fast-forward SHA; quiesces automation; creates protected immutable staging;
+runs installer dry-run and apply with a root-owned backup; performs one
+canonical deployment; attests stable/active identity, readiness and migration
+terminal state; performs a deterministic same-SHA cycle; and restores the
+timer's original enabled/active state. Inspect the same transaction without
+mutation with:
+
+```bash
+sudo madar-control-plane-upgrade --dry-run <exact-40-character-sha>
+```
+
+Audit JSON/logs are stored under
+`/var/lib/madar-control-plane/upgrades/history`. Controller backups are stored
+under `/var/lib/madar-control-plane/backups`. This root-controlled sibling is
+separate from application-owned `/var/lib/madar`. An initially disabled timer stays
+disabled. A pre-install failure restores the original timer state only after
+the old controller and serving release re-attest. A post-install or
+post-promotion failure leaves the timer disabled; post-promotion/schema repair
+is forward-only and never triggers an automatic traffic or database rollback.
+
+The full trust model and phase semantics are in
+[`docs/control-plane-upgrade-architecture.md`](../../docs/control-plane-upgrade-architecture.md).
+
+Do not manually pull `/srv/madar/production`, run migration SQL, switch
+blue/green traffic, hand-copy control-plane files, edit provenance/release
+state, or re-enable the timer after a failed post-promotion transaction without
+diagnosis.
+
+### One-time bootstrap
+
+The first release containing the upgrader cannot be installed by a command that
+does not yet exist in the trusted controller. It therefore requires one final
+use of the existing approved exact-SHA manual installation procedure: quiesce
+the timer/service, build a root-protected exact-SHA worktree, run
+`web/deployment/bin/madar-install-control-plane` dry-run, create the protected
+backup, apply as root, attest provenance/path contract/health, run the
+controlled deployment and same-SHA check, then restore automation. That install
+places `/usr/local/sbin/madar-control-plane-upgrade`. Future protected releases
+must use the one-command workflow.
+
+Never update the provenance marker or isolated installed files by hand.
 
 ## Database migrations
 

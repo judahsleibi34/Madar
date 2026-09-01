@@ -36,6 +36,14 @@ migration manifest. It does not make every migration automatic, does not merge
 release promotion and schema mutation into one rollback domain, and does not
 provide automatic downgrade SQL.
 
+Protected control-plane releases may be authorized through the root-owned
+one-command workflow described in
+[`control-plane-upgrade-architecture.md`](control-plane-upgrade-architecture.md).
+That bootstrapper synchronously invokes this same ordinary auto-deploy path and
+requires this coordinator to reach an existing successful terminal state; it
+does not add a migration mode, bypass backup/manifest gates, or alter the
+bridge-first state machine.
+
 ## 2. Architectural goals
 
 The architecture is designed to:

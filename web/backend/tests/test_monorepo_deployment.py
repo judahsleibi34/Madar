@@ -25,6 +25,9 @@ INSTALLER = WEB_ROOT / "deployment" / "bin" / "madar-install-control-plane"
 LEGACY_ENTRYPOINT = WEB_ROOT / "deployment" / "bin" / "madar-auto-deploy-legacy-entrypoint"
 PATH_CONTRACT = WEB_ROOT / "deployment" / "production-paths.conf"
 PROXY_SERVICE = WEB_ROOT / "deployment" / "systemd" / "madar-release-proxy.service"
+CONTROL_UPGRADE = WEB_ROOT / "deployment" / "bin" / "madar-control-plane-upgrade"
+CONTROL_UPGRADE_LIBRARY = WEB_ROOT / "deployment" / "lib" / "control_plane_upgrade.py"
+CONTROL_GUARD = WEB_ROOT / "deployment" / "bin" / "madar-control-plane-guard"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
@@ -47,6 +50,9 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.legacy_entrypoint = LEGACY_ENTRYPOINT.read_text(encoding="utf-8")
         self.path_contract = PATH_CONTRACT.read_text(encoding="utf-8")
         self.proxy_service = PROXY_SERVICE.read_text(encoding="utf-8")
+        self.control_upgrade = CONTROL_UPGRADE.read_text(encoding="utf-8")
+        self.control_upgrade_library = CONTROL_UPGRADE_LIBRARY.read_text(encoding="utf-8")
+        self.control_guard = CONTROL_GUARD.read_text(encoding="utf-8")
 
     def test_wrapper_delegates_a_clean_full_sha_to_immutable_deployer(self):
         self.assertIn('MADAR_PRODUCTION_REPO:-/srv/madar/production', self.deploy)
@@ -229,6 +235,11 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("rm -f -- /home/madar/docker_auto.sh", self.installer)
         self.assertIn("rm -rf -- /usr/local/lib/madar/web/deployment", self.installer)
         self.assertIn("/var/lib/madar/releases/state.json", self.installer)
+        self.assertIn("bin/madar-control-plane-upgrade", self.installer)
+        self.assertIn("lib/control_plane_upgrade.py", self.installer)
+        self.assertIn("/usr/local/sbin/madar-control-plane-upgrade", self.installer)
+        self.assertIn("/var/lib/madar-control-plane/upgrades/history", self.installer)
+        self.assertIn("/var/lib/madar-control-plane/backups", self.installer)
 
     def test_canonical_production_path_contract_is_single_and_complete(self):
         expected = {
@@ -241,6 +252,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
             "MADAR_CONTROL_PLANE_ROOT": "/opt/madar/control-plane/deployment",
             "MADAR_MIGRATION_BACKUP_SCRIPT": "/opt/madar/control-plane/deployment/scripts/backup_madar.sh",
             "MADAR_MIGRATION_BACKUP_VERIFY_SCRIPT": "/opt/madar/control-plane/deployment/scripts/verify_backup.sh",
+            "MADAR_CANONICAL_GIT_REMOTE": "git@github.com:judahsleibi34/Madar.git",
         }
         assignments = dict(
             line.split("=", 1)
@@ -263,6 +275,19 @@ class MonorepoDeploymentTests(unittest.TestCase):
             "WorkingDirectory=/opt/madar/control-plane/deployment/proxy",
             self.proxy_service,
         )
+
+    def test_privileged_upgrade_is_exact_sha_manual_and_fail_closed(self):
+        self.assertTrue(self.control_upgrade.startswith("#!/usr/bin/python3 -I"))
+        self.assertIn("os.environ.clear()", self.control_upgrade)
+        self.assertIn("approved_sha_not_current_origin_main", self.control_upgrade_library)
+        self.assertIn("candidate_not_descendant_of_production", self.control_upgrade_library)
+        self.assertIn("canonical_git_remote_mismatch", self.control_upgrade_library)
+        self.assertIn("candidate_protected_symlink_rejected", self.control_upgrade_library)
+        self.assertIn("same_sha_cycle_mutated_release_state", self.control_upgrade_library)
+        self.assertIn("post_promotion_forward_repair_timer_disabled", self.control_upgrade_library)
+        self.assertIn("sudo madar-control-plane-upgrade ${target_sha}", self.control_guard)
+        self.assertIn("LoadCredential=madar-control-plane-upgrade", self.control_upgrade_library)
+        self.assertNotIn("authorized.credential", self.auto_service)
 
     def test_legacy_entrypoint_delegates_only_to_immutable_controller(self):
         self.assertIn("madar-production-deploy", self.legacy_entrypoint)

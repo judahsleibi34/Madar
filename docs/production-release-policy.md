@@ -747,3 +747,43 @@ gates, non-automatic CI/manual checks, failure semantics, defaults, and bounded
 ranges against the implementation. If no text change is needed, the PR should
 say why. Control-plane changes also require the provenance-aware installation
 procedure before automatic deployment can accept the changed controller source.
+
+## T. Privileged protected-control-plane upgrade gate
+
+Ordinary releases remain automatic. When `madar-control-plane-guard` detects a
+protected-path difference between installed provenance and the exact candidate,
+it blocks the non-root deployer and prints the authorization command:
+
+```text
+sudo madar-control-plane-upgrade <exact-candidate-sha>
+```
+
+The root-owned upgrader pins freshly fetched `origin/main` to that full SHA,
+requires fast-forward ancestry and the canonical remote, validates healthy
+current production, quiesces automation, stages an immutable root-owned Git
+bundle, runs installer dry-run and apply with a verified backup, deploys once
+through a hardened transient systemd unit executing the exact ordinary
+`madar-auto-deploy` entrypoint, independently attests known-good health and
+migration terminal state, runs a deterministic same-SHA cycle, and restores the
+captured timer state. Its root interlock prevents concurrent ordinary/manual
+release, migration, and traffic-switch entrypoints. Post-install and
+post-promotion failures leave automation
+disabled; it never automatically restores old controller code, traffic, or
+schema across an irreversible boundary.
+
+The detailed trust model, phases, self-update behavior, audit locations,
+failure boundaries, operator commands and initial bootstrap procedure are in
+[`control-plane-upgrade-architecture.md`](control-plane-upgrade-architecture.md).
+
+Implemented by:
+
+- `web/deployment/lib/control_plane_upgrade.py`
+- `web/deployment/lib/control_plane_upgrade_authorization.py`
+- `web/deployment/bin/madar-control-plane-upgrade`
+- `web/deployment/bin/madar-install-control-plane`
+- `web/deployment/bin/madar-control-plane-guard`
+- `web/deployment/bin/madar-migrate`
+- `web/deployment/bin/madar-switch-traffic`
+
+Any change to these files or the protected-path set requires same-change review
+of this section and the architecture document.

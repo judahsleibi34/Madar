@@ -21,6 +21,9 @@ from deployment.lib.migration_executor import (  # noqa: E402
     LockedMigrationExecutor,
     MigrationManifest,
 )
+from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_upgrade_authorization,
+)
 
 
 def git_output(repository_root: Path, *args: str) -> str:
@@ -34,6 +37,7 @@ def git_output(repository_root: Path, *args: str) -> str:
 
 
 def main() -> int:
+    require_upgrade_authorization(None)
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
