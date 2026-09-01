@@ -38,12 +38,15 @@ declare -a tracked_files=(
   docker-compose.release.yml
   bin/madar-auto-deploy
   bin/madar-control-plane-guard
+  bin/madar-control-plane-upgrade
   bin/madar-production-deploy
   bin/madar-release-deploy
   bin/madar-migrate
   bin/madar-switch-traffic
   lib/__init__.py
   lib/environment_file.py
+  lib/control_plane_upgrade.py
+  lib/control_plane_upgrade_authorization.py
   lib/migration_executor.py
   lib/release_deployer.py
   releases/release.json
@@ -69,11 +72,21 @@ if (( ! apply )); then
   printf 'would install immutable Madar control plane under %s\n' "$install_root"
   printf 'would retire the legacy /usr/local/lib/madar/web/deployment controller after backup\n'
   printf 'would install operations alert hook at /usr/local/lib/madar/madar_alert_hook.sh\n'
+  printf 'would install the stable privileged entrypoint at /usr/local/sbin/madar-control-plane-upgrade\n'
+  printf 'would initialize root-owned upgrade audit, staging, and backup roots\n'
   printf 'would preserve replaced operational files under %s\n' "$backup_root"
   printf 'would leave madar-auto-deploy.timer stopped\n'
   exit 0
 fi
 [[ $EUID -eq 0 ]] || { echo "--apply requires root" >&2; exit 1; }
+
+read -r var_lib_uid var_lib_mode < <(stat -c '%u %a' /var/lib)
+[[ "$var_lib_uid" == 0 \
+   && ! "$var_lib_mode" =~ [2367][0-7]$ \
+   && ! "$var_lib_mode" =~ [2367]$ ]] || {
+  echo "privileged state parent /var/lib must be root-protected" >&2
+  exit 1
+}
 
 for required in \
   /srv/madar/production \
@@ -129,6 +142,7 @@ for specification in \
   /opt/madar/control-plane/deployment:current-opt-control-plane \
   /usr/local/lib/madar/web/deployment:legacy-usr-local-control-plane \
   /usr/local/sbin/madar-auto-deploy:legacy-auto-deploy-entrypoint \
+  /usr/local/sbin/madar-control-plane-upgrade:madar-control-plane-upgrade \
   /home/madar/docker_auto.sh:legacy-home-entrypoint \
   /etc/systemd/system/madar-auto-deploy.service:madar-auto-deploy.service \
   /etc/systemd/system/madar-auto-deploy.timer:madar-auto-deploy.timer \
@@ -156,6 +170,12 @@ install -d -o root -g madar -m 0750 \
   /opt/madar \
   "$control_plane_root"
 install -d -o root -g madar -m 0750 /usr/local/lib/madar
+install -d -o root -g root -m 0700 \
+  /var/lib/madar-control-plane \
+  /var/lib/madar-control-plane/upgrades \
+  /var/lib/madar-control-plane/upgrades/staging \
+  /var/lib/madar-control-plane/upgrades/history \
+  /var/lib/madar-control-plane/backups
 stage_root="$control_plane_root/.deployment.install.$$"
 [[ ! -e "$stage_root" ]] || {
   echo "control-plane staging path already exists: $stage_root" >&2
@@ -186,11 +206,40 @@ chmod 0644 "$stage_root/CONTROL_PLANE_SOURCE_SHA"
 find "$stage_root" -type d -exec chown root:madar {} +
 find "$stage_root" -type d -exec chmod 0750 {} +
 
-# Publish an exact controller tree. The previous tree is already copied into
-# the operator-selected backup, so stale removed files cannot survive while a
-# new provenance marker claims the current source.
-rm -rf -- "$install_root"
-mv -T -- "$stage_root" "$install_root"
+# Publish an exact controller tree in one filesystem operation. Linux
+# renameat2(RENAME_EXCHANGE) leaves either the old or the new complete tree at
+# the authoritative path; it never creates a remove-then-move gap. Refuse to
+# fall back to a non-atomic cutover if the platform cannot provide it.
+if [[ -e "$install_root" || -L "$install_root" ]]; then
+  [[ -d "$install_root" && ! -L "$install_root" ]] || {
+    echo "installed control-plane root must be a real directory" >&2
+    exit 1
+  }
+  /usr/bin/python3 -I - "$stage_root" "$install_root" <<'PY'
+import ctypes
+import os
+import sys
+
+AT_FDCWD = -100
+RENAME_EXCHANGE = 2
+source = os.fsencode(sys.argv[1])
+target = os.fsencode(sys.argv[2])
+libc = ctypes.CDLL(None, use_errno=True)
+renameat2 = getattr(libc, "renameat2", None)
+if renameat2 is None:
+    raise SystemExit("atomic controller publication is unavailable")
+renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+renameat2.restype = ctypes.c_int
+if renameat2(AT_FDCWD, source, AT_FDCWD, target, RENAME_EXCHANGE) != 0:
+    error = ctypes.get_errno()
+    raise OSError(error, os.strerror(error))
+PY
+  # After the exchange stage_root is the fully backed-up previous tree. It is
+  # no longer authoritative and may be removed without exposing a path gap.
+  rm -rf -- "$stage_root"
+else
+  mv -T -- "$stage_root" "$install_root"
+fi
 trap - EXIT
 install -o root -g root -m 0755 \
   "$alert_hook_source" /usr/local/lib/madar/madar_alert_hook.sh
@@ -198,6 +247,13 @@ for unit in "${units[@]}"; do
   install -o root -g root -m 0644 \
     "$deployment_root/systemd/$unit" "/etc/systemd/system/$unit"
 done
+
+# Install the next-invocation bootstrap wrapper only after the controller tree
+# is atomically published. A currently running old bootstrapper has already
+# loaded its Python implementation and remains transaction authority.
+install -o root -g root -m 0755 \
+  "$install_root/bin/madar-control-plane-upgrade" \
+  /usr/local/sbin/madar-control-plane-upgrade
 
 # The old privileged drop-in, in-place deployer, and /usr/local controller were
 # preserved above. Remove their live authority before daemon-reload so systemd

@@ -40,7 +40,9 @@ if ! git -C "$repo" diff --quiet \
   printf '%s\n' \
     "[madar-control-plane] installed source: ${installed_sha}" \
     "[madar-control-plane] candidate source: ${target_sha}" \
-    "[madar-control-plane] control-plane changes require root-owned reinstall" >&2
+    "[madar-control-plane] protected control-plane upgrade required" \
+    "[madar-control-plane] authorize this exact candidate with:" \
+    "[madar-control-plane] sudo madar-control-plane-upgrade ${target_sha}" >&2
   exit 1
 fi
 

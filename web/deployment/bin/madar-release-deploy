@@ -31,6 +31,9 @@ sys.path.insert(0, str(WEB_ROOT))
 
 from deployment.lib.release_deployer import Compatibility, ReleaseDeployer, atomic_json, utc_now  # noqa: E402
 from deployment.lib.environment_file import load_environment_file  # noqa: E402
+from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_upgrade_authorization,
+)
 from deployment.lib.migration_executor import (  # noqa: E402
     LockedMigrationExecutor,
     MigrationManifest,
@@ -70,6 +73,7 @@ PRODUCTION_PATH_KEYS = (
     "MADAR_TRAFFIC_SWITCH_COMMAND",
     "MADAR_MIGRATION_BACKUP_SCRIPT",
     "MADAR_MIGRATION_BACKUP_VERIFY_SCRIPT",
+    "MADAR_CANONICAL_GIT_REMOTE",
 )
 
 ACCEPTED_READINESS_STATES = {
@@ -89,7 +93,6 @@ ACTIVE_REFRESH_CORE_COMPONENTS = {
     "storage",
     "schema",
 }
-
 
 def load_production_path_contract(*, installed: bool | None = None) -> dict[str, str]:
     """Apply the tracked path contract before production configuration."""
@@ -1394,6 +1397,10 @@ def main() -> int:
     mode.add_argument("--automatic-migrate", action="store_true", help="Run an opted-in migration only after this SHA is known-good")
     parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
+    normalized_sha = args.sha.lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", normalized_sha):
+        raise RuntimeError("candidate_sha_invalid")
+    require_upgrade_authorization(normalized_sha)
     load_production_path_contract()
     repo = Path(os.environ["MADAR_PRODUCTION_REPO"]).resolve()
     state_root = Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]).resolve()
@@ -1407,14 +1414,14 @@ def main() -> int:
     if args.automatic_migrate:
         with deployment_lock(state_root):
             result = automatic_migrate_known_good(
-                sha=args.sha.lower(), state_root=state_root,
+                sha=normalized_sha, state_root=state_root,
                 compatibility=compatibility, operations=operations,
             )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     if args.prepare_only:
         result = prepare_release(
-            sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+            sha=normalized_sha, slot=args.slot, state_root=state_root,
             compatibility=compatibility, operations=operations,
         )
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -1422,14 +1429,14 @@ def main() -> int:
     if args.activate_prepared:
         with deployment_lock(state_root):
             result = activate_prepared_release(
-                sha=args.sha.lower(), slot=args.slot, state_root=state_root, operations=operations,
+                sha=normalized_sha, slot=args.slot, state_root=state_root, operations=operations,
             )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     if args.adopt_prepared:
         with deployment_lock(state_root):
             result = adopt_prepared_release(
-                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                sha=normalized_sha, slot=args.slot, state_root=state_root,
                 compatibility=compatibility, operations=operations,
             )
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -1437,7 +1444,7 @@ def main() -> int:
     if args.refresh_active_workers:
         with deployment_lock(state_root):
             result = refresh_active_workers(
-                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                sha=normalized_sha, slot=args.slot, state_root=state_root,
                 operations=operations,
             )
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -1445,13 +1452,13 @@ def main() -> int:
     if args.refresh_active_runtime:
         with deployment_lock(state_root):
             result = refresh_active_runtime(
-                sha=args.sha.lower(), slot=args.slot, state_root=state_root,
+                sha=normalized_sha, slot=args.slot, state_root=state_root,
                 operations=operations,
             )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     deployer = ReleaseDeployer(state_root=state_root, compatibility=compatibility, operations=operations)
-    result = deployer.deploy(args.sha.lower(), manual_retry=args.manual_retry)
+    result = deployer.deploy(normalized_sha, manual_retry=args.manual_retry)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
