@@ -96,6 +96,20 @@ script, and provenance marker is ready. The backed-up prior tree is then
 replaced, so removed stale files cannot survive beneath a marker for newer
 source.
 
+Installer dry-run and apply share the same read-only static preflight before
+the first directory, backup, or controller mutation. Every existing component
+of privileged source and destination paths must be a real root-owned directory
+with no group/world write bit and no effective non-root POSIX ACL write grant;
+private upgrade state directories, when present, must be mode 0700. Root-owned
+mode 0755 system parents such as `/var/lib` are valid. The preflight also checks
+launcher/controller/unit parents and existing targets, the backup and upgrade
+state hierarchy, writable destination mounts, source cleanliness and identity,
+required production paths, timer/service quiescence, and working
+`renameat2(RENAME_EXCHANGE)` support on the publication filesystem. A static
+failure is reported by dry-run before mutation and apply re-evaluates the same
+checks to remain fail-closed against races. The installer never chmods or
+chowns `/`, `/var`, or `/var/lib`.
+
 ## B. Candidate eligibility (automatic production gate)
 
 `madar-auto-deploy` and `madar-production-deploy` require a clean production
@@ -778,6 +792,7 @@ failure boundaries, operator commands and initial bootstrap procedure are in
 Implemented by:
 
 - `web/deployment/lib/control_plane_upgrade.py`
+- `web/deployment/lib/control_plane_filesystem.py`
 - `web/deployment/lib/control_plane_upgrade_authorization.py`
 - `web/deployment/bin/madar-control-plane-upgrade`
 - `web/deployment/bin/madar-install-control-plane`

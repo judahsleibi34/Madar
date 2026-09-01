@@ -44,6 +44,7 @@ declare -a tracked_files=(
   bin/madar-migrate
   bin/madar-switch-traffic
   lib/__init__.py
+  lib/control_plane_filesystem.py
   lib/environment_file.py
   lib/control_plane_upgrade.py
   lib/control_plane_upgrade_authorization.py
@@ -68,25 +69,13 @@ declare -a units=(
   madar-ops-alert@.service
 )
 
-if (( ! apply )); then
-  printf 'would install immutable Madar control plane under %s\n' "$install_root"
-  printf 'would retire the legacy /usr/local/lib/madar/web/deployment controller after backup\n'
-  printf 'would install operations alert hook at /usr/local/lib/madar/madar_alert_hook.sh\n'
-  printf 'would install the stable privileged entrypoint at /usr/local/sbin/madar-control-plane-upgrade\n'
-  printf 'would initialize root-owned upgrade audit, staging, and backup roots\n'
-  printf 'would preserve replaced operational files under %s\n' "$backup_root"
-  printf 'would leave madar-auto-deploy.timer stopped\n'
-  exit 0
-fi
-[[ $EUID -eq 0 ]] || { echo "--apply requires root" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || { echo "control-plane installer requires root" >&2; exit 1; }
 
-read -r var_lib_uid var_lib_mode < <(stat -c '%u %a' /var/lib)
-[[ "$var_lib_uid" == 0 \
-   && ! "$var_lib_mode" =~ [2367][0-7]$ \
-   && ! "$var_lib_mode" =~ [2367]$ ]] || {
-  echo "privileged state parent /var/lib must be root-protected" >&2
-  exit 1
-}
+# Dry-run and apply deliberately execute the exact same read-only static
+# filesystem contract before either reporting success or mutating a target.
+/usr/bin/python3 -I "$deployment_root/lib/control_plane_filesystem.py" \
+  --source-root "$repo_root" \
+  --backup-root "$backup_root"
 
 for required in \
   /srv/madar/production \
@@ -137,6 +126,27 @@ if [[ -d "$backup_root" && -n "$(find "$backup_root" -mindepth 1 -maxdepth 1 -pr
   echo "control-plane backup directory must be empty" >&2
   exit 1
 fi
+
+if (( ! apply )); then
+  printf 'control-plane static preflight PASS\n'
+  printf 'would install immutable Madar control plane under %s\n' "$install_root"
+  printf 'would retire the legacy /usr/local/lib/madar/web/deployment controller after backup\n'
+  printf 'would install operations alert hook at /usr/local/lib/madar/madar_alert_hook.sh\n'
+  printf 'would install the stable privileged entrypoint at /usr/local/sbin/madar-control-plane-upgrade\n'
+  printf 'would initialize root-owned upgrade audit, staging, and backup roots\n'
+  printf 'would preserve replaced operational files under %s\n' "$backup_root"
+  printf 'would leave madar-auto-deploy.timer stopped\n'
+  exit 0
+fi
+
+# Establish only the installer-owned private hierarchy. Its parent and every
+# existing component were already validated by the shared dry-run preflight.
+install -d -o root -g root -m 0700 \
+  /var/lib/madar-control-plane \
+  /var/lib/madar-control-plane/upgrades \
+  /var/lib/madar-control-plane/upgrades/staging \
+  /var/lib/madar-control-plane/upgrades/history \
+  /var/lib/madar-control-plane/backups
 install -d -m 0700 "$backup_root"
 for specification in \
   /opt/madar/control-plane/deployment:current-opt-control-plane \
@@ -170,12 +180,6 @@ install -d -o root -g madar -m 0750 \
   /opt/madar \
   "$control_plane_root"
 install -d -o root -g madar -m 0750 /usr/local/lib/madar
-install -d -o root -g root -m 0700 \
-  /var/lib/madar-control-plane \
-  /var/lib/madar-control-plane/upgrades \
-  /var/lib/madar-control-plane/upgrades/staging \
-  /var/lib/madar-control-plane/upgrades/history \
-  /var/lib/madar-control-plane/backups
 stage_root="$control_plane_root/.deployment.install.$$"
 [[ ! -e "$stage_root" ]] || {
   echo "control-plane staging path already exists: $stage_root" >&2

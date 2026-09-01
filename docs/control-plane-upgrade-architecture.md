@@ -72,7 +72,15 @@ Before candidate code executes, the bootstrapper verifies required paths,
 rejects symlinks anywhere in protected paths, hashes the complete protected
 tree, validates the exact canonical path contract, compiles Python, checks all
 deployment shell syntax, checks ownership/state-root conditions, and requires
-at least 1 GiB free in staging and backup filesystems. The protected-tree hash
+at least 1 GiB free in staging and backup filesystems. The installer uses one
+shared read-only filesystem preflight before both dry-run success and apply. It
+walks every existing privileged source/destination component without following
+symlinks; requires root ownership with no group/world write bit or effective
+non-root ACL write grant; requires private state directories to be mode 0700;
+checks destination mounts are writable; and proves `renameat2(RENAME_EXCHANGE)`
+on the target filesystem using disposable directories inside the protected
+candidate staging parent. Standard system parents such as root-owned mode 0755
+`/var/lib` satisfy this contract. The protected-tree hash
 is checked again after installer dry-run. Candidate code is not claimed to be
 intrinsically safe: operator approval of the exact reviewed SHA remains the
 code-trust decision.
@@ -114,8 +122,8 @@ switches remain authorized inside the credential-bearing transient unit.
 | 4 | `protected_change_detection` | If no protected diff exists, return `not_required` without quiescing; ordinary auto-deploy remains responsible. |
 | 5 | `automation_quiesce` | Capture timer state, disable/stop timer, stop service, arm interlock, release normal deploy lock. |
 | 6 | `candidate_staging` | Create the protected exact-SHA Git bundle and detached root-owned tree. |
-| 7 | `candidate_static_preflight` | Required-path, symlink, digest, syntax, contract, ownership and capacity validation. |
-| 8 | `installer_dry_run` | Execute candidate installer without apply; verify protected-tree digest is unchanged. |
+| 7 | `candidate_static_preflight` | Required-path, symlink, digest, syntax, contract, ownership, ACL, filesystem capability and capacity validation. |
+| 8 | `installer_dry_run` | Execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. |
 | 9 | `control_plane_install` / `control_plane_install_attestation` | Create protected backup and atomically install; attest provenance, guard, modes, units, paths, backup hashes and absence of legacy authority. |
 | 10 | `controlled_candidate_deployment` | Issue a one-cycle systemd credential and synchronously run the exact ordinary auto-deploy entrypoint in a hardened transient unit while the timer remains disabled. The canonical controller alone may build, migrate, promote or advance production Git. |
 | 11 | serving attestation | Require production HEAD, installed provenance, active/known-good state, stable and slot SHA/readiness, schema range, workers, frontend and proxy target to agree. Require a terminal migration outcome. |
@@ -231,10 +239,21 @@ backup, apply and provenance/health verification. That installation places the
 launcher in `/usr/local/sbin`. After this one-time bootstrap, future protected
 control-plane releases use only the one-command workflow.
 
+The bootstrap backup must be a unique child of the installer-owned root path,
+for example
+`/var/lib/madar-control-plane/backups/pre-<sha-prefix>-<UTC timestamp>`.
+Do not place privileged backups below application-owned `/var/lib/madar`:
+write authority over an ancestor permits replacement of an otherwise private
+child. The installer may create its own mode-0700
+`/var/lib/madar-control-plane` hierarchy after the shared dry-run preflight has
+attested `/`, `/var`, and `/var/lib`; it never changes those system parents.
+
 ## Implementation and test map
 
 - orchestration, staging, audit, attestation, failure boundaries:
   `web/deployment/lib/control_plane_upgrade.py`
+- shared dry-run/apply filesystem trust contract:
+  `web/deployment/lib/control_plane_filesystem.py`
 - isolated launcher: `web/deployment/bin/madar-control-plane-upgrade`
 - one-time interlock: `web/deployment/lib/control_plane_upgrade_authorization.py`
   plus `madar-release-deploy`, `madar-migrate`, and `madar-switch-traffic`

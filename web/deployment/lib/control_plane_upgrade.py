@@ -27,6 +27,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+LIB_ROOT = Path(__file__).resolve().parent
+if str(LIB_ROOT) not in sys.path:
+    sys.path.insert(0, str(LIB_ROOT))
+
+from control_plane_filesystem import (
+    FilesystemPreflightError,
+    require_root_protected_directory,
+    require_root_protected_ancestry,
+)
+
 
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 LOWER_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -182,16 +192,18 @@ def require_root_directory(
     path: Path, *, create: bool = False, mode: int = 0o700
 ) -> None:
     if create:
-        path.mkdir(parents=False, exist_ok=True, mode=mode)
-    if (
-        not path.is_dir()
-        or path.is_symlink()
-        or path.stat().st_uid != 0
-        or path.stat().st_mode & 0o022
-    ):
-        raise UpgradeError(f"root_protected_directory_invalid:{path}")
-    if create:
-        os.chmod(path, mode)
+        try:
+            path.mkdir(parents=False, mode=mode)
+            os.chmod(path, mode)
+        except FileExistsError:
+            pass
+    try:
+        require_root_protected_ancestry(path)
+        require_root_protected_directory(
+            path, exact_mode=mode if create else None
+        )
+    except FilesystemPreflightError as error:
+        raise UpgradeError(str(error)) from error
 
 
 @dataclass
