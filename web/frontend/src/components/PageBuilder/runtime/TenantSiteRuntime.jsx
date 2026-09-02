@@ -2013,16 +2013,16 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
             <span />
           )}
 
-<div className="runtime-form-page-navigation">
-            <span className="runtime-form-page-count">
-              {isPagedForm
-                ? formCopy.runtime.pageCount
-                    .replace("{current}", currentPageIndex + 1)
-                    .replace("{total}", formSections.length)
-                : ""}
-            </span>
+          <div className="runtime-form-page-navigation">
             {isPagedForm && (
-              <div className="runtime-form-page-numbers" role="navigation" aria-label="Form pages">
+              <div
+                className="runtime-form-page-numbers"
+                role="navigation"
+                aria-label={formCopy.runtime.pageCount
+                  .replace("{current}", currentPageIndex + 1)
+                  .replace("{total}", formSections.length)}
+              >
+                <span className="runtime-form-page-label" aria-hidden="true">Page</span>
                 {pageNavigationItems.map((item) => (
                   <button
                     key={item.index}

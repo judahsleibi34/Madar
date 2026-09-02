@@ -4809,23 +4809,6 @@ body.theme-dark .runtime-language-switch button:hover:not(.active),
   grid-column: 1 / -1;
 }
 
-.publish-unpublish-button {
-  align-self: flex-start;
-  border: 1px solid var(--theme-danger);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--color-status-danger-text);
-  padding: 10px 14px;
-  font: inherit;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.publish-unpublish-button:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-
 .publish-panel {
   min-width: 0;
   border: 1px solid var(--madar-border);
@@ -5353,6 +5336,324 @@ body.theme-dark .publish-empty-note,
   }
 }
 
+/* Publish workspace UX refresh */
+.publish-workspace {
+  font-family: inherit;
+}
+
+.publish-workspace .publish-console {
+  gap: 20px;
+}
+
+.publish-workspace .publish-panel {
+  display: grid;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(var(--theme-shadow-rgb), 0.055);
+}
+
+.publish-workspace .publish-panel-title {
+  min-height: 60px;
+  padding: 15px 20px;
+}
+
+.publish-workspace .publish-panel-title h3 {
+  color: var(--color-accent-text);
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.publish-workspace .publish-panel-title strong {
+  margin-inline-start: auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(var(--theme-primary-rgb), 0.09);
+  color: var(--color-accent-text);
+  font-size: 12px;
+}
+
+.publish-workspace .publish-status-list {
+  gap: 0;
+  border-top: 0;
+  padding: 20px;
+}
+
+.publish-workspace .publish-status-list > div {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 20px;
+  background: transparent;
+}
+
+.publish-workspace .publish-status-list > div:first-child {
+  padding-inline-start: 0;
+}
+
+.publish-workspace .publish-status-list > div:last-child {
+  padding-inline-end: 0;
+}
+
+.publish-workspace .publish-status-list > div + div {
+  border-inline-start: 1px solid var(--madar-border);
+}
+
+.publish-workspace .publish-status-list dt {
+  font-size: 12px;
+}
+
+.publish-workspace .publish-status-list dd {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.publish-status-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid var(--madar-border);
+  padding: 14px 20px;
+  background: rgba(var(--theme-shadow-rgb), 0.018);
+}
+
+.publish-status-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.publish-workspace .publish-link-panel {
+  height: 100%;
+}
+
+.publish-workspace .publish-link-card-body {
+  grid-template-columns: minmax(0, 1fr) minmax(168px, 188px);
+  align-items: center;
+  gap: 20px;
+  min-height: 230px;
+  padding: 20px;
+}
+
+.publish-workspace .publish-link-main {
+  align-content: center;
+  gap: 14px;
+}
+
+.publish-workspace .publish-link-main > .publish-card-note {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgba(var(--theme-primary-rgb), 0.07);
+  color: var(--madar-muted);
+  font-size: 12px;
+}
+
+.publish-workspace .publish-link-box {
+  gap: 8px;
+}
+
+.publish-workspace .publish-link-box input {
+  min-width: 0;
+  min-height: 44px;
+  background: var(--madar-surface-soft);
+  font-size: 13px;
+}
+
+.page-builder .publish-workspace .publish-link-box button {
+  min-width: 108px;
+  min-height: 44px;
+  border-color: var(--color-accent-text);
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
+}
+
+.publish-workspace .publish-link-actions a,
+.publish-workspace .publish-link-actions button {
+  min-height: 42px;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.publish-workspace .publish-link-actions a:hover,
+.publish-workspace .publish-link-actions button:hover:not(:disabled) {
+  border-color: rgba(var(--theme-primary-rgb), 0.32);
+  background: rgba(var(--theme-primary-rgb), 0.07);
+  color: var(--color-accent-text);
+}
+
+.publish-workspace .publish-qr-preview {
+  min-width: 0;
+  align-self: stretch;
+  align-content: center;
+  gap: 8px;
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--madar-surface-soft);
+}
+
+.publish-workspace .publish-qr-preview img {
+  width: 112px;
+  height: 112px;
+}
+
+.publish-workspace .publish-qr-preview > span {
+  color: var(--madar-text);
+  font-size: 11px;
+}
+
+.publish-workspace .publish-qr-actions {
+  gap: 6px;
+}
+
+.publish-workspace .publish-qr-actions button {
+  min-width: 0;
+  min-height: 34px;
+  padding-inline: 6px;
+  white-space: nowrap;
+}
+
+.publish-form-list {
+  display: grid;
+}
+
+.publish-form-card {
+  min-width: 0;
+}
+
+.publish-form-card + .publish-form-card {
+  border-top: 1px solid var(--madar-border);
+}
+
+.publish-forms-panel .publish-link-card-body {
+  min-height: 210px;
+}
+
+.publish-form-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.publish-form-state {
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgba(var(--theme-shadow-rgb), 0.06);
+  color: var(--madar-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.publish-form-state.is-live {
+  background: rgba(var(--theme-success-rgb), 0.12);
+  color: var(--color-status-success-text);
+}
+
+.publish-form-card.is-unpublished .publish-link-card-body {
+  background: rgba(var(--theme-shadow-rgb), 0.018);
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+  .publish-workspace .publish-console {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .publish-workspace .publish-console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .publish-workspace .publish-status-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 18px;
+  }
+
+  .publish-workspace .publish-status-list > div:nth-child(odd) {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+
+  .publish-workspace .publish-status-list > div:nth-child(even) {
+    padding-inline-end: 0;
+    border-inline-start: 1px solid var(--madar-border);
+  }
+}
+
+@media (max-width: 640px) {
+  .publish-workspace .publish-status-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 8px 18px;
+  }
+
+  .publish-workspace .publish-status-list > div,
+  .publish-workspace .publish-status-list > div:nth-child(even),
+  .publish-workspace .publish-status-list > div:nth-child(odd) {
+    border: 0;
+    border-bottom: 1px solid var(--madar-border);
+    padding: 12px 0;
+  }
+
+  .publish-workspace .publish-status-list > div:last-child {
+    border-bottom: 0;
+  }
+
+  .publish-status-footer,
+  .publish-status-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .publish-status-actions > button {
+    width: 100%;
+  }
+
+  .publish-workspace .publish-link-card-body {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .publish-workspace .publish-qr-preview {
+    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-areas:
+      "qr title"
+      "qr actions";
+    justify-items: stretch;
+    align-items: center;
+  }
+
+  .publish-workspace .publish-qr-preview > img,
+  .publish-workspace .publish-qr-preview > .publish-empty-note {
+    grid-area: qr;
+    width: 96px;
+    height: 96px;
+  }
+
+  .publish-workspace .publish-qr-preview > span {
+    grid-area: title;
+  }
+
+  .publish-workspace .publish-qr-actions {
+    grid-area: actions;
+  }
+}
+
+@media (max-width: 460px) {
+  .publish-workspace .publish-link-box,
+  .publish-workspace .publish-link-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-builder .publish-workspace .publish-link-box button {
+    width: 100%;
+  }
+}
 /* Forms tab final theme boundary:
    Builder/editor controls stay on the Madar admin theme.
    Form colors are reflected in the live form preview and published/runtime form. */
@@ -5448,17 +5749,31 @@ body.theme-dark .publish-empty-note,
 }
 .runtime-form-page-navigation {
   min-width: 0;
-  display: grid;
-  justify-items: center;
-  gap: 7px;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .runtime-form-page-numbers {
   display: flex;
-  flex-wrap: wrap;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: center;
+  overflow-x: auto;
+  padding: 2px;
   gap: 5px;
+  scrollbar-width: thin;
 }
+
+.runtime-form-page-label {
+  flex: 0 0 auto;
+  padding-inline-end: 3px;
+  color: var(--form-theme-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 
 .runtime-form-pagination button.runtime-form-page-number,
 .builder-form-preview-actions button.runtime-form-page-number {

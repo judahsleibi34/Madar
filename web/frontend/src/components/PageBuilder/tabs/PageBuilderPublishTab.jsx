@@ -45,59 +45,57 @@ export default function PageBuilderPublishTab({
   openPublicFormPage,
   publishedFormIds = null,
   onPreviewSite,
-  onUnpublish,
-  isUnpublishing = false,
   isLiveProject = false,
   onMakeLive,
   isMakingLive = false,
   lang = "en",
 }) {
   const [publicQrVersion, setPublicQrVersion] = useState(1);
-  const [formQrVersion, setFormQrVersion] = useState(1);
+  const [formQrVersions, setFormQrVersions] = useState({});
   const content = getPublishContent(lang);
-  const activeForm = project.forms?.find((form) => form.id === project.activeFormId) || project.forms?.[0];
+  const forms = Array.isArray(project.forms) ? project.forms : [];
   const publishSubdomain = sanitizeSubdomain(project?.publish?.subdomain || "");
   const hasPublicSubdomain = Boolean(publishSubdomain || hasConfiguredSubdomain);
   const configuredLiveSitePath = publishSubdomain ? `/site/${publishSubdomain}/` : "";
   const isPublished = project.status === "published";
-  const isActiveFormPublished = Boolean(activeForm) && (
-    Array.isArray(publishedFormIds)
-      ? publishedFormIds.includes(activeForm.id)
-      : isPublished
+  const isFormPublished = (form) => (
+    Array.isArray(publishedFormIds) ? publishedFormIds.includes(form.id) : isPublished
   );
   const resolvedLiveSitePath = isPublished ? liveSitePath || configuredLiveSitePath : "";
   const productionAppOrigin = getProductionAppOrigin();
   const publicLink = resolvedLiveSitePath
     ? `${productionAppOrigin}${resolvedLiveSitePath}`
     : "";
-  const publishedFormLink = isActiveFormPublished && publishSubdomain
-    ? getProductionFormUrl(project, activeForm.id)
-    : "";
   const publicLinkPlaceholder = hasPublicSubdomain
     ? content.siteNotPublished
     : content.noPublicLink;
   const formLinkPlaceholder = !hasPublicSubdomain
     ? content.noPublishedFormLink
-    : !isActiveFormPublished
-      ? content.formNotPublished
-      : content.noPublishedFormLink;
+    : content.formNotPublished;
 
   const copyPublicLink = async () => {
     if (!publicLink) return;
     await navigator.clipboard?.writeText(publicLink);
   };
 
-  const copyPublishedFormLink = async () => {
+  const copyPublishedFormLink = async (publishedFormLink) => {
     if (!publishedFormLink) return;
     await navigator.clipboard?.writeText(publishedFormLink);
   };
 
   const whatsAppUrl = publicLink ? `https://wa.me/?text=${encodeURIComponent(publicLink)}` : "";
   const qrUrl = buildQrUrl(publicLink, publicQrVersion);
-  const formWhatsAppUrl = publishedFormLink
-    ? `https://wa.me/?text=${encodeURIComponent(publishedFormLink)}`
-    : "";
-  const formQrUrl = buildQrUrl(publishedFormLink, formQrVersion);
+  const formDestinations = forms.map((form) => {
+    const isLive = isFormPublished(form);
+    const link = isLive && publishSubdomain ? getProductionFormUrl(project, form.id) : "";
+    return {
+      form,
+      isLive,
+      link,
+      whatsAppUrl: link ? `https://wa.me/?text=${encodeURIComponent(link)}` : "",
+      qrUrl: buildQrUrl(link, formQrVersions[form.id] || 1),
+    };
+  });
 
   const copyQrImage = async (qrImageUrl) => {
     if (!qrImageUrl) return;
@@ -146,8 +144,8 @@ export default function PageBuilderPublishTab({
       <div className="publish-console">
         <section className="publish-panel publish-status-panel">
           <div className="publish-panel-title">
-            <span>01</span>
             <h3>{content.statusTitle}</h3>
+            <strong>{isPublished ? "Live" : "Draft"}</strong>
           </div>
           <dl className="publish-status-list">
             <div>
@@ -167,41 +165,37 @@ export default function PageBuilderPublishTab({
               <dd>{project.publish?.lastPublishedAt || content.notPublished}</dd>
             </div>
           </dl>
-          {isPublished && onUnpublish && (
-            <button
-              type="button"
-              className="publish-unpublish-button"
-              disabled={isUnpublishing}
-              onClick={onUnpublish}
-            >
-              {isUnpublishing ? content.unpublishingSite : content.unpublishSite}
-            </button>
-          )}
           {isPublished && !isLiveProject && onMakeLive && (
-            <button
-              type="button"
-              className="primary-action"
-              disabled={isMakingLive}
-              onClick={onMakeLive}
-            >
-              {isMakingLive ? "Making live…" : "Make this the live project"}
-            </button>
-          )}
-          {isPublished && isLiveProject && (
-            <p className="publish-card-note" role="status">
-              This is the project currently shown on your public website.
-            </p>
+            <div className="publish-status-footer">
+              <div className="publish-status-actions">
+                <button
+                  type="button"
+                  className="primary-action"
+                  disabled={isMakingLive}
+                  onClick={onMakeLive}
+                >
+                  {isMakingLive ? "Making live..." : "Make this the live project"}
+                </button>
+              </div>
+            </div>
           )}
         </section>
 
         <section className="publish-panel publish-link-panel">
           <div className="publish-panel-title">
-            <span>02</span>
             <h3>{content.publicLinkTitle}</h3>
             <strong>{content.websiteLabel}</strong>
           </div>
           <div className="publish-link-card-body">
             <div className="publish-link-main">
+                <div className="publish-form-meta">
+                  <p className="publish-card-note">
+                    Website: <strong>{project.name}</strong>
+                  </p>
+                  <span className={"publish-form-state" + (publicLink ? " is-live" : "")}>
+                    {publicLink ? "Live" : "Not published"}
+                  </span>
+                </div>
                 <div className="publish-link-box">
                   <input
                     className={publicLink ? "" : "publish-link-note-input"}
@@ -239,79 +233,117 @@ export default function PageBuilderPublishTab({
                 <div className="publish-qr-actions">
                   <button type="button" onClick={() => setPublicQrVersion((value) => value + 1)}>
                     <RefreshCw size={14} aria-hidden="true" />
-                    New QR
+                    Refresh
                   </button>
                   <button type="button" onClick={() => copyQrImage(qrUrl)}>
                     <Copy size={14} aria-hidden="true" />
-                    Copy QR
+                    Copy
                   </button>
                 </div>
               </div>
             </div>
           </section>
 
-        <section className="publish-panel publish-link-panel">
+        <section className="publish-panel publish-link-panel publish-forms-panel">
           <div className="publish-panel-title">
-            <span>03</span>
             <h3>{content.formLinkTitle}</h3>
             <strong>{content.formLabel}</strong>
           </div>
-          {activeForm ? (
-            <div className="publish-link-card-body">
-              <div className="publish-link-main">
-                <p className="publish-card-note">
-                  {content.formPrefix} <strong>{activeForm.title || content.untitledForm}</strong>
-                </p>
-                  <div className="publish-link-box">
-                    <input
-                      className={publishedFormLink ? "" : "publish-link-note-input"}
-                      value={publishedFormLink}
-                      readOnly
-                      placeholder={formLinkPlaceholder}
-                    />
-                    <button type="button" onClick={copyPublishedFormLink} disabled={!publishedFormLink}>
-                    <Copy size={15} aria-hidden="true" />
-                      {content.copyLink}
-                    </button>
+          {formDestinations.length ? (
+            <div className="publish-form-list">
+              {formDestinations.map(({
+                form,
+                isLive,
+                link,
+                whatsAppUrl: formWhatsAppUrl,
+                qrUrl: formQrUrl,
+              }) => (
+                <article
+                  key={form.id}
+                  className={"publish-form-card" + (isLive ? " is-live" : " is-unpublished")}
+                >
+                  <div className="publish-link-card-body">
+                    <div className="publish-link-main">
+                      <div className="publish-form-meta">
+                        <p className="publish-card-note">
+                          {content.formPrefix} <strong>{form.title || content.untitledForm}</strong>
+                        </p>
+                        <span className={"publish-form-state" + (isLive ? " is-live" : "")}>
+                          {isLive ? "Live" : "Not published"}
+                        </span>
+                      </div>
+                      <div className="publish-link-box">
+                        <input
+                          className={link ? "" : "publish-link-note-input"}
+                          value={link}
+                          readOnly
+                          placeholder={formLinkPlaceholder}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyPublishedFormLink(link)}
+                          disabled={!link}
+                        >
+                          <Copy size={15} aria-hidden="true" />
+                          {content.copyLink}
+                        </button>
+                      </div>
+                      <div className="publish-link-actions">
+                        <a
+                          href={formWhatsAppUrl || undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-disabled={!link}
+                        >
+                          <MessageCircle size={15} aria-hidden="true" />
+                          {content.shareForm}
+                        </a>
+                        <button
+                          type="button"
+                          disabled={!link || !openPublicFormPage}
+                          onClick={() => openPublicFormPage?.(form.id)}
+                        >
+                          <Eye size={15} aria-hidden="true" />
+                          {content.previewForm}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="publish-qr-preview">
+                      {formQrUrl ? (
+                        <img
+                          key={formQrUrl}
+                          src={formQrUrl}
+                          alt={content.formQrAlt + ": " + (form.title || content.untitledForm)}
+                        />
+                      ) : (
+                        <div className="publish-empty-note">{formLinkPlaceholder}</div>
+                      )}
+                      <span>{content.formQrPreview}</span>
+                      <div className="publish-qr-actions">
+                        <button
+                          type="button"
+                          disabled={!formQrUrl}
+                          onClick={() => setFormQrVersions((versions) => ({
+                            ...versions,
+                            [form.id]: (versions[form.id] || 1) + 1,
+                          }))}
+                        >
+                          <RefreshCw size={14} aria-hidden="true" />
+                          Refresh
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!formQrUrl}
+                          onClick={() => copyQrImage(formQrUrl)}
+                        >
+                          <Copy size={14} aria-hidden="true" />
+                          Copy
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                <div className="publish-link-actions">
-                  <a
-                    href={formWhatsAppUrl || undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-disabled={!publishedFormLink}
-                  >
-                    <MessageCircle size={15} aria-hidden="true" />
-                    {content.shareForm}
-                  </a>
-                  <button
-                    type="button"
-                    disabled={!publishedFormLink || !openPublicFormPage}
-                    onClick={() => openPublicFormPage?.(activeForm.id)}
-                  >
-                    <Eye size={15} aria-hidden="true" />
-                    {content.previewForm}
-                  </button>
-                </div>
-              </div>
-                <div className="publish-qr-preview">
-                  {formQrUrl ? (
-                    <img key={formQrUrl} src={formQrUrl} alt={content.formQrAlt} />
-                  ) : (
-                    <div className="publish-empty-note">{formLinkPlaceholder}</div>
-                  )}
-                  <span>{content.formQrPreview}</span>
-                  <div className="publish-qr-actions">
-                    <button type="button" disabled={!formQrUrl} onClick={() => setFormQrVersion((value) => value + 1)}>
-                      <RefreshCw size={14} aria-hidden="true" />
-                      New QR
-                    </button>
-                    <button type="button" disabled={!formQrUrl} onClick={() => copyQrImage(formQrUrl)}>
-                      <Copy size={14} aria-hidden="true" />
-                      Copy QR
-                    </button>
-                  </div>
-                </div>
+                </article>
+              ))}
             </div>
           ) : (
             <div className="publish-empty-note">

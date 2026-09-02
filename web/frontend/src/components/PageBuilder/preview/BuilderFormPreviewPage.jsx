@@ -421,8 +421,12 @@ export default function BuilderFormPreviewPage() {
               )}
               {isPagedForm && (
                 <div className="runtime-form-page-navigation">
-                  <span className="runtime-form-page-count">Page {pageIndex + 1} of {sections.length}</span>
-                  <div className="runtime-form-page-numbers" role="navigation" aria-label="Form pages">
+                  <div
+                    className="runtime-form-page-numbers"
+                    role="navigation"
+                    aria-label={`Form pages, page ${pageIndex + 1} of ${sections.length}`}
+                  >
+                    <span className="runtime-form-page-label" aria-hidden="true">Page</span>
                     {pageNavigationItems.map((item) => (
                       <button
                         key={item.index}
