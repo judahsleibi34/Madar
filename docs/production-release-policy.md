@@ -847,3 +847,22 @@ Implemented by:
 
 Any change to these files or the protected-path set requires same-change review
 of this section and the architecture document.
+
+## Maintenance validation safety
+
+Compose retains the legacy repository-root environment and persistent-file
+fallbacks (`../.env` and `../backend` relative to `web`). The governed deployer
+always overrides both with the canonical absolute configuration and storage
+paths. Frontend-only changes must not relocate these fallback data roots.
+Authenticated browser rehearsals reject `madarportal.com` and all subdomains
+without relying on an optional operator-supplied production-host list.
+
+Logical recovery rehearsals use `web/scripts/rehearse_backup.py` with a
+digest-pinned extension-compatible PostgreSQL image, networkless disposable
+storage, strict full-dump restore, verified file copies, and explicit read-only
+regular-file mounts. Logical recovery alone does not attest replacement-provider
+configuration, credentials, grants, or full application readiness.
+
+Publication validation also requires standalone form IDs to be unique across
+the tenant lookup; bound-project preference cannot hide a duplicate and a
+truncated lookup cannot establish uniqueness.

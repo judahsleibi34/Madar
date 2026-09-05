@@ -27,6 +27,10 @@ describe("isolated E2E safety contract", () => {
   for (const baseUrl of [
     "https://madar.com",
     "https://app.madar.com",
+    "https://madarportal.com",
+    "https://api.madarportal.com",
+    "https://tenant.madarportal.com",
+    "https://MADARPORTAL.COM.",
     "https://production.example.test",
   ]) {
     it(`rejects forbidden target ${baseUrl}`, () => {
