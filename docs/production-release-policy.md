@@ -794,6 +794,11 @@ over the original source bytes. It does not run `py_compile`, depend on
 paths from the digest. The same strict protected-tree digest must still match
 after installer dry-run, so any actual added or changed protected file fails
 closed as `candidate_changed_after_dry_run`.
+The child validator is pinned to the resolved absolute `sys.executable` already
+running the trusted bootstrapper. Candidate files, caller `PATH`,
+`/usr/bin/env`, and a fixed distribution-specific Python path cannot select it;
+unsafe, non-executable, candidate-contained, or unexpectedly writable paths
+fail closed before syntax validation.
 
 The privileged upgrader also recognizes one temporary controller-first
 bootstrap state. It does so only after canonical candidate resolution: installed

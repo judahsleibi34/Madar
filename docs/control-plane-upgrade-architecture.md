@@ -123,7 +123,13 @@ deployment Python source in an isolated `python3 -I -B` process using built-in
 `compile()` on the source bytes, checks all deployment shell syntax, checks
 ownership/state-root conditions, and requires at least 1 GiB free in staging
 and backup filesystems. Syntax validation writes no bytecode and does not depend
-on ignored `PYTHON*` environment variables. The installer uses one
+on ignored `PYTHON*` environment variables. Its child interpreter is the
+resolved absolute `sys.executable` of the already-running trusted bootstrapper,
+not a candidate path, `PATH` lookup, `/usr/bin/env`, or distribution-specific
+filename. The original and resolved executable paths must exist beneath
+non-writable real directories; the target must be executable and not
+group/world writable, and root execution additionally requires root ownership.
+The installer uses one
 shared read-only filesystem preflight before both dry-run success and apply. It
 walks every existing privileged source/destination component without following
 symlinks; requires root ownership with no group/world write bit or effective

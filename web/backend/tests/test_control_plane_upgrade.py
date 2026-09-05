@@ -918,6 +918,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
     def test_static_preflight_uses_isolated_bytecode_free_compile(self):
         with tempfile.TemporaryDirectory() as root:
             operations, candidate = self.static_preflight_candidate(root)
+            candidate_interpreter = candidate / "web/deployment/bin/python3"
+            candidate_interpreter.write_text(
+                "#!/bin/sh\nexit 99\n", encoding="utf-8"
+            )
+            candidate_interpreter.chmod(0o755)
             real_run = subprocess.run
             commands = []
 
@@ -925,22 +930,57 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
                 commands.append((list(args), dict(kwargs)))
                 return real_run(args, **kwargs)
 
-            with mock.patch.object(
-                upgrade.subprocess, "run", side_effect=record_run
+            with (
+                mock.patch.object(
+                    upgrade.subprocess, "run", side_effect=record_run
+                ),
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "PATH": str(candidate_interpreter.parent),
+                        "PYTHONPATH": str(candidate),
+                        "PYTHONHOME": str(candidate),
+                    },
+                    clear=False,
+                ),
             ):
                 self.run_static_preflight(operations, candidate)
 
             python_commands = [
                 (args, kwargs)
                 for args, kwargs in commands
-                if args and args[0] == "/usr/bin/python3"
+                if upgrade.PYTHON_SYNTAX_VALIDATOR in args
             ]
             self.assertEqual(len(python_commands), 1)
             args, kwargs = python_commands[0]
+            self.assertEqual(args[0], str(Path(sys.executable).resolve()))
+            self.assertNotEqual(args[0], str(candidate_interpreter))
+            self.assertNotEqual(args[0], "/usr/bin/env")
             self.assertEqual(args[1:4], ["-I", "-B", "-c"])
             self.assertIn("compile(source.read()", args[4])
             self.assertNotIn("py_compile", args)
             self.assertNotIn("PYTHONPYCACHEPREFIX", kwargs["env"])
+            self.assertNotIn("PYTHONPATH", kwargs["env"])
+            self.assertNotIn("PYTHONHOME", kwargs["env"])
+
+    def test_trusted_python_interpreter_rejects_candidate_and_invalid_paths(self):
+        with tempfile.TemporaryDirectory() as root:
+            candidate = Path(root) / "candidate"
+            candidate.mkdir()
+            controlled = candidate / "python3"
+            controlled.write_text("not an interpreter\n", encoding="utf-8")
+            controlled.chmod(0o755)
+
+            for value in ("", "python3", str(controlled)):
+                with (
+                    self.subTest(value=value),
+                    mock.patch.object(upgrade.sys, "executable", value),
+                    self.assertRaisesRegex(
+                        upgrade.UpgradeError,
+                        "candidate_python_interpreter_untrusted",
+                    ),
+                ):
+                    upgrade.trusted_python_executable(candidate)
 
     def test_installer_dry_run_sequence_preserves_static_preflight_digest(self):
         with tempfile.TemporaryDirectory() as root:
@@ -974,6 +1014,24 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             tamper = candidate / "web/deployment/tampered_after_dry_run"
             tamper.write_text("tampered\n", encoding="utf-8")
 
+            self.assertNotEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+
+            tamper.unlink()
+            protected = candidate / "web/deployment/production-paths.conf"
+            original = protected.read_bytes()
+            protected.write_text(
+                protected.read_text(encoding="utf-8") + "# changed\n",
+                encoding="utf-8",
+            )
+            self.assertNotEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+
+            protected.write_bytes(original)
+            hidden = candidate / "web/deployment/.hidden-tamper"
+            hidden.write_text("hidden\n", encoding="utf-8")
             self.assertNotEqual(
                 operations.protected_tree_digest(candidate), digest_before
             )

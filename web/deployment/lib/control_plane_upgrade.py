@@ -135,6 +135,59 @@ def sanitized_environment(*, madar_user: bool = False) -> dict[str, str]:
     return environment
 
 
+def trusted_python_executable(candidate: Path) -> str:
+    """Bind child validation to this process's protected interpreter."""
+
+    value = sys.executable
+    if not value or not os.path.isabs(value):
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    original = Path(value)
+    try:
+        original_metadata = original.lstat()
+        executable = original.resolve(strict=True)
+        candidate_root = candidate.resolve(strict=True)
+        metadata = executable.stat()
+    except OSError as error:
+        raise UpgradeError("candidate_python_interpreter_untrusted") from error
+    try:
+        executable.relative_to(candidate_root)
+    except ValueError:
+        pass
+    else:
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    if (
+        not (stat.S_ISREG(original_metadata.st_mode)
+             or stat.S_ISLNK(original_metadata.st_mode))
+        or (stat.S_ISREG(original_metadata.st_mode)
+            and original_metadata.st_mode & 0o022)
+        or (os.geteuid() == 0 and original_metadata.st_uid != 0)
+    ):
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_mode & 0o022
+        or not os.access(executable, os.X_OK)
+        or (os.geteuid() == 0 and metadata.st_uid != 0)
+    ):
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    for path in (original, executable):
+        for parent in (path.parent, *path.parent.parents):
+            try:
+                parent_metadata = parent.lstat()
+            except OSError as error:
+                raise UpgradeError(
+                    "candidate_python_interpreter_untrusted"
+                ) from error
+            if (
+                stat.S_ISLNK(parent_metadata.st_mode)
+                or not stat.S_ISDIR(parent_metadata.st_mode)
+                or parent_metadata.st_mode & 0o022
+                or (os.geteuid() == 0 and parent_metadata.st_uid != 0)
+            ):
+                raise UpgradeError("candidate_python_interpreter_untrusted")
+    return str(executable)
+
+
 def redact(text: str) -> str:
     return SENSITIVE_ASSIGNMENT.sub(lambda match: f"{match.group(1)}=<redacted>", text)
 
@@ -1016,7 +1069,7 @@ class SystemOperations:
         try:
             completed = subprocess.run(
                 [
-                    "/usr/bin/python3", "-I", "-B", "-c",
+                    trusted_python_executable(candidate), "-I", "-B", "-c",
                     PYTHON_SYNTAX_VALIDATOR,
                     *map(str, python_files),
                 ],
