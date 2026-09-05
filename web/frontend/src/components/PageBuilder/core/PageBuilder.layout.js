@@ -130,6 +130,7 @@ export const directElementHeight = (element) => {
     loginBlock: 390,
     registrationBlock: 520,
     carousel: 420,
+    logoSlider: 280,
     carouselCards: 360,
     carouselSplit: 380,
     carouselSpotlight: 420,

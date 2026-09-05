@@ -61,7 +61,7 @@
 
 .theme-dark .page-builder .daw-kicker,
 [data-theme="dark"] .page-builder .daw-kicker {
-  color: var(--action-primary, #9b2f25);
+  color: var(--action-primary, var(--theme-primary));
 }
 
 .theme-dark .page-builder .daw-header p,
@@ -172,7 +172,7 @@
 .theme-dark .page-builder .daw-compact-pagination button,
 [data-theme="dark"] .page-builder .daw-compact-pagination button {
   background: var(--theme-surface);
-  border-color: var(--theme-border);
+  border-color: var(--color-border-control);
   color: var(--theme-text);
 }
 
@@ -186,7 +186,7 @@
 .theme-dark .page-builder .daw-compact-pagination button:disabled,
 [data-theme="dark"] .page-builder .daw-compact-pagination button:disabled {
   background: var(--theme-surface-2);
-  border-color: var(--theme-border);
+  border-color: var(--color-border-control);
   color: var(--theme-text-muted);
   opacity: 1;
 }

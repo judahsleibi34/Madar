@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlignCenter,
   AlignJustify,
   AlignLeft,
   AlignRight,
+  AlertTriangle,
   Baseline,
   Bold,
   ClipboardPaste,
@@ -137,6 +139,7 @@ import {
   pageBuilderFontFamilyOptions,
 } from "../core/PageBuilder.theme";
 import { resolveMediaUrl } from "../../../utils/media";
+import { updateElementInSectionsPreservingLayout } from "../core/PageBuilder.elementUpdates";
 import {
   mainBuilderHiddenTabs,
   builderWorkspaceCopy,
@@ -779,6 +782,7 @@ export default function PageBuilder({
   const [quizSessions, setQuizSessions] = useState({});
   const [toast, setToast] = useState("");
   const [reloadConfirmationOpen, setReloadConfirmationOpen] = useState(false);
+  const [publishPageReductionWarning, setPublishPageReductionWarning] = useState(null);
   const [conflictDetails, setConflictDetails] = useState(null);
   const [conflictServerCandidate, setConflictServerCandidate] = useState(null);
   const [conflictMergeState, setConflictMergeState] = useState(null);
@@ -801,6 +805,10 @@ export default function PageBuilder({
   const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
   const [logoUrlDraftEdited, setLogoUrlDraftEdited] = useState(false);
   const projectRef = useRef(project);
+  const undoStackRef = useRef([]);
+  const redoStackRef = useRef([]);
+  const lastHistoryEntryRef = useRef({ key: "", at: 0 });
+  const [historyDepth, setHistoryDepth] = useState({ undo: 0, redo: 0 });
   const appliedWebsiteSettingsSignatureRef = useRef("");
   const canvasShellRef = useRef(null);
   const dragPreviewFrameRef = useRef(null);
@@ -1759,8 +1767,31 @@ export default function PageBuilder({
     return safeProjectRoles.find((role) => role.id === selected.id) || null;
   }, [safeProjectRoles, selected]);
 
-  const updateProject = useCallback((updater) => {
-    setProject((prev) => updater(prev));
+  const updateProject = useCallback((updater, options = {}) => {
+    const previousProject = projectRef.current;
+    const nextProject = updater(previousProject);
+    if (!nextProject || nextProject === previousProject) return;
+
+    if (options.recordHistory !== false && hydrationCompleteRef.current) {
+      const now = Date.now();
+      const historyKey = String(options.historyKey || "");
+      const lastEntry = lastHistoryEntryRef.current;
+      const shouldCoalesce =
+        historyKey &&
+        historyKey === lastEntry.key &&
+        now - lastEntry.at < 700;
+
+      if (!shouldCoalesce) {
+        undoStackRef.current.push(previousProject);
+        if (undoStackRef.current.length > 80) undoStackRef.current.shift();
+      }
+      redoStackRef.current = [];
+      lastHistoryEntryRef.current = { key: historyKey, at: now };
+      setHistoryDepth({ undo: undoStackRef.current.length, redo: 0 });
+    }
+
+    projectRef.current = nextProject;
+    setProject(nextProject);
   }, []);
 
   useEffect(() => {
@@ -1813,25 +1844,79 @@ export default function PageBuilder({
           description: syncedValues.description,
         },
       };
-    });
+    }, { recordHistory: false });
   }, [builderProjectLoading, demoMode, updateProject, websiteSettings]);
 
   const setThemeMode = (mode) => {
     updateProject((prev) => applyThemeModeToProject(prev, mode));
   };
 
-  const updateActivePage = useCallback((updater) => {
+  const updateActivePage = useCallback((updater, historyOptions) => {
     updateProject((prev) => ({
       ...prev,
       pages: prev.pages.map((page) =>
         page.id === prev.activePageId ? updater(page) : page
       ),
-    }));
+    }), historyOptions);
   }, [updateProject]);
 
-  const updateSections = useCallback((updater) => {
-    updateActivePage((page) => ({ ...page, sections: updater(page.sections) }));
+  const updateSections = useCallback((updater, historyOptions) => {
+    updateActivePage(
+      (page) => ({ ...page, sections: updater(page.sections) }),
+      historyOptions
+    );
   }, [updateActivePage]);
+
+  const undoProjectChange = useCallback(() => {
+    const previousProject = undoStackRef.current.pop();
+    if (!previousProject) return;
+
+    redoStackRef.current.push(projectRef.current);
+    projectRef.current = previousProject;
+    lastHistoryEntryRef.current = { key: "", at: 0 };
+    setProject(previousProject);
+    setHistoryDepth({
+      undo: undoStackRef.current.length,
+      redo: redoStackRef.current.length,
+    });
+    setDragState(null);
+    showToast("Last builder change undone.");
+  }, [showToast]);
+
+  const redoProjectChange = useCallback(() => {
+    const nextProject = redoStackRef.current.pop();
+    if (!nextProject) return;
+
+    undoStackRef.current.push(projectRef.current);
+    projectRef.current = nextProject;
+    lastHistoryEntryRef.current = { key: "", at: 0 };
+    setProject(nextProject);
+    setHistoryDepth({
+      undo: undoStackRef.current.length,
+      redo: redoStackRef.current.length,
+    });
+    setDragState(null);
+    showToast("Builder change restored.");
+  }, [showToast]);
+
+  useEffect(() => {
+    const handleHistoryShortcut = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (isBuilderTextEditingTarget(event.target)) return;
+
+      const key = event.key.toLowerCase();
+      const wantsUndo = key === "z" && !event.shiftKey;
+      const wantsRedo = (key === "z" && event.shiftKey) || key === "y";
+      if (!wantsUndo && !wantsRedo) return;
+
+      event.preventDefault();
+      if (wantsRedo) redoProjectChange();
+      else undoProjectChange();
+    };
+
+    document.addEventListener("keydown", handleHistoryShortcut);
+    return () => document.removeEventListener("keydown", handleHistoryShortcut);
+  }, [redoProjectChange, undoProjectChange]);
 
   const getElementParentGeometry = useCallback((elementId) => {
     const elementFrame = findBuilderDataElement(
@@ -2011,6 +2096,7 @@ export default function PageBuilder({
     showToast("Page deleted.");
   };
 
+  // Handler factories only close over ref-backed callbacks for later user events.
   const {
     addForm,
     deleteActiveForm,
@@ -2023,6 +2109,7 @@ export default function PageBuilder({
     duplicateFormField,
     deleteFormField,
     deleteFormSection,
+  // eslint-disable-next-line react-hooks/refs
   } = createFormHandlers({
     project,
     activeForm,
@@ -2303,37 +2390,10 @@ export default function PageBuilder({
   const updateSelectedElement = useCallback((updates) => {
     if (!selectedElement) return;
 
-    const merge = (element) => ({
-      ...element,
-      ...updates,
-      styles: { ...element.styles, ...(updates.styles || {}) },
-      action: { ...element.action, ...(updates.action || {}) },
-    });
-
-    updateSections((sections) =>
-      sections.map((section) => {
-        if (section.mode === "direct") {
-          return {
-            ...section,
-            freeElements: section.freeElements.map((element) =>
-              element.id === selectedElement.id ? merge(element) : element
-            ),
-          };
-        }
-
-        return {
-          ...section,
-          rows: section.rows.map((row) => ({
-            ...row,
-            columns: row.columns.map((column) => ({
-              ...column,
-              elements: column.elements.map((element) =>
-                element.id === selectedElement.id ? merge(element) : element
-              ),
-            })),
-          })),
-        };
-      })
+    updateSections(
+      (sections) =>
+        updateElementInSectionsPreservingLayout(sections, selectedElement.id, updates),
+      { historyKey: `element:${selectedElement.id}` }
     );
   }, [selectedElement, updateSections]);
 
@@ -3784,7 +3844,10 @@ export default function PageBuilder({
     [builderProjectRecord]
   );
 
-  const publishProject = async (skipOverlapCheck = false) => {
+  const publishProject = async (
+    skipOverlapCheck = false,
+    skipPageCountConfirmation = false
+  ) => {
     return runBuilderPublishSingleFlight(publishPromiseRef, async () => {
       setActiveTopbarAction("publish");
       setToast("");
@@ -3929,10 +3992,11 @@ export default function PageBuilder({
 
       if (
         latestPublicationState.publishedHasMorePages &&
-        !window.confirm(
-          "The saved draft has fewer pages than the currently published site. Continue publishing this smaller draft?"
-        )
-      ) return false;
+        !skipPageCountConfirmation
+      ) {
+        setPublishPageReductionWarning(latestPublicationState);
+        return false;
+      }
 
       showToast("Publishing site…");
       const publishResponse = await publishBuilderProject(
@@ -4241,7 +4305,7 @@ export default function PageBuilder({
   };
 
   const startDrag = useCallback((event, element, interaction = "move", forceInteraction = false) => {
-    if (preview || element.mode !== "direct") return;
+    if (preview) return;
 
     const additiveSelection = event.shiftKey || event.ctrlKey || event.metaKey;
     if (interaction === "move" && additiveSelection) {
@@ -4262,11 +4326,39 @@ export default function PageBuilder({
       (["input", "textarea", "select", "option", "button"].includes(tagName) || isSelectableText)
     ) return;
 
+    let directElement = element;
+    let convertedSourceSection = null;
+
+    // Selecting or editing an auto-layout component must never rewrite its section.
+    // Only the explicit move/resize handle opts into free-position conversion.
+    if (element.mode !== "direct" && !forceInteraction) return;
+
+    if (element.mode !== "direct") {
+      const location = findElementLocation(element.id);
+      const sourceSection = activePage?.sections.find((section) => section.id === location?.sectionId);
+      if (!sourceSection) return;
+
+      convertedSourceSection = convertSectionToDirectLayout(sourceSection);
+      directElement = (convertedSourceSection.freeElements || []).find(
+        (candidate) => candidate.id === element.id
+      );
+      if (!directElement) return;
+
+      flushSync(() => {
+        updateSections((sections) => sections.map((section) =>
+          section.id === convertedSourceSection.id ? convertedSourceSection : section
+        ));
+        setSelectedElementIds([directElement.id]);
+        setSelected({ type: "element", id: directElement.id });
+      });
+    }
+
     event.stopPropagation();
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
 
-    const elementFrame = event.currentTarget.closest?.(".direct-element-frame");
+    const elementFrame = event.currentTarget.closest?.(".direct-element-frame") ||
+      findBuilderDataElement(canvasShellRef.current, "data-builder-element-id", directElement.id);
     const parentGeometry = getImmediateParentCanvasGeometry(elementFrame, {
       coordinateScale: 1,
     });
@@ -4282,14 +4374,15 @@ export default function PageBuilder({
     if (!immediateParent || !pointer) return;
 
     const sourceSectionId = immediateParent.dataset?.sectionId || "";
-    const sourceSection = activePage?.sections.find((section) => section.id === sourceSectionId);
+    const sourceSection = convertedSourceSection ||
+      activePage?.sections.find((section) => section.id === sourceSectionId);
     const sourceElements = sourceSection?.freeElements || [];
     const selectedIdsInSection = effectiveSelectedElementIds.filter((elementId) =>
       sourceElements.some((candidate) => candidate.id === elementId)
     );
-    const groupElementIds = interaction === "move" && selectedIdsInSection.includes(element.id)
+    const groupElementIds = interaction === "move" && selectedIdsInSection.includes(directElement.id)
       ? selectedIdsInSection
-      : [element.id];
+      : [directElement.id];
     const groupElements = groupElementIds
       .map((elementId) => sourceElements.find((candidate) => candidate.id === elementId))
       .filter(Boolean);
@@ -4318,9 +4411,9 @@ export default function PageBuilder({
       return [candidate.id, position];
     }));
 
-    const minimumSize = getDirectElementMinimumSize(element);
-    let current = groupStartPositions[element.id] || clampElementToBounds(
-      getRenderedFramePosition(element) || element.position?.[viewport] || createPosition()[viewport],
+    const minimumSize = getDirectElementMinimumSize(directElement);
+    let current = groupStartPositions[directElement.id] || clampElementToBounds(
+      getRenderedFramePosition(directElement) || directElement.position?.[viewport] || createPosition()[viewport],
       pointer.bounds,
       {
         minWidth: minimumSize.width,
@@ -4330,8 +4423,8 @@ export default function PageBuilder({
     );
     if (
       interaction === "resize" &&
-      element.type === "heading" &&
-      element.directWidthMode !== "fixed"
+      directElement.type === "heading" &&
+      directElement.directWidthMode !== "fixed"
     ) {
       current = {
         ...current,
@@ -4339,12 +4432,12 @@ export default function PageBuilder({
       };
     }
 
-    if (!effectiveSelectedElementIds.includes(element.id)) {
-      setSelectedElementIds([element.id]);
+    if (!effectiveSelectedElementIds.includes(directElement.id)) {
+      setSelectedElementIds([directElement.id]);
     }
-    setSelected({ type: "element", id: element.id });
+    setSelected({ type: "element", id: directElement.id });
     setDragState({
-      elementId: element.id,
+      elementId: directElement.id,
       groupElementIds,
       groupStartPositions,
       startClientX: event.clientX,
@@ -4362,7 +4455,7 @@ export default function PageBuilder({
       previewSectionHeight: 0,
       interaction,
     });
-  }, [activePage, preview, effectiveSelectedElementIds, viewport]);
+  }, [activePage, effectiveSelectedElementIds, findElementLocation, preview, updateSections, viewport]);
 
   const captureTextSelection = (event, field, itemIndex = null) => {
     setTextSelection(
@@ -4394,7 +4487,7 @@ export default function PageBuilder({
         const style = documentRef.createElement("style");
         style.id = "builder-text-selection-style";
         style.textContent =
-          "::highlight(builder-text-selection){color:inherit;background:rgba(133,44,33,.24)}";
+          "::highlight(builder-text-selection){color:inherit;background:rgba(var(--theme-primary-rgb),.24)}";
         documentRef.head.append(style);
       }
       highlights.set("builder-text-selection", new HighlightConstructor(range.cloneRange()));
@@ -4886,8 +4979,13 @@ export default function PageBuilder({
   const applyInlineTextToolbarAction = (action) => {
     if (!selectedElement) return;
 
-    if (action === "undo" || action === "redo") {
-      document.execCommand?.(action);
+    if (action === "undo") {
+      undoProjectChange();
+      return;
+    }
+
+    if (action === "redo") {
+      redoProjectChange();
       return;
     }
 
@@ -5031,6 +5129,14 @@ export default function PageBuilder({
           inlineToolbarInteractionRef.current = false;
         }}
       >
+        <button
+          type="button"
+          aria-label="Move component"
+          title="Drag to move component"
+          onPointerDown={(event) => startDrag(event, selectedElement, "move", true)}
+        >
+          <Move size={16} aria-hidden="true" />
+        </button>
         <select
           aria-label="Text style"
           value={getInlineTextFormatValue()}
@@ -5725,6 +5831,7 @@ export default function PageBuilder({
   const {
     renderSiteHeader,
     renderSiteFooter,
+  // eslint-disable-next-line react-hooks/refs
   } = createSiteChromeRenderers({
     project,
     activePage,
@@ -6047,7 +6154,6 @@ export default function PageBuilder({
               <section className="builder-panel pages-manager-panel">
                 <div className="pages-panel-heading">
                   <div>
-                    <span className="pages-panel-eyebrow">Site structure</span>
                     <h2>Pages</h2>
                   </div>
                   <span className="pages-count" aria-label={`${project.pages.length} pages`}>
@@ -6499,6 +6605,25 @@ export default function PageBuilder({
           {selectedElement.type !== "reservationBlock" && (
             <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
           )}
+          {selectedElement.type === "logoSlider" && (
+            <div className="logo-slider-settings">
+              <strong>Trusted logo slider</strong>
+              <label>
+                Heading
+                <input
+                  value={selectedElement.logoSliderTitle || ""}
+                  onChange={(event) => updateSelectedElement({ logoSliderTitle: event.target.value })}
+                />
+              </label>
+              <label>
+                Supporting text
+                <textarea
+                  value={selectedElement.logoSliderSubtitle || ""}
+                  onChange={(event) => updateSelectedElement({ logoSliderSubtitle: event.target.value })}
+                />
+              </label>
+            </div>
+          )}
           {(selectedElement.type === "loginBlock" || selectedElement.type === "registrationBlock") && (
             <div className="auth-workflow-settings">
               <strong>Authentication workflow</strong>
@@ -6549,13 +6674,13 @@ export default function PageBuilder({
           )}
           {carouselElementTypes.has(selectedElement.type) && (
             <details open className="carousel-slide-editor">
-              <summary>Carousel cards</summary>
-              <p className="builder-note">Edit each card and choose or replace its image.</p>
+              <summary>{selectedElement.type === "logoSlider" ? "Partner logos" : "Carousel cards"}</summary>
+              <p className="builder-note">{selectedElement.type === "logoSlider" ? "Add each partner name and upload its logo." : "Edit each card and choose or replace its image."}</p>
               <div className="carousel-slide-list">
                 {parseCarouselSlides(selectedElement.content).map((slide, index) => (
                   <details className="carousel-slide-card" defaultOpen={index === 0} key={`${selectedElement.id}_slide_${index}`}>
                     <summary>
-                      <span>Card {index + 1}</span>
+                      <span>{selectedElement.type === "logoSlider" ? "Logo" : "Card"} {index + 1}</span>
                       <span className="carousel-slide-edit-hint primary-action">
                         {resolveMediaUrl(slide.image) ? "Edit image" : "Add image"}
                       </span>
@@ -6628,12 +6753,12 @@ export default function PageBuilder({
                       <small>Only public HTTPS image URLs are accepted. Uploaded file paths stay hidden.</small>
                     </label>
                   </details>
-                  <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>Remove card</button>
+                  <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>{selectedElement.type === "logoSlider" ? "Remove logo" : "Remove card"}</button>
                     </div>
                   </details>
                 ))}
               </div>
-              <button type="button" className="primary-action" onClick={() => updateSelectedElement({ content: serializeCarouselSlides([...parseCarouselSlides(selectedElement.content), { title: "New card", description: "Add supporting text here.", image: "" }]) })}>+ Add card</button>
+              <button type="button" className="primary-action" onClick={() => updateSelectedElement({ content: serializeCarouselSlides([...parseCarouselSlides(selectedElement.content), selectedElement.type === "logoSlider" ? { title: "New partner", description: "Partner", image: "" } : { title: "New card", description: "Add supporting text here.", image: "" }]) })}>{selectedElement.type === "logoSlider" ? "+ Add logo" : "+ Add card"}</button>
             </details>
           )}
           {selectedElement.type === "list" && (
@@ -7215,7 +7340,6 @@ export default function PageBuilder({
     <div className="workspace-page site-chrome-workspace">
       <header className="workspace-header">
         <div>
-          <span className="workspace-kicker">Global site settings</span>
           <h2>Header & Footer</h2>
           <p>Manage the site header, navigation, footer links, and contact information.</p>
         </div>
@@ -7636,6 +7760,9 @@ export default function PageBuilder({
       hasConfiguredSubdomain={Boolean(publicSiteSubdomain)}
       openWebsiteSettings={() => navigate("/settings")}
       openPublicFormPage={openPublicFormPage}
+      publishedFormIds={(builderProjectRecord?.published_schema?.forms || [])
+        .map((form) => form?.id)
+        .filter(Boolean)}
       onPreviewSite={handlePreviewClick}
       onUnpublish={unpublishProject}
       isUnpublishing={isUnpublishingProject}
@@ -7729,7 +7856,6 @@ export default function PageBuilder({
         <main className="workspace-page" role="alert" aria-live="assertive">
           <section className="workspace-header">
             <div>
-              <span className="workspace-kicker">Draft recovery</span>
               <h2>{builderProjectLoading ? "Checking for a safe backend copy..." : "This browser draft cannot be read"}</h2>
               <p>
                 The original browser value and its backup were left untouched. Saving and publishing are paused so neither value can be replaced with an empty project.
@@ -7809,6 +7935,30 @@ export default function PageBuilder({
           )}
           builderCopy={builderCopy}
           demoMode={demoMode}
+          historyControls={(
+            <div className="builder-history-controls" role="toolbar" aria-label="Edit history">
+              <button
+                type="button"
+                onClick={undoProjectChange}
+                disabled={historyDepth.undo === 0}
+                aria-label="Undo last builder change"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 size={16} aria-hidden="true" />
+                <span>Undo</span>
+              </button>
+              <button
+                type="button"
+                onClick={redoProjectChange}
+                disabled={historyDepth.redo === 0}
+                aria-label="Redo builder change"
+                title="Redo (Ctrl+Shift+Z)"
+              >
+                <Redo2 size={16} aria-hidden="true" />
+                <span>Redo</span>
+              </button>
+            </div>
+          )}
           displayName={projectDisplayName}
           handlePreviewClick={handlePreviewClick}
           hideWorkspaceTabs={hideWorkspaceTabs}
@@ -7888,6 +8038,32 @@ export default function PageBuilder({
           onConfirm={() => {
             updateProject((prev) => setProjectDefaultPage(prev, homepageOverridePending.pageId));
             setHomepageOverridePending(null);
+          }}
+        />
+      )}
+
+      {publishPageReductionWarning && (
+        <PageDeleteConfirmModal
+          title="Publish fewer pages?"
+          icon={<AlertTriangle size={26} aria-hidden="true" />}
+          message={
+            <>
+              Your draft has <strong>{publishPageReductionWarning.draftPageCount} pages</strong>, while the live website has{" "}
+              <strong>{publishPageReductionWarning.publishedPageCount} pages</strong>. Publishing will remove{" "}
+              <strong>
+                {publishPageReductionWarning.publishedPageCount - publishPageReductionWarning.draftPageCount} live{" "}
+                {publishPageReductionWarning.publishedPageCount - publishPageReductionWarning.draftPageCount === 1
+                  ? "page"
+                  : "pages"}
+              </strong>.
+            </>
+          }
+          cancelLabel="Review pages"
+          confirmLabel="Publish smaller site"
+          onCancel={() => setPublishPageReductionWarning(null)}
+          onConfirm={() => {
+            setPublishPageReductionWarning(null);
+            void publishProject(true, true);
           }}
         />
       )}

@@ -16,7 +16,7 @@
 .page-builder .daw-section-heading > span,
 .page-builder .daw-report-header span {
   margin-bottom: 6px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -47,7 +47,7 @@
 .page-builder .daw-stepper button {
   border-radius: 8px !important;
   background: var(--theme-surface) !important;
-  border: 1px solid var(--theme-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   box-shadow: none !important;
 }
 
@@ -99,7 +99,7 @@
 .page-builder .daw-stepper button.active {
   background: var(--theme-primary-soft) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.22) !important;
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
 }
 
 .page-builder .daw-stepper button span {
@@ -172,7 +172,7 @@
 .page-builder .daw-flow-actions button:not(.daw-primary) {
   border-radius: 8px;
   background: var(--theme-surface);
-  border-color: var(--theme-border);
+  border-color: var(--color-border-control);
   color: var(--theme-text);
 }
 
@@ -205,7 +205,7 @@
 .page-builder .daw-analysis-generator,
 .page-builder .daw-analysis-domain-grid button {
   background: var(--theme-surface) !important;
-  border-color: var(--theme-border) !important;
+  border-color: var(--color-border-control) !important;
   border-radius: 8px !important;
   box-shadow: none !important;
 }
@@ -224,15 +224,15 @@
 }
 
 .page-builder .daw-cleaning-stack .daw-advanced-cleaning-grid > details.daw-cleaning-tool[open] > summary {
-  border-bottom: 1px solid var(--theme-border);
+  border-bottom: 1px solid var(--color-border-control);
   background: transparent !important;
 }
 
 .page-builder .daw-analysis-domain-grid button.active,
 .page-builder .daw-stepper button.active {
   background: var(--theme-surface) !important;
-  border-color: var(--theme-primary) !important;
-  color: var(--theme-primary) !important;
+  border-color: var(--color-accent-text) !important;
+  color: var(--color-accent-text) !important;
 }
 
 .page-builder .daw-analysis-generator-heading em {

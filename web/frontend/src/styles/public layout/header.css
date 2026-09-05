@@ -116,7 +116,7 @@
 
 .nav-menu a:hover,
 .nav-menu a.active {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .nav-menu a:hover::after,
@@ -125,7 +125,7 @@
 }
 
 .nav-menu a:focus-visible {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.075);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
@@ -175,7 +175,7 @@
 }
 
 .btn-login:hover {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   border-color: rgba(var(--theme-primary-rgb), 0.42);
   background: rgba(var(--theme-primary-rgb), 0.045);
   transform: translateY(-1px);
@@ -233,7 +233,7 @@
 
 .lang-toggle:hover {
   border-color: rgba(var(--theme-primary-rgb), 0.42);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.045);
 }
 
@@ -308,7 +308,7 @@
 .lang-dropdown button:hover,
 .lang-dropdown button.active {
   background: rgba(var(--theme-primary-rgb), 0.075);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 /* ============================================================
@@ -684,7 +684,7 @@
   height: 36px !important;
   border-radius: 12px !important;
   background: var(--theme-primary-soft) !important;
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
   border: 0 !important;
   box-shadow: none !important;
 }
@@ -1121,7 +1121,7 @@ html[data-darkreader-scheme] .hamburger span {
 }
 
 .header-theme-toggle:hover {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: transparent;
   transform: translateY(-1px);
 }
@@ -1155,7 +1155,7 @@ body.theme-dark .nav-menu a {
 [data-theme="dark"] .nav-menu a.active,
 body.theme-dark .nav-menu a:hover,
 body.theme-dark .nav-menu a.active {
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }
 
 [data-theme="dark"] .btn-login,
@@ -1176,7 +1176,7 @@ body.theme-dark .btn-login:hover,
 body.theme-dark .lang-toggle:hover,
 body.theme-dark .header-theme-toggle:hover {
   background: transparent;
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
   border-color: transparent;
 }
 
@@ -1240,7 +1240,7 @@ body.theme-dark .lang-dropdown button.active {
 .mobile-theme-toggle strong {
   font-size: 13px;
   font-weight: 950;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 [data-theme="dark"] .mobile-menu,
@@ -1277,7 +1277,7 @@ body.theme-dark .mobile-theme-toggle {
 
 [data-theme="dark"] .mobile-theme-toggle strong,
 body.theme-dark .mobile-theme-toggle strong {
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }
 
 /* ============================================================
@@ -1475,7 +1475,7 @@ html.theme-dark .nav-menu a:hover,
 html.theme-dark .nav-menu a.active,
 body.theme-dark .nav-menu a:hover,
 body.theme-dark .nav-menu a.active {
-  color: var(--theme-primary-hover) !important;
+  color: var(--color-accent-text) !important;
 }
 
 :root[data-theme="dark"] .lang-dropdown button:hover,
@@ -1503,7 +1503,7 @@ body.theme-dark .mobile-menu-lang:hover {
 html.theme-dark .mobile-menu-lang .language-toggle-animation,
 body.theme-dark .mobile-menu-lang .language-toggle-animation {
   background: var(--theme-primary-soft) !important;
-  color: var(--theme-primary-hover) !important;
+  color: var(--color-accent-text) !important;
 }
 
 :root[data-theme="dark"] .mobile-menu-lang .language-toggle-current,
@@ -1529,15 +1529,15 @@ html.theme-dark .header-language-switcher.language-toggle-button,
 html.theme-dark .header-language-switcher.language-toggle-button:hover,
 body.theme-dark .header-language-switcher.language-toggle-button,
 body.theme-dark .header-language-switcher.language-toggle-button:hover {
-  width: 42px !important;
-  min-width: 42px !important;
-  max-width: 42px !important;
-  height: 42px !important;
-  min-height: 42px !important;
+  width: var(--control-height) !important;
+  min-width: var(--control-height) !important;
+  max-width: var(--control-height) !important;
+  height: var(--control-height) !important;
+  min-height: var(--control-height) !important;
   grid-template-columns: 18px !important;
   padding: 0 !important;
   justify-content: center !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-default) !important;
   border-color: transparent !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -1554,7 +1554,7 @@ html.theme-dark .header-language-switcher.language-toggle-button:focus-visible,
 body.theme-dark .header-language-switcher.language-toggle-button:hover,
 body.theme-dark .header-language-switcher.language-toggle-button:focus-visible {
   background: transparent !important;
-  color: var(--theme-primary-hover) !important;
+  color: var(--color-accent-text) !important;
 }
 
 .header-language-switcher .language-toggle-animation,

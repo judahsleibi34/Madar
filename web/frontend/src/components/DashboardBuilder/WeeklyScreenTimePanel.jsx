@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock3 } from "lucide-react";
 import { fetchWeeklyScreenTime } from "../PageBuilder/services/PageBuilder.api";
 import { formatWeeklyScreenTime } from "../../hooks/useWeeklyScreenTime";
 import {
@@ -109,10 +108,6 @@ export default function WeeklyScreenTimePanel({
     <section className="weekly-screen-time-panel" aria-labelledby="weekly-screen-time-title">
       <header className="weekly-screen-time-header">
         <div>
-          <span className="weekly-screen-time-kicker">
-            <Clock3 size={15} aria-hidden="true" />
-            Screen Time
-          </span>
           <h2 id="weekly-screen-time-title">{selectedPeriod.title}</h2>
           <p>Focused time for admins and role-assigned users.</p>
         </div>

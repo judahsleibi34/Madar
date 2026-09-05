@@ -29,7 +29,7 @@
 .my-plan-eyebrow {
   display: inline-flex;
   margin-bottom: 10px;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 850;
   letter-spacing: 0.08em;
@@ -172,7 +172,7 @@
   border-radius: 999px;
   padding: 7px 11px;
   background: rgba(var(--theme-success-rgb), 0.1);
-  color: var(--theme-success);
+  color: var(--color-status-success-text);
   font-size: 12px;
   font-weight: 900;
 }
@@ -240,7 +240,7 @@
   content: "✓";
   position: absolute;
   inset-inline-start: 0;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-weight: 900;
 }
 
@@ -378,7 +378,7 @@
 }
 
 .my-plan-module-card.locked em {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .my-plan-module-detail {

@@ -39,7 +39,7 @@
 
 .user-dashboard-kicker {
   display: block;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 0.76rem;
   font-weight: 950;
   letter-spacing: 0.08em;
@@ -180,7 +180,7 @@ body.theme-light .user-dashboard-panel {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: var(--theme-primary-soft);
   border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
   box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.12);
@@ -227,7 +227,7 @@ body.theme-light .user-dashboard-panel {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: var(--theme-primary-soft);
   border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
 }
@@ -348,7 +348,7 @@ body.theme-light .user-dashboard-panel {
 .user-dashboard-builder-grid em {
   padding: 5px 9px;
   border-radius: 999px;
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.12);
   font-size: 0.7rem;
   font-style: normal;
@@ -397,7 +397,7 @@ body.theme-light .user-dashboard-panel {
   border-radius: 18px;
   display: grid;
   place-items: center;
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
   background: color-mix(in srgb, var(--theme-bg-soft) 82%, var(--theme-surface));
 }
 
@@ -442,7 +442,7 @@ body.theme-light .user-dashboard-panel {
 }
 
 .user-dashboard-usage-row strong {
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }
 
 .user-dashboard-usage-track {
@@ -489,7 +489,7 @@ body.theme-light .user-dashboard-usage-track {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
   background: rgba(var(--theme-primary-rgb), 0.12);
 }
 

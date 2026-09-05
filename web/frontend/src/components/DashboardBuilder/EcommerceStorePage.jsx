@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, RefreshCw, Settings, ShoppingBag } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
@@ -53,12 +53,8 @@ export default function EcommerceStorePage() {
 
   return (
     <main className="ecommerce-store-admin">
-      <header className="ecommerce-store-admin-header">
+      <header className="ecommerce-store-admin-header app-page-intro">
         <div>
-          <span className="ecommerce-store-admin-kicker">
-            <ShoppingBag size={16} aria-hidden="true" />
-            Online Store
-          </span>
           <h1>{draftPreview ? "Draft preview" : "Published store"}</h1>
           <p>{draftPreview ? "This private browser preview uses your unpublished design draft. Nothing here is live yet." : "Review the customer experience currently available in production."}</p>
         </div>

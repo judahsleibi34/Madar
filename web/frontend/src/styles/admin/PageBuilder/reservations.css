@@ -37,7 +37,7 @@
   min-height: 44px;
   padding: 0 16px;
   background: var(--form-theme-accent, var(--reservation-accent));
-  color: var(--form-theme-button-text, #fff);
+  color: var(--form-theme-button-text, var(--theme-text-inverse));
   box-shadow: none;
 }
 
@@ -74,14 +74,14 @@
 .reservation-empty-actions .primary-action {
   border-color: var(--form-theme-accent, var(--reservation-accent));
   background: var(--form-theme-accent, var(--reservation-accent));
-  color: var(--form-theme-button-text, #fff);
+  color: var(--form-theme-button-text, var(--theme-text-inverse));
   box-shadow: none;
 }
 
 .reservation-empty-actions .primary-action:hover {
   background: var(--form-theme-accent, var(--reservation-accent-dark));
   border-color: var(--form-theme-accent, var(--reservation-accent-dark));
-  color: var(--form-theme-button-text, #fff);
+  color: var(--form-theme-button-text, var(--theme-text-inverse));
 }
 
 .reservation-editor-layout {
@@ -304,13 +304,13 @@
 
 .reservation-editor-card .editor-card-header .reservation-delete-block {
   border-color: rgba(var(--theme-danger-rgb), 0.2);
-  color: var(--theme-danger);
+  color: var(--color-status-danger-text);
 }
 
 .reservation-editor-card .editor-card-header .reservation-delete-block:hover {
   background: rgba(var(--theme-danger-rgb), 0.08);
   border-color: rgba(var(--theme-danger-rgb), 0.32);
-  color: var(--theme-danger);
+  color: var(--color-status-danger-text);
 }
 
 .reservation-settings-section {
@@ -380,7 +380,7 @@
 
 .reservation-mode-switch button.active {
   background: var(--reservation-accent);
-  color: #fff;
+  color: var(--theme-text-inverse);
   box-shadow: var(--madar-red-shadow);
 }
 
@@ -453,7 +453,7 @@
   height: 36px;
   border-radius: 11px;
   padding: 0;
-  color: var(--theme-danger);
+  color: var(--color-status-danger-text);
   background: rgba(var(--theme-danger-rgb), 0.08);
 }
 
@@ -738,7 +738,7 @@
   height: 34px;
   padding: 0;
   border-radius: 10px;
-  color: var(--theme-danger);
+  color: var(--color-status-danger-text);
   background: rgba(var(--theme-danger-rgb), 0.08);
 }
 
@@ -961,7 +961,7 @@
   display: grid;
   gap: 3px;
   padding: 12px 14px;
-  border: 1px solid var(--pb-border, var(--madar-border));
+  border: 1px solid var(--pb-border, var(--color-border-control));
   border-radius: 12px;
   background: var(--pb-surface, var(--madar-surface));
 }
@@ -1079,7 +1079,7 @@
   align-items: center;
   min-height: 56px;
   padding: 8px 10px;
-  border: 1px solid var(--madar-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 12px;
   background: var(--madar-surface-soft);
   color: var(--madar-muted);
@@ -1137,7 +1137,7 @@
 .page-builder .reservation-step-actions button {
   min-height: 40px;
   padding: 0 14px;
-  border: 1px solid var(--madar-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 11px;
   background: var(--madar-surface);
   color: var(--madar-text);
@@ -1250,7 +1250,7 @@
   min-width: 0;
   min-height: 62px;
   padding: 10px 12px;
-  border: 1px solid var(--pb-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 11px;
   background: var(--pb-surface-muted);
   color: var(--pb-text);
@@ -1259,7 +1259,7 @@
 }
 
 .page-builder .booking-component-toolbox-list button:hover {
-  border-color: color-mix(in srgb, var(--pb-accent) 34%, var(--pb-border));
+  border-color: color-mix(in srgb, var(--pb-accent) 34%, var(--color-border-control));
   background: var(--pb-accent-soft);
   color: var(--pb-accent);
 }
@@ -1412,7 +1412,7 @@
 
 .page-builder .booking-canvas-component.is-selected,
 .page-builder .booking-canvas-component:focus-visible {
-  border-color: var(--pb-border);
+  border-color: var(--color-border-control);
   border-left-color: var(--pb-accent);
   box-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.1);
 }
@@ -1649,7 +1649,7 @@
 .page-builder .booking-text-toolbar > button,
 .page-builder .booking-text-toolbar > label {
   min-height: 32px;
-  border: 1px solid var(--pb-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: 7px;
   background: var(--pb-surface-raised);
   color: var(--pb-text);
@@ -1692,7 +1692,7 @@
 .page-builder .booking-text-toolbar > :is(button, select):hover,
 .page-builder .booking-text-toolbar > label:hover,
 .page-builder .booking-text-toolbar .is-active {
-  border-color: color-mix(in srgb, var(--pb-accent) 40%, var(--pb-border));
+  border-color: color-mix(in srgb, var(--pb-accent) 40%, var(--color-border-control));
   background: var(--pb-accent-soft);
   color: var(--pb-accent);
 }
@@ -1833,7 +1833,7 @@
   grid-column: span 2;
   width: 100%;
   min-height: 38px;
-  border-color: var(--pb-border);
+  border-color: var(--color-border-control);
   border-radius: 9px;
   background: var(--pb-surface-raised);
 }

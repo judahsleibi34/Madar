@@ -3,10 +3,10 @@
    ============================================================ */
 
 :root {
-  --action-primary: #9b2f25;
-  --action-primary-hover: #84271f;
-  --action-primary-active: #712019;
-  --action-danger: var(--action-primary);
+  --action-primary: var(--theme-primary);
+  --action-primary-hover: var(--theme-primary-hover);
+  --action-primary-active: var(--theme-primary-hover);
+  --action-danger: var(--color-danger-action);
   --action-danger-soft: color-mix(in srgb, var(--action-danger) 10%, var(--theme-surface));
   --action-focus-ring: 0 0 0 3px color-mix(in srgb, var(--action-primary) 28%, transparent);
 }
@@ -24,16 +24,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 10px 18px;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-5);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-default);
   background: var(--action-primary);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1;
+  color: var(--theme-text-inverse);
+  font-size: var(--type-small-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--type-small-line);
   text-align: center;
   box-shadow: none;
   cursor: pointer;
@@ -53,7 +53,7 @@
 .primary-action:hover,
 .small-action:hover {
   background: var(--action-primary-hover);
-  color: #fff;
+  color: var(--theme-text-inverse);
   transform: none;
   box-shadow: none;
 }
@@ -82,13 +82,18 @@
   .primary-action,
   .small-action
 ):focus-visible {
-  outline: 0;
+  outline: 2px solid var(--color-focus-indicator);
+  outline-offset: 2px;
   box-shadow: var(--action-focus-ring);
 }
 
 :is(button, [role="button"], .btn-signup, .primary-action):disabled,
 :is(button, [role="button"], .btn-signup, .primary-action)[aria-disabled="true"] {
-  opacity: 0.5;
+  background: var(--color-disabled-bg);
+  border-color: var(--color-disabled-border);
+  color: var(--color-disabled-text);
+  opacity: 1;
+  box-shadow: none;
   cursor: not-allowed;
   transform: none;
 }
@@ -99,8 +104,8 @@
 .secondary-action,
 .lang-toggle {
   background: transparent;
-  color: var(--madar-navy);
-  border: 1.5px solid var(--theme-border-strong);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-control);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -155,22 +160,22 @@
 .lang-dropdown button:hover,
 .lang-dropdown button.active {
   background: rgba(var(--theme-primary-rgb), 0.07);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   transform: none;
   box-shadow: none;
 }
 
 /* Destructive actions remain visually distinct from primary actions. */
 :is(.danger-button, .danger-lite, .page-delete-action, .form-command-button-danger) {
-  min-height: 40px;
-  padding: 10px 18px;
+  min-height: var(--control-height);
+  padding: 0 var(--space-5);
   border: 1px solid color-mix(in srgb, var(--action-danger) 48%, transparent);
-  border-radius: 8px;
+  border-radius: var(--radius-default);
   background: var(--action-danger-soft);
   color: var(--action-danger);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1;
+  font-size: var(--type-small-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--type-small-line);
   text-align: center;
   box-shadow: none;
 }
@@ -186,6 +191,7 @@
 }
 
 :is(.danger-button, .danger-lite, .page-delete-action, .form-command-button-danger):focus-visible {
-  outline: 0;
+  outline: 2px solid var(--color-focus-indicator);
+  outline-offset: 2px;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--action-danger) 24%, transparent);
 }

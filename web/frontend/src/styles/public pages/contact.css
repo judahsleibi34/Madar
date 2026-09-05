@@ -68,7 +68,7 @@
 
 .contact-form input:focus,
 .contact-form textarea:focus {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
 }
 
 .contact-form button {
@@ -102,11 +102,11 @@
 }
 
 .contact-form-status-success {
-  color: var(--theme-success);
+  color: var(--color-status-success-text);
 }
 
 .contact-form-status-error {
-  color: var(--theme-danger);
+  color: var(--color-status-danger-text);
 }
 
 .contact-info-card {
@@ -131,7 +131,7 @@
 
 .contact-info-card strong {
   display: block;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;

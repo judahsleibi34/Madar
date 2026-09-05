@@ -1,8 +1,8 @@
 /* Shared workspace footer: the same structure is used in the builder and Go Live. */
 .builder-canvas .ecommerce-style-footer {
   --workspace-footer-bg: var(--theme-primary);
-  --workspace-footer-text: #fff;
-  --workspace-footer-muted: #fff;
+  --workspace-footer-text: var(--theme-text-inverse);
+  --workspace-footer-muted: var(--theme-text-inverse);
   container-name: site-footer;
   container-type: inline-size;
   min-width: 0;

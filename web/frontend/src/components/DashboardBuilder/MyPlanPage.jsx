@@ -124,9 +124,8 @@ export default function MyPlanPage() {
 
   return (
     <section className="my-plan-page" dir={direction}>
-      <header className="my-plan-header">
+      <header className="my-plan-header app-page-intro">
         <div>
-          <span className="my-plan-eyebrow">{copy.title}</span>
           <h1>{copy.title}</h1>
           <p>{copy.subtitle}</p>
         </div>

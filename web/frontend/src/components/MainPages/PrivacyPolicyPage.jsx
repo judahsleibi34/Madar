@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage({ lang = "en" }) {
       dir={currentLang === "ar" ? "rtl" : "ltr"}
       lang={currentLang}
     >
-      <header className="privacy-policy-hero">
+      <header className="privacy-policy-hero app-page-intro">
         <p>{page.updated}</p>
         <h1>{page.title}</h1>
         <span>{page.intro}</span>

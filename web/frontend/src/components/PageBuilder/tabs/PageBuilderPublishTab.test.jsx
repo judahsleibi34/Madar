@@ -83,19 +83,19 @@ describe("PageBuilderPublishTab", () => {
     expect(onMakeLive).toHaveBeenCalledOnce();
   });
 
-  it("identifies the project currently bound to the public website", () => {
+  it("identifies the live project without showing redundant controls", () => {
     render(<PageBuilderPublishTab project={project} isLiveProject />);
 
-    expect(screen.getByRole("status").textContent).toContain(
-      "currently shown on your public website"
-    );
+    expect(screen.getByText("Live")).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "Make this the live project" })
     ).toBeNull();
+    expect(screen.queryByRole("button", { name: /take site offline/i })).toBeNull();
+    expect(screen.queryByText(/currently shown on your public website/i)).toBeNull();
   });
 
   it("uses the production tenant URL for the published form link", () => {
-    render(<PageBuilderPublishTab project={projectWithForm} />);
+    render(<PageBuilderPublishTab project={projectWithForm} publishedFormIds={["form-1"]} />);
 
     expect(
       screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
@@ -115,25 +115,27 @@ describe("PageBuilderPublishTab", () => {
     ).toBeTruthy();
   });
 
-  it("generates a public form URL for a saved draft independently of site publication", () => {
+  it("does not offer a production form URL before that form is published", () => {
     render(
       <PageBuilderPublishTab
         project={{ ...projectWithForm, status: "draft" }}
+        publishedFormIds={[]}
         hasConfiguredSubdomain
       />
     );
 
     expect(
-      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
+      screen.getByPlaceholderText("Publish this saved form to create its live link.")
     ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /preview form/i }).disabled).toBe(true);
   });
-
   it("opens the saved public-form runtime from Preview form", () => {
     const openPublicFormPage = vi.fn();
 
     render(
       <PageBuilderPublishTab
         project={projectWithForm}
+        publishedFormIds={["form-1"]}
         openPublicFormPage={openPublicFormPage}
       />
     );
@@ -162,4 +164,33 @@ describe("PageBuilderPublishTab", () => {
     expect(onPreviewSite).toHaveBeenCalledTimes(1);
     expect(openSpy).not.toHaveBeenCalled();
   });
-});
+
+  it("lists every published form and opens the selected form destination", () => {
+    const openPublicFormPage = vi.fn();
+    const multiFormProject = {
+      ...projectWithForm,
+      forms: [
+        ...projectWithForm.forms,
+        { id: "form-2", title: "Request a quote" },
+      ],
+    };
+
+    render(
+      <PageBuilderPublishTab
+        project={multiFormProject}
+        publishedFormIds={["form-1", "form-2"]}
+        openPublicFormPage={openPublicFormPage}
+      />
+    );
+
+    expect(
+      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
+    ).toBeTruthy();
+    expect(
+      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-2")
+    ).toBeTruthy();
+
+    const previewButtons = screen.getAllByRole("button", { name: /preview form/i });
+    fireEvent.click(previewButtons[1]);
+    expect(openPublicFormPage).toHaveBeenCalledWith("form-2");
+  });});

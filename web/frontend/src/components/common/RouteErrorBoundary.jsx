@@ -39,9 +39,10 @@ export default class RouteErrorBoundary extends Component {
     return (
       <main className="route-error" role="alert" aria-live="assertive">
         <section className="route-error__card" aria-labelledby="route-error-title">
-          <p className="route-error__eyebrow">Madar</p>
-          <h1 id="route-error-title">We could not open this page</h1>
-          <p>Something interrupted the page while it was loading. You can try again safely.</p>
+          <header className="route-error__intro app-page-intro">
+            <h1 id="route-error-title">We could not open this page</h1>
+            <p>Something interrupted the page while it was loading. You can try again safely.</p>
+          </header>
           {isBuilder ? (
             <p className="route-error__note">Your last saved version is safe.</p>
           ) : null}

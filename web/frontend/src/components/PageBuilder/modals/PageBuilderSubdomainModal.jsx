@@ -321,9 +321,6 @@ export default function PageBuilderSubdomainModal({
             </div>
 
             <div>
-              <span className="madar-website-name-kicker">
-                {content.kicker}
-              </span>
 
               <h2 id="website-name-title">{content.title}</h2>
 

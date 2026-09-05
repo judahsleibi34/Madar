@@ -118,7 +118,7 @@
   border-bottom: 1px solid rgba(var(--theme-primary-rgb), 0.13);
 }
 
-.page-skeleton-site-header > strong { color: var(--theme-primary); font-size: 1.05rem; letter-spacing: 0.04em; }
+.page-skeleton-site-header > strong { color: var(--color-accent-text); font-size: 1.05rem; letter-spacing: 0.04em; }
 .page-skeleton-site-header nav { display: flex; gap: 22px; }
 .page-skeleton-site-header nav i,
 .page-skeleton-site-action,

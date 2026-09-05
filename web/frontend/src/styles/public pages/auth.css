@@ -74,7 +74,7 @@
 .register-card input {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 12px;
   background: var(--theme-surface);
   color: var(--theme-text);
@@ -84,7 +84,7 @@
 }
 
 .register-card input:focus {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
@@ -144,7 +144,7 @@ html[dir="rtl"] .password-field button {
 }
 
 .register-card span {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -234,7 +234,7 @@ html[dir="rtl"] .register-card h1 {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background: color-mix(in srgb, var(--theme-primary) 12%, transparent);
 }
 
@@ -274,7 +274,7 @@ html[dir="rtl"] .register-card h1 {
 }
 
 .verification-secondary {
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 12px;
   background: var(--theme-surface);
   color: var(--theme-text);
@@ -340,7 +340,7 @@ body.theme-dark .register-card input,
 .theme-dark .login-card input,
 .theme-dark .register-card input {
   background: var(--theme-bg-soft);
-  border-color: var(--theme-border);
+  border-color: var(--color-border-control);
   color: var(--theme-text);
 }
 
@@ -351,7 +351,7 @@ body.theme-dark .register-card input:focus,
 .theme-dark .login-card input:focus,
 .theme-dark .register-card input:focus {
   background: var(--theme-bg-soft);
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.18);
 }
 
@@ -440,7 +440,7 @@ body.theme-dark .register-card input:focus,
 .login-card input {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 12px;
   background: var(--theme-surface);
   color: var(--theme-text);
@@ -456,13 +456,13 @@ body.theme-dark .register-card input:focus,
 }
 
 .login-card input:focus {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   background: var(--theme-surface);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
 .login-card span {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 700;
   text-align: left;
@@ -478,7 +478,7 @@ body.theme-dark .register-card input:focus,
 
 .login-options a,
 .login-signup-text a {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-weight: 900;
   text-decoration: none;
 }
@@ -537,7 +537,7 @@ body.theme-dark .register-card input:focus,
   z-index: 1;
   width: fit-content;
   max-width: 88%;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   background-color: rgba(var(--theme-primary-rgb), 0.045);
   border: 1px solid rgba(var(--theme-primary-rgb), 0.14);
   padding: 7px 11px;
@@ -582,7 +582,7 @@ body.theme-dark .register-card input:focus,
   place-items: center;
   border-radius: 8px;
   background: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 950;
 }
@@ -609,7 +609,7 @@ body.theme-dark .register-card input:focus,
 }
 
 .auth-toast-error {
-  border-left-color: var(--theme-primary);
+  border-left-color: var(--color-accent-text);
 }
 
 .auth-toast-success .auth-toast-icon {
@@ -653,7 +653,7 @@ body.theme-dark .register-card input:focus,
 .mfa-factor-select {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 12px;
   background: var(--theme-surface);
   color: var(--theme-text);
@@ -664,7 +664,7 @@ body.theme-dark .register-card input:focus,
 }
 
 .mfa-factor-select:focus {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   background: var(--theme-surface);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
@@ -676,7 +676,7 @@ body.theme-dark .register-card input:focus,
   border: 1px solid rgba(var(--theme-primary-rgb), 0.24);
   border-radius: 12px;
   background: transparent;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   padding: 12px 20px;
   font-size: 15px;
   font-weight: 850;
@@ -906,7 +906,7 @@ html[dir="rtl"] .password-field button {
 .forgot-card input {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 12px;
   background: var(--theme-surface);
   color: var(--theme-text);
@@ -916,7 +916,7 @@ html[dir="rtl"] .password-field button {
 }
 
 .forgot-card input:focus {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
 }
 
@@ -1021,7 +1021,7 @@ html[dir="rtl"] .forgot-card .form-status-message {
   margin: 2px 0 0;
   padding: 0;
   border-radius: 5px;
-  accent-color: var(--theme-primary);
+  accent-color: var(--color-accent-text);
   cursor: pointer;
 }
 
@@ -1033,7 +1033,7 @@ html[dir="rtl"] .forgot-card .form-status-message {
 }
 
 .register-card .auth-terms-copy a {
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-weight: 800;
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -1041,7 +1041,7 @@ html[dir="rtl"] .forgot-card .form-status-message {
 }
 
 .register-card .auth-terms-copy a:hover {
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }
 
 .auth-terms-consent.has-error input[type="checkbox"] {

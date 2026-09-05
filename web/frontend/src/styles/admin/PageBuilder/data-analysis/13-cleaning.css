@@ -179,13 +179,13 @@
 .page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool > summary::after {
   content: "+";
   margin-inline-start: auto;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   font-size: 18px;
   font-weight: 950;
 }
 
 .page-builder .daw-advanced-cleaning-grid > details.daw-cleaning-tool[open] > summary {
-  border-bottom: 1px solid var(--theme-border);
+  border-bottom: 1px solid var(--color-border-control);
   background: transparent;
 }
 
@@ -528,8 +528,8 @@
 
 .page-builder .daw-variable-recipe-list button.active,
 .page-builder .daw-variable-column-grid button.selected {
-  border-color: var(--theme-primary);
-  color: var(--theme-primary);
+  border-color: var(--color-accent-text);
+  color: var(--color-accent-text);
 }
 
 .page-builder .daw-variable-recipe-list strong {
@@ -572,7 +572,7 @@
 .page-builder .daw-variable-column-grid button:hover,
 .page-builder .daw-variable-recipe-list button:hover,
 .page-builder .daw-variable-auto:hover:not(:disabled) {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
 }
 
 .page-builder .daw-variable-column-grid em {
@@ -600,9 +600,9 @@
 }
 
 .page-builder .daw-analysis-domain-grid button.active {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   background: var(--theme-surface);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .page-builder .daw-analysis-domain-grid strong,
@@ -671,14 +671,14 @@
 }
 
 .page-builder .daw-confirm-button:hover {
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   background: var(--theme-surface);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .page-builder .daw-confirm-button.is-confirmed {
   background: var(--theme-primary);
-  border-color: var(--theme-primary);
+  border-color: var(--color-accent-text);
   color: var(--theme-text-inverse);
 }
 

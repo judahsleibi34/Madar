@@ -324,7 +324,7 @@ function StoreCategories({ categories, shopPath }) {
     <section className="live-store-directory">
       <header className="live-store-page-heading">
         <h1>Categories</h1>
-        <h2 className="live-store-page-subtitle">Browse the store</h2>
+        <p className="live-store-page-subtitle">Browse the store</p>
         <p>Choose a category to see the products available in it.</p>
       </header>
       {categories.length > 0 ? (
@@ -357,7 +357,7 @@ function StoreContact({ brand, site }) {
     <section className="live-store-contact-page">
       <div className="live-store-contact-intro live-store-page-heading">
         <h1>How can we help?</h1>
-        <h2 className="live-store-page-subtitle">Contact us</h2>
+        <p className="live-store-page-subtitle">Contact us</p>
         <p>{site?.description || `Get in touch with ${brand}. We will be happy to hear from you.`}</p>
       </div>
       <div className="live-store-contact-panel">

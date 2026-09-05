@@ -2,14 +2,20 @@ export default function PageBuilderTopbar({
   project,
   displayName,
   activeHelper,
+  activeTab,
   preview,
   copy,
   onPreviewClick,
 }) {
+  const hasNestedPageTitle = ["responses", "data", "reservations"].includes(activeTab);
+  const ProjectTitle = hasNestedPageTitle ? "span" : "h1";
+
   return (
     <header className="builder-topbar">
       <div className="builder-brand">
-        <h1>{displayName || project.name}</h1>
+        <ProjectTitle className={hasNestedPageTitle ? "builder-brand-name" : undefined}>
+          {displayName || project.name}
+        </ProjectTitle>
         <p>{activeHelper}</p>
       </div>
 

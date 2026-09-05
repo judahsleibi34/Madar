@@ -144,7 +144,7 @@
 .already-signed-actions a:not(:first-child) {
   border: 1px solid rgba(var(--theme-primary-rgb), 0.28);
   background: rgba(var(--theme-primary-rgb), 0.06);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
   box-shadow: none;
 }
 

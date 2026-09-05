@@ -107,14 +107,13 @@ export default function BasePlansPage({ lang = "en" }) {
 
   return (
     <main className="pricing-page" dir={activeLang === "ar" ? "rtl" : "ltr"}>
-      <section className="pricing-inner-header">
+      <section className="pricing-inner-header app-page-intro">
         {location.pathname !== PUBLIC_ROUTES.pricing && (
           <button className="pricing-back-button" type="button" onClick={() => navigate(PUBLIC_ROUTES.pricing)}>
             {t.back}
           </button>
         )}
         <div className="pricing-section-heading">
-          <span className="pricing-eyebrow">{t.eyebrow}</span>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </div>
@@ -128,7 +127,6 @@ export default function BasePlansPage({ lang = "en" }) {
         <section className="pricing-base-section">
           <div className="pricing-catalog-heading">
             <div>
-              <span>{t.eyebrow}</span>
               <h2>{t.plansTitle}</h2>
             </div>
           </div>

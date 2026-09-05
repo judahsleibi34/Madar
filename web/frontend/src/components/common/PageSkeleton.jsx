@@ -33,7 +33,6 @@ export default function PageSkeleton({
           </header>
           <section className="page-skeleton-site-hero">
             <div className="page-skeleton-site-copy" aria-hidden="true">
-              <i className="is-eyebrow" />
               <i className="is-title" />
               <i className="is-title is-short" />
               <i className="is-line" />

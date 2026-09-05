@@ -265,6 +265,65 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     expect(screen.queryByText(/Save failed/i)).toBeNull();
   });
 
+  it("uses the themed website modal before publishing a draft with fewer pages", async () => {
+    const publishedSchemaWithExtraPage = {
+      ...schemaA,
+      pages: [
+        ...schemaA.pages,
+        {
+          ...schemaA.pages[0],
+          id: "page-old",
+          name: "Old live page",
+          slug: "/old-live-page",
+          isDefault: false,
+        },
+      ],
+    };
+    apiMocks.fetchBuilderProject.mockResolvedValueOnce({
+      id: projectId,
+      name: "Semantic identity site",
+      slug: "semantic-identity-site",
+      status: "published",
+      draft_revision: 100,
+      draft_schema: schemaA,
+      published_revision: 2,
+      published_version: 2,
+      published_schema: publishedSchemaWithExtraPage,
+      updated_at: "2026-07-15T10:00:00.000Z",
+    });
+    apiMocks.publishBuilderProject.mockResolvedValueOnce({
+      project: {
+        id: projectId,
+        status: "published",
+        draft_revision: 100,
+        draft_schema: schemaA,
+        published_revision: 3,
+        published_version: 3,
+        published_schema: schemaA,
+      },
+      site: { subdomain: "semantic-test" },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages"]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+
+    await screen.findByLabelText("Page name");
+    fireEvent.click(screen.getByRole("button", { name: "Go Live" }));
+
+    expect(await screen.findByRole("heading", { name: "Publish fewer pages?" })).toBeTruthy();
+    expect(screen.getByText(/Publishing will remove/i)).toBeTruthy();
+    expect(apiMocks.publishBuilderProject).not.toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish smaller site" }));
+
+    await waitFor(() =>
+      expect(apiMocks.publishBuilderProject).toHaveBeenCalledWith(projectId, 100)
+    );
+  });
   it("reloads a saved project after duplicating text and horizontal-line elements", async () => {
     const reloadSchema = {
       ...schemaA,
@@ -504,6 +563,107 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
   });
 
+  it("undoes and redoes a component edit without changing its page structure", async () => {
+    const mounted = render(
+      <MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages/sections"]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+    await screen.findByLabelText("Page name");
+
+    const frame = mounted.container.querySelector('[data-builder-element-id="block-button"]');
+    fireEvent.click(frame.querySelector(".builder-element-button"));
+
+    const nameInput = await screen.findByLabelText("Name");
+    fireEvent.change(nameInput, { target: { value: "Updated action button" } });
+    expect(nameInput.value).toBe("Updated action button");
+
+    const undoButton = screen.getByRole("button", { name: "Undo last builder change" });
+    await waitFor(() => expect(undoButton.disabled).toBe(false));
+    fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+
+    await waitFor(() => expect(screen.getByLabelText("Name").value).toBe("Action button"));
+    expect(mounted.container.querySelector(".site-section.direct-layout-section")).toBeTruthy();
+
+    const redoButton = screen.getByRole("button", { name: "Redo builder change" });
+    await waitFor(() => expect(redoButton.disabled).toBe(false));
+    fireEvent.click(redoButton);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Name").value).toBe("Updated action button")
+    );
+    expect(mounted.container.querySelector(".site-section.direct-layout-section")).toBeTruthy();
+  });
+  it("converts an auto-layout text component to draggable direct layout from the move toolbar", async () => {
+    const autoLayoutSchema = {
+      ...schemaA,
+      pages: [{
+        ...schemaA.pages[0],
+        sections: [{
+          id: "section-auto",
+          name: "Generated hero",
+          mode: "auto",
+          rows: [{
+            id: "row-auto",
+            layout: { columns: "1", align: "center", gap: "medium" },
+            columns: [{
+              id: "column-auto",
+              name: "Generated copy",
+              layout: { align: "left" },
+              elements: [{
+                id: "generated-auto-text",
+                type: "text",
+                mode: "auto",
+                name: "Generated eyebrow",
+                content: "Palestinian ideas. Lasting change.",
+                styles: { color: "#005571", fontSize: "17px" },
+              }],
+            }],
+          }],
+          freeElements: [],
+          layout: { width: "large", minHeight: 320 },
+        }],
+      }],
+    };
+    apiMocks.fetchBuilderProject.mockResolvedValueOnce({
+      id: projectId,
+      name: autoLayoutSchema.name,
+      slug: autoLayoutSchema.slug,
+      status: "draft",
+      draft_revision: 100,
+      draft_schema: autoLayoutSchema,
+      published_revision: 0,
+      published_version: 0,
+      published_schema: autoLayoutSchema,
+      updated_at: "2026-07-15T10:00:00.000Z",
+    });
+
+    const mounted = render(
+      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+    await screen.findByLabelText("Page name");
+
+    const editor = mounted.container.querySelector(".builder-element-text");
+    fireEvent.click(editor);
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent.mouseUp(editor);
+
+    const moveHandle = await screen.findByRole("button", { name: "Move component" });
+    fireEvent.pointerDown(moveHandle, { pointerId: 9, clientX: 220, clientY: 180 });
+
+    await waitFor(() => {
+      expect(mounted.container.querySelector('[data-builder-element-id="generated-auto-text"]'))
+        .not.toBeNull();
+      expect(mounted.container.querySelector(".site-section.direct-layout-section"))
+        .not.toBeNull();
+    });
+  });
   it.skipIf(!actualCrashSchema)("edits copied mixed-format text from the current saved schema", async () => {
     apiMocks.fetchBuilderProject.mockResolvedValueOnce({
       id: projectId,

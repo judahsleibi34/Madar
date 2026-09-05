@@ -14,7 +14,7 @@
   padding: 48px 38px;
   border: 1px solid rgba(var(--theme-primary-rgb), 0.12);
   border-radius: 30px;
-  background: rgba(var(--theme-text-inverse-rgb), 0.94);
+  background: var(--theme-surface);
   box-shadow: 0 24px 70px rgba(var(--theme-shadow-rgb), 0.12);
 }
 
@@ -22,15 +22,6 @@
   display: grid;
   gap: 8px;
   justify-items: center;
-}
-
-.restricted-access-eyebrow {
-  margin: 0;
-  color: var(--theme-text-muted);
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .restricted-access-card h1 {
@@ -55,7 +46,7 @@
   border-radius: 999px;
   padding: 13px 22px;
   color: var(--theme-text-inverse);
-  background: linear-gradient(135deg, var(--theme-text), var(--theme-primary-hover));
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-hover));
   font-weight: 900;
   cursor: pointer;
   box-shadow: 0 16px 35px rgba(var(--theme-primary-rgb), 0.2);
@@ -72,23 +63,6 @@
   outline-offset: 4px;
 }
 
-[data-theme="dark"] .restricted-access-card,
-.dark .restricted-access-card {
-  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
-  background: rgba(21, 25, 31, 0.92);
-}
-
-[data-theme="dark"] .restricted-access-card h1,
-.dark .restricted-access-card h1 {
-  color: var(--theme-text);
-}
-
-[data-theme="dark"] .restricted-access-eyebrow,
-.dark .restricted-access-eyebrow,
-[data-theme="dark"] .restricted-access-card p,
-.dark .restricted-access-card p {
-  color: #cbd5e1;
-}
 
 @media (max-width: 680px) {
   .restricted-access-page {

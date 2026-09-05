@@ -48,9 +48,9 @@
 
 .page-builder .responses-settings-trigger:hover:not(:disabled),
 .page-builder .responses-settings-trigger[aria-expanded="true"] {
-  border-color: var(--madar-red);
+  border-color: var(--color-accent-text);
   background: var(--theme-primary-soft);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
 }
 
 .page-builder .responses-settings-trigger:focus-visible {

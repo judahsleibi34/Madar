@@ -218,7 +218,7 @@
 
 .page-builder .data-summary-grid article,
 .page-builder .data-card {
-  border: 1px solid var(--madar-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   border-radius: 8px !important;
   background: var(--theme-surface) !important;
   box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.08) !important;
@@ -497,7 +497,7 @@
   padding: 8px 10px !important;
   background: var(--theme-surface) !important;
   color: var(--madar-text) !important;
-  border: 1px solid var(--madar-border) !important;
+  border: 1px solid var(--color-border-control) !important;
   box-shadow: none !important;
   font-size: 12px !important;
   font-weight: 900 !important;

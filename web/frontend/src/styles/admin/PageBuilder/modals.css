@@ -36,7 +36,7 @@
   place-items: center;
   border-radius: 20px;
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-size: 28px;
   line-height: 1;
   font-weight: 950;
@@ -140,7 +140,7 @@
   padding: 5px 9px;
   border-radius: 999px;
   background: rgba(var(--theme-primary-rgb), 0.1);
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-size: 12px;
   font-weight: 950;
   text-transform: uppercase;
@@ -178,7 +178,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border: 1px solid var(--madar-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: 14px;
   overflow: hidden;
   background: var(--theme-surface);
@@ -199,7 +199,7 @@
 
 .subdomain-setup-error {
   margin: 0;
-  color: var(--madar-red);
+  color: var(--color-accent-text);
   font-weight: 900;
 }
 

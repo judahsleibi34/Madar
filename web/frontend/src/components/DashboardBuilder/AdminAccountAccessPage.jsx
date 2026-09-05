@@ -398,12 +398,8 @@ export default function AdminAccountAccessPage({
       data-language={isRtl ? "ar" : "en"}
       data-theme={themeMode}
     >
-      <section className="admin-access-hero">
+      <header className="admin-access-hero app-page-intro">
         <div>
-          <span className="admin-access-eyebrow">
-            <ShieldCheck size={15} aria-hidden="true" />
-            {copy.eyebrow}
-          </span>
 
           <h1>{copy.title}</h1>
           <p>{copy.subtitle}</p>
@@ -412,7 +408,7 @@ export default function AdminAccountAccessPage({
         <div className="admin-access-hero-icon" aria-hidden="true">
           <LockKeyhole size={34} />
         </div>
-      </section>
+      </header>
 
       <section className="admin-access-grid">
         <div className="admin-access-main-stack">

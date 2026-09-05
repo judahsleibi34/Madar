@@ -75,6 +75,13 @@ export const factoryContent = {
         content:
           "Design pages\nBuild flexible page sections and arrange content visually.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1800&q=90&auto=format&fit=crop\n\nCollect responses\nCreate forms and keep structured requests in one workspace.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1800&q=90&auto=format&fit=crop\n\nManage operations\nCoordinate reservations, users, and daily work from one place.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1800&q=90&auto=format&fit=crop",
       },
+      logoSlider: {
+        name: "Trusted by leading brands",
+        title: "Trusted by leading brands",
+        subtitle: "Organizations and teams that choose to work with us.",
+        content:
+          "Northstar\nPartner\n\nJuniper\nPartner\n\nAtlas\nPartner\n\nMosaic\nPartner\n\nCedar\nPartner",
+      },
       carouselCards: {
         name: "Card Carousel",
         content:

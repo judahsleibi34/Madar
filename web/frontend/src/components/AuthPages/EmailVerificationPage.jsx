@@ -190,7 +190,7 @@ export default function EmailVerificationPage({ lang = "en" }) {
           <Icon size={28} aria-hidden="true" />
         </div>
 
-        <div className="login-heading">
+        <div className="login-heading app-page-intro">
           <h1>{title}</h1>
           <p>{body}</p>
         </div>

@@ -10,9 +10,8 @@ export default function PricingPage({ lang = "en" }) {
 
   return (
     <main className="pricing-page pricing-choice-page" dir={isArabic ? "rtl" : "ltr"}>
-      <section className="pricing-hero pricing-choice-hero">
+      <section className="pricing-hero pricing-choice-hero app-page-intro">
         <div className="pricing-hero-copy">
-          <span className="pricing-eyebrow">{t.eyebrow}</span>
           <h1>{t.header}</h1>
           <p>{t.subheader}</p>
         </div>

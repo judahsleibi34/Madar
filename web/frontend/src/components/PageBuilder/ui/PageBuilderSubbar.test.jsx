@@ -13,11 +13,14 @@ describe("PageBuilderSubbar", () => {
         viewport="desktop"
         setViewport={vi.fn()}
         renderWorkspaceNavigator={() => <nav>Pages</nav>}
+        historyControls={<div role="toolbar" aria-label="Edit history">Undo</div>}
         artboardCameraControls={<div role="toolbar" aria-label="Artboard zoom">Zoom</div>}
       />
     );
 
     expect(screen.getByRole("toolbar", { name: "Artboard zoom" })
+      .closest(".builder-subbar-actions")).toBeTruthy();
+    expect(screen.getByRole("toolbar", { name: "Edit history" })
       .closest(".builder-subbar-actions")).toBeTruthy();
   });
 

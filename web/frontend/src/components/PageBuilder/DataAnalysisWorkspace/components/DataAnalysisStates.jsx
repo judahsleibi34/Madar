@@ -64,7 +64,6 @@ export function VisualizationPreviewModal({ preview, onClose }) {
       <section className="daw-modal daw-visualization-preview-modal">
         <div className="daw-modal-header">
           <div>
-            <span className="daw-kicker">PREVIEW</span>
             <h3>{title}</h3>
           </div>
           <button

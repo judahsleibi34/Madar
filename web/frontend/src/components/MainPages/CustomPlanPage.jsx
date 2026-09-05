@@ -66,7 +66,7 @@ export default function CustomPlanPage({ lang = "en" }) {
 
   return (
     <main className="pricing-page" dir={isArabic ? "rtl" : "ltr"}>
-      <section className="pricing-inner-header">
+      <section className="pricing-inner-header app-page-intro">
         <button
           type="button"
           className="pricing-back-button"
@@ -77,7 +77,7 @@ export default function CustomPlanPage({ lang = "en" }) {
 
         <div className="pricing-section-heading">
           <span>{t.customPlans.label}</span>
-          <h2>{t.customPlans.title}</h2>
+          <h1>{t.customPlans.title}</h1>
           <p>{t.customPlans.subtitle}</p>
         </div>
       </section>
@@ -119,9 +119,6 @@ export default function CustomPlanPage({ lang = "en" }) {
           </div>
 
           <aside className="pricing-custom-summary">
-            <span className="pricing-eyebrow">
-              {t.customPlans.summaryLabel}
-            </span>
 
             <h3>{t.customPlans.summaryTitle}</h3>
             <p>{t.customPlans.summaryText}</p>

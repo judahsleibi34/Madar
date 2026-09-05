@@ -243,7 +243,7 @@
 .admin-sidebar-nav button:hover,
 .admin-sidebar-nav button.active {
   background: rgba(var(--theme-primary-rgb), 0.08);
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 }
 
 .admin-sidebar-nav button.active {
@@ -324,7 +324,7 @@
 
 .admin-sidebar-theme-row:hover {
   background: rgba(var(--theme-primary-rgb), 0.08) !important;
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
 }
 
 .admin-sidebar-theme-row .theme-toggle-left {
@@ -356,7 +356,7 @@
   height: 20px;
   min-width: 20px;
 
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 
   display: inline-flex;
   align-items: center;
@@ -385,7 +385,7 @@
 }
 
 .admin-sidebar-theme-row.is-dark .theme-toggle-icon {
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
 }
 
 /* ============================================================
@@ -456,7 +456,7 @@
   border: none;
   border-radius: 14px;
   background: transparent;
-  color: var(--theme-primary);
+  color: var(--color-accent-text);
 
   display: flex;
   align-items: center;
@@ -479,7 +479,7 @@
 
 .admin-sidebar-logout:hover {
   background: rgba(var(--theme-primary-rgb), 0.08);
-  color: var(--theme-primary-hover);
+  color: var(--color-accent-text);
 }
 
 .admin-sidebar-logout span {
@@ -615,7 +615,7 @@ img.admin-sidebar-avatar {
 
   border-radius: 999px;
   background: rgba(var(--theme-shadow-rgb), 0.08);
-  color: var(--theme-primary) !important;
+  color: var(--color-accent-text) !important;
 
   font-size: 9.5px !important;
   font-weight: 950 !important;
@@ -793,133 +793,6 @@ img.admin-sidebar-avatar {
 .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-lang-switcher.language-toggle-button {
   justify-content: center !important;
   margin-inline: 0 !important;
-}
-
-/* ============================================================
-   DARK SIDEBAR
-   ============================================================ */
-
-.theme-dark .admin-sidebar,
-[data-theme="dark"] .admin-sidebar {
-  background: var(--theme-surface);
-  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
-}
-
-.theme-dark .admin-sidebar-brand,
-[data-theme="dark"] .admin-sidebar-brand {
-  background: transparent;
-  border: none;
-}
-
-.theme-dark .admin-sidebar-brand:hover,
-[data-theme="dark"] .admin-sidebar-brand:hover {
-  background: rgba(var(--theme-text-inverse-rgb), 0.06);
-}
-
-.theme-dark .admin-sidebar-brand strong,
-[data-theme="dark"] .admin-sidebar-brand strong,
-.theme-dark .admin-sidebar-user-info strong,
-[data-theme="dark"] .admin-sidebar-user-info strong {
-  color: var(--theme-text);
-}
-
-.theme-dark .admin-sidebar-icon,
-[data-theme="dark"] .admin-sidebar-icon {
-  color: var(--theme-text-inverse) !important;
-}
-
-.theme-dark .admin-sidebar-brand-text > span,
-[data-theme="dark"] .admin-sidebar-brand-text > span,
-.theme-dark .admin-sidebar-user-info span,
-[data-theme="dark"] .admin-sidebar-user-info span {
-  color: rgba(var(--theme-text-inverse-rgb), 0.7);
-}
-
-.theme-dark .admin-sidebar-admin-badge,
-[data-theme="dark"] .admin-sidebar-admin-badge {
-  background: rgba(var(--theme-primary-rgb), 0.14);
-  color: var(--theme-primary-hover) !important;
-}
-
-.theme-dark .admin-sidebar-nav a,
-.theme-dark .admin-sidebar-nav button,
-[data-theme="dark"] .admin-sidebar-nav a,
-[data-theme="dark"] .admin-sidebar-nav button {
-  color: rgba(var(--theme-text-inverse-rgb), 0.86);
-}
-
-.theme-dark .admin-sidebar-nav a:hover,
-.theme-dark .admin-sidebar-nav a.active,
-.theme-dark .admin-sidebar-nav button:hover,
-.theme-dark .admin-sidebar-nav button.active,
-[data-theme="dark"] .admin-sidebar-nav a:hover,
-[data-theme="dark"] .admin-sidebar-nav a.active,
-[data-theme="dark"] .admin-sidebar-nav button:hover,
-[data-theme="dark"] .admin-sidebar-nav button.active {
-  background: rgba(var(--theme-text-inverse-rgb), 0.08);
-  color: var(--theme-text-inverse);
-}
-
-.theme-dark .admin-sidebar-theme-row,
-[data-theme="dark"] .admin-sidebar-theme-row {
-  color: rgba(var(--theme-text-inverse-rgb), 0.86) !important;
-}
-
-.theme-dark .admin-sidebar-theme-row:hover,
-[data-theme="dark"] .admin-sidebar-theme-row:hover {
-  background: rgba(var(--theme-text-inverse-rgb), 0.08) !important;
-  color: var(--theme-text-inverse) !important;
-}
-
-.theme-dark .admin-sidebar-theme-row .theme-toggle-label,
-[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-label {
-  color: rgba(var(--theme-text-inverse-rgb), 0.86) !important;
-}
-
-.theme-dark .admin-sidebar-theme-row:hover .theme-toggle-label,
-[data-theme="dark"] .admin-sidebar-theme-row:hover .theme-toggle-label {
-  color: var(--theme-text-inverse) !important;
-}
-
-.theme-dark .admin-sidebar-lang,
-[data-theme="dark"] .admin-sidebar-lang {
-  background: transparent;
-  color: var(--theme-text);
-  border-color: transparent;
-}
-
-.theme-dark .admin-sidebar-lang:hover,
-[data-theme="dark"] .admin-sidebar-lang:hover {
-  background: rgba(var(--theme-text-inverse-rgb), 0.08);
-  border-color: transparent;
-}
-
-.theme-dark .admin-sidebar-logout,
-[data-theme="dark"] .admin-sidebar-logout {
-  color: rgba(var(--theme-text-inverse-rgb), 0.86);
-}
-
-.theme-dark .admin-sidebar-logout svg,
-[data-theme="dark"] .admin-sidebar-logout svg {
-  color: rgba(var(--theme-text-inverse-rgb), 0.86);
-}
-
-.theme-dark .admin-sidebar-logout:hover,
-[data-theme="dark"] .admin-sidebar-logout:hover {
-  background: rgba(var(--theme-primary-rgb), 0.14);
-  color: var(--theme-text-inverse);
-}
-
-.theme-dark .admin-sidebar-logout:hover svg,
-[data-theme="dark"] .admin-sidebar-logout:hover svg {
-  color: var(--theme-text-inverse);
-}
-
-.theme-dark .admin-sidebar-user,
-[data-theme="dark"] .admin-sidebar-user {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
 }
 
 /* ============================================================
@@ -1110,11 +983,7 @@ img.admin-sidebar-avatar {
 .admin-sidebar .admin-sidebar-brand,
 .admin-sidebar .admin-sidebar-brand:hover,
 .admin-sidebar .admin-sidebar-brand:focus-visible,
-.admin-sidebar .admin-sidebar-brand.active,
-.theme-dark .admin-sidebar .admin-sidebar-brand,
-.theme-dark .admin-sidebar .admin-sidebar-brand:hover,
-[data-theme="dark"] .admin-sidebar .admin-sidebar-brand,
-[data-theme="dark"] .admin-sidebar .admin-sidebar-brand:hover {
+.admin-sidebar .admin-sidebar-brand.active {
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
