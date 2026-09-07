@@ -30,6 +30,16 @@ targets=(
   "avatars:${MADAR_RESTORE_AVATARS_DIR:?required}"
 )
 restore_list_args=()
+provider_required="$(python3 - "$backup_path" <<'PY'
+import json,pathlib,sys
+p=pathlib.Path(sys.argv[1])/'manifest.json'
+print('true' if p.is_file() and json.loads(p.read_text()).get('recovery',{}).get('provider_objects_required') else 'false')
+PY
+)"
+if [[ "$provider_required" == true ]]; then
+  : "${MADAR_RESTORE_PROVIDER_DIR:?required for provider object reconstruction}"
+  [[ "$MADAR_RESTORE_PROVIDER_DIR" = /* && "$MADAR_RESTORE_PROVIDER_DIR" != / && ! -e "$MADAR_RESTORE_PROVIDER_DIR" ]] || die "provider restore target must be new and absolute"
+fi
 if [[ -n "${MADAR_RESTORE_USE_LIST:-}" ]]; then
   [[ -f "$MADAR_RESTORE_USE_LIST" ]] || die "MADAR_RESTORE_USE_LIST does not exist"
   restore_list_args=(--use-list="$MADAR_RESTORE_USE_LIST")
@@ -41,6 +51,7 @@ for entry in "${targets[@]}"; do
 done
 
 if (( DRY_RUN )); then
+  [[ "$provider_required" != true ]] || printf 'reconstruct provider bytes into %s (no remote platform restore)\n' "$MADAR_RESTORE_PROVIDER_DIR"
   printf 'pg_restore --exit-on-error --single-transaction --clean --if-exists --no-owner --no-acl <isolated libpq environment> %s/database.dump%s\n' "$backup_path" "${MADAR_RESTORE_USE_LIST:+ with reviewed restore list}"
   for entry in "${targets[@]}"; do
     printf 'copy %s/files/%s -> %s\n' "$backup_path" "${entry%%:*}" "${entry#*:}"
@@ -65,4 +76,7 @@ for entry in "${targets[@]}"; do
   mkdir -p "$target"
   cp -a "$backup_path/files/$name/". "$target/"
 done
+if [[ "$provider_required" == true ]]; then
+  cp -a "$backup_path/provider" "$MADAR_RESTORE_PROVIDER_DIR"
+fi
 printf 'restore completed; run application and schema verification against the isolated target\n'

@@ -9,11 +9,16 @@ Type=oneshot
 User=madar
 Group=madar
 UMask=0077
+LoadCredential=production.env:/etc/madar/production.env
 EnvironmentFile=/etc/madar/backup.env
-ExecStart=/usr/local/lib/madar/backup_madar.sh
+EnvironmentFile=/opt/madar/control-plane/deployment/production-paths.conf
+Environment=MADAR_PROVIDER_BACKUP_REQUIRED=true
+Environment=MADAR_BACKUP_STATE_DIR=/var/lib/madar/backup-state
+ExecStart=/usr/bin/python3 /usr/local/lib/madar/backup_support.py scheduled /usr/local/lib/madar/backup_madar.sh
 ExecStartPost=/usr/local/lib/madar/verify_latest_backup.sh
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
 PrivateTmp=true
 NoNewPrivileges=true
+TimeoutStartSec=2h

@@ -56,6 +56,13 @@ PROTECTED_PATHS = (
     "web/scripts/madar_alert_hook.sh",
     "web/scripts/backup_madar.sh",
     "web/scripts/verify_backup.sh",
+    "web/scripts/backup_support.py",
+    "web/scripts/verify_latest_backup.sh",
+    "web/scripts/replicate_latest_node1.py",
+    "web/scripts/replicate_latest_offhost.sh",
+    "web/scripts/replicate_backup_offhost.sh",
+    "web/scripts/restore_madar.sh",
+    "web/scripts/rehearse_backup.py",
 )
 EXPECTED_CONTRACT = {
     "MADAR_PRODUCTION_REPO": "/srv/madar/production",
@@ -838,6 +845,15 @@ class SystemOperations:
         return result.returncode == 1
 
     def quiesce(self) -> None:
+        self.backup_timer_states = {}
+        for name in ('madar-backup', 'madar-backup-verify', 'madar-node1-backup', 'madar-offhost-backup'):
+            service = self.systemctl_state(name + '.service')
+            if service['active'] in ('active', 'activating', 'deactivating', 'reloading'):
+                raise UpgradeError('backup_operation_running_retry_after_completion')
+            state = self.systemctl_state(name + '.timer')
+            self.backup_timer_states[name + '.timer'] = state
+            if state['active'] == 'active':
+                self.command('backup_timer_stop', ['/usr/bin/systemctl', 'stop', name + '.timer'])
         self.command(
             "timer_disable_now",
             ["/usr/bin/systemctl", "disable", "--now", "madar-auto-deploy.timer"],
@@ -915,6 +931,9 @@ class SystemOperations:
         expected_active = "active" if original.get("active") == "active" else "inactive"
         if restored != {"enabled": expected_enabled, "active": expected_active}:
             raise UpgradeError("auto_deploy_timer_restore_failed")
+        for name, state in getattr(self, 'backup_timer_states', {}).items():
+            if state['active'] == 'active':
+                self.command('backup_timer_restore', ['/usr/bin/systemctl', 'start', name])
         return restored
 
     def disable_automation_for_failure(self) -> None:
@@ -1117,6 +1136,16 @@ class SystemOperations:
             raise UpgradeError("installed_provenance_mismatch")
         self.production_repository_guard("guard_candidate", approved_sha)
         parse_contract(self.contract_path)
+        for relative in PROTECTED_PATHS:
+            if not relative.startswith('web/scripts/') or relative.endswith('madar_alert_hook.sh'):
+                continue
+            name = Path(relative).name
+            installed = Path('/usr/local/lib/madar') / name
+            canonical = self.control_root / 'scripts' / name
+            if (installed.is_symlink() or not installed.is_file() or installed.stat().st_uid != 0
+                    or stat.S_IMODE(installed.stat().st_mode) != 0o755
+                    or sha256_file(installed) != sha256_file(canonical)):
+                raise UpgradeError('installed_backup_helper_integrity_invalid')
         for path in self.control_root.rglob("*"):
             if path.is_symlink() or path.stat().st_uid != 0:
                 raise UpgradeError("installed_control_plane_ownership_invalid")
@@ -1125,6 +1154,10 @@ class SystemOperations:
         for unit in (
             "madar-auto-deploy.service", "madar-auto-deploy.timer",
             "madar-release-proxy.service", "madar-ops-alert@.service",
+            "madar-backup.service", "madar-backup.timer",
+            "madar-backup-verify.service", "madar-backup-verify.timer",
+            "madar-node1-backup.service", "madar-node1-backup.timer",
+            "madar-offhost-backup.service", "madar-offhost-backup.timer",
         ):
             path = Path("/etc/systemd/system") / unit
             if (

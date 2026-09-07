@@ -242,6 +242,9 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         scripts.mkdir(parents=True)
         for name in (
             "madar_alert_hook.sh", "backup_madar.sh", "verify_backup.sh",
+            "backup_support.py", "verify_latest_backup.sh", "replicate_latest_node1.py",
+            "replicate_latest_offhost.sh", "replicate_backup_offhost.sh",
+            "restore_madar.sh", "rehearse_backup.py",
         ):
             shutil.copy2(WEB_ROOT / "scripts" / name, scripts / name)
 

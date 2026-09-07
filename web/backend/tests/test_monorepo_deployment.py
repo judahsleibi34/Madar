@@ -31,6 +31,28 @@ CONTROL_GUARD = WEB_ROOT / "deployment" / "bin" / "madar-control-plane-guard"
 
 
 class MonorepoDeploymentTests(unittest.TestCase):
+    def test_backup_installer_and_private_readiness_mount_contract(self):
+        installer = INSTALLER.read_text()
+        for name in ('backup_madar.sh','verify_backup.sh','verify_latest_backup.sh','backup_support.py',
+                     'replicate_latest_node1.py','replicate_latest_offhost.sh','replicate_backup_offhost.sh',
+                     'restore_madar.sh','rehearse_backup.py'):
+            self.assertIn(name, installer)
+            self.assertIn(name, CONTROL_GUARD.read_text())
+        for name in ('madar-backup','madar-backup-verify','madar-node1-backup','madar-offhost-backup'):
+            self.assertIn(name+'.timer', installer)
+            self.assertIn(name+'.service', installer)
+        overlay = RELEASE_COMPOSE.read_text()
+        self.assertIn('source: /var/lib/madar/backup-state', overlay)
+        self.assertIn('read_only: true', overlay)
+        self.assertIn('create_host_path: false', overlay)
+        self.assertNotIn('/var/lib/madar/backups', overlay)
+        self.assertIn('backup operations must be quiesced', installer)
+        unit = (WEB_ROOT/'deployment/systemd/madar-backup.service').read_text()
+        self.assertIn('User=madar', unit)
+        self.assertIn('LoadCredential=production.env:/etc/madar/production.env', unit)
+        self.assertIn('MADAR_PROVIDER_BACKUP_REQUIRED=true', unit)
+        self.assertIn('OnFailure=madar-ops-alert@%n.service', unit)
+
     def setUp(self):
         self.deploy = DEPLOY.read_text(encoding="utf-8")
         self.wrapper = WRAPPER.read_text(encoding="utf-8")

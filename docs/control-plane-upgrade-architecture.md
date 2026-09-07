@@ -24,6 +24,23 @@ not turn the upgrader into a general application deployment path.
 
 ## Components and trust boundaries
 
+Backup operations are part of the exact-SHA installation boundary. In addition
+to the original migration backup scripts, the guard protects `backup_support.py`,
+`verify_latest_backup.sh`, `replicate_latest_node1.py`, both existing removable
+replication helpers, `restore_madar.sh`, and `rehearse_backup.py`. The installer
+backs up, checks source identity, installs, and compares all operational helpers
+and local/verification/Node 1/removable systemd units. Their target files join
+the shared root-ownership, mode and symlink preflight. The installed controller
+retains identical helper copies for provenance attestation.
+
+Before installation, existing operational timers are stopped and running backup
+services cause a safe refusal; active backup jobs are not killed. Successful
+completion or safely attested pre-install recovery restores captured timer
+activity. Installation never enables these timers. New backup-state storage is
+created as the unprivileged `madar` identity, not through root writes into an
+application-owned tree. The minimal state directory contains only verified
+creation metadata and is mounted read-only for release/refresh/rollback.
+
 | Component | Installed location | Responsibility |
 | --- | --- | --- |
 | Stable launcher | `/usr/local/sbin/madar-control-plane-upgrade` | Starts Python in isolated mode, discards the caller environment, and loads the currently trusted bootstrap implementation. |
