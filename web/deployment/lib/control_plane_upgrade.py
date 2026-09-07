@@ -100,6 +100,12 @@ SENSITIVE_ASSIGNMENT = re.compile(
     r"(?i)\b([A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_KEY|"
     r"DATABASE_URL|SUPABASE|VAPID|SMTP|OAUTH|JWT|CSRF)[A-Z0-9_]*)\s*=\s*\S+"
 )
+PYTHON_SYNTAX_VALIDATOR = (
+    "import sys\n"
+    "for filename in sys.argv[1:]:\n"
+    "    with open(filename, 'rb') as source:\n"
+    "        compile(source.read(), filename, 'exec', dont_inherit=True)\n"
+)
 
 
 class UpgradeError(RuntimeError):
@@ -127,6 +133,59 @@ def sanitized_environment(*, madar_user: bool = False) -> dict[str, str]:
     if madar_user:
         environment.update(HOME="/home/madar", USER="madar", LOGNAME="madar")
     return environment
+
+
+def trusted_python_executable(candidate: Path) -> str:
+    """Bind child validation to this process's protected interpreter."""
+
+    value = sys.executable
+    if not value or not os.path.isabs(value):
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    original = Path(value)
+    try:
+        original_metadata = original.lstat()
+        executable = original.resolve(strict=True)
+        candidate_root = candidate.resolve(strict=True)
+        metadata = executable.stat()
+    except OSError as error:
+        raise UpgradeError("candidate_python_interpreter_untrusted") from error
+    try:
+        executable.relative_to(candidate_root)
+    except ValueError:
+        pass
+    else:
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    if (
+        not (stat.S_ISREG(original_metadata.st_mode)
+             or stat.S_ISLNK(original_metadata.st_mode))
+        or (stat.S_ISREG(original_metadata.st_mode)
+            and original_metadata.st_mode & 0o022)
+        or (os.geteuid() == 0 and original_metadata.st_uid != 0)
+    ):
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_mode & 0o022
+        or not os.access(executable, os.X_OK)
+        or (os.geteuid() == 0 and metadata.st_uid != 0)
+    ):
+        raise UpgradeError("candidate_python_interpreter_untrusted")
+    for path in (original, executable):
+        for parent in (path.parent, *path.parent.parents):
+            try:
+                parent_metadata = parent.lstat()
+            except OSError as error:
+                raise UpgradeError(
+                    "candidate_python_interpreter_untrusted"
+                ) from error
+            if (
+                stat.S_ISLNK(parent_metadata.st_mode)
+                or not stat.S_ISDIR(parent_metadata.st_mode)
+                or parent_metadata.st_mode & 0o022
+                or (os.geteuid() == 0 and parent_metadata.st_uid != 0)
+            ):
+                raise UpgradeError("candidate_python_interpreter_untrusted")
+    return str(executable)
 
 
 def redact(text: str) -> str:
@@ -991,24 +1050,30 @@ class SystemOperations:
         if candidate_contract != self.contract:
             raise UpgradeError("candidate_path_contract_changed")
         digest = self.protected_tree_digest(candidate)
-        for path in (candidate / "web/deployment/bin").iterdir():
+        bin_files: list[tuple[Path, bytes]] = []
+        for path in sorted((candidate / "web/deployment/bin").iterdir()):
             if not path.is_file() or path.is_symlink():
                 raise UpgradeError("candidate_bin_entry_invalid")
-            first = path.open("rb").readline(256)
+            with path.open("rb") as handle:
+                first = handle.readline(256)
+            bin_files.append((path, first))
             if b"bash" in first:
-                self.command("candidate_bash_syntax", ["/usr/bin/bash", "-n", str(path)])
-        python_files = list((candidate / "web/deployment/lib").glob("*.py"))
+                self.command(
+                    "candidate_bash_syntax",
+                    ["/usr/bin/bash", "-n", str(path)],
+                )
+        python_files = sorted((candidate / "web/deployment/lib").glob("*.py"))
         python_files.extend(
-            path for path in (candidate / "web/deployment/bin").iterdir()
-            if b"python" in path.open("rb").readline(256)
+            path for path, first in bin_files if b"python" in first
         )
-        cache = candidate.parent / "pycache"
-        environment = sanitized_environment()
-        environment["PYTHONPYCACHEPREFIX"] = str(cache)
         try:
             completed = subprocess.run(
-                ["/usr/bin/python3", "-I", "-m", "py_compile", *map(str, python_files)],
-                env=environment,
+                [
+                    trusted_python_executable(candidate), "-I", "-B", "-c",
+                    PYTHON_SYNTAX_VALIDATOR,
+                    *map(str, python_files),
+                ],
+                env=sanitized_environment(),
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

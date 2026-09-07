@@ -9,7 +9,7 @@ function configuredProductionHosts(environment) {
 
 function isProductionHost(hostname, environment) {
   const host = hostname.toLowerCase().replace(/\.$/, "");
-  if (host === "madar.com" || host.endsWith(".madar.com")) return true;
+  if (["madar.com", "madarportal.com"].some((domain) => host === domain || host.endsWith(`.${domain}`))) return true;
   return configuredProductionHosts(environment).some(
     (blocked) => host === blocked || host.endsWith(`.${blocked}`)
   );

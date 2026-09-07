@@ -1599,6 +1599,31 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["form"]["id"], FORM_ID)
         self.assertEqual(response.json()["publication"]["project_id"], standalone_project_id)
+    def test_form_identity_is_ambiguous_even_when_live_project_matches(self):
+        fake_supabase = FakeSupabase()
+        duplicate = copy.deepcopy(fake_supabase.tables["builder_projects"][0])
+        duplicate["id"] = "other-published-project"
+        fake_supabase.tables["builder_projects"].append(duplicate)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            with self.assertRaises(HTTPException) as failure:
+                public_site_routes.get_published_form_for_site(fake_supabase.tables["website_settings"][0], FORM_ID)
+        self.assertEqual(failure.exception.status_code, 409)
+        self.assertIn("publication_form_ambiguous", str(failure.exception.detail))
+
+    def test_truncated_published_project_lookup_fails_closed(self):
+        fake_supabase = FakeSupabase()
+        template = fake_supabase.tables["builder_projects"][0]
+        for index in range(101):
+            other = copy.deepcopy(template)
+            other["id"] = f"other-{index}"
+            other["published_schema"]["forms"] = []
+            fake_supabase.tables["builder_projects"].append(other)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            with self.assertRaises(HTTPException) as failure:
+                public_site_routes.get_published_form_for_site(fake_supabase.tables["website_settings"][0], FORM_ID)
+        self.assertEqual(failure.exception.status_code, 409)
+        self.assertIn("publication_form_ambiguous", str(failure.exception.detail))
+
     def test_public_submission_rejects_bound_draft_project(self):
         fake_supabase = FakeSupabase()
         fake_supabase.tables["builder_projects"][0]["status"] = "draft"

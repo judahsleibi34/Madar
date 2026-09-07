@@ -757,8 +757,8 @@ def get_published_form_for_site(settings: dict, form_id: str):
     """Resolve a published form without requiring its project to be the live website.
 
     Standalone form links belong to the tenant site, not necessarily to the project
-    currently bound as the site's homepage. Prefer the live project when possible,
-    then look through the tenant's other published snapshots. Draft schemas are
+    currently bound as the site's homepage. Require one unambiguous matching
+    published snapshot across the bounded tenant lookup. Draft schemas are
     deliberately never considered here.
     """
 
@@ -766,6 +766,7 @@ def get_published_form_for_site(settings: dict, form_id: str):
     bound_project_id = str(settings.get("published_project_id") or "").strip()
 
     bound_project_error = None
+    bound_match = None
     if bound_project_id:
         try:
             project = get_bound_published_project(settings, require_pages=False)
@@ -782,7 +783,7 @@ def get_published_form_for_site(settings: dict, form_id: str):
                     if exc.status_code != 404:
                         raise
                 else:
-                    return project, form, published_schema
+                    bound_match = (project, form, published_schema)
 
     projects_response = (
         service_supabase.table("builder_projects")
@@ -798,8 +799,12 @@ def get_published_form_for_site(settings: dict, form_id: str):
         .execute()
     )
 
-    matches = []
-    for candidate in projects_response.data or []:
+    candidates = projects_response.data or []
+    # A truncated search cannot establish globally unique form identity.
+    if len(candidates) >= 101:
+        raise api_error(409, "publication_form_ambiguous", "The published form lookup is incomplete.")
+    matches = [bound_match[0]] if bound_match else []
+    for candidate in candidates:
         if str(candidate.get("id") or "") == bound_project_id:
             continue
         schema = candidate.get("published_schema")

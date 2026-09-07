@@ -23,6 +23,30 @@ jobs:
       - name: Build locked backend image
         run: docker build -t madar-backend-test web/backend
 
+      - name: Build Git-equipped CI-only backend image
+        run: |
+          docker tag madar-backend-test madar-backend-runtime-test
+
+          printf '%s\n' \
+            'FROM madar-backend-runtime-test' \
+            'USER 0:0' \
+            'RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*' \
+            'USER 65534:65534' \
+            | docker build -t madar-backend-test -
+
+          docker run --rm madar-backend-runtime-test sh -ceu '
+            test "$(id -u)" = "65534"
+            test "$(id -g)" = "65534"
+            ! command -v git >/dev/null 2>&1
+          '
+
+          docker run --rm madar-backend-test sh -ceu '
+            test "$(id -u)" = "65534"
+            test "$(id -g)" = "65534"
+            test "$(command -v git)" = "/usr/bin/git"
+            git --version
+          '
+
       - name: Run backend tests
         run: |
           docker run --rm \

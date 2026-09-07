@@ -787,6 +787,19 @@ post-promotion failures leave automation
 disabled; it never automatically restores old controller code, traffic, or
 schema across an irreversible boundary.
 
+Candidate static preflight hashes the strict protected tree and validates
+deployment Python syntax with isolated, bytecode-disabled built-in `compile()`
+over the original source bytes. It does not run `py_compile`, depend on
+`PYTHONPYCACHEPREFIX`, remove generated artifacts afterward, or exclude cache
+paths from the digest. The same strict protected-tree digest must still match
+after installer dry-run, so any actual added or changed protected file fails
+closed as `candidate_changed_after_dry_run`.
+The child validator is pinned to the resolved absolute `sys.executable` already
+running the trusted bootstrapper. Candidate files, caller `PATH`,
+`/usr/bin/env`, and a fixed distribution-specific Python path cannot select it;
+unsafe, non-executable, candidate-contained, or unexpectedly writable paths
+fail closed before syntax validation.
+
 The privileged upgrader also recognizes one temporary controller-first
 bootstrap state. It does so only after canonical candidate resolution: installed
 provenance must exactly equal the explicitly approved current `origin/main`
@@ -834,3 +847,22 @@ Implemented by:
 
 Any change to these files or the protected-path set requires same-change review
 of this section and the architecture document.
+
+## Maintenance validation safety
+
+Compose retains the legacy repository-root environment and persistent-file
+fallbacks (`../.env` and `../backend` relative to `web`). The governed deployer
+always overrides both with the canonical absolute configuration and storage
+paths. Frontend-only changes must not relocate these fallback data roots.
+Authenticated browser rehearsals reject `madarportal.com` and all subdomains
+without relying on an optional operator-supplied production-host list.
+
+Logical recovery rehearsals use `web/scripts/rehearse_backup.py` with a
+digest-pinned extension-compatible PostgreSQL image, networkless disposable
+storage, strict full-dump restore, verified file copies, and explicit read-only
+regular-file mounts. Logical recovery alone does not attest replacement-provider
+configuration, credentials, grants, or full application readiness.
+
+Publication validation also requires standalone form IDs to be unique across
+the tenant lookup; bound-project preference cannot hide a duplicate and a
+truncated lookup cannot establish uniqueness.

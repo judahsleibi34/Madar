@@ -9,8 +9,9 @@ does not replace a valid binding. Owners and admins must explicitly select a
 different published project through `PUT /builder/site-binding`.
 
 The bound project cannot be archived or unpublished until another published
-project is selected. Forms, form submissions, reservation configuration, and
-public page lookup all use the same bound project.
+project is selected. Reservation configuration and public page lookup use that
+bound project. Standalone form links may use another uniquely matching
+published project within the same authoritative site tenant.
 
 ## Published content access
 
@@ -45,5 +46,12 @@ Public responses expose only safe publication identity:
 Anonymous responses use revalidation caching and support `If-None-Match`.
 Authenticated protected-page responses are private and `no-store`. Draft schema
 and draft revision are never returned by public runtime routes. Form submission
-provenance records the bound project's published version, not its draft
+provenance records the resolved project's published version, not its draft
 revision.
+
+Standalone published-form links resolve within the authoritative site tenant,
+using published snapshots only. The bound homepage project does not override
+a duplicate form ID in another published project. More than 100 published
+projects makes the bounded lookup incomplete and fails closed with 409, as does
+multiple matching projects. This preserves unambiguous project identity for
+form reads, drafts, submissions, and quiz attempts.
