@@ -44,6 +44,7 @@ class BackupToolingTests(unittest.TestCase):
             "PGPASSWORD": "synthetic-test-password",
             "PGDATABASE": "madar",
             "MADAR_BACKUP_TIMESTAMP": timestamp,
+            "MADAR_PROVIDER_BACKUP_REQUIRED": "false",
         }
         for key, name in (
             ("MADAR_BUILDER_ASSETS_DIR", "builder-assets"),

@@ -138,6 +138,9 @@ SELECT 'auth_users='||count(*) FROM auth.users;
         result["metadata"] = dict(line.split("=", 1) for line in rows.splitlines())
         if result["metadata"]["invalid_indexes"] != "0":
             raise RehearsalError("invalid_restored_indexes")
+        expected_tables = manifest['database'].get('public_tables')
+        if expected_tables is not None and int(result['metadata']['public_tables']) != expected_tables:
+            raise RehearsalError('restored_public_table_count_mismatch')
         file_sets = {}
         with tempfile.TemporaryDirectory(prefix="madar-file-restore-") as scratch:
             for name_set in ("builder-assets", "private-uploads", "generated-artifacts", "avatars"):
@@ -151,6 +154,17 @@ SELECT 'auth_users='||count(*) FROM auth.users;
                     raise RehearsalError("file_restore_checksum_mismatch")
                 file_sets[name_set] = {"files": len(before), "checksums_match": True}
         result["file_sets"] = file_sets
+        if manifest.get('recovery', {}).get('provider_objects_required'):
+            source = backup / 'provider'
+            before = file_inventory(source)
+            with tempfile.TemporaryDirectory(prefix='madar-provider-restore-') as scratch:
+                target = Path(scratch) / 'provider'
+                shutil.copytree(source, target, symlinks=True)
+                if file_inventory(target) != before:
+                    raise RehearsalError('provider_restore_checksum_mismatch')
+                provider = json.loads((target / 'manifest.json').read_text())
+                result['provider_objects'] = {'objects': len(provider['objects']), 'checksums_match': True,
+                                              'remote_provider_restore_performed': False}
         result["status"] = "logical_database_and_file_restore_passed"
     finally:
         try:

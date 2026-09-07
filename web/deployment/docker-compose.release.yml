@@ -1,3 +1,15 @@
+services:
+  backend:
+    environment:
+      BACKUP_FRESHNESS_MARKER: /run/madar-backup/latest.json
+    volumes:
+      - type: bind
+        source: /var/lib/madar/backup-state
+        target: /run/madar-backup
+        read_only: true
+        bind:
+          create_host_path: false
+
 networks:
   default:
     name: madar-release-${MADAR_SLOT:?slot required}-default

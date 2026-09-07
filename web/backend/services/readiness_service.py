@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import json
+import re
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -278,13 +280,29 @@ def check_notification_push() -> str:
 def check_backup_freshness() -> str:
     required = _env_bool("BACKUP_FRESHNESS_REQUIRED", False)
     marker = os.getenv("BACKUP_FRESHNESS_MARKER", "").strip()
+    if not required:
+        return "disabled"
     if not marker:
         return "missing" if required else "disabled"
     try:
         maximum_age = int(os.getenv("BACKUP_MAX_AGE_SECONDS", "129600"))
         if maximum_age <= 0:
             return "misconfigured"
-        age = datetime.now(timezone.utc).timestamp() - Path(marker).stat().st_mtime
+        path = Path(marker)
+        if path.is_symlink() or not path.is_file():
+            return "missing"
+        # Check mtime first for legacy stale-state diagnostics, then validate
+        # the timestamp attested by the verifier. Touching a file cannot renew it.
+        age = datetime.now(timezone.utc).timestamp() - path.stat().st_mtime
+        if not 0 <= age <= maximum_age:
+            return "stale"
+        state = json.loads(path.read_text())
+        if (state.get('format') != 1 or state.get('verified') is not True
+                or state.get('backup_id') != 'madar-' + state.get('created_at', '')
+                or not re.fullmatch(r'[0-9a-f]{64}', state.get('manifest_sha256', ''))):
+            return "invalid"
+        created = datetime.strptime(state['created_at'], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - created).total_seconds()
         return "ok" if 0 <= age <= maximum_age else "stale"
     except (OSError, ValueError):
         return "missing" if required else "unavailable"

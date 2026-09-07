@@ -32,6 +32,7 @@ assert manifest.get("checksums") == "SHA256SUMS"
 assert manifest.get("configuration", {}).get("values_included") is False
 PY
 fi
+python3 "$(dirname "$0")/backup_support.py" verify "$backup_path" || die "checksum verification failed or backup contract invalid"
 (
   cd "$backup_path"
   sha256sum --check --strict SHA256SUMS >/dev/null

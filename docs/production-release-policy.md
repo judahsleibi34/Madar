@@ -112,6 +112,42 @@ chowns `/`, `/var`, or `/var/lib`.
 
 ## B. Candidate eligibility (automatic production gate)
 
+### Scheduled backup operational contract (2026-09-07)
+
+The exact-SHA controller installer also installs and hash-compares the local
+backup, verification, restore/rehearsal, online Node 1 and removable-media
+helpers under `/usr/local/lib/madar`, and their canonical systemd units. All
+helper scripts and `backup_support.py` are provenance-protected by the guard
+and privileged upgrader. Replaced helpers/units are included in the protected
+installer backup and filesystem preflight. Timers are never enabled by install.
+The upgrader stops existing backup timers, refuses a running backup operation,
+and restores their previous activity only after successful governed completion
+or safe pre-install recovery. A direct installer requires quiescence as well.
+
+Scheduled backups load canonical host storage paths after backup.env and obtain
+only provider credentials from a systemd `LoadCredential` copy of production.env;
+the scalar parser supports legacy colon syntax without shell evaluation.
+The format-3 extension preserves the four legacy local file-set names and adds
+mandatory provider-object manifests and bytes, bound to the database backup ID.
+Provider inventory must be unchanged across the database dump/object downloads.
+New backups default to requiring provider data; explicitly scoped local-only
+test/isolated backups can opt out and record that limitation in the manifest.
+Full Supabase platform recovery is never asserted by this logical backup.
+
+The installed release Compose overlay mounts only `/var/lib/madar/backup-state`
+read-only at `/run/madar-backup`; it requires an existing source directory.
+Both slots, refresh and rollback use this controller overlay. The verifier
+publishes a nonsecret mode-0644 JSON file there via rename after verification.
+The backend validates its attested creation time and verification state, so an
+atomic replacement is visible and touching an old marker cannot renew it.
+`BACKUP_FRESHNESS_REQUIRED` stays false until a fresh real backup is proven;
+activation is a protected configuration change followed by governed runtime
+refresh. Missing/stale/invalid state then fails readiness. The private backup
+repository is never mounted into the application.
+
+See `web/docs/backup-restore-runbook.md` for schedules, retention, and the
+distinct online Node 1 versus offline removable-media layers.
+
 `madar-auto-deploy` and `madar-production-deploy` require a clean production
 checkout, including tracked and untracked files, before fetching `origin/main`.
 The fetched candidate is resolved to a full lowercase Git SHA. The CLI
