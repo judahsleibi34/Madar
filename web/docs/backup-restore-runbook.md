@@ -12,6 +12,14 @@ Operational scripts and units are installed by the governed exact-SHA control-pl
 
 Recovery layers:
 
+Every provider-inclusive backup also compares non-soft-deleted builder registry
+hashes against the captured local/provider bytes. Missing active or referenced
+assets and content mismatches fail closed. Historical unreferenced records whose
+bytes were already absent are preserved in the database and disclosed by hashed
+keys/counts in `builder_registry_coverage`; they are not silently called recovered
+or deleted. The September 7 baseline contains four such July records with no
+actual or published references and no matching retained backup bytes.
+
 1. Local verified backup: private mode-0700 backup root.
 2. Automated Node 1 online off-host copy: `replicate_latest_node1.py`, using strict noninteractive SSH through `madar-node1-lan`. This is online and mutable, not offline or immutable.
 3. Existing age-encrypted removable/offline media: `replicate_latest_offhost.sh` and `replicate_backup_offhost.sh`, with the existing mount/volume identity gates. No connected removable media means this layer is not proven.

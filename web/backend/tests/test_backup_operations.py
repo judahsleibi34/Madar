@@ -175,6 +175,20 @@ class BackupOperationsTests(unittest.TestCase):
                     support.provider_snapshot(path, 'madar-20260720T000000Z')
             self.assertFalse((path / 'provider/manifest.json').exists())
 
+    def test_registry_requires_active_assets_and_discloses_historical_missing(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root)
+            row = {'storage_key':'tenant_1/builder_assets/'+'a'*32+'.png','sha256':'b'*64,
+                   'status':'unreferenced','references':0}
+            with mock.patch.object(support.subprocess, 'run', return_value=mock.Mock(returncode=0,stdout=json.dumps([row]))):
+                coverage = support.registry_coverage(path, [])
+                self.assertEqual(coverage['required_missing'], 0)
+                self.assertEqual(len(coverage['preexisting_unreferenced_missing_key_hashes']), 1)
+            for active in ({**row,'status':'active'}, {**row,'references':1}):
+                with mock.patch.object(support.subprocess, 'run', return_value=mock.Mock(returncode=0,stdout=json.dumps([active]))):
+                    with self.assertRaisesRegex(support.BackupError, 'required_builder_asset_missing'):
+                        support.registry_coverage(path, [])
+
     def test_marker_atomic_replacement_exposes_only_private_backup_metadata(self):
         with tempfile.TemporaryDirectory() as root:
             source, env = self.make_backup(root)

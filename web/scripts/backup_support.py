@@ -292,10 +292,48 @@ def provider_snapshot(root: Path, backup_id: str) -> None:
         objects.append({**row, 'file': 'objects/' + leaf, 'bytes': size, 'sha256': digest(target)})
     if before != provider_inventory():
         raise BackupError('provider_inventory_changed_retry_required')
+    coverage = registry_coverage(root, objects)
     manifest = {'format': 1, 'status': 'complete', 'database_backup_id': backup_id,
+                'builder_registry_coverage': coverage,
                 'platform_recovery_proven': False, 'objects': objects}
     (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (root / 'provider-inventory.json').unlink()
+
+
+def registry_coverage(root: Path, objects: list[dict]) -> dict:
+    sql = """select coalesce(json_agg(x),'[]'::json) from
+      (select b.storage_key,b.sha256,b.status,
+       (select count(*) from public.builder_asset_references r where r.asset_id=b.id) as references
+       from public.builder_assets b where b.status <> 'soft_deleted') x;"""
+    env = dict(os.environ, PGCONNECT_TIMEOUT='10',
+               PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=30000')
+    result = subprocess.run(['psql','-X','-At','-v','ON_ERROR_STOP=1','-c',sql],
+                            env=env, capture_output=True, text=True, timeout=45)
+    if result.returncode:
+        raise BackupError('builder_registry_inventory_failed')
+    rows = json.loads(result.stdout)
+    provider = {(row['bucket_id'], row['name']): row['sha256'] for row in objects}
+    missing_unreferenced = []
+    covered = 0
+    for row in rows:
+        key = PurePosixPath(row['storage_key'])
+        if key.is_absolute() or '..' in key.parts:
+            raise BackupError('builder_registry_path_invalid')
+        local = root / 'files/builder-assets' / str(key)
+        local_hash = digest(local) if local.is_file() and not local.is_symlink() else None
+        provider_hash = provider.get((os.environ.get('BUILDER_ASSET_BUCKET', 'builder-assets'), str(key)))
+        if any(value is not None and value != row['sha256'] for value in (local_hash, provider_hash)):
+            raise BackupError('builder_registry_content_hash_mismatch')
+        if local_hash is not None or provider_hash is not None:
+            covered += 1
+        elif row['status'] == 'active' or int(row['references']) > 0:
+            raise BackupError('required_builder_asset_missing')
+        else:
+            # Preserve the existing registry in the DB dump. Do not manufacture
+            # bytes or delete historical dangling records to claim recovery.
+            missing_unreferenced.append(hashlib.sha256(str(key).encode()).hexdigest())
+    return {'registry_rows':len(rows), 'covered':covered, 'required_missing':0,
+            'preexisting_unreferenced_missing_key_hashes':sorted(missing_unreferenced)}
 
 
 def scheduled(script: Path) -> None:
