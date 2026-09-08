@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
@@ -286,9 +286,9 @@ class AdminAal2EnforcementTests(unittest.TestCase):
             "get_user_security_settings",
             return_value={"mfa_required": True},
         ), patch.object(
-            mfa_routes.supabase.auth.mfa,
-            "enroll",
-            return_value=enroll_response,
+            mfa_routes,
+            "get_request_mfa_client",
+            return_value=SimpleNamespace(auth=SimpleNamespace(mfa=SimpleNamespace(enroll=MagicMock(return_value=enroll_response)))),
         ), patch.object(mfa_routes, "record_mfa_event"), patch.object(
             auth_service,
             "get_current_aal",

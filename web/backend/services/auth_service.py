@@ -5,6 +5,8 @@ import hashlib
 import hmac
 import time
 import threading
+
+import jwt
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, Request, Response
@@ -16,7 +18,7 @@ from supabase_auth.errors import (
     AuthSessionMissingError,
 )
 
-from database import service_supabase, supabase
+from database import service_supabase, supabase, create_session_supabase_client
 from services.account_lifecycle_service import (
     ACTIVE_ACCOUNT_STATUS,
     effective_account_status,
@@ -364,6 +366,10 @@ def get_authenticated_user_row(
     allow_admin_account_access: bool = True,
     reject_admin_account_access: bool = True,
 ):
+    # A failed/repeated authentication must not retain assurance from an earlier call.
+    request.state.verified_session_assurance = None
+    request.state.verified_auth_session = None
+    request.state.mfa_client = None
     access_token = request.cookies.get("madar_access_token")
     refresh_token = request.cookies.get("madar_refresh_token")
 
@@ -431,6 +437,15 @@ def get_authenticated_user_row(
 
     if not auth_user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    request.state.verified_auth_session = {
+        "access_token": next_access_token,
+        "refresh_token": next_refresh_token or "",
+        "auth_id": str(auth_user_id),
+    }
+    request.state.verified_session_assurance = _verified_token_assurance(
+        next_access_token, str(auth_user_id), auth_user
+    )
 
     if response and next_access_token and next_refresh_token:
         set_auth_cookies(
@@ -530,40 +545,70 @@ def require_system_admin(
         raise HTTPException(status_code=403, detail="Admin access is required")
 
     if require_aal2:
-        require_current_session_aal2()
+        require_current_session_aal2(request)
 
     return auth_user, user_data
 
 
-def get_current_aal() -> dict:
+def _verified_token_assurance(access_token: str | None, auth_id: str, auth_user) -> dict:
+    """Read claims only AFTER Auth has verified this exact token and subject.
+
+    get_user(token), or the verified refresh response, is the authentication
+    boundary. This helper is not a JWT verifier and must never be called on an
+    unverified cookie. No shared client's cached session is authorization.
+    """
     try:
-        get_aal = getattr(supabase.auth.mfa, "get_authenticator_assurance_level", None)
-
-        if not get_aal:
+        claims = jwt.decode(access_token or "", options={"verify_signature": False})
+        expires_at = claims.get("exp")
+        if (
+            claims.get("sub") != auth_id
+            or type(expires_at) is not int
+            or expires_at <= time.time()
+            or claims.get("aal") not in {"aal1", "aal2"}
+        ):
             return {}
-
-        aal_response = get_aal()
-        data = _get_auth_value(aal_response, "data") or aal_response
-
-        return {
-            "current_level": _get_auth_value(data, "current_level")
-            or _get_auth_value(data, "currentLevel")
-            or _get_auth_value(data, "aal"),
-            "next_level": _get_auth_value(data, "next_level")
-            or _get_auth_value(data, "nextLevel"),
-        }
-
-    except Exception as error:
-        logger.warning(
-            "auth.admin_aal2.lookup_failed",
-            extra={"error_type": type(error).__name__},
-        )
+        factors = _get_auth_value(auth_user, "factors") or []
+        next_level = "aal2" if any(
+            _get_auth_value(factor, "status") == "verified" for factor in factors
+        ) else claims["aal"]
+        return {"current_level": claims["aal"], "next_level": next_level, "expires_at": expires_at}
+    except (jwt.PyJWTError, TypeError, ValueError):
         return {}
 
 
-def require_current_session_aal2() -> dict:
-    aal = get_current_aal()
+def get_request_mfa_client(request: Request, response: Response):
+    """Create Auth state for the authenticated request, never another user."""
+    existing = getattr(request.state, "mfa_client", None)
+    if existing is not None:
+        return existing
+    verified = getattr(request.state, "verified_auth_session", None)
+    if not verified or not verified.get("access_token"):
+        raise HTTPException(status_code=401, detail="Verified session required")
+    client = create_session_supabase_client()
+    try:
+        client.auth.set_session(verified["access_token"], verified["refresh_token"])
+        session = client.auth.get_session()
+        if not session or str(_get_auth_value(session.user, "id")) != verified["auth_id"]:
+            raise ValueError("session_subject_mismatch")
+        if session.access_token != verified["access_token"] and session.refresh_token:
+            set_auth_cookies(response, session.access_token, session.refresh_token)
+        request.state.mfa_client = client
+        return client
+    except Exception as error:
+        logger.warning("auth.mfa.session_unavailable", extra={"error_type": type(error).__name__})
+        raise SessionRefreshUnavailable() from error
 
+
+def get_current_aal(request: Request | None = None) -> dict:
+    """Return only this request's provider-verified assurance, or fail closed."""
+    assurance = getattr(request.state, "verified_session_assurance", None) if request else None
+    if not isinstance(assurance, dict) or assurance.get("expires_at", 0) <= time.time():
+        return {}
+    return {key: assurance[key] for key in ("current_level", "next_level")}
+
+
+def require_current_session_aal2(request: Request | None = None) -> dict:
+    aal = get_current_aal(request)
     if aal.get("current_level") != "aal2":
         raise HTTPException(
             status_code=403,
@@ -572,7 +617,6 @@ def require_current_session_aal2() -> dict:
                 "message": "MFA verification is required for this admin action",
             },
         )
-
     return aal
 
 

@@ -1,0 +1,36 @@
+# Authoritative research record
+
+Retrieved 2026-09-08. These are implementation requirements, not claims that the
+corresponding integrations have been completed.
+
+| Official source | Verified requirement | Implementation impact |
+| --- | --- | --- |
+| [CyberSource Secure Acceptance sunset](https://developer.cybersource.com/docs/cybs/en-us/platform/relnote/all/na/rn-2026-08-28/rn-announce/secure-acceptance-sunset.html) | Migration target September 30, 2026; Unified Checkout recommended | No new Secure Acceptance code. |
+| [CyberSource platform authentication](https://developer.cybersource.com/products/authentication.html) | JWT is the migration path from deprecated HTTP Signature; MLE mandate March 1, 2027 | New REST adapter must use JWT and current MLE. Official pages differ on transition wording; do not rely on the later deadline as permission to omit MLE. |
+| [Unified Checkout](https://developer.cybersource.com/docs/cybs/en-us/unified-checkout/developer/all/rest/unified-checkout.html) | v1 session endpoint `/uc/v1/sessions`; supported authentication and payment flows differ from v0 | Use v1, model 3DS separately, validate capture context and transient result. No integration implemented in this change. |
+| [UC client library setup](https://developer.cybersource.com/docs/cybs/en-us/unified-checkout/developer/all/rest/unified-checkout/uc-getting-started-cs-setup-intro/uc-getting-started-cs-js-library-intro.html) | Obtain clientLibrary and clientLibraryIntegrity from each transaction's response | Never hard-code library or SRI; dedicated controlled checkout document. |
+| [UC target origins](https://developer.cybersource.com/docs/cybs/en-us/unified-checkout/developer/all/rest/unified-checkout/uc-setup-capture-context/uc-capture-context-features/uc-cc-target-origin.html) | Origins identify scheme, host and optional port | Derive exact origins from trusted site bindings; no browser-selected origin or wildcard. |
+| [Webhook security](https://developer.cybersource.com/docs/cybs/en-us/webhooks/implementation/all/rest/webhooks/wh-fg-server-security.html) | Mutual trust, provider IP allowlist, Visa root trust and digital signature key | Edge network controls cannot replace cryptographic verification. Current documented IPs: 198.241.206.21 and 198.241.207.21; reverify before activation. |
+| [Webhook MLE](https://developer.cybersource.com/docs/cybs/en-us/webhooks/implementation/all/rest/webhooks/wh-fg-mle-intro.html) | Payment/UC events require MLE; X.509 certificates; JWE with AES-GCM-256 and RSA-OAEP-2048 | Do not enable an unencrypted/unverified webhook fallback. |
+| [Meta-key hierarchy](https://developer.cybersource.com/docs/cybs/en-us/security-keys/user/all/ada/security-keys/keys-meta-intro.html) | Portfolio/merchant keys can cover transacting MIDs; expiry affects all assigned MIDs | Backend merchant mapping, per-key lifecycle monitoring; no tenant access to meta keys. Technical support is not commercial authorization. |
+| [PCI SSC FAQ 1588](https://www.pcisecuritystandards.org/faqs/1588/) | Embedded payment page eligibility includes resistance to merchant-page script attacks | Builder-controlled scripts cannot surround the payment component. SAQ eligibility is not automatic compliance. |
+| [PCI SSC FAQ 1604](https://www.pcisecuritystandards.org/faqs/1604/) | Outsourced/iframe e-commerce pages retain applicable ASV scan responsibilities | Merchant/acquirer review and required scanning remain activation prerequisites. |
+| [Supabase self-host setup](https://supabase.com/docs/guides/self-hosting/docker) and [exact release](https://github.com/supabase/supabase/tree/241bb11c0627f2981746d37033f57dbfa81d29b0/docker) | Official v0.8.0 snapshot, Envoy gateway, PostgreSQL image 17.6.1.136 | Pin this tested candidate's complete image set. Actual rehearsal server reports PostgreSQL 17.6. |
+| [New self-host Auth keys](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys) | Opaque publishable/secret keys coexist with legacy keys; ES256 key configuration is shared across services | Synthetic login/JWKS/TOTP/refresh proof passed; no production key rotation. Internal JWKS containing symmetric material must remain private. |
+| [Platform restore](https://supabase.com/docs/guides/self-hosting/restore-from-platform) and [Auth migration](https://supabase.com/docs/guides/troubleshooting/migrating-auth-users-between-projects) | Auth data/password hashes migrate; signing material, OAuth redirect and session strategy are separate | Preserve-vs-rotate choice requires future explicit authorization. Restore guide version wording differs from current exact self-host snapshot; test actual target. |
+| [Storage copy](https://supabase.com/docs/guides/self-hosting/copy-from-platform-s3) | Use S3/rclone; direct placement in filesystem does not recreate Storage representation | Synthetic S3-to-S3 copy and download verification passed. Managed-source object parity is still untested. |
+| [S3 configuration](https://supabase.com/docs/guides/self-hosting/self-hosted-s3) and [Envoy](https://supabase.com/docs/guides/self-hosting/self-hosted-envoy) | S3 endpoint and storage backend are independent; forwarded path and public URL matter to signature verification | Keep local filesystem backend with S3 API transfers. Initial internal-host attempt failed SigV4; configured loopback public URL succeeded. |
+| [PostgreSQL replication restrictions](https://www.postgresql.org/docs/17/logical-replication-restrictions.html) | DDL and sequence state are not automatically replicated | Explicit DDL ordering, parity and sequence synchronization are mandatory. One writable primary. |
+| [PostgreSQL RLS](https://www.postgresql.org/docs/17/ddl-rowsecurity.html) | Owners and privileged roles can bypass RLS | Explicit backend authorization and exact grants inventory remain mandatory. Production and rehearsal verifier passed, including six commerce tables. |
+| [pgBackRest guide](https://pgbackrest.org/user-guide.html) | Full/differential/incremental backups, WAL, encrypted repositories and PITR; matching tool versions across hosts | Preserve logical backups and prove physical PITR separately. pgBackRest is absent from the tested database image; no PITR claim. |
+| [OWASP authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) | Deny by default and validate authorization per request | Request-bound AAL2 and fail-closed entitlement period checks added with adversarial tests. |
+| [Debezium outbox router](https://debezium.io/documentation/reference/stable/transformations/outbox-event-router.html) | Event ID supports dedupe; aggregate key supports ordering | PostgreSQL outbox/inbox can use the same identity principles without introducing Kafka. No generic exactly-once claim. |
+
+SDK discovery: the official [CyberSource Python repository](https://github.com/CyberSource/cybersource-rest-client-python/tree/02c726998827fcd407c43616c894a3f87c58d132)
+reports version 0.0.79. It has not been added to application requirements or fully
+reviewed/tested. This is discovery evidence, not an approved provider dependency.
+
+Pinned rehearsal tools: Node 22 Alpine image digest
+`sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32`;
+rclone 1.75.1 digest
+`sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5`.

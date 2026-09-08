@@ -304,7 +304,7 @@ class EntitlementMatrixTests(unittest.TestCase):
 
     def test_trial_and_grace_are_explicit_entitled_states(self):
         for subscription_state in ("trial", "grace"):
-            rows = [{"id": 1, "tenant_id": 7, "plan_id": "website", "state": subscription_state}]
+            rows = [{"id": 1, "tenant_id": 7, "plan_id": "website", "state": subscription_state, "period_end": "2099-01-01T00:00:00Z"}]
             with self.subTest(state=subscription_state), patch.dict(
                 environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}
             ), patch.object(entitlement_service, "_canonical_records", return_value=(rows, [])), patch.object(

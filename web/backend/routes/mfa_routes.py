@@ -12,10 +12,11 @@ from classes import (
     MfaLoginChallengeRequest,
     MfaLoginVerifyRequest,
 )
-from database import service_supabase, supabase
+from database import service_supabase
 from services.auth_service import (
     build_user_payload,
     get_authenticated_user_row,
+    get_request_mfa_client,
     normalize_user_type,
     set_auth_cookies,
 )
@@ -141,9 +142,9 @@ def current_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def get_authenticator_assurance_level() -> dict[str, Any]:
+def get_authenticator_assurance_level(request: Request, response: Response) -> dict[str, Any]:
     try:
-        get_aal = getattr(supabase.auth.mfa, "get_authenticator_assurance_level", None)
+        get_aal = getattr(get_request_mfa_client(request, response).auth.mfa, "get_authenticator_assurance_level", None)
 
         if not get_aal:
             return {}
@@ -173,17 +174,12 @@ def session_tokens_from_response(response: Any) -> tuple[str | None, str | None]
 def sanitized_exception_metadata(error: Exception) -> dict[str, Any]:
     metadata = {"error_type": type(error).__name__}
 
-    for attr in ("status", "code", "message"):
-        value = getattr(error, attr, None)
-
-        if value is not None:
-            metadata[attr] = str(value)
-
-    if "message" not in metadata:
-        message = str(error).strip()
-
-        if message:
-            metadata["message"] = message
+    # Provider exception text may contain tokens, URLs or customer data.
+    # Only the numeric HTTP status is safe to retain without provider-specific
+    # allowlisting of error codes.
+    status = getattr(error, "status", None)
+    if type(status) is int and 100 <= status <= 599:
+        metadata["status"] = str(status)
 
     return metadata
 
@@ -217,8 +213,8 @@ def require_pending_mfa_payload(request: Request, response: Response) -> dict[st
 @router.get("/status")
 def mfa_status(request: Request, response: Response):
     _, user_data, settings = authenticated_mfa_context(request, response)
-    factors = factor_list_from_response(supabase.auth.mfa.list_factors())
-    aal = get_authenticator_assurance_level()
+    factors = factor_list_from_response(get_request_mfa_client(request, response).auth.mfa.list_factors())
+    aal = get_authenticator_assurance_level(request, response)
 
     return {
         "mfa_required": bool((settings or {}).get("mfa_required")),
@@ -242,7 +238,7 @@ def mfa_enroll(payload: MfaEnrollRequest, request: Request, response: Response):
         enroll_payload["friendly_name"] = friendly_name
 
     try:
-        enroll_response = supabase.auth.mfa.enroll(enroll_payload)
+        enroll_response = get_request_mfa_client(request, response).auth.mfa.enroll(enroll_payload)
     except Exception as error:
         logger.warning(
             "auth.mfa.enroll_failed",
@@ -275,20 +271,20 @@ def mfa_enroll_verify(payload: MfaEnrollVerifyRequest, request: Request, respons
     factor_id = payload.factor_id.strip()
 
     try:
-        challenge_response = supabase.auth.mfa.challenge({"factor_id": factor_id})
+        challenge_response = get_request_mfa_client(request, response).auth.mfa.challenge({"factor_id": factor_id})
         challenge_id = challenge_id_from_response(challenge_response)
 
         if not challenge_id:
             raise ValueError("Missing MFA challenge id")
 
-        verify_response = supabase.auth.mfa.verify(
+        verify_response = get_request_mfa_client(request, response).auth.mfa.verify(
             {
                 "factor_id": factor_id,
                 "challenge_id": challenge_id,
                 "code": payload.code.strip(),
             }
         )
-        if get_authenticator_assurance_level().get("current_level") != "aal2":
+        if get_authenticator_assurance_level(request, response).get("current_level") != "aal2":
             raise ValueError("MFA enrollment did not produce aal2")
 
     except Exception as error:
@@ -352,7 +348,7 @@ def mfa_enroll_verify(payload: MfaEnrollVerifyRequest, request: Request, respons
 @router.get("/factors")
 def mfa_factors(request: Request, response: Response):
     authenticated_mfa_context(request, response)
-    return {"factors": factor_list_from_response(supabase.auth.mfa.list_factors())}
+    return {"factors": factor_list_from_response(get_request_mfa_client(request, response).auth.mfa.list_factors())}
 
 
 @router.delete("/factors/{factor_id}")
@@ -363,7 +359,7 @@ def mfa_remove_factor(factor_id: str, request: Request, response: Response):
     if not clean_factor_id:
         raise HTTPException(status_code=400, detail="MFA factor id is required")
 
-    aal = get_authenticator_assurance_level()
+    aal = get_authenticator_assurance_level(request, response)
     current_level = aal.get("current_level")
 
     if current_level != "aal2":
@@ -373,7 +369,7 @@ def mfa_remove_factor(factor_id: str, request: Request, response: Response):
         )
 
     try:
-        factors = factor_list_from_response(supabase.auth.mfa.list_factors())
+        factors = factor_list_from_response(get_request_mfa_client(request, response).auth.mfa.list_factors())
         matching = [item for item in factors if str(item.get("id") or "") == clean_factor_id]
         if len(matching) != 1:
             raise HTTPException(status_code=404, detail="MFA factor not found")
@@ -386,7 +382,7 @@ def mfa_remove_factor(factor_id: str, request: Request, response: Response):
                 status_code=409,
                 detail="The last verified administrator factor cannot be removed",
             )
-        supabase.auth.mfa.unenroll({"factor_id": clean_factor_id})
+        get_request_mfa_client(request, response).auth.mfa.unenroll({"factor_id": clean_factor_id})
     except HTTPException:
         raise
     except Exception as error:
