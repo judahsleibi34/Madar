@@ -41,7 +41,7 @@ def close_current_tenant(request: Request, response: Response):
     )
     if context.role != "owner":
         raise HTTPException(status_code=403, detail="Tenant owner access is required")
-    require_current_session_aal2()
+    require_current_session_aal2(request)
     result = request_tenant_deletion(
         target_tenant_id=context.tenant_id,
         requested_by_user_id=context.user_id,

@@ -127,3 +127,16 @@ def create_supabase_client(supabase_key: str) -> Client:
 
 supabase: Client = create_supabase_client(SUPABASE_ANON_KEY)
 service_supabase: Client = create_supabase_client(SUPABASE_SERVICE_KEY)
+
+
+def create_session_supabase_client() -> Client:
+    """Isolate mutable Auth state while sharing the thread-safe HTTP pool."""
+    return create_api_key_compatible_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=ClientOptions(
+            persist_session=False,
+            auto_refresh_token=False,
+            httpx_client=supabase.options.httpx_client,
+        ),
+    )

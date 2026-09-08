@@ -256,6 +256,34 @@ def _unentitled_state(
     }
 
 
+def _period_is_current(record: dict[str, Any], now: datetime) -> bool:
+    """Honor half-open commercial periods; malformed bounds never grant access.
+
+    Legacy active records may have no bounds. Trial/grace need an explicit end
+    before they can grant time-limited access. No scheduler or cache TTL is
+    required to revoke an expired period.
+    """
+    try:
+        bounds = []
+        for key in ("period_start", "period_end"):
+            raw = record.get(key)
+            if raw is None:
+                bounds.append(None)
+                continue
+            value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if value.tzinfo is None or value.utcoffset() is None:
+                return False
+            bounds.append(value.astimezone(timezone.utc))
+        start, end = bounds
+        if str(record.get("state") or "").strip().lower() in {"trial", "grace"} and end is None:
+            return False
+        if start is not None and end is not None and start >= end:
+            return False
+        return (start is None or start <= now) and (end is None or now < end)
+    except (ValueError, TypeError, OverflowError):
+        return False
+
+
 def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
     if not commercial_entitlements_enforced():
         return _temporary_operator_override_state(tenant_id)
@@ -266,6 +294,7 @@ def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
         return _unentitled_state(tenant_id, source="offline_test_unentitled")
 
     records = _canonical_records(tenant_id)
+    now = datetime.now(timezone.utc)
     if records is not None:
         subscriptions, addons = records
         entitled_subscriptions = [
@@ -289,6 +318,13 @@ def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
             plan_id = str((active_subscription or {}).get("plan_id") or "") or None
             if active_subscription:
                 capabilities, allowances = _plan_entitlements(plan_id)
+                if not capabilities or not _period_is_current(active_subscription, now):
+                    return _unentitled_state(
+                        tenant_id,
+                        source="canonical_invalid_or_outside_period",
+                        subscriptions=subscriptions,
+                        addons=addons,
+                    )
                 source = "canonical"
             else:
                 return _unentitled_state(
@@ -300,7 +336,7 @@ def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
                 )
             active_addons: list[dict[str, Any]] = []
             for addon in addons:
-                if addon.get("state") != ACTIVE_STATE:
+                if addon.get("state") != ACTIVE_STATE or not _period_is_current(addon, now):
                     continue
                 product = get_product(str(addon.get("addon_id") or ""))
                 if not product:
@@ -367,7 +403,7 @@ def require_entitlement(
 ) -> dict[str, Any]:
     state = get_tenant_entitlements(tenant_id)
     active = set(state.get("operational_capabilities", state["capabilities"]))
-    if capability in active:
+    if capability in CAPABILITIES and capability in active:
         return state
     if capability in set(state["capabilities"]):
         raise HTTPException(
@@ -396,7 +432,7 @@ def require_any_entitlement(
 ) -> dict[str, Any]:
     state = get_tenant_entitlements(tenant_id)
     active = set(state.get("operational_capabilities", state["capabilities"]))
-    if any(capability in active for capability in capabilities):
+    if any(capability in CAPABILITIES and capability in active for capability in capabilities):
         return state
     raise HTTPException(
         status_code=402,
