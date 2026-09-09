@@ -1068,6 +1068,15 @@ def login(user: LogIn, response: Response, request: Request):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
+@router.get("/tenants")
+def available_tenants(request: Request, response: Response):
+    from services.auth_service import require_regular_user
+    from services.tenant_selection_service import list_user_tenants
+    _, user = require_regular_user(request, response, allow_admin_account_access=False)
+    response.headers["Cache-Control"] = "private, no-store"
+    return {"tenants": list_user_tenants(user), "current_tenant_id": user.get("tenant_id")}
+
+
 @router.get("/user_status")
 def user_status(request: Request, response: Response):
     try:

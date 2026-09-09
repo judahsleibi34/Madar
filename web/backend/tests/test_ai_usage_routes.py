@@ -102,6 +102,10 @@ def auth_user(user_id=1, tenant_id=1, *, payment_status="", plan="", user_type="
     }
 
 
+def tenant_context(user_id=1, tenant_id=1):
+    return SimpleNamespace(user_id=user_id, tenant_id=tenant_id, user=auth_user(user_id,tenant_id)[1])
+
+
 class AIUsageRouteTests(unittest.TestCase):
     def setUp(self):
         self.client = build_client()
@@ -125,7 +129,7 @@ class AIUsageRouteTests(unittest.TestCase):
                 clear=False,
             ),
             patch.object(analysis_routes, "enforce_data_workspace_rate_limit", return_value=None),
-            patch.object(analysis_routes, "require_regular_user_id", return_value=auth_user()),
+            patch.object(analysis_routes, "require_active_tenant_user_id", return_value=tenant_context()),
             patch.object(
                 analysis_routes.token_metering,
                 "get_model_multipliers",
@@ -222,7 +226,7 @@ class AIUsageRouteTests(unittest.TestCase):
     def test_unauthorized_user_cannot_use_ai_route(self):
         with patch.object(
             analysis_routes,
-            "require_regular_user_id",
+            "require_active_tenant_user_id",
             side_effect=HTTPException(status_code=401, detail="Not logged in"),
         ), patch.object(analysis_routes.ai_service, "ask_planner") as ask_planner:
             response = self.post_ai()
@@ -234,8 +238,8 @@ class AIUsageRouteTests(unittest.TestCase):
     def test_tenant_user_dataset_mismatch_is_rejected_before_usage_increment(self):
         with patch.object(
             analysis_routes,
-            "require_regular_user_id",
-            return_value=auth_user(user_id=1, tenant_id=2),
+            "require_active_tenant_user_id",
+            return_value=tenant_context(user_id=1, tenant_id=2),
         ), patch.object(analysis_routes.ai_service, "ask_planner") as ask_planner:
             response = self.post_ai()
 
@@ -246,7 +250,7 @@ class AIUsageRouteTests(unittest.TestCase):
     def test_path_user_mismatch_is_rejected_before_usage_increment(self):
         with patch.object(
             analysis_routes,
-            "require_regular_user_id",
+            "require_active_tenant_user_id",
             side_effect=HTTPException(status_code=403, detail="User id does not match session"),
         ), patch.object(analysis_routes.ai_service, "ask_planner") as ask_planner:
             response = self.post_ai(user_id=2)

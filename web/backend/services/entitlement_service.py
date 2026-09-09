@@ -1,9 +1,8 @@
 """Server-authoritative commercial entitlement evaluation.
 
 Canonical records are authoritative. Missing, malformed, ambiguous, or
-unmigrated commercial state grants no paid capability. Existing published-site
-continuity is handled narrowly by ``require_public_runtime_entitlement`` rather
-than by a catalog-wide compatibility grant.
+unmigrated commercial state grants no paid capability. Published content uses
+the same fail-closed resolver as authenticated product routes.
 """
 
 from __future__ import annotations
@@ -17,6 +16,7 @@ from fastapi import HTTPException
 
 from database import service_supabase
 from services.api_errors import error_detail
+from services.commercial_metrics import record_commercial_metric
 from services.commercial_catalog import CAPABILITIES, GIB, get_product
 
 
@@ -284,8 +284,57 @@ def _period_is_current(record: dict[str, Any], now: datetime) -> bool:
         return False
 
 
-def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
-    if not commercial_entitlements_enforced():
+def _reviewed_commercial_state(tenant_id: int | str, snapshot: dict[str, Any]) -> dict[str, Any]:
+    from services.commercial_catalog import CATALOG_VERSION
+    import hashlib
+    import json
+
+    state = _unentitled_state(tenant_id, source="reviewed_access_periods")
+    state["review_required"] = snapshot["review_state"] != "reviewed"
+    state["commercial_status"] = "review_required" if state["review_required"] else "inactive"
+    period = snapshot.get("period")
+    if isinstance(period, dict) and not state["review_required"]:
+        if period.get("tenant_id") != int(tenant_id):
+            raise HTTPException(status_code=503, detail="Commercial tenant mismatch")
+        subscription = {**period, "state": "active", "period_start": period.get("valid_from"), "period_end": period.get("valid_until")}
+        capabilities, allowances = _plan_entitlements(period.get("plan_id"))
+        if capabilities and _period_is_current(subscription, datetime.now(timezone.utc)):
+            active_addons = []
+            for addon in snapshot["addons"]:
+                product = get_product(str(addon.get("addon_id") or ""))
+                if not product or addon.get("tenant_id") != int(tenant_id) or not _period_is_current(addon, datetime.now(timezone.utc)):
+                    continue
+                quantity = addon.get("quantity")
+                if type(quantity) is not int or quantity <= 0:
+                    continue
+                required = product.get("requires_capability")
+                if required and required not in capabilities:
+                    continue
+                capabilities.update(product.get("capabilities") or [])
+                active_addons.append(addon)
+                for key, value in (product.get("allowances") or {}).items():
+                    if type(value) is int:
+                        allowances[key] = int(allowances.get(key) or 0) + value * quantity
+            if snapshot.get("grandfathered_subdomain") is True and "page_builder" in capabilities:
+                capabilities.add("branded_madar_subdomain")
+            operational, availability = _operational_capabilities(capabilities)
+            state.update(plan_id=period["plan_id"], subscription=subscription, subscriptions=[subscription],
+                         active_addons=active_addons, capabilities=sorted(capabilities),
+                         operational_capabilities=sorted(operational), capability_availability=availability,
+                         allowances=allowances, commercial_status="active")
+    if not state["review_required"] and state["commercial_status"] != "active" and snapshot.get("has_history"):
+        state["commercial_status"] = "scheduled" if snapshot.get("next_transition_at") else "expired_or_revoked"
+    digest = hashlib.sha256(json.dumps({"capabilities": state["capabilities"], "allowances": state["allowances"],
+        "status": state["commercial_status"], "period": (state["subscription"] or {}).get("id")}, sort_keys=True).encode()).hexdigest()[:24]
+    state["entitlement_revision"] = f"{CATALOG_VERSION}:{snapshot['revision']}:{digest}"
+    state["commercial_revision"] = snapshot["revision"]
+    state["next_transition_at"] = snapshot.get("next_transition_at")
+    state["commercial_entitlements_enforced"] = commercial_entitlements_enforced()
+    return state
+
+
+def get_tenant_entitlements(tenant_id: int | str, *, preview: bool = False) -> dict[str, Any]:
+    if not commercial_entitlements_enforced() and not preview:
         return _temporary_operator_override_state(tenant_id)
 
     # The repository's offline suite intentionally uses dummy Supabase URLs.
@@ -293,6 +342,10 @@ def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
     if _offline_test_compatibility():
         return _unentitled_state(tenant_id, source="offline_test_unentitled")
 
+    from services.commercial_access_service import read_commercial_snapshot
+    snapshot = read_commercial_snapshot(int(tenant_id))
+    if snapshot is not None:
+        return _reviewed_commercial_state(tenant_id, snapshot)
     records = _canonical_records(tenant_id)
     now = datetime.now(timezone.utc)
     if records is not None:
@@ -414,8 +467,9 @@ def require_entitlement(
                 context={"capability": capability},
             ),
         )
+    record_commercial_metric("capability_denial")
     raise HTTPException(
-        status_code=402,
+        status_code=403,
         detail=error_detail(
             "entitlement_required",
             message or f"An active {capability.replace('_', ' ')} entitlement is required.",
@@ -434,8 +488,9 @@ def require_any_entitlement(
     active = set(state.get("operational_capabilities", state["capabilities"]))
     if any(capability in CAPABILITIES and capability in active for capability in capabilities):
         return state
+    record_commercial_metric("capability_denial")
     raise HTTPException(
-        status_code=402,
+        status_code=403,
         detail=error_detail(
             "entitlement_required",
             message,
@@ -449,7 +504,7 @@ def get_storage_quota_bytes(tenant_id: int | str) -> int:
     quota = int(state.get("allowances", {}).get("storage_bytes") or 0)
     if quota <= 0:
         raise HTTPException(
-            status_code=402,
+            status_code=403,
             detail=error_detail(
                 "storage_entitlement_required",
                 "An active plan with hosted storage is required.",
@@ -483,7 +538,7 @@ def require_workspace_seat_available(tenant_id: int | str) -> dict[str, int]:
     used = get_workspace_seat_usage(tenant_id)
     if used >= capacity:
         raise HTTPException(
-            status_code=402,
+            status_code=403,
             detail=error_detail(
                 "workspace_seat_limit_reached",
                 "No workspace member seats remain.",
@@ -527,7 +582,7 @@ def require_branded_subdomain(
     ):
         return
     raise HTTPException(
-        status_code=402,
+        status_code=403,
         detail=error_detail(
             "branded_subdomain_entitlement_required",
             "This branded Madar subdomain requires an active add-on.",
@@ -539,27 +594,12 @@ def require_public_runtime_entitlement(
     settings: dict[str, Any],
     capability: str,
 ) -> dict[str, Any]:
-    """Keep an already-published runtime available during billing outages.
+    """Published content remains subject to the current tenant decision.
 
-    Canonical inactive/suspended tenants are denied normally. Only dependency
-    failures fall back, and only for a record already bound to published content.
+    A publication binding proves ownership, not current commercial authority.
+    Resolver failures must propagate even when a published snapshot exists.
     """
-    try:
-        return require_entitlement(settings.get("tenant_id"), capability)
-    except HTTPException as error:
-        if (
-            error.status_code == 503
-            and settings.get("published_project_id")
-        ):
-            logger.warning(
-                "entitlements.public_runtime_compatibility",
-                extra={
-                    "tenant_id": settings.get("tenant_id"),
-                    "capability": capability,
-                },
-            )
-            return {"source": "published_runtime_dependency_fallback"}
-        raise
+    return require_entitlement(settings.get("tenant_id"), capability)
 
 
 def increment_operational_usage(

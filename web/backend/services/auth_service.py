@@ -523,7 +523,9 @@ def get_authenticated_user_row(
                 extra={"admin_user_id": user_data.get("id"), "error_type": type(error).__name__},
             )
 
-    return auth_user, user_data
+    from services.tenant_selection_service import select_request_tenant
+
+    return auth_user, select_request_tenant(request, user_data)
 
 
 def require_system_admin(

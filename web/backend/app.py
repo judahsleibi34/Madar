@@ -22,6 +22,7 @@ from data_analysis.routes.cleaning_routes import router as cleaning_router
 from data_analysis.routes.data_routes import router as data_router
 from data_analysis.routes.visualization_routes import router as visualization_router
 
+from routes.admin_commercial_routes import router as admin_commercial_router
 from routes.admin_billing_routes import router as admin_billing_router
 from routes.admin_account_access_routes import router as admin_account_access_router
 from routes.admin_profile_routes import router as admin_profile_router
@@ -353,6 +354,7 @@ app.include_router(calendar_router)
 app.include_router(ecommerce_router)
 app.include_router(admin_account_access_router)
 app.include_router(admin_billing_router)
+app.include_router(admin_commercial_router)
 app.include_router(admin_profile_router)
 app.include_router(admin_user_router)
 app.include_router(builder_router)

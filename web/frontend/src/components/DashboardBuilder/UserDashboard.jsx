@@ -1,3 +1,4 @@
+import { useWorkspaceCapabilities } from "../../commercial/capabilityContext";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -13,7 +14,6 @@ import {
   ListRestart,
   Users,
 } from "lucide-react";
-import { STORAGE_KEY } from "../PageBuilder/core/PageBuilder.constants";
 import { getLocalTenantPath } from "../PageBuilder/core/PageBuilder.routing";
 import { getBuilderWorkspacePath } from "../PageBuilder/core/PageBuilder.workspaceRouting";
 import WeeklyScreenTimePanel from "./WeeklyScreenTimePanel";
@@ -87,14 +87,6 @@ function parseProjectSchema(record) {
   return typeof source === "object" ? source : null;
 }
 
-function getLocalProject() {
-  try {
-    return parseProjectSchema(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"));
-  } catch {
-    return null;
-  }
-}
-
 function countReservationForms(project) {
   let count = 0;
   const inspect = (element) => {
@@ -161,6 +153,10 @@ async function loadAllReservations() {
 
 function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = "" }) {
   const { t } = useTranslation();
+  const { ready, can } = useWorkspaceCapabilities();
+  const mayBuild = can("forms") || can("page_builder");
+  const mayReserve = can("reservation_management");
+  const mayWebsite = can("page_builder");
   const initialMetrics = readDashboardMetricsCache(cacheScope);
   const [metrics, setMetrics] = useState(() => initialMetrics || EMPTY_METRICS);
   const [loading, setLoading] = useState(() => !initialMetrics);
@@ -183,6 +179,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
     let cancelled = false;
 
     const loadMetrics = async () => {
+      if (!ready || !mayBuild) return;
       const cachedMetrics = readDashboardMetricsCache(cacheScope);
       if (cachedMetrics) {
         setMetrics(cachedMetrics);
@@ -199,13 +196,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
       }
 
       const remoteProjects = records.map(parseProjectSchema).filter(Boolean);
-      const localProject = getLocalProject();
-      const projects =
-        remoteProjects.length > 0
-          ? remoteProjects
-          : localProject
-            ? [localProject]
-            : [];
+      const projects = remoteProjects;
       const primaryProject = projects[0] || null;
       const primaryRecord = records[0] || null;
       const projectId = String(
@@ -214,9 +205,9 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 
       const [storage, reservations, memberGroups] = await Promise.all([
         fetchBuilderStorageUsage().catch(() => null),
-        loadAllReservations().catch(() => []),
+        mayReserve ? loadAllReservations().catch(() => []) : Promise.resolve([]),
         Promise.all(
-          records.map((record) => {
+          (mayWebsite ? records : []).map((record) => {
             const projectId = record?.id || record?.project_id;
             return projectId
               ? fetchBuilderSiteMembers(projectId).catch(() => [])
@@ -267,7 +258,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
     return () => {
       cancelled = true;
     };
-  }, [cacheScope]);
+  }, [cacheScope, ready, mayBuild, mayReserve, mayWebsite]);
 
   const cards = useMemo(() => {
     const projectNote =
@@ -382,10 +373,10 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
           <CircleCheckBig size={18} aria-hidden="true" />
           <span>Completed forms</span>
         </Link>
-        <Link className="is-primary" to={websitePath}>
+        {mayWebsite && <Link className="is-primary" to={websitePath}>
           <ExternalLink size={18} aria-hidden="true" />
           <span>View website</span>
-        </Link>
+        </Link>}
       </nav>
 
       <section
@@ -393,7 +384,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         aria-label="Workspace metrics"
         aria-busy={loading}
       >
-        {cards.map((card) => {
+        {cards.filter((card) => !card.id.startsWith("reservation-") || mayReserve).filter((card) => !["permitted-users", "permission-types"].includes(card.id) || mayWebsite).map((card) => {
           const Icon = card.icon;
           return (
             <article
@@ -444,7 +435,8 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 }
 
 export default function UserDashboard(props) {
-  const cacheScope = getDashboardCacheScope(props.user);
+  const { revision } = useWorkspaceCapabilities();
+  const cacheScope = `${getDashboardCacheScope(props.user)}:${revision}`;
   return (
     <UserDashboardContent
       key={cacheScope || "uncached"}

@@ -1,3 +1,5 @@
+import { WorkspaceContext } from "../../../commercial/capabilityContext";
+import matrix from "../../../commercial/planMatrix.generated.json";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,9 +22,20 @@ function LocationProbe() {
 describe("BuilderProjectChooser", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("creates a Forms workspace without creating Website pages", async () => {
+    listBuilderProjects.mockResolvedValue({ projects: [], pagination: { has_more: false } });
+    createBuilderProject.mockResolvedValue({ id: "forms-project" });
+    render(<WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.forms[cap] === true }}>
+      <MemoryRouter><BuilderProjectChooser autoEnterProject /><LocationProbe /></MemoryRouter>
+    </WorkspaceContext.Provider>);
+    await waitFor(() => expect(createBuilderProject).toHaveBeenCalledOnce());
+    expect(createBuilderProject.mock.calls[0][0].draft_schema.pages).toEqual([]);
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/page-builder/projects/forms-project/forms"));
+  });
+
   it("presents an accessible loading bar while projects are fetched", () => {
     listBuilderProjects.mockReturnValue(new Promise(() => {}));
-    const { container } = render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
+    const { container } = render(<WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter><BuilderProjectChooser /></MemoryRouter></WorkspaceContext.Provider>);
 
     expect(screen.getByRole("status").textContent).toContain("Loading your projects");
     expect(screen.getByText("Loading projects...")).toBeTruthy();
@@ -34,7 +47,7 @@ describe("BuilderProjectChooser", () => {
   it("shows a responsive Builder workspace preview while automatically entering a project", () => {
     listBuilderProjects.mockReturnValue(new Promise(() => {}));
     const { container } = render(
-      <MemoryRouter><BuilderProjectChooser autoEnterProject /></MemoryRouter>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter><BuilderProjectChooser autoEnterProject /></MemoryRouter></WorkspaceContext.Provider>
     );
 
     expect(screen.getByRole("status").textContent).toContain("Opening the Page Builder");
@@ -54,10 +67,10 @@ describe("BuilderProjectChooser", () => {
       pagination: { limit: 20, offset: 0, count: 2, has_more: false },
     });
     render(
-      <MemoryRouter initialEntries={["/page-builder"]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={["/page-builder"]}>
         <BuilderProjectChooser />
         <LocationProbe />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     fireEvent.click((await screen.findByText("Beta")).closest("button"));
     expect(screen.getByTestId("location").textContent)
@@ -69,7 +82,7 @@ describe("BuilderProjectChooser", () => {
       projects: [{ id: "active", name: "Active", status: "draft" }],
       pagination: { limit: 20, offset: 0, count: 1, has_more: false },
     });
-    render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
+    render(<WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter><BuilderProjectChooser /></MemoryRouter></WorkspaceContext.Provider>);
     expect(await screen.findByText("Active")).toBeTruthy();
     expect(screen.queryByText("Archived")).toBeNull();
   });
@@ -80,10 +93,10 @@ describe("BuilderProjectChooser", () => {
       pagination: { limit: 20, offset: 0, count: 1, has_more: false },
     });
     render(
-      <MemoryRouter initialEntries={["/page-builder/pages"]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={["/page-builder/pages"]}>
         <BuilderProjectChooser autoOpenSingleProject />
         <LocationProbe />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await waitFor(() => expect(screen.getByTestId("location").textContent)
       .toBe("/page-builder/projects/only-project/pages"));
@@ -99,10 +112,10 @@ describe("BuilderProjectChooser", () => {
       pagination: { limit: 20, offset: 0, count: 2, has_more: false },
     });
     render(
-      <MemoryRouter initialEntries={["/page-builder"]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={["/page-builder"]}>
         <BuilderProjectChooser autoEnterProject />
         <LocationProbe />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
 
     expect(screen.queryByText("Choose a project")).toBeNull();
@@ -117,10 +130,10 @@ describe("BuilderProjectChooser", () => {
     });
     createBuilderProject.mockResolvedValue({ id: "new-project" });
     render(
-      <MemoryRouter initialEntries={["/page-builder"]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={["/page-builder"]}>
         <BuilderProjectChooser autoEnterProject />
         <LocationProbe />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
 
     await waitFor(() => expect(screen.getByTestId("location").textContent)
@@ -145,7 +158,7 @@ describe("BuilderProjectChooser", () => {
         pagination: { limit: 20, offset: 20, count: 2, has_more: false },
       });
 
-    render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
+    render(<WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter><BuilderProjectChooser /></MemoryRouter></WorkspaceContext.Provider>);
     fireEvent.click(await screen.findByText("Load more projects"));
 
     expect(await screen.findByText("Project 21")).toBeTruthy();
@@ -163,7 +176,7 @@ describe("BuilderProjectChooser", () => {
       })
       .mockRejectedValueOnce(new Error("network"));
 
-    render(<MemoryRouter><BuilderProjectChooser /></MemoryRouter>);
+    render(<WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter><BuilderProjectChooser /></MemoryRouter></WorkspaceContext.Provider>);
     fireEvent.click(await screen.findByText("Load more projects"));
 
     expect((await screen.findByRole("alert")).textContent).toContain(

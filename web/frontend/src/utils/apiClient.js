@@ -6,6 +6,23 @@ export const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 let csrfToken = "";
 let refreshSessionPromise = null;
+let selectedTenantId = null;
+let tenantGeneration = 0;
+export const getSelectedTenantId = () => selectedTenantId;
+export const setSelectedTenantId = (value) => {
+  const next = value == null ? null : Number(value);
+  if (next !== null && (!Number.isSafeInteger(next) || next <= 0 || next > 2147483647)) throw new Error("Invalid workspace");
+  if (next !== selectedTenantId) tenantGeneration += 1;
+  selectedTenantId = next;
+};
+const isMadarApi = (input) => {
+  try {
+    const base = new URL(API_URL, globalThis.location?.origin || "http://localhost");
+    const target = new URL(input, globalThis.location?.origin || "http://localhost");
+    return target.origin === base.origin && (target.pathname === base.pathname || target.pathname.startsWith(base.pathname.replace(/\/+$/, "") + "/"));
+  } catch { return false; }
+};
+
 
 export const getApiUrl = (path) =>
   `${String(API_URL).replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
@@ -151,6 +168,12 @@ export const apiFetch = async (input, init = {}) => {
   const method = String(fetchInit.method || "GET").toUpperCase();
   const headers = new Headers(fetchInit.headers || {});
   const inputUrl = typeof input === "string" ? input : input?.url || "";
+  const generation = tenantGeneration;
+  const tenantScoped = isMadarApi(inputUrl);
+  const assertCurrentTenant = () => {
+    if (tenantScoped && generation !== tenantGeneration) throw new DOMException("Workspace changed", "AbortError");
+  };
+  if (tenantScoped && selectedTenantId !== null) headers.set("X-Madar-Tenant-ID", String(selectedTenantId));
   const isAuthRefresh = inputUrl.includes("/auth/refresh");
   const isAuthEndpoint =
     inputUrl.includes("/auth/login") ||
@@ -172,12 +195,15 @@ export const apiFetch = async (input, init = {}) => {
     }
   }
 
-  const runFetch = (requestHeaders = headers) => fetch(input, {
+  const runFetch = (requestHeaders = headers) => {
+    assertCurrentTenant();
+    return fetch(input, {
     ...fetchInit,
     method,
     credentials: fetchInit.credentials || "include",
     headers: requestHeaders,
-  });
+    });
+  };
 
   const serializesAuthSession =
     (method === "GET" && inputUrl.includes("/auth/user_status")) ||
@@ -189,6 +215,13 @@ export const apiFetch = async (input, init = {}) => {
       : await runFetch(requestHeaders);
 
   const response = await runSerializedFetch();
+  assertCurrentTenant();
+  if (response.status === 403 && tenantScoped) {
+    const denied = await response.clone().json().catch(() => null);
+    if (["entitlement_required", "storage_entitlement_required", "base_plan_required"].includes(denied?.detail?.code)) {
+      window.dispatchEvent(new Event("madar:commercial-denied"));
+    }
+  }
 
   const responseToken = response.headers.get(CSRF_HEADER_NAME);
 
@@ -203,6 +236,7 @@ export const apiFetch = async (input, init = {}) => {
     await isInvalidCsrfResponse(response)
   ) {
     const refreshedToken = await refreshCsrfToken();
+    assertCurrentTenant();
 
     if (refreshedToken) {
       return apiFetch(input, {
@@ -228,6 +262,7 @@ export const apiFetch = async (input, init = {}) => {
     }
 
     const refreshResponse = await refreshSessionPromise;
+    assertCurrentTenant();
 
     if (refreshResponse.ok) {
       return apiFetch(input, {
@@ -262,6 +297,7 @@ export const apiFetch = async (input, init = {}) => {
       }
 
       const refreshResponse = await refreshSessionPromise;
+    assertCurrentTenant();
 
       if (refreshResponse.ok) {
         const retryHeaders = new Headers(fetchInit.headers || {});
@@ -284,6 +320,7 @@ export const apiFetch = async (input, init = {}) => {
     }
   }
 
+  assertCurrentTenant();
   return response;
 };
 

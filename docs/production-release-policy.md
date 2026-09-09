@@ -902,3 +902,32 @@ configuration, credentials, grants, or full application readiness.
 Publication validation also requires standalone form IDs to be unique across
 the tenant lookup; bound-project preference cannot hide a duplicate and a
 truncated lookup cannot establish uniqueness.
+
+## Commercial access schema 094 bridge (2026-09-08)
+
+The current release manifest is `web/deployment/releases/migrations-094.json`.
+The application is compatible with schemas 093 and 094; the target is 094.
+Before the target exists, the commercial snapshot service accepts the existing
+resolver only after independently verifying schema 093. Missing RPCs at any
+other schema fail closed. Manual-ledger administration remains unavailable
+until migration 094 completes.
+
+The existing controller first accepts the schema-093-compatible application,
+creates and verifies its governed pre-migration backup, then applies the exact
+paired migration checksum and revalidates the serving release. Migration 094
+adds the tenant review state and append-only manual financial/access ledger.
+It seeds review-required rows only: no tenant plan assignment, historical payment
+backfill, production enforcement activation, provider activation, or database
+endpoint change. Financial deletion guards reject before any account/workspace
+freeze or file purge when retention review is needed.
+
+Rollback to the retained schema-093 binary is allowed only before the migration
+advances the schema. After 094, use governed forward repair. The privileged
+exact-SHA controller upgrade is required because the release metadata and
+manifest are protected control-plane files; its procedure is unchanged.
+
+The synthetic `rehearse_migration_094.sh` gate applies all canonical migrations
+on a pinned disposable PostgreSQL image, runs concurrency/isolation tests and
+the exact RLS/grants verifier, and restores a dump containing commercial receipt,
+period, revision and audit records. It does not replace the required fresh
+production backup and Node 1 round-trip after deployment.

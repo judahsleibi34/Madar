@@ -69,3 +69,16 @@ class BackupRehearsalTests(unittest.TestCase):
             (Path(root) / 'escape').symlink_to('/etc/passwd')
             with self.assertRaisesRegex(harness.RehearsalError, 'symlink'):
                 harness.file_inventory(Path(root))
+
+    def test_migration_requires_explicit_target_before_any_restore(self):
+        with mock.patch.object(harness.subprocess, 'run') as run:
+            with self.assertRaisesRegex(harness.RehearsalError, 'explicit_target_schema'):
+                harness.rehearse(Path('/missing'), 'postgres@sha256:' + 'a'*64, Path('/migration.sql'))
+            run.assert_not_called()
+
+    def test_target_table_contract_rejects_duplicates_or_sql(self):
+        for names in [('ledger', 'ledger'), ('ledger;drop table users',)]:
+            with mock.patch.object(harness.subprocess, 'run') as run:
+                with self.assertRaisesRegex(harness.RehearsalError, 'invalid_expected_new_tables'):
+                    harness.rehearse(Path('/missing'), 'postgres@sha256:' + 'a'*64, Path('/migration.sql'), target_schema=94, new_tables=names)
+                run.assert_not_called()

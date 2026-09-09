@@ -1,3 +1,4 @@
+import { useWorkspaceCapabilities } from "../../../commercial/capabilityContext";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -7,6 +8,16 @@ import { cleanBuilderProject } from "../core/PageBuilder.project";
 import { createBlankWorkspaceProject } from "../core/PageBuilder.starters";
 import { getBuilderWorkspacePath } from "../core/PageBuilder.workspaceRouting";
 import "../../../styles/admin/PageBuilder/index.css";
+
+function createWorkspaceDraft(entryTab) {
+  const draft = cleanBuilderProject(createBlankWorkspaceProject());
+  if (entryTab === "forms") {
+    draft.pages = [];
+    draft.activePageId = "";
+    draft.defaultPageId = "";
+  }
+  return draft;
+}
 
 function BuilderProjectLoadingState({
   variant = "projects",
@@ -33,6 +44,8 @@ export default function BuilderProjectChooser({
   autoOpenSingleProject = false,
 }) {
   const navigate = useNavigate();
+  const { can } = useWorkspaceCapabilities();
+  const entryTab = can("page_builder") ? "design" : "forms";
   const automaticEntryStartedRef = useRef(false);
   const [projects, setProjects] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -48,11 +61,11 @@ export default function BuilderProjectChooser({
           if (automaticEntryStartedRef.current) return;
           automaticEntryStartedRef.current = true;
           if (records.length > 0) {
-            navigate(getBuilderWorkspacePath(records[0].id, "design", workspace), { replace: true });
+            navigate(getBuilderWorkspacePath(records[0].id, entryTab, workspace), { replace: true });
             return;
           }
 
-          const draft = cleanBuilderProject(createBlankWorkspaceProject());
+          const draft = createWorkspaceDraft(entryTab);
           setStatus("creating");
           return createBuilderProject({
             name: draft.name || "Untitled Site",
@@ -60,12 +73,12 @@ export default function BuilderProjectChooser({
             draft_schema: draft,
           }).then((record) => {
             if (!cancelled) {
-              navigate(getBuilderWorkspacePath(record.id, "design", workspace), { replace: true });
+              navigate(getBuilderWorkspacePath(record.id, entryTab, workspace), { replace: true });
             }
           });
         }
         if (autoOpenSingleProject && records.length === 1 && !nextPagination.has_more) {
-          const tab = workspace === "builder-responses" ? "responses" : workspace === "builder-data" ? "data" : "design";
+          const tab = workspace === "builder-responses" ? "responses" : workspace === "builder-data" ? "data" : entryTab;
           navigate(getBuilderWorkspacePath(records[0].id, tab, workspace), { replace: true });
           return;
         }
@@ -79,7 +92,7 @@ export default function BuilderProjectChooser({
         setStatus("error");
       });
     return () => { cancelled = true; };
-  }, [autoEnterProject, autoOpenSingleProject, navigate, workspace]);
+  }, [autoEnterProject, autoOpenSingleProject, entryTab, navigate, workspace]);
 
   const loadMoreProjects = async () => {
     if (status === "loading-more" || !pagination.has_more) return;
@@ -105,7 +118,7 @@ export default function BuilderProjectChooser({
   };
 
   const openProject = (projectId) => {
-    const tab = workspace === "builder-responses" ? "responses" : workspace === "builder-data" ? "data" : "design";
+    const tab = workspace === "builder-responses" ? "responses" : workspace === "builder-data" ? "data" : entryTab;
     navigate(getBuilderWorkspacePath(projectId, tab, workspace));
   };
 
@@ -113,7 +126,7 @@ export default function BuilderProjectChooser({
     setStatus("creating");
     setError("");
     try {
-      const draft = cleanBuilderProject(createBlankWorkspaceProject());
+      const draft = createWorkspaceDraft(entryTab);
       const record = await createBuilderProject({
         name: draft.name || "Untitled Site",
         slug: `untitled-site-${Date.now()}`,

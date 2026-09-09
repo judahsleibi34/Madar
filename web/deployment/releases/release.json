@@ -1,14 +1,14 @@
 {
   "release_metadata_version": 1,
   "schema": {
-    "compatible_min": 81,
-    "compatible_max": 93,
-    "target": 93,
+    "compatible_min": 93,
+    "compatible_max": 94,
+    "target": 94,
     "migration_class": "expand-only",
-    "rollback_compatible_min": 81,
-    "rollback_compatible_max": 92
+    "rollback_compatible_min": 93,
+    "rollback_compatible_max": 93
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Compatibility bridge for schema 093. Promote and accept while schema 092 is serving; only after this bridge is known-good may the separately locked automation create and verify a schema-092 backup, apply the pinned expand migration 093, and revalidate the active release. The retained schema-092 release remains a traffic rollback target only until migration begins; after schema advances to 093, forward repair is required by policy.",
-  "migration_manifest": "migrations-093.json"
+  "notes": "Schema 093/094 commercial ledger bridge. Accept the exact release on schema 093, then create and verify the governed backup before migration 094. Seed unresolved tenants as review_required without granting access or inventing payments. Global commercial enforcement remains operator-disabled pending deliberate tenant review. After schema advances to 094, recover by forward repair; do not roll traffic back to schema-093-only binaries.",
+  "migration_manifest": "migrations-094.json"
 }

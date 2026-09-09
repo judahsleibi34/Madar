@@ -38,8 +38,6 @@ from services.account_lifecycle_service import synchronize_verified_account
 from services.ecommerce_cache_service import (
     ecommerce_cache_key,
     get_or_create_ecommerce_cache,
-    read_ecommerce_cache,
-    write_ecommerce_cache,
 )
 from services.screen_time_service import record_screen_time
 from services.site_permission_service import (
@@ -51,6 +49,7 @@ from services.entitlement_service import (
     increment_operational_usage,
     require_branded_subdomain,
     require_public_runtime_entitlement,
+    require_entitlement,
 )
 from services.tenant_lifecycle_service import tenant_is_active
 from services.hosted_address_service import (
@@ -1848,21 +1847,11 @@ def resolve_tenant_id(settings: dict):
 
 
 def resolve_public_store_settings(site_identifier: str, *, request: Request) -> dict:
-    """Reuse public store identity/profile lookups without sharing data across tenants."""
-    branded = _request_uses_branded_address(request, site_identifier)
-    cache_key = ecommerce_cache_key(
-        0,
-        "public-store-settings-v1",
-        site_identifier=site_identifier,
-        branded=branded,
-    )
-    cached = read_ecommerce_cache(cache_key)
-    if isinstance(cached, dict):
-        return cached
+    """Verify the current host binding and commercial access before any cache."""
     settings = resolve_website_settings(site_identifier, request=request)
     tenant_id = resolve_tenant_id(settings)
-    write_ecommerce_cache(cache_key, tenant_id, settings, ttl_seconds=30)
-    return settings
+    state = require_entitlement(tenant_id, "ecommerce_publish")
+    return {**settings, "_commercial_revision": state.get("entitlement_revision", "operator")}
 
 
 def _localized_catalog_text(translations: Any, locale: str) -> dict[str, str]:
@@ -2552,15 +2541,15 @@ def get_public_store_profile(subdomain: str, request: Request, response: Respons
         "etag": f'"store-profile-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "private, no-store",
+                "CDN-Cache-Control": "no-store",
             },
         )
     return {"success": True, "site": site_profile}
@@ -2590,7 +2579,8 @@ def get_public_catalog(
     limit_value = max(1, min(limit, 48))
     cache_key = ecommerce_cache_key(
         tenant_id,
-        "catalog-v1",
+        "catalog-v2",
+        entitlement_revision=settings.get("_commercial_revision"),
         locale=locale_value,
         search=search_value,
         category=category_value,
@@ -2634,16 +2624,16 @@ def get_public_catalog(
         "etag": f'"catalog-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "private, no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
@@ -2676,7 +2666,8 @@ def get_public_catalog_product(
     locale_value = str(locale or "en")[:16]
     cache_key = ecommerce_cache_key(
         tenant_id,
-        "product-v1",
+        "product-v2",
+        entitlement_revision=settings.get("_commercial_revision"),
         locale=locale_value,
         slug=clean_slug,
     )
@@ -2695,16 +2686,16 @@ def get_public_catalog_product(
         "etag": f'"product-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "private, no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
@@ -2908,6 +2899,7 @@ def get_member_site_page(
         f"{clean_subdomain}:{clean_page_reference}",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
+    require_public_runtime_entitlement(settings, "website_publish")
     project = get_bound_published_project(settings)
     schema, page, auth_destination_ids = find_published_page(project, clean_page_reference)
     if page_access_kind(page, auth_destination_ids) == "unsupported_role":

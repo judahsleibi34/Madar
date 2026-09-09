@@ -122,6 +122,12 @@ def get_website_tenant_context(request: Request, response: Response):
         except (TypeError, ValueError):
             raise HTTPException(status_code=403, detail="User id does not match session")
 
+    require_any_entitlement(
+        context.tenant_id,
+        {"forms", "page_builder"},
+        message="An active Forms or Website capability is required for public-site settings.",
+    )
+
     return context
 
 

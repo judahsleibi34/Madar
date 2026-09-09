@@ -19,6 +19,7 @@ import {
 import {
   apiFetch,
   clearCsrfToken,
+  setSelectedTenantId,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
 import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
@@ -248,7 +249,10 @@ export default function App() {
   }, [themeMode]);
 
   useEffect(() => {
-    if (authChecked && !isLoggedIn) clearAllCalendarWorkspaceCaches();
+    if (authChecked && !isLoggedIn) {
+      clearAllCalendarWorkspaceCaches();
+      setSelectedTenantId(null);
+    }
   }, [authChecked, isLoggedIn]);
 
   useEffect(() => {
@@ -578,6 +582,7 @@ export default function App() {
       setAuthChecked(true);
       setUser(null);
       clearCsrfToken();
+      setSelectedTenantId(null);
 
       applyThemeMode(themeMode);
 
@@ -719,10 +724,8 @@ export default function App() {
           {isDashboardRoute
             && authChecked
             && isLoggedIn
-            && user?.tenant_id
-            && (user?.id || user?.auth_id)
-            && isMadarPwaHost(window.location) ? (
-              <NotificationProvider user={user}>
+            && (user?.id || user?.auth_id) ? (
+              <NotificationProvider user={user?.tenant_id && isMadarPwaHost(window.location) ? user : null}>
                 {routeContent}
                 <NotificationToastViewport />
               </NotificationProvider>

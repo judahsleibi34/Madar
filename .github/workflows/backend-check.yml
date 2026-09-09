@@ -15,6 +15,8 @@ jobs:
 
       - name: Verify deterministic release preflight checks
         run: |
+          python3 web/scripts/generate_commercial_contract.py --check
+          python3 web/scripts/check_privileged_inventory.py
           python3 web/scripts/check_dependency_locks.py
           python3 web/scripts/check_migrations.py
           python3 web/scripts/check_migration_transitions.py
@@ -82,3 +84,6 @@ jobs:
 
       - name: Verify installed dependency consistency
         run: docker run --rm madar-backend-test python -m pip check
+
+      - name: Rehearse commercial migration, isolation and restore
+        run: bash web/scripts/rehearse_migration_094.sh

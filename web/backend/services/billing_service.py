@@ -236,6 +236,15 @@ def get_billing_summary_for_tenant(tenant_id: int | str | None) -> dict[str, Any
     if tenant_id is None or str(tenant_id).strip() == "":
         return {}
 
+    from services.commercial_access_service import read_commercial_snapshot
+    from services.entitlement_service import _reviewed_commercial_state
+    snapshot = read_commercial_snapshot(int(tenant_id))
+    if snapshot is not None:
+        effective = _reviewed_commercial_state(tenant_id, snapshot)
+        return {"subscription_type": "commercial_plan", "plan": effective.get("plan_id") or "",
+                "payment_status": effective["commercial_status"], "builder_type": "", "features": [],
+                "commercial_review_required": effective["review_required"]}
+
     try:
         result = (
             service_supabase

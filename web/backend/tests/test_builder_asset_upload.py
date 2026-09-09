@@ -1,3 +1,4 @@
+from tests.entitlement_test_support import installed_business_fixture
 import tempfile
 import unittest
 from io import BytesIO
@@ -90,6 +91,7 @@ class FakeSupabase:
 
 class BuilderAssetUploadTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(installed_business_fixture(1))
         self.client = build_client()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.upload_dir = Path(self.temp_dir.name).resolve()

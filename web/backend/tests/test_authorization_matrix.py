@@ -167,7 +167,7 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
     def auth_patches(self, current_user):
         return (
             patch.object(data_routes, "require_active_tenant_user_id", side_effect=fake_require_active_tenant_user_id(current_user)),
-            patch.object(analysis_routes, "require_regular_user_id", side_effect=fake_require_regular_user_id(current_user)),
+            patch.object(analysis_routes, "require_active_tenant_user_id", side_effect=fake_require_active_tenant_user_id(current_user)),
             patch.object(data_routes, "enforce_data_workspace_rate_limit", return_value=None),
             patch.object(cleaning_routes, "enforce_data_workspace_rate_limit", return_value=None),
             patch.object(analysis_routes, "enforce_data_workspace_rate_limit", return_value=None),
@@ -270,7 +270,7 @@ class TenantScopedRouteAuthorizationMatrixTests(unittest.TestCase):
     def setUp(self):
         self.entitlement_state = EntitlementTestState().allow_capability(
             "tenant-b", "response_management"
-        )
+        ).allow_capability("tenant-b", "forms")
         self.entitlement_patch = self.entitlement_state.installed()
         self.entitlement_patch.__enter__()
         self.client = build_tenant_client()
@@ -279,6 +279,7 @@ class TenantScopedRouteAuthorizationMatrixTests(unittest.TestCase):
         self.entitlement_patch.__exit__(None, None, None)
 
     def test_website_settings_requires_active_matching_user_context(self):
+        self.entitlement_state.allow_capability("tenant-a", "forms")
         with patch.object(website_routes, "require_active_tenant_member", return_value=tenant_context()), \
              patch.object(website_routes, "ensure_settings_for_tenant", return_value={"tenant_id": "tenant-a"}):
             owner = self.client.get("/users/1/website/settings")

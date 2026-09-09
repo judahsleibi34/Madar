@@ -59,6 +59,10 @@ SENSITIVE_TABLES = (
     "ecommerce_product_tags",
     "ecommerce_orders",
     "ecommerce_order_items",
+    "tenant_commercial_state",
+    "commercial_manual_payments",
+    "commercial_access_periods",
+    "commercial_access_events",
     "tenant_subscriptions",
     "tenant_addons",
     "billing_addon_requests",
@@ -108,6 +112,10 @@ SENSITIVE_TABLES = (
 )
 
 SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
+    "resolve_commercial_access",
+    "apply_commercial_access_command",
+    "bump_commercial_revision",
+    "guard_commercial_financial_deletion",
     "admin_update_user_type_safely",
     "assign_tenant_site_project_role",
     "apply_billing_webhook_event",
@@ -150,6 +158,10 @@ SENSITIVE_SECURITY_DEFINER_FUNCTIONS = (
 )
 
 PROTECTED_FUNCTIONS = (
+    "resolve_commercial_access",
+    "apply_commercial_access_command",
+    "bump_commercial_revision",
+    "guard_commercial_financial_deletion",
     "set_updated_at",
     "get_tables",
     "get_columns",
@@ -210,6 +222,8 @@ TABLE_CRUD_GRANTS = {"SELECT", "INSERT", "UPDATE", "DELETE"}
 # service-role routes where validation, audit, revision and authorization rules
 # are enforced.
 ALLOWED_DIRECT_GRANTS = {
+    **{table: {"anon": set(), "authenticated": set(), "service_role": {"SELECT"}}
+       for table in ("tenant_commercial_state", "commercial_manual_payments", "commercial_access_periods", "commercial_access_events")},
     "users": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
     "contacts": {"anon": set(), "authenticated": set(), "service_role": TABLE_CRUD_GRANTS},
     "tenants": {"anon": set(), "authenticated": {"SELECT"}, "service_role": TABLE_CRUD_GRANTS},
@@ -485,6 +499,7 @@ def fetch_catalog(
           p.prosecdef::text as security_definer,
           pg_get_userbyid(p.proowner) as owner_name,
           coalesce(array_to_string(p.proconfig, ','), '') as settings,
+          coalesce((select substr(setting, 13) from unnest(p.proconfig) setting where setting like 'search_path=%'), '') as configured_search_path,
           exists (
             select 1
             from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
@@ -644,12 +659,15 @@ def build_function_reports(functions: list[dict[str, str]]) -> list[FunctionRepo
         reports.append(
             FunctionReport(
                 signature=str(function.get("signature") or function.get("function_name") or "unknown"),
-                safe_search_path="search_path=public" in settings or "search_path=''" in settings,
+                safe_search_path=(
+                    str(function["configured_search_path"]).strip() in {"public", "''", '\"\"'}
+                    if "configured_search_path" in function else settings in {"search_path=public", "search_path=''", 'search_path=\"\"'}
+                ),
                 unsafe_execute_roles=unsafe_roles,
                 owner_safe=str(function.get("owner_name") or EXPECTED_OWNER) == EXPECTED_OWNER,
                 service_execute_correct=(
                     str(function.get("service_role_execute") or "true").lower() == "true"
-                ) != (str(function.get("function_name") or "") == "publish_builder_project_atomic"),
+                ) != (str(function.get("function_name") or "") in {"publish_builder_project_atomic", "bump_commercial_revision", "guard_commercial_financial_deletion"}),
                 security_mode_correct=(
                     str(function.get("function_name") or "") not in SENSITIVE_SECURITY_DEFINER_FUNCTIONS
                     or str(function.get("security_definer") or "true").lower() == "true"

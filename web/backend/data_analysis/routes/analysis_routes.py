@@ -11,7 +11,7 @@ from data_analysis.ai import usage as ai_usage
 from data_analysis.ai.settings import get_model_config_for_plan, normalize_plan_name
 from data_analysis.ai import token_metering
 from data_analysis.routes.data_routes import get_storage_scope
-from services.auth_service import require_regular_user_id
+from services.tenant_service import require_active_tenant_user_id
 from services.entitlement_service import require_entitlement
 from services.rate_limit_service import enforce_data_workspace_rate_limit
 
@@ -67,9 +67,11 @@ def _get_ai_context(
     request: Request,
     response: Response,
 ) -> tuple[str, str, dict[str, Any]]:
-    _, user_data = require_regular_user_id(user_id, request, response)
-    tenant_id = user_data.get("tenant_id")
-    scoped_user_id = user_data.get("id")
+    context = require_active_tenant_user_id(user_id, request, response)
+    require_entitlement(context.tenant_id, "standard_data_analysis")
+    user_data = context.user
+    tenant_id = context.tenant_id
+    scoped_user_id = context.user_id
 
     if tenant_id is None or scoped_user_id is None:
         raise HTTPException(status_code=400, detail="User storage scope is not available.")

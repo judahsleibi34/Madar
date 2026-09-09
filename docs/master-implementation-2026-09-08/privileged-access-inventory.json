@@ -1,0 +1,215 @@
+{
+  "inventory_version": 1,
+  "review_date": "2026-09-09",
+  "scope": "Direct privileged Supabase references in application Python; callers and SQL ACL inventory are reviewed separately. This inventory alone is not proof of authorization.",
+  "entries": [
+    {
+      "path": "web/backend/app.py",
+      "boundary": "public_asset_registry_or_verified_private_preview"
+    },
+    {
+      "path": "web/backend/data_analysis/ai/token_metering.py",
+      "boundary": "tenant_scoped_metering_from_authorized_analysis_request"
+    },
+    {
+      "path": "web/backend/data_analysis/ai/usage.py",
+      "boundary": "tenant_scoped_metering_from_authorized_analysis_request"
+    },
+    {
+      "path": "web/backend/database.py",
+      "boundary": "protected_client_factory"
+    },
+    {
+      "path": "web/backend/routes/admin_billing_routes.py",
+      "boundary": "platform_admin_request_aal2"
+    },
+    {
+      "path": "web/backend/routes/admin_commercial_routes.py",
+      "boundary": "platform_admin_request_aal2"
+    },
+    {
+      "path": "web/backend/routes/admin_profile_routes.py",
+      "boundary": "platform_admin_self_profile_read_and_aal2_mutations"
+    },
+    {
+      "path": "web/backend/routes/auth_routes.py",
+      "boundary": "verified_auth_or_pending_auth_protocol"
+    },
+    {
+      "path": "web/backend/routes/builder_routes.py",
+      "boundary": "verified_membership_role_capability_and_tenant_resource"
+    },
+    {
+      "path": "web/backend/routes/calendar_routes.py",
+      "boundary": "verified_membership_role_capability_and_tenant_resource"
+    },
+    {
+      "path": "web/backend/routes/ecommerce_routes.py",
+      "boundary": "verified_membership_role_capability_and_tenant_resource"
+    },
+    {
+      "path": "web/backend/routes/mfa_routes.py",
+      "boundary": "verified_auth_or_pending_auth_protocol"
+    },
+    {
+      "path": "web/backend/routes/password_routes.py",
+      "boundary": "verified_auth_or_pending_auth_protocol"
+    },
+    {
+      "path": "web/backend/routes/public_contact_routes.py",
+      "boundary": "public_host_binding_or_rate_limited_public_intake"
+    },
+    {
+      "path": "web/backend/routes/public_site_routes.py",
+      "boundary": "public_host_binding_or_rate_limited_public_intake"
+    },
+    {
+      "path": "web/backend/routes/user_routes.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller"
+    },
+    {
+      "path": "web/backend/services/account_lifecycle_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/admin_account_access_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/admin_user_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/asset_registry_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/audit_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/auth_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller"
+    },
+    {
+      "path": "web/backend/services/billing_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/builder_asset_storage.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/calendar_authorization_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/calendar_connection_sync_queue_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/calendar_reminder_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/calendar_sync_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/calendar_task_archive_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/calendar_task_sync_queue_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/commercial_access_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/commercial_billing_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/data_deletion_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/email_verification_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller"
+    },
+    {
+      "path": "web/backend/services/entitlement_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/identity_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller"
+    },
+    {
+      "path": "web/backend/services/installation_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/notification_delivery_queue_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/notification_delivery_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/notification_outbox_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/notification_preference_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/notification_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/observability_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/screen_time_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/site_permission_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/storage_quota_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/tenant_lifecycle_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    },
+    {
+      "path": "web/backend/services/tenant_selection_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/tenant_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/services/user_security_settings_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller"
+    },
+    {
+      "path": "web/backend/services/website_settings_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller"
+    },
+    {
+      "path": "web/backend/workers/calendar_sync_worker.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context"
+    }
+  ]
+}

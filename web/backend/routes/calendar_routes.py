@@ -121,7 +121,7 @@ def require_active_tenant_member(request: Request, response: Response):
     require_entitlement(
         context.tenant_id,
         "internal_calendar",
-        message="Business Plus is required to use the internal calendar.",
+        message="An internal-calendar capability is required.",
     )
     return context
 

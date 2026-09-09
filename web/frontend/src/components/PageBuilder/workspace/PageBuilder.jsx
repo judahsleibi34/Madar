@@ -1,3 +1,4 @@
+import { useWorkspaceCapabilities, builderTabCapabilities } from "../../../commercial/capabilityContext";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -701,6 +702,8 @@ export default function PageBuilder({
 } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { can } = useWorkspaceCapabilities();
+  const canUseTab = (tab) => demoMode || (builderTabCapabilities[tab] || []).some(can);
   const routeProjectId = getBuilderProjectIdFromPath(location.pathname);
   const routeWorkspace = getBuilderWorkspaceFromPath(location.pathname);
   const routeTab = getBuilderTabFromPath(location.pathname);
@@ -899,9 +902,9 @@ export default function PageBuilder({
   }, [demoMode, routeProjectId]);
 
   useEffect(() => {
-    if (activeTab !== "users") return;
+    if (activeTab !== "users" || (!demoMode && !can("page_builder"))) return;
     loadSiteMembers();
-  }, [activeTab, loadSiteMembers]);
+  }, [activeTab, loadSiteMembers, demoMode, can]);
 
   const stopAllCloudScheduling = useCallback(() => {
     stopBuilderSaveScheduling({
@@ -7778,6 +7781,7 @@ export default function PageBuilder({
   );
 
   const renderActiveTab = () => {
+    if (!canUseTab(activeTab)) return <p role="status">This workspace’s plan does not include this feature.</p>;
     if (activeTab === "design") return renderDesignTab();
     if (activeTab === "data") return renderDataTab();
     if (activeTab === "forms") return renderFormsTab();
@@ -7796,6 +7800,7 @@ export default function PageBuilder({
   const renderWorkspaceNavigator = () => (
     <nav className="workspace-tabs" aria-label={lang === "ar" ? "مساحات عمل المنشئ" : "Builder workspaces"}>
       {builderTabs
+        .filter((tab) => canUseTab(tab.id))
         .filter((tab) =>
           visibleTabIds
             ? visibleTabIds.includes(tab.id)

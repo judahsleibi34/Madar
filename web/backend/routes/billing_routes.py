@@ -45,6 +45,7 @@ def _commercial_context(request: Request, response: Response) -> TenantContext:
 
 @router.get("/billing/entitlements")
 def current_entitlements(request: Request, response: Response):
+    response.headers["Cache-Control"] = "private, no-store"
     context = _commercial_context(request, response)
     return {
         "success": True,

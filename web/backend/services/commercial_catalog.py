@@ -12,9 +12,9 @@ from datetime import date
 from typing import Any
 
 
-CATALOG_VERSION = "2026-07-30"
+CATALOG_VERSION = "2026-09-08"
 CATALOG_CURRENCY = "USD"
-CATALOG_EFFECTIVE_DATE = date(2026, 7, 30).isoformat()
+CATALOG_EFFECTIVE_DATE = date(2026, 9, 8).isoformat()
 GIB = 1024 * 1024 * 1024
 
 BASE_PLAN_IDS = ("forms", "website", "business", "business_plus")
@@ -58,7 +58,19 @@ CAPABILITIES = (
     "ocr",
     "hosted_email_mailbox",
     "custom_domain",
+    "cv_reranker",
+    "ecommerce_management",
+    "ecommerce_publish",
+    "ecommerce_orders",
+    "ecommerce_refunds",
 )
+
+RESERVATION_CAPABILITIES = frozenset({
+    "reservations", "reservation_management", "internal_calendar", "reservation_analytics",
+})
+ECOMMERCE_CAPABILITIES = frozenset({
+    "ecommerce_management", "ecommerce_publish", "ecommerce_orders", "ecommerce_refunds",
+})
 
 _FORMS_CAPABILITIES = {
     "forms",
@@ -77,7 +89,7 @@ _WEBSITE_CAPABILITIES = {
     "website_publish",
     "image_uploads",
     "standard_hosted_address",
-}
+} | RESERVATION_CAPABILITIES
 _BUSINESS_CAPABILITIES = _WEBSITE_CAPABILITIES | {
     "data_import",
     "standard_data_analysis",
@@ -85,14 +97,9 @@ _BUSINESS_CAPABILITIES = _WEBSITE_CAPABILITIES | {
     "data_cleaning",
     "charts",
     "data_exports",
-}
-_BUSINESS_PLUS_CAPABILITIES = _BUSINESS_CAPABILITIES | {
-    "reservations",
-    "reservation_management",
-    "internal_calendar",
-    "reservation_analytics",
-    "priority_support",
-}
+    "cv_reranker",
+} | ECOMMERCE_CAPABILITIES
+_BUSINESS_PLUS_CAPABILITIES = _BUSINESS_CAPABILITIES | {"priority_support"}
 
 
 def _plan(
@@ -173,7 +180,7 @@ PRODUCTS: dict[str, dict[str, Any]] = {
         5 * GIB,
         _BUSINESS_CAPABILITIES,
         30,
-        "Website publishing plus expanded data analysis, charts, and exports.",
+        "Website, reservations, e-commerce, expanded data analysis, charts, and exports.",
         (
             "everything_website",
             "expanded_analytics",
@@ -190,7 +197,7 @@ PRODUCTS: dict[str, dict[str, Any]] = {
         5 * GIB,
         _BUSINESS_PLUS_CAPABILITIES,
         40,
-        "Business tools plus reservations, internal calendar, and priority support.",
+        "All Business tools with priority support.",
         (
             "everything_business",
             "unlimited_reservation_requests",

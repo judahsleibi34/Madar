@@ -63,9 +63,15 @@ def file_inventory(root: Path) -> dict[str, str]:
     return files
 
 
-def rehearse(backup: Path, image: str, migration: Path | None = None) -> dict:
+def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_schema: int | None = None, new_tables: tuple[str, ...] = ()) -> dict:
     if not re.fullmatch(r"[a-zA-Z0-9./:_-]+@sha256:[0-9a-f]{64}", image):
         raise RehearsalError("postgres_image_must_be_digest_pinned")
+    if migration is not None and (type(target_schema) is not int or target_schema <= 0):
+        raise RehearsalError("migration_requires_explicit_target_schema")
+    if migration is None and (target_schema is not None or new_tables):
+        raise RehearsalError("target_contract_requires_migration")
+    if len(set(new_tables)) != len(new_tables) or any(not re.fullmatch(r"[a-z][a-z0-9_]*", table) for table in new_tables):
+        raise RehearsalError("invalid_expected_new_tables")
     regular_source(str(backup / "database.dump"))
     migration_mount = readonly_file_mount(str(migration), "/migration.sql") if migration else None
     manifest = json.loads((backup / "manifest.json").read_text())
@@ -127,6 +133,13 @@ def rehearse(backup: Path, image: str, migration: Path | None = None) -> dict:
         if schema != result["backup_schema"]:
             raise RehearsalError("restored_schema_mismatch")
         result["restored_schema"] = schema
+        table_query = "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' ORDER BY c.relname;"
+        restored_tables = set(run(psql, phase="restored_table_inventory", input=table_query).splitlines())
+        expected_tables = manifest['database'].get('public_tables')
+        if expected_tables is not None and len(restored_tables) != expected_tables:
+            raise RehearsalError('restored_public_table_count_mismatch')
+        if set(new_tables) & restored_tables:
+            raise RehearsalError('expected_new_table_already_exists')
         if migration:
             run(psql + ["--file", "/migration.sql"], phase="isolated_migration")
         rows = run(psql, phase="metadata_validation", input="""
@@ -138,9 +151,16 @@ SELECT 'auth_users='||count(*) FROM auth.users;
         result["metadata"] = dict(line.split("=", 1) for line in rows.splitlines())
         if result["metadata"]["invalid_indexes"] != "0":
             raise RehearsalError("invalid_restored_indexes")
-        expected_tables = manifest['database'].get('public_tables')
-        if expected_tables is not None and int(result['metadata']['public_tables']) != expected_tables:
-            raise RehearsalError('restored_public_table_count_mismatch')
+        final_tables = set(run(psql, phase="final_table_inventory", input=table_query).splitlines())
+        if final_tables != restored_tables | set(new_tables):
+            raise RehearsalError('migration_table_set_mismatch')
+        expected_schema = target_schema if migration else schema
+        if int(result['metadata']['schema']) != expected_schema:
+            raise RehearsalError('migration_target_schema_mismatch')
+        result['new_tables_verified'] = sorted(set(new_tables))
+        if migration:
+            result['migration_sha256'] = hashlib.sha256(migration.read_bytes()).hexdigest()
+            result['target_schema_verified'] = target_schema
         file_sets = {}
         with tempfile.TemporaryDirectory(prefix="madar-file-restore-") as scratch:
             for name_set in ("builder-assets", "private-uploads", "generated-artifacts", "avatars"):
@@ -182,9 +202,11 @@ def main() -> int:
     parser.add_argument("backup", type=Path)
     parser.add_argument("--postgres-image", required=True)
     parser.add_argument("--migration", type=Path)
+    parser.add_argument("--target-schema", type=int)
+    parser.add_argument("--new-table", action="append", default=[])
     args = parser.parse_args()
     try:
-        report = rehearse(args.backup, args.postgres_image, args.migration)
+        report = rehearse(args.backup, args.postgres_image, args.migration, target_schema=args.target_schema, new_tables=tuple(args.new_table))
     except (RehearsalError, OSError, ValueError, KeyError) as error:
         print(json.dumps({"status": "failed", "error": str(error) if isinstance(error, RehearsalError) else type(error).__name__}))
         return 1

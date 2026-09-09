@@ -145,9 +145,9 @@ class EntitlementMatrixTests(unittest.TestCase):
         self.assertIn("forms", forms)
         self.assertNotIn("page_builder", forms)
         self.assertIn("standard_hosted_address", website)
-        self.assertNotIn("reservations", website)
+        self.assertIn("reservations", website)
         self.assertIn("data_exports", business)
-        self.assertNotIn("internal_calendar", business)
+        self.assertIn("internal_calendar", business)
         self.assertIn("reservations", plus)
         self.assertIn("internal_calendar", plus)
 
@@ -183,7 +183,7 @@ class EntitlementMatrixTests(unittest.TestCase):
         with patch.object(entitlement_service, "has_entitlement", return_value=False):
             with self.assertRaises(HTTPException) as context:
                 entitlement_service.require_branded_subdomain({"tenant_id": 7})
-            self.assertEqual(context.exception.status_code, 402)
+            self.assertEqual(context.exception.status_code, 403)
 
         entitlement_service.require_branded_subdomain({
             "tenant_id": 7,
@@ -254,7 +254,7 @@ class EntitlementMatrixTests(unittest.TestCase):
         self.assertEqual(state["allowances"], {})
         self.assertTrue(state["review_required"])
 
-    def test_enforcement_enabled_preserves_inactive_tenant_402(self):
+    def test_enforcement_enabled_preserves_inactive_tenant_403(self):
         with patch.dict(environ, {
             "COMMERCIAL_ENTITLEMENTS_ENFORCED": "true",
             "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true",
@@ -265,7 +265,7 @@ class EntitlementMatrixTests(unittest.TestCase):
         ), patch.object(entitlement_service, "_legacy_features", return_value=[]):
             with self.assertRaises(HTTPException) as context:
                 entitlement_service.require_entitlement(7, "website_publish")
-        self.assertEqual(context.exception.status_code, 402)
+        self.assertEqual(context.exception.status_code, 403)
 
     def test_enforcement_disabled_entitles_unmapped_and_canceled_tenants(self):
         for records in (([], []), ([{

@@ -16,6 +16,7 @@ from services.ecommerce_cache_service import (
     invalidate_ecommerce_cache,
 )
 from services.tenant_service import require_active_tenant_member
+from services.entitlement_service import require_entitlement
 
 
 router = APIRouter(prefix="/ecommerce", tags=["Ecommerce"])
@@ -210,6 +211,9 @@ def _require_ecommerce_access(request: Request, response: Response):
     )
     if str(context.role or "").lower() not in {"owner", "admin", "member"}:
         raise HTTPException(status_code=403, detail="Ecommerce access required")
+    entitlements = require_entitlement(context.tenant_id, "ecommerce_management")
+    request.state.commercial_revision = entitlements.get("entitlement_revision", "operator")
+    response.headers["Cache-Control"] = "private, no-store"
     return context
 
 def _require_role(context) -> None:
@@ -391,7 +395,7 @@ def update_store_theme(payload: StoreThemePayload, request: Request, response: R
 def get_catalog(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     try:
-        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v2")
+        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v3", revision=getattr(request.state, "commercial_revision", "unresolved"), user_id=context.user_id, role=context.role)
         catalog, _cache_hit = get_or_create_ecommerce_cache(
             cache_key,
             context.tenant_id,

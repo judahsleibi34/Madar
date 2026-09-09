@@ -1,3 +1,4 @@
+from tests.entitlement_test_support import installed_business_fixture
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -171,6 +172,7 @@ def build_client():
 
 class BuilderSiteMemberTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(installed_business_fixture(7))
         self.client = build_client()
         self.project = {
             "id": "project-1",
