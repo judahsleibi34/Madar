@@ -36,7 +36,7 @@ Release is currently blocked by production notification readiness: four unresolv
 
 ### Resumed validation results
 
-- Authoritative backend workflow:1363 tests, zero failures/errors,14 explicitly skipped database tests executed separately; external attempts/sites empty.
+- Authoritative backend workflow:1364 tests, zero failures/errors,14 explicitly skipped database tests executed separately; external attempts/sites empty.
 - Fresh PostgreSQL migration/ledger suite:14 tests, exact RLS/grants and synthetic ledger dump/restore passed.
 - Frontend:893 tests passed,1 existing skip; lint and production API-origin build passed.
 - Authenticated browser: all four plans, direct API denials, admin MFA, manual receipt and replay passed. Separate Forms UI save persisted one form and zero website pages.
@@ -45,3 +45,7 @@ Release is currently blocked by production notification readiness: four unresolv
 - All52 direct/aliased privileged-client application files are classified; static inventory is an additional completeness gate, not proof that RLS constrains service-role access.
 
 Safe result files live under `/home/madar/master-resume-20260909`; previous evidence remains unchanged.
+
+### Calendar privacy audit follow-up
+
+Calendar bootstrap previously cached private event payloads in each backend process for15 seconds. Permission changes handled by a different process could not invalidate that copy. Bootstrap now rebuilds from current calendar membership and event visibility on each request, retaining no-store HTTP semantics. This adds database reads; a future cache would need a durable permission/data revision before reuse. Route-coverage tests now include every calendar and shared website-settings endpoint. Focused60 authorization/calendar tests and the full backend workflow passed in `backend-calendar`; no external attempts/sites.

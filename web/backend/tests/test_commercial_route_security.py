@@ -6,7 +6,7 @@ from unittest.mock import patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from routes import admin_commercial_routes, ecommerce_routes, builder_routes, public_site_routes
+from routes import admin_commercial_routes, ecommerce_routes, builder_routes, public_site_routes, calendar_routes, website_routes
 from services import entitlement_service
 from tests.entitlement_test_support import EntitlementTestState
 
@@ -72,6 +72,12 @@ class CommercialRouteSecurityTests(unittest.TestCase):
         for route in public_site_routes.router.routes:
             if route.path.endswith('/catalog') or '/catalog/products/' in route.path or route.path.endswith('/orders') or route.path.endswith('/store-profile'):
                 self.assertIn('resolve_public_store_settings',route.endpoint.__code__.co_names,route.path)
+        for route in calendar_routes.router.routes:
+            self.assertIn('require_active_tenant_member', route.endpoint.__code__.co_names, route.path)
+        self.assertIn('require_entitlement', calendar_routes.require_active_tenant_member.__code__.co_names)
+        for route in website_routes.router.routes:
+            self.assertIn('get_website_tenant_context', route.endpoint.__code__.co_names, route.path)
+        self.assertIn('require_any_entitlement', website_routes.get_website_tenant_context.__code__.co_names)
         # The helpers themselves must resolve a commercial decision, including
         # public binding lookup before any catalog cache can return a result.
         self.assertIn('require_entitlement',ecommerce_routes._require_ecommerce_access.__code__.co_names)
@@ -161,3 +167,18 @@ class BuilderDocumentCapabilityTests(unittest.TestCase):
                 with self.assertRaises(HTTPException) as caught:
                     entitlement_service.require_public_runtime_entitlement({"tenant_id": 7, "published_project_id": "published"}, capability)
                 self.assertEqual(caught.exception.status_code, 503)
+
+
+class CalendarPermissionFreshnessTests(unittest.TestCase):
+    def test_privacy_change_on_another_worker_is_visible_without_ttl_delay(self):
+        from datetime import datetime, timezone
+        from starlette.responses import Response
+        context = SimpleNamespace(tenant_id=7, user_id=3, role="member", membership_status="active", user={"timezone": "UTC"})
+        private_event = {"id": "private-event", "title": "Private appointment", "source_type": "local"}
+        start=datetime(2026,9,1,tzinfo=timezone.utc); end=datetime(2026,9,2,tzinfo=timezone.utc)
+        with patch.object(calendar_routes, "require_active_tenant_member", return_value=context), patch.object(calendar_routes, "calendar_feature_enabled", return_value=True), patch.object(calendar_routes, "reservation_events_for_range", return_value=[]), patch.object(calendar_routes, "_calendar_workspace_payload", side_effect=[{"events":[private_event]}, {"events":[]}]) as loader:
+            first=calendar_routes.calendar_bootstrap(object(), Response(), start, end)
+            second=calendar_routes.calendar_bootstrap(object(), Response(), start, end)
+        self.assertEqual(first["events"], [private_event])
+        self.assertEqual(second["events"], [])
+        self.assertEqual(loader.call_count, 2)
