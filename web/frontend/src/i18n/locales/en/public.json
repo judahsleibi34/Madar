@@ -88,7 +88,7 @@
       { "title": "Information we process", "body": "Account details may include name, email, phone, tenant profile data, website settings, uploaded assets, form submissions, billing selections, and operational logs such as IP address and user agent." },
       { "title": "How we use information", "body": "We use this data to authenticate users, operate tenant workspaces, publish customer sites, process contact and form submissions, secure the service, troubleshoot issues, and respond to support requests." },
       { "title": "Cookies and security", "body": "The application uses first-party authentication and CSRF cookies to keep sessions working and protect unsafe requests. Analytics and payment SDK cookies are not currently integrated in the frontend." },
-      { "title": "Third-party services", "body": "The application uses Supabase-backed authentication and data services. Public links may open Instagram, and builder starter content may reference external Unsplash image URLs until replaced by workspace content." },
+      { "title": "Third-party services", "body": "The application uses Supabase-backed authentication and data services. Public links may open Instagram. Builder images are stored as managed workspace assets when uploaded." },
       { "title": "Contact", "body": "For privacy or security questions, contact info@madar.com." }
     ]
   },

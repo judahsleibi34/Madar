@@ -85,6 +85,13 @@ export const getDirectElementMinimumSize = (element) => {
     return { width: 340, height: 520 };
   }
 
+  if (["text", "heading"].includes(element?.type)) {
+    const authoredHeights = Object.values(element.position || {})
+      .map((position) => Number(position?.height))
+      .filter((height) => Number.isFinite(height) && height > 0);
+    return { width: 80, height: Math.min(48, ...authoredHeights) };
+  }
+
   return { width: 80, height: 48 };
 };
 
@@ -854,7 +861,38 @@ export const createDirectPositions = (section, viewportName) => {
   return { positions, height: Math.max(240, rowY + edge) };
 };
 
-export const convertSectionToDirectLayout = (section) => {
+// Read the existing flow before switching to absolute frames. Client rectangles
+// include presentation zoom; stored positions must remain in artboard pixels.
+export const measureAutoSectionLayout = (sectionNode) => {
+  const artboard = sectionNode?.closest(".site-renderer-artboard");
+  const logicalWidth = Number(artboard?.parentElement?.dataset.logicalWidth);
+  const artboardRect = artboard?.getBoundingClientRect();
+  const scale = artboardRect?.width / logicalWidth;
+  if (!sectionNode || !Number.isFinite(scale) || scale <= 0) return null;
+
+  const sectionRect = sectionNode.getBoundingClientRect();
+  const positions = new Map();
+  const textAlignments = new Map();
+  sectionNode.querySelectorAll("[data-builder-content-id]").forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const id = node.dataset.builderContentId;
+    positions.set(id, {
+      x: (rect.left - sectionRect.left) / scale - sectionNode.clientLeft,
+      y: (rect.top - sectionRect.top) / scale - sectionNode.clientTop,
+      width: rect.width / scale,
+      height: rect.height / scale,
+    });
+    textAlignments.set(id, node.ownerDocument.defaultView.getComputedStyle(node).textAlign);
+  });
+  return {
+    positions,
+    textAlignments,
+    height: sectionRect.height / scale - sectionNode.clientTop * 2,
+  };
+};
+
+export const convertSectionToDirectLayout = (section, measuredLayouts = {}) => {
   const shouldUseFullWidth = String(section?.name || "").toLowerCase().includes("login");
   const normalizedLayout = shouldUseFullWidth
     ? { ...(section.layout || {}), width: "full" }
@@ -910,7 +948,7 @@ export const convertSectionToDirectLayout = (section) => {
   const layouts = Object.fromEntries(
     ["desktop", "tablet", "mobile"].map((viewportName) => [
       viewportName,
-      createDirectPositions(section, viewportName),
+      measuredLayouts[viewportName] || createDirectPositions(section, viewportName),
     ])
   );
 
@@ -919,6 +957,7 @@ export const convertSectionToDirectLayout = (section) => {
     mode: "direct",
     layout: {
       ...normalizedLayout,
+      ...(Object.keys(measuredLayouts).length ? { preserveAuthoredSpacing: true } : {}),
       minHeight: Math.max(Number(section.layout?.minHeight) || 0, layouts.desktop.height),
       minHeightByViewport: Object.fromEntries(
         Object.entries(layouts).map(([viewportName, layout]) => [
@@ -931,6 +970,18 @@ export const convertSectionToDirectLayout = (section) => {
     freeElements: elements.map((element) => ({
       ...element,
       mode: "direct",
+      // A converted heading retains its column width instead of spanning the row.
+      ...(element.type === "heading" ? { directWidthMode: "fixed" } : {}),
+      styles: {
+        ...(element.styles || {}),
+        ...(Object.values(measuredLayouts).some((layout) => layout?.positions.has(element.id))
+          ? {
+              width: "100%",
+              textAlign: element.styles?.textAlign || Object.values(measuredLayouts)
+                .find((layout) => layout?.textAlignments?.get(element.id))?.textAlignments.get(element.id),
+            }
+          : {}),
+      },
       position: {
         ...(element.position || {}),
         desktop: layouts.desktop.positions.get(element.id) || createPosition().desktop,

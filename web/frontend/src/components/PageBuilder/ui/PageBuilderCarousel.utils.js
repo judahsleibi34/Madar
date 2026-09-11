@@ -2,36 +2,21 @@ export const fallbackSlides = [
   {
     title: "Design pages",
     description: "Build flexible page sections and arrange content visually.",
-    image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1800&q=90&auto=format&fit=crop",
+    image: "",
   },
   {
     title: "Collect responses",
     description: "Create forms and keep structured requests in one workspace.",
-    image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1800&q=90&auto=format&fit=crop",
+    image: "",
   },
   {
     title: "Manage operations",
     description: "Coordinate reservations, users, and daily work from one place.",
-    image: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1800&q=90&auto=format&fit=crop",
+    image: "",
   },
 ];
 
-export const getHighQualityCarouselImageUrl = (value = "") => {
-  const source = String(value || "").trim();
-  if (!source) return "";
-
-  try {
-    const url = new URL(source);
-    if (url.hostname !== "images.unsplash.com") return source;
-
-    const requestedWidth = Number(url.searchParams.get("w")) || 0;
-    if (requestedWidth < 1800) url.searchParams.set("w", "1800");
-    url.searchParams.set("q", "90");
-    return url.toString();
-  } catch {
-    return source;
-  }
-};
+export const getHighQualityCarouselImageUrl = (value = "") => String(value || "").trim();
 
 export const parseCarouselSlides = (content = "") => {
   const blocks = String(content || "")

@@ -19,6 +19,28 @@ describe("SiteRenderer collision padding", () => {
     vi.stubGlobal("cancelAnimationFrame", () => {});
   });
 
+  it("keeps resolved resize geometry out of the responsive and collision passes", () => {
+    const snapshot = {
+      heading: { x: 39, y: 160, width: 480, height: 110 },
+      image: { x: 510, y: 80, width: 220, height: 300 },
+    };
+    const page = { id: "resize", sections: [{ id: "hero", mode: "direct", layout: { minHeight: 500 }, freeElements: [
+      { id: "heading", type: "heading", styles: {}, position: position(20, 100, 400, 100) },
+      { id: "image", type: "image", styles: {}, position: position(500, 80, 200, 300) },
+    ] }] };
+    const props = { project: { theme: {} }, activePage: page, viewportMode: "tablet", renderElement: (element) => <div>{element.id}</div> };
+    const view = render(<SiteRenderer {...props} interactionPositionsBySection={{ hero: snapshot }} />);
+    const heading = view.container.querySelector('[data-builder-element-id="heading"]');
+    const image = view.container.querySelector('[data-builder-element-id="image"]');
+    expect(heading.style.width).toBe("480px");
+    expect(heading.style.transform).toBe("translate3d(39px, 160px, 0)");
+    const imageBefore = image.style.cssText;
+    view.rerender(<SiteRenderer {...props} interactionPositionsBySection={{ hero: { ...snapshot, heading: { ...snapshot.heading, width: 420 } } }} />);
+    expect(heading.style.width).toBe("420px");
+    expect(heading.style.transform).toBe("translate3d(39px, 160px, 0)");
+    expect(image.style.cssText).toBe(imageBefore);
+  });
+
   it("renders overlapping saved mobile elements in stable order with proportional 15% gaps", () => {
     const page = {
       id: "mobile-page",
@@ -55,6 +77,26 @@ describe("SiteRenderer collision padding", () => {
     expect(Number(card.dataset.logicalY)).toBe(249);
     expect(section.style.minHeight).toBe("517px");
     expect(JSON.stringify(page)).toBe(before);
+  });
+
+  it("preserves converted flow spacing while still resolving actual overlap", () => {
+    const view = render(
+      <SiteRenderer
+        project={{ theme: {} }}
+        activePage={{ id: "converted", sections: [{
+          id: "flow", mode: "direct",
+          layout: { preserveAuthoredSpacing: true },
+          freeElements: [
+            { id: "heading", type: "heading", styles: {}, directWidthMode: "fixed", position: position(40, 20, 400, 100) },
+            { id: "copy", type: "text", styles: {}, position: position(40, 125, 400, 60) },
+            { id: "overlap", type: "text", styles: {}, position: position(40, 160, 400, 60) },
+          ],
+        }] }}
+        renderElement={(element) => <div>{element.id}</div>}
+      />
+    );
+    expect(view.container.querySelector('[data-builder-element-id="copy"]').dataset.logicalY).toBe("125");
+    expect(view.container.querySelector('[data-builder-element-id="overlap"]').dataset.logicalY).toBe("185");
   });
 
   it("keeps a saved two-column row aligned", () => {

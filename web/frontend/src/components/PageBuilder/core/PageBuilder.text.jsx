@@ -159,6 +159,32 @@ export const getEditableTextBlockFormats = (root, fallback = "text") => {
   });
 };
 
+export const getEditableSelectionBlockIndexes = (root, range) => {
+  const blocks = [...root.children].filter((node) => node.hasAttribute("data-builder-text-block"));
+  if (!range || !blocks.length) return [];
+  const boundaryIndex = (container, offset, isEnd) => {
+    if (container === root) {
+      const childOffset = Math.min(root.childNodes.length - 1, Math.max(0, offset - (isEnd && !range.collapsed ? 1 : 0)));
+      const child = root.childNodes[childOffset];
+      const index = blocks.indexOf(child);
+      return index >= 0 ? index : isEnd ? blocks.length - 1 : 0;
+    }
+    const node = container.nodeType === 1 ? container : container.parentElement;
+    const index = blocks.indexOf(node?.closest?.("[data-builder-text-block]"));
+    // A selection ending at the start of the next block excludes that block.
+    if (isEnd && !range.collapsed && offset === 0 && index > 0) {
+      const prefix = root.ownerDocument.createRange();
+      prefix.selectNodeContents(blocks[index]);
+      prefix.setEnd(container, offset);
+      if (!prefix.toString()) return index - 1;
+    }
+    return Math.max(0, index);
+  };
+  const first = boundaryIndex(range.startContainer, range.startOffset, false);
+  const last = Math.max(first, boundaryIndex(range.endContainer, range.endOffset, true));
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index);
+};
+
 export const getTextBlockIndexesForRange = (value, startOffset = 0, endOffset = startOffset) => {
   const text = String(value ?? "");
   const start = Math.max(0, Math.min(Number(startOffset) || 0, text.length));
@@ -351,6 +377,31 @@ export const getFloatingToolbarPlacement = ({
 
   return { left, top, placement };
 };
+export const getSelectionMoveHandlePlacement = ({ elementRect, toolbarRect, horizontalBounds, viewportHeight, placement }) => {
+  const size = 32;
+  const gap = 6;
+  const clamp = (value, min, max) => Math.max(min, Math.min(value, Math.max(min, max)));
+  const candidates = {
+    above: { left: elementRect.right - size, top: elementRect.top - size - gap },
+    below: { left: elementRect.right - size, top: elementRect.bottom + gap },
+    right: { left: elementRect.right + gap, top: elementRect.top },
+    left: { left: elementRect.left - size - gap, top: elementRect.top },
+  };
+  const order = placement === "above" ? ["below", "right", "left", "above"] : ["above", "right", "left", "below"];
+  const overlap = (point, rect) => Math.max(0, Math.min(point.left + size, rect.right) - Math.max(point.left, rect.left))
+    * Math.max(0, Math.min(point.top + size, rect.bottom) - Math.max(point.top, rect.top));
+  return order.map((edge) => {
+    const candidate = candidates[edge];
+    const point = {
+      left: clamp(candidate.left, horizontalBounds.left, horizontalBounds.right - size),
+      top: clamp(candidate.top, 12, viewportHeight - size - 12),
+      edge,
+    };
+    return { ...point, score: overlap(point, toolbarRect) * 10 + overlap(point, elementRect)
+      + Math.abs(point.left - candidate.left) + Math.abs(point.top - candidate.top) };
+  }).sort((a, b) => a.score - b.score)[0];
+};
+
 export const getCanvasTextSelectionRange = (event) => {
   const selection = window.getSelection();
 

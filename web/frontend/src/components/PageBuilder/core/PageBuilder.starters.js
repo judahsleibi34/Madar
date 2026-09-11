@@ -207,7 +207,7 @@ export const showcaseHeroSection = (formId = "") =>
           createElement("image", {
             name: "Hero Image",
             content:
-              "https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1400&auto=format&fit=crop",
+              "",
             styles: {
               borderRadius: "28px",
               alignSelf: "stretch",
@@ -631,7 +631,7 @@ export const buildStarterProject = (starterId = "website") => {
           cta: "Request content",
           formId: form.id,
           imageUrl:
-            "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1400&auto=format&fit=crop",
+            "",
         }),
         industryCardsSection({
           title: "Designed for content operations",
@@ -711,7 +711,7 @@ export const buildStarterProject = (starterId = "website") => {
           cta: "Place an order",
           formId: form.id,
           imageUrl:
-            "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1400&auto=format&fit=crop",
+            "",
         }),
         industryCardsSection({
           title: "Everything a lean commerce flow needs",
@@ -797,7 +797,7 @@ export const buildStarterProject = (starterId = "website") => {
           cta: "Submit employee request",
           formId: form.id,
           imageUrl:
-            "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1400&auto=format&fit=crop",
+            "",
         }),
         metricsSection(),
         industryCardsSection({
@@ -879,7 +879,7 @@ export const buildStarterProject = (starterId = "website") => {
           cta: "Submit field report",
           formId: form.id,
           imageUrl:
-            "https://images.unsplash.com/photo-1552664730-d307ca884978?w=1400&auto=format&fit=crop",
+            "",
         }),
         metricsSection(),
         industryCardsSection({
@@ -1131,7 +1131,7 @@ const pilatesHeroSection = (bookingPageId) =>
         createColumn([
           createElement("image", {
             name: "Pilates Studio",
-            content: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1400&auto=format&fit=crop",
+            content: "",
             styles: { borderRadius: "32px", alignSelf: "stretch" },
           }),
         ]),
@@ -1140,9 +1140,9 @@ const pilatesHeroSection = (bookingPageId) =>
   });
 
 const PILATES_CLASSES = [
-  { title: "Reformer Foundations", description: "A supportive 50-minute class for learning the equipment and building confident fundamentals.", image: "https://images.unsplash.com/photo-1632077804406-188472f1a810?w=1000&auto=format&fit=crop" },
-  { title: "Reformer Flow", description: "A balanced full-body session combining strength, mobility, and smooth transitions.", image: "https://images.unsplash.com/photo-1599901860904-17e6ed7083a0?w=1000&auto=format&fit=crop" },
-  { title: "Mat & Mobility", description: "Low-impact core work and restorative mobility with props, breath, and careful pacing.", image: "https://images.unsplash.com/photo-1575052814086-f385e2e2ad1b?w=1000&auto=format&fit=crop" },
+  { title: "Reformer Foundations", description: "A supportive 50-minute class for learning the equipment and building confident fundamentals.", image: "" },
+  { title: "Reformer Flow", description: "A balanced full-body session combining strength, mobility, and smooth transitions.", image: "" },
+  { title: "Mat & Mobility", description: "Low-impact core work and restorative mobility with props, breath, and careful pacing.", image: "" },
 ];
 
 const pilatesClassesSection = (bookingPageId) =>
@@ -1241,7 +1241,7 @@ const pilatesBookingSection = () =>
           }),
           createElement("image", {
             name: "Reformer class preparation",
-            content: "https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=1200&auto=format&fit=crop",
+            content: "",
             styles: { borderRadius: "24px", alignSelf: "stretch" },
           }),
         ]),
@@ -1255,37 +1255,37 @@ const PILATES_DEMO_PRODUCTS = [
     name: "Studio Grip Socks",
     description: "Soft organic-cotton grip socks for stable reformer sessions.",
     price: "$18",
-    image: "https://images.unsplash.com/photo-1582966772680-860e372bb558?w=900&auto=format&fit=crop",
+    image: "",
   },
   {
     name: "Cork Massage Ball",
     description: "A compact recovery tool for feet, hips, shoulders, and travel days.",
     price: "$14",
-    image: "https://images.unsplash.com/photo-1599447292180-45fd84092ef4?w=900&auto=format&fit=crop",
+    image: "",
   },
   {
     name: "Everyday Studio Bottle",
     description: "A lightweight insulated bottle for class, commute, and weekends.",
     price: "$28",
-    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=900&auto=format&fit=crop",
+    image: "",
   },
   {
     name: "Linen Carry Tote",
     description: "A relaxed studio tote with room for layers, water, and essentials.",
     price: "$32",
-    image: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=900&auto=format&fit=crop",
+    image: "",
   },
   {
     name: "Recovery Tea Blend",
     description: "A caffeine-free botanical blend for a slower post-class ritual.",
     price: "$16",
-    image: "https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?w=900&auto=format&fit=crop",
+    image: "",
   },
   {
     name: "Movement Journal",
     description: "A simple notebook for class notes, goals, and small wins.",
     price: "$20",
-    image: "https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop",
+    image: "",
   },
 ];
 

@@ -212,7 +212,7 @@
   resize: none;
 }
 
-/* Keep both logo actions comfortably inside their own columns. Global action
+/* Keep the logo actions comfortably inside their columns. Global action
    padding is wider than the original fixed tracks, which otherwise crowds the
    right edge of “Apply URL”. */
 .page-builder .site-chrome-workspace .site-chrome-logo-control {
@@ -221,8 +221,7 @@
 }
 
 .page-builder .site-chrome-workspace :is(
-  .site-chrome-logo-apply,
-  .site-chrome-logo-upload
+    .site-chrome-logo-upload
 ) {
   box-sizing: border-box;
   padding-inline: 14px !important;

@@ -29,13 +29,10 @@ describe("workspace card carousel content", () => {
     }]);
   });
 
-  it("upgrades existing Unsplash card URLs without changing uploaded assets", () => {
-    expect(getHighQualityCarouselImageUrl(
-      "https://images.unsplash.com/photo-example?w=900&auto=format&fit=crop"
-    )).toContain("w=1800");
-    expect(getHighQualityCarouselImageUrl(
-      "https://images.unsplash.com/photo-example?w=900&auto=format&fit=crop"
-    )).toContain("q=90");
+  it("preserves legacy URLs and managed uploaded assets without rewriting them", () => {
+    expect(getHighQualityCarouselImageUrl("https://example.com/legacy.jpg")).toBe(
+      "https://example.com/legacy.jpg"
+    );
     expect(getHighQualityCarouselImageUrl(
       "/api/uploads/tenant_1/builder_assets/example.png"
     )).toBe("/api/uploads/tenant_1/builder_assets/example.png");

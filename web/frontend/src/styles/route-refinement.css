@@ -4557,14 +4557,6 @@ body.theme-dark .page-builder .workspace-tabs button.active,
   -webkit-text-fill-color: var(--builder-text) !important;
 }
 
-.page-builder .builder-inspector .carousel-image-url-control,
-.page-builder .builder-inspector .carousel-image-url-control > summary {
-  background: transparent !important;
-  border-color: transparent !important;
-  color: var(--builder-text) !important;
-  -webkit-text-fill-color: var(--builder-text) !important;
-  box-shadow: none !important;
-}
 
 .page-builder .builder-inspector .carousel-slide-card-body > .danger-lite {
   background: color-mix(in srgb, var(--theme-danger) 10%, var(--builder-surface-raised)) !important;

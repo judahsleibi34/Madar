@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildStarterProject, createInitialProject, PILATES_DEMO_THEME } from "./PageBuilder.starters";
+import { parseCarouselSlides } from "../ui/PageBuilderCarousel.utils";
 
 const getElements = (page) => (page?.sections || []).flatMap((section) => [
   ...(section.freeElements || []),
@@ -47,27 +48,27 @@ describe("Pilates demo starter", () => {
     expect(studioElements.filter((element) => element.type === "image")).toHaveLength(1);
     expect(bookingElements.filter((element) => element.type === "image")).toHaveLength(1);
     const classGallery = studioElements.find((element) => element.type === "carousel");
-    const gallerySlides = classGallery.content.split("\n\n");
+    const gallerySlides = parseCarouselSlides(classGallery.content);
     expect(gallerySlides).toHaveLength(3);
-    expect(gallerySlides.every((slide) => /^.+\n.+\nhttps:\/\//.test(slide))).toBe(true);
+    expect(gallerySlides.every((slide) => slide.image === "")).toBe(true);
 
     const shopElements = getElements(project.pages[2]);
     const shopGallery = shopElements.find((element) => element.type === "carousel");
-    const productSlides = shopGallery.content.split("\n\n");
+    const productSlides = parseCarouselSlides(shopGallery.content);
     expect(productSlides).toHaveLength(6);
-    expect(productSlides.every((slide) => /^.+\n.+\nhttps:\/\//.test(slide))).toBe(true);
+    expect(productSlides.every((slide) => slide.image === "")).toBe(true);
     expect(shopGallery.content).toContain("Studio Grip Socks");
   });
 
-  it("does not leave visible template components empty", () => {
+  it("keeps copy populated while images wait for managed uploads", () => {
     const project = buildStarterProject("pilates");
-    const contentTypes = new Set(["heading", "text", "card", "carousel", "list", "button", "image"]);
+    const contentTypes = new Set(["heading", "text", "card", "carousel", "list", "button"]);
     const visibleElements = project.pages.flatMap(getElements).filter((element) => contentTypes.has(element.type));
 
     expect(visibleElements.length).toBeGreaterThan(0);
     expect(visibleElements.every((element) => String(element.content || "").trim().length > 0)).toBe(true);
-    expect(visibleElements.filter((element) => element.type === "image").every((element) => (
-      /^https:\/\//.test(element.content)
+    expect(project.pages.flatMap(getElements).filter((element) => element.type === "image").every((element) => (
+      element.content === ""
     ))).toBe(true);
   });
 });

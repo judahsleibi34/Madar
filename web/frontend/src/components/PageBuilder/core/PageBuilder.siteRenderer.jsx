@@ -114,6 +114,7 @@ const SiteRenderer = forwardRef(function SiteRenderer({
   className = "",
   canvasStyle = {},
   getDirectElementPosition,
+  interactionPositionsBySection,
   getDirectCanvasProps,
   getDirectFrameProps,
   renderDirectElementOverlay,
@@ -254,10 +255,13 @@ const SiteRenderer = forwardRef(function SiteRenderer({
           entry.element.id,
           { ...entry.position },
         ]))
-      : resolveDirectElementCollisionPadding(orderedEntries, RESPONSIVE_ELEMENT_GAP_RATIO);
+      : resolveDirectElementCollisionPadding(
+          orderedEntries,
+          section.layout?.preserveAuthoredSpacing ? 0 : RESPONSIVE_ELEMENT_GAP_RATIO
+        );
     return [
       section.id,
-      resolvedPositions,
+      { ...resolvedPositions, ...interactionPositionsBySection?.[section.id] },
     ];
   }));
   const resolvedSectionHeights = Object.fromEntries(sections.map((section) => {
@@ -350,7 +354,9 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                     const usesIntrinsicHeight = intrinsicHeightElementTypes.has(element.type);
                     const frameStyle = {
                       ...getDirectElementFrameStyle({
-                        element: layoutElement,
+                        element: interactionPositionsBySection?.[section.id]?.[element.id]
+                          ? { ...layoutElement, directWidthMode: "fixed" }
+                          : layoutElement,
                         position: effectivePosition,
                         viewportWidth: logicalWidth,
                         sectionHeight: logicalHeight,

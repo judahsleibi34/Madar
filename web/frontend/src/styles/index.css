@@ -42,6 +42,8 @@
 @import "/src/styles/theme-transition.css";
 /* Canonical Page Builder geometry must follow legacy route refinements. */
 @import "./admin/PageBuilder/workspace-stability.css";
+@import "./admin/PageBuilder/selection-toolbar.css";
+@import "./admin/PageBuilder/workspace-controls.css";
 @import "/src/styles/admin/PageBuilder/footer-responsive.css";
 
 /* ============================================================

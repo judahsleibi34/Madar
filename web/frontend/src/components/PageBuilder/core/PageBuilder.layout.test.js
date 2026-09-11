@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   compactDirectSectionAfterElementRemoval,
+  convertSectionToDirectLayout,
+  measureAutoSectionLayout,
   applyEditorialCardSizingToSections,
   constrainResizeToSiblingElements,
   getDirectElementMinimumSize,
@@ -487,4 +489,49 @@ describe("page builder scaled canvas coordinates", () => {
 
     expect(result).toMatchObject({ x: 260, width: 1140, height: 570 });
   });
+});
+
+
+describe("dragging auto-layout sections", () => {
+  it("preserves zoomed two-column geometry and a heading's wrapping width", () => {
+    const camera = document.createElement("div");
+    camera.dataset.logicalWidth = "1200";
+    camera.innerHTML = '<div class="site-renderer-artboard"><section><div data-builder-content-id="heading" style="text-align: right"></div><div data-builder-content-id="image"></div></section></div>';
+    const artboard = camera.firstElementChild;
+    const sectionNode = artboard.firstElementChild;
+    artboard.getBoundingClientRect = () => ({ width: 600 });
+    sectionNode.getBoundingClientRect = () => ({ left: 100, top: 200, height: 320 });
+    sectionNode.children[0].getBoundingClientRect = () => ({ left: 130, top: 240, width: 240, height: 70 });
+    sectionNode.children[1].getBoundingClientRect = () => ({ left: 410, top: 225, width: 250, height: 200 });
+    const source = {
+      mode: "auto",
+      rows: [{ columns: [
+        { elements: [{ id: "heading", type: "heading", styles: {} }] },
+        { elements: [{ id: "image", type: "image", styles: {} }] },
+      ] }],
+    };
+    const measured = measureAutoSectionLayout(sectionNode);
+    const result = convertSectionToDirectLayout(source, { desktop: measured });
+    expect(result.freeElements[0].position.desktop).toEqual({ x: 60, y: 80, width: 480, height: 140 });
+    expect(result.freeElements[1].position.desktop).toEqual({ x: 620, y: 50, width: 500, height: 400 });
+    expect(result.freeElements[0].directWidthMode).toBe("fixed");
+    expect(result.freeElements[0].styles.textAlign).toBe("right");
+    expect(result.layout.minHeightByViewport.desktop).toBe(640);
+    expect(result.freeElements[0].position.mobile.width).toBeGreaterThan(0);
+    expect(source.mode).toBe("auto");
+    expect(source.rows[0].columns[0].elements[0].position).toBeUndefined();
+  });
+
+  it("does not fabricate DOM measurements when the canvas is not measurable", () => {
+    expect(measureAutoSectionLayout(null)).toBeNull();
+    expect(measureAutoSectionLayout(document.createElement("section"))).toBeNull();
+  });
+});
+
+
+it("keeps a one-line component's authored height when dragging", () => {
+  expect(getDirectElementMinimumSize({
+    type: "text", position: { desktop: { height: 29.5 } },
+  }).height).toBe(29.5);
+  expect(getDirectElementMinimumSize({ type: "text" }).height).toBe(48);
 });
