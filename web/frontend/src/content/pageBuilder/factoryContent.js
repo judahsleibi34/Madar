@@ -58,7 +58,7 @@ export const factoryContent = {
       photoProofing: {
         name: "Photo Proofing",
         content:
-          "Portrait by the window\nNatural light portrait\nhttps://images.unsplash.com/photo-1519741497674-611481863552?w=1400&q=88&auto=format&fit=crop\n\nGolden hour walk\nOutdoor couple session\nhttps://images.unsplash.com/photo-1606800052052-a08af7148866?w=1400&q=88&auto=format&fit=crop\n\nQuiet moment\nEditorial wedding detail\nhttps://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=1400&q=88&auto=format&fit=crop\n\nCelebration\nA candid favorite from the session\nhttps://images.unsplash.com/photo-1537633552985-df8429e8048b?w=1400&q=88&auto=format&fit=crop",
+          "Portrait by the window\nNatural light portrait\n\n\nGolden hour walk\nOutdoor couple session\n\n\nQuiet moment\nEditorial wedding detail\n\n\nCelebration\nA candid favorite from the session\n",
         settings: {
           title: "Choose your favorite photos",
           description: "Drag right to keep a photo or left to pass. You can undo any choice.",
@@ -68,12 +68,12 @@ export const factoryContent = {
       card: {
         name: "Card Carousel",
         content:
-          "Starter card\nUse this for services, offers, instructions, or dashboard blocks.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop\n\nSecond card\nRename every title, description, and image from the inspector.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop",
+          "Starter card\nUse this for services, offers, instructions, or dashboard blocks.\n\n\nSecond card\nRename every title, description, and image from the inspector.\n",
       },
       carousel: {
         name: "Card Carousel",
         content:
-          "Design pages\nBuild flexible page sections and arrange content visually.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1800&q=90&auto=format&fit=crop\n\nCollect responses\nCreate forms and keep structured requests in one workspace.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1800&q=90&auto=format&fit=crop\n\nManage operations\nCoordinate reservations, users, and daily work from one place.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1800&q=90&auto=format&fit=crop",
+          "Design pages\nBuild flexible page sections and arrange content visually.\n\n\nCollect responses\nCreate forms and keep structured requests in one workspace.\n\n\nManage operations\nCoordinate reservations, users, and daily work from one place.\n",
       },
       logoSlider: {
         name: "Trusted by leading brands",
@@ -85,32 +85,32 @@ export const factoryContent = {
       carouselCards: {
         name: "Card Carousel",
         content:
-          "Featured service\nPresent one offer at a time with a clean card and supporting image.\nhttps://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&auto=format&fit=crop\n\nProduct highlight\nUse this variant for offers, collections, packages, or case studies.\nhttps://images.unsplash.com/photo-1497215728101-856f4ea42174?w=1200&auto=format&fit=crop\n\nCustomer story\nMove through compact slides without taking over the full page section.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&auto=format&fit=crop",
+          "Featured service\nPresent one offer at a time with a clean card and supporting image.\n\n\nProduct highlight\nUse this variant for offers, collections, packages, or case studies.\n\n\nCustomer story\nMove through compact slides without taking over the full page section.\n",
       },
       carouselSplit: {
         name: "Split Carousel",
         content:
-          "Strategy and execution\nPair focused text with a strong image area for services or announcements.\nhttps://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&auto=format&fit=crop\n\nBuilt for teams\nShow process steps, onboarding, or operational features in a balanced layout.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop\n\nReady to publish\nUse the same slide format: title, description, and image URL.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop",
+          "Strategy and execution\nPair focused text with a strong image area for services or announcements.\n\n\nBuilt for teams\nShow process steps, onboarding, or operational features in a balanced layout.\n\n\nReady to publish\nUse the same slide format: title, description, and an uploaded image.\n",
       },
       carouselSpotlight: {
         name: "Spotlight Carousel",
         content:
-          "A brighter idea\nPut one bold story in the spotlight with cinematic depth.\nhttps://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1400&auto=format&fit=crop\n\nShape the future\nLayer luminous color, oversized type, and focused imagery.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1400&auto=format&fit=crop\n\nMake it memorable\nChoose a different image for every story directly in the inspector.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1400&auto=format&fit=crop",
+          "A brighter idea\nPut one bold story in the spotlight with cinematic depth.\n\n\nShape the future\nLayer luminous color, oversized type, and focused imagery.\n\n\nMake it memorable\nChoose a different image for every story directly in the inspector.\n",
       },
       carouselStack: {
         name: "Stacked Cards Carousel",
         content:
-          "Behind the scenes\nA tactile stack of stories that feels draggable and alive.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&auto=format&fit=crop\n\nThe next chapter\nClick the peeking cards or use the controls to move through the stack.\nhttps://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&auto=format&fit=crop\n\nBuilt together\nPerfect for teams, case studies, portfolios, and product collections.\nhttps://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&auto=format&fit=crop",
+          "Behind the scenes\nA tactile stack of stories that feels draggable and alive.\n\n\nThe next chapter\nClick the peeking cards or use the controls to move through the stack.\n\n\nBuilt together\nPerfect for teams, case studies, portfolios, and product collections.\n",
       },
       carouselEditorial: {
         name: "Editorial Carousel",
         content:
-          "Issue No. 01\nAn editorial layout with dramatic numbering and gallery-like composition.\nhttps://images.unsplash.com/photo-1497215842964-222b430dc094?w=1400&auto=format&fit=crop\n\nIssue No. 02\nUse it for campaigns, reports, interviews, or curated project stories.\nhttps://images.unsplash.com/photo-1497366216548-37526070297c?w=1400&auto=format&fit=crop\n\nIssue No. 03\nEvery title, caption, and image remains yours to customize.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1400&auto=format&fit=crop",
+          "Issue No. 01\nAn editorial layout with dramatic numbering and gallery-like composition.\n\n\nIssue No. 02\nUse it for campaigns, reports, interviews, or curated project stories.\n\n\nIssue No. 03\nEvery title, caption, and image remains yours to customize.\n",
       },
       circularGallery: {
         name: "Circular Gallery",
         content:
-          "Studio workspace\nA warm workspace for planning and operations.\nhttps://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&auto=format&fit=crop\n\nTeam session\nPeople collaborating around a product launch.\nhttps://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&auto=format&fit=crop\n\nProduct desk\nClean desk scene with business tools.\nhttps://images.unsplash.com/photo-1497215728101-856f4ea42174?w=1200&auto=format&fit=crop\n\nService meeting\nClient service conversation in progress.\nhttps://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&auto=format&fit=crop\n\nAnalytics view\nDashboard and operations review moment.\nhttps://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&auto=format&fit=crop\n\nLaunch planning\nPlanning board for growth and execution.\nhttps://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop",
+          "Studio workspace\nA warm workspace for planning and operations.\n\n\nTeam session\nPeople collaborating around a product launch.\n\n\nProduct desk\nClean desk scene with business tools.\n\n\nService meeting\nClient service conversation in progress.\n\n\nAnalytics view\nDashboard and operations review moment.\n\n\nLaunch planning\nPlanning board for growth and execution.\n",
       },
       list: {
         name: "List",

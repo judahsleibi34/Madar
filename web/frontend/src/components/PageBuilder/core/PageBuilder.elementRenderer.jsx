@@ -98,7 +98,8 @@ export const createElementRenderer = ({
       },
       onKeyUp: (event) => {
         if (field === "content" && ["heading", "text"].includes(element.type)) {
-          captureCanvasTextSelection?.(event, field, itemIndex, element.id, { silent: true });
+          const selectedAll = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a";
+          captureCanvasTextSelection?.(event, field, itemIndex, element.id, { silent: !selectedAll });
         }
       },
       onFocus: (event) => {
@@ -191,9 +192,13 @@ export const createElementRenderer = ({
     const isSelected = selected.type === "element" && selected.id === element.id;
 
     const commonProps = {
+      "data-builder-content-id": element.id,
       className: `builder-element builder-element-${element.type} ${isSelected ? "is-selected" : ""}`,
       style: isFree ? getFreeElementStyle(element) : getElementStyle(element),
-      onPointerDown: (event) => startDrag(event, element),
+      onPointerDown: (event) => {
+        event.currentTarget.dataset.builderSelectBody = String(!isSelected);
+        startDrag(event, element);
+      },
       onClick: (event) => {
         event.stopPropagation();
         if (!preview) {
@@ -213,6 +218,21 @@ export const createElementRenderer = ({
             });
           }
           setSelected({ type: "element", id: element.id });
+          const selectBody = event.currentTarget.dataset.builderSelectBody === "true" || !isSelected;
+          delete event.currentTarget.dataset.builderSelectBody;
+          if (selectBody && ["heading", "text"].includes(element.type)
+            && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+            const selection = window.getSelection();
+            // Keep a range the user just dragged; a plain first click selects the body.
+            if (selection && (selection.isCollapsed || !event.currentTarget.contains(selection.anchorNode))) {
+              event.currentTarget.focus({ preventScroll: true });
+              const range = document.createRange();
+              range.selectNodeContents(event.currentTarget);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+            captureCanvasTextSelection?.(event, "content", null, element.id);
+          }
         }
       },
     };

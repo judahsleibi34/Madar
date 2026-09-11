@@ -445,6 +445,94 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     expect(screen.queryByText("We could not open this page")).toBeNull();
   });
 
+  it.each(["first click", "select all"])("formats every selected line as H1 after %s", async (selectionMethod) => {
+    const schema = {
+      ...schemaA,
+      pages: [{ ...schemaA.pages[0], sections: [{ ...schemaA.pages[0].sections[0],
+        freeElements: [{ id: "mixed-heading", type: "heading", name: "Mixed heading",
+          content: "Empowering Change\nmakers", textBlockFormats: ["h1", "text"],
+          styles: { fontSize: "46px" } }],
+      }] }],
+    };
+    apiMocks.fetchBuilderProject.mockResolvedValueOnce({
+      id: projectId, name: schema.name, slug: schema.slug, status: "draft",
+      draft_revision: 100, draft_schema: schema, published_revision: 0,
+      published_version: 0, published_schema: schema,
+    });
+    const mounted = render(
+      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+        <PageBuilder user={user} />
+      </MemoryRouter>
+    );
+    await screen.findByLabelText("Page name");
+    const frame = mounted.container.querySelector('[data-builder-element-id="mixed-heading"]');
+    let editor = frame.querySelector('[contenteditable="true"]');
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    if (selectionMethod === "first click") {
+      const focus = vi.spyOn(editor, "focus");
+      fireEvent.pointerDown(editor);
+      fireEvent.click(editor);
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+      expect(selection.toString()).toBe("Empowering Changemakers");
+      expect(editor.classList.contains("is-selected")).toBe(true);
+    } else {
+      fireEvent.pointerDown(editor);
+      fireEvent.click(editor);
+      editor = frame.querySelector('[contenteditable="true"]');
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      fireEvent.keyUp(editor, { key: "a", ctrlKey: true });
+    }
+    const boundary = mounted.container.querySelector('[data-selection-for="mixed-heading"]');
+    expect(boundary.parentElement).toBe(frame.parentElement);
+    expect(boundary.previousElementSibling).toBe(frame);
+    expect(boundary.querySelector('[aria-label="Resize Mixed heading"]')).not.toBeNull();
+    expect(screen.getAllByRole("button", { name: "Move Mixed heading" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Move component" })).toBeNull();
+    const parent = frame.parentElement;
+    Object.defineProperties(parent, {
+      clientWidth: { configurable: true, value: 1200 },
+      clientHeight: { configurable: true, value: 720 },
+      offsetWidth: { configurable: true, value: 1200 },
+      offsetHeight: { configurable: true, value: 720 },
+    });
+    parent.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1200, bottom: 720, width: 1200, height: 720 });
+    Object.defineProperties(frame, {
+      offsetWidth: { configurable: true, get: () => Number.parseFloat(frame.style.width) },
+      offsetHeight: { configurable: true, get: () => Number.parseFloat(frame.style.height) },
+    });
+    const initialBox = { transform: frame.style.transform, width: frame.style.width, height: frame.style.height };
+    const resize = boundary.querySelector('[aria-label="Resize Mixed heading"]');
+    fireEvent.pointerDown(resize, { pointerId: 4, clientX: 500, clientY: 200 });
+    expect({ transform: frame.style.transform, width: frame.style.width, height: frame.style.height }).toEqual(initialBox);
+    fireEvent.pointerUp(resize, { pointerId: 4, clientX: 500, clientY: 200 });
+    expect({ transform: frame.style.transform, width: frame.style.width, height: frame.style.height }).toEqual(initialBox);
+    expect(screen.getByRole("button", { name: "Undo last builder change" }).disabled).toBe(true);
+    const style = await screen.findByLabelText("Text style");
+    expect(style.value).toBe("mixed");
+    fireEvent.pointerDown(style);
+    fireEvent.blur(editor);
+    fireEvent.change(style, { target: { value: "h1" } });
+    fireEvent.pointerUp(style);
+    await waitFor(() => {
+      expect([...frame.querySelectorAll("[data-builder-text-block]")]
+        .map((block) => block.dataset.builderTextBlock)).toEqual(["h1", "h1"]);
+    });
+    // Subsequent clicks allow caret placement instead of reselecting the body.
+    const updatedEditor = frame.querySelector('[contenteditable="true"]');
+    const caret = document.createRange();
+    caret.setStart(updatedEditor.firstChild.firstChild, 3);
+    caret.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(caret);
+    fireEvent.pointerDown(updatedEditor);
+    fireEvent.click(updatedEditor);
+    expect(selection.isCollapsed).toBe(true);
+  });
+
   it("applies bullets only to the selected text line", async () => {
     const lineSchema = {
       ...schemaA,
@@ -655,11 +743,21 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     fireEvent.mouseUp(editor);
 
     const moveHandle = await screen.findByRole("button", { name: "Move component" });
+    const sectionNode = editor.closest(".site-section");
+    const artboard = editor.closest(".site-renderer-artboard");
+    const logicalWidth = Number(artboard.parentElement.dataset.logicalWidth);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(logicalWidth);
+    artboard.getBoundingClientRect = () => ({ width: logicalWidth / 2 });
+    sectionNode.getBoundingClientRect = () => ({ left: 100, top: 200, height: 320 });
+    editor.getBoundingClientRect = () => ({ left: 150, top: 230, width: 220, height: 30 });
     fireEvent.pointerDown(moveHandle, { pointerId: 9, clientX: 220, clientY: 180 });
 
     await waitFor(() => {
-      expect(mounted.container.querySelector('[data-builder-element-id="generated-auto-text"]'))
-        .not.toBeNull();
+      const convertedFrame = mounted.container.querySelector('[data-builder-element-id="generated-auto-text"]');
+      expect(convertedFrame).not.toBeNull();
+      expect(Number(convertedFrame.dataset.logicalX)).toBe(100);
+      expect(Number(convertedFrame.dataset.logicalY)).toBe(60);
+      expect(Number(convertedFrame.dataset.logicalWidth)).toBe(440);
       expect(mounted.container.querySelector(".site-section.direct-layout-section"))
         .not.toBeNull();
     });

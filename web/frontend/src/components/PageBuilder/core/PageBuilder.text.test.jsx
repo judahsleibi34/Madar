@@ -5,9 +5,11 @@ import {
   collapseAccidentalTextDuplication,
   createDomTextRange,
   getFloatingToolbarPlacement,
+  getSelectionMoveHandlePlacement,
   getEditableTextWithLineBreaks,
   getTextBlockFormats,
   getTextBlockIndexesForRange,
+  getEditableSelectionBlockIndexes,
   replaceRichTextRangeStyle,
   renderRichText,
   renderRichTextBlocks,
@@ -230,5 +232,66 @@ describe("renderRichText", () => {
 
     expect(collapseAccidentalTextDuplication(original.repeat(3))).toBe(original);
     expect(collapseAccidentalTextDuplication(original)).toBe(original);
+  });
+});
+
+
+describe("selection move handle placement", () => {
+  const bounds = { left: 12, right: 800 };
+  it("uses the opposite edge from the formatting toolbar", () => {
+    const result = getSelectionMoveHandlePlacement({
+      elementRect: { left: 100, right: 400, top: 200, bottom: 260 },
+      toolbarRect: { left: 50, right: 550, top: 80, bottom: 180 },
+      horizontalBounds: bounds, viewportHeight: 600, placement: "above",
+    });
+    expect(result).toMatchObject({ left: 368, top: 266, edge: "below" });
+  });
+  it("uses a side edge when the component touches both viewport edges", () => {
+    const result = getSelectionMoveHandlePlacement({
+      elementRect: { left: 100, right: 400, top: 0, bottom: 600 },
+      toolbarRect: { left: 100, right: 400, top: 12, bottom: 112 },
+      horizontalBounds: bounds, viewportHeight: 600, placement: "above",
+    });
+    expect(result.edge).toBe("right");
+    expect(result.left).toBeGreaterThan(400);
+    expect(result.top).toBeGreaterThanOrEqual(12);
+  });
+  it("keeps the handle inside the canvas at the top-right corner", () => {
+    const result = getSelectionMoveHandlePlacement({
+      elementRect: { left: 650, right: 820, top: 5, bottom: 65 },
+      toolbarRect: { left: 300, right: 800, top: 75, bottom: 175 },
+      horizontalBounds: bounds, viewportHeight: 600, placement: "below",
+    });
+    expect(result.left).toBeGreaterThanOrEqual(12);
+    expect(result.left + 32).toBeLessThanOrEqual(800);
+    expect(result.top).toBeGreaterThanOrEqual(12);
+    expect(result.edge).toBe("left");
+  });
+});
+
+
+describe("editable selection block boundaries", () => {
+  it("includes every block when the editable container is selected", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<h1 data-builder-text-block="h1">First</h1><p data-builder-text-block="text">Second</p>';
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    expect(getEditableSelectionBlockIndexes(root, range)).toEqual([0, 1]);
+  });
+  it("targets only the last block for a caret at the container end", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<p data-builder-text-block="text">First</p><p data-builder-text-block="text">Second</p>';
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    range.collapse(false);
+    expect(getEditableSelectionBlockIndexes(root, range)).toEqual([1]);
+  });
+  it("excludes the next block when selection ends at its first character", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<p data-builder-text-block="text">First</p><p data-builder-text-block="text">Second</p>';
+    const range = document.createRange();
+    range.setStart(root.firstChild.firstChild, 0);
+    range.setEnd(root.lastChild.firstChild, 0);
+    expect(getEditableSelectionBlockIndexes(root, range)).toEqual([0]);
   });
 });
